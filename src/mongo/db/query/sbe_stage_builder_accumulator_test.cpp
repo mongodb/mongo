@@ -1652,7 +1652,7 @@ TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     std::vector<BSONObj> groupSpecs;
     groupSpecs.reserve(testCases.size());
-    for (auto testCase : testCases) {
+    for (const auto& testCase : testCases) {
         auto groupSpec = fromjson(fmt::sprintf("{%s}", testCase));
         runSbeGroupCompatibleFlagTest({groupSpec}, expCtx);
         groupSpecs.push_back(groupSpec);
@@ -1671,7 +1671,7 @@ TEST_F(SbeStageBuilderGroupTest, SbeIncompatibleExpressionInGroup) {
     };
 
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
-    for (auto testCase : testCases) {
+    for (const auto& testCase : testCases) {
         auto groupSpec = fromjson(fmt::sprintf("{%s}", testCase));
         runSbeIncompatibleGroupSpecTest({groupSpec}, expCtx);
     }

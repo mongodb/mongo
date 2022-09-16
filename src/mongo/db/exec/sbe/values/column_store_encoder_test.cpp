@@ -368,7 +368,7 @@ TEST(SBEColumnStoreEncoder, ColumnsWithEmbeddedBSONElements) {
     value::ColumnStoreEncoder encoder;
     auto cellCursor = cellView.subcellValuesGenerator(&encoder);
 
-    for (auto comparison : testComparisons) {
+    for (const auto& comparison : testComparisons) {
         auto cellValue = cellCursor.nextValue();
         ASSERT(cellValue);
 

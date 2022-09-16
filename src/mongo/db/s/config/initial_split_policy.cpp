@@ -764,7 +764,7 @@ BSONObjSet ReshardingSplitPolicy::_extractSplitPointsFromZones(const ShardKeyPat
         return splitPoints;
     }
 
-    for (auto zone : *_zones) {
+    for (const auto& zone : *_zones) {
         splitPoints.insert(zone.getMinKey());
         splitPoints.insert(zone.getMaxKey());
     }

@@ -253,7 +253,7 @@ Status validateRecipientNodesForShardSplit(const ShardSplitDonorDocument& stateD
 
     stdx::unordered_set<std::string> uniqueTagValues;
     const auto& tagConfig = localConfig.getTagConfig();
-    for (auto member : recipientNodes) {
+    for (const auto& member : recipientNodes) {
         for (repl::MemberConfig::TagIterator it = member.tagsBegin(); it != member.tagsEnd();
              ++it) {
             if (tagConfig.getTagKey(*it) == *recipientTagName) {

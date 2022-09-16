@@ -337,7 +337,7 @@ std::unique_ptr<ColumnKeyGenerator> makeKeyGen(BSONObj columnstoreProjection = B
 
 ProjPairVector expectedProjPairs(std::vector<std::pair<BSONObj, StringSet>> bsonPairs) {
     ProjPairVector projPairs;
-    for (auto [projection, fields] : bsonPairs) {
+    for (const auto& [projection, fields] : bsonPairs) {
         projPairs.push_back({makeKeyGen(projection), fields});
     }
     return projPairs;

@@ -47,7 +47,7 @@ bool validateValue(const Value& val) {
 Value convertNonFiniteInputValue(Value value) {
     int posCnt = 0, negCnt = 0, nanCnt = 0;
     bool isDecimal = false;
-    for (auto val : value.getArray()) {
+    for (const auto& val : value.getArray()) {
         if (val.isNaN()) {
             nanCnt++;
         } else if (val.getType() == NumberDecimal) {

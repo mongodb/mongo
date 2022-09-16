@@ -95,10 +95,10 @@ Status ensureNoNewlyAddedMembers(const ReplSetConfig& config) {
 Status validateSingleNodeChange(const ReplSetConfig& oldConfig, const ReplSetConfig& newConfig) {
     // Add MemberId of voting nodes from each config into respective sets.
     std::set<MemberId> oldIdSet, newIdSet;
-    for (MemberConfig m : oldConfig.votingMembers()) {
+    for (const MemberConfig& m : oldConfig.votingMembers()) {
         oldIdSet.insert(m.getId());
     }
-    for (MemberConfig m : newConfig.votingMembers()) {
+    for (const MemberConfig& m : newConfig.votingMembers()) {
         newIdSet.insert(m.getId());
     }
 

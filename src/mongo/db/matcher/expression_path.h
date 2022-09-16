@@ -91,7 +91,7 @@ public:
     void applyRename(const StringMap<std::string>& renameList) {
         size_t renamesFound = 0u;
         std::string rewrittenPath;
-        for (auto rename : renameList) {
+        for (const auto& rename : renameList) {
             if (rename.first == path()) {
                 rewrittenPath = rename.second;
 

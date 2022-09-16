@@ -120,7 +120,7 @@ public:
     void insertTimedBatch(std::vector<std::pair<BSONObj, Milliseconds>> timedBatch,
                           bool verifyBatchTimeWithDefaultTargetBatchTimeMS = true) {
         Milliseconds totalDurationOfBatch{0};
-        for (auto [doc, duration] : timedBatch) {
+        for (const auto& [doc, duration] : timedBatch) {
             _client.insert(nss.ns(), doc);
             _opObserver->setDeleteRecordDurationMillis(doc, duration);
             totalDurationOfBatch += duration;

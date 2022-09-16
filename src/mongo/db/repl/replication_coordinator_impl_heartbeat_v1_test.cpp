@@ -1112,7 +1112,7 @@ TEST_F(ReplCoordHBV1ReconfigTest,
     // from the config object. This simulates the case of receiving a heartbeat response from a 4.2
     // node.
     BSONObjBuilder finalRes;
-    for (auto field : origResObj.getFieldNames<std::set<std::string>>()) {
+    for (const auto& field : origResObj.getFieldNames<std::set<std::string>>()) {
         if (field == "t") {
             continue;
         } else if (field == "config") {

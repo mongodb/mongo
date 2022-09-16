@@ -167,7 +167,7 @@ void checkForHolesAndOverlapsInChunks(std::vector<ReshardedChunk>& chunks,
                                                         keyPattern.globalMax()));
 
     boost::optional<BSONObj> prevMax = boost::none;
-    for (auto chunk : chunks) {
+    for (const auto& chunk : chunks) {
         if (prevMax) {
             uassert(ErrorCodes::BadValue,
                     "Chunk ranges must be contiguous",
@@ -213,7 +213,7 @@ void checkForOverlappingZones(std::vector<ReshardingZoneType>& zones) {
         });
 
     boost::optional<BSONObj> prevMax = boost::none;
-    for (auto zone : zones) {
+    for (const auto& zone : zones) {
         if (prevMax) {
             uassert(ErrorCodes::BadValue,
                     "Zone ranges must not overlap",

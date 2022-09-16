@@ -56,7 +56,7 @@ protected:
     // Pushes BSONObjs from the given vector into the given MockStage. Each empty BSONObj in
     // the vector causes a NEED_TIME to be queued up at that point instead of a result.
     void queueData(const std::vector<BSONObj>& results, MockStage* mockStage) {
-        for (auto result : results) {
+        for (const auto& result : results) {
             if (result.isEmpty()) {
                 mockStage->enqueueStateCode(PlanStage::NEED_TIME);
                 continue;
@@ -130,7 +130,7 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialSucceeds) {
     ASSERT_FALSE(trialStage->pickedBackupPlan());
 
     // Confirm that we see the full trialPlan results when we iterate the trialStage.
-    for (auto result : trialResults) {
+    for (const auto& result : trialResults) {
         ASSERT_BSONOBJ_EQ(result, *nextResult(trialStage.get()));
     }
     ASSERT_FALSE(nextResult(trialStage.get()));
@@ -165,7 +165,7 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialPlanHitsEOF) {
     ASSERT_EQ(stats->trialWorks, 5U);
 
     // Confirm that we see the full trialPlan results when we iterate the trialStage.
-    for (auto result : trialResults) {
+    for (const auto& result : trialResults) {
         ASSERT_BSONOBJ_EQ(result, *nextResult(trialStage.get()));
     }
     ASSERT_FALSE(nextResult(trialStage.get()));
@@ -203,7 +203,7 @@ TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialDoesNotSucceed) {
     ASSERT_TRUE(trialStage->pickedBackupPlan());
 
     // Confirm that we see the full backupPlan results when we iterate the trialStage.
-    for (auto result : backupResults) {
+    for (const auto& result : backupResults) {
         ASSERT_BSONOBJ_EQ(result, *nextResult(trialStage.get()));
     }
     ASSERT_FALSE(nextResult(trialStage.get()));

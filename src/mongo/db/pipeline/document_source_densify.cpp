@@ -183,7 +183,7 @@ SortPattern getSortPatternForDensify(RangeStatement rangeStatement,
     std::vector<SortPatternPart> sortParts;
     // We do not add partitions to the sort spec if the range is "full".
     if (!stdx::holds_alternative<Full>(rangeStatement.getBounds())) {
-        for (auto partition : partitions) {
+        for (const auto& partition : partitions) {
             SortPatternPart part;
             part.fieldPath = partition.fullPath();
             sortParts.push_back(std::move(part));

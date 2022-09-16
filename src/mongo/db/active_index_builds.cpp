@@ -161,7 +161,7 @@ std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::_filterInde
     WithLock lk, IndexBuildFilterFn indexBuildFilter) const {
 
     std::vector<std::shared_ptr<ReplIndexBuildState>> indexBuilds;
-    for (auto pair : _allIndexBuilds) {
+    for (const auto& pair : _allIndexBuilds) {
         auto replState = pair.second;
         if (!indexBuildFilter(*replState)) {
             continue;
@@ -192,7 +192,7 @@ Status ActiveIndexBuilds::registerIndexBuild(
         return replIndexBuildState->collectionUUID == replState.collectionUUID;
     };
     auto collIndexBuilds = _filterIndexBuilds_inlock(lk, pred);
-    for (auto existingIndexBuild : collIndexBuilds) {
+    for (const auto& existingIndexBuild : collIndexBuilds) {
         for (const auto& name : replIndexBuildState->indexNames) {
             if (existingIndexBuild->indexNames.end() !=
                 std::find(existingIndexBuild->indexNames.begin(),

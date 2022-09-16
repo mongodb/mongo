@@ -1305,7 +1305,7 @@ partitionCursors(std::vector<OwnedRemoteCursor> ownedCursors) {
  */
 void injectMetaCursor(Pipeline* mergePipeline, std::vector<OwnedRemoteCursor> metaCursors) {
     // Provide the "meta" cursors to the $setVariableFromSubPipeline stage.
-    for (auto source : mergePipeline->getSources()) {
+    for (const auto& source : mergePipeline->getSources()) {
         if (auto* setVarStage =
                 dynamic_cast<DocumentSourceSetVariableFromSubPipeline*>(source.get())) {
 

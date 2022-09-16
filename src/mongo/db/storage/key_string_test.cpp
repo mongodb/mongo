@@ -1847,7 +1847,7 @@ TEST_F(KeyStringBuilderTest, RandomizedInputsForToBsonSafe) {
                                                           std::numeric_limits<unsigned int>::max());
 
     const auto interestingElements = getInterestingElements(KeyString::Version::V1);
-    for (auto elem : interestingElements) {
+    for (const auto& elem : interestingElements) {
         const KeyString::Builder ks(KeyString::Version::V1, elem, ALL_ASCENDING);
 
         auto ksBuffer = SharedBuffer::allocate(ks.getSize());
@@ -1908,7 +1908,7 @@ void perfTest(KeyString::Version version, const Numbers& numbers) {
         Timer t;
 
         for (uint64_t i = 0; i < iters; i++)
-            for (auto item : numbers) {
+            for (const auto& item : numbers) {
                 // Assuming there are sufficient invariants in the to/from KeyString::Builder
                 // methods
                 // that calls will not be optimized away.

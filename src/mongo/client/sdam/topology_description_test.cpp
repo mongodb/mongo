@@ -254,7 +254,7 @@ TEST_F(TopologyDescriptionTestFixture, ShouldSetLogicalSessionTimeoutToMinOfAllS
             return newInstanceBuilder.instance();
         });
 
-    for (auto description : serverDescriptionsWithTimeouts) {
+    for (const auto& description : serverDescriptionsWithTimeouts) {
         topologyDescription->installServerDescription(description);
     }
 
@@ -289,7 +289,7 @@ TEST_F(TopologyDescriptionTestFixture,
             return newInstance;
         });
 
-    for (auto description : serverDescriptionsWithTimeouts) {
+    for (const auto& description : serverDescriptionsWithTimeouts) {
         topologyDescription->installServerDescription(description);
     }
 

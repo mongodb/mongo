@@ -3916,7 +3916,7 @@ TEST(ExpressionAddTest, VerifyNoDoubleDoubleSummation) {
         -9.779323414999364,      -546522170658.2997};
     double straightSum = 0.0;
     DoubleDoubleSummation compensatedSum;
-    for (auto x : doubleValues) {
+    for (const auto& x : doubleValues) {
         compensatedSum.addDouble(x.getDouble());
         straightSum += x.getDouble();
     }

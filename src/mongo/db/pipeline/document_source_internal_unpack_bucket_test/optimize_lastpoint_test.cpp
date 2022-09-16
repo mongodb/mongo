@@ -44,7 +44,7 @@ void assertExpectedLastpointOpt(const boost::intrusive_ptr<ExpressionContext> ex
                                 const std::vector<std::string>& expectedPipelineStrs,
                                 const bool expectedSuccess = true) {
     std::vector<BSONObj> inputPipelineBson;
-    for (auto stageStr : inputPipelineStrs) {
+    for (const auto& stageStr : inputPipelineStrs) {
         inputPipelineBson.emplace_back(fromjson(stageStr));
     }
 
@@ -62,7 +62,7 @@ void assertExpectedLastpointOpt(const boost::intrusive_ptr<ExpressionContext> ex
 
     // Assert the pipeline is unchanged.
     auto serializedItr = serialized.begin();
-    for (auto stageStr : expectedPipelineStrs) {
+    for (const auto& stageStr : expectedPipelineStrs) {
         auto expectedStageBson = fromjson(stageStr);
         ASSERT_BSONOBJ_EQ(*serializedItr, expectedStageBson);
         ++serializedItr;

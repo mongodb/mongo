@@ -1146,7 +1146,7 @@ void ReplicationCoordinatorImpl::_restartScheduledHeartbeats_inlock(
         restartedTargets.insert(hbHandle.target);
     }
 
-    for (auto target : restartedTargets) {
+    for (const auto& target : restartedTargets) {
         _scheduleHeartbeatToTarget_inlock(target, now, replSetName);
         _topCoord->restartHeartbeat(now, target);
     }

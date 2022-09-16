@@ -579,7 +579,7 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithFindAndModifyPreImageAnd
 
     auto expectedSequence = {entry3, entry4, entry1, entry2};
 
-    for (auto oplog : expectedSequence) {
+    for (const auto& oplog : expectedSequence) {
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
@@ -661,7 +661,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
     auto expectedSequence = {entry3, entry4, entry1, entry2};
 
-    for (auto oplog : expectedSequence) {
+    for (const auto& oplog : expectedSequence) {
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
@@ -2354,7 +2354,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
     auto expectedSequence = {entry1, entry2};
 
-    for (auto oplog : expectedSequence) {
+    for (const auto& oplog : expectedSequence) {
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
@@ -2535,7 +2535,7 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWritesContainingWrite
 
     auto expectedSequence = {entry1a, entry2b, entry2a};
 
-    for (auto oplog : expectedSequence) {
+    for (const auto& oplog : expectedSequence) {
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
@@ -2682,7 +2682,7 @@ TEST_F(SessionCatalogMigrationSourceTest, FilterRewrittenOplogEntriesOutsideChun
 
 
     DBDirectClient client(opCtx());
-    for (auto entry : entries) {
+    for (const auto& entry : entries) {
         SessionTxnRecord sessionRecord(
             sessionId, txnNumber, entry.getOpTime(), entry.getWallClockTime());
 
@@ -2732,7 +2732,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
                   sessionRecord1.toBSON());
 
-    for (auto entry : entries) {
+    for (const auto& entry : entries) {
         insertOplogEntry(entry);
     }
 

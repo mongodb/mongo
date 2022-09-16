@@ -117,7 +117,7 @@ TEST_F(HashJoinStageTest, HashJoinCollationTest) {
 
         // make sure all the expected pairs occur in the result
         ASSERT_EQ(resultsView->size(), expectedVec.size());
-        for (auto [outer, inner] : expectedVec) {
+        for (const auto& [outer, inner] : expectedVec) {
             auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(outer << inner));
             bool found = false;
             for (size_t i = 0; i < resultsView->size(); i++) {

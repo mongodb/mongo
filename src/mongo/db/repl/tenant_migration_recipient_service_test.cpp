@@ -2081,12 +2081,12 @@ TEST_F(TenantMigrationRecipientServiceTest,
                                              collUuid,
                                              entryAfterStartApplyingOpTime,
                                              boost::none /* migrationUUID */));
-    for (auto entry : oplogEntries) {
+    for (const auto& entry : oplogEntries) {
         auto opTime = entry.getOpTime();
         ASSERT_OK(storage->insertDocument(
             opCtx.get(), oplogNss, {entry.toBSON(), opTime.getTimestamp()}, opTime.getTerm()));
     }
-    for (auto entry : noOpEntries) {
+    for (const auto& entry : noOpEntries) {
         auto opTime = entry.getOpTime();
         ASSERT_OK(storage->insertDocument(
             opCtx.get(), oplogNss, {entry.toBSON(), opTime.getTimestamp()}, opTime.getTerm()));
@@ -2229,7 +2229,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
                                               entryAfterStartApplyingOpTime,
                                               boost::none /* migrationUUID */);
 
-    for (auto entry : oplogEntries) {
+    for (const auto& entry : oplogEntries) {
         auto opTime = entry.getOpTime();
         ASSERT_OK(storage->insertDocument(
             opCtx.get(), oplogNss, {entry.toBSON(), opTime.getTimestamp()}, opTime.getTerm()));

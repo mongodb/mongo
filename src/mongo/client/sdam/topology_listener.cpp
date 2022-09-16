@@ -218,7 +218,7 @@ void TopologyEventsPublisher::_nextDelivery() {
     }
 
     // send to the listeners outside of the lock.
-    for (auto listener : listeners) {
+    for (const auto& listener : listeners) {
         // The copy logic above guaranteed that only non-empty elements are in the vector.
         _sendEvent(listener.get(), *nextEvent);
     }

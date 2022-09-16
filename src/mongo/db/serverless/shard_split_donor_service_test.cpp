@@ -480,7 +480,7 @@ auto makeHelloReply(const std::string& setName,
 };
 
 void mockCommandReplies(MockReplicaSet* replSet) {
-    for (auto hostAndPort : replSet->getHosts()) {
+    for (const auto& hostAndPort : replSet->getHosts()) {
         auto node = replSet->getNode(hostAndPort.toString());
         node->setCommandReply("replSetStepUp", BSON("ok" << 1));
         node->setCommandReply("appendOplogNote", BSON("ok" << 1));

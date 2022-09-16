@@ -218,7 +218,7 @@ public:
         BSONObj toBSON() const noexcept {
             stdx::lock_guard<Mutex> lk(_mutex);
             BSONObjBuilder bob;
-            for (auto entry : _resolved) {
+            for (const auto& entry : _resolved) {
                 bob.append(entry.first, entry.second);
             }
             return bob.obj();

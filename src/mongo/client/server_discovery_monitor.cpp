@@ -478,7 +478,7 @@ void ServerDiscoveryMonitor::shutdown() {
         return;
 
     _isShutdown = true;
-    for (auto singleMonitor : _singleMonitors) {
+    for (const auto& singleMonitor : _singleMonitors) {
         singleMonitor.second->shutdown();
     }
 }

@@ -1350,7 +1350,7 @@ TEST_F(ExpressionDateFromStringTest, ReturnsOnErrorForParseFailures) {
 
     std::vector<std::string> invalidDates = {
         "60.Monday1770/06:59", "July 4th", "12:50:53", "2017, 12:50:53"};
-    for (auto date : invalidDates) {
+    for (const auto& date : invalidDates) {
         auto spec = BSON("$dateFromString" << BSON("dateString" << date << "onError"
                                                                 << "Error default"));
         auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
@@ -1363,7 +1363,7 @@ TEST_F(ExpressionDateFromStringTest, ReturnsOnErrorForFormatMismatch) {
 
     const std::string date = "2018/02/06";
     std::vector<std::string> unmatchedFormats = {"%Y", "%Y/%m/%d:%H", "Y/m/d"};
-    for (auto format : unmatchedFormats) {
+    for (const auto& format : unmatchedFormats) {
         auto spec =
             BSON("$dateFromString" << BSON("dateString" << date << "format" << format << "onError"
                                                         << "Error default"));

@@ -311,7 +311,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
     if (params.count("setShellParameter")) {
         auto ssp = params["setShellParameter"].as<std::map<std::string, std::string>>();
         auto* paramSet = ServerParameterSet::getNodeParameterSet();
-        for (auto it : ssp) {
+        for (const auto& it : ssp) {
             const auto& name = it.first;
             auto param = paramSet->getIfExists(name);
             if (!param || !kSetShellParameterAllowlist.count(name)) {

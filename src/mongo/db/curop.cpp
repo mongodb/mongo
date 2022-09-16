@@ -1427,7 +1427,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
 
     return [pieces = std::move(pieces)](ProfileFilter::Args args) {
         BSONObjBuilder bob;
-        for (auto piece : pieces) {
+        for (const auto& piece : pieces) {
             piece(args, bob);
         }
         return bob.obj();

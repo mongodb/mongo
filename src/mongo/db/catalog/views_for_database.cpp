@@ -200,7 +200,7 @@ Status ViewsForDatabase::upsertIntoGraph(OperationContext* opCtx,
         refs.push_back(viewDef.viewOn());
 
         int pipelineSize = 0;
-        for (auto obj : viewDef.pipeline()) {
+        for (const auto& obj : viewDef.pipeline()) {
             pipelineSize += obj.objsize();
         }
 

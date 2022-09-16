@@ -112,7 +112,7 @@ void IndexBuildsCoordinatorMongodTest::createCollection(const NamespaceString& n
 std::vector<BSONObj> makeSpecs(const NamespaceString& nss, std::vector<std::string> keys) {
     invariant(keys.size());
     std::vector<BSONObj> indexSpecs;
-    for (auto keyName : keys) {
+    for (const auto& keyName : keys) {
         indexSpecs.push_back(
             BSON("v" << 2 << "key" << BSON(keyName << 1) << "name" << (keyName + "_1")));
     }

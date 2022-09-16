@@ -2567,7 +2567,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
 TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernHasNoAtClusterTime) {
     TxnNumber txnNum{3};
-    for (auto rcIt : supportedNonSnapshotRCLevels) {
+    for (const auto& rcIt : supportedNonSnapshotRCLevels) {
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(rcIt.second);
 
         auto txnRouter = TransactionRouter::get(operationContext());
@@ -2589,7 +2589,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernHasNoAtClu
 TEST_F(TransactionRouterTestWithDefaultSession,
        SupportedNonSnapshotReadConcernLevelsArePassedThrough) {
     TxnNumber txnNum{3};
-    for (auto rcIt : supportedNonSnapshotRCLevels) {
+    for (const auto& rcIt : supportedNonSnapshotRCLevels) {
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(rcIt.second);
 
         auto txnRouter = TransactionRouter::get(operationContext());
@@ -2624,7 +2624,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        NonSnapshotReadConcernLevelsPreserveAfterClusterTime) {
     const auto clusterTime = LogicalTime(Timestamp(10, 1));
     TxnNumber txnNum{3};
-    for (auto rcIt : supportedNonSnapshotRCLevels) {
+    for (const auto& rcIt : supportedNonSnapshotRCLevels) {
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(clusterTime, rcIt.second);
 
@@ -2646,7 +2646,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernLevelsPreserveAfterOpTime) {
     const auto opTime = repl::OpTime(Timestamp(10, 1), 2);
     TxnNumber txnNum{3};
-    for (auto rcIt : supportedNonSnapshotRCLevels) {
+    for (const auto& rcIt : supportedNonSnapshotRCLevels) {
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(opTime, rcIt.second);
 
         auto txnRouter = TransactionRouter::get(operationContext());

@@ -57,7 +57,7 @@ void benchmarkExpression(BSONObj expressionSpec,
 
     // Run the test.
     for (auto keepRunning : state) {
-        for (auto document : documents) {
+        for (const auto& document : documents) {
             benchmark::DoNotOptimize(expression->evaluate(document, variables));
         }
         benchmark::ClobberMemory();

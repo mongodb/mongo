@@ -127,7 +127,7 @@ void BM_BSONToKeyString(benchmark::State& state,
     const BsonsAndKeyStrings bsonsAndKeyStrings = generateBsonsAndKeyStrings(bsonType, version);
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        for (auto bson : bsonsAndKeyStrings.bsons) {
+        for (const auto& bson : bsonsAndKeyStrings.bsons) {
             benchmark::DoNotOptimize(KeyString::Builder(version, bson, ALL_ASCENDING));
         }
     }

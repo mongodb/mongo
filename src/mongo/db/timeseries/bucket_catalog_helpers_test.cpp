@@ -366,7 +366,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
     // no meta field specified.
     {
         std::vector<BSONObj> docsWithOutMeta;
-        for (auto doc : docsWithSuitableBuckets) {
+        for (const auto& doc : docsWithSuitableBuckets) {
             docsWithOutMeta.push_back(doc.removeField(_metaField));
         }
 

@@ -1025,7 +1025,7 @@ void DocumentSourceLookUp::serializeToArray(
     }
     if (!hasLocalFieldForeignFieldJoin() || pipeline.size() > 0) {
         MutableDocument exprList;
-        for (auto letVar : _letVariables) {
+        for (const auto& letVar : _letVariables) {
             exprList.addField(letVar.name,
                               letVar.expression->serialize(static_cast<bool>(explain)));
         }

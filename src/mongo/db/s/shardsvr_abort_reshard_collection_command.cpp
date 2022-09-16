@@ -92,7 +92,7 @@ public:
                 (*machine)->abort(isUserCanceled());
             }
 
-            for (auto doneFuture : futuresToWait) {
+            for (const auto& doneFuture : futuresToWait) {
                 doneFuture.get(opCtx);
             }
 

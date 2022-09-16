@@ -258,7 +258,7 @@ void TopologyDescription::calculateLogicalSessionTimeout() {
     bool hasDataBearingServer = false;
 
     invariant(_servers.size() > 0);
-    for (auto description : _servers) {
+    for (const auto& description : _servers) {
         if (!description->isDataBearingServer()) {
             continue;
         }
@@ -282,7 +282,7 @@ BSONObj TopologyDescription::toBSON() {
     bson << "topologyType" << mongo::sdam::toString(_type);
 
     BSONObjBuilder bsonServers;
-    for (auto server : this->getServers()) {
+    for (const auto& server : this->getServers()) {
         bsonServers << server->getAddress().toString() << server->toBson();
     }
     bson.append("servers", bsonServers.obj());

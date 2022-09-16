@@ -478,7 +478,7 @@ void DocumentSourceGraphLookUp::performSearch() {
 
     // If _startWith evaluates to an array, treat each value as a separate starting point.
     if (startingValue.isArray()) {
-        for (auto value : startingValue.getArray()) {
+        for (const auto& value : startingValue.getArray()) {
             _frontier.insert(value);
             _frontierUsageBytes += value.getApproximateSize();
         }

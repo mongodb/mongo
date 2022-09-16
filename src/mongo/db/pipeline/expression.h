@@ -559,7 +559,7 @@ public:
         // Verify that '_output' produces an array and pass each element to 'process'.
         auto output = _output->evaluate(root, variables);
         uassert(5788200, "Input must be an array", output.isArray());
-        for (auto& item : output.getArray()) {
+        for (const auto& item : output.getArray()) {
             accum.process(item, false);
         }
         return accum.getValue(false);

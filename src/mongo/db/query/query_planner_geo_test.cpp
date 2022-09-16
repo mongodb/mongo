@@ -1311,7 +1311,7 @@ public:
                                                        ErrorCodes::Error errorCode) {
         for (auto version : versions) {
             params.indices.clear();
-            for (auto keyPattern : keyPatterns) {
+            for (const auto& keyPattern : keyPatterns) {
                 addIndex(keyPattern, BSON("2dsphereIndexVersion" << version));
             }
 
@@ -1328,14 +1328,14 @@ public:
                                            std::vector<std::string> expectedSolutions) {
         for (auto version : versions) {
             params.indices.clear();
-            for (auto keyPattern : keyPatterns) {
+            for (const auto& keyPattern : keyPatterns) {
                 addIndex(keyPattern, BSON("2dsphereIndexVersion" << version));
             }
 
             runQuery(predicate);
 
             assertNumSolutions(expectedSolutions.size());
-            for (auto solution : expectedSolutions) {
+            for (const auto& solution : expectedSolutions) {
                 assertSolutionExists(solution);
             }
         }
@@ -1349,7 +1349,7 @@ public:
                                            size_t numExpectedSolutions) {
         for (auto version : versions) {
             params.indices.clear();
-            for (auto keyPattern : keyPatterns) {
+            for (const auto& keyPattern : keyPatterns) {
                 addIndex(keyPattern, BSON("2dsphereIndexVersion" << version));
             }
 

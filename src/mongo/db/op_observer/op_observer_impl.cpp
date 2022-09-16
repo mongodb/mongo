@@ -399,7 +399,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
 
     BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
-    for (auto indexDoc : indexes) {
+    for (const auto& indexDoc : indexes) {
         indexesArr.append(indexDoc);
     }
     indexesArr.done();
@@ -464,7 +464,7 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
     indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
 
     BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
-    for (auto indexDoc : indexes) {
+    for (const auto& indexDoc : indexes) {
         indexesArr.append(indexDoc);
     }
     indexesArr.done();
@@ -493,7 +493,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
     indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
 
     BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
-    for (auto indexDoc : indexes) {
+    for (const auto& indexDoc : indexes) {
         indexesArr.append(indexDoc);
     }
     indexesArr.done();

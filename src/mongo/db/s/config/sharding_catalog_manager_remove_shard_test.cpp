@@ -334,7 +334,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
     // Mock the operation during which the chunks are moved to the other shard.
     const NamespaceString chunkNS(ChunkType::ConfigNS);
-    for (ChunkType chunk : chunks) {
+    for (const ChunkType& chunk : chunks) {
         ChunkType updatedChunk = chunk;
         updatedChunk.setShard(shard2.getName());
         ASSERT_OK(updateToConfigCollection(

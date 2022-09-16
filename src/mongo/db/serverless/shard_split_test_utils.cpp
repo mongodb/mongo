@@ -58,10 +58,10 @@ void reconfigToAddRecipientNodes(ServiceContext* serviceContext,
                                  const std::vector<HostAndPort>& recipientNodes) {
     BSONArrayBuilder members;
     int idx = 0;
-    for (auto node : donorNodes) {
+    for (const auto& node : donorNodes) {
         members.append(BSON("_id" << idx++ << "host" << node.toString()));
     }
-    for (auto node : recipientNodes) {
+    for (const auto& node : recipientNodes) {
         members.append(BSON("_id" << idx++ << "host" << node.toString() << "priority" << 0
                                   << "hidden" << 1 << "votes" << 0 << "tags"
                                   << BSON(recipientTagName << UUID::gen().toString())));

@@ -3292,7 +3292,7 @@ void assertTwoPipelinesOptimizeAndMergeTo(const std::string inputPipe1,
     auto pipeline2 = getOptimizedPipeline(input2Bson);
 
     // Merge the pipelines
-    for (auto source : pipeline2->getSources()) {
+    for (const auto& source : pipeline2->getSources()) {
         pipeline1->pushBack(source);
     }
     pipeline1->optimizePipeline();

@@ -331,7 +331,7 @@ TEST_F(OplogApplierTest, LastOpInLargeTransactionIsProcessedIndividually) {
     // Makes entries with ts from range [2, 5).
     std::vector<OplogEntry> multiEntryTransaction =
         makeMultiEntryTransactionOplogEntries(2, dbName, /* prepared */ false, /* num entries*/ 3);
-    for (auto entry : multiEntryTransaction) {
+    for (const auto& entry : multiEntryTransaction) {
         srcOps.push_back(entry);
     }
 

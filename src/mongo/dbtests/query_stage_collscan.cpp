@@ -756,7 +756,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateExclusi
         Date_t minDate = middleDate - Milliseconds(1);
         std::vector<BSONObj> dateDocuments = {
             BSON("_id" << minDate), BSON("_id" << middleDate), BSON("_id" << maxDate)};
-        for (auto doc : dateDocuments) {
+        for (const auto& doc : dateDocuments) {
             insertDocument(ns, doc);
         }
 

@@ -100,7 +100,7 @@ public:
                 }
             }
 
-            for (auto doneFuture : futuresToWait) {
+            for (const auto& doneFuture : futuresToWait) {
                 doneFuture.get(opCtx);
             }
 

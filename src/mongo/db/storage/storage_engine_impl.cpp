@@ -654,7 +654,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     // other contexts such as `recoverToStableTimestamp`.
     std::vector<DurableCatalog::Entry> catalogEntries = _catalog->getAllCatalogEntries(opCtx);
     if (!_options.forRepair) {
-        for (DurableCatalog::Entry entry : catalogEntries) {
+        for (const DurableCatalog::Entry& entry : catalogEntries) {
             if (engineIdents.find(entry.ident) == engineIdents.end()) {
                 return {ErrorCodes::UnrecoverableRollbackError,
                         str::stream() << "Expected collection does not exist. Collection: "
@@ -668,7 +668,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     //
     // Also, remove unfinished builds except those that were background index builds started on a
     // secondary.
-    for (DurableCatalog::Entry entry : catalogEntries) {
+    for (const DurableCatalog::Entry& entry : catalogEntries) {
         std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metaData =
             _catalog->getMetaData(opCtx, entry.catalogId);
         NamespaceString nss(metaData->nss);

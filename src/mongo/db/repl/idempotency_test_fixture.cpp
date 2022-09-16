@@ -114,7 +114,7 @@ std::string CollectionState::toString() const {
 
     sb << "Index specs: [ ";
     bool firstIter = true;
-    for (auto indexSpec : this->indexSpecs) {
+    for (const auto& indexSpec : this->indexSpecs) {
         if (!firstIter) {
             sb << ", ";
         } else {

@@ -212,7 +212,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitorForHost(const 
 
     stdx::lock_guard<Latch> lk(_mutex);
 
-    for (auto entry : _monitors) {
+    for (const auto& entry : _monitors) {
         auto monitor = entry.second.lock();
         if (monitor && monitor->contains(host)) {
             return monitor;

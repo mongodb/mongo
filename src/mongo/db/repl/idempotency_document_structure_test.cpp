@@ -79,7 +79,7 @@ TEST(DocGenTest, SomePreChosenDocExists) {
     DocumentStructureEnumerator enumerator({fields, depth, length}, &trivialScalarGenerator);
     BSONObj start;
     bool docFound = false;
-    for (auto doc : enumerator) {
+    for (const auto& doc : enumerator) {
         if (doc.binaryEqual(specialDoc)) {
             docFound = true;
             break;

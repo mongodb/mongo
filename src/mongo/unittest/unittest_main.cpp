@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
 
     if (list) {
         auto suiteNames = ::mongo::unittest::getAllSuiteNames();
-        for (auto name : suiteNames) {
+        for (const auto& name : suiteNames) {
             std::cout << name << std::endl;
         }
         return static_cast<int>(mongo::ExitCode::clean);

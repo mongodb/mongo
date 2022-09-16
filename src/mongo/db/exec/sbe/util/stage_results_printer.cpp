@@ -58,7 +58,7 @@ void StageResultsPrinter<T>::printStageResults(CompileCtx* ctx,
                                                const SlotNames& slotNames,
                                                PlanStage* stage) {
     std::vector<value::SlotAccessor*> accessors;
-    for (auto slot : slotNames) {
+    for (const auto& slot : slotNames) {
         accessors.push_back(stage->getAccessor(*ctx, slot.first));
     }
 
@@ -92,7 +92,7 @@ template <typename T>
 void StageResultsPrinter<T>::printSlotNames(const SlotNames& slotNames) {
     _stream << "[";
     bool first = true;
-    for (auto slot : slotNames) {
+    for (const auto& slot : slotNames) {
         if (!first) {
             _stream << ", ";
         } else {

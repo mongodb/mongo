@@ -239,7 +239,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
         combined.emplace_back(std::move(part));
     }
     if (sortBy) {
-        for (auto part : *sortBy) {
+        for (const auto& part : *sortBy) {
             combined.push_back(part);
         }
     }

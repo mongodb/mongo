@@ -37,7 +37,7 @@ parsedUpdateArrayFilters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const std::vector<BSONObj>& rawArrayFiltersIn,
                          const NamespaceString& nss) {
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFiltersOut;
-    for (auto rawArrayFilter : rawArrayFiltersIn) {
+    for (const auto& rawArrayFilter : rawArrayFiltersIn) {
         auto parsedArrayFilter =
             MatchExpressionParser::parse(rawArrayFilter,
                                          expCtx,

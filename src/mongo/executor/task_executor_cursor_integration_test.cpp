@@ -184,7 +184,7 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
     for (size_t i = 0; i < kNumConnections; i++) {
         handles.emplace_back(scheduleRemoteCommand(opCtx.get(), target, cmd));
     }
-    for (auto cbHandle : handles) {
+    for (const auto& cbHandle : handles) {
         executor()->wait(cbHandle);
     }
 

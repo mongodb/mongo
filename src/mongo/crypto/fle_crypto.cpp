@@ -2714,7 +2714,7 @@ void EDCServerCollection::validateEncryptedFieldInfo(BSONObj& obj,
                                                      const EncryptedFieldConfig& efc,
                                                      bool bypassDocumentValidation) {
     stdx::unordered_set<std::string> indexedFields;
-    for (auto f : efc.getFields()) {
+    for (const auto& f : efc.getFields()) {
         if (f.getQueries().has_value()) {
             indexedFields.insert(f.getPath().toString());
         }

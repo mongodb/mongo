@@ -928,7 +928,7 @@ TEST(IsIndependent, NonRenameableExpressionIsNotIndependent) {
         "       {a: {$_internalSchemaObjectMatch: {b: 2}}}]}",
         "{$or: [{a: {$elemMatch: {b: 3}}}, {a: {$elemMatch: {b: 4}}}]}"};
 
-    for (auto str : stringExpressions) {
+    for (const auto& str : stringExpressions) {
         BSONObj matchPredicate = fromjson(str);
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));

@@ -256,7 +256,7 @@ void openCatalog(OperationContext* opCtx,
     // indexes on that collection are done at once, so we use a map to group them together.
     stdx::unordered_map<NamespaceString, IndexNameObjs> nsToIndexNameObjMap;
     auto catalog = CollectionCatalog::get(opCtx);
-    for (StorageEngine::IndexIdentifier indexIdentifier : reconcileResult.indexesToRebuild) {
+    for (const StorageEngine::IndexIdentifier& indexIdentifier : reconcileResult.indexesToRebuild) {
         auto indexName = indexIdentifier.indexName;
         auto coll = catalog->lookupCollectionByNamespace(opCtx, indexIdentifier.nss);
         auto indexSpecs = getIndexNameObjs(

@@ -1381,7 +1381,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     return status;
                 }
                 wuow.commit();
-                for (auto entry : insertObjs) {
+                for (size_t i = 0; i < insertObjs.size(); i++) {
                     opCounters->gotInsert();
                     if (shouldUseGlobalOpCounters) {
                         ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(

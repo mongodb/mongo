@@ -1712,7 +1712,7 @@ TEST_F(ReplCoordTest, UpdatePositionArgsAdvancesWallTimes) {
 
     // Make sure wall times are propagated through processReplSetUpdatePosition
     auto memberDataVector = repl->getMemberData();
-    for (auto member : memberDataVector) {
+    for (const auto& member : memberDataVector) {
         if (member.getMemberId() == MemberId(1)) {
             ASSERT_EQ(member.getLastAppliedWallTime(), memberOneAppliedWallTime);
             ASSERT_EQ(member.getLastDurableWallTime(), memberOneDurableWallTime);
@@ -8372,7 +8372,7 @@ TEST_F(ReplCoordTest, IgnoreNonNullDurableOpTimeOrWallTimeForArbiterFromReplSetU
 
     // Make sure node 2 is fully caught up but node 3 has null durable optime/walltime.
     auto memberDataVector = repl->getMemberData();
-    for (auto member : memberDataVector) {
+    for (const auto& member : memberDataVector) {
         auto memberId = member.getMemberId();
         if (memberId == MemberId(1) || memberId == MemberId(2)) {
             ASSERT_EQ(member.getLastAppliedOpTime(), opTime2.asOpTime());
@@ -8441,7 +8441,7 @@ TEST_F(ReplCoordTest, IgnoreNonNullDurableOpTimeOrWallTimeForArbiterFromHeartbea
         hbResp.toBSON(), 1 /* targetIndex */, Milliseconds(5) /* ping */);
 
     auto memberDataVector = repl->getMemberData();
-    for (auto member : memberDataVector) {
+    for (const auto& member : memberDataVector) {
         auto memberId = member.getMemberId();
         if (memberId == MemberId(1)) {
             ASSERT_EQ(member.getLastAppliedOpTime(), opTime2.asOpTime());

@@ -590,7 +590,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, ManySmallDocumentsTransferMods) {
         }
 
         WriteUnitOfWork wuow(operationContext());
-        for (BSONObj add : insertDocs) {
+        for (const BSONObj& add : insertDocs) {
             cloner.onInsertOp(operationContext(), add, {});
         }
         wuow.commit();

@@ -178,7 +178,7 @@ Status SortedDataIndexAccessMethod::insert(OperationContext* opCtx,
                                            const std::vector<BsonRecord>& bsonRecords,
                                            const InsertDeleteOptions& options,
                                            int64_t* numInserted) {
-    for (auto bsonRecord : bsonRecords) {
+    for (const auto& bsonRecord : bsonRecords) {
         invariant(bsonRecord.id != RecordId());
 
         if (!bsonRecord.ts.isNull()) {

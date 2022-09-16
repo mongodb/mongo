@@ -245,7 +245,7 @@ COMMON_THREAD_POOL_TEST(RepeatedScheduleDoesntSmashStack) {
 
 void addTestsForThreadPool(const std::string& suiteName, ThreadPoolFactory makeThreadPool) {
     auto& suite = unittest::Suite::getSuite(suiteName);
-    for (auto testCase : threadPoolTestCaseRegistry()) {
+    for (const auto& testCase : threadPoolTestCaseRegistry()) {
         suite.add(str::stream() << suiteName << "::" << testCase.first,
                   __FILE__,
                   [testCase, makeThreadPool] { testCase.second(makeThreadPool)->run(); });

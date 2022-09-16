@@ -181,7 +181,7 @@ TEST(Metadata, UpconvertUsesDocumentSequecesCorrectly) {
         fromjson("{NOT_insert: 'coll', documents:[{a:1}]}"),
     };
 
-    for (auto cmd : valid) {
+    for (const auto& cmd : valid) {
         const auto converted = rpc::upconvertRequest("db", cmd, 0);
         ASSERT_BSONOBJ_EQ(converted.body, fromjson("{insert: 'coll', $db: 'db'}"));
         ASSERT_EQ(converted.sequences.size(), 1u);
@@ -203,7 +203,7 @@ TEST(Metadata, UpconvertUsesDocumentSequecesCorrectly) {
         }
     }
 
-    for (auto cmd : invalid) {
+    for (const auto& cmd : invalid) {
         const auto converted = rpc::upconvertRequest("db", cmd, 0);
         ASSERT_BSONOBJ_EQ(converted.body, addDollarDB(cmd, "db"));
         ASSERT_EQ(converted.sequences.size(), 0u);

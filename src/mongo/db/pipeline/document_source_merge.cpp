@@ -552,7 +552,7 @@ Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> 
     spec.setWhenNotMatched(_descriptor.mode.second);
     spec.setOn([&]() {
         std::vector<std::string> mergeOnFields;
-        for (auto path : _mergeOnFields) {
+        for (const auto& path : _mergeOnFields) {
             mergeOnFields.push_back(path.fullPath());
         }
         return mergeOnFields;

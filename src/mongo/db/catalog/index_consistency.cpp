@@ -157,7 +157,7 @@ void IndexConsistency::repairMissingIndexEntries(OperationContext* opCtx,
         if (indexName != index->descriptor()->indexName()) {
             // Assuming that _missingIndexEntries is sorted by indexName, this lookup should not
             // happen often.
-            for (auto currIndex : _validateState->getIndexes()) {
+            for (const auto& currIndex : _validateState->getIndexes()) {
                 if (currIndex->descriptor()->indexName() == indexName) {
                     index = currIndex;
                     break;

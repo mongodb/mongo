@@ -106,7 +106,7 @@ TEST_F(TopologyManagerTestFixture,
        ShouldUpdateServerDescriptionsTopologyDescriptionPtrWhenTopologyDescriptionIsInstalled) {
     auto checkServerTopologyDescriptionMatches = [](TopologyDescriptionPtr topologyDescription) {
         auto rawTopologyDescPtr = topologyDescription.get();
-        for (auto server : topologyDescription->getServers()) {
+        for (const auto& server : topologyDescription->getServers()) {
             auto rawServerTopologyDescPtr = (*server->getTopologyDescription()).get();
             ASSERT(server->getTopologyDescription());
             ASSERT(rawServerTopologyDescPtr == rawTopologyDescPtr);

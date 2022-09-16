@@ -278,17 +278,17 @@ public:
         BSONArrayBuilder cappedCollections;
         BSONObjBuilder collectionsByUUID;
 
-        for (auto elem : cappedCollectionSet) {
+        for (const auto& elem : cappedCollectionSet) {
             cappedCollections.append(elem);
         }
 
-        for (auto entry : collectionToUUIDMap) {
+        for (const auto& entry : collectionToUUIDMap) {
             auto collName = entry.first;
             auto uuid = entry.second;
             uuid.appendToBuilder(&collectionsByUUID, collName);
         }
 
-        for (auto entry : collectionToHashMap) {
+        for (const auto& entry : collectionToHashMap) {
             auto collName = entry.first;
             auto hash = entry.second;
             bb.append(collName, hash);

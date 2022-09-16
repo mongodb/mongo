@@ -195,7 +195,7 @@ void checkCollectionUUIDConsistencyAcrossShards(
 
     std::vector<MismatchedShard> mismatches;
 
-    for (auto cmdResponse : responses) {
+    for (const auto& cmdResponse : responses) {
         auto responseData = uassertStatusOK(cmdResponse.swResponse);
         auto collectionVector = responseData.data.firstElement()["firstBatch"].Array();
         auto shardId = cmdResponse.shardId;
@@ -217,7 +217,7 @@ void checkCollectionUUIDConsistencyAcrossShards(
                      << " with expected UUID: " << collectionUuid.toString()
                      << " has different UUIDs on the following shards: [";
 
-        for (auto mismatch : mismatches) {
+        for (const auto& mismatch : mismatches) {
             errorMessage << "{ " << mismatch.shardId << ":" << mismatch.uuid << " },";
         }
         errorMessage << "]";
@@ -239,7 +239,7 @@ void checkTargetCollectionDoesNotExistInCluster(
         opCtx, toNss.db(), cmdObj, shardIds, **executor);
 
     std::vector<std::string> shardsContainingTargetCollection;
-    for (auto cmdResponse : responses) {
+    for (const auto& cmdResponse : responses) {
         uassertStatusOK(cmdResponse.swResponse);
         auto responseData = uassertStatusOK(cmdResponse.swResponse);
         auto collectionVector = responseData.data.firstElement()["firstBatch"].Array();

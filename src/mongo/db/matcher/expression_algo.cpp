@@ -782,7 +782,7 @@ bool containsDependency(const OrderedPathSet& testSet, const OrderedPathSet& pre
 
     PathComparator pathComparator;
     auto i2 = testSet.begin();
-    for (auto p1 : prefixCandidates) {
+    for (const auto& p1 : prefixCandidates) {
         while (pathComparator(*i2, p1)) {
             ++i2;
             if (i2 == testSet.end()) {

@@ -1113,7 +1113,7 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWithErrorOnCanc
 
 void addTestsForExecutor(const std::string& suiteName, ExecutorFactory makeExecutor) {
     auto& suite = unittest::Suite::getSuite(suiteName);
-    for (auto testCase : executorTestCaseRegistry()) {
+    for (const auto& testCase : executorTestCaseRegistry()) {
         suite.add(str::stream() << suiteName << "::" << testCase.first,
                   __FILE__,
                   [testCase, makeExecutor] { testCase.second(makeExecutor)->run(); });

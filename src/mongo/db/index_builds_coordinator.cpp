@@ -674,7 +674,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     invariant(collection);
     auto durableCatalog = DurableCatalog::get(opCtx);
 
-    for (auto spec : specs) {
+    for (const auto& spec : specs) {
         std::string indexName =
             spec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
         if (indexName.empty()) {
@@ -761,7 +761,7 @@ std::vector<UUID> IndexBuildsCoordinator::abortCollectionIndexBuilds(
           "reason"_attr = reason);
 
     std::vector<UUID> buildUUIDs;
-    for (auto replState : collIndexBuilds) {
+    for (const auto& replState : collIndexBuilds) {
         if (abortIndexBuildByBuildUUID(
                 opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, reason)) {
             buildUUIDs.push_back(replState->buildUUID);
@@ -782,7 +782,7 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
         auto indexBuildFilter = [=](const auto& replState) { return dbName == replState.dbName; };
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
-    for (auto replState : builds) {
+    for (const auto& replState : builds) {
         if (!abortIndexBuildByBuildUUID(
                 opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, reason)) {
             // The index build may already be in the midst of tearing down.
@@ -818,7 +818,7 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
     buildsWaitingToFinish.reserve(builds.size());
     const auto indexBuildActionStr =
         indexBuildActionToString(IndexBuildAction::kTenantMigrationAbort);
-    for (auto replState : builds) {
+    for (const auto& replState : builds) {
         if (!abortIndexBuildByBuildUUID(
                 opCtx, replState->buildUUID, IndexBuildAction::kTenantMigrationAbort, reason)) {
             // The index build may already be in the midst of tearing down.
@@ -853,7 +853,7 @@ void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext*
         auto indexBuildFilter = [](const auto& replState) { return true; };
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
-    for (auto replState : builds) {
+    for (const auto& replState : builds) {
         if (!abortIndexBuildByBuildUUID(
                 opCtx, replState->buildUUID, IndexBuildAction::kInitialSyncAbort, reason)) {
             // The index build may already be in the midst of tearing down.
@@ -1056,7 +1056,7 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
         // Restart the 'paused' index build in the background.
         IndexBuilds buildsToRestart;
         IndexBuildDetails details{collUUID};
-        for (auto spec : oplogEntry.indexSpecs) {
+        for (const auto& spec : oplogEntry.indexSpecs) {
             details.indexSpecs.emplace_back(spec.getOwned());
         }
         buildsToRestart.insert({buildUUID, details});
@@ -1528,7 +1528,7 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
         // Record the index builds aborted due to rollback. This allows any rollback algorithm
         // to efficiently restart all unfinished index builds without having to scan all indexes
         // in all collections.
-        for (auto spec : replState->indexSpecs) {
+        for (const auto& spec : replState->indexSpecs) {
             aborted.indexSpecs.emplace_back(spec.getOwned());
         }
         buildsStopped.insert({replState->buildUUID, aborted});

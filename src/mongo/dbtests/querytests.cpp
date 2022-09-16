@@ -1815,7 +1815,7 @@ public:
 
     void checkNewDBInResults(const std::vector<BSONObj> results, const int dbNum) {
         std::string target = "unittestsdb" + std::to_string(dbNum);
-        for (auto res : results) {
+        for (const auto& res : results) {
             if (res["name"].str() == target) {
                 return;
             }

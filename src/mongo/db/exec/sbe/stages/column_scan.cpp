@@ -712,7 +712,7 @@ std::unique_ptr<PlanStageStats> ColumnScanStage::getStats(bool includeDebugInfo)
         bob.appendNumber("numRowStoreFetches",
                          static_cast<long long>(_specificStats.numRowStoreFetches));
         BSONObjBuilder columns(bob.subobjStart("columns"));
-        for (ColumnScanStats::CursorStats cursorStat : _specificStats.cursorStats) {
+        for (const ColumnScanStats::CursorStats& cursorStat : _specificStats.cursorStats) {
             StringData path = cursorStat.path;
             if (path == ColumnStore::kRowIdPath) {
                 path = "<<RowId Column>>";
@@ -726,7 +726,7 @@ std::unique_ptr<PlanStageStats> ColumnScanStage::getStats(bool includeDebugInfo)
         columns.done();
 
         BSONObjBuilder parentColumns(bob.subobjStart("parentColumns"));
-        for (ColumnScanStats::CursorStats cursorStat : _specificStats.parentCursorStats) {
+        for (const ColumnScanStats::CursorStats& cursorStat : _specificStats.parentCursorStats) {
             StringData path = cursorStat.path;
             BSONObjBuilder column(parentColumns.subobjStart(path));
             column.appendNumber("numNexts", static_cast<long long>(cursorStat.numNexts));

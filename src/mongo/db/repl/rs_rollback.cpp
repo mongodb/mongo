@@ -1351,7 +1351,7 @@ void syncFixUp(OperationContext* opCtx,
     // collection drops, because one of the preconditions of dropping a collection is that there are
     // no unfinished indxes.
     LOGV2(21694, "Rolling back unfinished startIndexBuild operations");
-    for (auto index : fixUpInfo.unfinishedIndexesToDrop) {
+    for (const auto& index : fixUpInfo.unfinishedIndexesToDrop) {
         UUID uuid = index.first;
         std::set<std::string> indexNames = index.second;
 

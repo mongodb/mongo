@@ -336,7 +336,7 @@ TEST_F(TenantOplogBatcherTest, LargeTransactionProcessedIndividuallyAndExpanded)
     // Makes entries with ts from range [2, 5).
     std::vector<OplogEntry> multiEntryTransaction = makeMultiEntryTransactionOplogEntries(
         2, dbName, /* prepared */ false, {innerOps1, innerOps2, innerOps3});
-    for (auto entry : multiEntryTransaction) {
+    for (const auto& entry : multiEntryTransaction) {
         srcOps.push_back(entry.getEntry().toBSON());
     }
 

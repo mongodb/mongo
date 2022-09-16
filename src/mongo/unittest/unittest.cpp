@@ -501,7 +501,7 @@ int Suite::run(const std::vector<std::string>& suites,
 
     std::vector<std::unique_ptr<Result>> results;
 
-    for (std::string name : torun) {
+    for (const std::string& name : torun) {
         std::shared_ptr<Suite>& s = suitesMap()[name];
         fassert(16145, s != nullptr);
 

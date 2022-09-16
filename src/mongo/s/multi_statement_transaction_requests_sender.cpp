@@ -49,7 +49,7 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     std::vector<AsyncRequestsSender::Request> newRequests;
     newRequests.reserve(requests.size());
 
-    for (auto request : requests) {
+    for (const auto& request : requests) {
         newRequests.emplace_back(
             request.shardId,
             txnRouter.attachTxnFieldsIfNeeded(opCtx, request.shardId, request.cmdObj));

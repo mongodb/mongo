@@ -119,7 +119,7 @@ public:
     // Define valid transitions.
     // Must be called prior to starting the state machine.
     void validTransitions(const TransitionsContainer& transitions) noexcept {
-        for (auto [from, toStates] : transitions) {
+        for (const auto& [from, toStates] : transitions) {
             for (auto to : toStates) {
                 validTransition(from, to);
             }

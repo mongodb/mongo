@@ -62,7 +62,7 @@ void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) noexcept {
     auto listeners = _listeners;
     lk.unlock();
 
-    for (auto listener : listeners) {
+    for (const auto& listener : listeners) {
         if (auto l = listener.lock()) {
             l->onFoundSet(name);
         }
@@ -93,7 +93,7 @@ void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) 
     auto listeners = _listeners;
     lk.unlock();
 
-    for (auto listener : listeners) {
+    for (const auto& listener : listeners) {
         if (auto l = listener.lock()) {
             l->onPossibleSet(state);
         }
@@ -127,7 +127,7 @@ void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
     auto listeners = _listeners;
     lk.unlock();
 
-    for (auto listener : listeners) {
+    for (const auto& listener : listeners) {
         if (auto l = listener.lock()) {
             l->onConfirmedSet(state);
         }
@@ -154,7 +154,7 @@ void ReplicaSetChangeNotifier::onDroppedSet(const std::string& name) noexcept {
     auto listeners = _listeners;
     lk.unlock();
 
-    for (auto listener : listeners) {
+    for (const auto& listener : listeners) {
         if (auto l = listener.lock()) {
             l->onDroppedSet(name);
         }

@@ -436,7 +436,7 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
     if (!status.isOK()) {
         StringBuilder errorMsg;
         errorMsg << status.reason();
-        for (std::string error : errors) {
+        for (const std::string& error : errors) {
             errorMsg << ". " << error;
         }
         errorMsg << ".";

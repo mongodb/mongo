@@ -642,8 +642,8 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
     Timestamp firstTimeInBatch = ops.front().getTimestamp();
     // Set any indexes to multikey that this batch ignored. This must be done while holding the
     // parallel batch writer mode lock.
-    for (WorkerMultikeyPathInfo infoVector : multikeyVector) {
-        for (MultikeyPathInfo info : infoVector) {
+    for (const WorkerMultikeyPathInfo& infoVector : multikeyVector) {
+        for (const MultikeyPathInfo& info : infoVector) {
             // We timestamp every multikey write with the first timestamp in the batch. It is always
             // safe to set an index as multikey too early, just not too late. We conservatively pick
             // the first timestamp in the batch since we do not have enough information to find out

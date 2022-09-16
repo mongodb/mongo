@@ -61,7 +61,7 @@ public:
         bob << commandName() << coll;
         bob << "lsid" << _lsid.toBSON();
 
-        for (auto arg : args) {
+        for (const auto& arg : args) {
             bob << arg.firstElement();
         }
 
@@ -233,7 +233,7 @@ public:
 
     void checkFieldNamesAreAllowed(BSONObj& mirroredObj) {
         const auto possibleKeys = getAllowedKeys();
-        for (auto key : mirroredObj.getFieldNames<std::set<std::string>>()) {
+        for (const auto& key : mirroredObj.getFieldNames<std::set<std::string>>()) {
             ASSERT(std::find(possibleKeys.begin(), possibleKeys.end(), key) != possibleKeys.end());
         }
     }

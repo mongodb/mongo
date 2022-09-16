@@ -466,7 +466,7 @@ public:
     std::vector<JsonTestCase::TestCaseResult> runTests() {
         std::vector<JsonTestCase::TestCaseResult> results;
         const auto testFiles = getTestFiles();
-        for (auto jsonTest : testFiles) {
+        for (const auto& jsonTest : testFiles) {
             int restoreHeartBeatFrequencyMs = sdamHeartBeatFrequencyMs;
 
             std::unique_ptr<JsonTestCase> testCase;

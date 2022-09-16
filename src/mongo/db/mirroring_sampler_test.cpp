@@ -101,13 +101,13 @@ public:
     }
 
     void resetHitCounts() {
-        for (auto pair : _hitCounts) {
+        for (const auto& pair : _hitCounts) {
             _hitCounts[pair.first] = 0;
         }
     }
 
     void populteHitCounts(std::vector<HostAndPort>& targets) {
-        for (auto host : targets) {
+        for (const auto& host : targets) {
             auto it = _hitCounts.find(host.toString());
             invariant(it != _hitCounts.end());
             it->second++;
@@ -129,7 +129,7 @@ public:
     double getHitCountsSTD() {
         const auto mean = getHitCounsMean();
         double standardDeviation = 0.0;
-        for (auto pair : _hitCounts) {
+        for (const auto& pair : _hitCounts) {
             standardDeviation += std::pow(pair.second - mean, 2);
         }
 

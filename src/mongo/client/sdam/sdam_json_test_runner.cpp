@@ -112,7 +112,7 @@ public:
     PhaseResult execute(TopologyManager& topology) const {
         PhaseResult testResult{{}, _phaseNum};
 
-        for (auto response : _isMasterResponses) {
+        for (const auto& response : _isMasterResponses) {
             auto descriptionStr =
                 (response.getResponse()) ? response.getResponse()->toString() : "[ Network Error ]";
             LOGV2(20202,
@@ -542,7 +542,7 @@ public:
     std::vector<JsonTestCase::TestCaseResult> runTests() {
         std::vector<JsonTestCase::TestCaseResult> results;
         const auto testFiles = getTestFiles();
-        for (auto jsonTest : testFiles) {
+        for (const auto& jsonTest : testFiles) {
             auto testCase = JsonTestCase(jsonTest);
             try {
                 LOGV2(20208, "### Executing Test Case ###", "test"_attr = testCase.Name());
