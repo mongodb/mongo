@@ -42,25 +42,7 @@ namespace {
 
 using unittest::assertGet;
 
-class ConfigIndexTest : public ConfigServerTestFixture {
-protected:
-    /*
-     * Initializes the sharding state and locks both the config db and rstl.
-     */
-    void setUp() override {
-        // Prevent DistLockManager from writing to lockpings collection before we create the
-        // indexes.
-        // TODO (SERVER-64987): Remove lock acquisition.
-        _autoDb = setUpAndLockConfigDb();
-    }
-
-    void tearDown() override {
-        _autoDb = {};
-        ConfigServerTestFixture::tearDown();
-    }
-
-    std::unique_ptr<AutoGetDb> _autoDb;
-};
+using ConfigIndexTest = ConfigServerTestFixture;
 
 TEST_F(ConfigIndexTest, CompatibleIndexAlreadyExists) {
     createIndexOnConfigCollection(operationContext(),

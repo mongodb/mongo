@@ -96,30 +96,14 @@ ConfigServerTestFixture::ConfigServerTestFixture(Options options, bool setUpMajo
 
 ConfigServerTestFixture::~ConfigServerTestFixture() = default;
 
-void ConfigServerTestFixture::setUp() {
-    _setUp([] {});
-}
-
-std::unique_ptr<AutoGetDb> ConfigServerTestFixture::setUpAndLockConfigDb() {
-    std::unique_ptr<AutoGetDb> autoDb;
-    auto lockConfigDb = [&] {
-        autoDb =
-            std::make_unique<AutoGetDb>(operationContext(), NamespaceString::kConfigDb, MODE_X);
-    };
-    _setUp(lockConfigDb);
-    return autoDb;
-}
-
 void ConfigServerTestFixture::setUpAndInitializeConfigDb() {
-    // Prevent DistLockManager from writing to lockpings collection before we create the indexes.
-    auto autoDb = setUpAndLockConfigDb();
-
+    ConfigServerTestFixture::setUp();
     // Initialize the config database while we have exclusive access.
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 }
 
-void ConfigServerTestFixture::_setUp(std::function<void()> onPreInitGlobalStateFn) {
+void ConfigServerTestFixture::setUp() {
     ShardingMongodTestFixture::setUp();
 
     // TODO: SERVER-26919 set the flag on the mock repl coordinator just for the window where it
@@ -144,8 +128,6 @@ void ConfigServerTestFixture::_setUp(std::function<void()> onPreInitGlobalStateF
         std::make_unique<NetworkTestEnv>(_executorForAddShard, _mockNetworkForAddShard);
     auto configServerCatalogCacheLoader = std::make_unique<ConfigServerCatalogCacheLoader>();
     CatalogCacheLoader::set(getServiceContext(), std::move(configServerCatalogCacheLoader));
-
-    onPreInitGlobalStateFn();
 
     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(ConnectionString::forLocal()));
 }
