@@ -316,9 +316,14 @@ void TransportLayerASIO::TimerService::start() {
     auto precondition = State::kInitialized;
     if (_state.compareAndSwap(&precondition, State::kStarted)) {
         _thread = stdx::thread([reactor = _reactor] {
-            LOGV2_INFO(5490002, "Started a new thread for the timer service");
+            if (!serverGlobalParams.quiet.load()) {
+                LOGV2_INFO(5490002, "Started a new thread for the timer service");
+            }
             reactor->run();
-            LOGV2_INFO(5490003, "Returning from the timer service thread");
+
+            if (!serverGlobalParams.quiet.load()) {
+                LOGV2_INFO(5490003, "Returning from the timer service thread");
+            }
         });
     }
 }
