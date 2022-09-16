@@ -607,7 +607,7 @@ TEST_F(ShardKeyPatternTest, ExtractQueryShardKeyHashed) {
 }
 
 static bool indexComp(const ShardKeyPattern& pattern, const BSONObj& indexPattern) {
-    return pattern.isUniqueIndexCompatible(indexPattern);
+    return pattern.isIndexUniquenessCompatible(indexPattern);
 }
 
 TEST_F(ShardKeyPatternTest, UniqueIndexCompatibleSingle) {

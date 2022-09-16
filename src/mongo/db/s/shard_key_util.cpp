@@ -115,12 +115,14 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
     for (const auto& idx : indexes) {
         BSONObj currentKey = idx["key"].embeddedObject();
         bool isUnique = idx["unique"].trueValue();
+        bool isPrepareUnique = idx["prepareUnique"].trueValue();
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "can't shard collection '" << nss.ns() << "' with unique index on "
                               << currentKey << " and proposed shard key "
                               << shardKeyPattern.toBSON()
                               << ". Uniqueness can't be maintained unless shard key is a prefix",
-                !isUnique || shardKeyPattern.isUniqueIndexCompatible(currentKey));
+                (!isUnique && !isPrepareUnique) ||
+                    shardKeyPattern.isIndexUniquenessCompatible(currentKey));
     }
 
     // 2. Check for a useful index

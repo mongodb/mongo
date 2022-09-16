@@ -109,6 +109,7 @@ constexpr StringData kAbortIndexBuildFieldName = "abortIndexBuild"_sd;
 constexpr StringData kIndexesFieldName = "indexes"_sd;
 constexpr StringData kKeyFieldName = "key"_sd;
 constexpr StringData kUniqueFieldName = "unique"_sd;
+constexpr StringData kPrepareUniqueFieldName = "prepareUnique"_sd;
 
 /**
  * Checks if unique index specification is compatible with sharding configuration.
@@ -124,9 +125,9 @@ void checkShardKeyRestrictions(OperationContext* opCtx,
 
     const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
     uassert(ErrorCodes::CannotCreateIndex,
-            str::stream() << "cannot create unique index over " << newIdxKey
-                          << " with shard key pattern " << shardKeyPattern.toBSON(),
-            shardKeyPattern.isUniqueIndexCompatible(newIdxKey));
+            str::stream() << "cannot create index with 'unique' or 'prepareUnique' option over "
+                          << newIdxKey << " with shard key pattern " << shardKeyPattern.toBSON(),
+            shardKeyPattern.isIndexUniquenessCompatible(newIdxKey));
 }
 
 /**
@@ -3024,7 +3025,7 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
 
     // Verify that each spec is compatible with the collection's sharding state.
     for (const BSONObj& spec : resultSpecs) {
-        if (spec[kUniqueFieldName].trueValue()) {
+        if (spec[kUniqueFieldName].trueValue() || spec[kPrepareUniqueFieldName].trueValue()) {
             checkShardKeyRestrictions(opCtx, nss, spec[kKeyFieldName].Obj());
         }
     }
