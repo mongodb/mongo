@@ -30,9 +30,10 @@
 #include "mongo/crypto/fle_fields_util.h"
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/basic_types_gen.h"
+#include "mongo/db/exec/document_value/value.h"
+#include <limits>
 
 namespace mongo {
 void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* placeholder) {
@@ -41,7 +42,7 @@ void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* place
             auto val = placeholder->getValue().getElement();
             uassert(6720200, "Range Find placeholder value must be an object.", val.isABSONObj());
             auto obj = val.Obj();
-            FLE2RangeSpec::parse(IDLParserContext("v"), obj);
+            FLE2RangeFindSpec::parse(IDLParserContext("v"), obj);
             uassert(6832501,
                     "Sparsity must be defined for range placeholders.",
                     placeholder->getSparsity());
@@ -61,16 +62,86 @@ void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* place
     }
 }
 
-void validateIDLFLE2RangeSpec(const FLE2RangeSpec* placeholder) {
-    auto min = placeholder->getMin().getElement();
-    auto max = placeholder->getMax().getElement();
-    uassert(6833400,
-            str::stream() << "Minimum element in a range must be numeric or date, not: "
-                          << min.type(),
-            min.isNumber() || min.type() == BSONType::MinKey || min.type() == BSONType::Date);
-    uassert(6833401,
-            str::stream() << "Maximum element in a range must be numeric or date, not: "
-                          << max.type(),
-            max.isNumber() || max.type() == BSONType::MaxKey || min.type() == BSONType::Date);
+bool isInfinite(ImplicitValue val) {
+    constexpr auto inf = std::numeric_limits<double>::infinity();
+    if (val.getType() != BSONType::NumberDouble) {
+        return false;
+    }
+    auto num = val.getDouble();
+    return num == inf || num == -inf;
 }
+namespace {
+bool isWithinInt(int64_t num) {
+    return num <= std::numeric_limits<int32_t>::max() && num >= std::numeric_limits<int32_t>::min();
+}
+}  // namespace
+
+void validateQueryBounds(BSONType indexType, ImplicitValue lb, ImplicitValue ub) {
+    // Bounds of any type might have an infinite endpoint because open-ended bounds are represented
+    // with the undefined endpoint as infinity or -infinity.
+    switch (indexType) {
+        case NumberInt:
+            uassert(
+                6901306,
+                "If the index type is NumberInt, then lower bound for query must be an int or be a "
+                "long that is within the range of int.",
+                isInfinite(lb) || lb.getType() == BSONType::NumberInt ||
+                    (lb.getType() == BSONType::NumberLong && isWithinInt(lb.getLong())));
+            uassert(
+                6901307,
+                "If the index type is NumberInt, then upper bound for query must be an int or be a "
+                "long that is within the range of int.",
+                isInfinite(ub) || ub.getType() == BSONType::NumberInt ||
+                    (ub.getType() == BSONType::NumberLong && isWithinInt(ub.getLong())));
+            break;
+        case NumberLong:
+            uassert(
+                6901308,
+                "Lower bound for query over NumberLong must be either a NumberLong or NumberInt.",
+                isInfinite(lb) || lb.getType() == BSONType::NumberLong ||
+                    lb.getType() == BSONType::NumberInt);
+            uassert(
+                6901309,
+                "Upper bound for query over NumberLong must be either a NumberLong or NumberInt.",
+                isInfinite(ub) || ub.getType() == BSONType::NumberLong ||
+                    ub.getType() == BSONType::NumberInt);
+            break;
+        case Date:
+            uassert(6901310,
+                    "Lower bound for query over Date must be a Date.",
+                    isInfinite(lb) || lb.getType() == BSONType::Date);
+            uassert(6901311,
+                    "Upper bound for query over Date must be a Date.",
+                    isInfinite(ub) || ub.getType() == BSONType::Date);
+            break;
+        case NumberDouble:
+            uassert(6901312,
+                    "Lower bound for query over NumberDouble must be a NumberDouble.",
+                    lb.getType() == BSONType::NumberDouble);
+            uassert(6901313,
+                    "Upper bound for query over NumberDouble must be a NumberDouble.",
+                    ub.getType() == BSONType::NumberDouble);
+            break;
+        case NumberDecimal:
+            uassert(6901314,
+                    "Lower bound for query over NumberDecimal must be a NumberDecimal.",
+                    isInfinite(lb) || lb.getType() == BSONType::NumberDecimal);
+            uassert(6901315,
+                    "Upper bound for query over NumberDecimal must be a NumberDecimal.",
+                    isInfinite(ub) || ub.getType() == BSONType::NumberDecimal);
+            break;
+        default:
+            uasserted(6901305,
+                      str::stream() << "Index type must be a numeric or date, not: " << indexType);
+    }
+}
+
+void validateIDLFLE2RangeFindSpec(const FLE2RangeFindSpec* placeholder) {
+    auto min = placeholder->getIndexMin().getElement();
+    auto max = placeholder->getIndexMax().getElement();
+    uassert(6901304, "Range min and range max must be the same type.", min.type() == max.type());
+    auto lb = placeholder->getLowerBound().getElement();
+    auto ub = placeholder->getUpperBound().getElement();
+    validateQueryBounds(min.type(), lb, ub);
+}  // namespace mongo
 }  // namespace mongo

@@ -77,12 +77,12 @@ structs:
                 stability: unstable
                 validator: { gte: 0 }
             min:
-                description: "Defines the lower bound for field values. Only applicable for queryType range"
+                description: "Defines the lower bound for field values in this encrypted index. Only applicable for queryType range"
                 type: encrypted_numeric
                 optional: true
                 stability: unstable
             max:
-                description: "Defines the upper bound for field values. Only applicable for queryType range"
+                description: "Defines the upper bound for field values in this encrypted index. Only applicable for queryType range"
                 type: encrypted_numeric
                 optional: true
                 stability: unstable

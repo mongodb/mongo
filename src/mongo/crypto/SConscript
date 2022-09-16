@@ -119,6 +119,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/idl_parser',
+        "encrypted_field_config",
     ],
 )
 

@@ -698,54 +698,40 @@ FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayload(FLEIndexK
     return iupayload;
 }
 
-std::vector<std::string> getMinCover(const FLE2RangeSpec& spec, uint8_t sparsity) {
-    std::vector<std::string> edges;
-    // TODO SERVER-69013
-    return edges;
-}
 
 std::unique_ptr<Edges> getEdges(BSONElement element,
-                                BSONElement lowerBound,
-                                BSONElement upperBound,
+                                BSONElement minBound,
+                                BSONElement maxBound,
                                 int sparsity) {
     switch (element.type()) {
         case BSONType::NumberInt:
-            uassert(
-                6775501, "lower bound must be integer", lowerBound.type() == BSONType::NumberInt);
-            uassert(
-                6775502, "upper bound must be integer", upperBound.type() == BSONType::NumberInt);
-            return getEdgesInt32(element.Int(), lowerBound.Int(), upperBound.Int(), sparsity);
+            uassert(6775501, "min bound must be integer", minBound.type() == BSONType::NumberInt);
+            uassert(6775502, "max bound must be integer", maxBound.type() == BSONType::NumberInt);
+            return getEdgesInt32(element.Int(), minBound.Int(), maxBound.Int(), sparsity);
 
         case BSONType::NumberLong:
-            uassert(
-                6775503, "lower bound must be long int", lowerBound.type() == BSONType::NumberLong);
-            uassert(
-                6775504, "upper bound must be long int", upperBound.type() == BSONType::NumberLong);
-            return getEdgesInt64(element.Long(), lowerBound.Long(), upperBound.Long(), sparsity);
+            uassert(6775503, "min bound must be long int", minBound.type() == BSONType::NumberLong);
+            uassert(6775504, "max bound must be long int", maxBound.type() == BSONType::NumberLong);
+            return getEdgesInt64(element.Long(), minBound.Long(), maxBound.Long(), sparsity);
 
         case BSONType::Date:
-            uassert(6775505, "lower bound must be date", lowerBound.type() == BSONType::Date);
-            uassert(6775506, "upper bound must be date", upperBound.type() == BSONType::Date);
+            uassert(6775505, "min bound must be date", minBound.type() == BSONType::Date);
+            uassert(6775506, "max bound must be date", maxBound.type() == BSONType::Date);
             return getEdgesInt64(element.Date().asInt64(),
-                                 lowerBound.Date().asInt64(),
-                                 upperBound.Date().asInt64(),
+                                 minBound.Date().asInt64(),
+                                 maxBound.Date().asInt64(),
                                  sparsity);
 
         case BSONType::NumberDouble:
-            uassert(
-                6775507, "lower bound must be double", lowerBound.type() == BSONType::NumberDouble);
-            uassert(
-                6775508, "upper bound must be double", upperBound.type() == BSONType::NumberDouble);
-            return getEdgesDouble(
-                element.Double(), lowerBound.Double(), upperBound.Double(), sparsity);
+            uassert(6775507, "min bound must be double", minBound.type() == BSONType::NumberDouble);
+            uassert(6775508, "max bound must be double", maxBound.type() == BSONType::NumberDouble);
+            return getEdgesDouble(element.Double(), minBound.Double(), maxBound.Double(), sparsity);
 
         case BSONType::NumberDecimal:
-            uassert(6775509,
-                    "lower bound must be decimal",
-                    lowerBound.type() == BSONType::NumberDecimal);
-            uassert(6775510,
-                    "upper bound must be decimal",
-                    upperBound.type() == BSONType::NumberDecimal);
+            uassert(
+                6775509, "min bound must be decimal", minBound.type() == BSONType::NumberDecimal);
+            uassert(
+                6775510, "max bound must be decimal", maxBound.type() == BSONType::NumberDecimal);
             uasserted(ErrorCodes::BadValue, "decimal not supported atm");
 
         default:
@@ -754,15 +740,15 @@ std::unique_ptr<Edges> getEdges(BSONElement element,
 }
 
 std::vector<EdgeTokenSet> getEdgeTokenSet(BSONElement element,
-                                          BSONElement lowerBound,
-                                          BSONElement upperBound,
+                                          BSONElement minBound,
+                                          BSONElement maxBound,
                                           int sparsity,
                                           uint64_t contentionFactor,
                                           const EDCToken& edcToken,
                                           const ESCToken& escToken,
                                           const ECCToken& eccToken,
                                           const ECOCToken& ecocToken) {
-    const auto edges = getEdges(element, lowerBound, upperBound, sparsity);
+    const auto edges = getEdges(element, minBound, maxBound, sparsity);
     const auto edgesList = edges->get();
 
     std::vector<EdgeTokenSet> tokens;
@@ -813,8 +799,8 @@ FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayloadForRange(
     FLEIndexKeyAndId indexKey,
     FLEUserKeyAndId userKey,
     BSONElement element,
-    BSONElement lowerBound,
-    BSONElement upperBound,
+    BSONElement minBound,
+    BSONElement maxBound,
     uint8_t sparsity,
     uint64_t contentionFactor) {
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
@@ -865,8 +851,8 @@ FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayloadForRange(
     iupayload.setIndexKeyId(indexKey.keyId);
 
     auto edgeTokenSet = getEdgeTokenSet(element,
-                                        lowerBound,
-                                        upperBound,
+                                        minBound,
+                                        maxBound,
                                         sparsity,
                                         contentionFactor,
                                         edcToken,
@@ -1121,8 +1107,8 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                     indexKey,
                     userKey,
                     rangeInsertSpec.getValue().getElement(),
-                    rangeInsertSpec.getLowerBound().getElement(),
-                    rangeInsertSpec.getUpperBound().getElement(),
+                    rangeInsertSpec.getMinBound().getElement(),
+                    rangeInsertSpec.getMaxBound().getElement(),
                     ep.getSparsity().value(),  // Enforced as non-optional in this case in IDL
                     contentionFactor(ep));
 
@@ -1132,7 +1118,8 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                                    builder);
             } else if (ep.getType() == Fle2PlaceholderType::kFind) {
                 IDLParserContext ctx("root");
-                auto rangeFindSpec = FLE2RangeSpec::parse(ctx, ep.getValue().getElement().Obj());
+                auto rangeFindSpec =
+                    FLE2RangeFindSpec::parse(ctx, ep.getValue().getElement().Obj());
 
                 auto edges = getMinCover(rangeFindSpec, ep.getSparsity().value());
 
@@ -1480,6 +1467,77 @@ boost::multiprecision::int128_t exp10(int x) {
 }
 
 }  // namespace
+
+std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t sparsity) {
+    auto indexMin = spec.getIndexMin().getElement();
+    auto indexMax = spec.getIndexMax().getElement();
+    tassert(6901300, "Min and max must have the same type", indexMin.type() == indexMax.type());
+    auto bsonType = indexMin.type();
+
+    auto lowerBound = spec.getLowerBound().getElement();
+    auto upperBound = spec.getUpperBound().getElement();
+    auto includeLowerBound = spec.getLbIncluded();
+    auto includeUpperBound = spec.getUbIncluded();
+
+    // Open-ended ranges are represented with infinity as the other endpoint. Resolve infinite
+    // bounds at this point to end at the min or max for this index.
+    if (isInfinite(lowerBound)) {
+        lowerBound = indexMin;
+        includeLowerBound = true;
+    }
+    if (isInfinite(upperBound)) {
+        upperBound = indexMax;
+        includeUpperBound = true;
+    }
+
+    // TODO: Check on the implications of safeNumberInt() and safeNumberLong().
+    switch (bsonType) {
+        case NumberInt:
+            return minCoverInt32(lowerBound.safeNumberInt(),
+                                 includeLowerBound,
+                                 upperBound.safeNumberInt(),
+                                 includeUpperBound,
+                                 indexMin.Int(),
+                                 indexMax.Int(),
+                                 sparsity);
+        case NumberLong:
+            return minCoverInt64(lowerBound.safeNumberLong(),
+                                 includeLowerBound,
+                                 upperBound.safeNumberLong(),
+                                 includeUpperBound,
+                                 indexMin.Long(),
+                                 indexMax.Long(),
+                                 sparsity);
+        case Date:
+            return minCoverInt64(lowerBound.Date().asInt64(),
+                                 includeLowerBound,
+                                 upperBound.Date().asInt64(),
+                                 includeUpperBound,
+                                 indexMin.Date().asInt64(),
+                                 indexMax.Date().asInt64(),
+                                 sparsity);
+        case NumberDouble:
+            return minCoverDouble(lowerBound.numberDouble(),
+                                  includeLowerBound,
+                                  upperBound.numberDouble(),
+                                  includeUpperBound,
+                                  indexMin.Double(),
+                                  indexMax.Double(),
+                                  sparsity);
+        case NumberDecimal:
+            return minCoverDecimal128(lowerBound.numberDecimal(),
+                                      includeLowerBound,
+                                      upperBound.numberDecimal(),
+                                      includeUpperBound,
+                                      indexMin.numberDecimal(),
+                                      indexMax.numberDecimal(),
+                                      sparsity);
+        default:
+            // IDL validates that no other type is permitted.
+            MONGO_UNREACHABLE_TASSERT(6901302);
+    }
+    MONGO_UNREACHABLE_TASSERT(6901303);
+}
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const Value& value) {
     uassert(6672416, "Expected binData with subtype Encrypt", value.getType() == BinData);
@@ -3587,23 +3645,25 @@ std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
 template <typename T>
 class MinCoverGenerator {
 public:
-    static std::vector<std::string> minCover(T rangeMin, T rangeMax, T max, int sparsity) {
-        MinCoverGenerator<T> mcg(rangeMin, rangeMax, max, sparsity);
+    static std::vector<std::string> minCover(T lowerBound, T upperBound, T max, int sparsity) {
+        MinCoverGenerator<T> mcg(lowerBound, upperBound, max, sparsity);
         std::vector<std::string> c;
         mcg.minCoverRec(c, 0, mcg._maxlen);
         return c;
     }
 
 private:
-    MinCoverGenerator(T rangeMin, T rangeMax, T max, int sparsity)
-        : _rangeMin(rangeMin),
-          _rangeMax(rangeMax),
+    MinCoverGenerator(T lowerBound, T upperBound, T max, int sparsity)
+        : _lowerBound(lowerBound),
+          _upperBound(upperBound),
           _sparsity(sparsity),
           _maxlen(getFirstBitSet(max)) {
         static_assert(!std::numeric_limits<T>::is_signed);
         static_assert(std::numeric_limits<T>::is_integer);
-        uassert(6860001, "Min must be less than max for range search", rangeMin <= rangeMax);
-        dassert(rangeMin >= 0 && rangeMax <= max);
+        tassert(6860001,
+                "Lower bound must be less or equal to upper bound for range search.",
+                lowerBound <= upperBound);
+        dassert(lowerBound >= 0 && upperBound <= max);
     }
 
     // Generate and apply a mask to an integer, filling masked bits with 1;
@@ -3647,11 +3707,11 @@ private:
     void minCoverRec(std::vector<std::string>& c, T blockStart, int maskedBits) {
         const T blockEnd = applyMask(blockStart, maskedBits);
 
-        if (blockEnd < _rangeMin || blockStart > _rangeMax) {
+        if (blockEnd < _lowerBound || blockStart > _upperBound) {
             return;
         }
 
-        if (blockStart >= _rangeMin && blockEnd <= _rangeMax && isLevelStored(maskedBits)) {
+        if (blockStart >= _lowerBound && blockEnd <= _upperBound && isLevelStored(maskedBits)) {
             c.push_back(toString(blockStart, maskedBits));
             return;
         }
@@ -3664,64 +3724,112 @@ private:
     }
 
 private:
-    T _rangeMin;
-    T _rangeMax;
+    T _lowerBound;
+    T _upperBound;
     int _sparsity;
     int _maxlen;
 };
 
 template <typename T>
-std::vector<std::string> minCover(T rangeMin, T rangeMax, T min, T max, int sparsity) {
+std::vector<std::string> minCover(T lowerBound, T upperBound, T min, T max, int sparsity) {
     dassert(0 == min);
-    return MinCoverGenerator<T>::minCover(rangeMin, rangeMax, max, sparsity);
+    return MinCoverGenerator<T>::minCover(lowerBound, upperBound, max, sparsity);
 }
 
-std::vector<std::string> minCoverInt32(int32_t rangeMin,
-                                       int32_t rangeMax,
+/**
+ * OST-1 represents all ranges as inclusive, but MQL queries also have support for ranges that
+ * exclude either bound. If the user query does not include the lower/upper bound, then narrow the
+ * range by 1 on the proper end.
+ *
+ * This function is templated so that it can operate on the concrete OSTType struct for each
+ * supported numeric type.
+ */
+template <typename T>
+void adjustBounds(T& lowerBound, bool includeLowerBound, T& upperBound, bool includeUpperBound) {
+    if (!includeLowerBound) {
+        uassert(6901316,
+                "Lower bound must be less than the range maximum if lower bound is excluded from "
+                "range.",
+                lowerBound.value < lowerBound.max);
+        lowerBound.value += 1;
+    }
+    if (!includeUpperBound) {
+        uassert(6901317,
+                "Upper bound must be greater than the range minimum if upper bound is excluded "
+                "from range.",
+                upperBound.value > upperBound.min);
+        upperBound.value -= 1;
+    }
+}
+
+std::vector<std::string> minCoverInt32(int32_t lowerBound,
+                                       bool includeLowerBound,
+                                       int32_t upperBound,
+                                       bool includeUpperBound,
                                        boost::optional<int32_t> min,
                                        boost::optional<int32_t> max,
                                        int sparsity) {
-    auto a = getTypeInfo32(rangeMin, min, max);
-    auto b = getTypeInfo32(rangeMax, min, max);
+    auto a = getTypeInfo32(lowerBound, min, max);
+    auto b = getTypeInfo32(upperBound, min, max);
     dassert(a.min == b.min);
     dassert(a.max == b.max);
+    adjustBounds(a, includeLowerBound, b, includeUpperBound);
+    if (a.value > b.value) {
+        return {};
+    }
     return minCover(a.value, b.value, a.min, a.max, sparsity);
 }
 
-std::vector<std::string> minCoverInt64(int64_t rangeMin,
-                                       int64_t rangeMax,
+std::vector<std::string> minCoverInt64(int64_t lowerBound,
+                                       bool includeLowerBound,
+                                       int64_t upperBound,
+                                       bool includeUpperBound,
                                        boost::optional<int64_t> min,
                                        boost::optional<int64_t> max,
                                        int sparsity) {
-    auto a = getTypeInfo64(rangeMin, min, max);
-    auto b = getTypeInfo64(rangeMax, min, max);
+    auto a = getTypeInfo64(lowerBound, min, max);
+    auto b = getTypeInfo64(upperBound, min, max);
     dassert(a.min == b.min);
     dassert(a.max == b.max);
+    adjustBounds(a, includeLowerBound, b, includeUpperBound);
+    if (a.value > b.value) {
+        return {};
+    }
     return minCover(a.value, b.value, a.min, a.max, sparsity);
 }
 
-std::vector<std::string> minCoverDouble(double rangeMin,
-                                        double rangeMax,
+std::vector<std::string> minCoverDouble(double lowerBound,
+                                        bool includeLowerBound,
+                                        double upperBound,
+                                        bool includeUpperBound,
                                         boost::optional<double> min,
                                         boost::optional<double> max,
                                         int sparsity) {
-    auto a = getTypeInfoDouble(rangeMin, min, max);
-    auto b = getTypeInfoDouble(rangeMax, min, max);
+    auto a = getTypeInfoDouble(lowerBound, min, max);
+    auto b = getTypeInfoDouble(upperBound, min, max);
     dassert(a.min == b.min);
     dassert(a.max == b.max);
+    adjustBounds(a, includeLowerBound, b, includeUpperBound);
+    if (a.value > b.value) {
+        return {};
+    }
     return minCover(a.value, b.value, a.min, a.max, sparsity);
 }
-
-std::vector<std::string> minCoverDecimal128(Decimal128 rangeMin,
-                                            Decimal128 rangeMax,
+std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
+                                            bool includeLowerBound,
+                                            Decimal128 upperBound,
+                                            bool includeUpperBound,
                                             boost::optional<Decimal128> min,
                                             boost::optional<Decimal128> max,
                                             int sparsity) {
-    auto a = getTypeInfoDecimal128(rangeMin, min, max);
-    auto b = getTypeInfoDecimal128(rangeMax, min, max);
+    auto a = getTypeInfoDecimal128(lowerBound, min, max);
+    auto b = getTypeInfoDecimal128(upperBound, min, max);
     dassert(a.min == b.min);
     dassert(a.max == b.max);
+    adjustBounds(a, includeLowerBound, b, includeUpperBound);
+    if (a.value > b.value) {
+        return {};
+    }
     return minCover(a.value, b.value, a.min, a.max, sparsity);
 }
-
 }  // namespace mongo

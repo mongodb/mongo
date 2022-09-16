@@ -29,14 +29,18 @@
 
 #pragma once
 
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
+
 namespace mongo {
 class FLE2EncryptionPlaceholder;
-class FLE2RangeSpec;
-
+class FLE2RangeFindSpec;
 /**
  * Extra validation for the placeholder struct to verify that range placeholders have min/max
  * endpoints. Will throw a uassert if the placeholder does not pass validation.
  */
 void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* placeholder);
-void validateIDLFLE2RangeSpec(const FLE2RangeSpec* placeholder);
+void validateIDLFLE2RangeFindSpec(const FLE2RangeFindSpec* placeholder);
+void validateQueryBounds(BSONType indexType, ImplicitValue lb, ImplicitValue ub);
+bool isInfinite(ImplicitValue val);
 }  // namespace mongo

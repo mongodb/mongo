@@ -163,7 +163,7 @@ structs:
             cpp_name: maxContentionCounter
           s:
             description: "Queryable Encryption range hypergraph sparsity factor"
-            type: int
+            type: long
             cpp_name: sparsity
             optional: true
             validator: { gte: 1, lte: 4 }
@@ -343,23 +343,29 @@ structs:
             description: "Encrypted value"
             type: bindata_generic
 
-    FLE2RangeSpec:
+    FLE2RangeFindSpec:
         description: "Range find specification that is encoded inside of a FLE2EncryptionPlaceholder."
         strict: true
-        cpp_validator_func: "validateIDLFLE2RangeSpec"
+        cpp_validator_func: "validateIDLFLE2RangeFindSpec"
         fields:
-          min:
-            description: "The minimum value for an encrypted range query."
+          lowerBound:
+            description: "The lower bound for an encrypted range query."
             type: IDLAnyType
-          minIncluded:
+          lbIncluded:
             description: "Indicates if the lower bound should be included in the range."
             type: bool
-          max:
-            description: "The maximum value for an encrypted range query."
+          upperBound:
+            description: "The upper bound for an encrypted range query."
             type: IDLAnyType
-          maxIncluded:
+          ubIncluded:
             description: "Indicates if the upper bound should be included in the range."
             type: bool
+          indexMin:
+            description: "Minimum value for the encrypted index that this query is using."
+            type: encrypted_numeric_element
+          indexMax:
+            description: "Maximum value for the encrypted index that this query is using."
+            type: encrypted_numeric_element
 
     FLE2RangeInsertSpec:
         description: "Range insert specification that is encoded inside of a FLE2EncryptionPlaceholder."
@@ -369,11 +375,11 @@ structs:
             description: "Value to encrypt"
             type: encrypted_numeric_element
             cpp_name: value
-          lb:
-            description: "Queryable Encryption lower bound for range"
+          min:
+            description: "Queryable Encryption min bound for range"
             type: encrypted_numeric_element
-            cpp_name: lowerBound
-          ub:
-            description: "Queryable Encryption upper bound for range"
+            cpp_name: minBound
+          max:
+            description: "Queryable Encryption max bound for range"
             type: encrypted_numeric_element
-            cpp_name: upperBound
+            cpp_name: maxBound

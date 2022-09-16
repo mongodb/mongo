@@ -164,10 +164,9 @@ struct MinCoverTestVector {
     int sparsity;
     std::string expect;
 
-    bool validate(
-        std::function<std::vector<std::string>(T, T, boost::optional<T>, boost::optional<T>, int)>
-            algo) const {
-        auto result = algo(rangeMin, rangeMax, min, max, sparsity);
+    bool validate(std::function<std::vector<std::string>(
+                      T, bool, T, bool, boost::optional<T>, boost::optional<T>, int)> algo) const {
+        auto result = algo(rangeMin, true, rangeMax, true, min, max, sparsity);
 
         std::stringstream ss(expect);
         std::vector<std::string> vexpect;

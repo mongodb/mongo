@@ -478,10 +478,10 @@ BSONObj generateFLE2RangeInsertSpec(BSONElement value) {
     spec.setValue(value);
 
     auto lowerDoc = BSON("lb" << 0);
-    spec.setLowerBound(lowerDoc.firstElement());
+    spec.setMinBound(lowerDoc.firstElement());
     auto upperDoc = BSON("ub" << 15);
 
-    spec.setUpperBound(upperDoc.firstElement());
+    spec.setMaxBound(upperDoc.firstElement());
     auto specDoc = BSON("s" << spec.toBSON());
 
     return specDoc;

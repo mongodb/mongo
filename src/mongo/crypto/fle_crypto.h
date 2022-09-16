@@ -1396,26 +1396,34 @@ std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
  * Mincover calculator
  */
 
-std::vector<std::string> minCoverInt32(int32_t rangeMin,
-                                       int32_t rangeMax,
+std::vector<std::string> minCoverInt32(int32_t lowerBound,
+                                       bool includeLowerBound,
+                                       int32_t upperBound,
+                                       bool includeUpperBound,
                                        boost::optional<int32_t> min,
                                        boost::optional<int32_t> max,
                                        int sparsity);
 
-std::vector<std::string> minCoverInt64(int64_t rangeMin,
-                                       int64_t rangeMax,
+std::vector<std::string> minCoverInt64(int64_t lowerBound,
+                                       bool includeLowerBound,
+                                       int64_t upperBound,
+                                       bool includeUpperBound,
                                        boost::optional<int64_t> min,
                                        boost::optional<int64_t> max,
                                        int sparsity);
 
-std::vector<std::string> minCoverDouble(double rangeMin,
-                                        double rangeMax,
+std::vector<std::string> minCoverDouble(double lowerBound,
+                                        bool includeLowerBound,
+                                        double upperBound,
+                                        bool includeUpperBound,
                                         boost::optional<double> min,
                                         boost::optional<double> max,
                                         int sparsity);
 
-std::vector<std::string> minCoverDecimal128(Decimal128 rangeMin,
-                                            Decimal128 rangeMax,
+std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
+                                            bool includeLowerBound,
+                                            Decimal128 upperBound,
+                                            bool includeUpperBound,
                                             boost::optional<Decimal128> min,
                                             boost::optional<Decimal128> max,
                                             int sparsity);
@@ -1501,4 +1509,9 @@ private:
     stdx::unordered_set<PrfBlock> _cachedEDCTokens;
 };
 
+/**
+ * Get the set of edges that minimally cover a range query specified by the given range spec and
+ * sparsity.jj
+ */
+std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t sparsity);
 }  // namespace mongo
