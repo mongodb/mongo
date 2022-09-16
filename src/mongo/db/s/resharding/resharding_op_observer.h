@@ -61,6 +61,11 @@ public:
     ReshardingOpObserver();
     ~ReshardingOpObserver() override;
 
+    void onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const UUID& uuid,
+                                                          BSONObj indexDoc) override {}
+
     void onCreateGlobalIndex(OperationContext* opCtx,
                              const NamespaceString& globalIndexNss,
                              const UUID& globalIndexUUID) final{};

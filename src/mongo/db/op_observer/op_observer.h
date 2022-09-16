@@ -122,6 +122,11 @@ public:
 
     virtual ~OpObserver() = default;
 
+    virtual void onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
+                                                                  const NamespaceString& nss,
+                                                                  const UUID& uuid,
+                                                                  BSONObj indexDoc) = 0;
+
     virtual void onCreateGlobalIndex(OperationContext* opCtx,
                                      const NamespaceString& globalIndexNss,
                                      const UUID& globalIndexUUID) = 0;

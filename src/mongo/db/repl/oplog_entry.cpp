@@ -163,6 +163,8 @@ DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
         return DurableOplogEntry::CommandType::kAbortTransaction;
     } else if (commandString == "importCollection") {
         return DurableOplogEntry::CommandType::kImportCollection;
+    } else if (commandString == "modifyShardedCollectionGlobalIndexCatalog") {
+        return DurableOplogEntry::CommandType::kModifyShardedCollectionGlobalIndexCatalog;
     } else if (commandString == "createGlobalIndex") {
         return DurableOplogEntry::CommandType::kCreateGlobalIndex;
     } else if (commandString == "dropGlobalIndex") {

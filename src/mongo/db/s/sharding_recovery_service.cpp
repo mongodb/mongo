@@ -429,29 +429,40 @@ void ShardingRecoveryService::recoverIndexesCatalog(OperationContext* opCtx) {
     const auto collectionNames = CollectionShardingState::getCollectionNames(opCtx);
     for (const auto& collName : collectionNames) {
         try {
-            AutoGetCollection collLock(opCtx, collName, MODE_IS);
+            AutoGetCollection collLock(opCtx, collName, MODE_X);
             auto* const csr = CollectionShardingRuntime::get(opCtx, collName);
-            auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-            csr->setIndexVersion(opCtx, boost::none);
+            csr->clearIndexes(opCtx);
         } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
             LOGV2_DEBUG(6686501,
                         2,
-                        "Skipping attempting to set index version for view in "
+                        "Skipping attempting to clear indexes for a view in "
                         "recoverIndexCatalogs",
                         "namespace"_attr = collName);
         }
     }
 
     DBDirectClient client(opCtx);
+    stdx::unordered_map<std::string, Timestamp> indexVersions;
     FindCommandRequest findRequest{NamespaceString::kShardCollectionCatalogNamespace};
-    findRequest.setProjection(BSON(CollectionTypeBase::kNssFieldName
-                                   << 1 << CollectionTypeBase::kIndexVersionFieldName << 1));
-    // Map the index versions that are on disk to memory.
-    client.find(std::move(findRequest), [&opCtx](const BSONObj& coll) {
-        auto nss = NamespaceString(coll[CollectionTypeBase::kNssFieldName].str());
-        auto indexVersion = coll[CollectionTypeBase::kIndexVersionFieldName].timestamp();
-        AutoGetCollection collLock(opCtx, nss, MODE_IS);
-        CollectionShardingRuntime::get(opCtx, nss)->setIndexVersion(opCtx, indexVersion);
+    findRequest.setProjection(
+        BSON(CollectionType::kNssFieldName << 1 << CollectionType::kIndexVersionFieldName << 1));
+    // Map the indexes that are on disk to memory with the appropiate indexVersion.
+    client.find(std::move(findRequest), [&opCtx, &indexVersions](const BSONObj& coll) {
+        auto nss = coll[CollectionType::kNssFieldName].str();
+        auto indexVersion = coll[CollectionType::kIndexVersionFieldName].timestamp();
+        indexVersions.emplace(nss, indexVersion);
+    });
+
+    FindCommandRequest findIndexesRequest{NamespaceString::kShardIndexCatalogNamespace};
+    client.find(std::move(findIndexesRequest), [&opCtx, &indexVersions](const BSONObj& coll) {
+        auto indexEntry =
+            IndexCatalogType::parse(IDLParserContext("recoverIndexesCatalogContext"), coll);
+        auto nss =
+            CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, indexEntry.getCollectionUUID());
+        invariant(indexVersions.contains(nss->ns()));
+        AutoGetCollection collLock(opCtx, *nss, MODE_X);
+        CollectionShardingRuntime::get(opCtx, collLock->ns())
+            ->addIndex(opCtx, indexEntry, indexVersions[collLock->ns().toString()]);
     });
 
     LOGV2_DEBUG(6686502, 2, "Recovered all index versions");

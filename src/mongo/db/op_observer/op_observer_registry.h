@@ -58,6 +58,14 @@ public:
         _observers.push_back(std::move(observer));
     }
 
+    void onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const UUID& uuid,
+                                                          BSONObj indexDoc) override {
+        for (auto& o : _observers)
+            o->onModifyShardedCollectionGlobalIndexCatalogEntry(opCtx, nss, uuid, indexDoc);
+    }
+
     void onCreateGlobalIndex(OperationContext* opCtx,
                              const NamespaceString& globalIndexNss,
                              const UUID& globalIndexUUID) final {

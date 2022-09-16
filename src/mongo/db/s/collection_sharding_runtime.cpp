@@ -88,7 +88,8 @@ CollectionShardingRuntime::CollectionShardingRuntime(
       _rangeDeleterExecutor(std::move(rangeDeleterExecutor)),
       _stateChangeMutex(_nss.toString()),
       _metadataType(_nss.isNamespaceAlwaysUnsharded() ? MetadataType::kUnsharded
-                                                      : MetadataType::kUnknown) {}
+                                                      : MetadataType::kUnknown),
+      _indexCache(boost::none, IndexCatalogTypeMap()) {}
 
 CollectionShardingRuntime* CollectionShardingRuntime::get(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
@@ -487,15 +488,34 @@ void CollectionShardingRuntime::resetShardVersionRecoverRefreshFuture(const CSRL
     _shardVersionInRecoverOrRefresh = boost::none;
 }
 
-void CollectionShardingRuntime::setIndexVersion(OperationContext* opCtx,
-                                                const boost::optional<Timestamp>& indexVersion) {
-    auto csrLock = CSRLock::lockExclusive(opCtx, this);
-    _indexVersion = indexVersion;
-}
-
 boost::optional<Timestamp> CollectionShardingRuntime::getIndexVersion(OperationContext* opCtx) {
     auto csrLock = CSRLock::lockShared(opCtx, this);
     return _indexVersion;
+}
+
+GlobalIndexesCache& CollectionShardingRuntime::getIndexes(OperationContext* opCtx) {
+    return _indexCache;
+}
+
+void CollectionShardingRuntime::addIndex(OperationContext* opCtx,
+                                         const IndexCatalogType& index,
+                                         const Timestamp& indexVersion) {
+    auto csrLock = CSRLock::lockExclusive(opCtx, this);
+    _indexVersion.emplace(indexVersion);
+    _indexCache.add(index, indexVersion);
+}
+
+void CollectionShardingRuntime::removeIndex(OperationContext* opCtx,
+                                            const std::string& name,
+                                            const Timestamp& indexVersion) {
+    auto csrLock = CSRLock::lockExclusive(opCtx, this);
+    _indexCache.remove(name, indexVersion);
+}
+
+void CollectionShardingRuntime::clearIndexes(OperationContext* opCtx) {
+    auto csrLock = CSRLock::lockExclusive(opCtx, this);
+    _indexVersion = boost::none;
+    _indexCache.clear();
 }
 
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,

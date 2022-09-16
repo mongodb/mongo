@@ -2265,6 +2265,20 @@ void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
         opCtx, &oplogEntry, DurableTxnStateEnum::kAborted, _oplogWriter.get());
 }
 
+void OpObserverImpl::onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
+                                                                      const NamespaceString& nss,
+                                                                      const UUID& uuid,
+                                                                      BSONObj opDoc) {
+    repl::MutableOplogEntry oplogEntry;
+    auto obj = BSON("modifyShardedCollectionGlobalIndexCatalog" << nss.toString()).addFields(opDoc);
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setNss(nss);
+    oplogEntry.setUuid(uuid);
+    oplogEntry.setObject(obj);
+
+    logOperation(opCtx, &oplogEntry, true, _oplogWriter.get());
+}
+
 void OpObserverImpl::_onReplicationRollback(OperationContext* opCtx,
                                             const RollbackObserverInfo& rbInfo) {
     // Reset the key manager cache.

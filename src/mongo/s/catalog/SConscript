@@ -31,6 +31,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
+        '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/pcre_wrapper',
     ],
 )

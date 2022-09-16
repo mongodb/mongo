@@ -47,6 +47,11 @@ public:
     explicit PrimaryOnlyServiceOpObserver(ServiceContext* serviceContext);
     ~PrimaryOnlyServiceOpObserver();
 
+    void onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const UUID& uuid,
+                                                          BSONObj indexDoc) final {}
+
     void onCreateGlobalIndex(OperationContext* opCtx,
                              const NamespaceString& globalIndexNss,
                              const UUID& globalIndexUUID) final{};

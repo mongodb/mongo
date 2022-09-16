@@ -281,6 +281,7 @@ env.Library(
         'client/shard_registry.cpp',
         'global_indexes_cache.cpp',
         'grid.cpp',
+        'global_index_cache.cpp',
         'shard_key_pattern.cpp',
     ],
     LIBDEPS=[

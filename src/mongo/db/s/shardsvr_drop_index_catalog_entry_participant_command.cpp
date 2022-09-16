@@ -32,6 +32,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
 #include "mongo/db/s/sharding_index_catalog_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -44,54 +45,6 @@
 
 namespace mongo {
 namespace {
-
-/**
- * Drops an index from the local catalog.
- *
- * Returns true if there was a write performed.
- */
-bool dropIndex(OperationContext* opCtx,
-               std::shared_ptr<executor::TaskExecutor> executor,
-               const NamespaceString& userCollectionNss,
-               const std::string& name,
-               const UUID& collectionUUID,
-               const Timestamp& lastmod) {
-    write_ops::DeleteCommandRequest deleteOp(NamespaceString::kShardIndexCatalogNamespace);
-    deleteOp.setDeletes({[&] {
-        write_ops::DeleteOpEntry entry;
-        entry.setQ(BSON(IndexCatalogType::kCollectionUUIDFieldName
-                        << collectionUUID << IndexCatalogType::kNameFieldName << name));
-        entry.setMulti(false);
-        return entry;
-    }()});
-    deleteOp.setWriteCommandRequestBase([] {
-        write_ops::WriteCommandRequestBase wcb;
-        wcb.setStmtId(1);
-        return wcb;
-    }());
-
-    write_ops::UpdateCommandRequest updateCollectionOp(
-        NamespaceString::kShardCollectionCatalogNamespace);
-    updateCollectionOp.setUpdates({[&] {
-        write_ops::UpdateOpEntry entry;
-        entry.setQ(BSON(CollectionType::kNssFieldName << userCollectionNss.ns()
-                                                      << CollectionType::kUuidFieldName
-                                                      << collectionUUID));
-        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-            BSON("$set" << BSON(CollectionType::kUuidFieldName
-                                << collectionUUID << CollectionType::kIndexVersionFieldName
-                                << lastmod))));
-        entry.setUpsert(true);
-        entry.setMulti(false);
-        return entry;
-    }()});
-
-    DBDirectClient client(opCtx);
-    auto updateResult = write_ops::checkWriteErrors(client.update(updateCollectionOp));
-    auto deleteResult = write_ops::checkWriteErrors(client.remove(deleteOp));
-
-    return deleteResult.getN() || updateResult.getN();
-}
 
 class ShardsvrDropIndexCatalogEntryParticipantCommand final
     : public TypedCommand<ShardsvrDropIndexCatalogEntryParticipantCommand> {
@@ -150,26 +103,11 @@ public:
             }
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-            auto writesExecuted = dropIndex(opCtx,
-                                            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                                            ns(),
-                                            request().getName().toString(),
-                                            request().getCollectionUUID(),
-                                            request().getLastmod());
-
-            if (!writesExecuted) {
-                // Since no write that generated a retryable write oplog entry with this sessionId
-                // and txnNumber happened, we need to make a dummy write so that the session gets
-                // durably persisted on the oplog. This must be the last operation done on this
-                // command.
-                DBDirectClient client(opCtx);
-                client.update(NamespaceString::kServerConfigurationNamespace.ns(),
-                              BSON("_id" << Request::kCommandName),
-                              BSON("$inc" << BSON("count" << 1)),
-                              true /* upsert */,
-                              false /* multi */);
-            }
+            removeGlobalIndexCatalogEntryFromCollection(opCtx,
+                                                        ns(),
+                                                        request().getCollectionUUID(),
+                                                        request().getName().toString(),
+                                                        request().getLastmod());
         }
 
     private:

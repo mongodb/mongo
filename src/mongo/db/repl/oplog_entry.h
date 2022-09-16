@@ -451,6 +451,7 @@ public:
         kCommitTransaction,
         kAbortTransaction,
         kImportCollection,
+        kModifyShardedCollectionGlobalIndexCatalog,
         kCreateGlobalIndex,
         kDropGlobalIndex,
         kInsertGlobalIndexKey,

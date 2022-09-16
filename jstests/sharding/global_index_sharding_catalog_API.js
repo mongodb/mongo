@@ -7,7 +7,7 @@
 (function() {
 'use strict';
 
-const st = new ShardingTest({mongos: 1, shards: 2});
+const st = new ShardingTest({mongos: 1, shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
 
 const shard0 = st.shard0.shardName;
 const shard1 = st.shard1.shardName;
@@ -31,6 +31,7 @@ st.s.adminCommand({enableSharding: cbName, primaryShard: shard0});
 st.s.adminCommand({shardCollection: nss, key: {_id: 1}});
 
 const collectionUUID = st.s.getCollection('config.collections').findOne({_id: nss}).uuid;
+
 st.rs0.getPrimary().adminCommand({
     _shardsvrRegisterIndex: nss,
     keyPattern: index1Pattern,
@@ -41,6 +42,7 @@ st.rs0.getPrimary().adminCommand({
     lastmod: Timestamp(0, 0),
     writeConcern: {w: 'majority'}
 });
+st.rs0.awaitReplication();
 
 // Check that we created the index on the config server and on shard0, which is the only shard with
 // data.
@@ -57,6 +59,14 @@ assert.eq(1, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments
     name: index1Name
 }));
 assert.eq(1, st.rs0.getPrimary().getCollection(shardCollectionCatalog).countDocuments({
+    uuid: collectionUUID,
+    indexVersion: {$exists: true}
+}));
+assert.eq(1, st.rs0.getSecondary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+    name: index1Name
+}));
+assert.eq(1, st.rs0.getSecondary().getCollection(shardCollectionCatalog).countDocuments({
     uuid: collectionUUID,
     indexVersion: {$exists: true}
 }));
@@ -92,6 +102,7 @@ st.rs0.getPrimary().adminCommand({
     lastmod: Timestamp(0, 0),
     writeConcern: {w: 'majority'}
 });
+st.rs0.awaitReplication();
 
 // Check that we created the index on the config server and on both shards because there is data
 // everywhere.
@@ -103,7 +114,19 @@ assert.eq(1, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments
     collectionUUID: collectionUUID,
     name: index2Name
 }));
+assert.eq(1, st.rs0.getSecondary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+    name: index2Name
+}));
+assert.eq(1, st.rs0.getSecondary().getCollection(shardCollectionCatalog).countDocuments({
+    uuid: collectionUUID,
+    indexVersion: {$exists: true}
+}));
 assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+    name: index2Name
+}));
+assert.eq(1, st.rs1.getSecondary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index2Name
 }));
@@ -123,7 +146,6 @@ assert.eq(0, st.rs1.getPrimary().getCollection(configsvrIndexCatalog).countDocum
 }));
 
 // Drop index test.
-
 st.rs0.getPrimary().adminCommand({
     _shardsvrUnregisterIndex: 'foo.test',
     name: index2Name,
@@ -140,7 +162,15 @@ assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments
     collectionUUID: collectionUUID,
     name: index2Name
 }));
+assert.eq(0, st.rs0.getSecondary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+    name: index2Name
+}));
 assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+    name: index2Name
+}));
+assert.eq(0, st.rs1.getSecondary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index2Name
 }));

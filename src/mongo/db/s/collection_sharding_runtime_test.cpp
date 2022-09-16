@@ -32,9 +32,11 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
@@ -44,8 +46,6 @@
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/util/fail_point.h"
-
-#include "mongo/db/s/sharding_index_catalog_util.h"
 
 namespace mongo {
 namespace {
@@ -550,35 +550,6 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
     ASSERT(cleanupComplete.isReady());
 }
 
-TEST_F(CollectionShardingRuntimeWithRangeDeleterTest, IncreaseIndexVersionAsParticipant) {
-    OperationContext* opCtx = operationContext();
-    Timestamp indexVersion(1, 0);
-
-    // Simulate the commit of the index by writing in the config.shard.collections collection.
-    write_ops::UpdateCommandRequest updateCollectionOp(
-        NamespaceString::kShardCollectionCatalogNamespace);
-    updateCollectionOp.setUpdates({[&] {
-        write_ops::UpdateOpEntry entry;
-        entry.setQ(BSON(CollectionType::kNssFieldName << kTestNss.toString()
-                                                      << CollectionType::kUuidFieldName << uuid()));
-        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-            BSON("$set" << BSON(CollectionType::kIndexVersionFieldName << indexVersion))));
-        entry.setUpsert(true);
-        entry.setMulti(false);
-        return entry;
-    }()});
-    updateCollectionOp.setWriteCommandRequestBase([] {
-        write_ops::WriteCommandRequestBase wcb;
-        wcb.setStmtId(1);
-        return wcb;
-    }());
-
-    DBDirectClient client(opCtx);
-    write_ops::checkWriteErrors(client.update(updateCollectionOp));
-
-    ASSERT_EQ(indexVersion, csr().getIndexVersion(opCtx).value());
-}
-
 TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
        WaitForCleanCorrectEvenAfterClearFollowedBySetFilteringMetadata) {
     globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::alwaysOn);
@@ -616,5 +587,34 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
     ASSERT(cleanupComplete.isReady());
 }
 
+class CollectionShardingRuntimeWithCatalogTest
+    : public CollectionShardingRuntimeWithRangeDeleterTest {
+public:
+    void setUp() override {
+        CollectionShardingRuntimeWithRangeDeleterTest::setUp();
+        DBDirectClient client(operationContext());
+        client.createCollection(NamespaceString::kShardIndexCatalogNamespace.ns());
+        client.createCollection(NamespaceString::kShardCollectionCatalogNamespace.ns());
+    }
+
+    void tearDown() override {
+        OpObserver::Times::get(operationContext()).reservedOpTimes.clear();
+        CollectionShardingRuntimeWithRangeDeleterTest::tearDown();
+    }
+};
+
+TEST_F(CollectionShardingRuntimeWithCatalogTest, TestGlobalIndexesCache) {
+    OperationContext* opCtx = operationContext();
+
+    ASSERT_EQ(true, csr().getIndexes(opCtx).empty());
+
+    Timestamp indexVersion(1, 0);
+    addGlobalIndexCatalogEntryToCollection(
+        opCtx, kTestNss, "x_1", BSON("x" << 1), BSONObj(), uuid(), indexVersion, boost::none);
+
+    ASSERT_EQ(false, csr().getIndexes(opCtx).empty());
+    ASSERT_EQ(indexVersion, *csr().getIndexes(opCtx).getVersion());
+    ASSERT_EQ(indexVersion, *csr().getIndexVersion(opCtx));
+}
 }  // namespace
 }  // namespace mongo

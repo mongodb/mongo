@@ -90,6 +90,7 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -101,6 +102,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -1096,6 +1098,40 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
     {"abortTransaction",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
          return applyAbortTransaction(opCtx, entry, mode);
+     }}},
+    {"modifyShardedCollectionGlobalIndexCatalog",
+     {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
+         auto entryObj = entry.getObject();
+         try {
+             if (entry.getObject()["op"].str() == "i") {
+                 auto indexEntry = IndexCatalogType::parse(
+                     IDLParserContext("OplogModifyCatalogEntryContext"), entryObj["entry"].Obj());
+                 addGlobalIndexCatalogEntryToCollection(opCtx,
+                                                        entry.getNss(),
+                                                        indexEntry.getName().toString(),
+                                                        indexEntry.getKeyPattern(),
+                                                        indexEntry.getOptions(),
+                                                        indexEntry.getCollectionUUID(),
+                                                        indexEntry.getLastmod(),
+                                                        indexEntry.getIndexCollectionUUID());
+
+             } else {
+                 removeGlobalIndexCatalogEntryFromCollection(
+                     opCtx,
+                     entry.getNss(),
+                     uassertStatusOK(UUID::parse(
+                         entryObj["entry"][IndexCatalogType::kCollectionUUIDFieldName])),
+                     entryObj["entry"][IndexCatalogType::kNameFieldName].str(),
+                     entryObj["entry"][IndexCatalogType::kLastmodFieldName].timestamp());
+             }
+         } catch (const DBException& ex) {
+             LOGV2_ERROR(6712302,
+                         "Failed to apply modifyShardedCollectionGlobalIndexCatalog with entry obj",
+                         "entryObj"_attr = redact(entryObj),
+                         "error"_attr = redact(ex));
+             return ex.toStatus();
+         }
+         return Status::OK();
      }}},
     {"createGlobalIndex",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {

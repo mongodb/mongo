@@ -44,6 +44,26 @@ env.Library(
 )
 
 env.Library(
+    target='sharding_catalog',
+    source=[
+        'global_index_ddl_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/ops/write_ops',
+        '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
+        '$BUILD_DIR/mongo/db/shard_role',
+        '$BUILD_DIR/mongo/db/transaction/transaction',
+        '$BUILD_DIR/mongo/s/common_s',
+    ],
+)
+
+env.Library(
     target='sharding_runtime_d',
     source=[
         'active_migrations_registry.cpp',
@@ -204,7 +224,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/storage/remove_saver',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
+        '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/future_util',
+        'sharding_catalog',
         'sharding_logging',
     ],
 )
@@ -339,6 +361,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/util/log_and_backoff',
@@ -516,10 +539,12 @@ env.Library(
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         '$BUILD_DIR/mongo/s/commands/cluster_commands_common',
         '$BUILD_DIR/mongo/s/commands/sharded_cluster_sharding_commands',
+        '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/sharding_initialization',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/s/startup_initialization',
         'forwardable_operation_metadata',
+        'sharding_catalog',
         'sharding_logging',
         'sharding_runtime_d',
         'user_writes_recoverable_critical_section',
@@ -702,6 +727,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'shard_server_test_fixture',
+        'sharding_catalog',
         'sharding_commands_d',
         'sharding_logging',
         'transaction_coordinator',

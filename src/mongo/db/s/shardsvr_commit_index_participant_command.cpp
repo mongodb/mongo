@@ -32,6 +32,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
 #include "mongo/db/s/sharding_index_catalog_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -40,65 +41,11 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace {
-
-/**
- * Insert an index in the local catalog.
- *
- * Returns true if there was a write performed.
- */
-bool commitIndex(OperationContext* opCtx,
-                 std::shared_ptr<executor::TaskExecutor> executor,
-                 const NamespaceString& userCollectionNss,
-                 const std::string& name,
-                 const BSONObj& keyPattern,
-                 const BSONObj& options,
-                 const UUID& collectionUUID,
-                 const Timestamp& lastmod,
-                 const boost::optional<UUID>& indexCollectionUUID) {
-    IndexCatalogType indexCatalogEntry(name, keyPattern, options, lastmod, collectionUUID);
-    indexCatalogEntry.setIndexCollectionUUID(indexCollectionUUID);
-
-    write_ops::UpdateCommandRequest upsertIndexOp(NamespaceString::kShardIndexCatalogNamespace);
-    upsertIndexOp.setUpdates({[&] {
-        write_ops::UpdateOpEntry entry;
-        entry.setQ(BSON(IndexCatalogType::kCollectionUUIDFieldName
-                        << collectionUUID << IndexCatalogType::kNameFieldName << name));
-        entry.setU(
-            write_ops::UpdateModification::parseFromClassicUpdate(indexCatalogEntry.toBSON()));
-        entry.setUpsert(true);
-        entry.setMulti(false);
-        return entry;
-    }()});
-
-    write_ops::UpdateCommandRequest updateCollectionOp(
-        NamespaceString::kShardCollectionCatalogNamespace);
-    updateCollectionOp.setUpdates({[&] {
-        write_ops::UpdateOpEntry entry;
-        entry.setQ(BSON(CollectionType::kNssFieldName << userCollectionNss.ns()
-                                                      << CollectionType::kUuidFieldName
-                                                      << collectionUUID));
-        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-            BSON("$set" << BSON(CollectionType::kIndexVersionFieldName << lastmod))));
-        entry.setUpsert(true);
-        entry.setMulti(false);
-        return entry;
-    }()});
-    updateCollectionOp.setWriteCommandRequestBase([] {
-        write_ops::WriteCommandRequestBase wcb;
-        wcb.setStmtId(1);
-        return wcb;
-    }());
-
-    DBDirectClient client(opCtx);
-    auto upsertResult = write_ops::checkWriteErrors(client.update(upsertIndexOp));
-    auto updateResult = write_ops::checkWriteErrors(client.update(updateCollectionOp));
-
-    return upsertResult.getN() || updateResult.getN();
-}
 
 class ShardsvrCommitIndexParticipantCommand final
     : public TypedCommand<ShardsvrCommitIndexParticipantCommand> {
@@ -157,30 +104,14 @@ public:
             }
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-            auto writesPerformed =
-                commitIndex(opCtx,
-                            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                            ns(),
-                            request().getName().toString(),
-                            request().getKeyPattern(),
-                            request().getOptions(),
-                            request().getCollectionUUID(),
-                            request().getLastmod(),
-                            request().getIndexCollectionUUID());
-
-            if (!writesPerformed) {
-                // Since no write that generated a retryable write oplog entry with this sessionId
-                // and txnNumber happened, we need to make a dummy write so that the session gets
-                // durably persisted on the oplog. This must be the last operation done on this
-                // command.
-                DBDirectClient client(opCtx);
-                client.update(NamespaceString::kServerConfigurationNamespace.ns(),
-                              BSON("_id" << Request::kCommandName),
-                              BSON("$inc" << BSON("count" << 1)),
-                              true /* upsert */,
-                              false /* multi */);
-            }
+            addGlobalIndexCatalogEntryToCollection(opCtx,
+                                                   ns(),
+                                                   request().getName().toString(),
+                                                   request().getKeyPattern(),
+                                                   request().getOptions(),
+                                                   request().getCollectionUUID(),
+                                                   request().getLastmod(),
+                                                   request().getIndexCollectionUUID());
         }
 
     private:

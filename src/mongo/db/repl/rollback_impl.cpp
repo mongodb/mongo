@@ -431,6 +431,7 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
                     << "' during rollback.";
                 return Status(ErrorCodes::UnrecoverableRollbackError, message);
             }
+            case OplogEntry::CommandType::kModifyShardedCollectionGlobalIndexCatalog:
             case OplogEntry::CommandType::kCreateGlobalIndex:
             case OplogEntry::CommandType::kDropGlobalIndex:
             case OplogEntry::CommandType::kCreate:

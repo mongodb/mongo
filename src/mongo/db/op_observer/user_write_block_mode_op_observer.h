@@ -154,6 +154,12 @@ public:
 
     // Noop operations (don't perform any check).
 
+    // Unchecked because sharded collection global indexes are modified from internal commands.
+    void onModifyShardedCollectionGlobalIndexCatalogEntry(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const UUID& uuid,
+                                                          BSONObj indexDoc) final {}
+
     // Unchecked because global indexes are created from internal commands.
     void onCreateGlobalIndex(OperationContext* opCtx,
                              const NamespaceString& globalIndexNss,
