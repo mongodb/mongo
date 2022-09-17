@@ -10,6 +10,8 @@
  *   requires_multi_updates,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # This test depends on stats read from the primary node in replica sets.
+ *   assumes_read_preference_unchanged,
  * ]
  */
 (function() {
@@ -61,10 +63,22 @@ TimeseriesTest.run((insert) => {
     }));
     docs[0][metaFieldName] = "b";
 
+    let stats = assert.commandWorked(coll.stats());
+    assert(stats.timeseries);
+    const expectedNumBucketsReopened = stats.timeseries['numBucketsReopened'] + 1;
+
     assert.commandWorked(insert(coll, docs.slice(1)));
     assert.docEq(coll.find({}, {_id: 0}).sort({[timeFieldName]: 1}).toArray(), docs);
 
-    // All three documents should be in their own buckets.
-    assert.eq(bucketsColl.find().itcount(), 3, bucketsColl.find().toArray());
+    if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
+        assert.eq(bucketsColl.find().itcount(), 2, bucketsColl.find().toArray());
+        stats = assert.commandWorked(coll.stats());
+        assert(stats.timeseries);
+        assert.eq(stats.timeseries['bucketCount'], 2);
+        assert.eq(stats.timeseries['numBucketsReopened'], expectedNumBucketsReopened);
+    } else {
+        // All three documents should be in their own buckets.
+        assert.eq(bucketsColl.find().itcount(), 3, bucketsColl.find().toArray());
+    }
 });
 })();

@@ -1350,7 +1350,8 @@ const operations = [
                 assert.eq(profileDoc.idxEntryBytesWritten, 0);
                 assert.eq(profileDoc.idxEntryUnitsWritten, 0);
             }
-            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.cursorSeeks,
+                      (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) ? 1 : 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
         }

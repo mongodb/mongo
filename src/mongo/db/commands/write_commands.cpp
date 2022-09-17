@@ -69,6 +69,7 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
@@ -831,16 +832,22 @@ public:
                 if (batch->needToDecompressBucketBeforeInserting()) {
                     const auto output = _performTimeseriesUpdate(
                         opCtx, batch, metadata, _makeTimeseriesDecompressionOp(opCtx, batch));
-                    if (auto error =
-                            generateError(opCtx, output.result, start + index, errors->size())) {
+                    if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
+                        output.result.getStatus().code() == ErrorCodes::WriteConflict) {
+                        bucketCatalog.abort(batch,
+                                            output.result.isOK()
+                                                ? Status{ErrorCodes::WriteConflict,
+                                                         "Could not update non-existent bucket"}
+                                                : output.result.getStatus());
+                        docsToRetry->push_back(index);
+                        opCtx->recoveryUnit()->abandonSnapshot();
+                        return true;
+                    } else if (auto error = generateError(
+                                   opCtx, output.result, start + index, errors->size())) {
                         errors->emplace_back(std::move(*error));
                         bucketCatalog.abort(batch, output.result.getStatus());
                         return output.canContinue;
                     }
-                    invariant(output.result.getValue().getNModified() == 1,
-                              str::stream() << "Expected 1 update of document with _id '" << docId
-                                            << "', but found "
-                                            << output.result.getValue().getNModified() << ".");
                 }
 
                 const auto output = _performTimeseriesUpdate(
@@ -848,17 +855,22 @@ public:
                     batch,
                     metadata,
                     _makeTimeseriesUpdateOp(opCtx, batch, metadata, std::move(stmtIds)));
-                if (auto error =
-                        generateError(opCtx, output.result, start + index, errors->size())) {
+                if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
+                    output.result.getStatus().code() == ErrorCodes::WriteConflict) {
+                    bucketCatalog.abort(batch,
+                                        output.result.isOK()
+                                            ? Status{ErrorCodes::WriteConflict,
+                                                     "Could not update non-existent bucket"}
+                                            : output.result.getStatus());
+                    docsToRetry->push_back(index);
+                    opCtx->recoveryUnit()->abandonSnapshot();
+                    return true;
+                } else if (auto error =
+                               generateError(opCtx, output.result, start + index, errors->size())) {
                     errors->emplace_back(std::move(*error));
                     bucketCatalog.abort(batch, output.result.getStatus());
                     return output.canContinue;
                 }
-
-                invariant(output.result.getValue().getNModified() == 1,
-                          str::stream()
-                              << "Expected 1 update of document with _id '" << docId
-                              << "', but found " << output.result.getValue().getNModified() << ".");
             }
 
             getOpTimeAndElectionId(opCtx, opTime, electionId);
@@ -1078,28 +1090,90 @@ public:
                     return true;
                 }
 
-                auto result = bucketCatalog.insert(
-                    opCtx,
-                    ns().isTimeseriesBucketsCollection() ? ns().getTimeseriesViewNamespace() : ns(),
-                    bucketsColl->getDefaultCollator(),
-                    timeSeriesOptions,
-                    request().getDocuments()[start + index],
-                    _canCombineTimeseriesInsertWithOtherClients(opCtx));
+                auto viewNs =
+                    ns().isTimeseriesBucketsCollection() ? ns().getTimeseriesViewNamespace() : ns();
+                auto& measurementDoc = request().getDocuments()[start + index];
 
-                if (auto error = generateError(opCtx, result, start + index, errors->size())) {
+                StatusWith<BucketCatalog::InsertResult> swResult =
+                    Status{ErrorCodes::BadValue, "Uninitialized InsertResult"};
+                do {
+                    if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+                            serverGlobalParams.featureCompatibility)) {
+                        swResult = bucketCatalog.tryInsert(
+                            opCtx,
+                            viewNs,
+                            bucketsColl->getDefaultCollator(),
+                            timeSeriesOptions,
+                            measurementDoc,
+                            _canCombineTimeseriesInsertWithOtherClients(opCtx));
+
+                        if (swResult.isOK()) {
+                            const auto& insertResult = swResult.getValue();
+                            if (insertResult.candidate) {
+                                // TODO (SERVER-66685): Implement archival bucket fetching
+                                // procedure.
+                            }
+
+                            // If the InsertResult doesn't contain a batch, we failed to insert the
+                            // measurement into an open bucket and need to create/reopen a bucket.
+                            if (!insertResult.batch) {
+                                boost::optional<BucketCatalog::BucketToReopen> bucketToReopen =
+                                    boost::none;
+
+                                // Resort to Query-Based reopening approach.
+                                auto suitableBucket = timeseries::findSuitableBucket(
+                                    opCtx, bucketsNs, timeSeriesOptions, measurementDoc);
+                                if (!suitableBucket.isEmpty()) {
+                                    auto validator = [&](OperationContext * opCtx,
+                                                         const BSONObj& bucketDoc) -> auto {
+                                        return bucketsColl->checkValidation(opCtx, bucketDoc);
+                                    };
+                                    bucketToReopen = BucketCatalog::BucketToReopen{
+                                        suitableBucket, validator, insertResult.catalogEra};
+                                }
+
+                                swResult = bucketCatalog.insert(
+                                    opCtx,
+                                    viewNs,
+                                    bucketsColl->getDefaultCollator(),
+                                    timeSeriesOptions,
+                                    measurementDoc,
+                                    _canCombineTimeseriesInsertWithOtherClients(opCtx),
+                                    bucketToReopen);
+                            }
+                        }
+                    } else {
+                        swResult = bucketCatalog.insert(
+                            opCtx,
+                            viewNs,
+                            bucketsColl->getDefaultCollator(),
+                            timeSeriesOptions,
+                            measurementDoc,
+                            _canCombineTimeseriesInsertWithOtherClients(opCtx));
+                    }
+
+                    // If there is an era offset (between the bucket we want to reopen and the
+                    // catalog's current era), we could hit a WriteConflict error indicating we will
+                    // need to refetch a bucket document as it is potentially stale.
+                } while (!swResult.isOK() &&
+                         (swResult.getStatus().code() == ErrorCodes::WriteConflict));
+
+                if (auto error = generateError(opCtx, swResult, start + index, errors->size())) {
+                    invariant(swResult.getStatus().code() != ErrorCodes::WriteConflict);
                     errors->emplace_back(std::move(*error));
                     return false;
-                } else {
-                    const auto& batch = result.getValue().batch;
-                    batches.emplace_back(batch, index);
-                    if (isTimeseriesWriteRetryable(opCtx)) {
-                        stmtIds[batch->bucket().id].push_back(stmtId);
-                    }
+                }
+
+                const auto& insertResult = swResult.getValue();
+                const auto& batch = insertResult.batch;
+                batches.emplace_back(batch, index);
+                if (isTimeseriesWriteRetryable(opCtx)) {
+                    stmtIds[batch->bucket().id].push_back(stmtId);
                 }
 
                 // If this insert closed buckets, rewrite to be a compressed column. If we cannot
                 // perform write operations at this point the bucket will be left uncompressed.
-                for (const auto& closedBucket : result.getValue().closedBuckets) {
+                for (const auto& closedBucket : insertResult.closedBuckets) {
                     if (!canContinue) {
                         break;
                     }
@@ -1169,6 +1243,11 @@ public:
                 if (swCommitInfo.getStatus() == ErrorCodes::TimeseriesBucketCleared) {
                     tassert(6023102, "the 'docsToRetry' cannot be null", docsToRetry);
                     docsToRetry->push_back(index);
+                    continue;
+                }
+                if (swCommitInfo.getStatus() == ErrorCodes::WriteConflict) {
+                    docsToRetry->push_back(index);
+                    opCtx->recoveryUnit()->abandonSnapshot();
                     continue;
                 }
                 if (auto error = generateError(

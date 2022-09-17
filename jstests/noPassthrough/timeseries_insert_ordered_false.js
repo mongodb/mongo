@@ -95,8 +95,11 @@ function runTest(conn, failPointConn, shardColl) {
     // The documents should go into two new buckets due to the failed insert on the existing bucket.
     assert.commandWorked(coll.insert(docs.slice(1, 3), {ordered: false}));
     assert.docEq(coll.find().sort({_id: 1}).toArray(), docs);
+    // If we allow bucket reopening, we will save out on opening another bucket.
+    const expectedBucketCount =
+        (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) ? 2 : 3;
     assert.eq(bucketsColl.count(),
-              3,
+              expectedBucketCount,
               'Expected three buckets but found: ' + tojson(bucketsColl.find().toArray()));
 }
 

@@ -844,7 +844,13 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     boost::optional<BSONObj> deletedDoc;
     const bool isRecordingPreImageForRetryableWrite =
         retryableFindAndModifyLocation != RetryableFindAndModifyLocation::kNone;
-    if (isRecordingPreImageForRetryableWrite || isChangeStreamPreAndPostImagesEnabled()) {
+    const bool isTimeseriesCollection =
+        getTimeseriesOptions() || ns().isTimeseriesBucketsCollection();
+
+    if (isRecordingPreImageForRetryableWrite || isChangeStreamPreAndPostImagesEnabled() ||
+        (isTimeseriesCollection &&
+         feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+             serverGlobalParams.featureCompatibility))) {
         deletedDoc.emplace(doc.value().getOwned());
     }
     int64_t keysDeleted = 0;

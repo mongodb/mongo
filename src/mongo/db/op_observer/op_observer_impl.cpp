@@ -1072,6 +1072,12 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     } else if (nss == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
             opCtx, documentKey.getId().firstElement(), boost::none);
+    } else if (nss.isTimeseriesBucketsCollection() &&
+               feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+                   serverGlobalParams.featureCompatibility)) {
+        invariant(args.deletedDoc);
+        auto& bucketCatalog = BucketCatalog::get(opCtx);
+        bucketCatalog.clear(args.deletedDoc->getField("_id").OID());
     }
 }
 

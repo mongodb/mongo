@@ -395,9 +395,14 @@ bool BucketCatalog::BucketStateManager::_hasBeenCleared(WithLock catalogLock, Bu
     return false;
 }
 
-void BucketCatalog::BucketStateManager::initializeBucketState(const OID& id) {
+bool BucketCatalog::BucketStateManager::initializeBucketState(
+    const OID& id, boost::optional<std::uint64_t> targetEra) {
     stdx::lock_guard catalogLock{*_mutex};
+    if (targetEra.has_value() && targetEra.value() < _era) {
+        return false;
+    }
     _bucketStates.emplace(id, BucketState::kNormal);
+    return true;
 }
 
 void BucketCatalog::BucketStateManager::eraseBucketState(const OID& id) {
@@ -414,6 +419,13 @@ boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::g
         return _setBucketStateHelper(catalogLock, bucket->id(), BucketState::kCleared);
     }
     auto it = _bucketStates.find(bucket->id());
+    return it != _bucketStates.end() ? boost::make_optional(it->second) : boost::none;
+}
+
+boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::getBucketState(
+    const OID& oid) const {
+    stdx::lock_guard catalogLock{*_mutex};
+    auto it = _bucketStates.find(oid);
     return it != _bucketStates.end() ? boost::make_optional(it->second) : boost::none;
 }
 
@@ -799,7 +811,13 @@ Status BucketCatalog::reopenBucket(OperationContext* opCtx,
     stdx::lock_guard stripeLock{stripe.mutex};
 
     ClosedBuckets closedBuckets;
-    _reopenBucket(&stripe, stripeLock, stats, key, std::move(bucket), &closedBuckets);
+    _reopenBucket(&stripe,
+                  stripeLock,
+                  stats,
+                  key,
+                  std::move(bucket),
+                  _bucketStateManager.getEra(),
+                  &closedBuckets);
     return Status::OK();
 }
 
@@ -1126,8 +1144,8 @@ const BucketCatalog::Bucket* BucketCatalog::_findBucket(const Stripe& stripe,
             return it->second.get();
         }
 
-        auto state = _bucketStateManager.getBucketState(it->second.get());
-        if (state && state != BucketState::kCleared && state != BucketState::kPreparedAndCleared) {
+        if (auto state = _bucketStateManager.getBucketState(it->second.get()); state &&
+            (state != BucketState::kCleared && state != BucketState::kPreparedAndCleared)) {
             return it->second.get();
         }
     }
@@ -1142,13 +1160,13 @@ BucketCatalog::Bucket* BucketCatalog::_useBucket(Stripe* stripe,
 }
 
 BucketCatalog::Bucket* BucketCatalog::_useBucketInState(Stripe* stripe,
-                                                        WithLock,
+                                                        WithLock stripeLock,
                                                         const OID& id,
                                                         BucketState targetState) {
     auto it = stripe->allBuckets.find(id);
     if (it != stripe->allBuckets.end()) {
-        auto state = _bucketStateManager.setBucketState(it->second.get(), targetState);
-        if (state && state != BucketState::kCleared && state != BucketState::kPreparedAndCleared) {
+        if (auto state = _bucketStateManager.setBucketState(it->second.get(), targetState);
+            state && state != BucketState::kCleared && state != BucketState::kPreparedAndCleared) {
             return it->second.get();
         }
     }
@@ -1168,8 +1186,8 @@ BucketCatalog::Bucket* BucketCatalog::_useBucket(Stripe* stripe,
 
     Bucket* bucket = it->second;
 
-    auto state = _bucketStateManager.getBucketState(bucket);
-    if (state == BucketState::kNormal || state == BucketState::kPrepared) {
+    if (auto state = _bucketStateManager.getBucketState(bucket);
+        state && (state == BucketState::kNormal || state == BucketState::kPrepared)) {
         _markBucketNotIdle(stripe, stripeLock, bucket);
         return bucket;
     }
@@ -1218,7 +1236,7 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     BSONElement metadata;
     auto metaFieldName = options.getMetaField();
     if (metaFieldName) {
-        metadata = bucketDoc.getField(*metaFieldName);
+        metadata = bucketDoc.getField(timeseries::kBucketMetaFieldName);
     }
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
@@ -1266,7 +1284,9 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     const bool isCompressed = timeseries::isCompressedBucket(bucketDoc);
     const BSONElement timeColumnElem = dataObj.getField(options.getTimeField());
 
-    if (isCompressed && timeColumnElem.type() == BSONType::BinData) {
+    if (dataObj.isEmpty() || !timeColumnElem.ok()) {
+        return {ErrorCodes::BadValue, "Bucket data field is malformed (missing a time field)"};
+    } else if (isCompressed && timeColumnElem.type() == BSONType::BinData) {
         BSONColumn storage{timeColumnElem};
         numMeasurements = storage.size();
     } else {
@@ -1284,6 +1304,7 @@ BucketCatalog::Bucket* BucketCatalog::_reopenBucket(Stripe* stripe,
                                                     ExecutionStatsController stats,
                                                     const BucketKey& key,
                                                     std::unique_ptr<Bucket>&& bucket,
+                                                    std::uint64_t targetEra,
                                                     ClosedBuckets* closedBuckets) {
     invariant(bucket);
 
@@ -1304,12 +1325,21 @@ BucketCatalog::Bucket* BucketCatalog::_reopenBucket(Stripe* stripe,
     }
 
     // We may need to initialize the bucket's state.
-    _bucketStateManager.initializeBucketState(bucket->id());
+    bool initialized = _bucketStateManager.initializeBucketState(bucket->id(), targetEra);
+    if (!initialized) {
+        return nullptr;
+    }
 
     // Pass ownership of the reopened bucket to the bucket catalog.
     auto [it, inserted] = stripe->allBuckets.try_emplace(bucket->id(), std::move(bucket));
-    tassert(6668200, "Expected bucket to be inserted", inserted);
     Bucket* unownedBucket = it->second.get();
+
+    // If the bucket wasn't inserted into the stripe, then that bucket is already open and we can
+    // return the bucket 'it' points to.
+    if (!inserted) {
+        _markBucketNotIdle(stripe, stripeLock, unownedBucket);
+        return unownedBucket;
+    }
 
     // If we already have an open bucket for this key, we need to archive it.
     if (auto it = stripe->openBuckets.find(key); it != stripe->openBuckets.end()) {
@@ -1365,25 +1395,34 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
 
     if (rehydratedBucket.isOK()) {
         invariant(mode == AllowBucketCreation::kYes);
+        if (Bucket* bucket = _reopenBucket(&stripe,
+                                           stripeLock,
+                                           stats,
+                                           key,
+                                           std::move(rehydratedBucket.getValue()),
+                                           bucketToReopen->catalogEra,
+                                           &result.closedBuckets)) {
+            result.batch = _insertIntoBucket(opCtx,
+                                             &stripe,
+                                             stripeLock,
+                                             doc,
+                                             combine,
+                                             mode,
+                                             &info,
+                                             bucket,
+                                             &result.closedBuckets);
+            invariant(result.batch);
 
-        Bucket* bucket = _reopenBucket(&stripe,
-                                       stripeLock,
-                                       stats,
-                                       key,
-                                       std::move(rehydratedBucket.getValue()),
-                                       &result.closedBuckets);
-
-        result.batch = _insertIntoBucket(
-            opCtx, &stripe, stripeLock, doc, combine, mode, &info, bucket, &result.closedBuckets);
-        invariant(result.batch);
-
-        return result;
+            return result;
+        } else {
+            return {ErrorCodes::WriteConflict, "Bucket may be stale"};
+        }
     }
 
     Bucket* bucket = _useBucket(&stripe, stripeLock, info, mode);
     if (!bucket) {
         invariant(mode == AllowBucketCreation::kNo);
-        result.candidate = _findArchivedCandidate(stripe, stripeLock, info);
+        result.candidate = _findArchivedCandidate(&stripe, stripeLock, info);
         return result;
     }
 
@@ -1391,7 +1430,7 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
         opCtx, &stripe, stripeLock, doc, combine, mode, &info, bucket, &result.closedBuckets);
     if (!result.batch) {
         invariant(mode == AllowBucketCreation::kNo);
-        result.candidate = _findArchivedCandidate(stripe, stripeLock, info);
+        result.candidate = _findArchivedCandidate(&stripe, stripeLock, info);
     }
     return result;
 }
@@ -1413,7 +1452,7 @@ std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::_insertIntoBucket(
 
     bool isNewlyOpenedBucket = bucket->_ns.isEmpty();
     if (!isNewlyOpenedBucket) {
-        auto action = _determineRolloverAction(doc, info, bucket, sizeToBeAdded);
+        auto action = _determineRolloverAction(doc, info, bucket, sizeToBeAdded, mode);
         if (action == RolloverAction::kArchive && mode == AllowBucketCreation::kNo) {
             // We don't actually want to roll this bucket over yet, bail out.
             return std::shared_ptr<WriteBatch>{};
@@ -1529,15 +1568,15 @@ void BucketCatalog::_archiveBucket(Stripe* stripe, WithLock stripeLock, Bucket* 
     _removeBucket(stripe, stripeLock, bucket, archived);
 }
 
-boost::optional<OID> BucketCatalog::_findArchivedCandidate(const Stripe& stripe,
+boost::optional<OID> BucketCatalog::_findArchivedCandidate(Stripe* stripe,
                                                            WithLock stripeLock,
-                                                           const CreationInfo& info) const {
-    const auto setIt = stripe.archivedBuckets.find(info.key.hash);
-    if (setIt == stripe.archivedBuckets.end()) {
+                                                           const CreationInfo& info) {
+    auto setIt = stripe->archivedBuckets.find(info.key.hash);
+    if (setIt == stripe->archivedBuckets.end()) {
         return boost::none;
     }
 
-    const auto& archivedSet = setIt->second;
+    auto& archivedSet = setIt->second;
 
     // We want to find the largest time that is not greater than info.time. Generally lower_bound
     // will return the smallest element not less than the search value, but we are using
@@ -1553,7 +1592,19 @@ boost::optional<OID> BucketCatalog::_findArchivedCandidate(const Stripe& stripe,
     // We need to make sure our measurement can fit without violating max span. If not, we
     // can't use this bucket.
     if (info.time - candidateTime < Seconds(*info.options.getBucketMaxSpanSeconds())) {
-        return candidateBucket.bucketId;
+        auto state = _bucketStateManager.getBucketState(candidateBucket.bucketId);
+        if (state && state == BucketState::kNormal) {
+            return candidateBucket.bucketId;
+        } else {
+            if (state) {
+                _bucketStateManager.eraseBucketState(candidateBucket.bucketId);
+            }
+            if (archivedSet.size() == 1) {
+                stripe->archivedBuckets.erase(setIt);
+            } else {
+                archivedSet.erase(it);
+            }
+        }
     }
 
     return boost::none;
@@ -1608,6 +1659,7 @@ void BucketCatalog::_abort(Stripe* stripe,
 
 void BucketCatalog::_markBucketIdle(Stripe* stripe, WithLock stripeLock, Bucket* bucket) {
     invariant(bucket);
+    invariant(!bucket->_idleListEntry.has_value());
     stripe->idleBuckets.push_front(bucket);
     bucket->_idleListEntry = stripe->idleBuckets.begin();
 }
@@ -1635,7 +1687,8 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
            numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
         Bucket* bucket = stripe->idleBuckets.back();
 
-        if (canArchive && BucketState::kCleared != _bucketStateManager.getBucketState(bucket)) {
+        if (auto state = _bucketStateManager.getBucketState(bucket);
+            canArchive && state && BucketState::kCleared != state) {
             // Can archive a bucket if it hasn't been cleared. Note: an idle bucket cannot be
             // kPreparedAndCleared.
             _archiveBucket(stripe, stripeLock, bucket);
@@ -1691,7 +1744,8 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     tassert(6130900, "Expected bucket to be inserted", inserted);
     Bucket* bucket = it->second.get();
     stripe->openBuckets[info.key] = bucket;
-    _bucketStateManager.initializeBucketState(bucketId);
+    bool initialized = _bucketStateManager.initializeBucketState(bucketId, boost::none);
+    invariant(initialized);
 
     if (info.openedDuetoMetadata) {
         info.stats.incNumBucketsOpenedDueToMetadata();
@@ -1710,14 +1764,21 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
 BucketCatalog::RolloverAction BucketCatalog::_determineRolloverAction(const BSONObj& doc,
                                                                       CreationInfo* info,
                                                                       Bucket* bucket,
-                                                                      uint32_t sizeToBeAdded) {
+                                                                      uint32_t sizeToBeAdded,
+                                                                      AllowBucketCreation mode) {
     const bool canArchive = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
         serverGlobalParams.featureCompatibility);
+    // If the mode is enabled to create new buckets, then we should update archival stats
+    // accordingly. If we specify the mode to not allow bucket creation, it means we are not sure if
+    // we want to archive yet and should wait to update archival stats.
+    const bool shouldUpdateStats = (mode == AllowBucketCreation::kYes);
 
     auto bucketTime = bucket->getTime();
     if (info->time - bucketTime >= Seconds(*info->options.getBucketMaxSpanSeconds())) {
         if (canArchive) {
-            info->stats.incNumBucketsArchivedDueToTimeForward();
+            if (shouldUpdateStats) {
+                info->stats.incNumBucketsArchivedDueToTimeForward();
+            }
             return RolloverAction::kArchive;
         } else {
             info->stats.incNumBucketsClosedDueToTimeForward();
@@ -1726,7 +1787,9 @@ BucketCatalog::RolloverAction BucketCatalog::_determineRolloverAction(const BSON
     }
     if (info->time < bucketTime) {
         if (canArchive) {
-            info->stats.incNumBucketsArchivedDueToTimeBackward();
+            if (shouldUpdateStats) {
+                info->stats.incNumBucketsArchivedDueToTimeBackward();
+            }
             return RolloverAction::kArchive;
         } else {
             info->stats.incNumBucketsClosedDueToTimeBackward();
