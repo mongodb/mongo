@@ -795,6 +795,19 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         startChangeCollectionExpiredDocumentsRemover(serviceContext);
     }
 
+    if (computeModeEnabled) {
+        if (!isStandalone || serverGlobalParams.clusterRole != ClusterRole::None) {
+            LOGV2_ERROR(6968200, "'enableComputeMode' can be used only in standalone server");
+            exitCleanly(ExitCode::badOptions);
+        }
+        LOGV2_WARNING_OPTIONS(
+            6968201,
+            {logv2::LogTag::kStartupWarnings},
+            "There could be security risks in using 'enableComputeMode'. It is recommended to use "
+            "this mode under an isolated environment and execute the server under a user with "
+            "restricted access permissions");
+    }
+
     // Set up the logical session cache
     LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
