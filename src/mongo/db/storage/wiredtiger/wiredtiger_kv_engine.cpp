@@ -2655,4 +2655,11 @@ StatusWith<BSONObj> WiredTigerKVEngine::getStorageMetadata(StringData ident) con
                                 << fileMetadata.getValue());
 }
 
+KeyFormat WiredTigerKVEngine::getKeyFormat(OperationContext* opCtx, StringData ident) const {
+
+    const std::string wtTableConfig =
+        uassertStatusOK(WiredTigerUtil::getMetadataCreate(opCtx, "table:{}"_format(ident)));
+    return wtTableConfig.find("key_format=u") != string::npos ? KeyFormat::String : KeyFormat::Long;
+}
+
 }  // namespace mongo

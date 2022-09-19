@@ -412,6 +412,8 @@ public:
 
     StatusWith<BSONObj> getStorageMetadata(StringData ident) const override;
 
+    KeyFormat getKeyFormat(OperationContext* opCtx, StringData ident) const override;
+
 private:
     class WiredTigerSessionSweeper;
 
