@@ -72,7 +72,7 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
     }
 
     NamespaceString viewName;
-    // TODO SERVER-67155 Use deserialize function on NamespaceString to reconstruct NamespaceString
+    // TODO SERVER-69499 Use deserialize function on NamespaceString to reconstruct NamespaceString
     // correctly.
     if (!gMultitenancySupport ||
         (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
@@ -143,7 +143,7 @@ Status DurableViewCatalog::onExternalInsert(OperationContext* opCtx,
     auto catalog = CollectionCatalog::get(opCtx);
 
     NamespaceString viewName;
-    // TODO SERVER-67155 Use deserialize function on NamespaceString to reconstruct NamespaceString
+    // TODO SERVER-69499 Use deserialize function on NamespaceString to reconstruct NamespaceString
     // correctly.
     if (!gMultitenancySupport ||
         (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
@@ -260,7 +260,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
     invariant(systemViews);
 
     std::string nssOnDisk;
-    // TODO SERVER-67155 Move this check into a function on NamespaceString.
+    // TODO SERVER-69499 Move this check into a function on NamespaceString.
     if (!gMultitenancySupport ||
         (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
          gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
@@ -304,7 +304,7 @@ void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceStri
 
 
     std::string nssOnDisk;
-    // TODO SERVER-67155 Move this check into a function on NamespaceString.
+    // TODO SERVER-69499 Move this check into a function on NamespaceString.
     if (!gMultitenancySupport ||
         (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
          gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
