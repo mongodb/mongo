@@ -29,6 +29,8 @@
 
 #include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
 
+#include <boost/algorithm/string/replace.hpp>
+
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
@@ -888,9 +890,12 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                 }();
 
                 // Convert the MatchExpression $regex into a $regexMatch on the corresponding field.
+                // Backslashes must be escaped to ensure they retain their special behavior.
+                const auto regex =
+                    boost::replace_all_copy(std::string(nsElem.regex()), R"(\)", R"(\\)");
                 const std::string exprRegexMatch = str::stream()
-                    << "{$regexMatch: {input: " << exprDbOrCollName << ", regex: '"
-                    << nsElem.regex() << "', options: '" << nsElem.regexFlags() << "'}}";
+                    << "{$regexMatch: {input: " << exprDbOrCollName << ", regex: '" << regex
+                    << "', options: '" << nsElem.regexFlags() << "'}}";
 
                 // Finally, wrap the regex in a $let which defines the '$$oplogField' variable.
                 const std::string exprRewrittenPredicate = str::stream()

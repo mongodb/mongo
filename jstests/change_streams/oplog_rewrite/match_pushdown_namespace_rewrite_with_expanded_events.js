@@ -817,5 +817,48 @@ verifyOnWholeCluster(
     },
     [9, 3] /* expectedOplogRetDocsForEachShard */);
 
+// Create a new change stream and resume token for replaying the stream after this point.
+const thirdResumeAfterToken =
+    db.getSiblingDB("admin").watch([], {allChangesForCluster: true}).getResumeToken();
+
+// The test cases below verify the behavior of regex matches with escaped characters on collections
+// with special names (e.g. containing dots). This exercises the fix for SERVER-67715.
+const collWithDot =
+    createShardedCollection(st, "_id" /* shardKey */, dbName, "foo.bar", 2 /*splitAt */);
+assert.commandWorked(collWithDot.createIndex({x: 1}));
+assert.commandWorked(collWithDot.insert({_id: 1}));
+assert.commandWorked(collWithDot.insert({_id: 3}));
+assert.commandWorked(
+    collWithDot.runCommand({collMod: "foo.bar", index: {keyPattern: {x: 1}, hidden: true}}));
+assert.commandWorked(collWithDot.runCommand({dropIndexes: "foo.bar", index: {x: 1}}));
+
+const collWithUnderscore =
+    createShardedCollection(st, "_id" /* shardKey */, dbName, "foo_bar", 2 /*splitAt */);
+assert.commandWorked(collWithUnderscore.createIndex({x: 1}));
+assert.commandWorked(collWithUnderscore.insert({_id: 1}));
+assert.commandWorked(collWithUnderscore.insert({_id: 3}));
+assert.commandWorked(
+    collWithUnderscore.runCommand({collMod: "foo_bar", index: {keyPattern: {x: 1}, hidden: true}}));
+assert.commandWorked(collWithUnderscore.runCommand({dropIndexes: "foo_bar", index: {x: 1}}));
+
+// Ensure that a regex match properly respects escaped characters (here, testing that the escaped
+// "." character is treated as a literal dot). Note that we expect 5 extra oplog entries on shard0:
+//  - 1 from the "create" event (which only appears on shard0)
+//  - 4 no-op entries from sharding the two collections that are not affected by the filter pushdown
+//    (2 "shardCollection" + 2 "migrateChunkToNewShard")
+verifyOnWholeCluster(thirdResumeAfterToken,
+                     {$match: {"ns.coll": {$nin: [/^foo\./]}}},
+                     {
+                         "foo_bar": {
+                             create: ["foo_bar"],
+                             shardCollection: ["foo_bar"],
+                             createIndexes: ["foo_bar", "foo_bar"],
+                             insert: [1, 3],
+                             modify: ["foo_bar", "foo_bar"],
+                             dropIndexes: ["foo_bar", "foo_bar"]
+                         }
+                     },
+                     [9, 4] /* expectedOplogRetDocsForEachShard */);
+
 st.stop();
 })();

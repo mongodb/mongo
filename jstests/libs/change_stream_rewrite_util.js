@@ -138,7 +138,10 @@ function assertNumMatchingOplogEventsForShard(stats, shardName, expectedTotalRet
     assert(stats.shards.hasOwnProperty(shardName), stats);
     assert.eq(Object.keys(stats.shards[shardName].stages[0])[0], "$cursor", stats);
     const executionStats = stats.shards[shardName].stages[0].$cursor.executionStats;
-    assert.eq(executionStats.nReturned, expectedTotalReturned, executionStats);
+    assert.eq(executionStats.nReturned,
+              expectedTotalReturned,
+              () => `Expected ${expectedTotalReturned} events on shard ${shardName} but got ` +
+                  `${executionStats.nReturned}. Execution stats:\n${tojson(executionStats)}`);
 }
 
 // Returns a newly created sharded collection sharded by caller provided shard key.
@@ -180,7 +183,10 @@ function verifyChangeStreamOnWholeCluster(
             eventIdentifierList.forEach(eventIdentifier => {
                 assert.soon(() => cursor.hasNext(), {op: op, eventIdentifier: eventIdentifier});
                 const event = cursor.next();
-                assert.eq(event.operationType, op, event);
+                assert.eq(event.operationType,
+                          op,
+                          () => `Expected "${op}" but got "${event.operationType}". Full event: ` +
+                              `${tojson(event)}`);
 
                 if (op == "dropDatabase") {
                     assert.eq(event.ns.db, eventIdentifier, event);
