@@ -113,6 +113,7 @@ function assertNoMetrics(res) {
     assert(!res.hasOwnProperty("isUnique"), res);
     assert(!res.hasOwnProperty("cardinality"), res);
     assert(!res.hasOwnProperty("frequency"), res);
+    assert(!res.hasOwnProperty("monotonicity"), res);
 }
 
 function assertMetrics(res, {numDocs, isUnique, cardinality, frequency}) {
@@ -120,6 +121,7 @@ function assertMetrics(res, {numDocs, isUnique, cardinality, frequency}) {
     assert.eq(res.isUnique, isUnique, res);
     assert.eq(res.cardinality, cardinality, res);
     assert.eq(bsonWoCompare(res.frequency, frequency), 0, res);
+    assert(res.hasOwnProperty("monotonicity"), res);
 }
 
 /**

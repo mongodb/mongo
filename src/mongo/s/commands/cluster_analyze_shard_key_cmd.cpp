@@ -44,15 +44,21 @@ namespace mongo {
 
 namespace {
 
-ShardId getRandomOwningShardId(const ChunkManager& cm, const CachedDatabaseInfo& dbInfo) {
+/**
+ * Returns a new command object with shard version and/or database version appended to it based on
+ * the given routing info.
+ */
+BSONObj makeVersionedCmdObj(const ChunkManager& cm,
+                            const BSONObj& unversionedCmdObj,
+                            ShardId shardId) {
     if (cm.isSharded()) {
-        std::set<ShardId> shardIds;
-        cm.getAllShardIds(&shardIds);
-        auto it = shardIds.begin();
-        std::advance(it, std::rand() % shardIds.size());
-        return *it;
+        auto placementVersion = cm.getVersion(shardId);
+        return appendShardVersion(
+            unversionedCmdObj,
+            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)));
     }
-    return dbInfo->getPrimary();
+    auto versionedCmdObj = appendShardVersion(unversionedCmdObj, ShardVersion::UNSHARDED());
+    return appendDbVersionIfPresent(versionedCmdObj, cm.dbVersion());
 }
 
 class AnalyzeShardKeyCmd : public TypedCommand<AnalyzeShardKeyCmd> {
@@ -68,37 +74,63 @@ public:
             const auto& nss = ns();
             const auto& catalogCache = Grid::get(opCtx)->catalogCache();
             const auto cm = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
-            const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
 
-            auto shardId = getRandomOwningShardId(cm, dbInfo);
-            uassert(ErrorCodes::IllegalOperation,
-                    "Cannot analyze a shard key for a collection on the config server",
-                    shardId != ShardId::kConfigServerId);
-            const auto shard =
-                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-
-            auto cmdObj = CommandHelpers::filterCommandRequestForPassthrough(request().toBSON({}));
+            std::set<ShardId> candidateShardIds;
             if (cm.isSharded()) {
-                cmdObj = appendShardVersion(
-                    cmdObj,
-                    ShardVersion(cm.getVersion(shardId),
-                                 CollectionIndexes(cm.getVersion(shardId), boost::none)));
+                cm.getAllShardIds(&candidateShardIds);
             } else {
-                cmdObj = appendShardVersion(cmdObj, ShardVersion::UNSHARDED());
-                cmdObj = appendDbVersionIfPresent(cmdObj, dbInfo->getVersion());
+                candidateShardIds.insert(cm.dbPrimary());
             }
 
-            auto swResponse = shard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
-                NamespaceString::kAdminDb.toString(),
-                cmdObj,
-                Shard::RetryPolicy::kIdempotent);
-            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swResponse));
+            const auto unversionedCmdObj =
+                CommandHelpers::filterCommandRequestForPassthrough(request().toBSON({}));
+            while (true) {
+                // Select a random shard.
+                invariant(!candidateShardIds.empty());
+                auto it = candidateShardIds.begin();
+                std::advance(it, std::rand() % candidateShardIds.size());
+                auto shardId = *it;
+                candidateShardIds.erase(shardId);
 
-            auto response = AnalyzeShardKeyResponse::parse(
-                IDLParserContext("clusterAnalyzeShardKey"), swResponse.getValue().response);
-            return response;
+                uassert(ErrorCodes::IllegalOperation,
+                        "Cannot analyze a shard key for a collection on the config server",
+                        shardId != ShardId::kConfigServerId);
+
+                // Build a versioned command for the selected shard.
+                auto versionedCmdObj = makeVersionedCmdObj(cm, unversionedCmdObj, shardId);
+
+                // Execute the command against the shard.
+                auto shard =
+                    uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+                auto swResponse = shard->runCommandWithFixedRetryAttempts(
+                    opCtx,
+                    ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
+                    NamespaceString::kAdminDb.toString(),
+                    versionedCmdObj,
+                    Shard::RetryPolicy::kIdempotent);
+                auto status = Shard::CommandResponse::getEffectiveStatus(swResponse);
+
+                if (status == ErrorCodes::CollectionIsEmptyLocally) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            "Cannot analyze a shard key for an empty collection",
+                            !candidateShardIds.empty());
+
+                    LOGV2(6875300,
+                          "Failed to analyze shard key on the selected shard since it did not "
+                          "have any documents for the collection locally. Retrying on a different "
+                          "shard.",
+                          "nss"_attr = nss,
+                          "key"_attr = request().getKey(),
+                          "shardId"_attr = shardId,
+                          "error"_attr = status);
+                    continue;
+                }
+
+                uassertStatusOK(status);
+                auto response = AnalyzeShardKeyResponse::parse(
+                    IDLParserContext("clusterAnalyzeShardKey"), swResponse.getValue().response);
+                return response;
+            }
         }
 
     private:

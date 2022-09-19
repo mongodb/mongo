@@ -137,6 +137,7 @@ env.Library(
     source=[
         'analyze_shard_key_cmd.idl',
         'analyze_shard_key_feature_flag.idl',
+        'analyze_shard_key_server_parameters.idl',
         'cannot_implicitly_create_collection_info.cpp',
         'catalog/mongo_version_range.cpp',
         'catalog/type_changelog.cpp',

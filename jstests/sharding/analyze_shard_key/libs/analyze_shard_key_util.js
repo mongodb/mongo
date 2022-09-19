@@ -59,6 +59,34 @@ var AnalyzeShardKeyUtil = (function() {
     }
 
     /**
+     * Returns a random integer between the given range (inclusive).
+     */
+    function getRandInteger(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    /**
+     * Returns a random element in the given array.
+     */
+    function getRandomElement(arr) {
+        return arr[getRandInteger(0, arr.length - 1)];
+    }
+
+    /**
+     * Returns the field name "<prefix>", "<prefix>.x" or "<prefix>.x.y" with roughly equal
+     * probability.
+     */
+    function getRandomFieldName(prefix) {
+        const prob = Math.random();
+        if (prob < 0.3) {
+            return prefix;
+        } else if (prob < 0.6) {
+            return prefix + ".x";
+        }
+        return prefix + ".x.y";
+    }
+
+    /**
      * Enables profiling of the given database on all the given mongods.
      */
     function enableProfiler(mongodConns, dbName) {
@@ -81,6 +109,9 @@ var AnalyzeShardKeyUtil = (function() {
         isIdKeyPattern,
         getCombinedFieldNames,
         setDottedField,
+        getRandInteger,
+        getRandomElement,
+        getRandomFieldName,
         enableProfiler,
         disableProfiler
     };

@@ -42,17 +42,16 @@ function testExistingUnshardedCollection(writeConn, testCases) {
         if (testCase.isSupported) {
             // This is an unsharded collection so in a sharded cluster it only exists on the
             // primary shard.
-            if (testCase.isNonShardsvrMongod || testCase.isPrimaryShardMongod ||
-                testCase.isMongos) {
-                assert.commandFailedWithCode(res0, ErrorCodes.InvalidOptions);
-                // When there isn't an index available, the calculation of the metrics about the
-                // characteristics of the shard key is skipped by design. As a result, there is no
-                // "non-empty collection" check.
-                assert.commandWorked(res1);
-            } else {
-                assert.commandFailedWithCode(res0, ErrorCodes.NamespaceNotFound);
-                assert.commandFailedWithCode(res1, ErrorCodes.NamespaceNotFound);
-            }
+            let expectedErrCode = (() => {
+                if (testCase.isMongos || testCase.isNonShardsvrMongod) {
+                    return ErrorCodes.InvalidOptions;
+                } else if (testCase.isPrimaryShardMongod) {
+                    return ErrorCodes.CollectionIsEmptyLocally;
+                }
+                return ErrorCodes.NamespaceNotFound;
+            })();
+            assert.commandFailedWithCode(res0, expectedErrCode);
+            assert.commandFailedWithCode(res1, expectedErrCode);
         } else {
             assert.commandFailedWithCode(res0, ErrorCodes.IllegalOperation);
             assert.commandFailedWithCode(res1, ErrorCodes.IllegalOperation);
@@ -112,12 +111,11 @@ function testExistingShardedCollection(st, testCases) {
         const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});
         const res1 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey1});
         if (testCase.isSupported) {
-            assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
-            assert.commandFailedWithCode(res0, ErrorCodes.InvalidOptions);
-            // When there isn't an index available, the calculation of the metrics about the
-            // characteristics of the shard key is skipped by design. As a result, there is no
-            // "non-empty collection" check.
-            assert.commandWorked(res1);
+            const expectedErrCode =
+                testCase.isMongos ? ErrorCodes.InvalidOptions : ErrorCodes.CollectionIsEmptyLocally;
+            assert.commandFailedWithCode(res, expectedErrCode);
+            assert.commandFailedWithCode(res0, expectedErrCode);
+            assert.commandFailedWithCode(res1, expectedErrCode);
         } else {
             assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
             assert.commandFailedWithCode(res0, ErrorCodes.IllegalOperation);

@@ -29,13 +29,18 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/math/statistics/bivariate_statistics.hpp>
+
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/s/analyze_shard_key_cmd_util.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
+#include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/s/service_entry_point_mongos.h"
@@ -319,6 +324,81 @@ CardinalityFrequencyMetricsBundle calculateCardinalityAndFrequency(OperationCont
     return bundle;
 }
 
+/**
+ * Returns the monotonicity metrics for the given shard key, i.e. whether the value of the given
+ * shard key is monotonically changing in insertion order. If the collection is clustered or the
+ * shard key does not have a supporting index, returns 'unknown'.
+ */
+MonotonicityTypeEnum calculateMonotonicity(OperationContext* opCtx,
+                                           const CollectionPtr& collection,
+                                           const BSONObj& shardKey) {
+    if (collection->isClustered()) {
+        return MonotonicityTypeEnum::kUnknown;
+    }
+
+    if (KeyPattern::isHashedKeyPattern(shardKey) && shardKey.nFields() == 1) {
+        return MonotonicityTypeEnum::kNotMonotonic;
+    }
+
+    auto index = findShardKeyPrefixedIndex(opCtx,
+                                           collection,
+                                           collection->getIndexCatalog(),
+                                           shardKey,
+                                           /*requireSingleKey=*/true);
+
+    if (!index) {
+        return MonotonicityTypeEnum::kUnknown;
+    }
+    // Non-clustered indexes always have an associated IndexDescriptor.
+    invariant(index->descriptor());
+
+    std::vector<int64_t> recordIds;
+    BSONObj prevKey;
+
+    KeyPattern indexKeyPattern(index->keyPattern());
+    auto exec = InternalPlanner::indexScan(opCtx,
+                                           &collection,
+                                           index->descriptor(),
+                                           indexKeyPattern.globalMin(),
+                                           indexKeyPattern.globalMax(),
+                                           BoundInclusion::kExcludeBothStartAndEndKeys,
+                                           PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+    try {
+        RecordId recordId;
+        BSONObj recordVal;
+        while (PlanExecutor::ADVANCED == exec->getNext(&recordVal, &recordId)) {
+            auto currentKey = dotted_path_support::extractElementsBasedOnTemplate(
+                recordVal.replaceFieldNames(shardKey), shardKey);
+            if (SimpleBSONObjComparator::kInstance.evaluate(prevKey == currentKey)) {
+                continue;
+            }
+            prevKey = currentKey;
+            recordIds.push_back(recordId.getLong());
+        }
+    } catch (DBException& ex) {
+        LOGV2_WARNING(6875301, "Internal error while reading", "ns"_attr = collection->ns());
+        ex.addContext("Executor error while reading during 'analyzeShardKey' command");
+        throw;
+    }
+
+    invariant(recordIds.size() > 0);
+
+    auto coefficient = [&] {
+        auto& y = recordIds;
+        std::vector<int64_t> x(y.size());
+        std::iota(x.begin(), x.end(), 1);
+        return boost::math::statistics::correlation_coefficient<std::vector<int64_t>>(x, y);
+    }();
+    auto coefficientThreshold = gMonotonicityCorrelationCoefficientThreshold.load();
+    LOGV2(6875302,
+          "Calculating monotonicity",
+          "coefficient"_attr = coefficient,
+          "coefficientThreshold"_attr = coefficientThreshold);
+
+    return abs(coefficient) >= coefficientThreshold ? MonotonicityTypeEnum::kMonotonic
+                                                    : MonotonicityTypeEnum::kNotMonotonic;
+}
+
 }  // namespace
 
 KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* opCtx,
@@ -335,6 +415,12 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
                 str::stream() << "Cannot analyze a shard key for a non-existing collection",
                 collection);
 
+        uassert(serverGlobalParams.clusterRole == ClusterRole::ShardServer
+                    ? ErrorCodes::CollectionIsEmptyLocally
+                    : ErrorCodes::InvalidOptions,
+                "Cannot analyze a shard key for an empty collection",
+                collection->numRecords(opCtx) > 0);
+
         auto indexSpec = findCompatiblePrefixedIndex(
             opCtx, *collection, collection->getIndexCatalog(), shardKeyBson);
 
@@ -345,6 +431,7 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
         indexKeyBson = indexSpec->keyPattern.getOwned();
         metrics.setIsUnique(shardKeyBson.nFields() == indexKeyBson.nFields() ? indexSpec->isUnique
                                                                              : false);
+        metrics.setMonotonicity(calculateMonotonicity(opCtx, *collection, shardKeyBson));
     }
 
     auto bundle = calculateCardinalityAndFrequency(

@@ -33,6 +33,15 @@ imports:
   - "mongo/db/basic_types.idl"
   - "mongo/db/keypattern.idl"
 
+enums:
+  MonotonicityType:
+    description: "The monotonicity type of a shard key."
+    type: string
+    values:
+      kMonotonic: "monotonic"
+      kNotMonotonic: "not monotonic"
+      kUnknown: "unknown"
+
 structs:
   percentileMetrics:
     description: "The percentile metrics for a set of non-negative integers."
@@ -75,6 +84,10 @@ structs:
         type: percentileMetrics
         description: "The percentile metrics for the number of documents for each distinct shard key
                       value."
+        optional: true
+      monotonicity:
+        type: MonotonicityType
+        description: "The monotonicity of the shard key values in insertion order."
         optional: true
 
   analyzeShardKeyResponse:
