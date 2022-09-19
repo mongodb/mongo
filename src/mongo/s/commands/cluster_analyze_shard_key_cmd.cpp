@@ -90,7 +90,7 @@ public:
 
             auto swResponse = shard->runCommandWithFixedRetryAttempts(
                 opCtx,
-                ReadPreferenceSetting{ReadPreference::Nearest},
+                ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
                 NamespaceString::kAdminDb.toString(),
                 cmdObj,
                 Shard::RetryPolicy::kIdempotent);

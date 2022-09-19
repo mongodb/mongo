@@ -74,6 +74,9 @@ function validateCommandTestCase(testCase) {
     assert(testCase.explicitlyCreateCollection
                ? typeof (testCase.explicitlyCreateCollection) === "boolean"
                : true);
+    assert(testCase.expectNonEmptyCollection
+               ? typeof (testCase.expectNonEmptyCollection) === "boolean"
+               : true);
     assert(testCase.cleanUp ? typeof (testCase.cleanUp) === "function" : true,
            "cleanUp must be a function: " + tojson(testCase));
 }
@@ -92,6 +95,10 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
 
     if (testCase.explicitlyCreateCollection) {
         assert.commandWorked(primaryShardBefore.getDB(dbName).runCommand({create: collName}));
+    }
+    if (testCase.expectNonEmptyCollection) {
+        assert.commandWorked(
+            primaryShardBefore.getDB(dbName).runCommand({insert: collName, documents: [{x: 0}]}));
     }
 
     // Ensure all nodes know the dbVersion before the movePrimary.
@@ -194,6 +201,10 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
     if (testCase.explicitlyCreateCollection) {
         assert.commandWorked(primaryShardAfter.getDB(dbName).runCommand({create: collName}));
     }
+    if (testCase.expectNonEmptyCollection) {
+        assert.commandWorked(
+            primaryShardAfter.getDB(dbName).runCommand({insert: collName, documents: [{x: 0}]}));
+    }
 
     // The only change after the drop/recreate database should be that the old primary shard should
     // have cleared its dbVersion.
@@ -280,6 +291,7 @@ let testCases = {
             runsAgainstAdminDb: true,
             sendsDbVersion: true,
             explicitlyCreateCollection: true,
+            expectNonEmptyCollection: true,
             command: function(dbName, collName) {
                 return {analyzeShardKey: dbName + "." + collName, key: {_id: 1}};
             },

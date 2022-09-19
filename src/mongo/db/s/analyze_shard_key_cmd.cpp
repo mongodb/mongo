@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/s/analyze_shard_key_cmd_util.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
@@ -77,7 +78,14 @@ public:
 
             LOGV2(6875001, "Start analyzing shard key", "nss"_attr = nss, "key"_attr = key);
 
-            return {};
+            Response response;
+
+            // Calculate metrics about the characteristics of the shard key.
+            auto keyCharacteristics =
+                analyze_shard_key::calculateKeyCharacteristicsMetrics(opCtx, nss, key);
+            response.setKeyCharacteristics(keyCharacteristics);
+
+            return response;
         }
 
     private:

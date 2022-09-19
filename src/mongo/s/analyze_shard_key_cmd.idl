@@ -30,12 +30,59 @@ global:
   cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/keypattern.idl"
   - "mongo/db/basic_types.idl"
+  - "mongo/db/keypattern.idl"
 
 structs:
+  percentileMetrics:
+    description: "The percentile metrics for a set of non-negative integers."
+    strict: true
+    fields:
+      p99:
+        type: long
+        validator: { gte: 0 }
+      p95:
+        type: long
+        validator: { gte: 0 }
+      p90:
+        type: long
+        validator: { gte: 0 }
+      p80:
+        type: long
+        validator: { gte: 0 }
+      p50:
+        type: long
+        validator: { gte: 0 }
+
+  keyCharacteristicsMetrics:
+    description: "The metrics about the characteristics of a shard key."
+    fields:
+      numDocs:
+        type: long
+        description: "The number of the documents in the collection."
+        validator: { gte: 0 }
+        optional: true
+      isUnique:
+        type: bool
+        description: "Whether the shard key index enforces a uniqueness constraint."
+        optional: true
+      cardinality:
+        type: long
+        description: "The number of distinct shard key values in the collection."
+        validator: { gte: 0 }
+        optional: true
+      frequency:
+        type: percentileMetrics
+        description: "The percentile metrics for the number of documents for each distinct shard key
+                      value."
+        optional: true
+
   analyzeShardKeyResponse:
     description: "The response for the 'analyzeShardKey' command."
+    strict: false
+    inline_chained_structs: true
+    chained_structs:
+      keyCharacteristicsMetrics: keyCharacteristics
 
 commands:
   analyzeShardKey:

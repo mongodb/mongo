@@ -32,6 +32,33 @@ function testExistingUnshardedCollection(writeConn, testCases) {
     const candidateKey1 = {candidateKey1: 1};  // does not have a supporting index.
     assert.commandWorked(coll.createIndex(candidateKey0));
 
+    // Analyze shard keys while the collection is empty.
+    testCases.forEach(testCase => {
+        jsTest.log(`Running analyzeShardKey command against an empty unsharded collection: ${
+            tojson(testCase)}`);
+
+        const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});
+        const res1 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey1});
+        if (testCase.isSupported) {
+            // This is an unsharded collection so in a sharded cluster it only exists on the
+            // primary shard.
+            if (testCase.isNonShardsvrMongod || testCase.isPrimaryShardMongod ||
+                testCase.isMongos) {
+                assert.commandFailedWithCode(res0, ErrorCodes.InvalidOptions);
+                // When there isn't an index available, the calculation of the metrics about the
+                // characteristics of the shard key is skipped by design. As a result, there is no
+                // "non-empty collection" check.
+                assert.commandWorked(res1);
+            } else {
+                assert.commandFailedWithCode(res0, ErrorCodes.NamespaceNotFound);
+                assert.commandFailedWithCode(res1, ErrorCodes.NamespaceNotFound);
+            }
+        } else {
+            assert.commandFailedWithCode(res0, ErrorCodes.IllegalOperation);
+            assert.commandFailedWithCode(res1, ErrorCodes.IllegalOperation);
+        }
+    });
+
     // Analyze shard keys while the collection is non-empty.
     assert.commandWorked(coll.insert([{candidateKey0: 1, candidateKey1: 1}]));
     testCases.forEach(testCase => {
@@ -75,6 +102,28 @@ function testExistingShardedCollection(st, testCases) {
     const candidateKey0 = {candidateKey0: 1};
     const candidateKey1 = {candidateKey1: 1};  // does not have a supporting index
     assert.commandWorked(coll.createIndex(candidateKey0));
+
+    // Analyze shard keys while the collection is empty.
+    testCases.forEach(testCase => {
+        jsTest.log(`Running analyzeShardKey command against an empty sharded collection: ${
+            tojson(testCase)}`);
+
+        const res = testCase.conn.adminCommand({analyzeShardKey: ns, key: currentKey});
+        const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});
+        const res1 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey1});
+        if (testCase.isSupported) {
+            assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
+            assert.commandFailedWithCode(res0, ErrorCodes.InvalidOptions);
+            // When there isn't an index available, the calculation of the metrics about the
+            // characteristics of the shard key is skipped by design. As a result, there is no
+            // "non-empty collection" check.
+            assert.commandWorked(res1);
+        } else {
+            assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
+            assert.commandFailedWithCode(res0, ErrorCodes.IllegalOperation);
+            assert.commandFailedWithCode(res1, ErrorCodes.IllegalOperation);
+        }
+    });
 
     // Analyze shard keys while the collection is non-empty.
     assert.commandWorked(coll.insert([
