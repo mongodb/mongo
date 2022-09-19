@@ -321,7 +321,6 @@ TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotTraverseLeafArrays) {
     ASSERT_FALSE(expr.matchesBSON(BSON("a" << BSONArray())));
 }
 
-/* TODO: SERVER-64113
 TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotMatchShortBinData) {
     MatcherTypeSet typeSet;
     typeSet.bsonTypes.insert(BSONType::String);
@@ -329,15 +328,16 @@ TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotMatchShortBinData) {
     InternalSchemaBinDataEncryptedTypeExpression expr("a", std::move(typeSet));
 
     FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
+    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     blob.originalBsonType = BSONType::String;
-    auto binData = BSONBinData(
-        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader) - sizeof(blob.originalBsonType),
-BinDataType::Encrypt);
+    auto binData = BSONBinData(reinterpret_cast<const void*>(&blob),
+                               sizeof(FleBlobHeader) - sizeof(blob.originalBsonType),
+                               BinDataType::Encrypt);
 
-    ASSERT_FALSE(expr.matchesBSON(BSON("a" << binData << "foo" << "bar")));
-} */
+    ASSERT_FALSE(expr.matchesBSON(BSON("a" << binData << "foo"
+                                           << "bar")));
+}
 
 TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotTraverseLeafArrays) {
     InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a", BSONType::String);
