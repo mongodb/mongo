@@ -381,37 +381,7 @@ void ServiceExecutorFixed::_checkForShutdown() {
     reactor->stop();
 }
 
-Status ServiceExecutorFixed::scheduleTask(Task task, ScheduleFlags flags) try {
-    {
-        auto lk = stdx::lock_guard(_mutex);
-        if (_state != State::kRunning)
-            return inShutdownStatus();
-        _stats->tasksScheduled.fetchAndAdd(1);
-    }
-
-    // Inline execution requires:
-    //  - `kMayRecurse` flag must be set.
-    //  - Calling thread's `_executorContext` must be valid and within its recursion limit.
-    if ((flags & ScheduleFlags::kMayRecurse) == ScheduleFlags::kMayRecurse && _executorContext &&
-        _executorContext->getRecursionDepth() < fixedServiceExecutorRecursionLimit.loadRelaxed()) {
-        // Recursively executing the task on the executor thread.
-        _executorContext->run(std::move(task));
-        return Status::OK();
-    }
-
-    hangBeforeSchedulingServiceExecutorFixedTask.pauseWhileSet();
-
-    _threadPool->schedule([this, task = std::move(task)](Status status) mutable {
-        invariant(status);
-        _executorContext->run([&] { task(); });
-    });
-
-    return Status::OK();
-} catch (DBException& e) {
-    return e.toStatus();
-}
-
-void ServiceExecutorFixed::_schedule(OutOfLineExecutor::Task task) noexcept {
+void ServiceExecutorFixed::schedule(Task task) {
     {
         auto lk = stdx::unique_lock(_mutex);
         if (_state != State::kRunning) {
@@ -423,6 +393,7 @@ void ServiceExecutorFixed::_schedule(OutOfLineExecutor::Task task) noexcept {
         _stats->tasksScheduled.fetchAndAdd(1);
     }
 
+    hangBeforeSchedulingServiceExecutorFixedTask.pauseWhileSet();
     _threadPool->schedule([this, task = std::move(task)](Status status) mutable {
         _executorContext->run([&] { task(std::move(status)); });
     });
@@ -433,7 +404,7 @@ size_t ServiceExecutorFixed::getRunningThreads() const {
 }
 
 void ServiceExecutorFixed::runOnDataAvailable(const SessionHandle& session,
-                                              OutOfLineExecutor::Task onCompletionCallback) {
+                                              Task onCompletionCallback) {
     invariant(session);
     yieldIfAppropriate();
 

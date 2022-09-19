@@ -39,29 +39,6 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: gInitialServiceExecutorUseDedicatedThread
     default: true
-  synchronousServiceExecutorRecursionLimit:
-    description: >-
-        Tasks may recurse further if their recursion depth is less than this value.
-    set_at: [ startup, runtime ]
-    cpp_vartype: "AtomicWord<int>"
-    cpp_varname: "synchronousServiceExecutorRecursionLimit"
-    default: 8
-
-  fixedServiceExecutorRecursionLimit:
-    description: >-
-        Tasks may recurse further if their recursion depth is less than this value.
-    set_at: [ startup, runtime ]
-    cpp_vartype: "AtomicWord<int>"
-    cpp_varname: "fixedServiceExecutorRecursionLimit"
-    default: 8
-
-  reservedServiceExecutorRecursionLimit:
-    description: >-
-        Tasks may recurse further if their recursion depth is less than this value.
-    set_at: [ startup, runtime ]
-    cpp_vartype: 'AtomicWord<int>'
-    cpp_varname: reservedServiceExecutorRecursionLimit
-    default: 8
 
   fixedServiceExecutorThreadLimit:
     description: >-

@@ -51,7 +51,7 @@ namespace transport {
 /**
  * A service executor that uses a fixed (configurable) number of threads to execute tasks.
  * This executor always yields before executing scheduled tasks, and never yields before scheduling
- * new tasks (i.e., `ScheduleFlags::kMayYieldBeforeSchedule` is a no-op for this executor).
+ * new tasks.
  */
 class ServiceExecutorFixed final : public ServiceExecutor,
                                    public std::enable_shared_from_this<ServiceExecutorFixed> {
@@ -68,13 +68,9 @@ public:
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
 
-    Status scheduleTask(Task task, ScheduleFlags flags) override;
-    void schedule(OutOfLineExecutor::Task task) override {
-        _schedule(std::move(task));
-    }
+    void schedule(Task task) override;
 
-    void runOnDataAvailable(const SessionHandle& session,
-                            OutOfLineExecutor::Task onCompletionCallback) override;
+    void runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback) override;
 
     size_t getRunningThreads() const override;
 
@@ -96,7 +92,7 @@ private:
 
     struct Waiter {
         SessionHandle session;
-        OutOfLineExecutor::Task onCompletionCallback;
+        Task onCompletionCallback;
     };
 
     const std::string& _name() const;
@@ -106,8 +102,6 @@ private:
 
     /** Requires `_mutex` locked. */
     void _beginShutdown();
-
-    void _schedule(OutOfLineExecutor::Task task) noexcept;
 
     void _finalize() noexcept;
 

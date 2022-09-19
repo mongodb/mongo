@@ -54,14 +54,13 @@ public:
 
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
-    Status scheduleTask(Task task, ScheduleFlags flags) override;
+    void schedule(Task task) override;
 
     size_t getRunningThreads() const override {
         return _numRunningWorkerThreads.loadRelaxed();
     }
 
-    void runOnDataAvailable(const SessionHandle& session,
-                            OutOfLineExecutor::Task onCompletionCallback) override;
+    void runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback) override;
 
     void appendStats(BSONObjBuilder* bob) const override;
 

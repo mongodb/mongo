@@ -34,7 +34,6 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_utils.h"
 #include "mongo/util/thread_safety_context.h"
 
@@ -61,7 +60,6 @@ const auto serviceExecutorSynchronousRegisterer = ServiceContext::ConstructorAct
 }  // namespace
 
 thread_local std::deque<ServiceExecutor::Task> ServiceExecutorSynchronous::_localWorkQueue = {};
-thread_local int ServiceExecutorSynchronous::_localRecursionDepth = 0;
 thread_local int64_t ServiceExecutorSynchronous::_localThreadIdleCounter = 0;
 
 ServiceExecutorSynchronous::ServiceExecutorSynchronous(ServiceContext* ctx)
@@ -95,28 +93,15 @@ ServiceExecutorSynchronous* ServiceExecutorSynchronous::get(ServiceContext* ctx)
     return ref.get();
 }
 
-Status ServiceExecutorSynchronous::scheduleTask(Task task, ScheduleFlags flags) {
+void ServiceExecutorSynchronous::schedule(Task task) {
     if (!_stillRunning.load()) {
-        return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
+        task(Status(ErrorCodes::ShutdownInProgress, "Executor is not running"));
+        return;
     }
 
     if (!_localWorkQueue.empty()) {
-        if ((flags & ScheduleFlags::kMayYieldBeforeSchedule) != ScheduleFlags{}) {
-            yieldIfAppropriate();
-        }
-
-        // Execute task directly (recurse) if allowed by the caller as it produced better
-        // performance in testing. Try to limit the amount of recursion so we don't blow up the
-        // stack, even though this shouldn't happen with this executor that uses blocking network
-        // I/O.
-        if ((flags & ScheduleFlags::kMayRecurse) != ScheduleFlags{} &&
-            (_localRecursionDepth < synchronousServiceExecutorRecursionLimit.loadRelaxed())) {
-            ++_localRecursionDepth;
-            task();
-        } else {
-            _localWorkQueue.emplace_back(std::move(task));
-        }
-        return Status::OK();
+        _localWorkQueue.emplace_back(std::move(task));
+        return;
     }
 
     // First call to scheduleTask() for this connection, spawn a worker thread that will push jobs
@@ -129,8 +114,7 @@ Status ServiceExecutorSynchronous::scheduleTask(Task task, ScheduleFlags flags) 
 
             _localWorkQueue.emplace_back(std::move(task));
             while (!_localWorkQueue.empty() && _stillRunning.loadRelaxed()) {
-                _localRecursionDepth = 1;
-                _localWorkQueue.front()();
+                _localWorkQueue.front()(Status::OK());
                 _localWorkQueue.pop_front();
             }
 
@@ -142,8 +126,10 @@ Status ServiceExecutorSynchronous::scheduleTask(Task task, ScheduleFlags flags) 
                 condVarAnchor->notify_all();
             }
         });
-
-    return status;
+    // The usual way to fail to schedule is to invoke the task, but in this case
+    // we don't have the task anymore. We gave it away to the callback that the
+    // failed thread was supposed to run.
+    iassert(status);
 }
 
 void ServiceExecutorSynchronous::appendStats(BSONObjBuilder* bob) const {
@@ -157,8 +143,7 @@ void ServiceExecutorSynchronous::appendStats(BSONObjBuilder* bob) const {
     subbob.append(kClientsWaiting, 0);
 }
 
-void ServiceExecutorSynchronous::runOnDataAvailable(const SessionHandle& session,
-                                                    OutOfLineExecutor::Task callback) {
+void ServiceExecutorSynchronous::runOnDataAvailable(const SessionHandle& session, Task callback) {
     invariant(session);
     yieldIfAppropriate();
 

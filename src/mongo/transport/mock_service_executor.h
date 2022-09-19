@@ -42,12 +42,11 @@ public:
         return startCb();
     }
 
-    Status scheduleTask(Task task, ScheduleFlags flags) override {
-        return scheduleTaskCb(std::move(task), std::move(flags));
+    void schedule(Task task) override {
+        return scheduleTaskCb(std::move(task));
     }
 
-    void runOnDataAvailable(const SessionHandle& session,
-                            OutOfLineExecutor::Task onCompletionCallback) override {
+    void runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback) override {
         runOnDataAvailableCb(session, std::move(onCompletionCallback));
     }
 
@@ -64,8 +63,8 @@ public:
     }
 
     std::function<Status()> startCb;
-    std::function<Status(Task, ScheduleFlags)> scheduleTaskCb;
-    std::function<void(const SessionHandle&, OutOfLineExecutor::Task)> runOnDataAvailableCb;
+    std::function<void(Task)> scheduleTaskCb;
+    std::function<void(const SessionHandle&, Task)> runOnDataAvailableCb;
     std::function<Status(Milliseconds)> shutdownCb;
     std::function<size_t()> getRunningThreadsCb;
     std::function<void(BSONObjBuilder*)> appendStatsCb;

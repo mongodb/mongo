@@ -35,7 +35,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_utils.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/thread_safety_context.h"
@@ -69,7 +68,6 @@ const auto serviceExecutorReservedRegisterer = ServiceContext::ConstructorAction
 }  // namespace
 
 thread_local std::deque<ServiceExecutor::Task> ServiceExecutorReserved::_localWorkQueue = {};
-thread_local int ServiceExecutorReserved::_localRecursionDepth = 0;
 thread_local int64_t ServiceExecutorReserved::_localThreadIdleCounter = 0;
 
 ServiceExecutorReserved::ServiceExecutorReserved(ServiceContext* ctx,
@@ -144,8 +142,7 @@ Status ServiceExecutorReserved::_startWorker() {
 
             _localWorkQueue.emplace_back(std::move(task));
             while (!_localWorkQueue.empty() && _stillRunning.loadRelaxed()) {
-                _localRecursionDepth = 1;
-                _localWorkQueue.front()();
+                _localWorkQueue.front()(Status::OK());
                 _localWorkQueue.pop_front();
             }
 
@@ -189,31 +186,20 @@ Status ServiceExecutorReserved::shutdown(Milliseconds timeout) {
                  "reserved executor couldn't shutdown all worker threads within time limit.");
 }
 
-Status ServiceExecutorReserved::scheduleTask(Task task, ScheduleFlags flags) {
+void ServiceExecutorReserved::schedule(Task task) {
     if (!_stillRunning.load()) {
-        return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
+        task(Status(ErrorCodes::ShutdownInProgress, "Executor is not running"));
+        return;
     }
 
     if (!_localWorkQueue.empty()) {
-        // Execute task directly (recurse) if allowed by the caller as it produced better
-        // performance in testing. Try to limit the amount of recursion so we don't blow up the
-        // stack, even though this shouldn't happen with this executor that uses blocking
-        // network I/O.
-        if (((flags & ScheduleFlags::kMayRecurse) != ScheduleFlags{}) &&
-            (_localRecursionDepth < reservedServiceExecutorRecursionLimit.loadRelaxed())) {
-            ++_localRecursionDepth;
-            task();
-        } else {
-            _localWorkQueue.emplace_back(std::move(task));
-        }
-        return Status::OK();
+        _localWorkQueue.emplace_back(std::move(task));
+        return;
     }
 
     stdx::lock_guard<Latch> lk(_mutex);
     _readyTasks.push_back(std::move(task));
     _threadWakeup.notify_one();
-
-    return Status::OK();
 }
 
 void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {
@@ -243,7 +229,7 @@ void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {
 }
 
 void ServiceExecutorReserved::runOnDataAvailable(const SessionHandle& session,
-                                                 OutOfLineExecutor::Task onCompletionCallback) {
+                                                 Task onCompletionCallback) {
     scheduleCallbackOnDataAvailable(session, std::move(onCompletionCallback), this);
 }
 

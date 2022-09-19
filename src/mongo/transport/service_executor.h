@@ -55,20 +55,6 @@ public:
     static void shutdownAll(ServiceContext* serviceContext, Date_t deadline);
 
     virtual ~ServiceExecutor() = default;
-    using Task = unique_function<void()>;
-
-    /** With no flags set, `scheduleTask` will launch new threads as needed. */
-    enum class ScheduleFlags {
-        kDeferredTask = 1 << 0,           /**< Never given a newly launched thread. */
-        kMayRecurse = 1 << 1,             /**< May be run recursively. */
-        kMayYieldBeforeSchedule = 1 << 2, /**< May yield before scheduling. */
-    };
-    friend constexpr ScheduleFlags operator&(ScheduleFlags a, ScheduleFlags b) noexcept {
-        return ScheduleFlags{stdx::to_underlying(a) & stdx::to_underlying(b)};
-    }
-    friend constexpr ScheduleFlags operator|(ScheduleFlags a, ScheduleFlags b) noexcept {
-        return ScheduleFlags{stdx::to_underlying(a) | stdx::to_underlying(b)};
-    }
 
     /*
      * Starts the ServiceExecutor. This may create threads even if no tasks are scheduled.
@@ -76,32 +62,11 @@ public:
     virtual Status start() = 0;
 
     /*
-     * Schedules a task with the ServiceExecutor and returns immediately.
-     *
-     * This is guaranteed to unwind the stack before running the task, although the task may be
-     * run later in the same thread.
-     *
-     * If defer is true, then the executor may defer execution of this Task until an available
-     * thread is available.
-     */
-    virtual Status scheduleTask(Task task, ScheduleFlags flags) = 0;
-
-    /*
-     * Provides an executor-friendly wrapper for "scheduleTask". Internally, it wraps instance of
-     * "OutOfLineExecutor::Task" inside "ServiceExecutor::Task" objects, which are then scheduled
-     * for execution on the service executor. May throw if "scheduleTask" returns a non-okay status.
-     */
-    void schedule(OutOfLineExecutor::Task func) override {
-        iassert(scheduleTask([task = std::move(func)]() mutable { task(Status::OK()); }, {}));
-    }
-
-    /*
      * Awaits the availability of incoming data for the specified session. On success, it will
      * schedule the callback on current executor. Otherwise, it will invoke the callback with a
      * non-okay status on the caller thread.
      */
-    virtual void runOnDataAvailable(const SessionHandle& session,
-                                    OutOfLineExecutor::Task onCompletionCallback) = 0;
+    virtual void runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback) = 0;
 
     /*
      * Stops and joins the ServiceExecutor. Any outstanding tasks will not be executed, and any

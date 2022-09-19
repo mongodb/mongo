@@ -228,11 +228,7 @@ public:
                 [callback = std::move(callback)](Status status) { callback(status); });
         };
         serviceExecutor->getRunningThreadsCb = [&] { return 0; };
-        serviceExecutor->scheduleTaskCb = [&](ServiceExecutor::Task task,
-                                              MockServiceExecutor::ScheduleFlags) {
-            task();
-            return Status::OK();
-        };
+        serviceExecutor->scheduleTaskCb = [&](OutOfLineExecutor::Task task) { task(Status::OK()); };
     }
 
     void SetUp(benchmark::State& state) override {

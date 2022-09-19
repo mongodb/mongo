@@ -59,14 +59,13 @@ public:
 
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
-    Status scheduleTask(Task task, ScheduleFlags flags) override;
+    void schedule(Task task) override;
 
     size_t getRunningThreads() const override {
         return _numRunningWorkerThreads.loadRelaxed();
     }
 
-    void runOnDataAvailable(const SessionHandle& session,
-                            OutOfLineExecutor::Task onCompletionCallback) override;
+    void runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback) override;
 
     void appendStats(BSONObjBuilder* bob) const override;
 
@@ -74,7 +73,6 @@ private:
     Status _startWorker();
 
     static thread_local std::deque<Task> _localWorkQueue;
-    static thread_local int _localRecursionDepth;
     static thread_local int64_t _localThreadIdleCounter;
 
     AtomicWord<bool> _stillRunning{false};

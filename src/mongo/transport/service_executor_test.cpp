@@ -64,6 +64,15 @@ constexpr auto kWorkerThreadRunTime = Milliseconds{1000};
 // Run time + generous scheduling time slice
 constexpr auto kShutdownTime = Milliseconds{kWorkerThreadRunTime.count() + 50};
 
+class JoinThread : public stdx::thread {
+public:
+    using stdx::thread::thread;
+    ~JoinThread() {
+        if (joinable())
+            join();
+    }
+};
+
 /* This implements the portions of the transport::Reactor based on ASIO, but leaves out
  * the methods not needed by ServiceExecutors.
  *
@@ -142,17 +151,19 @@ public:
 };
 
 TEST_F(ServiceExecutorSynchronousTest, BasicTaskRuns) {
-    unittest::Barrier barrier(2);
     ServiceExecutorSynchronous executor(getGlobalServiceContext());
     ASSERT_OK(executor.start());
-    ASSERT_OK(executor.scheduleTask([&] { barrier.countDownAndWait(); }, {}));
-    barrier.countDownAndWait();
+    PromiseAndFuture<void> pf;
+    executor.schedule([&](Status st) { pf.promise.setFrom(st); });
+    ASSERT_DOES_NOT_THROW(pf.future.get());
     ASSERT_OK(executor.shutdown(kShutdownTime));
 }
 
 TEST_F(ServiceExecutorSynchronousTest, ScheduleFailsBeforeStartup) {
     ServiceExecutorSynchronous executor(getGlobalServiceContext());
-    ASSERT_NOT_OK(executor.scheduleTask([] {}, {}));
+    PromiseAndFuture<void> pf;
+    executor.schedule([&](Status s) { pf.promise.setFrom(s); });
+    ASSERT_THROWS(pf.future.get(), DBException);
 }
 
 class ServiceExecutorFixedTest : public unittest::Test {
@@ -193,112 +204,55 @@ public:
 
 TEST_F(ServiceExecutorFixedTest, ScheduleFailsBeforeStartup) {
     Handle handle;
-    ASSERT_NOT_OK(handle->scheduleTask([] {}, {}));
+    PromiseAndFuture<void> pf;
+    handle->schedule([&](Status s) { pf.promise.setFrom(s); });
+    ASSERT_THROWS(pf.future.get(), DBException);
 }
 
 TEST_F(ServiceExecutorFixedTest, BasicTaskRuns) {
-    unittest::Barrier barrier(2);
     Handle handle;
     handle.start();
-
-    ASSERT_OK(handle->scheduleTask([&] { barrier.countDownAndWait(); }, {}));
-    barrier.countDownAndWait();
-}
-
-TEST_F(ServiceExecutorFixedTest, RecursiveTask) {
-    unittest::Barrier barrier(2);
-    Handle handle;
-    handle.start();
-
-    std::function<void()> recursiveTask = [&] {
-        if (handle->getRecursionDepthForExecutorThread() <
-            fixedServiceExecutorRecursionLimit.load()) {
-            ASSERT_OK(
-                handle->scheduleTask(recursiveTask, ServiceExecutor::ScheduleFlags::kMayRecurse));
-        } else {
-            // This test never returns unless the service executor can satisfy the recursion depth.
-            barrier.countDownAndWait();
-        }
-    };
-
-    // Schedule recursive task and wait for the recursion to stop
-    ASSERT_OK(handle->scheduleTask(recursiveTask, ServiceExecutor::ScheduleFlags::kMayRecurse));
-    barrier.countDownAndWait();
-}
-
-TEST_F(ServiceExecutorFixedTest, FlattenRecursiveScheduledTasks) {
-    unittest::Barrier barrier(2);
-    Handle handle;
-    handle.start();
-    AtomicWord<int> tasksToSchedule{fixedServiceExecutorRecursionLimit.load() * 3};
-
-    // A recursive task that expects to be executed non-recursively. The task recursively schedules
-    // "tasksToSchedule" tasks to the service executor, and each scheduled task verifies that the
-    // recursion depth remains zero during its execution.
-    std::function<void()> recursiveTask = [&] {
-        ASSERT_EQ(handle->getRecursionDepthForExecutorThread(), 1);
-        if (tasksToSchedule.fetchAndSubtract(1) > 0) {
-            ASSERT_OK(handle->scheduleTask(recursiveTask, {}));
-        } else {
-            // Once there are no more tasks to schedule, notify the main thread to proceed.
-            barrier.countDownAndWait();
-        }
-    };
-
-    // Schedule the recursive task and wait for the execution to finish.
-    ASSERT_OK(handle->scheduleTask(recursiveTask,
-                                   ServiceExecutor::ScheduleFlags::kMayYieldBeforeSchedule));
-    barrier.countDownAndWait();
+    PromiseAndFuture<void> pf;
+    handle->schedule([&](Status s) { pf.promise.setFrom(s); });
+    ASSERT_DOES_NOT_THROW(pf.future.get());
 }
 
 TEST_F(ServiceExecutorFixedTest, ShutdownTimeLimit) {
-    SharedPromise<void> invoked;
-    SharedPromise<void> mayReturn;
-
+    unittest::Barrier mayReturn(2);
     Handle handle;
     handle.start();
 
-    ASSERT_OK(handle->scheduleTask(
-        [&] {
-            invoked.emplaceValue();
-            mayReturn.getFuture().get();
-        },
-        {}));
-
-    invoked.getFuture().get();
+    PromiseAndFuture<void> pf;
+    handle->schedule([&](Status st) {
+        pf.promise.setFrom(st);
+        mayReturn.countDownAndWait();
+    });
+    ASSERT_DOES_NOT_THROW(pf.future.get());
     ASSERT_NOT_OK(handle->shutdown(kShutdownTime));
 
     // Ensure the service executor is stopped before leaving the test.
-    mayReturn.emplaceValue();
+    mayReturn.countDownAndWait();
 }
 
 TEST_F(ServiceExecutorFixedTest, ScheduleSucceedsBeforeShutdown) {
-    unittest::threadAssertionMonitoredTest([&](auto&& monitor) {
-        unittest::Barrier barrier(2);
-        Handle handle;
-        handle.start();
+    boost::optional<FailPointEnableBlock> failpoint("hangBeforeSchedulingServiceExecutorFixedTask");
+    PromiseAndFuture<void> pf;
+    Handle handle;
+    handle.start();
 
-        stdx::thread scheduleClient;
-        ScopeGuard joinGuard([&] { scheduleClient.join(); });
+    // The executor accepts the work, but hasn't used the underlying pool yet.
+    JoinThread scheduleClient{[&] { handle->schedule([&](Status s) { pf.promise.setFrom(s); }); }};
+    (*failpoint)->waitForTimesEntered(1);
 
-        {
-            FailPointEnableBlock failpoint("hangBeforeSchedulingServiceExecutorFixedTask");
+    // Trigger an immediate shutdown which will not affect the task we have accepted.
+    ASSERT_NOT_OK(handle->shutdown(Milliseconds{0}));
+    failpoint.reset();
 
-            // The executor accepts the work, but hasn't used the underlying pool yet.
-            scheduleClient = monitor.spawn(
-                [&] { ASSERT_OK(handle->scheduleTask([&] { barrier.countDownAndWait(); }, {})); });
-            failpoint->waitForTimesEntered(1);
+    // Our failpoint has been disabled, so the task can run to completion.
+    ASSERT_DOES_NOT_THROW(pf.future.get());
 
-            // Trigger an immediate shutdown which will not affect the task we have accepted.
-            ASSERT_NOT_OK(handle->shutdown(Milliseconds{0}));
-        }
-
-        // Our failpoint has been disabled, so the task can run to completion.
-        barrier.countDownAndWait();
-
-        // Now we can wait for the task to finish and shutdown.
-        ASSERT_OK(handle->shutdown(kShutdownTime));
-    });
+    // Now we can wait for the task to finish and shutdown.
+    ASSERT_OK(handle->shutdown(kShutdownTime));
 }
 
 TEST_F(ServiceExecutorFixedTest, ScheduleFailsAfterShutdown) {
@@ -306,7 +260,9 @@ TEST_F(ServiceExecutorFixedTest, ScheduleFailsAfterShutdown) {
     handle.start();
 
     ASSERT_OK(handle->shutdown(kShutdownTime));
-    ASSERT_NOT_OK(handle->scheduleTask([] { MONGO_UNREACHABLE; }, {}));
+    PromiseAndFuture<void> pf;
+    handle->schedule([&](Status s) { pf.promise.setFrom(s); });
+    ASSERT_THROWS(pf.future.get(), ExceptionFor<ErrorCodes::ServiceExecutorInShutdown>);
 }
 
 TEST_F(ServiceExecutorFixedTest, RunTaskAfterWaitingForData) {
