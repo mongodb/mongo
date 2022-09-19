@@ -793,6 +793,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target="db_commands_test",
     source=[
+        "create_indexes_test.cpp",
         "index_filter_commands_test.cpp",
         "fle_compact_test.cpp",
         "list_collections_filter_test.cpp",
@@ -806,7 +807,9 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/crypto/encrypted_field_config",
         "$BUILD_DIR/mongo/crypto/fle_crypto",
         "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
         "$BUILD_DIR/mongo/db/catalog/collection",
+        "$BUILD_DIR/mongo/db/catalog/collection_crud",
         "$BUILD_DIR/mongo/db/commands/list_collections_filter",
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
         "$BUILD_DIR/mongo/db/dbdirectclient",

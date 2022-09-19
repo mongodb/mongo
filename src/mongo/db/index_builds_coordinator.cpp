@@ -2038,7 +2038,16 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
                                             replState->collectionUUID,
                                             indexBuildOptions.commitQuorum.value(),
                                             replState->indexNames);
-            uassertStatusOK(indexbuildentryhelpers::addIndexBuildEntry(opCtx, indexBuildEntry));
+
+            try {
+                uassertStatusOK(indexbuildentryhelpers::addIndexBuildEntry(opCtx, indexBuildEntry));
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& e) {
+                // If config.system.indexBuilds is not found, convert the NamespaceNotFound
+                // exception to an anonymous error code. This is to distinguish from
+                // a NamespaceNotFound exception on the user collection, which callers sometimes
+                // interpret as not being an error condition.
+                uasserted(6325700, e.reason());
+            }
 
             opCtx->getServiceContext()->getOpObserver()->onStartIndexBuild(
                 opCtx,

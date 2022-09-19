@@ -3670,6 +3670,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesNonRetriableClonerE
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, IncrementNumRestartsDueToRecipientFailureCounter) {
+    FailPointEnableBlock createIndexesFailpointBlock("skipCreatingIndexDuringRebuildService");
     stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
     const UUID migrationUUID = UUID::gen();
     const OpTime topOfOplogOpTime(Timestamp(1, 1), 1);
@@ -3723,6 +3724,7 @@ TEST_F(TenantMigrationRecipientServiceTest, IncrementNumRestartsDueToRecipientFa
 
 TEST_F(TenantMigrationRecipientServiceTest,
        RecipientFailureCounterNotIncrementedWhenMigrationForgotten) {
+    FailPointEnableBlock createIndexesFailpointBlock("skipCreatingIndexDuringRebuildService");
     const UUID migrationUUID = UUID::gen();
     const OpTime topOfOplogOpTime(Timestamp(1, 1), 1);
 

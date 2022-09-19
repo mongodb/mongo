@@ -179,6 +179,7 @@ MONGO_FAIL_POINT_DEFINE(fpWaitUntilTimestampMajorityCommitted);
 MONGO_FAIL_POINT_DEFINE(hangAfterUpdatingTransactionEntry);
 MONGO_FAIL_POINT_DEFINE(fpBeforeAdvancingStableTimestamp);
 MONGO_FAIL_POINT_DEFINE(hangMigrationBeforeRetryCheck);
+MONGO_FAIL_POINT_DEFINE(skipCreatingIndexDuringRebuildService);
 
 namespace {
 // We never restart just the oplog fetcher.  If a failure occurs, we restart the whole state machine
@@ -298,6 +299,9 @@ void TenantMigrationRecipientService::abortAllMigrations(OperationContext* opCtx
 ExecutorFuture<void> TenantMigrationRecipientService::_rebuildService(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return AsyncTry([this] {
+               if (MONGO_unlikely(skipCreatingIndexDuringRebuildService.shouldFail())) {
+                   return;
+               }
                auto nss = getStateDocumentsNS();
 
                AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
