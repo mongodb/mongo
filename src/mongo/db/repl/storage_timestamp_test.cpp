@@ -3362,14 +3362,12 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
 
     {
         Snapshotted<BSONObj> objSnapshot(_opCtx->recoveryUnit()->getSnapshotId(), oldObj);
-        const RecordData oldRec(objSnapshot.value().objdata(), objSnapshot.value().objsize());
-        Snapshotted<RecordData> recordSnapshot(objSnapshot.snapshotId(), oldRec);
         auto cursor = collection->getCursor(_opCtx);
         auto record = cursor->next();
         invariant(record);
         WriteUnitOfWork wuow(_opCtx);
         const auto statusWith = collection->updateDocumentWithDamages(
-            _opCtx, record->id, std::move(recordSnapshot), source, damages, &args);
+            _opCtx, record->id, objSnapshot, source, damages, false, nullptr, &args);
         wuow.commit();
         ASSERT_OK(statusWith.getStatus());
     }

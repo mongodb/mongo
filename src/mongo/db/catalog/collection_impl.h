@@ -204,18 +204,19 @@ public:
     bool updateWithDamagesSupported() const final;
 
     /**
-     * Not allowed to modify indexes.
      * Illegal to call if updateWithDamagesSupported() returns false.
      * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
      * success.
-     * @return the contents of the updated record.
+     * Returns the contents of the updated document.
      */
-    StatusWith<RecordData> updateDocumentWithDamages(OperationContext* opCtx,
-                                                     const RecordId& loc,
-                                                     const Snapshotted<RecordData>& oldRec,
-                                                     const char* damageSource,
-                                                     const mutablebson::DamageVector& damages,
-                                                     CollectionUpdateArgs* args) const final;
+    StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
+                                                  const RecordId& loc,
+                                                  const Snapshotted<BSONObj>& oldDoc,
+                                                  const char* damageSource,
+                                                  const mutablebson::DamageVector& damages,
+                                                  bool indexesAffected,
+                                                  OpDebug* opDebug,
+                                                  CollectionUpdateArgs* args) const final;
 
     // -----------
 

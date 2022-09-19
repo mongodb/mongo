@@ -34,6 +34,8 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/update/document_diff_applier.h"
+#include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
@@ -260,6 +262,59 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
                 indexesAffected,
                 opDebug,
                 &args);
+            wuow.commit();
+        }
+    }
+
+    assertMultikeyPaths(collection.getCollection(), keyPattern, {MultikeyComponents{}, {0U}});
+}
+
+TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    createIndex(collection(),
+                BSON("name"
+                     << "a_1_b_1"
+                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
+        .transitional_ignore();
+    AutoGetCollection collection(_opCtx.get(), _nss, MODE_IX);
+
+    auto oldDoc = BSON("_id" << 0 << "a" << 5);
+    {
+        WriteUnitOfWork wuow(_opCtx.get());
+        OpDebug* const nullOpDebug = nullptr;
+        ASSERT_OK(collection_internal::insertDocument(
+            _opCtx.get(), *collection, InsertStatement(oldDoc), nullOpDebug));
+        wuow.commit();
+    }
+
+    assertMultikeyPaths(
+        collection.getCollection(), keyPattern, {MultikeyComponents{}, MultikeyComponents{}});
+
+    {
+        auto cursor = collection->getCursor(_opCtx.get());
+        auto record = cursor->next();
+        invariant(record);
+
+        auto oldDoc = collection->docFor(_opCtx.get(), record->id);
+        auto newDoc = BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3));
+        auto diffResult = doc_diff::computeDiff(oldDoc.value(), newDoc, 0, nullptr);
+        auto damagesOutput = doc_diff::computeDamages(oldDoc.value(), diffResult->diff, false);
+        {
+            WriteUnitOfWork wuow(_opCtx.get());
+            const bool indexesAffected = true;
+            OpDebug* opDebug = nullptr;
+            CollectionUpdateArgs args;
+            auto newDocResult =
+                collection->updateDocumentWithDamages(_opCtx.get(),
+                                                      record->id,
+                                                      oldDoc,
+                                                      damagesOutput.damageSource.get(),
+                                                      damagesOutput.damages,
+                                                      indexesAffected,
+                                                      opDebug,
+                                                      &args);
+            ASSERT_TRUE(newDocResult.getValue().woCompare(newDoc) == 0);
+            ASSERT_TRUE(newDocResult.isOK());
             wuow.commit();
         }
     }

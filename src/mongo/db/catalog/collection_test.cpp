@@ -34,7 +34,10 @@
 #include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/update/document_diff_applier.h"
+#include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -237,6 +240,105 @@ void CollectionTest::makeCollectionForMultikey(NamespaceString nss, StringData i
             opCtx, collWriter, BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1))));
         wuow.commit();
     }
+}
+
+TEST_F(CollectionTest, VerifyIndexIsUpdated) {
+    NamespaceString nss("test.t");
+    auto indexName = "myindex"_sd;
+    makeCollectionForMultikey(nss, indexName);
+
+    auto opCtx = operationContext();
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    const auto& coll = autoColl.getCollection();
+
+    auto oldDoc = BSON("_id" << 1 << "a" << 1);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(
+            collection_internal::insertDocument(opCtx, coll, InsertStatement(oldDoc), nullptr));
+        wuow.commit();
+    }
+    auto idxCatalog = coll->getIndexCatalog();
+    auto idIndex = idxCatalog->findIdIndex(opCtx);
+    auto userIdx = idxCatalog->findIndexByName(opCtx, indexName);
+    auto oldRecordId = idIndex->getEntry()->accessMethod()->asSortedData()->findSingle(
+        opCtx, coll, BSON("_id" << 1));
+    auto oldIndexRecordID = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
+        opCtx, coll, BSON("a" << 1));
+    ASSERT_TRUE(!oldRecordId.isNull());
+    ASSERT_EQ(oldRecordId, oldIndexRecordID);
+    {
+        Snapshotted<BSONObj> result;
+        ASSERT_TRUE(coll->findDoc(opCtx, oldRecordId, &result));
+        ASSERT_BSONOBJ_EQ(oldDoc, result.value());
+    }
+
+    auto newDoc = BSON("_id" << 1 << "a" << 5);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        Snapshotted<BSONObj> oldSnap(opCtx->recoveryUnit()->getSnapshotId(), oldDoc);
+        CollectionUpdateArgs args;
+        coll->updateDocument(opCtx, oldRecordId, oldSnap, newDoc, true, nullptr, &args);
+        wuow.commit();
+    }
+    auto indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
+        opCtx, coll, BSON("a" << 1));
+    ASSERT_TRUE(indexRecordId.isNull());
+    indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
+        opCtx, coll, BSON("a" << 5));
+    ASSERT_EQ(indexRecordId, oldRecordId);
+}
+
+TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
+    NamespaceString nss("test.t");
+    auto indexName = "myindex"_sd;
+    makeCollectionForMultikey(nss, indexName);
+
+    auto opCtx = operationContext();
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    const auto& coll = autoColl.getCollection();
+
+    auto oldDoc = BSON("_id" << 1 << "a" << 1 << "b"
+                             << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(
+            collection_internal::insertDocument(opCtx, coll, InsertStatement(oldDoc), nullptr));
+        wuow.commit();
+    }
+    auto idxCatalog = coll->getIndexCatalog();
+    auto idIndex = idxCatalog->findIdIndex(opCtx);
+    auto userIdx = idxCatalog->findIndexByName(opCtx, indexName);
+    auto oldRecordId = idIndex->getEntry()->accessMethod()->asSortedData()->findSingle(
+        opCtx, coll, BSON("_id" << 1));
+    ASSERT_TRUE(!oldRecordId.isNull());
+
+    auto newDoc = BSON("_id" << 1 << "a" << 5 << "b" << 32);
+    auto diff = doc_diff::computeDiff(oldDoc, newDoc, 0, nullptr);
+    ASSERT(diff);
+    auto damagesOutput = doc_diff::computeDamages(oldDoc, diff->diff, false);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        Snapshotted<BSONObj> oldSnap(opCtx->recoveryUnit()->getSnapshotId(), oldDoc);
+        CollectionUpdateArgs args;
+        auto newDocStatus = coll->updateDocumentWithDamages(opCtx,
+                                                            oldRecordId,
+                                                            oldSnap,
+                                                            damagesOutput.damageSource.get(),
+                                                            damagesOutput.damages,
+                                                            true,
+                                                            nullptr,
+                                                            &args);
+        ASSERT_OK(newDocStatus);
+        ASSERT_BSONOBJ_EQ(newDoc, newDocStatus.getValue());
+        wuow.commit();
+    }
+    auto indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
+        opCtx, coll, BSON("a" << 1));
+    ASSERT_TRUE(indexRecordId.isNull());
+    indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
+        opCtx, coll, BSON("a" << 5));
+    ASSERT_EQ(indexRecordId, oldRecordId);
 }
 
 TEST_F(CollectionTest, SetIndexIsMultikey) {

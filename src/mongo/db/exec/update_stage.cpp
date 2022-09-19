@@ -294,12 +294,17 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                 }
 
                 WriteUnitOfWork wunit(opCtx());
-                StatusWith<RecordData> newRecStatus = collection()->updateDocumentWithDamages(
-                    opCtx(), recordId, std::move(snap), source, _damages, &args);
+                newObj = uassertStatusOK(
+                    collection()->updateDocumentWithDamages(opCtx(),
+                                                            recordId,
+                                                            oldObj,
+                                                            source,
+                                                            _damages,
+                                                            driver->modsAffectIndices(),
+                                                            _params.opDebug,
+                                                            &args));
                 invariant(oldObj.snapshotId() == opCtx()->recoveryUnit()->getSnapshotId());
                 wunit.commit();
-
-                newObj = uassertStatusOK(std::move(newRecStatus)).releaseToBson();
             }
 
             newRecordId = recordId;

@@ -1012,22 +1012,24 @@ bool CollectionImpl::updateWithDamagesSupported() const {
     return _shared->_recordStore->updateWithDamagesSupported();
 }
 
-StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
+StatusWith<BSONObj> CollectionImpl::updateDocumentWithDamages(
     OperationContext* opCtx,
     const RecordId& loc,
-    const Snapshotted<RecordData>& oldRec,
+    const Snapshotted<BSONObj>& oldDoc,
     const char* damageSource,
     const mutablebson::DamageVector& damages,
+    bool indexesAffected,
+    OpDebug* opDebug,
     CollectionUpdateArgs* args) const {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_IX));
-    invariant(oldRec.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
+    invariant(oldDoc.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
     invariant(updateWithDamagesSupported());
 
     // For in-place updates we need to grab an owned copy of the pre-image doc if pre-image
     // recording is enabled and we haven't already set the pre-image due to this update being
     // a retryable findAndModify or a possible update to the shard key.
     if (!args->preImageDoc && isChangeStreamPreAndPostImagesEnabled()) {
-        args->preImageDoc = oldRec.value().toBson().getOwned();
+        args->preImageDoc = oldDoc.value().getOwned();
     }
     OplogUpdateEntryArgs onUpdateArgs(args, ns(), _uuid);
     const bool setNeedsRetryImageOplogField =
@@ -1050,17 +1052,45 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
         invariant(!(isRetryableWrite(opCtx) && setNeedsRetryImageOplogField));
     }
 
-    auto newRecStatus =
-        _shared->_recordStore->updateWithDamages(opCtx, loc, oldRec.value(), damageSource, damages);
+    RecordData oldRecordData(oldDoc.value().objdata(), oldDoc.value().objsize());
+    StatusWith<BSONObj> newDocStatus =
+        _shared->_recordStore->updateWithDamages(opCtx, loc, oldRecordData, damageSource, damages)
+            .transform(
+                [](RecordData&& recordData) { return recordData.releaseToBson().getOwned(); });
 
-    if (newRecStatus.isOK()) {
-        args->updatedDoc = newRecStatus.getValue().toBson();
+    if (newDocStatus.isOK()) {
+        args->updatedDoc = newDocStatus.getValue();
         args->changeStreamPreAndPostImagesEnabledForCollection =
             isChangeStreamPreAndPostImagesEnabled();
 
+        if (indexesAffected) {
+            int64_t keysInserted = 0;
+            int64_t keysDeleted = 0;
+
+            uassertStatusOK(_indexCatalog->updateRecord(opCtx,
+                                                        {this, CollectionPtr::NoYieldTag{}},
+                                                        oldDoc.value(),
+                                                        args->updatedDoc,
+                                                        loc,
+                                                        &keysInserted,
+                                                        &keysDeleted));
+
+            if (opDebug) {
+                opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
+                opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+                // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
+                if (!opCtx->inMultiDocumentTransaction()) {
+                    opCtx->recoveryUnit()->onRollback([opDebug, keysInserted, keysDeleted]() {
+                        opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
+                        opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
+                    });
+                }
+            }
+        }
+
         opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
     }
-    return newRecStatus;
+    return newDocStatus;
 }
 
 bool CollectionImpl::isTemporary() const {
