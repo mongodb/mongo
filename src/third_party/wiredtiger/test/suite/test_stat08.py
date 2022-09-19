@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
+from unittest import skip
 import wiredtiger, wttest
 
 # test_stat08.py
@@ -64,6 +65,7 @@ class test_stat08(wttest.WiredTigerTestCase):
         if k is self.BYTES_READ or k is self.READ_TIME:
             self.assertTrue(value > 0)
 
+    @skip("skipping this test: FIXME-WT-9774")
     def test_session_stats(self):
         self.session = self.conn.open_session()
         self.session.create("table:test_stat08",
