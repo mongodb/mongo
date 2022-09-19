@@ -101,11 +101,10 @@ failPoint.wait();
 // cannot become majority committed, regardless of which node steps up.
 stopServerReplication([coordPrimary, coordSecondary]);
 
-// Induce the coordinator primary to step down.
-
-// The amount of time the node has to wait before becoming primary again.
-const stepDownSecs = 2;
-assert.commandWorked(coordPrimary.adminCommand({replSetStepDown: stepDownSecs, force: true}));
+// Induce the coordinator primary to step down, but allow it to immediately step back up.
+assert.commandWorked(
+    coordPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+assert.commandWorked(coordPrimary.adminCommand({replSetFreeze: 0}));
 
 failPoint.off();
 
