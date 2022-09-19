@@ -38,8 +38,8 @@ static bool use_columns = false;
 
 #define ENV_CONFIG                                     \
     "create,log=(enabled,file_max=100K,remove=false)," \
-    "transaction_sync=(enabled,method=none)"
-#define ENV_CONFIG_REC "log=(recover=on)"
+    "transaction_sync=(enabled,method=none),statistics=(all)"
+#define ENV_CONFIG_REC "log=(recover=on),statistics=(all)"
 
 #define LOG_FILE_1 "WiredTigerLog.0000000001"
 

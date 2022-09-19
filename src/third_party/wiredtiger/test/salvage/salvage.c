@@ -519,7 +519,8 @@ build(int ikey, int ivalue, int cnt)
     /*
      * Disable logging: we're modifying files directly, we don't want to run recovery.
      */
-    testutil_check(wiredtiger_open(HOME, NULL, "create,log=(enabled=false)", &conn));
+    testutil_check(
+      wiredtiger_open(HOME, NULL, "create,log=(enabled=false),statistics=(all)", &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->drop(session, LOAD_URI, "force"));
 
@@ -701,8 +702,8 @@ process(void)
     /* Salvage. */
     config[0] = '\0';
     if (verbose)
-        testutil_check(__wt_snprintf(
-          config, sizeof(config), "error_prefix=\"%s\",verbose=[salvage,verify],", progname));
+        testutil_check(__wt_snprintf(config, sizeof(config),
+          "error_prefix=\"%s\",verbose=[salvage,verify],statistics=(all),", progname));
     strcat(config, "log=(enabled=false),");
 
     testutil_check(wiredtiger_open(HOME, NULL, config, &conn));

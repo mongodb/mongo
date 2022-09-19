@@ -362,7 +362,8 @@ open_with_corruption(const char *sfx)
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", home));
 
     /* Don't abort in the diagnostic builds on detecting corruption. */
-    ret = wiredtiger_open(buf, &event_handler, "debug_mode=(corruption_abort=false)", &conn);
+    ret = wiredtiger_open(
+      buf, &event_handler, "debug_mode=(corruption_abort=false),statistics=(all)", &conn);
 
     /*
      * Not all out of sync combinations lead to corruption. We keep the previous checkpoint in the
@@ -396,7 +397,7 @@ open_with_salvage(const char *sfx, TABLE_INFO *table_data)
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%s", home, sfx));
     else
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", home));
-    testutil_check(wiredtiger_open(buf, &event_handler, "salvage=true", &conn));
+    testutil_check(wiredtiger_open(buf, &event_handler, "salvage=true,statistics=(all)", &conn));
     testutil_assert(conn != NULL);
     if (sfx != NULL)
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%s/%s", home, sfx, WT_METAFILE_SLVG));
@@ -427,7 +428,7 @@ open_normal(const char *sfx, TABLE_INFO *table_data)
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%s", home, sfx));
     else
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", home));
-    testutil_check(wiredtiger_open(buf, &event_handler, NULL, &conn));
+    testutil_check(wiredtiger_open(buf, &event_handler, "statistics=(all)", &conn));
     verify_metadata(conn, &table_data[0]);
     testutil_check(conn->close(conn, NULL));
 }
@@ -484,7 +485,7 @@ main(int argc, char *argv[])
     home = opts->home;
     testutil_make_work_dir(home);
 
-    testutil_check(wiredtiger_open(home, &event_handler, "create", &opts->conn));
+    testutil_check(wiredtiger_open(home, &event_handler, "create,statistics=(all)", &opts->conn));
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &wt_session));
     /*

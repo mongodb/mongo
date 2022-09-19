@@ -116,7 +116,8 @@ main(int argc, char *argv[])
     testutil_check(
       __wt_snprintf(sharedopts->joinuri, sizeof(sharedopts->joinuri), "join:%s", opts->uri));
 
-    testutil_check(wiredtiger_open(opts->home, NULL, "create,cache_size=1G", &opts->conn));
+    testutil_check(
+      wiredtiger_open(opts->home, NULL, "create,cache_size=1G,statistics=(all)", &opts->conn));
 
     test_join(opts, sharedopts, true, true);
     test_join(opts, sharedopts, true, false);

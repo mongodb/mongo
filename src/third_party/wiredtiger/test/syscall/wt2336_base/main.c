@@ -61,7 +61,7 @@ main(int argc, char *argv[])
     (void)argc;
     (void)argv;
     fprintf(stderr, SEPARATOR "wiredtiger_open\n");
-    if ((ret = wiredtiger_open(".", NULL, "create", &conn)) != 0)
+    if ((ret = wiredtiger_open(".", NULL, "create,statistics=(all)", &conn)) != 0)
         fail(ret);
 
     usleep(100);

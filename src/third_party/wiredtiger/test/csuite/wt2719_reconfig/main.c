@@ -177,7 +177,8 @@ main(int argc, char *argv[])
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
 
-    testutil_check(wiredtiger_open(opts->home, &event_handler, "create", &opts->conn));
+    testutil_check(
+      wiredtiger_open(opts->home, &event_handler, "create,statistics=(all)", &opts->conn));
 
     /* Open an LSM file so the LSM reconfiguration options make sense. */
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));

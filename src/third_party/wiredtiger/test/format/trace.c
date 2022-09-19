@@ -99,7 +99,8 @@ trace_init(void)
 
     /* Configure logging with automatic removal, and keep the last N log files. */
     testutil_check(__wt_snprintf(config, sizeof(config),
-      "create,log=(enabled=true,remove=true),debug_mode=(log_retention=%d)", retain));
+      "create,log=(enabled=true,remove=true),debug_mode=(log_retention=%d),statistics=(all)",
+      retain));
     testutil_check(__wt_snprintf(tracedir, sizeof(tracedir), "%s/%s", g.home, TRACE_DIR));
     testutil_checkfmt(
       wiredtiger_open(tracedir, NULL, config, &g.trace_conn), "%s: %s", tracedir, config);

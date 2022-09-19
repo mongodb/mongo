@@ -115,7 +115,7 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
 
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "create,cache_size=%s,eviction=(threads_max=5),statistics=(fast)",
+      "create,cache_size=%s,eviction=(threads_max=5),statistics=(all)",
       opts->table_type == TABLE_FIX ? "500MB" : "2GB"));
     testutil_check(wiredtiger_open(opts->home, NULL, buf, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
@@ -129,7 +129,7 @@ main(int argc, char *argv[])
 
     /* Force to disk and re-open. */
     testutil_check(opts->conn->close(opts->conn, NULL));
-    testutil_check(wiredtiger_open(opts->home, NULL, NULL, &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL, "statistics=(all)", &opts->conn));
 
     (void)signal(SIGINT, onsig);
 

@@ -121,7 +121,7 @@ main(int argc, char *argv[])
     testutil_check(wiredtiger_open(opts->home, NULL,
       "create,cache_size=1G,checkpoint=(wait=30),eviction_trigger=80,eviction_target=64,eviction_"
       "dirty_target=65,eviction_dirty_trigger=80,log=(enabled,file_max=10M),transaction_sync=("
-      "enabled=true,method=none)",
+      "enabled=true,method=none),statistics=(all)",
       &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 

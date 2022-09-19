@@ -107,7 +107,7 @@ main(int argc, char *argv[])
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
 
-    testutil_check(wiredtiger_open(opts->home, NULL, "create", &conn));
+    testutil_check(wiredtiger_open(opts->home, NULL, "create,statistics=(all)", &conn));
     opts->conn = conn;
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
