@@ -45,9 +45,6 @@ namespace {
 const NamespaceString kNss = NamespaceString("test.t");
 
 class CollectionValidationTest : public CatalogTestFixture {
-protected:
-    CollectionValidationTest(Options options = {}) : CatalogTestFixture(std::move(options)) {}
-
 private:
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -57,12 +54,6 @@ private:
         ASSERT_OK(storageInterface()->createCollection(
             operationContext(), kNss, defaultCollectionOptions));
     };
-};
-
-// Background validation opens checkpoint cursors which requires reading from the disk.
-class CollectionValidationDiskTest : public CollectionValidationTest {
-protected:
-    CollectionValidationDiskTest() : CollectionValidationTest(Options{}.ephemeral(false)) {}
 };
 
 /**
@@ -218,7 +209,7 @@ TEST_F(CollectionValidationTest, ValidateEmpty) {
                        /*numInvalidDocuments*/ 0,
                        /*numErrors*/ 0);
 }
-TEST_F(CollectionValidationDiskTest, BackgroundValidateEmpty) {
+TEST_F(CollectionValidationTest, BackgroundValidateEmpty) {
     backgroundValidate(operationContext(),
                        /*valid*/ true,
                        /*numRecords*/ 0,
@@ -236,7 +227,7 @@ TEST_F(CollectionValidationTest, Validate) {
                        /*numInvalidDocuments*/ 0,
                        /*numErrors*/ 0);
 }
-TEST_F(CollectionValidationDiskTest, BackgroundValidate) {
+TEST_F(CollectionValidationTest, BackgroundValidate) {
     auto opCtx = operationContext();
     backgroundValidate(opCtx,
                        /*valid*/ true,
@@ -255,7 +246,7 @@ TEST_F(CollectionValidationTest, ValidateError) {
                        /*numInvalidDocuments*/ 1,
                        /*numErrors*/ 1);
 }
-TEST_F(CollectionValidationDiskTest, BackgroundValidateError) {
+TEST_F(CollectionValidationTest, BackgroundValidateError) {
     auto opCtx = operationContext();
     backgroundValidate(opCtx,
                        /*valid*/ false,
@@ -289,7 +280,7 @@ void waitUntilValidateFailpointHasBeenReached() {
     ASSERT(CollectionValidation::getIsValidationPausedForTest());
 }
 
-TEST_F(CollectionValidationDiskTest, BackgroundValidateRunsConcurrentlyWithWrites) {
+TEST_F(CollectionValidationTest, BackgroundValidateRunsConcurrentlyWithWrites) {
     auto opCtx = operationContext();
     auto serviceContext = opCtx->getServiceContext();
 

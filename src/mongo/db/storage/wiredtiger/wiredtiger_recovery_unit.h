@@ -181,6 +181,8 @@ public:
 
     std::shared_ptr<StorageStats> getOperationStatistics() const override;
 
+    void refreshSnapshot() override;
+
     void ignoreAllMultiTimestampConstraints() {
         _multiTimestampConstraintTracker.ignoreAllMultiTimestampConstraints = true;
     }

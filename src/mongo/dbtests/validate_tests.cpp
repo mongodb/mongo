@@ -122,13 +122,6 @@ public:
     }
 
 protected:
-    void forceCheckpoint(bool background) {
-        if (background) {
-            // Checkpoint all of the data.
-            _opCtx.getServiceContext()->getStorageEngine()->checkpoint();
-        }
-    }
-
     ValidateResults runValidate() {
         // validate() will set a kCheckpoint read source. Callers continue to do operations after
         // running validate, so we must reset the read source back to normal before returning.
@@ -148,7 +141,6 @@ protected:
         ValidateResults results;
         BSONObjBuilder output;
 
-        forceCheckpoint(_background);
         ASSERT_OK(CollectionValidation::validate(
             &_opCtx, _nss, mode, repairMode, &results, &output, kTurnOnExtraLoggingForTest));
 
@@ -3365,15 +3357,6 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
-            // after running validate, so we must reset the read source back to normal before
-            // returning.
-            auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
-            ON_BLOCK_EXIT([&] {
-                _opCtx.recoveryUnit()->abandonSnapshot();
-                _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
-            });
-            forceCheckpoint(_background);
             ASSERT_OK(CollectionValidation::validate(&_opCtx,
                                                      _nss,
                                                      mode,
@@ -4176,15 +4159,6 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
-            // after running validate, so we must reset the read source back to normal before
-            // returning.
-            auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
-            ON_BLOCK_EXIT([&] {
-                _opCtx.recoveryUnit()->abandonSnapshot();
-                _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
-            });
-            forceCheckpoint(_background);
             ASSERT_OK(CollectionValidation::validate(&_opCtx,
                                                      _nss,
                                                      mode,
@@ -4290,15 +4264,6 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
-            // after running validate, so we must reset the read source back to normal before
-            // returning.
-            auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
-            ON_BLOCK_EXIT([&] {
-                _opCtx.recoveryUnit()->abandonSnapshot();
-                _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
-            });
-            forceCheckpoint(_background);
             ASSERT_OK(CollectionValidation::validate(&_opCtx,
                                                      _nss,
                                                      mode,
@@ -4401,15 +4366,6 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
-            // after running validate, so we must reset the read source back to normal before
-            // returning.
-            auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
-            ON_BLOCK_EXIT([&] {
-                _opCtx.recoveryUnit()->abandonSnapshot();
-                _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
-            });
-            forceCheckpoint(_background);
             ASSERT_OK(CollectionValidation::validate(&_opCtx,
                                                      _nss,
                                                      mode,
@@ -4441,15 +4397,6 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
-            // after running validate, so we must reset the read source back to normal before
-            // returning.
-            auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
-            ON_BLOCK_EXIT([&] {
-                _opCtx.recoveryUnit()->abandonSnapshot();
-                _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
-            });
-            forceCheckpoint(_background);
             ASSERT_OK(CollectionValidation::validate(&_opCtx,
                                                      _nss,
                                                      mode,
