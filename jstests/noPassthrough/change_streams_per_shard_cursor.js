@@ -98,7 +98,7 @@ let c = pscWatch(sdb, "coll", shardId);
 for (let i = 1; i <= 4; i++) {
     sdb.coll.insertOne({location: 2, i});
     assert(!c.isExhausted());
-    assert(c.hasNext());
+    assert.soon(() => c.hasNext());
     c.next();
 }
 assert(!c.hasNext());
@@ -108,12 +108,12 @@ c = pscWatch(sdb, 1, shardId);
 
 sdb.coll.insertOne({location: 3});
 assert(!c.isExhausted());
-assert(c.hasNext());
+assert.soon(() => c.hasNext());
 c.next();
 
 sdb.coll2.insertOne({location: 4});
 assert(!c.isExhausted());
-assert(c.hasNext());
+assert.soon(() => c.hasNext());
 c.next();
 
 assert(!c.hasNext());
@@ -129,7 +129,7 @@ assert(!c.hasNext());
 
 sdb.toBeCreated.insertOne({location: 8});
 assert(!c.isExhausted());
-assert(c.hasNext());
+assert.soon(() => c.hasNext());
 c.next();
 
 assert(!c.hasNext());
@@ -164,7 +164,7 @@ c = pscWatch(sdb, "coll", shardId);
 
 sdb.coll.insertOne({location: 5, _id: -2});
 assert(!c.isExhausted());
-assert(c.hasNext());
+assert.soon(() => c.hasNext());
 c.next();
 
 sdb.coll.insertOne({location: 6, _id: 2});
@@ -176,12 +176,12 @@ c = pscWatch(sdb.getSiblingDB("admin"), 1, shardId, {}, {allChangesForCluster: t
 
 sdb.coll.insertOne({location: 7, _id: -3});
 assert(!c.isExhausted());
-assert(c.hasNext());
+assert.soon(() => c.hasNext());
 c.next();
 
 sdb.coll2.insertOne({location: 8, _id: -4});
 assert(!c.isExhausted());
-assert(c.hasNext());
+assert.soon(() => c.hasNext());
 c.next();
 
 sdb.coll.insertOne({location: 9, _id: 3});
