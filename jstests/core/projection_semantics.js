@@ -10,15 +10,16 @@
  *   # We could potentially need to resume an index build in the event of a stepdown, which is not
  *   # yet implemented.
  *   does_not_support_stepdowns,
- *   uses_column_store_index,
+ *   # Columnstore indexes are incompatible with clustered collections.
+ *   incompatible_with_clustered_collection,
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
-const columnstoreEnabled = checkSBEEnabled(
-    db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true /* checkAllNodes */);
+const columnstoreEnabled =
+    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"]);
 
 const coll = db.projection_semantics;
 coll.drop();

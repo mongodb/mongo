@@ -9,18 +9,26 @@
  *   # We could potentially need to resume an index build in the event of a stepdown, which is not
  *   # yet implemented.
  *   does_not_support_stepdowns,
- *   uses_column_store_index,
- *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
+ *   # Columnstore indexes are incompatible with clustered collections.
+ *   incompatible_with_clustered_collection,
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const mongod = MongoRunner.runMongod({});
 const db = mongod.getDB("test");
+
+const columnStoreEnabled =
+    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"]);
+if (!columnStoreEnabled) {
+    jsTestLog("Skipping column store bulk load test test since the feature flag is not enabled.");
+    MongoRunner.stopMongod(mongod);
+    return;
+}
 
 //
 // Create test documents.

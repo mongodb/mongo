@@ -1,12 +1,11 @@
 /**
  * Testing of just the query layer's integration for columnar index.
  * @tags: [
+ *   # columnstore indexes are new in 6.2.
  *   requires_fcv_62,
  *   # Runs explain on an aggregate command which is only compatible with readConcern local.
  *   assumes_read_concern_unchanged,
  *   uses_column_store_index,
- *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  * ]
  */
 (function() {
@@ -15,6 +14,14 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/analyze_plan.js");         // For "planHasStage."
 load("jstests/aggregation/extras/utils.js");  // For "resultsEq."
+load("jstests/libs/sbe_util.js");             // For "checkSBEEnabled.""
+
+const columnstoreEnabled =
+    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"]);
+if (!columnstoreEnabled) {
+    jsTestLog("Skipping columnstore index validation test since the feature flag is not enabled.");
+    return;
+}
 
 const coll = db.columnstore_index_correctness;
 coll.drop();

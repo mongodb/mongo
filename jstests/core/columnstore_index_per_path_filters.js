@@ -3,12 +3,14 @@
  * might be pushed down into the column scan stage.
  *
  * @tags: [
+ *   # columnstore indexes are new in 6.2.
  *   requires_fcv_62,
  *   # Runs explain on an aggregate command which is only compatible with readConcern local.
  *   assumes_read_concern_unchanged,
+ *   # TODO SERVER-66925 We could potentially need to resume an index build in the event of a
+ *   # stepdown, which is not yet implemented.
+ *   does_not_support_stepdowns,
  *   uses_column_store_index,
- *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  * ]
  */
 (function() {
@@ -17,6 +19,14 @@
 load("jstests/aggregation/extras/utils.js");  // For "resultsEq."
 load("jstests/libs/analyze_plan.js");         // For "planHasStage."
 load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages.
+load("jstests/libs/sbe_util.js");             // For "checkSBEEnabled.""
+
+const columnstoreEnabled =
+    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"]);
+if (!columnstoreEnabled) {
+    jsTestLog("Skipping columnstore index validation test since the feature flag is not enabled.");
+    return;
+}
 
 const coll_filters = db.columnstore_index_per_path_filters;
 function runPerPathFiltersTest({docs, query, projection, expected, testDescription}) {
