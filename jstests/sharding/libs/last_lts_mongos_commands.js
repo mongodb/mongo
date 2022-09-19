@@ -14,6 +14,7 @@ const commandsRemovedFromMongosSinceLastLTS = [
 // defined without always existing on the mongos being used.
 const commandsAddedToMongosSinceLastLTS = [
     "_clusterQueryWithoutShardKey",
+    "_clusterWriteWithoutShardKey",
     "abortReshardCollection",
     "analyze",
     "analyzeShardKey",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.

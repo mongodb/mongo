@@ -79,6 +79,7 @@ let testCases = {
     _addShard: {skip: "internal command"},
     _cloneCollectionOptionsFromPrimaryShard: {skip: "internal command"},
     _clusterQueryWithoutShardKey: {skip: "internal command"},
+    _clusterWriteWithoutShardKey: {skip: "internal command"},
     _configsvrAbortReshardCollection: {skip: "internal command"},
     _configsvrAddShard: {skip: "internal command"},
     _configsvrAddShardToZone: {skip: "internal command"},

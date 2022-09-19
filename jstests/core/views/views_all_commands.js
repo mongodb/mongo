@@ -82,6 +82,7 @@ let viewsCommandTests = {
     _cloneCatalogData: {skip: isAnInternalCommand},
     _cloneCollectionOptionsFromPrimaryShard: {skip: isAnInternalCommand},
     _clusterQueryWithoutShardKey: {skip: isAnInternalCommand},
+    _clusterWriteWithoutShardKey: {skip: isAnInternalCommand},
     _configsvrAbortReshardCollection: {skip: isAnInternalCommand},
     _configsvrAddShard: {skip: isAnInternalCommand},
     _configsvrAddShardToZone: {skip: isAnInternalCommand},

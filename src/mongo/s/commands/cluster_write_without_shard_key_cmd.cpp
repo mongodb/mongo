@@ -39,10 +39,10 @@
 namespace mongo {
 namespace {
 
-class ClusterQueryWithoutShardKeyCmd : public TypedCommand<ClusterQueryWithoutShardKeyCmd> {
+class ClusterWriteWithoutShardKeyCmd : public TypedCommand<ClusterWriteWithoutShardKeyCmd> {
 public:
-    using Request = ClusterQueryWithoutShardKey;
-    using Response = ClusterQueryWithoutShardKeyResponse;
+    using Request = ClusterWriteWithoutShardKey;
+    using Response = ClusterWriteWithoutShardKeyResponse;
 
     class Invocation final : public InvocationBase {
     public:
@@ -53,10 +53,10 @@ public:
                     "_clusterQueryWithoutShardKey can only be run on Mongos",
                     isMongos());
 
-            LOGV2(6962300,
-                  "Running read phase for a write without a shard key.",
+            LOGV2(6962400,
+                  "Running write phase for a write without a shard key.",
                   "clientWriteRequest"_attr = request().getWriteCmd(),
-                  "stmtIdInBatch"_attr = request().getStmtId());
+                  "shardId"_attr = request().getShardId());
             return {};
         }
 
@@ -91,7 +91,7 @@ public:
     }
 };
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ClusterQueryWithoutShardKeyCmd,
+MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ClusterWriteWithoutShardKeyCmd,
                                        feature_flags::gFeatureFlagUpdateOneWithoutShardKey);
 
 }  // namespace

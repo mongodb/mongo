@@ -35,12 +35,16 @@ imports:
 structs:
   clusterQueryWithoutShardKeyResponse: 
     description: "The response for the '_clusterQueryWithoutShardKeyFind' command."
+  clusterWriteWithoutShardKeyResponse: 
+    description: "The response for the '_clusterWriteWithoutShardKeyFind' command."
   
 commands:
   _clusterQueryWithoutShardKey:
     command_name: _clusterQueryWithoutShardKey
     cpp_name: ClusterQueryWithoutShardKey
-    description: "An internal command used to broadcast a query to all shards for updates/deletes/findAndModifies that do not provide a shard key."
+    description: >- 
+      "An internal command used to broadcast a query to all shards for updates/deletes
+      /findAndModifies that do not provide a shard key."
     namespace: ignored
     api_version: ""
     reply_type: clusterQueryWithoutShardKeyResponse
@@ -51,4 +55,19 @@ commands:
       stmtId:
         description: "The stmtId of the write statement in the original batch write."
         type: int
-     
+  _clusterWriteWithoutShardKey:
+    command_name: _clusterWriteWithoutShardKey
+    cpp_name: ClusterWriteWithoutShardKey
+    description: >- 
+      "An internal command used to target target an update/delete/findAndModify command to a 
+      specific shard using a shardId."
+    namespace: ignored
+    api_version: ""
+    reply_type: clusterWriteWithoutShardKeyResponse
+    fields:
+      writeCmd:
+        description: "The original write command."
+        type: object
+      shardId:
+        description: "The shard id of the target shard for the write."
+        type: shard_id

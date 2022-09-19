@@ -49,6 +49,7 @@ let testCases = {
     _addShard: {skip: "primary only"},
     _shardsvrCloneCatalogData: {skip: "primary only"},
     _clusterQueryWithoutShardKey: {skip: "internal command"},
+    _clusterWriteWithoutShardKey: {skip: "internal command"},
     _configsvrAddShard: {skip: "primary only"},
     _configsvrAddShardToZone: {skip: "primary only"},
     _configsvrBalancerCollectionStatus: {skip: "primary only"},
