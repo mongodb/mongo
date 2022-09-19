@@ -1420,7 +1420,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-audit-log-encryption-no-compression
     display_name: Linux Single-node Replica Set Audit w/ At-Rest Log Encryption (No compression)
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-audit-log-encryption-no-compression
@@ -1436,7 +1436,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-audit
     display_name: Linux Single-node Replica Set Audit
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-audit
@@ -1452,7 +1452,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-audit-log-encryption-compression
     display_name: Linux Single-node Replica Set Audit w/ At-Rest Log Encryption (With compression)
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-audit-log-encryption-compression
