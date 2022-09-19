@@ -57,6 +57,7 @@
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/version/releases.h"
@@ -325,7 +326,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
             if (cmrIndex->idx->unique()) {
                 indexForOplog->setUnique(boost::none);
             } else {
-                // Disallow one-step unique convertion. The user has to set
+                // Disallow one-step unique conversion. The user has to set
                 // 'prepareUnique' to true first.
                 if (!cmrIndex->idx->prepareUnique()) {
                     return Status(ErrorCodes::InvalidOptions,
@@ -366,6 +367,24 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
                 cmrIndex->idx->unique()) {
                 indexForOplog->setPrepareUnique(boost::none);
             } else {
+                // Checks if the index key pattern conflicts with the shard key pattern.
+                if (auto catalogClient = Grid::get(opCtx)->catalogClient()) {
+                    try {
+                        auto shardedColl = catalogClient->getCollection(opCtx, nss);
+                        const ShardKeyPattern shardKeyPattern(shardedColl.getKeyPattern());
+                        if (!shardKeyPattern.isIndexUniquenessCompatible(
+                                cmrIndex->idx->keyPattern())) {
+                            return {ErrorCodes::InvalidOptions,
+                                    fmt::format(
+                                        "cannot set 'prepareUnique' for index {} with shard key "
+                                        "pattern {}",
+                                        cmrIndex->idx->keyPattern().toString(),
+                                        shardKeyPattern.toBSON().toString())};
+                        }
+                    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                        // The collection is unsharded or doesn't exist.
+                    }
+                }
                 cmrIndex->indexPrepareUnique = cmdIndex.getPrepareUnique();
             }
         }
