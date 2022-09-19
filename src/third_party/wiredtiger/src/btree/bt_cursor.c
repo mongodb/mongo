@@ -612,6 +612,9 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
     WT_STAT_CONN_DATA_INCR(session, cursor_reset);
 
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+    /* Initialize the update value as we are not pointing to any value. */
+    cbt->upd_value->type = WT_UPDATE_INVALID;
+    WT_TIME_WINDOW_INIT(&cbt->upd_value->tw);
 
     return (__cursor_reset(cbt));
 }
@@ -2204,6 +2207,10 @@ __wt_btcur_open(WT_CURSOR_BTREE *cbt)
     cbt->tmp = &cbt->_tmp;
     cbt->modify_update = &cbt->_modify_update;
     cbt->upd_value = &cbt->_upd_value;
+
+    /* Initialize the value. */
+    cbt->upd_value->type = WT_UPDATE_INVALID;
+    WT_TIME_WINDOW_INIT(&cbt->upd_value->tw);
 
 #ifdef HAVE_DIAGNOSTIC
     cbt->lastkey = &cbt->_lastkey;
