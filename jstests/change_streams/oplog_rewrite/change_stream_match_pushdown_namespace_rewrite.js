@@ -1084,5 +1084,29 @@ verifyOnWholeCluster(
     {change_stream_match_pushdown_and_rewrite_and_rewrite: {dropDatabase: [dbName, dbName]}},
     1 /* expectedOplogRetDocsForEachShard */);
 
+// Create two sharded collections in the main test database, then start a new change stream to get a
+// fresh resume token.
+const collWithDot =
+    createShardedCollection(st, "_id" /* shardKey */, dbName, "foo.bar", 2 /*splitAt */);
+const collWithUnderscore =
+    createShardedCollection(st, "_id" /* shardKey */, dbName, "foo_bar", 2 /*splitAt */);
+const thirdResumeAfterToken =
+    db.getSiblingDB("admin").watch([], {allChangesForCluster: true}).getResumeToken();
+
+// Insert one document per collection, per shard. The test cases below verify the behavior of regex
+// matches with escaped characters on collections with special names (e.g. containing dots). This
+// exercises the fix for SERVER-67715.
+assert.commandWorked(collWithDot.insert({_id: 1}));
+assert.commandWorked(collWithDot.insert({_id: 3}));
+assert.commandWorked(collWithUnderscore.insert({_id: 1}));
+assert.commandWorked(collWithUnderscore.insert({_id: 3}));
+
+// Ensure that a regex match properly respects escaped characters (here, testing that the escaped
+// "." character is treated as a literal dot).
+verifyOnWholeCluster(thirdResumeAfterToken,
+                     {$match: {"ns.coll": {$nin: [/^foo\./]}}},
+                     {"foo_bar": {insert: [1, 3]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
+
 st.stop();
 })();
