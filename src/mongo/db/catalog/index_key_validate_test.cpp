@@ -334,6 +334,14 @@ TEST(IndexKeyValidateTest, UpdateTTLIndexNaNExpireAfterSeconds) {
                    nullptr, fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: NaN}")))));
 }
 
+TEST(IndexKeyValidateTest, ValidateAfterSecondsAcceptsFloatingPointNumber) {
+    auto spec = unittest::assertGet(index_key_validate::validateIndexSpec(
+        nullptr, fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: 123.456}")));
+
+    // TTLMonitor extracts 'expireAfterSeconds' using BSONElement::safeNumberLong().
+    ASSERT_EQUALS(spec["expireAfterSeconds"].safeNumberLong(), 123LL);
+}
+
 TEST(IndexKeyValidateTest, RepairIndexSpecs) {
     ASSERT(fromjson("{key: {a: 1}, name: 'index'}")
                .binaryEqual(index_key_validate::repairIndexSpec(
