@@ -1785,6 +1785,10 @@ public:
         return next;
     }
 
+    Pipeline* getPipeline_forTest() override {
+        return nullptr;
+    }
+
 private:
     std::list<BSONObj> _toReturn;
 };

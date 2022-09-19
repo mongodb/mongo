@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/s/config/initial_split_policy.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/query/sharded_agg_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -232,7 +233,6 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedPathAndIdIsProjected
 TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedHashedPathSucceeds) {
     auto shardKeyPattern = ShardKeyPattern(BSON("_id.a" << 1 << "b" << 1 << "_id.b"
                                                         << "hashed"));
-
     auto pipeline =
         Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
                             shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
@@ -249,5 +249,27 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedHashedPathSucceeds) 
                       BSON("_id.a" << 20 << "b" << 1 << "_id.b" << 2598032665634823220LL));
     ASSERT(!pipeline->getNext());
 }
+
+TEST_F(ReshardingSplitPolicyTest, ReshardingSucceedsWithLimitedMemoryForSortOperation) {
+    RAIIServerParameterControllerForTest sortMaxMemory{
+        "internalQueryMaxBlockingSortMemoryUsageBytes", 100};
+    auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
+    const NamespaceString ns("reshard", "foo");
+    auto pipelineDocSource =
+        ReshardingSplitPolicy::makePipelineDocumentSource_forTest(operationContext(),
+                                                                  kTestAggregateNss,
+                                                                  shardKeyPattern,
+                                                                  3 /*numInitialChunks*/,
+                                                                  2 /*samplesPerChunk*/);
+    auto mockSource = DocumentSourceMock::createForTest(
+        {"{_id: 20, a: 4}", "{_id: 30, a: 3}", "{_id: 40, a: 2}", "{_id: 50, a: 1}"}, expCtx());
+    pipelineDocSource->getPipeline_forTest()->addInitialSource(mockSource.get());
+    auto next = pipelineDocSource->getNext();
+    ASSERT_BSONOBJ_EQ(BSON("a" << 2), next.value());
+    next = pipelineDocSource->getNext();
+    ASSERT_BSONOBJ_EQ(BSON("a" << 4), next.value());
+    ASSERT(!pipelineDocSource->getNext());
+}
+
 }  // namespace
 }  // namespace mongo

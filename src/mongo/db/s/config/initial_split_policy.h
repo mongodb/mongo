@@ -41,7 +41,6 @@
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/string_map.h"
-
 namespace mongo {
 
 struct SplitPolicyParams {
@@ -290,6 +289,7 @@ public:
     public:
         virtual ~SampleDocumentSource(){};
         virtual boost::optional<BSONObj> getNext() = 0;
+        virtual Pipeline* getPipeline_forTest() = 0;
     };
 
     // Provides documents from a real Pipeline
@@ -298,6 +298,9 @@ public:
         PipelineDocumentSource() = delete;
         PipelineDocumentSource(SampleDocumentPipeline pipeline, int skip);
         boost::optional<BSONObj> getNext() override;
+        Pipeline* getPipeline_forTest() override {
+            return _pipeline.get();
+        }
 
     private:
         SampleDocumentPipeline _pipeline;
@@ -333,13 +336,21 @@ public:
 
     static constexpr int kDefaultSamplesPerChunk = 10;
 
+    static std::unique_ptr<SampleDocumentSource> makePipelineDocumentSource_forTest(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        const ShardKeyPattern& shardKey,
+        int numInitialChunks,
+        int samplesPerChunk);
+
 private:
     static std::unique_ptr<SampleDocumentSource> _makePipelineDocumentSource(
         OperationContext* opCtx,
         const NamespaceString& ns,
         const ShardKeyPattern& shardKey,
         int numInitialChunks,
-        int samplesPerChunk);
+        int samplesPerChunk,
+        MakePipelineOptions opts = {});
 
     /**
      * Returns a set of split points to ensure that chunk boundaries will align with the zone
