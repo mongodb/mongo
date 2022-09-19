@@ -406,7 +406,7 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
     const NamespaceString& edcNss,
     std::vector<EDCServerPayloadInfo>& serverPayload,
     const EncryptedFieldConfig& efc,
-    int32_t stmtId,
+    int32_t* stmtId,
     BSONObj document,
     bool bypassDocumentValidation = false);
 
