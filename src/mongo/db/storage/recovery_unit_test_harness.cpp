@@ -72,11 +72,11 @@ class TestChange final : public RecoveryUnit::Change {
 public:
     TestChange(int* count) : _count(count) {}
 
-    void commit(boost::optional<Timestamp>) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
         *_count = *_count + 1;
     }
 
-    void rollback() override {
+    void rollback(OperationContext* opCtx) override {
         *_count = *_count - 1;
     }
 

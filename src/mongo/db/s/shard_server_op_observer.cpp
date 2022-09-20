@@ -84,30 +84,27 @@ bool isStandaloneOrPrimary(OperationContext* opCtx) {
  */
 class CollectionVersionLogOpHandler final : public RecoveryUnit::Change {
 public:
-    CollectionVersionLogOpHandler(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  bool droppingCollection)
-        : _opCtx(opCtx), _nss(nss), _droppingCollection(droppingCollection) {}
+    CollectionVersionLogOpHandler(const NamespaceString& nss, bool droppingCollection)
+        : _nss(nss), _droppingCollection(droppingCollection) {}
 
-    void commit(boost::optional<Timestamp>) override {
-        invariant(_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IX));
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
+        invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IX));
 
-        CatalogCacheLoader::get(_opCtx).notifyOfCollectionVersionUpdate(_nss);
+        CatalogCacheLoader::get(opCtx).notifyOfCollectionVersionUpdate(_nss);
 
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
-        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         if (_droppingCollection)
-            CollectionShardingRuntime::get(_opCtx, _nss)
-                ->clearFilteringMetadataForDroppedCollection(_opCtx);
+            CollectionShardingRuntime::get(opCtx, _nss)
+                ->clearFilteringMetadataForDroppedCollection(opCtx);
         else
-            CollectionShardingRuntime::get(_opCtx, _nss)->clearFilteringMetadata(_opCtx);
+            CollectionShardingRuntime::get(opCtx, _nss)->clearFilteringMetadata(opCtx);
     }
 
-    void rollback() override {}
+    void rollback(OperationContext* opCtx) override {}
 
 private:
-    OperationContext* _opCtx;
     const NamespaceString _nss;
     const bool _droppingCollection;
 };
@@ -121,13 +118,13 @@ public:
     SubmitRangeDeletionHandler(OperationContext* opCtx, RangeDeletionTask task)
         : _opCtx(opCtx), _task(std::move(task)) {}
 
-    void commit(boost::optional<Timestamp>) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
         if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
             migrationutil::submitRangeDeletionTask(_opCtx, _task).getAsync([](auto) {});
         }
     }
 
-    void rollback() override {}
+    void rollback(OperationContext* opCtx) override {}
 
 private:
     OperationContext* _opCtx;
@@ -163,8 +160,8 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, deletedNss, MODE_IX);
 
-    opCtx->recoveryUnit()->registerChange(std::make_unique<CollectionVersionLogOpHandler>(
-        opCtx, deletedNss, /* droppingCollection */ true));
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<CollectionVersionLogOpHandler>(deletedNss, /* droppingCollection */ true));
 }
 
 /**
@@ -373,7 +370,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         AutoGetCollection autoColl(opCtx, updatedNss, MODE_IX);
         if (refreshingFieldNewVal.isBoolean() && !refreshingFieldNewVal.boolean()) {
             opCtx->recoveryUnit()->registerChange(std::make_unique<CollectionVersionLogOpHandler>(
-                opCtx, updatedNss, /* droppingCollection */ false));
+                updatedNss, /* droppingCollection */ false));
         }
 
         if (enterCriticalSectionFieldNewVal.ok()) {

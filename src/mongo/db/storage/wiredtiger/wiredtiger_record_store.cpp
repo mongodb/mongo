@@ -148,13 +148,11 @@ public:
     InsertChange(OplogStones* oplogStones,
                  int64_t bytesInserted,
                  const Record& highestInsertedRecord,
-                 int64_t countInserted,
-                 OperationContext* opCtx)
+                 int64_t countInserted)
         : _oplogStones(oplogStones),
           _bytesInserted(bytesInserted),
           _recordId(highestInsertedRecord.id),
-          _countInserted(countInserted),
-          _opCtx(opCtx) {
+          _countInserted(countInserted) {
         // We only want to initialize _wall by parsing BSONObj when we expect to need it in
         // OplogStone::createNewStoneIfNeeded.
         int64_t currBytes = _oplogStones->_currentBytes.load() + _bytesInserted;
@@ -172,7 +170,7 @@ public:
         }
     }
 
-    void commit(boost::optional<Timestamp>) final {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {
         invariant(_bytesInserted >= 0);
         invariant(_recordId.isValid());
 
@@ -182,18 +180,17 @@ public:
             // When other InsertChanges commit concurrently, an uninitialized wallTime may delay the
             // creation of a new stone. This delay is limited to the number of concurrently running
             // transactions, so the size difference should be inconsequential.
-            _oplogStones->createNewStoneIfNeeded(_opCtx, _recordId, _wall);
+            _oplogStones->createNewStoneIfNeeded(opCtx, _recordId, _wall);
         }
     }
 
-    void rollback() final {}
+    void rollback(OperationContext* opCtx) final {}
 
 private:
     OplogStones* _oplogStones;
     int64_t _bytesInserted;
     RecordId _recordId;
     int64_t _countInserted;
-    OperationContext* _opCtx;
     Date_t _wall;
 };
 
@@ -369,8 +366,8 @@ void WiredTigerRecordStore::OplogStones::updateCurrentStoneAfterInsertOnCommit(
     int64_t bytesInserted,
     const Record& highestInsertedRecord,
     int64_t countInserted) {
-    opCtx->recoveryUnit()->registerChange(std::make_unique<InsertChange>(
-        this, bytesInserted, highestInsertedRecord, countInserted, opCtx));
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<InsertChange>(this, bytesInserted, highestInsertedRecord, countInserted));
 }
 
 void WiredTigerRecordStore::OplogStones::clearStonesOnCommit(OperationContext* opCtx) {

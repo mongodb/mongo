@@ -127,7 +127,7 @@ public:
 
     PublishCatalogUpdates(OperationContext* opCtx,
                           UncommittedCatalogUpdates& uncommittedCatalogUpdates)
-        : _opCtx(opCtx), _uncommittedCatalogUpdates(uncommittedCatalogUpdates) {}
+        : _uncommittedCatalogUpdates(uncommittedCatalogUpdates) {}
 
     static void ensureRegisteredWithRecoveryUnit(
         OperationContext* opCtx, UncommittedCatalogUpdates& UncommittedCatalogUpdates) {
@@ -138,7 +138,7 @@ public:
             std::make_unique<PublishCatalogUpdates>(opCtx, UncommittedCatalogUpdates));
     }
 
-    void commit(boost::optional<Timestamp> commitTime) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) override {
         boost::container::small_vector<CollectionCatalog::CatalogWriteFn, kNumStaticActions>
             writeJobs;
 
@@ -154,7 +154,7 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection: {
-                    writeJobs.push_back([opCtx = _opCtx, &from = entry.nss, &to = entry.renameTo](
+                    writeJobs.push_back([opCtx, &from = entry.nss, &to = entry.renameTo](
                                             CollectionCatalog& catalog) {
                         catalog._collections.erase(from);
 
@@ -166,15 +166,14 @@ public:
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kDroppedCollection: {
                     writeJobs.push_back(
-                        [opCtx = _opCtx,
-                         uuid = *entry.uuid(),
-                         isDropPending = *entry.isDropPending](CollectionCatalog& catalog) {
+                        [opCtx, uuid = *entry.uuid(), isDropPending = *entry.isDropPending](
+                            CollectionCatalog& catalog) {
                             catalog.deregisterCollection(opCtx, uuid, isDropPending);
                         });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRecreatedCollection: {
-                    writeJobs.push_back([opCtx = _opCtx,
+                    writeJobs.push_back([opCtx,
                                          collection = entry.collection,
                                          uuid = *entry.externalUUID,
                                          commitTime](CollectionCatalog& catalog) {
@@ -214,25 +213,23 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kAddViewResource: {
-                    writeJobs.push_back(
-                        [opCtx = _opCtx, &viewName = entry.nss](CollectionCatalog& catalog) {
-                            ResourceCatalog::get(opCtx->getServiceContext())
-                                .add({RESOURCE_COLLECTION, viewName}, viewName);
-                            catalog.deregisterUncommittedView(viewName);
-                        });
+                    writeJobs.push_back([opCtx, &viewName = entry.nss](CollectionCatalog& catalog) {
+                        ResourceCatalog::get(opCtx->getServiceContext())
+                            .add({RESOURCE_COLLECTION, viewName}, viewName);
+                        catalog.deregisterUncommittedView(viewName);
+                    });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRemoveViewResource: {
-                    writeJobs.push_back(
-                        [opCtx = _opCtx, &viewName = entry.nss](CollectionCatalog& catalog) {
-                            ResourceCatalog::get(opCtx->getServiceContext())
-                                .remove({RESOURCE_COLLECTION, viewName}, viewName);
-                        });
+                    writeJobs.push_back([opCtx, &viewName = entry.nss](CollectionCatalog& catalog) {
+                        ResourceCatalog::get(opCtx->getServiceContext())
+                            .remove({RESOURCE_COLLECTION, viewName}, viewName);
+                    });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kDroppedIndex: {
                     writeJobs.push_back(
-                        [opCtx = _opCtx,
+                        [opCtx,
                          indexEntry = entry.indexEntry,
                          isDropPending = *entry.isDropPending](CollectionCatalog& catalog) {
                             catalog.deregisterIndex(opCtx, std::move(indexEntry), isDropPending);
@@ -244,7 +241,7 @@ public:
 
         // Write all catalog updates to the catalog in the same write to ensure atomicity.
         if (!writeJobs.empty()) {
-            CollectionCatalog::write(_opCtx, [&writeJobs](CollectionCatalog& catalog) {
+            CollectionCatalog::write(opCtx, [&writeJobs](CollectionCatalog& catalog) {
                 for (auto&& job : writeJobs) {
                     job(catalog);
                 }
@@ -252,12 +249,11 @@ public:
         }
     }
 
-    void rollback() override {
+    void rollback(OperationContext* opCtx) override {
         _uncommittedCatalogUpdates.releaseEntries();
     }
 
 private:
-    OperationContext* _opCtx;
     UncommittedCatalogUpdates& _uncommittedCatalogUpdates;
 };
 

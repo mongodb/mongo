@@ -111,11 +111,11 @@ class CountsChange : public RecoveryUnit::Change {
 public:
     CountsChange(WiredTigerRecordStore* rs, long long numRecords, long long dataSize)
         : _rs(rs), _numRecords(numRecords), _dataSize(dataSize) {}
-    void commit(boost::optional<Timestamp>) {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) {
         _rs->setNumRecords(_numRecords);
         _rs->setDataSize(_dataSize);
     }
-    void rollback() {}
+    void rollback(OperationContext* opCtx) {}
 
 private:
     WiredTigerRecordStore* _rs;

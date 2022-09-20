@@ -129,10 +129,17 @@ public:
     std::unique_ptr<RecoveryUnit> releaseRecoveryUnit();
 
     /*
-     * Similar to releaseRecoveryUnit(), but sets up a new, inactive RecoveryUnit after releasing
-     * the existing one.
+     * Sets up a new, inactive RecoveryUnit in the OperationContext. Destroys any previous recovery
+     * unit and executes its rollback handlers.
+     */
+    void replaceRecoveryUnit();
+
+    /*
+     * Similar to replaceRecoveryUnit(), but returns the previous recovery unit like
+     * releaseRecoveryUnit().
      */
     std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit();
+
 
     /**
      * Associates the OperatingContext with a different RecoveryUnit for getMore or

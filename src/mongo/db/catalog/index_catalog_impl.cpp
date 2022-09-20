@@ -1345,27 +1345,25 @@ Status IndexCatalogImpl::dropUnfinishedIndex(OperationContext* opCtx,
 namespace {
 class IndexRemoveChange final : public RecoveryUnit::Change {
 public:
-    IndexRemoveChange(OperationContext* opCtx,
-                      const NamespaceString& nss,
+    IndexRemoveChange(const NamespaceString& nss,
                       const UUID& uuid,
                       std::shared_ptr<IndexCatalogEntry> entry,
                       SharedCollectionDecorations* collectionDecorations)
-        : _opCtx(opCtx),
-          _nss(nss),
+        : _nss(nss),
           _uuid(uuid),
           _entry(std::move(entry)),
           _collectionDecorations(collectionDecorations) {}
 
-    void commit(boost::optional<Timestamp> commitTime) final {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) final {
         if (commitTime) {
-            HistoricalIdentTracker::get(_opCtx).recordDrop(
+            HistoricalIdentTracker::get(opCtx).recordDrop(
                 _entry->getIdent(), _nss, _uuid, commitTime.value());
         }
 
         _entry->setDropped();
     }
 
-    void rollback() final {
+    void rollback(OperationContext* opCtx) final {
         auto indexDescriptor = _entry->descriptor();
 
         // Refresh the CollectionIndexUsageTrackerDecoration's knowledge of what indices are
@@ -1377,7 +1375,6 @@ public:
     }
 
 private:
-    OperationContext* _opCtx;
     const NamespaceString _nss;
     const UUID _uuid;
     std::shared_ptr<IndexCatalogEntry> _entry;
@@ -1410,7 +1407,7 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
 
     invariant(released.get() == entry);
     opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-        opCtx, collection->ns(), collection->uuid(), released, collection->getSharedDecorations()));
+        collection->ns(), collection->uuid(), released, collection->getSharedDecorations()));
 
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
@@ -1584,8 +1581,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     auto oldEntry = _readyIndexes.release(oldDesc);
     invariant(oldEntry);
     opCtx->recoveryUnit()->registerChange(
-        std::make_unique<IndexRemoveChange>(opCtx,
-                                            collection->ns(),
+        std::make_unique<IndexRemoveChange>(collection->ns(),
                                             collection->uuid(),
                                             std::move(oldEntry),
                                             collection->getSharedDecorations()));

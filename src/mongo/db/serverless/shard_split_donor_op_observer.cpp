@@ -245,18 +245,17 @@ void onTransitionToAborted(OperationContext* opCtx, const ShardSplitDonorDocumen
  */
 class TenantMigrationDonorCommitOrAbortHandler final : public RecoveryUnit::Change {
 public:
-    TenantMigrationDonorCommitOrAbortHandler(OperationContext* opCtx,
-                                             ShardSplitDonorDocument donorStateDoc)
-        : _opCtx(opCtx), _donorStateDoc(std::move(donorStateDoc)) {}
+    TenantMigrationDonorCommitOrAbortHandler(ShardSplitDonorDocument donorStateDoc)
+        : _donorStateDoc(std::move(donorStateDoc)) {}
 
-    void commit(boost::optional<Timestamp>) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
         if (_donorStateDoc.getExpireAt()) {
             if (_donorStateDoc.getTenantIds()) {
                 auto tenantIds = _donorStateDoc.getTenantIds().value();
                 for (auto&& tenantId : tenantIds) {
                     auto mtab =
                         tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
-                            _opCtx->getServiceContext(), tenantId);
+                            opCtx->getServiceContext(), tenantId);
 
                     if (!mtab) {
                         // The state doc and TenantMigrationDonorAccessBlocker for this
@@ -266,7 +265,7 @@ public:
                         continue;
                     }
 
-                    if (isSecondary(_opCtx)) {
+                    if (isSecondary(opCtx)) {
                         // Setting expireAt implies that the TenantMigrationDonorAccessBlocker
                         // for this migration will be removed shortly after this. However, a
                         // lagged secondary might not manage to advance its majority commit
@@ -288,7 +287,7 @@ public:
                         // The migration durably aborted and is now marked as garbage
                         // collectable, remove its TenantMigrationDonorAccessBlocker right away
                         // to allow back-to-back migration retries.
-                        TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
+                        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                             .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
                     }
                 }
@@ -298,20 +297,19 @@ public:
 
         switch (_donorStateDoc.getState()) {
             case ShardSplitDonorStateEnum::kCommitted:
-                onTransitionToCommitted(_opCtx, _donorStateDoc);
+                onTransitionToCommitted(opCtx, _donorStateDoc);
                 break;
             case ShardSplitDonorStateEnum::kAborted:
-                onTransitionToAborted(_opCtx, _donorStateDoc);
+                onTransitionToAborted(opCtx, _donorStateDoc);
                 break;
             default:
                 MONGO_UNREACHABLE;
         }
     }
 
-    void rollback() override {}
+    void rollback(OperationContext* opCtx) override {}
 
 private:
-    OperationContext* _opCtx;
     const ShardSplitDonorDocument _donorStateDoc;
 };
 
@@ -359,7 +357,7 @@ void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
         case ShardSplitDonorStateEnum::kCommitted:
         case ShardSplitDonorStateEnum::kAborted:
             opCtx->recoveryUnit()->registerChange(
-                std::make_unique<TenantMigrationDonorCommitOrAbortHandler>(opCtx, donorStateDoc));
+                std::make_unique<TenantMigrationDonorCommitOrAbortHandler>(donorStateDoc));
             break;
         default:
             uasserted(ErrorCodes::IllegalOperation,

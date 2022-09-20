@@ -73,9 +73,9 @@ public:
                                                const repl::OpTime& prepareOrCommitOpTime)
         : _lsid(lsid), _stmts(stmts), _prepareOrCommitOpTime(prepareOrCommitOpTime) {}
 
-    void commit(boost::optional<Timestamp>) override;
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override;
 
-    void rollback() override{};
+    void rollback(OperationContext* opCtx) override{};
 
 private:
     const LogicalSessionId _lsid;

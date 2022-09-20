@@ -47,7 +47,6 @@ public:
     }
 
     ~CappedDeleteSideTxn() {
-        _opCtx->releaseRecoveryUnit();
         _opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(_originalRecoveryUnit),
                                 _originalRecoveryUnitState);
     }

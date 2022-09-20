@@ -245,6 +245,12 @@ public:
     }
 
     /**
+     * Sets the OperationContext that currently owns this RecoveryUnit. Should only be called by the
+     * OperationContext.
+     */
+    void setOperationContext(OperationContext* opCtx);
+
+    /**
      * Informs the RecoveryUnit that a snapshot will be needed soon, if one was not already
      * established. This specifically allows the storage engine to preallocate any required
      * transaction resources while minimizing the critical section between generating a new
@@ -559,23 +565,29 @@ public:
      * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The
      * change is either rollback()'d or commit()'d when the WriteUnitOfWork goes out of scope.
      *
-     * Neither rollback() nor commit() may fail or throw exceptions.
+     * Neither rollback() nor commit() may fail or throw exceptions. Acquiring locks or blocking
+     * operations should not be performed in these handlers, as it may lead to deadlocks.
+     * LockManager locks are still held due to 2PL.
      *
-     * Change implementors are responsible for handling their own locking, and must be aware
-     * that rollback() and commit() may be called after resources with a shorter lifetime than
-     * the WriteUnitOfWork have been freed. Each registered change will be committed or rolled
-     * back once.
+     * Change implementors are responsible for handling their own synchronization, and must be aware
+     * that rollback() and commit() may be called out of line and after the WriteUnitOfWork have
+     * been freed. Pointers or references to stack variables should not be bound to the definitions
+     * of rollback() or commit(). Each registered change will be committed or rolled back once.
      *
      * commit() handlers are passed the timestamp at which the transaction is committed. If the
      * transaction is not committed at a particular timestamp, or if the storage engine does not
      * support timestamps, then boost::none will be supplied for this parameter.
+     *
+     * The OperationContext provided in commit() and rollback() handlers is the current
+     * OperationContext and may not be the same as when the Change was registered on the
+     * RecoveryUnit. See above for usage restrictions.
      */
     class Change {
     public:
         virtual ~Change() {}
 
-        virtual void rollback() = 0;
-        virtual void commit(boost::optional<Timestamp> commitTime) = 0;
+        virtual void rollback(OperationContext* opCtx) = 0;
+        virtual void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) = 0;
     };
 
     /**
@@ -600,10 +612,10 @@ public:
         public:
             CallbackChange(CommitCallback&& commit, RollbackCallback&& rollback)
                 : _rollback(std::move(rollback)), _commit(std::move(commit)) {}
-            void rollback() final {
+            void rollback(OperationContext* opCtx) final {
                 _rollback();
             }
-            void commit(boost::optional<Timestamp> ts) final {
+            void commit(OperationContext* opCtx, boost::optional<Timestamp> ts) final {
                 _commit(ts);
             }
 
@@ -643,10 +655,10 @@ public:
         class OnRollbackChange final : public Change {
         public:
             OnRollbackChange(Callback&& callback) : _callback(std::move(callback)) {}
-            void rollback() final {
+            void rollback(OperationContext* opCtx) final {
                 _callback();
             }
-            void commit(boost::optional<Timestamp>) final {}
+            void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {}
 
         private:
             Callback _callback;
@@ -665,8 +677,8 @@ public:
         class OnCommitChange final : public Change {
         public:
             OnCommitChange(Callback&& callback) : _callback(std::move(callback)) {}
-            void rollback() final {}
-            void commit(boost::optional<Timestamp> commitTime) final {
+            void rollback(OperationContext* opCtx) final {}
+            void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) final {
                 _callback(commitTime);
             }
 
@@ -834,6 +846,7 @@ private:
     Changes _changes;
     std::unique_ptr<Change> _changeForCatalogVisibility;
     State _state = State::kInactive;
+    OperationContext* _opCtx = nullptr;
     uint64_t _mySnapshotId;
     bool _readOnly = false;
 };

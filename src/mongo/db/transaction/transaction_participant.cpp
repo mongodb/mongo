@@ -1144,6 +1144,11 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     // Save the RecoveryUnit from the new transaction and replace it with an empty one.
     _recoveryUnit = opCtx->releaseAndReplaceRecoveryUnit();
+    // The recovery unit is detached from the OperationContext, but keep the OperationContext in the
+    // case we need to run rollback handlers.
+    if (_recoveryUnit) {
+        _recoveryUnit->setOperationContext(opCtx);
+    }
 
     // End two-phase locking on locker manually since the WUOW has been released.
     _opCtx->lockState()->endWriteUnitOfWork();
@@ -1202,6 +1207,11 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     invariant(!(stashStyle == StashStyle::kSecondary && opCtx->lockState()->hasMaxLockTimeout()));
 
     _recoveryUnit = opCtx->releaseAndReplaceRecoveryUnit();
+    // The recovery unit is detached from the OperationContext, but keep the OperationContext in the
+    // case we need to run rollback handlers.
+    if (_recoveryUnit) {
+        _recoveryUnit->setOperationContext(opCtx);
+    }
 
     _apiParameters = APIParameters::get(opCtx);
     _readConcernArgs = repl::ReadConcernArgs::get(opCtx);

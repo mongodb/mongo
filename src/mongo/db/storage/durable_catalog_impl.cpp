@@ -147,8 +147,8 @@ public:
     AddIdentChange(DurableCatalogImpl* catalog, RecordId catalogId)
         : _catalog(catalog), _catalogId(std::move(catalogId)) {}
 
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
+    virtual void commit(OperationContext* opCtx, boost::optional<Timestamp>) {}
+    virtual void rollback(OperationContext* opCtx) {
         stdx::lock_guard<Latch> lk(_catalog->_catalogIdToEntryMapLock);
         _catalog->_catalogIdToEntryMap.erase(_catalogId);
     }

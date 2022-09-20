@@ -143,12 +143,12 @@ public:
                             const repl::OpTime& opTime)
         : _cloner(cloner), _idObj(idObj.getOwned()), _op(op), _opTime(opTime) {}
 
-    void commit(boost::optional<Timestamp>) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
         _cloner->_addToTransferModsQueue(_idObj, _op, _opTime);
         _cloner->_decrementOutstandingOperationTrackRequests();
     }
 
-    void rollback() override {
+    void rollback(OperationContext* opCtx) override {
         _cloner->_decrementOutstandingOperationTrackRequests();
     }
 
@@ -159,7 +159,8 @@ private:
     const repl::OpTime _opTime;
 };
 
-void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestamp>) {
+void LogTransactionOperationsForShardingHandler::commit(OperationContext* opCtx,
+                                                        boost::optional<Timestamp>) {
     std::set<NamespaceString> namespacesTouchedByTransaction;
 
     // Inform the session migration subsystem that a transaction has committed for the given

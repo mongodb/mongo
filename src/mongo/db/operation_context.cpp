@@ -428,6 +428,10 @@ void OperationContext::setTxnRetryCounter(TxnRetryCounter txnRetryCounter) {
 }
 
 std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit() {
+    if (_recoveryUnit) {
+        _recoveryUnit->setOperationContext(nullptr);
+    }
+
     return std::move(_recoveryUnit);
 }
 
@@ -439,9 +443,19 @@ std::unique_ptr<RecoveryUnit> OperationContext::releaseAndReplaceRecoveryUnit() 
     return ru;
 }
 
+void OperationContext::replaceRecoveryUnit() {
+    setRecoveryUnit(
+        std::unique_ptr<RecoveryUnit>(getServiceContext()->getStorageEngine()->newRecoveryUnit()),
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+}
+
 WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit(
     std::unique_ptr<RecoveryUnit> unit, WriteUnitOfWork::RecoveryUnitState state) {
     _recoveryUnit = std::move(unit);
+    if (_recoveryUnit) {
+        _recoveryUnit->setOperationContext(this);
+    }
+
     WriteUnitOfWork::RecoveryUnitState oldState = _ruState;
     _ruState = state;
     return oldState;

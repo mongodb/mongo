@@ -50,14 +50,11 @@ using std::shared_ptr;
 // Works for both removes and updates
 class EphemeralForTestRecordStore::RemoveChange : public RecoveryUnit::Change {
 public:
-    RemoveChange(OperationContext* opCtx,
-                 Data* data,
-                 RecordId loc,
-                 const EphemeralForTestRecord& rec)
-        : _opCtx(opCtx), _data(data), _loc(loc), _rec(rec) {}
+    RemoveChange(Data* data, RecordId loc, const EphemeralForTestRecord& rec)
+        : _data(data), _loc(loc), _rec(rec) {}
 
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
+    virtual void commit(OperationContext* opCtx, boost::optional<Timestamp>) {}
+    virtual void rollback(OperationContext* opCtx) {
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
         Records::iterator it = _data->records.find(_loc);
@@ -70,7 +67,6 @@ public:
     }
 
 private:
-    OperationContext* _opCtx;
     Data* const _data;
     const RecordId _loc;
     const EphemeralForTestRecord _rec;
@@ -86,8 +82,8 @@ public:
         swap(_records, _data->records);
     }
 
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
+    virtual void commit(OperationContext* opCtx, boost::optional<Timestamp>) {}
+    virtual void rollback(OperationContext* opCtx) {
         using std::swap;
 
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
@@ -330,7 +326,7 @@ void EphemeralForTestRecordStore::deleteRecord(WithLock lk,
                                                OperationContext* opCtx,
                                                const RecordId& loc) {
     EphemeralForTestRecord* rec = recordFor(lk, loc);
-    opCtx->recoveryUnit()->registerChange(std::make_unique<RemoveChange>(opCtx, _data, loc, *rec));
+    opCtx->recoveryUnit()->registerChange(std::make_unique<RemoveChange>(_data, loc, *rec));
     _data->dataSize -= rec->size;
     invariant(_data->records.erase(loc) == 1);
 }
@@ -407,8 +403,7 @@ Status EphemeralForTestRecordStore::doUpdateRecord(OperationContext* opCtx,
     EphemeralForTestRecord newRecord(len);
     memcpy(newRecord.data.get(), data, len);
 
-    opCtx->recoveryUnit()->registerChange(
-        std::make_unique<RemoveChange>(opCtx, _data, loc, *oldRecord));
+    opCtx->recoveryUnit()->registerChange(std::make_unique<RemoveChange>(_data, loc, *oldRecord));
     _data->dataSize += len - oldLen;
     *oldRecord = newRecord;
     return Status::OK();
@@ -435,8 +430,7 @@ StatusWith<RecordData> EphemeralForTestRecordStore::doUpdateWithDamages(
 
     EphemeralForTestRecord newRecord(len);
 
-    opCtx->recoveryUnit()->registerChange(
-        std::make_unique<RemoveChange>(opCtx, _data, loc, *oldRecord));
+    opCtx->recoveryUnit()->registerChange(std::make_unique<RemoveChange>(_data, loc, *oldRecord));
 
     char* root = newRecord.data.get();
     char* old = oldRecord->data.get();
@@ -502,8 +496,7 @@ void EphemeralForTestRecordStore::doCappedTruncateAfter(
             aboutToDelete(opCtx, id, record.toRecordData());
         }
 
-        opCtx->recoveryUnit()->registerChange(
-            std::make_unique<RemoveChange>(opCtx, _data, id, record));
+        opCtx->recoveryUnit()->registerChange(std::make_unique<RemoveChange>(_data, id, record));
         _data->dataSize -= record.size;
         _data->records.erase(it++);
     }

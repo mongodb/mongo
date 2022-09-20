@@ -564,23 +564,21 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
 
     class KillSessionTokenOnCommit : public RecoveryUnit::Change {
     public:
-        KillSessionTokenOnCommit(OperationContext* opCtx,
-                                 MongoDSessionCatalogTransactionInterface* ti,
+        KillSessionTokenOnCommit(MongoDSessionCatalogTransactionInterface* ti,
                                  SessionCatalog::KillToken sessionKillToken)
-            : _opCtx(opCtx), _ti(ti), _sessionKillToken(std::move(sessionKillToken)) {}
+            : _ti(ti), _sessionKillToken(std::move(sessionKillToken)) {}
 
-        void commit(boost::optional<Timestamp>) override {
-            rollback();
+        void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
+            rollback(opCtx);
         }
 
-        void rollback() override {
+        void rollback(OperationContext* opCtx) override {
             std::vector<SessionCatalog::KillToken> sessionKillTokenVec;
             sessionKillTokenVec.emplace_back(std::move(_sessionKillToken));
-            killSessionTokens(_opCtx, _ti, std::move(sessionKillTokenVec));
+            killSessionTokens(opCtx, _ti, std::move(sessionKillTokenVec));
         }
 
     private:
-        OperationContext* _opCtx;
         MongoDSessionCatalogTransactionInterface* _ti;
         SessionCatalog::KillToken _sessionKillToken;
     };
@@ -597,7 +595,7 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
                 !ti->isTransactionPrepared(session));
 
         opCtx->recoveryUnit()->registerChange(
-            std::make_unique<KillSessionTokenOnCommit>(opCtx, ti, session.kill()));
+            std::make_unique<KillSessionTokenOnCommit>(ti, session.kill()));
     });
 }
 

@@ -117,7 +117,12 @@ void RecoveryUnit::endReadOnlyUnitOfWork() {
     _readOnly = false;
 }
 
+void RecoveryUnit::setOperationContext(OperationContext* opCtx) {
+    _opCtx = opCtx;
+}
+
 void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimestamp) {
+    invariant(_opCtx);
     for (auto& change : _changes) {
         try {
             // Log at higher level because commits occur far more frequently than rollbacks.
@@ -125,7 +130,7 @@ void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimes
                         3,
                         "CUSTOM COMMIT {demangleName_typeid_change}",
                         "demangleName_typeid_change"_attr = redact(demangleName(typeid(*change))));
-            change->commit(commitTimestamp);
+            change->commit(_opCtx, commitTimestamp);
         } catch (...) {
             std::terminate();
         }
@@ -138,7 +143,7 @@ void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimes
                         "CUSTOM COMMIT {demangleName_typeid_change}",
                         "demangleName_typeid_change"_attr =
                             redact(demangleName(typeid(*_changeForCatalogVisibility))));
-            _changeForCatalogVisibility->commit(commitTimestamp);
+            _changeForCatalogVisibility->commit(_opCtx, commitTimestamp);
         }
     } catch (...) {
         std::terminate();
@@ -155,6 +160,9 @@ void RecoveryUnit::abortRegisteredChanges() {
     _executeRollbackHandlers();
 }
 void RecoveryUnit::_executeRollbackHandlers() {
+    // Make sure we have an OperationContext when executing rollback handlers. Unless we have no
+    // handlers to run, which might be the case in unit tests.
+    invariant(_opCtx || (_changes.empty() && !_changeForCatalogVisibility));
     try {
         if (_changeForCatalogVisibility) {
 
@@ -163,7 +171,7 @@ void RecoveryUnit::_executeRollbackHandlers() {
                         "CUSTOM ROLLBACK {demangleName_typeid_change}",
                         "demangleName_typeid_change"_attr =
                             redact(demangleName(typeid(*_changeForCatalogVisibility))));
-            _changeForCatalogVisibility->rollback();
+            _changeForCatalogVisibility->rollback(_opCtx);
         }
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
              it != end;
@@ -173,7 +181,7 @@ void RecoveryUnit::_executeRollbackHandlers() {
                         2,
                         "CUSTOM ROLLBACK {demangleName_typeid_change}",
                         "demangleName_typeid_change"_attr = redact(demangleName(typeid(*change))));
-            change->rollback();
+            change->rollback(_opCtx);
         }
         _changeForCatalogVisibility.reset();
         _changes.clear();
