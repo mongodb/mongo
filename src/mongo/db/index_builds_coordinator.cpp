@@ -2702,7 +2702,11 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
     // lock
     DatabaseName dbName(boost::none, replState->dbName);
-    AutoGetDb autoDb(opCtx, dbName, MODE_IX);
+    // Skip the check for sharding's critical section check as it can only be acquired during a
+    // `movePrimary` or drop database operations. The only operation that would affect the index
+    // build is when the collection's data needs to get modified, but the only modification possible
+    // is to delete the entire collection, which will cause the index to be dropped.
+    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
 
     // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by waiting
     // for a a strong collection lock. See SERVER-42621.
