@@ -647,6 +647,7 @@ env.CppUnitTest(
         'operation_sharding_state_test.cpp',
         'persistent_task_queue_test.cpp',
         'range_deleter_service_test.cpp',
+        'range_deleter_service_test_util.cpp',
         'range_deleter_service_op_observer_test.cpp',
         'range_deletion_util_test.cpp',
         'resharding/resharding_agg_test.cpp',

@@ -47,8 +47,6 @@ class ShardId;
 
 namespace migrationutil {
 
-constexpr auto kRangeDeletionThreadName = "range-deleter"_sd;
-
 /**
  * Creates a report document with the provided parameters:
  *
@@ -136,15 +134,6 @@ void persistMigrationCoordinatorLocally(OperationContext* opCtx,
 void persistRangeDeletionTaskLocally(OperationContext* opCtx,
                                      const RangeDeletionTask& deletionTask,
                                      const WriteConcernOptions& writeConcern);
-
-/**
- * Updates the range deletion task document to increase or decrease numOrphanedDocs and waits for
- * write concern.
- */
-void persistUpdatedNumOrphans(OperationContext* opCtx,
-                              const UUID& collectionUuid,
-                              const ChunkRange& range,
-                              long long changeInOrphans);
 
 /**
  * Retrieves the value of 'numOrphanedDocs' from the recipient shard's range deletion task document.

@@ -120,9 +120,6 @@ public:
         Lock::CollectionLock collLock(_opCtx, kNss, MODE_IX);
         CollectionMetadata collMetadata(std::move(cm), ShardId("dummyShardId"));
         CollectionShardingRuntime::get(_opCtx, kNss)->setFilteringMetadata(_opCtx, collMetadata);
-        auto* css = CollectionShardingState::get(_opCtx, kNss);
-        auto& csr = *checked_cast<CollectionShardingRuntime*>(css);
-        csr.setFilteringMetadata(_opCtx, collMetadata);
     }
 
     UUID uuid() const {

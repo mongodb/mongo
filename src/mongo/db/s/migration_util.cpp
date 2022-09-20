@@ -643,30 +643,6 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
     }
 }
 
-void persistUpdatedNumOrphans(OperationContext* opCtx,
-                              const UUID& collectionUuid,
-                              const ChunkRange& range,
-                              long long changeInOrphans) {
-    const auto query = getQueryFilterForRangeDeletionTask(collectionUuid, range);
-    try {
-        PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-        ScopedRangeDeleterLock rangeDeleterLock(opCtx, collectionUuid);
-        // The DBDirectClient will not retry WriteConflictExceptions internally while holding an X
-        // mode lock, so we need to retry at this level.
-        writeConflictRetry(
-            opCtx, "updateOrphanCount", NamespaceString::kRangeDeletionNamespace.ns(), [&] {
-                store.update(opCtx,
-                             query,
-                             BSON("$inc" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName
-                                                 << changeInOrphans)),
-                             WriteConcerns::kLocalWriteConcern);
-            });
-        BalancerStatsRegistry::get(opCtx)->updateOrphansCount(collectionUuid, changeInOrphans);
-    } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
-        // When upgrading or downgrading, there may be no documents with the orphan count field.
-    }
-}
-
 long long retrieveNumOrphansFromRecipient(OperationContext* opCtx,
                                           const MigrationCoordinatorDocument& migrationInfo) {
     const auto recipientShard = uassertStatusOK(

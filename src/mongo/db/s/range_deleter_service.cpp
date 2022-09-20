@@ -28,10 +28,16 @@
  */
 
 #include "mongo/db/s/range_deleter_service.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/balancer_stats_registry.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/range_deleter_service_op_observer.h"
+#include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/future_util.h"
@@ -41,7 +47,31 @@
 namespace mongo {
 namespace {
 const auto rangeDeleterServiceDecorator = ServiceContext::declareDecoration<RangeDeleterService>();
+
+const BSONObj getShardKeyPattern(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const UUID& collectionUuid) {
+    while (true) {
+        opCtx->checkForInterrupt();
+        boost::optional<NamespaceString> optNss;
+        {
+            AutoGetCollection collection(
+                opCtx, NamespaceStringOrUUID{dbName.toString(), collectionUuid}, MODE_IS);
+
+            auto optMetadata = CollectionShardingRuntime::get(opCtx, collection.getNss())
+                                   ->getCurrentMetadataIfKnown();
+            if (optMetadata && optMetadata->isSharded()) {
+                return optMetadata->getShardKeyPattern().toBSON();
+            }
+            optNss = collection.getNss();
+        }
+
+        onShardVersionMismatchNoExcept(opCtx, *optNss, boost::none).ignore();
+        continue;
+    }
 }
+
+}  // namespace
 
 const ReplicaSetAwareServiceRegistry::Registerer<RangeDeleterService>
     rangeDeleterServiceRegistryRegisterer("RangeDeleterService");
@@ -56,6 +86,13 @@ RangeDeleterService* RangeDeleterService::get(OperationContext* opCtx) {
 
 void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long term) {
     if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+        return;
+    }
+
+    if (disableResumableRangeDeleter.load()) {
+        LOGV2_INFO(
+            6872508,
+            "Not resuming range deletions on step-up because `disableResumableRangeDeleter=true`");
         return;
     }
 
@@ -236,6 +273,8 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
     bool fromResubmitOnStepUp) {
 
     if (disableResumableRangeDeleter.load()) {
+        LOGV2_INFO(6872509,
+                   "Not scheduling range deletion because `disableResumableRangeDeleter=true`");
         return SemiFuture<void>::makeReady(
                    Status(ErrorCodes::ResumableRangeDeleterDisabled,
                           "Not submitting any range deletion task because the "
@@ -278,12 +317,134 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
                                   _executor->now() + delayForActiveQueriesOnSecondariesToComplete)
                     .share();
             })
-            .then([this, collUuid = rdt.getCollectionUuid(), range = rdt.getRange()]() {
-                // Step 3: perform the actual range deletion
-                // TODO
+            .then([this,
+                   dbName = rdt.getNss().dbName(),
+                   collectionUuid = rdt.getCollectionUuid(),
+                   range = rdt.getRange()]() {
+                return withTemporaryOperationContext(
+                    [&](OperationContext* opCtx) {
+                        // A task is considered completed when all the following conditions are met:
+                        // - All orphans have been deleted
+                        // - The deletions have been majority committed
+                        // - The range deletion task document has been deleted
+                        bool taskCompleted = false;
 
-                // Deregister the task
-                deregisterTask(collUuid, range);
+                        while (!taskCompleted) {
+                            try {
+                                // Perform the actual range deletion
+                                bool orphansRemovalCompleted = false;
+                                while (!orphansRemovalCompleted) {
+                                    try {
+                                        LOGV2_DEBUG(
+                                            6872501,
+                                            2,
+                                            "Beginning deletion of documents in orphan range",
+                                            "dbName"_attr = dbName,
+                                            "collectionUUID"_attr = collectionUuid.toString(),
+                                            "range"_attr = redact(range.toString()));
+
+                                        auto shardKeyPattern =
+                                            getShardKeyPattern(opCtx, dbName, collectionUuid);
+
+                                        uassertStatusOK(deleteRangeInBatches(
+                                            opCtx, dbName, collectionUuid, shardKeyPattern, range));
+                                        orphansRemovalCompleted = true;
+                                    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                                        // No orphaned documents to remove from a dropped collection
+                                        orphansRemovalCompleted = true;
+                                    } catch (
+                                        ExceptionFor<
+                                            ErrorCodes::
+                                                RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist>&) {
+                                        // No orphaned documents to remove from a dropped collection
+                                        orphansRemovalCompleted = true;
+                                    } catch (
+                                        ExceptionFor<
+                                            ErrorCodes::
+                                                RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist>&) {
+                                        // The task can be considered completed because the range
+                                        // deletion document doesn't exist
+                                        orphansRemovalCompleted = true;
+                                    } catch (const DBException& e) {
+                                        LOGV2_ERROR(6872502,
+                                                    "Failed to delete documents in orphan range",
+                                                    "dbName"_attr = dbName,
+                                                    "collectionUUID"_attr =
+                                                        collectionUuid.toString(),
+                                                    "range"_attr = redact(range.toString()),
+                                                    "error"_attr = e);
+                                        throw;
+                                    }
+                                }
+
+                                {
+                                    repl::ReplClientInfo::forClient(opCtx->getClient())
+                                        .setLastOpToSystemLastOpTime(opCtx);
+                                    auto clientOpTime =
+                                        repl::ReplClientInfo::forClient(opCtx->getClient())
+                                            .getLastOp();
+
+                                    LOGV2_DEBUG(
+                                        6872503,
+                                        2,
+                                        "Waiting for majority replication of local deletions",
+                                        "dbName"_attr = dbName,
+                                        "collectionUUID"_attr = collectionUuid,
+                                        "range"_attr = redact(range.toString()),
+                                        "clientOpTime"_attr = clientOpTime);
+
+                                    // Synchronously wait for majority before removing the range
+                                    // deletion task document: oplog gets applied in parallel for
+                                    // different collections, so it's important not to apply
+                                    // out of order the deletions of orphans and the removal of the
+                                    // entry persisted in `config.rangeDeletions`
+                                    WaitForMajorityService::get(opCtx->getServiceContext())
+                                        .waitUntilMajority(clientOpTime,
+                                                           CancellationToken::uncancelable())
+                                        .get(opCtx);
+                                }
+
+                                // Remove persistent range deletion task
+                                try {
+                                    removePersistentRangeDeletionTask(opCtx, collectionUuid, range);
+
+                                    LOGV2_DEBUG(
+                                        6872504,
+                                        2,
+                                        "Completed removal of persistent range deletion task",
+                                        "dbName"_attr = dbName,
+                                        "collectionUUID"_attr = collectionUuid.toString(),
+                                        "range"_attr = redact(range.toString()));
+
+                                } catch (const DBException& e) {
+                                    LOGV2_ERROR(6872505,
+                                                "Failed to remove persistent range deletion task",
+                                                "dbName"_attr = dbName,
+                                                "collectionUUID"_attr = collectionUuid.toString(),
+                                                "range"_attr = redact(range.toString()),
+                                                "error"_attr = e);
+                                    throw;
+                                }
+                            } catch (const DBException& e) {
+                                // Fail in case of shutdown/stepdown errors as the range
+                                // deletion will be resumed on the next step up
+                                if (ErrorCodes::isShutdownError(e.code()) ||
+                                    ErrorCodes::isNotPrimaryError(e.code())) {
+                                    return e.toStatus();
+                                }
+
+                                // Iterate again in case of any other error
+                                continue;
+                            }
+
+                            taskCompleted = true;
+                        }
+
+                        return Status::OK();
+                    },
+                    dbName,
+                    collectionUuid,
+                    true);
             })
             // IMPORTANT: no continuation should be added to this chain after this point
             // in order to make sure range deletions order is preserved.

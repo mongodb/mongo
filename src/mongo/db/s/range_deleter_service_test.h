@@ -31,6 +31,7 @@
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/log_test.h"
 
 namespace mongo {
 
@@ -44,7 +45,7 @@ public:
 
     RangeDeletionTask getTask();
     void drainOngoingQueries();
-    auto getOngoingQueriesFuture();
+    SemiFuture<void> getOngoingQueriesFuture();
 
 private:
     RangeDeletionTask _task;
@@ -58,32 +59,59 @@ public:
 
     OperationContext* opCtx;
 
-    // Util methods
-    RangeDeletionTask createRangeDeletionTask(const UUID& collectionUUID,
-                                              const BSONObj& min,
-                                              const BSONObj& max,
-                                              CleanWhenEnum whenToClean = CleanWhenEnum::kNow,
-                                              bool pending = true);
-
-    std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngoingQueries(
-        const UUID& collectionUUID,
-        const BSONObj& min,
-        const BSONObj& max,
-        CleanWhenEnum whenToClean = CleanWhenEnum::kNow,
-        bool pending = true);
-
     // Instantiate some collection UUIDs and tasks to be used for testing
     UUID uuidCollA = UUID::gen();
-    inline static const NamespaceString nsCollA = NamespaceString("test", "collA");
+    inline static const NamespaceString nsCollA{"test", "collA"};
+    UUID uuidCollB = UUID::gen();
+    inline static const NamespaceString nsCollB{"test", "collB"};
+
+    inline static std::map<UUID, NamespaceString> nssWithUuid{};
+
     std::shared_ptr<RangeDeletionWithOngoingQueries> rangeDeletionTask0ForCollA;
     std::shared_ptr<RangeDeletionWithOngoingQueries> rangeDeletionTask1ForCollA;
-
-    UUID uuidCollB = UUID::gen();
-    inline static const NamespaceString nsCollB = NamespaceString("test", "collB");
     std::shared_ptr<RangeDeletionWithOngoingQueries> rangeDeletionTask0ForCollB;
 
+    inline static const std::string kShardKey = "_id";
+    inline static const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
+
 private:
+    void _setFilteringMetadataWithUUID(OperationContext* opCtx, const UUID& uuid);
+
+    // Scoped objects
     RAIIServerParameterControllerForTest enableFeatureFlag{"featureFlagRangeDeleterService", true};
+    unittest::MinimumLoggedSeverityGuard _severityGuard{logv2::LogComponent::kShardingRangeDeleter,
+                                                        logv2::LogSeverity::Debug(2)};
 };
+
+RangeDeletionTask createRangeDeletionTask(const UUID& collectionUUID,
+                                          const BSONObj& min,
+                                          const BSONObj& max,
+                                          CleanWhenEnum whenToClean = CleanWhenEnum::kNow,
+                                          bool pending = true);
+
+std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngoingQueries(
+    const UUID& collectionUUID,
+    const BSONObj& min,
+    const BSONObj& max,
+    CleanWhenEnum whenToClean = CleanWhenEnum::kNow,
+    bool pending = true);
+
+SharedSemiFuture<void> registerAndCreatePersistentTask(
+    OperationContext* opCtx,
+    const RangeDeletionTask& rdt,
+    SemiFuture<void>&& waitForActiveQueriesToComplete);
+
+int insertDocsWithinRange(
+    OperationContext* opCtx, const NamespaceString& nss, int min, int max, int maxCount);
+
+void verifyRangeDeletionTasks(OperationContext* opCtx,
+                              UUID uuidColl,
+                              std::vector<ChunkRange> expectedChunkRanges);
+
+// CRUD operation over `config.rangeDeletions`
+void insertRangeDeletionTaskDocument(OperationContext* opCtx, const RangeDeletionTask& rdt);
+void updatePendingField(OperationContext* opCtx, UUID rdtId, bool pending);
+void removePendingField(OperationContext* opCtx, UUID rdtId);
+void deleteRangeDeletionTaskDocument(OperationContext* opCtx, UUID rdtId);
 
 }  // namespace mongo

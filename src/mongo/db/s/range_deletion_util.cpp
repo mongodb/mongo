@@ -49,7 +49,8 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/balancer_stats_registry.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -190,33 +191,6 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     return numDeleted;
 }
 
-template <typename Callable>
-auto withTemporaryOperationContext(Callable&& callable, const NamespaceString& nss) {
-    ThreadClient tc(migrationutil::kRangeDeletionThreadName, getGlobalServiceContext());
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc->setSystemOperationKillableByStepdown(lk);
-    }
-    auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
-    auto opCtx = uniqueOpCtx.get();
-
-    // Ensure that this operation will be killed by the RstlKillOpThread during step-up or stepdown.
-    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-    invariant(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
-
-    {
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        Lock::GlobalLock lock(opCtx, MODE_IX);
-        uassert(ErrorCodes::PrimarySteppedDown,
-                str::stream() << "Not primary while running range deletion task for collection"
-                              << nss,
-                replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-                    replCoord->canAcceptWritesFor(opCtx, nss));
-    }
-
-    return callable(opCtx);
-}
-
 void ensureRangeDeletionTaskStillExists(OperationContext* opCtx,
                                         const UUID& collectionUuid,
                                         const ChunkRange& range) {
@@ -284,26 +258,9 @@ ExecutorFuture<void> deleteRangeInBatchesWithExecutor(
             [=](OperationContext* opCtx) {
                 return deleteRangeInBatches(opCtx, nss.db(), collectionUuid, keyPattern, range);
             },
-            nss);
+            nss.db(),
+            collectionUuid);
     });
-}
-
-void removePersistentRangeDeletionTask(const NamespaceString& nss,
-                                       const UUID& collectionUuid,
-                                       const ChunkRange& range) {
-    withTemporaryOperationContext(
-        [&](OperationContext* opCtx) {
-            PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-
-            auto overlappingRangeQuery = BSON(
-                RangeDeletionTask::kCollectionUuidFieldName
-                << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
-                << GTE << range.getMin()
-                << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey << LTE
-                << range.getMax());
-            store.remove(opCtx, overlappingRangeQuery);
-        },
-        nss);
 }
 
 ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
@@ -329,7 +286,8 @@ ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
                 .waitUntilMajority(clientOpTime, CancellationToken::uncancelable())
                 .thenRunOn(executor);
         },
-        nss);
+        nss.db(),
+        collectionUuid);
 }
 
 std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext* opCtx,
@@ -347,6 +305,13 @@ std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext*
     return tasks;
 }
 
+BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const ChunkRange& range) {
+    return BSON(RangeDeletionTask::kCollectionUuidFieldName
+                << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
+                << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
+                << range.getMax());
+}
+
 }  // namespace
 
 Status deleteRangeInBatches(OperationContext* opCtx,
@@ -354,6 +319,8 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                             const UUID& collectionUuid,
                             const BSONObj& keyPattern,
                             const ChunkRange& range) {
+    suspendRangeDeletion.pauseWhileSet();
+
     bool allDocsRemoved = false;
     // Delete all batches in this range unless a stepdown error occurs. Do not yield the
     // executor to ensure that this range is fully deleted before another range is
@@ -402,7 +369,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                 }
             }();
 
-            migrationutil::persistUpdatedNumOrphans(opCtx, collectionUuid, range, -numDeleted);
+            persistUpdatedNumOrphans(opCtx, collectionUuid, range, -numDeleted);
 
             if (MONGO_unlikely(hangAfterDoingDeletion.shouldFail())) {
                 hangAfterDoingDeletion.pauseWhileSet(opCtx);
@@ -508,7 +475,6 @@ SharedSemiFuture<void> removeDocumentsInRange(
             invariant(s.isOK());
         })
         .then([=]() mutable {
-            suspendRangeDeletion.pauseWhileSet();
             // Wait for possibly ongoing queries on secondaries to complete.
             return sleepUntil(executor,
                               executor->now() + delayForActiveQueriesOnSecondariesToComplete);
@@ -574,7 +540,12 @@ SharedSemiFuture<void> removeDocumentsInRange(
             }
 
             try {
-                removePersistentRangeDeletionTask(nss, collectionUuid, range);
+                withTemporaryOperationContext(
+                    [&](OperationContext* opCtx) {
+                        removePersistentRangeDeletionTask(opCtx, collectionUuid, range);
+                    },
+                    nss.db(),
+                    collectionUuid);
             } catch (const DBException& e) {
                 LOGV2_ERROR(23770,
                             "Failed to delete range deletion task for range {range} in collection "
@@ -600,6 +571,43 @@ SharedSemiFuture<void> removeDocumentsInRange(
         })
         .semi()
         .share();
+}
+
+void persistUpdatedNumOrphans(OperationContext* opCtx,
+                              const UUID& collectionUuid,
+                              const ChunkRange& range,
+                              long long changeInOrphans) {
+    const auto query = getQueryFilterForRangeDeletionTask(collectionUuid, range);
+    try {
+        PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+        ScopedRangeDeleterLock rangeDeleterLock(opCtx, collectionUuid);
+        // The DBDirectClient will not retry WriteConflictExceptions internally while holding an X
+        // mode lock, so we need to retry at this level.
+        writeConflictRetry(
+            opCtx, "updateOrphanCount", NamespaceString::kRangeDeletionNamespace.ns(), [&] {
+                store.update(opCtx,
+                             query,
+                             BSON("$inc" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName
+                                                 << changeInOrphans)),
+                             WriteConcerns::kLocalWriteConcern);
+            });
+        BalancerStatsRegistry::get(opCtx)->updateOrphansCount(collectionUuid, changeInOrphans);
+    } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
+        // When upgrading or downgrading, there may be no documents with the orphan count field.
+    }
+}
+
+void removePersistentRangeDeletionTask(OperationContext* opCtx,
+                                       const UUID& collectionUuid,
+                                       const ChunkRange& range) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+
+    auto overlappingRangeQuery = BSON(
+        RangeDeletionTask::kCollectionUuidFieldName
+        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey << GTE
+        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey << LTE
+        << range.getMax());
+    store.remove(opCtx, overlappingRangeQuery);
 }
 
 }  // namespace mongo

@@ -58,6 +58,7 @@
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
@@ -1379,7 +1380,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                         // Revert to the original DocumentValidationSettings for opCtx
                     }
 
-                    migrationutil::persistUpdatedNumOrphans(
+                    persistUpdatedNumOrphans(
                         opCtx, *_collectionUuid, ChunkRange(_min, _max), batchNumCloned);
 
                     {
@@ -1827,8 +1828,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
     }
 
     if (changeInOrphans != 0) {
-        migrationutil::persistUpdatedNumOrphans(
-            opCtx, *_collectionUuid, ChunkRange(_min, _max), changeInOrphans);
+        persistUpdatedNumOrphans(opCtx, *_collectionUuid, ChunkRange(_min, _max), changeInOrphans);
     }
     return didAnything;
 }

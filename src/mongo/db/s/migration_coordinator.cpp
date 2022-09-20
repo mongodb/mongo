@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
@@ -215,7 +216,7 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
     const auto numOrphans = migrationutil::retrieveNumOrphansFromRecipient(opCtx, _migrationInfo);
 
     if (numOrphans > 0) {
-        migrationutil::persistUpdatedNumOrphans(
+        persistUpdatedNumOrphans(
             opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange(), numOrphans);
     }
 

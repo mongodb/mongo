@@ -31,12 +31,16 @@
 #include <boost/optional.hpp>
 #include <list>
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
 
 namespace mongo {
+
+constexpr auto kRangeDeletionThreadName = "range-deleter"_sd;
 
 /**
  * DO NOT USE - only necessary for the legacy range deleter
@@ -94,4 +98,59 @@ void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const Namespace
 void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
                                        const NamespaceString& fromNss,
                                        const NamespaceString& toNss);
+
+/**
+ * Updates the range deletion task document to increase or decrease numOrphanedDocs
+ */
+void persistUpdatedNumOrphans(OperationContext* opCtx,
+                              const UUID& collectionUuid,
+                              const ChunkRange& range,
+                              long long changeInOrphans);
+
+/**
+ * Removes range deletion task documents from `config.rangeDeletions` for the specified range and
+ * collection
+ */
+void removePersistentRangeDeletionTask(OperationContext* opCtx,
+                                       const UUID& collectionUuid,
+                                       const ChunkRange& range);
+
+/**
+ * Wrapper to run a safer step up/step down killable task within an operation context
+ */
+template <typename Callable>
+auto withTemporaryOperationContext(Callable&& callable,
+                                   const DatabaseName dbName,
+                                   const UUID& collectionUUID,
+                                   bool writeToRangeDeletionNamespace = false) {
+    ThreadClient tc(kRangeDeletionThreadName, getGlobalServiceContext());
+    {
+        stdx::lock_guard<Client> lk(*tc.get());
+        tc->setSystemOperationKillableByStepdown(lk);
+    }
+    auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
+    auto opCtx = uniqueOpCtx.get();
+
+    // Ensure that this operation will be killed by the RstlKillOpThread during step-up or stepdown.
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+    invariant(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
+
+    {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        Lock::GlobalLock lock(opCtx, MODE_IX);
+        uassert(
+            ErrorCodes::PrimarySteppedDown,
+            str::stream()
+                << "Not primary while running range deletion task for collection with UUID "
+                << collectionUUID,
+            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
+                replCoord->canAcceptWritesFor(opCtx,
+                                              NamespaceStringOrUUID(dbName, collectionUUID)) &&
+                (!writeToRangeDeletionNamespace ||
+                 replCoord->canAcceptWritesFor(opCtx, NamespaceString::kRangeDeletionNamespace)));
+    }
+
+    return callable(opCtx);
+}
+
 }  // namespace mongo

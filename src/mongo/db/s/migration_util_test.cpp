@@ -36,6 +36,7 @@
 #include "mongo/db/s/collection_sharding_runtime_test.cpp"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
@@ -344,11 +345,11 @@ TEST_F(MigrationUtilsTest, TestUpdateNumberOfOrphans) {
     auto rangeDeletionDoc = createDeletionTask(opCtx, kTestNss, collectionUuid, 0, 10);
     store.add(opCtx, rangeDeletionDoc);
 
-    migrationutil::persistUpdatedNumOrphans(opCtx, collectionUuid, rangeDeletionDoc.getRange(), 5);
+    persistUpdatedNumOrphans(opCtx, collectionUuid, rangeDeletionDoc.getRange(), 5);
     rangeDeletionDoc.setNumOrphanDocs(5);
     ASSERT_EQ(store.count(opCtx, rangeDeletionDoc.toBSON().removeField("timestamp")), 1);
 
-    migrationutil::persistUpdatedNumOrphans(opCtx, collectionUuid, rangeDeletionDoc.getRange(), -5);
+    persistUpdatedNumOrphans(opCtx, collectionUuid, rangeDeletionDoc.getRange(), -5);
     rangeDeletionDoc.setNumOrphanDocs(0);
     ASSERT_EQ(store.count(opCtx, rangeDeletionDoc.toBSON().removeField("timestamp")), 1);
 }

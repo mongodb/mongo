@@ -32,66 +32,6 @@
 
 namespace mongo {
 
-void insertRangeDeletionTaskDocument(OperationContext* opCtx, const RangeDeletionTask& rdt) {
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    store.add(opCtx, rdt);
-}
-
-void updatePendingField(OperationContext* opCtx, UUID migrationId, bool pending) {
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    store.update(opCtx,
-                 BSON(RangeDeletionTask::kIdFieldName << migrationId),
-                 BSON("$set" << BSON(RangeDeletionTask::kPendingFieldName << pending)));
-}
-
-void removePendingField(OperationContext* opCtx, UUID migrationId) {
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    store.update(opCtx,
-                 BSON(RangeDeletionTask::kIdFieldName << migrationId),
-                 BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << "")));
-}
-
-void deleteRangeDeletionTaskDocument(OperationContext* opCtx, UUID migrationId) {
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    store.remove(opCtx, BSON(RangeDeletionTask::kIdFieldName << migrationId));
-}
-
-// Ensure that `expectedChunkRanges` range deletion tasks are scheduled for collection with UUID
-// `uuidColl`
-void verifyRangeDeletionTasks(OperationContext* opCtx,
-                              UUID uuidColl,
-                              std::vector<ChunkRange> expectedChunkRanges) {
-    auto rds = RangeDeleterService::get(opCtx);
-
-    // Get chunk ranges inserted to be deleted by RangeDeleterService
-    BSONObj dumpState = rds->dumpState();
-    BSONElement chunkRangesElem = dumpState.getField(uuidColl.toString());
-    if (!chunkRangesElem.ok() && expectedChunkRanges.size() == 0) {
-        return;
-    }
-    ASSERT(chunkRangesElem.ok()) << "Expected to find range deletion tasks from collection "
-                                 << uuidColl.toString();
-
-    const auto chunkRanges = chunkRangesElem.Array();
-    ASSERT_EQ(chunkRanges.size(), expectedChunkRanges.size());
-
-    // Sort expectedChunkRanges vector to replicate RangeDeleterService dumpState order
-    struct {
-        bool operator()(const ChunkRange& a, const ChunkRange& b) {
-            return a.getMin().woCompare(b.getMin()) < 0;
-        }
-    } RANGES_COMPARATOR;
-
-    std::sort(expectedChunkRanges.begin(), expectedChunkRanges.end(), RANGES_COMPARATOR);
-
-    // Check expectedChunkRanges are exactly the same as the returned ones
-    for (size_t i = 0; i < expectedChunkRanges.size(); ++i) {
-        ASSERT(ChunkRange::fromBSONThrowing(chunkRanges[i].Obj()) == expectedChunkRanges[i])
-            << "Expected " << ChunkRange::fromBSONThrowing(chunkRanges[i].Obj()).toBSON()
-            << " == " << expectedChunkRanges[i].toBSON();
-    }
-}
-
 /**
 ** TESTS
 */
