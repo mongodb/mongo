@@ -45,6 +45,7 @@
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -228,13 +229,11 @@ public:
             {BSON("_id" << 10 << kSourceShardKey << 20), BSON(_indexKey << 30)});
         replaceFetcherResultList(std::move(fetcherResults));
 
-        const auto& indexNs = globalIndexNss(kSourceNss, _indexName);
-        client.createCollection(indexNs.ns());
-        auto all = client.getCollectionInfos(indexNs.db().toString(),
-                                             BSON("name" << indexNs.coll().toString()));
-
-        ASSERT_EQ(1, all.size());
-        _indexCollectionUUID.emplace(uassertStatusOK(UUID::parse(all.front()["info"]["uuid"])));
+        CreateGlobalIndex createGlobalIndex(_indexCollectionUUID);
+        createGlobalIndex.setDbName({boost::none, "admin"});
+        BSONObj cmdResult;
+        auto success = client.runCommand("admin", createGlobalIndex.toBSON({}), cmdResult);
+        ASSERT(success) << "createGlobalIndex cmd failed with result: " << cmdResult;
     }
 
     void checkIndexCollection(OperationContext* opCtx) {
@@ -242,18 +241,18 @@ public:
 
         MockGlobalIndexClonerFetcher fetcherCopy(_fetcherCopyForVerification);
         while (auto next = fetcherCopy.getNext(opCtx)) {
-            FindCommandRequest query(globalIndexNss(kSourceNss, _indexName));
-            query.setFilter(BSON("_id" << next->indexKeyValues));
+            FindCommandRequest query(NamespaceString::makeGlobalIndexNSS(_indexCollectionUUID));
+            query.setFilter(BSON("_id" << next->documentKey));
 
             auto doc = client.findOne(query);
             ASSERT_TRUE(!doc.isEmpty())
-                << "doc with index key: " << next->indexKeyValues
+                << "doc with document key: " << next->documentKey
                 << " missing in global index output collection: " << dumpOutputColl(opCtx);
         }
     }
 
     GlobalIndexClonerDoc makeStateDocument() {
-        return GlobalIndexClonerDoc(*_indexCollectionUUID,
+        return GlobalIndexClonerDoc(_indexCollectionUUID,
                                     kSourceNss,
                                     _collectionUUID,
                                     _indexName,
@@ -296,7 +295,7 @@ public:
 private:
     std::string dumpOutputColl(OperationContext* opCtx) {
         DBDirectClient client(opCtx);
-        FindCommandRequest query(globalIndexNss(kSourceNss, _indexName));
+        FindCommandRequest query(NamespaceString::makeGlobalIndexNSS(_indexCollectionUUID));
 
         std::ostringstream outputStr;
         auto res = client.find(query);
@@ -314,11 +313,12 @@ private:
         return outputStr.str();
     }
 
-    boost::optional<UUID> _indexCollectionUUID;
+    const UUID _indexCollectionUUID{UUID::gen()};
     const UUID _collectionUUID{UUID::gen()};
     const std::string _indexName{"global_x_1"};
     const StringData _indexKey{"x"};
     const BSONObj _indexSpec{BSON("key" << BSON(_indexKey << 1) << "unique" << true)};
+    const RAIIServerParameterControllerForTest _enableFeature{"featureFlagGlobalIndexes", true};
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
     std::shared_ptr<StateTransitionController> _stateTransitionController;

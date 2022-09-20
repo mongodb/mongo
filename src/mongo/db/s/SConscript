@@ -82,7 +82,6 @@ env.Library(
         'global_index/global_index_cloner.idl',
         'global_index/global_index_cloning_external_state.cpp',
         'global_index/global_index_cloning_service.cpp',
-        'global_index/global_index_entry.idl',
         'global_index/global_index_inserter.cpp',
         'global_index/global_index_server_parameters.idl',
         'global_index/global_index_util.cpp',

@@ -57,7 +57,6 @@ public:
 
 private:
     NamespaceString _skipIdNss();
-    NamespaceString _globalIndexNss();
 
     const NamespaceString _nss;
     const std::string _indexName;

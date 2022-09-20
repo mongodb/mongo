@@ -41,9 +41,5 @@ NamespaceString skipIdNss(const NamespaceString& nss, StringData indexName) {
                            "{}.globalIndex.{}.skipList"_format(nss.coll(), indexName.toString()));
 }
 
-NamespaceString globalIndexNss(const NamespaceString& nss, StringData indexName) {
-    return NamespaceString(nss.db(), "{}.globalIndex.{}"_format(nss.coll(), indexName));
-}
-
 }  // namespace global_index
 }  // namespace mongo

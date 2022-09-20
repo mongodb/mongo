@@ -316,6 +316,7 @@ SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj 
         .then([this](DbResponse dbResponse) {
             auto reply = rpc::makeReply(&dbResponse.response)->getCommandReply().getOwned();
             _hooks->runReplyHook(reply);
+            uassertStatusOK(getStatusFromCommandResult(reply));
             return reply;
         })
         .semi();

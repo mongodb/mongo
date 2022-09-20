@@ -40,11 +40,5 @@ namespace global_index {
  */
 NamespaceString skipIdNss(const NamespaceString& nss, StringData indexName);
 
-/**
- * Returns the namespace of global index collection. This should be removed once the global index
- * catalog api is available.
- */
-NamespaceString globalIndexNss(const NamespaceString& nss, StringData indexName);
-
 }  // namespace global_index
 }  // namespace mongo

@@ -32,7 +32,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/global_index/global_index_entry_gen.h"
 #include "mongo/db/s/global_index/global_index_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -40,7 +39,9 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
 
@@ -74,15 +75,11 @@ public:
         // future will not run unless the clock is advanced manually.
         _executor = makeTaskExecutorForCloner();
 
-        const auto& indexNs = globalIndexNss();
-        client.createCollection(indexNs.ns());
-        auto all = client.getCollectionInfos(indexNs.db().toString(),
-                                             BSON("name" << indexNs.coll().toString()));
-
-        ASSERT_EQ(1, all.size());
-        _indexUUID.emplace(uassertStatusOK(UUID::parse(all.front()["info"]["uuid"])));
-
-        client.createCollection(skipIdNss().ns());
+        CreateGlobalIndex createGlobalIndex(_indexUUID);
+        createGlobalIndex.setDbName({boost::none, "admin"});
+        BSONObj cmdResult;
+        auto success = client.runCommand("admin", createGlobalIndex.toBSON({}), cmdResult);
+        ASSERT(success) << "createGlobalIndex cmd failed with result: " << cmdResult;
     }
 
     void tearDown() override {
@@ -99,7 +96,7 @@ public:
     }
 
     const UUID& indexUUID() const {
-        return *_indexUUID;
+        return _indexUUID;
     }
 
     NamespaceString skipIdNss() const {
@@ -107,7 +104,7 @@ public:
     }
 
     NamespaceString globalIndexNss() const {
-        return NamespaceString(_nss.db(), "{}.globalIndex.{}"_format(_nss.coll(), _indexName));
+        return NamespaceString::makeGlobalIndexNSS(indexUUID());
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> getExecutor() {
@@ -131,8 +128,9 @@ private:
 
     const NamespaceString _nss{"test", "user"};
     const std::string _indexName{"global_x"};
+    const UUID _indexUUID{UUID::gen()};
+    const RAIIServerParameterControllerForTest _enableFeature{"featureFlagGlobalIndexes", true};
 
-    boost::optional<UUID> _indexUUID;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
 };
 
@@ -144,13 +142,7 @@ TEST_F(GlobalIndexInserterTest, ClonerUpdatesIndexEntryAndSkipIdCollection) {
     cloner.processDoc(operationContext(), indexKeyValues, documentKey);
 
     DBDirectClient client(operationContext());
-
-    FindCommandRequest indexEntryQuery(globalIndexNss());
-    auto indexEntryDoc = client.findOne(indexEntryQuery);
-    ASSERT_BSONOBJ_EQ(BSON(GlobalIndexEntry::kIndexKeyValueFieldName
-                           << indexKeyValues << GlobalIndexEntry::kDocumentKeyFieldName
-                           << documentKey),
-                      indexEntryDoc);
+    ASSERT_EQ(1, client.count(globalIndexNss()));
 
     FindCommandRequest skipIdQuery(skipIdNss());
     auto skipIdDoc = client.findOne(skipIdQuery);
@@ -170,9 +162,7 @@ TEST_F(GlobalIndexInserterTest, ClonerSkipsDocumentIfInSkipCollection) {
 
     cloner.processDoc(operationContext(), indexKeyValues, documentKey);
 
-    FindCommandRequest indexEntryQuery(globalIndexNss());
-    auto indexEntryDoc = client.findOne(indexEntryQuery);
-    ASSERT_TRUE(indexEntryDoc.isEmpty());
+    ASSERT_EQ(0, client.count(globalIndexNss()));
 }
 
 TEST_F(GlobalIndexInserterTest, ClonerRetriesWhenItEncountersWCE) {
@@ -193,7 +183,6 @@ TEST_F(GlobalIndexInserterTest, ClonerRetriesWhenItEncountersWCE) {
         fp->waitForTimesEntered(1);
 
         write_ops::InsertCommandRequest skipIdInsert(skipIdNss());
-        GlobalIndexEntry indexEntry(indexKeyValues, documentKey);
         skipIdInsert.setDocuments({BSON("_id" << documentKey)});
         client.insert(skipIdInsert);
 
@@ -202,9 +191,7 @@ TEST_F(GlobalIndexInserterTest, ClonerRetriesWhenItEncountersWCE) {
 
     clonerThread.get();
 
-    FindCommandRequest indexEntryQuery(globalIndexNss());
-    auto indexEntryDoc = client.findOne(indexEntryQuery);
-    ASSERT_TRUE(indexEntryDoc.isEmpty());
+    ASSERT_EQ(0, client.count(globalIndexNss()));
 }
 
 TEST_F(GlobalIndexInserterTest, ClonerThrowsIfIndexEntryAlreadyExists) {
@@ -212,14 +199,10 @@ TEST_F(GlobalIndexInserterTest, ClonerThrowsIfIndexEntryAlreadyExists) {
 
     const auto indexKeyValues = BSON("x" << 34);
     const auto documentKey = BSON("_id" << 12 << "x" << 34);
+    const auto documentKey2 = BSON("_id" << 25 << "x" << 34);
 
-    DBDirectClient client(operationContext());
-    write_ops::InsertCommandRequest globalIndexInsert(globalIndexNss());
-    GlobalIndexEntry indexEntry(indexKeyValues, documentKey);
-    globalIndexInsert.setDocuments({indexEntry.toBSON()});
-    client.insert(globalIndexInsert);
-
-    ASSERT_THROWS_CODE(cloner.processDoc(operationContext(), indexKeyValues, documentKey),
+    cloner.processDoc(operationContext(), indexKeyValues, documentKey);
+    ASSERT_THROWS_CODE(cloner.processDoc(operationContext(), indexKeyValues, documentKey2),
                        DBException,
                        ErrorCodes::DuplicateKey);
 }
