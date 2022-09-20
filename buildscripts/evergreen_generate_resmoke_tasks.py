@@ -91,7 +91,7 @@ DEFAULT_CONFIG_VALUES = {
     "resmoke_args": "",
     "resmoke_repeat_suites": 1,
     "run_multiple_jobs": "true",
-    "target_resmoke_time": 60,
+    "target_resmoke_time": 90,
     "test_suites_dir": DEFAULT_TEST_SUITE_DIR,
     "use_default_timeouts": False,
     "use_large_distro": False,
