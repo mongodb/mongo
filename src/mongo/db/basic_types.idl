@@ -34,6 +34,7 @@ global:
         - "mongo/db/logical_time.h"
         - "mongo/db/namespace_string.h"
         - "mongo/db/tenant_id.h"
+        - "mongo/util/namespace_string_util.h"
         - "mongo/util/uuid.h"
 
 types:
@@ -224,8 +225,8 @@ types:
         bson_serialization_type: string
         description: "A MongoDB NamespaceString"
         cpp_type: "mongo::NamespaceString"
-        serializer: mongo::NamespaceString::toString
-        deserializer: mongo::NamespaceString
+        serializer: ::mongo::NamespaceStringUtil::serialize
+        deserializer: mongo::NamespaceStringUtil::deserialize
         deserialize_with_tenant: true
 
     connection_string:

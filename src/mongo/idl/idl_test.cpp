@@ -38,7 +38,9 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/authorization_contract.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/write_concern_options_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/idl/unittest_gen.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -3899,7 +3901,11 @@ TEST(IDLTypeCommand, ReplyTypeCanParseWithGenericFields) {
     ASSERT_THROWS(CommandWithReplyType::Reply::parse(ctxt, bsonInvalidReply), DBException);
 }
 
-TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithTenant) {
+TEST(IDLCommand,
+     TestCommandTypeNamespaceCommand_WithMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+
     IDLParserContext ctxt("root");
 
     auto testDoc = BSON(CommandTypeNamespaceCommand::kCommandName << "db.coll1"
@@ -3911,14 +3917,38 @@ TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithTenant) {
         CommandTypeNamespaceCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "admin"));
     ASSERT_EQUALS(testStruct.getCommandParameter(), NamespaceString(tenantId, "db.coll1"));
-
     assert_same_types<decltype(testStruct.getCommandParameter()), const NamespaceString&>();
+    // Positive: Test we can roundtrip from the just parsed document
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
+}
 
+TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithMultitenancySupportOn) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+
+    IDLParserContext ctxt("root");
+
+    const auto tenantId = TenantId(OID::gen());
+    const auto nssWithPrefixedTenantId =
+        std::string(str::stream() << tenantId.toString() << "_db.coll1");
+    auto testDoc = BSON(CommandTypeNamespaceCommand::kCommandName << nssWithPrefixedTenantId
+                                                                  << "field1" << 3 << "$db"
+                                                                  << "admin");
+
+    auto testStruct = CommandTypeNamespaceCommand::parse(ctxt, makeOMR(testDoc));
+    // TODO SERVER-70053: Expect tenantId to be the extracted prefix once DatabaseName uses the
+    // correct serializer/deserializer.
+    ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(boost::none, "admin"));
+    // Deserialize called from parse correctly sets the tenantId field.
+    ASSERT_EQUALS(testStruct.getCommandParameter(), NamespaceString(tenantId, "db.coll1"));
+    assert_same_types<decltype(testStruct.getCommandParameter()), const NamespaceString&>();
     // Positive: Test we can roundtrip from the just parsed document
     ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 }
 
 TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     IDLParserContext ctxt("root");
 
     auto testDoc = BSONObjBuilder{}

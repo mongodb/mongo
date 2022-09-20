@@ -336,6 +336,7 @@ OplogEntry makeLargeTransactionOplogEntries(int t,
                                             int curr,
                                             int count,
                                             const std::vector<OplogEntry> innerOps) {
+    // TODO SERVER-62491: Replace TenantId with kSystemTenantId.
     auto nss = NamespaceString(NamespaceString::kAdminDb).getCommandNS();
     OpTime prevWriteOpTime = isFirst ? OpTime() : OpTime(Timestamp(t - 1, 1), 1);
     BSONObj oField;

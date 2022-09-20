@@ -106,17 +106,7 @@ Status ViewsForDatabase::_insert(OperationContext* opCtx,
         return collator.getStatus();
     }
 
-    NamespaceString viewName;
-    // TODO SERVER-69499 Use deserialize function on NamespaceString to reconstruct NamespaceString
-    // correctly.
-    if (!gMultitenancySupport ||
-        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
-        viewName = NamespaceString(tenantId, view["_id"].str());
-    } else {
-        viewName =
-            NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(view["_id"].str());
-    }
+    NamespaceString viewName = NamespaceStringUtil::deserialize(tenantId, view["_id"].str());
 
     auto pipeline = view["pipeline"].Obj();
     for (auto&& stage : pipeline) {

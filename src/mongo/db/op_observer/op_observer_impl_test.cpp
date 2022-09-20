@@ -688,8 +688,8 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
     auto dropTargetUuid = UUID::gen();
     auto stayTemp = false;
     auto tid{TenantId(OID::gen())};  // rename should not occur across tenants
-    NamespaceString sourceNss(tid, "test.foo");
-    NamespaceString targetNss(tid, "test.bar");
+    NamespaceString sourceNss(boost::none, str::stream() << tid.toString() << "_test.foo");
+    NamespaceString targetNss(boost::none, str::stream() << tid.toString() << "_test.bar");
 
     // Write to the oplog.
     {
@@ -706,8 +706,9 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
     // Ensure that renameCollection fields were properly added to oplog entry.
     ASSERT_EQUALS(uuid, unittest::assertGet(UUID::parse(oplogEntryObj["ui"])));
     ASSERT_FALSE(oplogEntry.getTid());
-    // TODO: SERVER-67155 perform check against getCommandNS after oplogEntry.getNss() contains tid
-    ASSERT_EQUALS(NamespaceString(boost::none, sourceNss.dbName().db(), "$cmd"),
+    // TODO: SERVER-62395: Assert sourceNss and oplogEntry.getNss() are equal.
+    ASSERT_EQUALS(NamespaceStringUtil::deserialize(
+                      boost::none, str::stream() << sourceNss.dbName().toString() << ".$cmd"),
                   oplogEntry.getNss());
     auto oExpected = BSON("renameCollection" << sourceNss.toStringWithTenantId() << "to"
                                              << targetNss.toStringWithTenantId() << "stayTemp"

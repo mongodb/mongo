@@ -71,17 +71,8 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
             name == "timeseries";
     }
 
-    NamespaceString viewName;
-    // TODO SERVER-69499 Use deserialize function on NamespaceString to reconstruct NamespaceString
-    // correctly.
-    if (!gMultitenancySupport ||
-        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
-        viewName = NamespaceString(dbName.tenantId(), viewDefinition["_id"].str());
-    } else {
-        viewName = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
-            viewDefinition["_id"].str());
-    }
+    NamespaceString viewName =
+        NamespaceStringUtil::deserialize(dbName.tenantId(), viewDefinition["_id"].str());
 
     const auto viewNameIsValid = NamespaceString::validCollectionComponent(viewName.ns()) &&
         NamespaceString::validDBName(viewName.dbName());
@@ -142,17 +133,8 @@ Status DurableViewCatalog::onExternalInsert(OperationContext* opCtx,
 
     auto catalog = CollectionCatalog::get(opCtx);
 
-    NamespaceString viewName;
-    // TODO SERVER-69499 Use deserialize function on NamespaceString to reconstruct NamespaceString
-    // correctly.
-    if (!gMultitenancySupport ||
-        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
-        viewName = NamespaceString(name.tenantId(), doc.getStringField("_id"));
-    } else {
-        viewName = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
-            doc.getStringField("_id"));
-    }
+    NamespaceString viewName =
+        NamespaceStringUtil::deserialize(name.tenantId(), doc.getStringField("_id"));
     NamespaceString viewOn(name.dbName(), doc.getStringField("viewOn"));
     BSONArray pipeline(doc.getObjectField("pipeline"));
     BSONObj collation(doc.getObjectField("collation"));
@@ -259,15 +241,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, systemViewsNs);
     invariant(systemViews);
 
-    std::string nssOnDisk;
-    // TODO SERVER-69499 Move this check into a function on NamespaceString.
-    if (!gMultitenancySupport ||
-        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
-        nssOnDisk = name.toString();
-    } else {
-        nssOnDisk = name.toStringWithTenantId();
-    }
+    std::string nssOnDisk = NamespaceStringUtil::serialize(name);
 
     RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << nssOnDisk));
 
@@ -303,15 +277,7 @@ void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceStri
         return;
 
 
-    std::string nssOnDisk;
-    // TODO SERVER-69499 Move this check into a function on NamespaceString.
-    if (!gMultitenancySupport ||
-        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
-        nssOnDisk = name.toString();
-    } else {
-        nssOnDisk = name.toStringWithTenantId();
-    }
+    std::string nssOnDisk = NamespaceStringUtil::serialize(name);
 
     RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << nssOnDisk));
     if (!id.isValid())

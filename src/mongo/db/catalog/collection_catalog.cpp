@@ -1954,14 +1954,7 @@ Status CollectionCatalog::_createOrUpdateView(
     // Build the BSON definition for this view to be saved in the durable view catalog and/or to
     // insert in the viewMap. If the collation is empty, omit it from the definition altogether.
     BSONObjBuilder viewDefBuilder;
-    // TODO SERVER-69499 Use serialize function on NamespaceString to create the string to write.
-    if (!gMultitenancySupport ||
-        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
-        viewDefBuilder.append("_id", viewName.toString());
-    } else {
-        viewDefBuilder.append("_id", viewName.toStringWithTenantId());
-    }
+    viewDefBuilder.append("_id", NamespaceStringUtil::serialize(viewName));
     viewDefBuilder.append("viewOn", viewOn.coll());
     viewDefBuilder.append("pipeline", pipeline);
     if (collator) {

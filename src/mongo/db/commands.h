@@ -1130,10 +1130,10 @@ private:
     static RequestType _parseRequest(OperationContext* opCtx,
                                      const DatabaseName& dbName,
                                      const BSONObj& cmdObj) {
-        // TODO SERVER-69499 pass tenantId to the BSONObj parse function
         return RequestType::parse(
             IDLParserContext(RequestType::kCommandName,
-                             APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+                             APIParameters::get(opCtx).getAPIStrict().value_or(false),
+                             dbName.tenantId()),
             cmdObj);
     }
 

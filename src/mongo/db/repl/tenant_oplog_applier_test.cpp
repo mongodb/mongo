@@ -205,8 +205,8 @@ private:
         logv2::LogComponent::kTenantMigration, logv2::LogSeverity::Debug(1)};
 };
 
-// TODO SERVER-69499 Remove all calls to DatabaseName::toStringWithTenantId() once the OplogEntry
-// deserializer passes "tid" to the NamespaceString constructor
+// TODO SERVER-70007: Construct the DatabaseName object for these tests with the tenantId as the
+// prefix.
 TEST_F(TenantOplogApplierTest, NoOpsForSingleBatch) {
     std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeInsertOplogEntry(
@@ -847,7 +847,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
         ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
         ASSERT_TRUE(opCtx->writesAreReplicated());
         ASSERT_FALSE(args.fromMigrate);
-        // TODO SERVER-69499 Check that (nss.dbName() == _dbName) once the OplogEntry deserializer
+        // TODO SERVER-70007 Check that (nss.dbName() == _dbName) once the OplogEntry deserializer
         // passes "tid" to the NamespaceString constructor
         ASSERT_EQUALS(nss.dbName().db(), _dbName.toStringWithTenantId());
         ASSERT_EQUALS(nss.coll(), "bar");

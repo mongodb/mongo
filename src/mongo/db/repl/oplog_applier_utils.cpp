@@ -37,6 +37,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/global_index.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -209,7 +210,12 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     const NamespaceString nss(op.getNss());
     auto opType = op.getOpType();
 
-    invariant(op.getTid() == nss.tenantId());
+    if ((gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
+        invariant(op.getTid() == nss.tenantId());
+    } else {
+        invariant(op.getTid() == boost::none);
+    }
 
     if (opType == OpTypeEnum::kNoop) {
         incrementOpsAppliedStats();

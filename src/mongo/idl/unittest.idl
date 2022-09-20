@@ -1062,7 +1062,7 @@ commands:
             variant: [bool, one_string]
 
     CommandTypeNamespaceCommand:
-        description: Command with custom type naemspacestring
+        description: Command with custom type namespacestring
         command_name: CommandTypeNamespaceCommand
         namespace: type
         type: namespacestring

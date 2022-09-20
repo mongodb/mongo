@@ -723,8 +723,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentInclud
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, boost::none, doc, boost::none);
 
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
-
-    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(collectionReader.next()));
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncorrectTenantId) {
@@ -745,8 +745,10 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncorr
         _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nssTenant2, false),
         ExceptionFor<ErrorCodes::NamespaceNotFound>);
 
-    ASSERT_FALSE(docExists(_opCtx.get(), nssTenant1, doc));
-    ASSERT_FALSE(docExists(_opCtx.get(), nssTenant2, doc));
+    CollectionReader collectionReaderTenant1(_opCtx.get(), nssTenant1);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, collectionReaderTenant1.next().getStatus());
+
+    ASSERT(!collectionExists(_opCtx.get(), nssTenant2));
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncludesTenantId) {
@@ -770,7 +772,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentInclud
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 
     // Check that the doc actually got deleted.
-    ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, collectionReader.next().getStatus());
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncorrectTenantId) {
@@ -790,8 +793,10 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncorr
 
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nssTenant2, false);
 
-    ASSERT_TRUE(docExists(_opCtx.get(), nssTenant1, doc));
-    ASSERT_FALSE(docExists(_opCtx.get(), nssTenant2, doc));
+    CollectionReader collectionReaderTenant1(_opCtx.get(), nssTenant1);
+    ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(collectionReaderTenant1.next()));
+
+    ASSERT(!collectionExists(_opCtx.get(), nssTenant2));
 }
 
 // Steady state constraints are required for secondaries in order to avoid turning an insert into an
@@ -844,7 +849,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentInclud
 
     // Check that the doc exists in its new updated form.
     BSONObj updatedDoc = BSON("_id" << 0 << "a" << 1);
-    ASSERT_TRUE(docExists(_opCtx.get(), nss, updatedDoc));
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(updatedDoc, unittest::assertGet(collectionReader.next()));
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncorrectTenantId) {
@@ -871,8 +877,10 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncorr
         _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nssTenant2, true),
         ExceptionFor<ErrorCodes::NamespaceNotFound>);
 
-    ASSERT_TRUE(docExists(_opCtx.get(), nssTenant1, doc));
-    ASSERT_FALSE(docExists(_opCtx.get(), nssTenant2, doc));
+    CollectionReader collectionReaderTenant1(_opCtx.get(), nssTenant1);
+    ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(collectionReaderTenant1.next()));
+
+    ASSERT(!collectionExists(_opCtx.get(), nssTenant2));
 }
 
 class MultiOplogEntryOplogApplierImplTest : public OplogApplierImplTest {

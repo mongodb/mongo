@@ -798,14 +798,8 @@ BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(
 
     BSONObjBuilder newCmd;
     newCmd.append("internalRenameIfOptionsAndIndexesMatch", 1);
-    if (!gMultitenancySupport ||
-        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
-        newCmd.append("from", sourceNs.ns());
-        newCmd.append("to", targetNs.ns());
-    } else {
-        newCmd.append("from", sourceNs.toStringWithTenantId());
-        newCmd.append("to", targetNs.toStringWithTenantId());
-    }
+    newCmd.append("from", NamespaceStringUtil::serialize(sourceNs));
+    newCmd.append("to", NamespaceStringUtil::serialize(targetNs));
     newCmd.append("collectionOptions", originalCollectionOptions);
     BSONArrayBuilder indexArrayBuilder(newCmd.subarrayStart("indexes"));
     for (auto&& index : originalIndexes) {

@@ -49,14 +49,30 @@ std::string NamespaceStringUtil::serialize(const NamespaceString& ns) {
 
 NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenantId,
                                                  StringData ns) {
+    if (ns.empty()) {
+        return NamespaceString();
+    }
     if (gMultitenancySupport) {
         if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
-            invariant(tenantId != boost::none);
+            // TODO SERVER-69721 : Enable the invariant.
+            // TODO SERVER-62491: Invariant for all databases. Remove the invariant bypass for
+            // admin, local, config dbs.
+            // StringData dbName = ns.substr(0, ns.find('.'));
+            // if (!(dbName == NamespaceString::kAdminDb) && !(dbName == NamespaceString::kLocalDb)
+            // &&
+            //     !(dbName == NamespaceString::kConfigDb)) {
+            //          invariant(tenantId != boost::none);
+            // }
             return NamespaceString(std::move(tenantId), ns);
         }
         auto nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+        // TenantId could be prefixed, or passed in separately (or both) and namespace is always
+        // constructed with the tenantId separately.
         if (tenantId != boost::none) {
+            if (!nss.tenantId()) {
+                return NamespaceString(std::move(tenantId), ns);
+            }
             invariant(tenantId == nss.tenantId());
         }
         return nss;

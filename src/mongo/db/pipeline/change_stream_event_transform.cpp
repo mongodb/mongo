@@ -80,12 +80,8 @@ void setResumeTokenForEvent(const ResumeTokenData& resumeTokenData, MutableDocum
 }
 
 NamespaceString createNamespaceStringFromOplogEntry(Value tid, StringData ns) {
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
-        auto tenantId = tid.missing() ? boost::none : boost::optional<TenantId>{tid.getOid()};
-        return NamespaceString(tenantId, ns);
-    }
-
-    return NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+    auto tenantId = tid.missing() ? boost::none : boost::optional<TenantId>{tid.getOid()};
+    return NamespaceStringUtil::deserialize(tenantId, ns);
 }
 
 }  // namespace

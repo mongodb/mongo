@@ -204,7 +204,7 @@ TEST(ChangeStreamEventTransformTest, TestUpdateTransformWithTenantId) {
                                      documentKey.toBson()  // o2
     );
 
-    changeStreamDoc = applyTransformation(updateField, nssWithTenant);
+    changeStreamDoc = applyTransformation(oplogEntry, nssWithTenant);
     outputNs = changeStreamDoc[DocumentSourceChangeStream::kNamespaceField].getDocument();
 
     ASSERT_DOCUMENT_EQ(outputNs, expectedNamespace);

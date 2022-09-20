@@ -61,9 +61,6 @@ enums:
             kPostImage: "postImage"
 
 structs:
-    # TODO SERVER-69499 Ensure the tenantId is included in the serialized "ns" field when
-    # multitenancySupport is on but featureFlagRequireTenantId is off. Currently it will not be
-    # included in either place
     DurableReplOperation:
         description: "A document that represents an operation. Should never be used directly in
                       server code. Instead, create an instance of ReplOperation."

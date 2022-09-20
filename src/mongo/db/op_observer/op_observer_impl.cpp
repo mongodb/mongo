@@ -1359,16 +1359,9 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  bool stayTemp,
                                                  bool markFromMigrate) {
     BSONObjBuilder builder;
-    if (!gMultitenancySupport ||
-        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
-        builder.append("renameCollection", fromCollection.ns());
-        builder.append("to", toCollection.ns());
-    } else {
-        builder.append("renameCollection", fromCollection.toStringWithTenantId());
-        builder.append("to", toCollection.toStringWithTenantId());
-    }
 
+    builder.append("renameCollection", NamespaceStringUtil::serialize(fromCollection));
+    builder.append("to", NamespaceStringUtil::serialize(toCollection));
     builder.append("stayTemp", stayTemp);
     if (dropTargetUUID) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");
