@@ -11,7 +11,11 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-amazon
-    compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     multiversion_platform: amazon
     multiversion_edition: targeted
@@ -61,13 +65,20 @@ buildvariants:
   run_on:
   - amazon1-2018-test
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
-    compile_flags: --ssl MONGO_DISTMOD=amzn64 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=amzn64
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     multiversion_platform: amzn64
     multiversion_edition: enterprise
@@ -120,7 +131,11 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: amazon2
     multiversion_edition: targeted
     has_packages: true
@@ -171,7 +186,9 @@ buildvariants:
   run_on:
   - amazon2-test
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: >-
       --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip
@@ -179,8 +196,14 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: amazon2
     multiversion_edition: enterprise
     has_packages: true
@@ -232,7 +255,11 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     has_packages: true
     packager_script: packager.py
@@ -280,13 +307,23 @@ buildvariants:
   run_on:
   - amazon2-arm64-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0
     has_packages: true
@@ -405,7 +442,11 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-debian10
-    compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=debian10
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: debian10
@@ -457,13 +498,24 @@ buildvariants:
   run_on:
   - debian10-test
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-debian10
-    compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=debian10
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: debian10
@@ -514,7 +566,11 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-debian11
-    compile_flags: --ssl MONGO_DISTMOD=debian11 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=debian11
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: debian11
@@ -566,13 +622,23 @@ buildvariants:
   run_on:
   - debian11-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-debian11
-    compile_flags: --ssl MONGO_DISTMOD=debian11 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=debian11
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: debian11
@@ -623,7 +689,10 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel70
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=rhel70
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel70
     multiversion_edition: targeted
     has_packages: true
@@ -673,7 +742,10 @@ buildvariants:
   run_on:
   - rhel76-test
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=rhel70
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -690,7 +762,11 @@ buildvariants:
   expansions:
     resmoke_jobs_factor: 1
     disable_shared_scons_cache: true
-    compile_flags: MONGO_DISTMOD=rhel80 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      MONGO_DISTMOD=rhel80
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
@@ -713,7 +789,10 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel80
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel80
     multiversion_edition: targeted
     has_packages: true
@@ -763,13 +842,22 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-expansions
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel80
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: true
@@ -880,7 +968,10 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-rhel82
-    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=rhel82
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -927,13 +1018,23 @@ buildvariants:
   run_on:
   - rhel82-arm64-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-rhel82
-    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=rhel82
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: aarch64
@@ -988,7 +1089,11 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=suse12
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: suse12
     multiversion_edition: targeted
     has_packages: true
@@ -1037,13 +1142,21 @@ buildvariants:
   run_on:
   - suse12-sp5-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=suse12
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: suse12
     multiversion_edition: enterprise
     has_packages: true
@@ -1086,13 +1199,21 @@ buildvariants:
   run_on:
   - suse15-test
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-suse15
-    compile_flags: --ssl MONGO_DISTMOD=suse15 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=suse15
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -1132,7 +1253,11 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-suse15
-    compile_flags: --ssl MONGO_DISTMOD=suse15 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=suse15
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: suse15
@@ -1183,7 +1308,12 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu1804
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      --ocsp-stapling=off
+      MONGO_DISTMOD=ubuntu1804
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
@@ -1240,13 +1370,25 @@ buildvariants:
   - ubuntu1804-test
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1804
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      --ocsp-stapling=off
+      MONGO_DISTMOD=ubuntu1804
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
@@ -1310,13 +1452,23 @@ buildvariants:
   run_on:
   - ubuntu1804-arm64-build
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu1804
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      --ocsp-stapling=off
+      MONGO_DISTMOD=ubuntu1804
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -1371,7 +1523,12 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu1804
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      --ocsp-stapling=off
+      MONGO_DISTMOD=ubuntu1804
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -1407,7 +1564,11 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=ubuntu2204
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu2204
     multiversion_edition: targeted
     has_packages: true
@@ -1459,7 +1620,11 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu2004
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=ubuntu2004
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu2004
     multiversion_edition: targeted
     has_packages: true
@@ -1510,13 +1675,22 @@ buildvariants:
   - ubuntu2004-small
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu2004
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=ubuntu2004
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: ubuntu2004
     multiversion_edition: enterprise
     has_packages: true
@@ -1567,13 +1741,23 @@ buildvariants:
   - ubuntu2204-small
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=ubuntu2204
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: ubuntu2204
     multiversion_edition: enterprise
     has_packages: true
@@ -1623,13 +1807,20 @@ buildvariants:
   run_on:
   - ubuntu2004-arm64-large
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu2004
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=ubuntu2004
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -1681,7 +1872,11 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2004
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=ubuntu2004
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -1723,7 +1918,11 @@ buildvariants:
     multiversion_platform_44_or_later: windows
     multiversion_edition: base
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+      --win-version-min=win10
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -1775,9 +1974,20 @@ buildvariants:
   - windows-vsCurrent-small
   expansions:
     exe: ".exe"
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      msi
+      archive-mh
+      archive-mh-debug
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+      --win-version-min=win10
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -1851,7 +2061,11 @@ buildvariants:
     push_name: macos
     push_arch: x86_64
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: >-
+      --ssl
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1902,7 +2116,11 @@ buildvariants:
     push_name: macos
     push_arch: arm64
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx_arm.vars
+    compile_flags: >-
+      --ssl
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --variables-files=etc/scons/xcode_macosx_arm.vars
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1950,13 +2168,21 @@ buildvariants:
   - macos-1100
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: osx
     push_bucket: downloads.10gen.com
     push_name: macos
     push_arch: x86_64-enterprise
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: >-
+      --ssl
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1990,13 +2216,21 @@ buildvariants:
   - macos-1100-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: osx
     push_bucket: downloads.10gen.com
     push_name: macos
     push_arch: arm64-enterprise
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx_arm.vars
+    compile_flags: >-
+      --ssl
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --variables-files=etc/scons/xcode_macosx_arm.vars
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG

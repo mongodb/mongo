@@ -10,10 +10,19 @@ buildvariants:
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
-    compile_flags: --ssl MONGO_DISTMOD=rhel81 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel81
+      -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_factor: 0.25
     has_packages: true
     packager_script: packager_enterprise.py
@@ -65,10 +74,19 @@ buildvariants:
   cron: "0 4 * * 0"
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     release_buid: true
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel72
+      -j3
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -120,10 +138,18 @@ buildvariants:
   cron: "0 4 * * 0"
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     release_buid: true
-    compile_flags: --ssl MONGO_DISTMOD=rhel83 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel83
+      -j3
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py

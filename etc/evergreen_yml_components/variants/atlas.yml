@@ -9,13 +9,22 @@ buildvariants:
   run_on:
   - rhel70-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=rhel70
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel70
     multiversion_edition: enterprise
     has_packages: true

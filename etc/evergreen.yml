@@ -76,10 +76,19 @@ variables:
   modules:
   - enterprise
   expansions: &enterprise-windows-nopush-expansions-template
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      msi
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
+      --win-version-min=win10
     num_scons_link_jobs_available: 0.5
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -127,13 +136,23 @@ variables:
   run_on:
   - rhel70-small
   expansions: &enterprise-rhel-70-64-bit-expansions-template
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel70
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel70
     multiversion_edition: enterprise
     has_packages: true
@@ -219,7 +238,14 @@ buildvariants:
   - rhel80-medium
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=on --enable-http-client=on --link-model=dynamic
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --enable-free-mon=on
+      --enable-http-client=on
+      --link-model=dynamic
     scons_cache_scope: shared
     scons_cache_mode: all
     test_flags: --excludeWithAnyTags=requires_http_client
@@ -284,7 +310,14 @@ buildvariants:
   expansions:
     use_wt_develop: true
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=on --enable-http-client=on --link-model=dynamic
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --enable-free-mon=on
+      --enable-http-client=on
+      --link-model=dynamic
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
@@ -310,8 +343,17 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
+      --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars
     has_packages: false
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -391,21 +433,38 @@ buildvariants:
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang DEBUG"
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
+      --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
 
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-dynamic-v4gcc-cxx20-debug-experimental
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC C++20 DEBUG"
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars --cxx-std=20
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
+      --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars
+      --cxx-std=20
 
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-dynamic-v4clang-cxx20-debug-experimental
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang C++20 DEBUG"
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars --cxx-std=20
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
+      --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
+      --cxx-std=20
 
 - name: enterprise-rhel-80-64-bit-coverage
   display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage"
@@ -416,9 +475,19 @@ buildvariants:
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --opt=off --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: >-
+      --dbg=on
+      --gcov
+      --opt=off
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -497,9 +566,19 @@ buildvariants:
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --opt=debug --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --link-model=dynamic
+    compile_flags: >-
+      --dbg=on
+      --gcov
+      --opt=debug
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+      --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -530,9 +609,19 @@ buildvariants:
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --opt=off --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_gcc.vars --link-model=dynamic
+    compile_flags: >-
+      --dbg=on
+      --gcov
+      --opt=off
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v4_gcc.vars
+      --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -560,9 +649,19 @@ buildvariants:
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --opt=debug --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars --link-model=dynamic
+    compile_flags: >-
+      --dbg=on
+      --gcov
+      --opt=debug
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars
+      --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -595,7 +694,15 @@ buildvariants:
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=*
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
+      --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
+      --cxx-std=20
+      --experimental-optimization=*
+      --experimental-runtime-hardening=*
 
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-v4gcc-cxx20-pm-1328-experimental
@@ -603,7 +710,14 @@ buildvariants:
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-    compile_flags: --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=* --disable-warnings-as-errors
+    compile_flags: >-
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars
+      --cxx-std=20
+      --experimental-optimization=*
+      --experimental-runtime-hardening=*
+      --disable-warnings-as-errors
   tasks: &enterprise-rhel80-dynamic-v4gcc-debug-experimental-tasks-no-unittests
     - name: compile_test_and_package_parallel_core_stream_TG
       distros:
@@ -677,7 +791,13 @@ buildvariants:
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-    compile_flags: --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=*
+    compile_flags: >-
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
+      --cxx-std=20
+      --experimental-optimization=*
+      --experimental-runtime-hardening=*
   tasks: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-tasks-no-unittests
 
 - name: stm-daily-cron
@@ -719,7 +839,12 @@ buildvariants:
   expansions:
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=on --win-version-min=win10 -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8") MONGO_DISTMOD=windows
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      --win-version-min=win10
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8")
+      MONGO_DISTMOD=windows
     num_scons_link_jobs_available: 0.2
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -789,9 +914,20 @@ buildvariants:
   expansions:
     burn_in_tests_build_variant: enterprise-windows-required
     exe: ".exe"
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      msi
+      archive-mh
+      archive-mh-debug
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8") --win-version-min=win10
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8")
+      --win-version-min=win10
     num_scons_link_jobs_available: 0.2
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -862,9 +998,20 @@ buildvariants:
   expansions:
     burn_in_tests_build_variant: enterprise-windows-required
     exe: ".exe"
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      msi
+      archive-mh
+      archive-mh-debug
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+      --win-version-min=win10
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -946,9 +1093,23 @@ buildvariants:
   - windows-vsCurrent-small
   expansions:
     exe: ".exe"
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      msi
+      archive-mh
+      archive-mh-debug
     content_type: application/zip
-    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10 --cxx-std=20
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+      --win-version-min=win10
+      --cxx-std=20
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -999,10 +1160,20 @@ buildvariants:
   run_on:
   - windows-vsCurrent-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
+    compile_flags: >-
+      --dbg=on
+      --opt=off
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+      --win-version-min=win10
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -1036,7 +1207,13 @@ buildvariants:
     test_flags: --excludeWithAnyTags=incompatible_with_macos
     resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: >-
+      --ssl
+      --dbg=on
+      --opt=on
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --variables-files=etc/scons/xcode_macosx.vars
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1066,7 +1243,11 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: >-
+      --ssl
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      -variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
@@ -1094,7 +1275,14 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --cxx-std=20
+    compile_flags: >-
+      --ssl
+      --dbg=on
+      --opt=on
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --variables-files=etc/scons/xcode_macosx.vars
+      --cxx-std=20
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
@@ -1121,7 +1309,11 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx_arm.vars
+    compile_flags: >-
+      --ssl
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --variables-files=etc/scons/xcode_macosx_arm.vars
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
@@ -1211,9 +1403,20 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-dynamic-required-expansions
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: false
@@ -1226,7 +1429,9 @@ buildvariants:
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_buildvariants: >-
+      enterprise-rhel-80-64-bit-inmem
+      enterprise-rhel-80-64-bit-multiversion
     burn_in_tag_compile_distro: rhel80-xlarge
     burn_in_tag_compile_task_group_name: compile_and_archive_dist_test_TG
     num_scons_link_jobs_available: 0.99
@@ -1355,7 +1560,15 @@ buildvariants:
   stepback: false
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-glibcxx-debug --dbg=on --allocator=system
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
+      --use-glibcxx-debug
+      --dbg=on
+      --allocator=system
 
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
@@ -1367,9 +1580,21 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: false
@@ -1508,8 +1733,17 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-dynamic-classic-engine-expansions
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: false
@@ -1520,7 +1754,9 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 5
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_buildvariants: >-
+      enterprise-rhel-80-64-bit-inmem
+      enterprise-rhel-80-64-bit-multiversion
     burn_in_tag_compile_distro: rhel80-xlarge
     burn_in_tag_compile_task_group_name: compile_and_archive_dist_test_TG
     num_scons_link_jobs_available: 0.99
@@ -1627,7 +1863,9 @@ buildvariants:
   - rhel80-small
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=rhel80
@@ -1848,8 +2086,16 @@ buildvariants:
   run_on:
   - rhel80-build
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      archive-mh
+      archive-mh-debug
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: true
@@ -1902,7 +2148,10 @@ buildvariants:
   run_on:
   - rhel80-build
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
     repo_edition: enterprise
     large_distro_name: rhel80-large
     num_scons_link_jobs_available: 0.1
@@ -1920,7 +2169,11 @@ buildvariants:
   expansions:
     num_scons_link_jobs_available: 0.1
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: >-
+      --ssl
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --variables-files=etc/scons/xcode_macosx.vars
   tasks:
   - name: build_metrics_gen_TG
 
@@ -1932,7 +2185,11 @@ buildvariants:
   - windows-vsCurrent-small
   expansions:
     num_scons_link_jobs_available: 0.1
-    compile_flags: CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    compile_flags: >-
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
+      --win-version-min=win10
     python: '/cygdrive/c/python/python37/python.exe'
   tasks:
   - name: build_metrics_gen_TG
@@ -1960,7 +2217,13 @@ buildvariants:
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     additional_package_targets: ""
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enterprise-features=hot_backups --link-model=dynamic
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel70
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --enterprise-features=hot_backups
+      --link-model=dynamic
     has_packages: false
     scons_cache_mode: all
     scons_cache_scope: shared
@@ -1980,7 +2243,14 @@ buildvariants:
   - rhel70
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 --use-libunwind=off --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel70
+      --use-libunwind=off
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     has_packages: false
     additional_package_targets: ""
     scons_cache_mode: all
@@ -2027,7 +2297,12 @@ buildvariants:
   - ubuntu1804-test
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
@@ -2065,7 +2340,11 @@ buildvariants:
   expansions:
     resmoke_jobs_factor: 1
     disable_shared_scons_cache: true
-    compile_flags: MONGO_DISTMOD=ubuntu1804 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      MONGO_DISTMOD=ubuntu1804
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
@@ -2087,8 +2366,15 @@ buildvariants:
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel72
+      -j3
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -2119,7 +2405,10 @@ buildvariants:
   - rhel80-xxlarge
   expansions:
     lang_environment: LANG=C
-    compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_${clang_tidy_toolchain}_clang.vars
+    compile_flags: >-
+      --link-model=dynamic
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_${clang_tidy_toolchain}_clang.vars
     scons_cache_scope: shared
     scons_cache_mode: all
     show_scons_timings: false
@@ -2152,7 +2441,12 @@ buildvariants:
   - rhel80-small
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
@@ -2193,7 +2487,11 @@ buildvariants:
   run_on:
   - rhel80-medium
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     scons_cache_scope: shared
   tasks:
   - name: compile_upload_benchmarks_TG
@@ -2215,14 +2513,25 @@ buildvariants:
   stepback: false
   expansions:
     toolchain_version: v3
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: >-
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
       ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: >-
+      --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
+      --dbg=on
+      --opt=on
+      --allocator=system
+      --sanitize=address
+      --ssl
+      --ocsp-stapling=off
+      --enable-free-mon=on
+      -j$(grep -c ^processor /proc/cpuinfo)
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
@@ -2306,14 +2615,25 @@ buildvariants:
   - rhel80-build
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: >-
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
       ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: >-
+      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+      --dbg=on
+      --opt=on
+      --allocator=system
+      --sanitize=address
+      --ssl
+      --ocsp-stapling=off
+      --enable-free-mon=on
+      -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
@@ -2381,12 +2701,22 @@ buildvariants:
   stepback: false
   expansions:
     toolchain_version: v3
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: >-
+      --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
+      --dbg=on
+      --opt=on
+      --sanitize=undefined
+      --ssl
+      --ocsp-stapling=off
+      --enable-free-mon=on
+      -j$(grep -c ^processor /proc/cpuinfo)
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
@@ -2467,12 +2797,22 @@ buildvariants:
   - rhel80-build
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: >-
+      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+      --dbg=on
+      --opt=on
+      --sanitize=undefined
+      --ssl
+      --ocsp-stapling=off
+      --enable-free-mon=on
+      -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
       --excludeWithAnyTags=requires_ocsp_stapling
@@ -2533,7 +2873,9 @@ buildvariants:
   - rhel80-build
   stepback: true
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
@@ -2541,7 +2883,16 @@ buildvariants:
       UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
       ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
+    compile_flags: >-
+      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+      --dbg=on
+      --opt=on
+      --allocator=system
+      --sanitize=undefined,address
+      --ssl
+      --ocsp-stapling=off
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
@@ -2571,7 +2922,9 @@ buildvariants:
   display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
@@ -2579,7 +2932,16 @@ buildvariants:
       UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
       ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
+    compile_flags: >-
+      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+      --dbg=on
+      --opt=on
+      --allocator=system
+      --sanitize=undefined,address
+      --ssl
+      --ocsp-stapling=off
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
@@ -2620,7 +2982,9 @@ buildvariants:
   - rhel80-large
   stepback: false
   expansions: &enterprise-rhel80-debug-tsan-expansions-template
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     lang_environment: LANG=C
     toolchain_version: v3
     # If you add anything to san_options, make sure the appropriate
@@ -2635,7 +2999,16 @@ buildvariants:
     # of the ServiceContext.
     #
     san_options: TSAN_OPTIONS="halt_on_error=1:report_thread_leaks=0:die_after_fork=0:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars --dbg=on --opt=on --allocator=system --sanitize=thread --ssl --enable-free-mon=on --use-libunwind=off -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: >-
+      --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
+      --dbg=on
+      --opt=on
+      --allocator=system
+      --sanitize=thread
+      --ssl
+      --enable-free-mon=on
+      --use-libunwind=off
+      -j$(grep -c ^processor /proc/cpuinfo)
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
     scons_cache_scope: shared
@@ -2869,7 +3242,12 @@ buildvariants:
   modules:
   - enterprise
   expansions:
-    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off --link-model=dynamic
+    compile_flags: >-
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --use-diagnostic-latches=off
+      --link-model=dynamic
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
@@ -2890,7 +3268,13 @@ buildvariants:
   modules:
   - enterprise
   expansions:
-    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --dbg=on --opt=off --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --detect-odr-violations
+    compile_flags: >-
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --dbg=on
+      --opt=off
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --detect-odr-violations
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
@@ -2916,7 +3300,11 @@ buildvariants:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: >-
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
@@ -2956,7 +3344,11 @@ buildvariants:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: >-
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
@@ -2995,7 +3387,11 @@ buildvariants:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: >-
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
@@ -3033,7 +3429,11 @@ buildvariants:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: >-
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
@@ -3071,7 +3471,11 @@ buildvariants:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
-    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: >-
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
@@ -3107,7 +3511,10 @@ buildvariants:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: >-
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
@@ -3187,7 +3594,11 @@ buildvariants:
   expansions:
     # --link-model=dynamic is set by visiblity_test's task_compile_flags
     # expansion
-    compile_flags: CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    compile_flags: >-
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
+      --win-version-min=win10
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     has_packages: false
@@ -3266,7 +3677,13 @@ buildvariants:
   expansions:
     # Do not set link-model=dynamic on this build. The antithesis image builder
     # scripts cannot handle the shared library build
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars CCFLAGS="-fsanitize-coverage=trace-pc-guard" LIBS="voidstar"
+    compile_flags: >-
+      --ssl
+      --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+      CCFLAGS="-fsanitize-coverage=trace-pc-guard"
+      LIBS="voidstar"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     repo_edition: enterprise
@@ -3318,7 +3735,9 @@ buildvariants:
   - rhel80-build
   stepback: false
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
     lang_environment: LANG=C
     toolchain_version: v3
     # If you add anything to san_options, make sure the appropriate changes are
@@ -3327,7 +3746,17 @@ buildvariants:
       UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
       ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
-    compile_flags: LINKFLAGS=-nostdlib++ LIBS=stdc++ --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address,fuzzer --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: >-
+      LINKFLAGS=-nostdlib++
+      LIBS=stdc++
+      --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
+      --dbg=on
+      --opt=on
+      --allocator=system
+      --sanitize=undefined,address,fuzzer
+      --ssl
+      --ocsp-stapling=off
+      -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
