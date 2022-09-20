@@ -823,31 +823,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto fieldSlotIds = _slotIdGenerator.generateMultiple(csn->allFields.size());
     auto rowStoreSlot = _slotIdGenerator.generate();
-    auto emptyExpr = sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
-
-    std::string rootStr = "rowStoreRoot";
-    optimizer::FieldMapBuilder builder(rootStr, true);
-
-    // When building its output document (in 'recordSlot'), the 'ColumnStoreStage' should not try to
-    // separately project both a document and its sub-fields (e.g., both 'a' and 'a.b'). Compute the
-    // subset of 'csn->allFields' that only includes a field if no other field in 'csn->allFields'
-    // is its prefix.
-    auto fieldsToProject =
-        DepsTracker::simplifyDependencies(csn->allFields, DepsTracker::TruncateToRootLevel::no);
-    for (const std::string& field : fieldsToProject) {
-        builder.integrateFieldPath(FieldPath(field),
-                                   [](const bool isLastElement, optimizer::FieldMapEntry& entry) {
-                                       entry._hasLeadingObj = true;
-                                       entry._hasKeep = true;
-                                   });
-    }
-
-    // Generate the expression that is applied to the row store record (in the case when the result
-    // cannot be reconstructed from the index).
-    optimizer::SlotVarMap slotMap{};
-    slotMap[rootStr] = rowStoreSlot;
-    auto abt = builder.generateABT();
-    auto rowStoreExpr = abt ? abtToExpr(*abt, slotMap) : emptyExpr->clone();
 
     // Get all the paths but make sure "_id" comes first (the order of paths given to the
     // column_scan stage defines the order of fields in the reconstructed record).
@@ -882,12 +857,42 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         match_expression::addDependencies(csn->postAssemblyFilter.get(), &residual);
     }
     std::vector<bool> includeInOutput(paths.size(), false);
+    OrderedPathSet fieldsToProject;  // projection when falling back to the row store
     for (size_t i = 0; i < paths.size(); i++) {
         if (csn->outputFields.find(paths[i]) != csn->outputFields.end() ||
             residual.fields.find(paths[i]) != residual.fields.end()) {
             includeInOutput[i] = true;
+            fieldsToProject.insert(paths[i]);
         }
     }
+
+    const std::string rootStr = "rowStoreRoot";
+    optimizer::FieldMapBuilder builder(rootStr, true);
+
+    // When building its output document (in 'recordSlot'), the 'ColumnStoreStage' should not try to
+    // separately project both a document and its sub-fields (e.g., both 'a' and 'a.b'). Compute the
+    // the subset of 'csn->allFields' that only includes a field if no other field in
+    // 'csn->allFields' is its prefix.
+    fieldsToProject =
+        DepsTracker::simplifyDependencies(fieldsToProject, DepsTracker::TruncateToRootLevel::no);
+    for (const std::string& field : fieldsToProject) {
+        builder.integrateFieldPath(FieldPath(field),
+                                   [](const bool isLastElement, optimizer::FieldMapEntry& entry) {
+                                       entry._hasLeadingObj = true;
+                                       entry._hasKeep = true;
+                                   });
+    }
+
+    // Generate the expression that is applied to the row store record(in the case when the result
+    // cannot be reconstructed from the index).
+    optimizer::SlotVarMap slotMap{};
+    slotMap[rootStr] = rowStoreSlot;
+    auto abt = builder.generateABT();
+    // We might get null abt if no paths were added to the builder. It means we should be projecting
+    // an empty object.
+    tassert(6935000, "ABT must be valid if have fields to project", fieldsToProject.empty() || abt);
+    auto rowStoreExpr = abt ? abtToExpr(*abt, slotMap)
+                            : sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
 
     std::unique_ptr<sbe::PlanStage> stage =
         std::make_unique<sbe::ColumnScanStage>(getCurrentCollection(reqs)->uuid(),
