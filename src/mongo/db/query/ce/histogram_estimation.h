@@ -89,11 +89,9 @@ double estimateCardEq(const ArrayHistogram& ah, sbe::value::TypeTags tag, sbe::v
  */
 double estimateCardRange(const ArrayHistogram& ah,
                          bool includeScalar,
-                         /* Define lower bound. */
                          bool lowInclusive,
                          sbe::value::TypeTags tagLow,
                          sbe::value::Value valLow,
-                         /* Define upper bound. */
                          bool highInclusive,
                          sbe::value::TypeTags tagHigh,
                          sbe::value::Value valHigh,

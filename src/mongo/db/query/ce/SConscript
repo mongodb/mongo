@@ -7,12 +7,10 @@ env = env.Clone()
 env.Library(
     target="query_ce",
     source=[
-        'array_histogram.cpp',
         'ce_histogram.cpp',
         'ce_sampling.cpp',
         'collection_statistics_impl.cpp',
         'histogram_estimation.cpp',
-        'scalar_histogram.cpp',
         'stats_cache.cpp',
         'stats_cache_loader_impl.cpp',
     ],
@@ -20,6 +18,30 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
+        'query_stats',
+        'stats_serialization',
+    ],
+)
+
+env.Library(
+    target="query_stats",
+    source=[
+        'array_histogram.cpp',
+        'scalar_histogram.cpp',
+        'value_utils.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values',
+    ],
+)
+
+env.Library(
+    target="query_stats_gen",
+    source=[
+        'max_diff.cpp',
+    ],
+    LIBDEPS=[
+        'query_stats',
         'stats_serialization',
     ],
 )
@@ -36,6 +58,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils',
         "$BUILD_DIR/mongo/unittest/unittest",
         'query_ce',
+        'query_stats',
     ],
 )
 
@@ -129,9 +152,11 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/pcre_wrapper',
         'query_ce',
+        'query_stats',
         'stats_serialization',
     ],
 )
+
 env.CppUnitTest(
     target="stats_cache_test",
     source=[
@@ -145,6 +170,7 @@ env.CppUnitTest(
         'query_ce',
     ],
 )
+
 env.CppUnitTest(
     target="stats_path_test",
     source=[
@@ -154,7 +180,34 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
         'ce_test_utils',
-        'query_ce',
         'stats_serialization',
+    ],
+)
+
+env.Library(
+    target="query_stats_test_utils",
+    source=[
+        'rand_utils.cpp',
+        'rand_utils_new.cpp',
+        'maxdiff_test_utils.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/sbe/sbe_abt_test_util',
+        "$BUILD_DIR/mongo/unittest/unittest",
+        'query_ce',
+        'query_stats',
+        'query_stats_gen',
+        'stats_serialization',
+    ],
+)
+
+env.CppUnitTest(
+    target="maxdiff_histogram_test",
+    source=[
+        'maxdiff_histogram_test.cpp',
+    ],
+    LIBDEPS=[
+        'query_stats_test_utils',
     ],
 )

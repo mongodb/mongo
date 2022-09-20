@@ -29,50 +29,11 @@
 
 #include "mongo/db/query/ce/histogram_estimation.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/query/ce/value_utils.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 
 namespace mongo::ce {
 using namespace sbe;
-namespace {
-
-bool sameTypeBracket(value::TypeTags tag1, value::TypeTags tag2) {
-    if (tag1 == tag2) {
-        return true;
-    }
-    return ((value::isNumber(tag1) && value::isNumber(tag2)) ||
-            (value::isString(tag1) && value::isString(tag2)));
-}
-
-double valueToDouble(value::TypeTags tag, value::Value val) {
-    double result = 0;
-    if (value::isNumber(tag)) {
-        result = value::numericCast<double>(tag, val);
-    } else if (value::isString(tag)) {
-        const StringData sd = value::getStringView(tag, val);
-
-        // Convert a prefix of the string to a double.
-        const size_t maxPrecision = std::min(sd.size(), sizeof(double));
-        for (size_t i = 0; i < maxPrecision; ++i) {
-            const char ch = sd[i];
-            const double charToDbl = ch / std::pow(2, i * 8);
-            result += charToDbl;
-        }
-    } else {
-        uassert(6844500, "Unexpected value type", false);
-    }
-
-    return result;
-}
-
-int32_t compareValues3w(value::TypeTags tag1,
-                        value::Value val1,
-                        value::TypeTags tag2,
-                        value::Value val2) {
-    const auto [compareTag, compareVal] = value::compareValue(tag1, val1, tag2, val2);
-    uassert(6695716, "Invalid comparison result", compareTag == value::TypeTags::NumberInt32);
-    return value::bitcastTo<int32_t>(compareVal);
-}
-}  // namespace
 
 EstimationResult getTotals(const ScalarHistogram& h) {
     if (h.empty()) {
@@ -170,7 +131,7 @@ EstimationResult estimate(const ScalarHistogram& h,
             const size_t half = len >> 1;
             const auto [boundTag, boundVal] = h.getBounds().getAt(bucketIndex + half);
 
-            if (compareValues3w(boundTag, boundVal, tag, val) < 0) {
+            if (compareValues(boundTag, boundVal, tag, val) < 0) {
                 bucketIndex += half + 1;
                 len -= half + 1;
             } else {
@@ -195,7 +156,7 @@ EstimationResult estimate(const ScalarHistogram& h,
 
     const Bucket& bucket = h.getBuckets().at(bucketIndex);
     const auto [boundTag, boundVal] = h.getBounds().getAt(bucketIndex);
-    const bool isEndpoint = compareValues3w(boundTag, boundVal, tag, val) == 0;
+    const bool isEndpoint = compareValues(boundTag, boundVal, tag, val) == 0;
 
     if (isEndpoint) {
         switch (type) {
@@ -302,7 +263,7 @@ double estimateCardRange(const ArrayHistogram& ah,
                          EstimationAlgo estimationAlgo) {
     uassert(6695701,
             "Low bound must not be higher than high",
-            compareValues3w(tagLow, valLow, tagHigh, valHigh) <= 0);
+            compareValues(tagLow, valLow, tagHigh, valHigh) <= 0);
 
     // Helper lambda to shorten code for legibility.
     auto estRange = [&](const ScalarHistogram& h) {

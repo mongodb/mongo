@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/ce/array_histogram.h"
+#include "mongo/db/query/ce/value_utils.h"
 
 namespace mongo::ce {
 using namespace sbe;
