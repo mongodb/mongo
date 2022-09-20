@@ -34,6 +34,8 @@
 
 #include "mongo/config.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
@@ -56,7 +58,17 @@ namespace executor {
 using namespace fmt::literals;
 
 namespace {
-static inline const std::string kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
+MONGO_FAIL_POINT_DEFINE(triggerSendRequestNetworkTimeout);
+MONGO_FAIL_POINT_DEFINE(forceConnectionNetworkTimeout);
+
+bool connHealthMetricsEnabled() {
+    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV();
+}
+
+CounterMetric numConnectionNetworkTimeouts("operation.numConnectionNetworkTimeouts",
+                                           connHealthMetricsEnabled);
+CounterMetric timeSpentWaitingBeforeConnectionTimeoutMillis(
+    "operation.totalTimeWaitingBeforeConnectionTimeoutMillis", connHealthMetricsEnabled);
 
 Status appendMetadata(RemoteCommandRequestOnAny* request,
                       const std::unique_ptr<rpc::EgressMetadataHook>& hook) {
@@ -436,18 +448,38 @@ AsyncDBClient* NetworkInterfaceTL::RequestState::getClient(const ConnectionHandl
 }
 
 void NetworkInterfaceTL::CommandStateBase::setTimer() {
+    auto nowVal = interface->now();
+
+    triggerSendRequestNetworkTimeout.executeIf(
+        [&](const BSONObj& data) {
+            LOGV2(6496503,
+                  "triggerSendRequestNetworkTimeout failpoint enabled, timing out request",
+                  "request"_attr = requestOnAny.cmdObj.toString());
+            // Sleep to make sure the elapsed wait time for connection timeout is > 1 millisecond.
+            sleepmillis(100);
+            deadline = nowVal;
+        },
+        [&](const BSONObj& data) {
+            return data["collectionNS"].valueStringData() ==
+                requestOnAny.cmdObj.firstElement().valueStringData();
+        });
+
     if (deadline == kNoExpirationDate || !requestOnAny.enforceLocalTimeout) {
         return;
     }
 
     const auto timeoutCode = requestOnAny.timeoutCode;
-    const auto nowVal = interface->now();
     if (nowVal >= deadline) {
-        auto connDuration = stopwatch.elapsed();
+        connTimeoutWaitTime = stopwatch.elapsed();
+        LOGV2(6496501,
+              "Operation timed out while waiting to acquire connection",
+              "requestId"_attr = requestOnAny.id,
+              "duration"_attr = connTimeoutWaitTime);
         uasserted(timeoutCode,
                   str::stream() << "Remote command timed out while waiting to get a "
                                    "connection from the pool, took "
-                                << connDuration << ", timeout was set to " << requestOnAny.timeout);
+                                << connTimeoutWaitTime << ", timeout was set to "
+                                << requestOnAny.timeout);
     }
 
     // TODO reform with SERVER-41459
@@ -613,6 +645,12 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                 rs.status = Status(ErrorCodes::HostUnreachable, rs.status.reason());
             }
 
+            if (rs.status == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
+                numConnectionNetworkTimeouts.increment(1);
+                timeSpentWaitingBeforeConnectionTimeoutMillis.increment(
+                    durationCount<Milliseconds>(cmdState->connTimeoutWaitTime));
+            }
+
             LOGV2_DEBUG(22597,
                         2,
                         "Request finished with response",
@@ -767,6 +805,21 @@ void NetworkInterfaceTL::RequestManager::killOperationsForPendingRequests() {
 
 void NetworkInterfaceTL::RequestManager::trySend(
     StatusWith<ConnectionPool::ConnectionHandle> swConn, size_t idx) noexcept {
+    forceConnectionNetworkTimeout.executeIf(
+        [&](const BSONObj& data) {
+            LOGV2(6496502,
+                  "forceConnectionNetworkTimeout failpoint enabled, timing out request",
+                  "request"_attr = cmdState->requestOnAny.cmdObj.toString());
+            // Sleep to make sure the elapsed wait time for connection timeout is > 1 millisecond.
+            sleepmillis(100);
+            swConn = Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,
+                            "Couldn't get a connection within the time limit");
+        },
+        [&](const BSONObj& data) {
+            return data["collectionNS"].valueStringData() ==
+                cmdState->requestOnAny.cmdObj.firstElement().valueStringData();
+        });
+
     // Our connection wasn't any good
     if (!swConn.isOK()) {
         {
@@ -791,6 +844,14 @@ void NetworkInterfaceTL::RequestManager::trySend(
 
         // We're the last one, set the promise if it hasn't already been set via cancel or timeout
         if (cmdState->finishLine.arriveStrongly()) {
+            if (swConn.getStatus() == cmdState->requestOnAny.timeoutCode) {
+                cmdState->connTimeoutWaitTime = cmdState->stopwatch.elapsed();
+                LOGV2(6496500,
+                      "Operation timed out while waiting to acquire connection",
+                      "requestId"_attr = cmdState->requestOnAny.id,
+                      "duration"_attr = cmdState->connTimeoutWaitTime);
+            }
+
             auto& reactor = cmdState->interface->_reactor;
             if (reactor->onReactorThread()) {
                 cmdState->fulfillFinalPromise(std::move(swConn.getStatus()));
@@ -878,7 +939,7 @@ void NetworkInterfaceTL::RequestManager::trySend(
 
         BSONObjBuilder updatedCmdBuilder;
         updatedCmdBuilder.appendElements(request->cmdObj);
-        updatedCmdBuilder.append(kMaxTimeMSOpOnlyField, request->timeout.count());
+        updatedCmdBuilder.append("maxTimeMSOpOnly", request->timeout.count());
         request->cmdObj = updatedCmdBuilder.obj();
     }
 

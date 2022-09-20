@@ -180,6 +180,9 @@ private:
         StrongWeakFinishLine finishLine;
 
         boost::optional<UUID> operationKey;
+
+        // Total time spent waiting for connections that eventually time out.
+        Milliseconds connTimeoutWaitTime{0};
     };
 
     struct CommandState final : public CommandStateBase {
