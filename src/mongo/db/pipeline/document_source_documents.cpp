@@ -44,7 +44,7 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 REGISTER_DOCUMENT_SOURCE(documents,
-                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceDocuments::LiteParsed::parse,
                          DocumentSourceDocuments::createFromBson,
                          AllowedWithApiStrict::kAlways);
 

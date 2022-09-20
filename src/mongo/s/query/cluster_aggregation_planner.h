@@ -82,6 +82,7 @@ struct AggregationTargeter {
         boost::optional<ChunkManager> cm,
         stdx::unordered_set<NamespaceString> involvedNamespaces,
         bool hasChangeStream,
+        bool startsWithDocuments,
         bool allowedToPassthrough,
         bool perShardCursor);
 
@@ -125,7 +126,8 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                 const ClusterAggregate::Namespaces& namespaces,
                                 const PrivilegeVector& privileges,
                                 BSONObjBuilder* result,
-                                bool hasChangeStream);
+                                bool hasChangeStream,
+                                bool startsWithDocuments);
 
 /**
  * Similar to runPipelineOnPrimaryShard but allows $changeStreams. Intended for use by per shard
