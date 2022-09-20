@@ -279,9 +279,8 @@ env.Library(
         'chunk.cpp',
         'client/shard_factory.cpp',
         'client/shard_registry.cpp',
-        'global_indexes_cache.cpp',
-        'grid.cpp',
         'global_index_cache.cpp',
+        'grid.cpp',
         'shard_key_pattern.cpp',
     ],
     LIBDEPS=[
