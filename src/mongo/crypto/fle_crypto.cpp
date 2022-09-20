@@ -732,7 +732,10 @@ std::unique_ptr<Edges> getEdges(BSONElement element,
                 6775509, "min bound must be decimal", minBound.type() == BSONType::NumberDecimal);
             uassert(
                 6775510, "max bound must be decimal", maxBound.type() == BSONType::NumberDecimal);
-            uasserted(ErrorCodes::BadValue, "decimal not supported atm");
+            return getEdgesDecimal128(element.numberDecimal(),
+                                      minBound.numberDecimal(),
+                                      maxBound.numberDecimal(),
+                                      sparsity);
 
         default:
             uassert(6775500, "must use supported FLE2 range type", false);
@@ -2612,7 +2615,7 @@ StatusWith<FLE2IndexedRangeEncryptedValue> FLE2IndexedRangeEncryptedValue::decry
         return {swEdgeCount.getStatus()};
     }
 
-    uassert(6775315, "Edge count must be less then 129", swEdgeCount.getValue() < 129);
+    uassert(6775315, "Edge count must not be over 129", swEdgeCount.getValue() <= 129);
 
     std::vector<FLEEdgeToken> tokens;
     tokens.reserve(swEdgeCount.getValue());

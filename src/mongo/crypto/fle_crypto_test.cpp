@@ -1009,8 +1009,7 @@ TEST(FLE_EDC, Range_Allowed_Types) {
 
     const std::vector<std::pair<BSONObj, BSONType>> rangeAllowedObjects{
         {BSON("sample" << 123.456), NumberDouble},
-        // TODO SERVER-68542 remove the commented line
-        // {BSON("sample" << Decimal128()), NumberDecimal},
+        {BSON("sample" << Decimal128()), NumberDecimal},
         {BSON("sample" << 123456), NumberInt},
         {BSON("sample" << 12345678901234567LL), NumberLong},
         {BSON("sample" << Date_t::fromMillisSinceEpoch(12345)), Date},
