@@ -598,7 +598,7 @@ private:
 };
 
 /**
- * TODO: SERVER-44105 remove
+ * TODO (SERVER-69813): Get rid of this when ShardServerCatalogCacheLoader will be removed.
  * RAII type for letting secondary reads to block behind the PBW lock.
  * Note: Do not add additional usage. This is only temporary for ease of backport.
  */

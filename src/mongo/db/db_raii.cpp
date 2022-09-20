@@ -55,7 +55,7 @@ namespace {
 
 const boost::optional<int> kDoNotChangeProfilingLevel = boost::none;
 
-// TODO: SERVER-44105 remove
+// TODO (SERVER-69813): Get rid of this when ShardServerCatalogCacheLoader will be removed.
 // If set to false, secondary reads should wait behind the PBW lock.
 const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
     OperationContext::declareDecoration<boost::optional<bool>>();
