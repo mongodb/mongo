@@ -1313,6 +1313,9 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, permitted values are \c "none" or custom storage
 	 * source name created with WT_CONNECTION::add_storage_source.  See @ref
 	 * custom_storage_sources for more information., a string; default \c none.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;object_target_size, this option is no longer supported\,
+	 * retained for backward compatibility., an integer greater than or equal to 0; default \c
+	 * 0.}
 	 * @config{ ),,}
 	 * @config{type, set the type of data source used to store a column group\, index or simple
 	 * table.  By default\, a \c "file:" URI is derived from the object name.  The \c type
@@ -2280,9 +2283,6 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;local_retention, time in seconds to retain data
 	 * on tiered storage on the local tier for faster read access., an integer between 0 and
 	 * 10000; default \c 300.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;object_target_size, the
-	 * approximate size of objects before creating them on the tiered storage tier., an integer
-	 * between 100K and 10TB; default \c 10M.}
 	 * @config{ ),,}
 	 * @config{verbose, enable messages for various events.  Options are given as a list\, such
 	 * as <code>"verbose=[evictserver\,read]"</code>., a list\, with values chosen from the
