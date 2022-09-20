@@ -443,7 +443,12 @@ BoundsTightness translateWildcardIndexBoundsAndTightness(
     if (boundsOverlapObjectTypeBracket(*oil) && !oil->intervals.front().isMinToMax()) {
         oil->intervals = {IndexBoundsBuilder::allValues()};
         if (ietBuilder) {
-            ietBuilder->reset();
+            // We need to replace a previously added interval in the IET builder with a new
+            // all-values interval.
+            tassert(
+                6944102, "Cannot pop an element from an empty IET builder", !ietBuilder->isEmpty());
+            ietBuilder->pop();
+
             ietBuilder->addConst(*oil);
         }
         return BoundsTightness::INEXACT_FETCH;

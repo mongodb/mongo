@@ -97,6 +97,10 @@ assertExpectedDocAnswersWildcardIndexQuery(
     true,
     {$_path: [`["a", "a"]`, `["a.", "a/")`], "a": [`[MinKey, MaxKey]`]});
 
+// A conjunction of {$type: 'object'} and $eq should match the given object.
+assertExpectedDocAnswersWildcardIndexQuery(
+    {a: {b: "foo"}}, {$and: [{"a": {$type: 'object'}}, {"a.b": "foo"}]}, true);
+
 // A $type of 'array' will match an empty array.
 assertExpectedDocAnswersWildcardIndexQuery(
     {a: [[]]},
