@@ -2240,6 +2240,40 @@ buildvariants:
       - name: linkbench
       - name: linkbench2
 
+  - name: atlas-M60-real
+    display_name: M60-Atlas ReplSet
+    cron: "0 0 * * 0,4" # 00:00 on Sunday, Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas
+      canaries: none
+      atlas_setup: M60-repl
+      use_custom_build: true
+      infrastructure_provisioning: graviton-replica
+      platform: linux
+      project_dir: *project_dir
+      storageEngine: wiredTiger
+      run_server_on_arm: true
+    run_on:
+      - "rhel70-perf-M60-like"
+    depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+    tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: tpcc
+      - name: linkbench
+      - name: linkbench2
+
   - name: renew-ssl-cert
     display_name: Renew SSL Cert
     cron: "0 0 * * 4" # 00:00 on Thursday
