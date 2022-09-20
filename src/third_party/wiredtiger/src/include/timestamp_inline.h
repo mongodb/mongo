@@ -41,6 +41,11 @@
       (tw1)->stop_ts == (tw2)->stop_ts && (tw1)->stop_txn == (tw2)->stop_txn &&                   \
       (tw1)->prepare == (tw2)->prepare)
 
+/* Return true if the stop time windows are the same. */
+#define WT_TIME_WINDOWS_STOP_EQUAL(tw1, tw2)                                                 \
+    ((tw1)->durable_stop_ts == (tw2)->durable_stop_ts && (tw1)->stop_ts == (tw2)->stop_ts && \
+      (tw1)->stop_txn == (tw2)->stop_txn && (tw1)->prepare == (tw2)->prepare)
+
 /*
  * Set the start values of a time window from those in an update structure. Durable timestamp can be
  * 0 for prepared updates, in those cases use the prepared timestamp as durable timestamp.
