@@ -256,7 +256,7 @@ function testAnalyzeShardKeysUnshardedCollection(conn, testCases) {
     const collName = "testColl";
     const db = conn.getDB(dbName);
 
-    jsTest.log(`Testing analyzing a shard key for a unsharded collection: ${
+    jsTest.log(`Testing analyzing a shard key for an unsharded collection: ${
         tojsononeline({dbName, collName})}`);
 
     testMonotonicity(conn, dbName, collName, null /* currentShardKey */, testCases);
@@ -271,7 +271,7 @@ function testAnalyzeShardKeysShardedCollection(st, testCases) {
     const currentShardKeySplitPoint = {skey: 0};
     const db = st.s.getDB(dbName);
 
-    jsTest.log(`Testing analyzing a shard key for a unsharded collection: ${
+    jsTest.log(`Testing analyzing a shard key for a sharded collection: ${
         tojsononeline({dbName, collName})}`);
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
