@@ -89,6 +89,11 @@ structs:
         type: MonotonicityType
         description: "The monotonicity of the shard key values in insertion order."
         optional: true
+      numOrphanDocs:
+        type: long
+        description: "The number of the orphan documents in the collection."
+        validator: { gte: 0 }
+        optional: true
 
   analyzeShardKeyResponse:
     description: "The response for the 'analyzeShardKey' command."

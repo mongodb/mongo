@@ -37,10 +37,12 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/s/analyze_shard_key_cmd_util.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/s/service_entry_point_mongos.h"
@@ -59,6 +61,7 @@ constexpr StringData kNumDocsFieldName = "numDocs"_sd;
 constexpr StringData kCardinalityFieldName = "cardinality"_sd;
 constexpr StringData kFrequencyFieldName = "frequency"_sd;
 constexpr StringData kIndexFieldName = "index"_sd;
+constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
 
 const std::vector<double> kPercentiles{0.99, 0.95, 0.9, 0.8, 0.5};
 
@@ -399,6 +402,67 @@ MonotonicityTypeEnum calculateMonotonicity(OperationContext* opCtx,
                                                     : MonotonicityTypeEnum::kNotMonotonic;
 }
 
+/**
+ * Returns the number of orphan documents. If the collection is unsharded, returns none.
+ */
+boost::optional<int64_t> getNumOrphanDocuments(OperationContext* opCtx,
+                                               const NamespaceString& nss) {
+    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        return boost::none;
+    }
+
+    auto cm =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
+    if (!cm.isSharded()) {
+        return boost::none;
+    }
+
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(
+        BSON("$match" << BSON(RangeDeletionTask::kCollectionUuidFieldName << cm.getUUID())));
+    pipeline.push_back(
+        BSON("$group" << BSON("_id" << BSONNULL << kNumOrphanDocsFieldName
+                                    << BSON("$sum"
+                                            << "$" + RangeDeletionTask::kNumOrphanDocsFieldName))));
+    AggregateCommandRequest aggRequest(NamespaceString::kRangeDeletionNamespace, pipeline);
+    auto cmdObj = applyReadWriteConcern(
+        opCtx, true /* appendRC */, true /* appendWC */, aggRequest.toBSON({}));
+
+    std::set<ShardId> shardIds;
+    cm.getAllShardIds(&shardIds);
+    std::vector<AsyncRequestsSender::Request> requests;
+    for (const auto& shardId : shardIds) {
+        requests.emplace_back(shardId, cmdObj);
+    }
+    auto shardResults = gatherResponses(opCtx,
+                                        NamespaceString::kConfigDb,
+                                        ReadPreferenceSetting(ReadPreference::SecondaryPreferred),
+                                        Shard::RetryPolicy::kIdempotent,
+                                        requests);
+
+    long long numOrphanDocs = 0;
+    for (const auto& shardResult : shardResults) {
+        const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
+        uassertStatusOK(shardResponse.status);
+        const auto cmdResult = shardResponse.data;
+        uassertStatusOK(getStatusFromCommandResult(cmdResult));
+
+        auto firstBatch = cmdResult.firstElement()["firstBatch"].Obj();
+        BSONObjIterator it(firstBatch);
+
+        if (!it.more()) {
+            continue;
+        }
+
+        auto doc = it.next().Obj();
+        invariant(!it.more());
+        numOrphanDocs += doc.getField(kNumOrphanDocsFieldName).exactNumberLong();
+    }
+
+    return numOrphanDocs;
+}
+
 }  // namespace
 
 KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* opCtx,
@@ -439,6 +503,8 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
     metrics.setNumDocs(bundle.numDocs);
     metrics.setCardinality(bundle.cardinality);
     metrics.setFrequency(bundle.frequency);
+
+    metrics.setNumOrphanDocs(getNumOrphanDocuments(opCtx, nss));
 
     return metrics;
 }
