@@ -99,9 +99,8 @@ TEST_F(MemoryUsageTrackerTest, UpdateUsageUpdatesGlobal) {
     ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
 }
 
-DEATH_TEST_F(MemoryUsageTrackerTest,
-             UpdateFunctionUsageToNegativeIsDisallowed,
-             "Underflow on memory tracking") {
+// TODO SERVER-61281: Switch to 'DEATH_TEST_F' checking the underflow case.
+TEST_F(MemoryUsageTrackerTest, UpdateFunctionUsageToNegativeIsDisallowed) {
     _funcTracker.set(50LL);
     ASSERT_EQ(_funcTracker.currentMemoryBytes(), 50LL);
     ASSERT_EQ(_funcTracker.maxMemoryBytes(), 50LL);
@@ -109,16 +108,19 @@ DEATH_TEST_F(MemoryUsageTrackerTest,
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
     _funcTracker.update(-100);
+    ASSERT_EQ(_tracker.currentMemoryBytes(), 0LL);
+    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 }
 
-DEATH_TEST_F(MemoryUsageTrackerTest,
-             UpdateMemUsageToNegativeIsDisallowed,
-             "Underflow on memory tracking") {
+// TODO SERVER-61281: Switch to 'DEATH_TEST_F' checking the underflow case.
+TEST_F(MemoryUsageTrackerTest, UpdateMemUsageToNegativeIsDisallowed) {
     _tracker.set(50LL);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
     _tracker.update(-100);
+    ASSERT_EQ(_tracker.currentMemoryBytes(), 0LL);
+    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 }
 
 }  // namespace

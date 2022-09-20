@@ -50,11 +50,8 @@ public:
         PerFunctionMemoryTracker() = delete;
 
         void update(long long diff) {
-            tassert(5578603,
-                    str::stream() << "Underflow on memory tracking, attempting to add " << diff
-                                  << " but only " << _currentMemoryBytes << " available",
-                    diff >= 0 || _currentMemoryBytes >= std::abs(diff));
-            set(_currentMemoryBytes + diff);
+            // TODO SERVER-61281: Check for memory underflow.
+            set(std::max(_currentMemoryBytes + diff, 0ll));
         }
 
         void set(long long total) {
@@ -145,11 +142,8 @@ public:
      * Updates total memory usage.
      */
     void update(long long diff) {
-        tassert(5578602,
-                str::stream() << "Underflow on memory tracking, attempting to add " << diff
-                              << " but only " << _memoryUsageBytes << " available",
-                diff >= 0 || (int)_memoryUsageBytes >= -1 * diff);
-        set(_memoryUsageBytes + diff);
+        // TODO SERVER-61281: Check for memory underflow.
+        set(std::max(_memoryUsageBytes + diff, 0ll));
     }
 
     auto currentMemoryBytes() const {
