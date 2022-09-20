@@ -30,36 +30,47 @@
 #include "mongo/s/hedge_options_util.h"
 
 #include "mongo/s/mongos_server_parameters_gen.h"
+#include "mongo/util/sort.h"
 
 namespace mongo {
 namespace {
-// Only hedge commands that cannot trigger writes.
-const std::set<std::string> supportedCmds{"collStats",
-                                          "count",
-                                          "dataSize",
-                                          "dbStats",
-                                          "distinct",
-                                          "filemd5",
-                                          "find",
-                                          "listCollections",
-                                          "listIndexes",
-                                          "planCacheListFilters"};
+// Only do hedging for commands that cannot trigger writes.
+constexpr std::array hedgeCommands{
+    "collStats"_sd,
+    "count"_sd,
+    "dataSize"_sd,
+    "dbStats"_sd,
+    "distinct"_sd,
+    "filemd5"_sd,
+    "find"_sd,
+    "listCollections"_sd,
+    "listIndexes"_sd,
+    "planCacheListFilters"_sd,
+};
+
+static_assert(constexprIsSorted(hedgeCommands.begin(), hedgeCommands.end()));
+
+bool commandCanHedge(StringData command) {
+    return std::binary_search(hedgeCommands.begin(), hedgeCommands.end(), command);
+}
 }  // namespace
 
 void extractHedgeOptions(const BSONObj& cmdObj,
                          const ReadPreferenceSetting& readPref,
                          executor::RemoteCommandRequestOnAny::Options& options) {
-    options.resetHedgeOptions();
-    if (!(gReadHedgingMode.load() == ReadHedgingMode::kOn && readPref.hedgingMode &&
-          readPref.hedgingMode->getEnabled())) {
-        return;
-    }
-    auto cmdName(cmdObj.firstElement().fieldNameStringData().toString());
-    if (supportedCmds.count(cmdName)) {
-        options.hedgeCount = 1;
-        options.maxTimeMSForHedgedReads = gMaxTimeMSForHedgedReads.load();
-        options.isHedgeEnabled = true;
-        return;
-    }
+    const bool canHedge = [&] {
+        if (gReadHedgingMode.load() != ReadHedgingMode::kOn)
+            return false;  // Hedging is globally disabled.
+        auto&& mode = readPref.hedgingMode;
+        if (!mode || !mode->getEnabled())
+            return false;  // The read preference didn't enable hedging.
+        auto cmdName = cmdObj.firstElement().fieldNameStringData();
+        if (!commandCanHedge(cmdName))
+            return false;  // This is not a command that can hedge.
+        return true;
+    }();
+    options.isHedgeEnabled = canHedge;
+    options.hedgeCount = canHedge ? 1 : 0;
+    options.maxTimeMSForHedgedReads = canHedge ? gMaxTimeMSForHedgedReads.load() : 0;
 }
 }  // namespace mongo

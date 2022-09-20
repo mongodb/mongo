@@ -60,9 +60,8 @@ protected:
 
     /**
      * Sets the given server parameters and creates ReadPreferenceSetting from 'rspObj' and extracts
-     * HedgeOptions from it. If 'hedge' is true, asserts that the resulting HedgeOptions is not
-     * empty, otherwise asserts that it is empty. Resets the server parameters to the defaults
-     * before returning.
+     * HedgeOptions from it. If 'hedge' is true, asserts that the resulting HedgeOptions'
+     * maxTimeforHedgedReads is equal to what was passed in.
      */
     void checkHedgeOptions(const BSONObj& serverParameters,
                            const BSONObj& cmdObj,
