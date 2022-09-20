@@ -1633,6 +1633,9 @@ StatusWith<RecordData> WiredTigerRecordStore::doUpdateWithDamages(
     WT_ITEM value;
     invariantWTOK(c->get_value(c, &value), c->session);
 
+    _increaseDataSize(opCtx,
+                      static_cast<int64_t>(value.size) - static_cast<int64_t>(oldRec.size()));
+
     return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
 }
 

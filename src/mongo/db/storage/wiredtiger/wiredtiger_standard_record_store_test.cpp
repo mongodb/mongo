@@ -192,6 +192,59 @@ TEST_F(SizeStorerUpdateTest, Basic) {
     rs->updateStatsAfterRepair(opCtx.get(), val, val);
     ASSERT_EQUALS(getNumRecords(opCtx.get()), val);
     ASSERT_EQUALS(getDataSize(opCtx.get()), val);
+};
+
+TEST_F(SizeStorerUpdateTest, DataSizeModification) {
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+    RecordId recordId;
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        auto rId = rs->insertRecord(opCtx.get(), "12345", 5, Timestamp{1});
+        ASSERT_TRUE(rId.isOK());
+        recordId = rId.getValue();
+        uow.commit();
+    }
+
+    ASSERT_EQ(getDataSize(opCtx.get()), 5);
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        ASSERT_OK(rs->updateRecord(opCtx.get(), recordId, "54321", 5));
+        uow.commit();
+    }
+    ASSERT_EQ(getDataSize(opCtx.get()), 5);
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        ASSERT_OK(rs->updateRecord(opCtx.get(), recordId, "1234", 4));
+        uow.commit();
+    }
+    ASSERT_EQ(getDataSize(opCtx.get()), 4);
+
+    RecordData oldRecordData("1234", 4);
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        const auto damageSource = "";
+        mutablebson::DamageVector damageVector;
+        damageVector.push_back(mutablebson::DamageEvent(0, 0, 0, 1));
+        auto newDoc =
+            rs->updateWithDamages(opCtx.get(), recordId, oldRecordData, damageSource, damageVector);
+        ASSERT_TRUE(newDoc.isOK());
+        oldRecordData = newDoc.getValue().getOwned();
+        ASSERT_EQ(std::memcmp(oldRecordData.data(), "234", 3), 0);
+        ASSERT_EQ(getDataSize(opCtx.get()), 3);
+        uow.commit();
+    }
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        const auto damageSource = "3456";
+        mutablebson::DamageVector damageVector;
+        damageVector.push_back(mutablebson::DamageEvent(0, 4, 1, 2));
+        ASSERT_TRUE(
+            rs->updateWithDamages(opCtx.get(), recordId, oldRecordData, damageSource, damageVector)
+                .isOK());
+        ASSERT_EQ(getDataSize(opCtx.get()), 5);
+        uow.commit();
+    }
 }
 
 }  // namespace
