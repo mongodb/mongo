@@ -30,10 +30,6 @@
 #include "mongo/db/query/cqf_command_utils.h"
 
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/exec/add_fields_projection_executor.h"
-#include "mongo/db/exec/exclusion_projection_executor.h"
-#include "mongo/db/exec/inclusion_projection_executor.h"
-#include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -110,6 +106,7 @@
 #include "mongo/db/pipeline/visitors/document_source_visitor.h"
 #include "mongo/db/pipeline/visitors/document_source_walker.h"
 #include "mongo/db/pipeline/visitors/transformer_interface_walker.h"
+#include "mongo/db/query/projection_ast_path_tracking_visitor.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -366,60 +363,52 @@ private:
     bool& _eligible;
 };
 
-
-class ABTTransformerVisitor : public TransformerInterfaceConstVisitor {
+class ABTProjectionVisitor final : public projection_ast::ProjectionASTConstVisitor {
 public:
-    ABTTransformerVisitor(bool& eligible) : _eligible(eligible) {}
-
-    void visit(const projection_executor::ExclusionProjectionExecutor* transformer) override {
-        checkUnsupportedInclusionExclusion(transformer);
+    ABTProjectionVisitor(projection_ast::PathTrackingVisitorContext<>* context, bool& eligible)
+        : _context{context}, _eligible(eligible) {
+        invariant(_context);
     }
 
-    void visit(const projection_executor::InclusionProjectionExecutor* transformer) override {
-        checkUnsupportedInclusionExclusion(transformer);
+    void visit(const projection_ast::ProjectionPositionalASTNode* node) final {
+        unsupportedProjectionType();
     }
 
-    void visit(const projection_executor::AddFieldsProjectionExecutor* transformer) override {
-        unsupportedTransformer(transformer);
+    void visit(const projection_ast::ProjectionSliceASTNode* node) final {
+        unsupportedProjectionType();
     }
 
-    void visit(const GroupFromFirstDocumentTransformation* transformer) override {
-        unsupportedTransformer(transformer);
+    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {
+        unsupportedProjectionType();
     }
 
-    void visit(const ReplaceRootTransformation* transformer) override {
-        unsupportedTransformer(transformer);
+    void visit(const projection_ast::ExpressionASTNode* node) final {
+        unsupportedProjectionType();
+    }
+
+    void visit(const projection_ast::BooleanConstantASTNode* node) final {
+        const auto& path = _context->fullPath();
+        assertSupportedPath(path.fullPath());
+    }
+
+    void visit(const projection_ast::ProjectionPathASTNode* node) final {}
+
+    void visit(const projection_ast::MatchExpressionASTNode* node) final {
+        unsupportedProjectionType();
     }
 
 private:
-    void unsupportedTransformer(const TransformerInterface* transformer) {
+    projection_ast::PathTrackingVisitorContext<>* _context;
+    bool& _eligible;
+
+    void assertSupportedPath(const std::string& path) {
+        if (FieldRef(path).hasNumericPathComponents())
+            _eligible = false;
+    }
+
+    void unsupportedProjectionType() {
         _eligible = false;
     }
-
-    template <typename T>
-    void checkUnsupportedInclusionExclusion(const T* transformer) {
-        OrderedPathSet computedPaths;
-        StringMap<std::string> renamedPaths;
-        transformer->getRoot()->reportComputedPaths(&computedPaths, &renamedPaths);
-
-        // Non-simple projections are supported under test only.
-        if (computedPaths.size() > 0 || renamedPaths.size() > 0) {
-            unsupportedTransformer(transformer);
-            return;
-        }
-
-        OrderedPathSet preservedPaths;
-        transformer->getRoot()->reportProjectedPaths(&preservedPaths);
-
-        for (const std::string& path : preservedPaths) {
-            if (FieldRef(path).hasNumericPathComponents()) {
-                unsupportedTransformer(transformer);
-                return;
-            }
-        }
-    }
-
-    bool& _eligible;
 };
 
 /**
@@ -572,9 +561,26 @@ public:
     }
 
     void visit(const DocumentSourceSingleDocumentTransformation* source) override {
-        ABTTransformerVisitor visitor(eligible);
-        TransformerInterfaceWalker walker(&visitor);
-        walker.walk(&source->getTransformer());
+        switch (source->getType()) {
+            case TransformerInterface::TransformerType::kComputedProjection:
+            case TransformerInterface::TransformerType::kGroupFromFirstDocument:
+            case TransformerInterface::TransformerType::kReplaceRoot:
+                eligible = false;
+                break;
+            case TransformerInterface::TransformerType::kExclusionProjection:
+            case TransformerInterface::TransformerType::kInclusionProjection: {
+                tassert(6684602,
+                        "Translating Inclusion or Exclusion projection but there's no AST in "
+                        "DocumentSource",
+                        source->hasProjectionAST());
+
+                projection_ast::PathTrackingVisitorContext context;
+                ABTProjectionVisitor visitor(&context, eligible);
+                projection_ast::PathTrackingWalker walker{&context, {&visitor}, {}};
+                tree_walker::walk<true, projection_ast::ASTNode>(source->getProjectionAST()->root(),
+                                                                 &walker);
+            }
+        }
     }
 
     void unsupportedStage(const DocumentSource* source) {
@@ -741,15 +747,10 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
     tree_walker::walk<true, MatchExpression>(expression, &walker);
 
     if (cq.getProj()) {
-        // TODO SERVER-66846 Replace this with ProjectionAST walker
-        auto projExecutor = projection_executor::buildProjectionExecutor(
-            cq.getExpCtx(),
-            cq.getProj(),
-            ProjectionPolicies::findProjectionPolicies(),
-            projection_executor::BuilderParamsBitSet{projection_executor::kDefaultBuilderParams});
-        ABTTransformerVisitor visitor(eligible);
-        TransformerInterfaceWalker walker(&visitor);
-        walker.walk(projExecutor.get());
+        projection_ast::PathTrackingVisitorContext context;
+        ABTProjectionVisitor visitor(&context, eligible);
+        projection_ast::PathTrackingWalker walker{&context, {&visitor}, {}};
+        tree_walker::walk<true, projection_ast::ASTNode>(cq.getProj()->root(), &walker);
     }
 
     return eligible;

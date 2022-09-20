@@ -105,8 +105,19 @@ assertNotSupportedByBonsai({
     cursor: {}
 },
                            false);
+assertNotSupportedByBonsai(
+    {aggregate: coll.getName(), pipeline: [{$project: {'a.b': '$c'}}], cursor: {}}, true);
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, projection: {'a.b': '$c'}}, true);
 
-// Test-only projection spec.
+assertNotSupportedByBonsai(
+    {aggregate: coll.getName(), pipeline: [{$addFields: {a: '$z'}}], cursor: {}}, true);
+
+assertNotSupportedByBonsai(
+    {aggregate: coll.getName(), pipeline: [{$project: {a: {$slice: ["$a", 0, 1]}}}], cursor: {}},
+    false);
+assertNotSupportedByBonsai(
+    {find: coll.getName(), filter: {}, projection: {a: {$slice: ["$a", 0, 1]}}}, false);
+
 assertNotSupportedByBonsai(
     {find: coll.getName(), filter: {}, projection: {a: {$concat: ["test", "-only"]}}}, true);
 assertNotSupportedByBonsai({

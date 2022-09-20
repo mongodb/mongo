@@ -39,6 +39,8 @@
 
 namespace mongo::optimizer {
 
+// TODO: SERVER-68516 remove this file and implement computed projection translation in
+// projection_ast_visitor.h.
 class ABTTransformerVisitor : public TransformerInterfaceConstVisitor {
 public:
     ABTTransformerVisitor(AlgebrizerContext& ctx, FieldMapBuilder& builder)
