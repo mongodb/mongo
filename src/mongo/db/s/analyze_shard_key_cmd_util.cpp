@@ -172,7 +172,8 @@ void runAggregate(OperationContext* opCtx,
                                                        PrivilegeVector(),
                                                        &responseBuilder));
                     succeeded = true;
-                    auto firstBatch = responseBuilder.obj().firstElement()["firstBatch"].Obj();
+                    auto response = responseBuilder.obj();
+                    auto firstBatch = response.firstElement()["firstBatch"].Obj();
                     BSONObjIterator it(firstBatch);
 
                     while (it.more()) {
