@@ -476,6 +476,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'change_stream_options',
+        'change_stream_serverless_helpers',
         'service_context',
     ],
 )
@@ -488,7 +489,9 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+        'change_stream_serverless_helpers',
         'server_base',
+        'server_options_core',
     ],
 )
 

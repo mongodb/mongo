@@ -10,6 +10,9 @@
 (function() {
 "use strict";
 
+// For ChangeStreamMultitenantReplicaSetTest.
+load("jstests/serverless/libs/change_collection_util.js");
+
 // Verifies that the 'getClusterParameter' on the 'changeStreams' cluster-wide parameter returns the
 // expected response.
 function assertGetResponse(db, expectedChangeStreamParam) {
@@ -69,9 +72,7 @@ function testWithoutAdminDB(conn) {
 
 // Tests the set and get change streams parameter on the replica-set.
 {
-    const rst = new ReplSetTest({name: "replSet", nodes: 2});
-    rst.startSet();
-    rst.initiate();
+    const rst = new ChangeStreamMultitenantReplicaSetTest({name: "replSet", nodes: 2});
 
     const primary = rst.getPrimary();
     const secondary = rst.getSecondaries()[0];
@@ -89,7 +90,14 @@ function testWithoutAdminDB(conn) {
 
 // Tests the set and get change streams parameter on the sharded cluster.
 {
-    const st = new ShardingTest({shards: 1, mongos: 1});
+    const st = new ShardingTest({
+        shards: 1,
+        mongos: 1,
+        other: {
+            mongosOptions: {setParameter: {featureFlagServerlessChangeStreams: true}},
+            shardOptions: {setParameter: {featureFlagServerlessChangeStreams: true}}
+        }
+    });
     const adminDB = st.rs0.getPrimary().getDB("admin");
 
     // Test that setClusterParameter cannot be issued directly on shards in the sharded cluster,
@@ -104,5 +112,22 @@ function testWithoutAdminDB(conn) {
     testWithAdminDB(st.s);
 
     st.stop();
+}
+
+// Tests that 'changeStreams.expireAfterSeconds' is only available in serverless.
+{
+    const rst = new ReplSetTest({nodes: 1});
+    rst.startSet({setParameter: {featureFlagServerlessChangeStreams: false}});
+    rst.initiate();
+
+    const primary = rst.getPrimary();
+    const adminDB = primary.getDB("admin");
+
+    assert.commandFailedWithCode(
+        adminDB.runCommand(
+            {setClusterParameter: {changeStreams: {expireAfterSeconds: NumberLong(10)}}}),
+        ErrorCodes.CommandNotSupported);
+
+    rst.stopSet();
 }
 }());

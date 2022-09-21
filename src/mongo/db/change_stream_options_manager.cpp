@@ -32,6 +32,7 @@
 
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_options_parameter_gen.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -131,6 +132,14 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
                     }
                 },
                 [&](const std::int64_t& expireAfterSeconds) {
+                    if (change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+                        validateStatus = {
+                            ErrorCodes::CommandNotSupported,
+                            "The 'changeStreamOptions.preAndPostImages.expireAfterSeconds' is "
+                            "unsupported in serverless, consider using "
+                            "'changeStreams.expireAfterSeconds' instead."};
+                        return;
+                    }
                     if (expireAfterSeconds <= 0) {
                         validateStatus = {
                             ErrorCodes::BadValue,

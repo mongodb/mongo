@@ -16,6 +16,8 @@
  *
  */
 
+load("jstests/libs/feature_flag_util.js");
+
 const testOnlyClusterParameterNames = [
     "testStrClusterParameter",
     "testIntClusterParameter",
@@ -23,6 +25,25 @@ const testOnlyClusterParameterNames = [
 ];
 const nonTestClusterParameterNames = ["changeStreamOptions", "changeStreams"];
 const clusterParameterNames = testOnlyClusterParameterNames.concat(nonTestClusterParameterNames);
+
+// A dictionary to ignore the cluster parameters based on specific criteria. The key is the name of
+// a cluster parameter and the value is a boolean function returning 'true' in cases when the
+// parameter should be ignored.
+const ignoreParametersDict = {
+    changeStreamOptions: function(conn) {
+        return FeatureFlagUtil.isEnabled(conn, "ServerlessChangeStreams");
+    },
+    changeStreams: function(conn) {
+        return !FeatureFlagUtil.isEnabled(conn, "ServerlessChangeStreams");
+    }
+};
+
+function ignoreParameter(paramName, conn) {
+    if (ignoreParametersDict[paramName]) {
+        return ignoreParametersDict[paramName](conn);
+    }
+    return false;
+}
 
 const testOnlyClusterParametersDefault = [
     {
@@ -131,6 +152,9 @@ function setupSharded(st) {
 // Upserts config.clusterParameters document with w:majority via setClusterParameter.
 function runSetClusterParameter(conn, update) {
     const paramName = update._id;
+    if (ignoreParameter(paramName, conn)) {
+        return;
+    }
     let updateCopy = Object.assign({}, update);
     delete updateCopy._id;
     delete updateCopy.clusterParameterTime;
@@ -171,6 +195,9 @@ function runGetClusterParameterNode(conn, getClusterParameterArgs, expectedClust
                 }
                 return sorted;
             }, {});
+        if (ignoreParameter(expectedClusterParameter._id, conn)) {
+            continue;
+        }
         if (bsonWoCompare(sortedExpectedClusterParameter, sortedActualClusterParameter) !== 0) {
             print('expected: ' + tojson(sortedExpectedClusterParameter) +
                   '\nactual: ' + tojson(sortedActualClusterParameter));
