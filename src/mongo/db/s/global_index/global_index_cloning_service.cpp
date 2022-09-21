@@ -85,7 +85,7 @@ void GlobalIndexCloningService::checkIfConflictsWithOtherInstances(
 
 GlobalIndexCloningService::CloningStateMachine::CloningStateMachine(
     ServiceContext* serviceContext,
-    const GlobalIndexCloningService* cloningService,
+    GlobalIndexCloningService* cloningService,
     std::unique_ptr<GlobalIndexCloningService::CloningExternalState> externalState,
     std::unique_ptr<GlobalIndexClonerFetcherFactoryInterface> fetcherFactory,
     GlobalIndexClonerDoc clonerDoc)
@@ -111,32 +111,44 @@ GlobalIndexCloningService::CloningStateMachine::CloningStateMachine(
 SemiFuture<void> GlobalIndexCloningService::CloningStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
-    auto abortToken = _initAbortSource(stepdownToken);
+    auto cleanupToken = _initCleanupToken(stepdownToken);
     _execForCancelableOpCtx->startup();
-    _retryingCancelableOpCtxFactory.emplace(abortToken, _execForCancelableOpCtx);
+    _retryingCancelableOpCtxFactory.emplace(cleanupToken, _execForCancelableOpCtx);
 
     _init(executor);
 
     _readyToCommitPromise.setFrom(ExecutorFuture(**executor)
-                                      .then([this, executor, abortToken] {
-                                          return _persistStateDocument(executor, abortToken);
+                                      .then([this, executor, cleanupToken] {
+                                          return _persistStateDocument(executor, cleanupToken);
                                       })
-                                      .then([this, executor, abortToken] {
-                                          return _runUntilDoneCloning(executor, abortToken);
+                                      .then([this, executor, cleanupToken] {
+                                          return _runUntilDoneCloning(executor, cleanupToken);
                                       })
                                       .unsafeToInlineFuture());
 
     _completionPromise.setFrom(
         _readyToCommitPromise.getFuture()
             .thenRunOn(**executor)
-            .then([this, stepdownToken] {
-                _retryingCancelableOpCtxFactory.emplace(stepdownToken, _execForCancelableOpCtx);
-            })
             .then([this, executor, stepdownToken] {
                 return future_util::withCancellation(_waitForCleanupPromise.getFuture(),
                                                      stepdownToken);
             })
-            .then([this, executor, stepdownToken] { return _cleanup(executor, stepdownToken); })
+            .thenRunOn(_cloningService->getInstanceCleanupExecutor())
+            // The shared_ptr stored in the PrimaryOnlyService's map for the this instance can be
+            // cleared during replication step up. Stashing a shared_ptr to the callback will
+            // ensure that this instance will be kept alive while the callback is being used.
+            .onCompletion([this, cleanupToken, stepdownToken, self = shared_from_this()](
+                              const Status& status) {
+                _retryingCancelableOpCtxFactory.emplace(stepdownToken, _execForCancelableOpCtx);
+
+                auto wasCleanupTriggered = cleanupToken.isCanceled() && !stepdownToken.isCanceled();
+                if (status.isOK() || wasCleanupTriggered) {
+                    return _cleanup(_cloningService->getInstanceCleanupExecutor(), stepdownToken)
+                        .semi();
+                }
+
+                return SemiFuture<void>(status);
+            })
             .unsafeToInlineFuture()
             .tapError([](const Status& status) {
                 LOGV2(6755903,
@@ -147,34 +159,50 @@ SemiFuture<void> GlobalIndexCloningService::CloningStateMachine::run(
     return _completionPromise.getFuture().semi();
 }
 
-void GlobalIndexCloningService::CloningStateMachine::interrupt(Status status) {}
-
-void GlobalIndexCloningService::CloningStateMachine::abort() {
-    stdx::lock_guard<Latch> lk(_mutex);
-    if (_abortSource) {
-        _abortSource->cancel();
-    }
+void GlobalIndexCloningService::CloningStateMachine::interrupt(Status status) {
+    // This service relies on the cancellation of the token from the primary only service and
+    // ignores the interrupts.
 }
 
 ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_cleanup(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& stepdownToken) {
+    std::shared_ptr<executor::TaskExecutor> executor, const CancellationToken& stepdownToken) {
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor, stepdownToken](auto& cancelableFactory) {
-            return ExecutorFuture(**executor)
-                .then([this, executor, stepdownToken, &cancelableFactory] {
+            return ExecutorFuture(executor).then(
+                [this, executor, stepdownToken, &cancelableFactory] {
                     auto opCtx = cancelableFactory.makeOperationContext(&cc());
-                    PersistentTaskStore<GlobalIndexClonerDoc> store(
-                        _cloningService->getStateDocumentsNS());
-                    store.remove(opCtx.get(),
-                                 BSON(GlobalIndexClonerDoc::kIndexCollectionUUIDFieldName
-                                      << _indexCollectionUUID));
+
+                    const BSONObj instanceId(
+                        BSON(GlobalIndexClonerDoc::kIndexCollectionUUIDFieldName
+                             << _indexCollectionUUID));
+
+                    DBDirectClient client(opCtx.get());
+                    auto result = client.remove([&] {
+                        write_ops::DeleteCommandRequest deleteRequest(
+                            _cloningService->getStateDocumentsNS());
+
+                        write_ops::DeleteOpEntry deleteStateDoc;
+                        deleteStateDoc.setQ(instanceId);
+                        deleteStateDoc.setMulti(false);
+                        deleteRequest.setDeletes({deleteStateDoc});
+
+                        return deleteRequest;
+                    }());
+
+                    if (const auto& errorList = result.getWriteErrors()) {
+                        uassertStatusOK(errorList->front().getStatus());
+                    }
+
+                    if (result.getN() != 1) {
+                        // This is to handle cases where the state document hasn't been inserted.
+                        _cloningService->releaseInstance(instanceId, Status::OK());
+                    }
                 });
         })
         .onTransientError([](const auto& status) {})
         .onUnrecoverableError([](const auto& status) {})
         .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, stepdownToken);
+        .on(executor, stepdownToken);
 }
 
 void GlobalIndexCloningService::CloningStateMachine::_init(
@@ -238,8 +266,6 @@ boost::optional<BSONObj> GlobalIndexCloningService::CloningStateMachine::reportF
     return boost::none;
 }
 
-void GlobalIndexCloningService::CloningStateMachine::abort(bool isUserCancelled) {}
-
 void GlobalIndexCloningService::CloningStateMachine::checkIfOptionsConflict(
     const BSONObj& stateDoc) const {
     auto newCloning =
@@ -252,16 +278,22 @@ void GlobalIndexCloningService::CloningStateMachine::checkIfOptionsConflict(
             newCloning.getNss() == _sourceNss && newCloning.getCollectionUUID() == _sourceCollUUID);
 }
 
-CancellationToken GlobalIndexCloningService::CloningStateMachine::_initAbortSource(
+CancellationToken GlobalIndexCloningService::CloningStateMachine::_initCleanupToken(
     const CancellationToken& stepdownToken) {
-    {
+    auto cleanupCalled = ([&] {
         stdx::lock_guard<Latch> lk(_mutex);
-        _abortSource = CancellationSource(stepdownToken);
+        _cleanupSignalSource = CancellationSource(stepdownToken);
+
+        return _cleanupCalled;
+    })();
+
+    if (cleanupCalled) {
+        // cleanup request came in before _cleanupSignalSource was initialized,
+        // so we should cancel it.
+        _cleanupSignalSource->cancel();
     }
 
-    // TODO: SERVER-67563 Handle possible race between _initAbortSource and abort
-
-    return _abortSource->token();
+    return _cleanupSignalSource->token();
 }
 
 ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_persistStateDocument(
@@ -417,13 +449,21 @@ void GlobalIndexCloningService::CloningStateMachine::_ensureCollection(Operation
 }
 
 void GlobalIndexCloningService::CloningStateMachine::cleanup() {
-    stdx::unique_lock lk(_mutex);
+    auto cleanupSource = ([&] {
+        stdx::lock_guard lk(_mutex);
 
-    if (!_waitForCleanupPromise.getFuture().isReady()) {
-        _waitForCleanupPromise.emplaceValue();
+        if (!_waitForCleanupPromise.getFuture().isReady()) {
+            _waitForCleanupPromise.emplaceValue();
+        }
+
+        _cleanupCalled = true;
+
+        return _cleanupSignalSource;
+    })();
+
+    if (cleanupSource) {
+        cleanupSource->cancel();
     }
-
-    // TODO: SERVER-67563 Implement abort
 }
 
 GlobalIndexClonerStateEnum GlobalIndexCloningService::CloningStateMachine::_getState() const {

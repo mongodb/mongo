@@ -82,7 +82,7 @@ class GlobalIndexCloningService::CloningStateMachine final
 public:
     CloningStateMachine(
         ServiceContext* service,
-        const GlobalIndexCloningService* cloningService,
+        GlobalIndexCloningService* cloningService,
         std::unique_ptr<GlobalIndexCloningService::CloningExternalState> externalState,
         std::unique_ptr<GlobalIndexClonerFetcherFactoryInterface> fetcherFactory,
         GlobalIndexClonerDoc clonerDoc);
@@ -91,8 +91,6 @@ public:
                          const CancellationToken& token) noexcept override;
 
     void interrupt(Status status) override;
-
-    void abort();
 
     SharedSemiFuture<void> getReadyToCommitFuture() const {
         return _readyToCommitPromise.getFuture();
@@ -111,11 +109,6 @@ public:
         MongoProcessInterface::CurrentOpSessionsMode) noexcept override;
 
     /**
-     * Initiates the cancellation of the cloning operation.
-     */
-    void abort(bool isUserCancelled);
-
-    /**
      * Tells this cloner to perform cleanup. This can cause this cloner to abort if it is still
      * running.
      */
@@ -128,7 +121,7 @@ private:
      * Initializes the _abortSource and generates a token from it to return back the caller.
      * Should only be called once per lifetime.
      */
-    CancellationToken _initAbortSource(const CancellationToken& stepdownToken);
+    CancellationToken _initCleanupToken(const CancellationToken& stepdownToken);
 
     /**
      * Initializes the necessary components.
@@ -169,7 +162,7 @@ private:
     /**
      * Removes the side collections created by this cloner.
      */
-    ExecutorFuture<void> _cleanup(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    ExecutorFuture<void> _cleanup(std::shared_ptr<executor::TaskExecutor> executor,
                                   const CancellationToken& stepdownToken);
 
     /**
@@ -205,7 +198,7 @@ private:
     ServiceContext* const _serviceContext;  // (TS)
 
     // The primary-only service instance corresponding to the cloner instance. Not owned.
-    const GlobalIndexCloningService* const _cloningService;  // (TS)
+    GlobalIndexCloningService* const _cloningService;  // (TS)
 
     const UUID _indexCollectionUUID;
     const NamespaceString _sourceNss;
@@ -228,7 +221,11 @@ private:
     GlobalIndexClonerMutableState _mutableState;  // (NC)
 
     // Canceled when there is an unrecoverable error or stepdown.
-    boost::optional<CancellationSource> _abortSource;  // (M)
+    boost::optional<CancellationSource> _cleanupSignalSource;  // (M)
+
+    // True if cleanup was called. Main purpose is to act as a stand-in when _abortSource
+    // is not yet initialized.
+    bool _cleanupCalled{false};  // (M)
 
     std::unique_ptr<GlobalIndexClonerFetcherFactoryInterface> _fetcherFactory;  // (TS)
     std::unique_ptr<GlobalIndexClonerFetcherInterface> _fetcher;                // (NC)

@@ -355,7 +355,7 @@ TEST_F(GlobalIndexClonerServiceTest, ShouldBeSafeToRetryOnStepDown) {
     auto prevState = GlobalIndexClonerStateEnum::kUnused;
     for (const auto& nextState : states) {
         LOGV2(6870601,
-              "Testing next state",
+              "Testing step down prior to state",
               "state"_attr = GlobalIndexClonerState_serializer(nextState));
 
         auto cloner = ([&] {
@@ -444,6 +444,35 @@ TEST_F(GlobalIndexClonerServiceTest, ShouldWorkWithEmptyCollection) {
 
     ASSERT_TRUE(doesCollectionExist(rawOpCtx, skipIdNss(doc.getNss(), doc.getIndexName())));
     checkIndexCollection(rawOpCtx);
+}
+
+TEST_F(GlobalIndexClonerServiceTest, CleanupBeforeReadyResultsInAbort) {
+    auto doc = makeStateDocument();
+    auto opCtx = makeOperationContext();
+    auto rawOpCtx = opCtx.get();
+
+    const std::vector<GlobalIndexClonerStateEnum> states{
+        GlobalIndexClonerStateEnum::kCloning, GlobalIndexClonerStateEnum::kReadyToCommit};
+    PauseDuringStateTransitions stateTransitionsGuard{stateTransitionController(), states};
+
+    for (const auto& nextState : states) {
+        LOGV2(6756300,
+              "Testing cleanup abort",
+              "state"_attr = GlobalIndexClonerState_serializer(nextState));
+
+        auto cloner = GlobalIndexStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
+        auto readyToCommitFuture = cloner->getReadyToCommitFuture();
+        auto completionFuture = cloner->getCompletionFuture();
+
+        stateTransitionsGuard.wait(nextState);
+
+        cloner->cleanup();
+
+        ASSERT_THROWS(readyToCommitFuture.get(), DBException);
+        completionFuture.get();
+
+        stateTransitionsGuard.unset(nextState);
+    }
 }
 
 }  // namespace
