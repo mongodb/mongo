@@ -647,6 +647,21 @@ env.CppUnitTest(
     ],
 )
 
+bmEnv = env.Clone()
+bmEnv.InjectThirdParty(libraries=["benchmark"])
+
+bmEnv.Library(
+    target='expression_bm_fixture',
+    source=[
+        'expression_bm_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/third_party/shim_benchmark',
+    ],
+)
+
 env.Benchmark(
     target='expression_bm',
     source=[
@@ -654,7 +669,7 @@ env.Benchmark(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/query_expressions',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/query_expressions', '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'expression_bm_fixture'
     ],
 )

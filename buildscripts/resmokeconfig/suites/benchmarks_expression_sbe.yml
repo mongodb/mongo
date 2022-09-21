@@ -1,0 +1,14 @@
+# This benchmark measures the performance of expressions in SBE.
+test_kind: benchmark_test
+
+selector:
+  root: build/benchmarks.txt
+  include_files:
+    # The trailing asterisk is for handling the .exe extension on Windows.
+    - build/**/system_resource_canary_bm*
+    - build/install/bin/sbe_expression_bm*
+
+executor:
+  config: {}
+  hooks:
+    - class: CombineBenchmarkResults

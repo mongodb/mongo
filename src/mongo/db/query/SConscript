@@ -399,8 +399,8 @@ env.CppUnitTest(
         "sbe_and_sorted_test.cpp",
         "sbe_stage_builder_accumulator_test.cpp",
         "sbe_stage_builder_lookup_test.cpp",
-        "sbe_stage_builder_test_fixture.cpp",
         "sbe_stage_builder_test.cpp",
+        "sbe_stage_builder_test_fixture.cpp",
         "sbe_shard_filter_test.cpp",
         "shard_filterer_factory_mock.cpp",
         "view_response_formatter_test.cpp",
@@ -417,7 +417,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/rpc/rpc",
         "$BUILD_DIR/mongo/util/clock_source_mock",
@@ -430,6 +429,19 @@ env.CppUnitTest(
         "query_planner",
         "query_planner_test_fixture",
         "query_request",
+        "query_test_service_context",
+    ],
+)
+
+env.Benchmark(
+    target="sbe_expression_bm",
+    source=[
+        "sbe_expression_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/pipeline/expression_bm_fixture",
+        "$BUILD_DIR/mongo/db/query_exec",
         "query_test_service_context",
     ],
 )
