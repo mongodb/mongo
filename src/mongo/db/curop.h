@@ -277,9 +277,6 @@ public:
     // Indicates whether this operation used the common query framework (CQF).
     bool cqfUsed{false};
 
-    // Tracks whether an aggregation query has a lookup stage regardless of the engine used.
-    bool pipelineUsesLookup{false};
-
     // Tracks the amount of indexed loop joins in a pushed down lookup stage.
     int indexedLoopJoin{0};
 
