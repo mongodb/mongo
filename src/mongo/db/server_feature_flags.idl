@@ -41,10 +41,6 @@ feature_flags:
             require tenantID to be a part of NamespaceString and TenantDatabase.
         cpp_varname: gFeatureFlagRequireTenantID
         default: false
-    featureFlagOptionalCfgSvr:
-        description: "Optional config server for small clusters"
-        cpp_varname: gFeatureFlagOptionalCfgSvr
-        default: false
     featureFlagConnHealthMetrics:
         description: "Enable newly added cluster connection health metrics"
         cpp_varname: gFeatureFlagConnHealthMetrics
