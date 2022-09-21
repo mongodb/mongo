@@ -1262,7 +1262,7 @@ public:
                 "Eval frame's input slot is not defined",
                 _context->evalStack.topFrame().data().inputSlot);
         auto childInputSlot = *_context->evalStack.topFrame().data().inputSlot;
-        auto [filterSlot, filterStage] = [&]() {
+        auto filterPair = [&]() {
             auto [expr, stage] = _context->evalStack.popFrame();
             auto [predicateSlot, predicateStage] = projectEvalExpr(std::move(expr),
                                                                    std::move(stage),
@@ -1281,13 +1281,16 @@ public:
         // We're using 'kDoNotTraverseLeaf' traverse mode, so we're guaranteed that 'makePredicate'
         // will only be called once, so it's safe to bind the reference to 'filterStage' subtree
         // here.
-        auto makePredicate = std::bind(&elemMatchMakePredicate,
-                                       _context,
-                                       filterSlot,
-                                       std::ref(filterStage),
-                                       childInputSlot,
-                                       _1,
-                                       _2);
+        auto makePredicate =
+            [this, filterSlot = filterPair.first, &filterStage = filterPair.second, childInputSlot](
+                sbe::value::SlotId&& inputSlot, EvalStage&& inputStage) {
+                return elemMatchMakePredicate(_context,
+                                              filterSlot,
+                                              filterStage,
+                                              childInputSlot,
+                                              std::forward<sbe::value::SlotId>(inputSlot),
+                                              std::forward<EvalStage>(inputStage));
+            };
 
         // 'makePredicate' defined above returns a state instead of plain boolean value, so there is
         // no need to use combinator for it.
@@ -1324,22 +1327,25 @@ public:
                                              _context->state.slotIdGenerator,
                                              _context->stateHelper);
 
-        sbe::value::SlotId filterSlot;
-        std::tie(filterSlot, filterStage) = projectEvalExpr(std::move(filterExpr),
-                                                            std::move(filterStage),
-                                                            _context->planNodeId,
-                                                            _context->state.slotIdGenerator);
+        auto filterPair = projectEvalExpr(std::move(filterExpr),
+                                          std::move(filterStage),
+                                          _context->planNodeId,
+                                          _context->state.slotIdGenerator);
 
         // We're using 'kDoNotTraverseLeaf' traverse mode, so we're guaranteed that 'makePredcate'
         // will only be called once, so it's safe to bind the reference to 'filterStage' subtree
         // here.
-        auto makePredicate = std::bind(&elemMatchMakePredicate,
-                                       _context,
-                                       filterSlot,
-                                       std::ref(filterStage),
-                                       childInputSlot,
-                                       _1,
-                                       _2);
+        auto makePredicate =
+            [this, filterSlot = filterPair.first, &filterStage = filterPair.second, childInputSlot](
+                sbe::value::SlotId&& inputSlot, EvalStage&& inputStage) {
+                return elemMatchMakePredicate(_context,
+                                              filterSlot,
+                                              filterStage,
+                                              childInputSlot,
+                                              std::forward<sbe::value::SlotId>(inputSlot),
+                                              std::forward<EvalStage>(inputStage));
+            };
+
 
         // 'makePredicate' defined above returns a state instead of plain boolean value, so there is
         // no need to use combinator for it.
