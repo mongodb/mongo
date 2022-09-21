@@ -144,10 +144,15 @@ public:
         ExclusiveLock(Locker* locker, ResourceMutex mutex)
             : ResourceLock(locker, mutex.getRid(), MODE_X) {}
 
-        // Lock/unlock overloads to allow ExclusiveLock to be used with with stdx::unique_lock and
-        // stdx::condition_variable_any
+        // Lock/unlock overloads to allow ExclusiveLock to be used with condition_variable-like
+        // utilities such as stdx::condition_variable_any and waitForConditionOrInterrupt
 
         void lock() {
+            // The contract of the condition_variable-like utilities is that that the lock is
+            // returned in the locked state so the acquisition below must be guaranteed to always
+            // succeed.
+            invariant(_opCtx);
+            UninterruptibleLockGuard ulg(_opCtx->lockState());
             _lock(MODE_X);
         }
 

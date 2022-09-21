@@ -124,7 +124,7 @@ TaskId PersistentTaskQueue<T>::push(OperationContext* opCtx, const T& t) {
     BSONObjBuilder builder;
 
     {
-        Lock::ExclusiveLock lock(opCtx->lockState(), _mutex);
+        Lock::ExclusiveLock lock(opCtx, _mutex);
 
         uassert(ErrorCodes::Interrupted, "Task queue was closed", !_closed);
 
@@ -148,7 +148,7 @@ TaskId PersistentTaskQueue<T>::pop(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     BSONObjBuilder builder;
 
-    Lock::ExclusiveLock lock(opCtx->lockState(), _mutex);
+    Lock::ExclusiveLock lock(opCtx, _mutex);
 
     uassert(ErrorCodes::Interrupted, "Task queue was closed", !_closed);
 
@@ -170,8 +170,7 @@ TaskId PersistentTaskQueue<T>::pop(OperationContext* opCtx) {
 
 template <typename T>
 const typename BlockingTaskQueue<T>::Record& PersistentTaskQueue<T>::peek(OperationContext* opCtx) {
-    Lock::ExclusiveLock lock(opCtx->lockState(), _mutex);
-
+    Lock::ExclusiveLock lock(opCtx, _mutex);
     opCtx->waitForConditionOrInterrupt(_cv, lock, [this] { return _count > 0 || _closed; });
     uassert(ErrorCodes::Interrupted, "Task queue was closed", !_closed);
 
@@ -184,7 +183,7 @@ const typename BlockingTaskQueue<T>::Record& PersistentTaskQueue<T>::peek(Operat
 
 template <typename T>
 void PersistentTaskQueue<T>::close(OperationContext* opCtx) {
-    Lock::ExclusiveLock lock(opCtx->lockState(), _mutex);
+    Lock::ExclusiveLock lock(opCtx, _mutex);
 
     _closed = true;
     _cv.notify_all();
@@ -192,14 +191,14 @@ void PersistentTaskQueue<T>::close(OperationContext* opCtx) {
 
 template <typename T>
 size_t PersistentTaskQueue<T>::size(OperationContext* opCtx) const {
-    Lock::ExclusiveLock lock(opCtx->lockState(), _mutex);
+    Lock::ExclusiveLock lock(opCtx, _mutex);
 
     return _count;
 }
 
 template <typename T>
 bool PersistentTaskQueue<T>::empty(OperationContext* opCtx) const {
-    Lock::ExclusiveLock lock(opCtx->lockState(), _mutex);
+    Lock::ExclusiveLock lock(opCtx, _mutex);
 
     return _count == 0;
 }
