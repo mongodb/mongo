@@ -25,6 +25,11 @@ function runDistinctExplain(collection, keyString, query) {
     return coll.runCommand({explain: distinctCmd, verbosity: 'executionStats'});
 }
 
+// Ensure db exists (needed for explain to work).
+db.filler_collection.drop();
+assert.commandWorked(db.createCollection("filler_collection"));
+db.filler_collection.drop();
+
 coll.drop();
 
 // Collection doesn't exist.

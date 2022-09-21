@@ -5,8 +5,11 @@
  * ]
  */
 (function() {
+
+// Ensure db exists (needed for explain to work).
 db.filler_collection.drop();
 assert.commandWorked(db.createCollection("filler_collection"));
+db.filler_collection.drop();
 
 var missingColl = db.explain_null_collection;
 
