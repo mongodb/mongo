@@ -75,7 +75,7 @@ public:
     inline static const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
 
 private:
-    void _setFilteringMetadataWithUUID(OperationContext* opCtx, const UUID& uuid);
+    void _setFilteringMetadataByUUID(OperationContext* opCtx, const UUID& uuid);
 
     // Scoped objects
     RAIIServerParameterControllerForTest enableFeatureFlag{"featureFlagRangeDeleterService", true};
@@ -87,14 +87,16 @@ RangeDeletionTask createRangeDeletionTask(const UUID& collectionUUID,
                                           const BSONObj& min,
                                           const BSONObj& max,
                                           CleanWhenEnum whenToClean = CleanWhenEnum::kNow,
-                                          bool pending = true);
+                                          bool pending = true,
+                                          boost::optional<KeyPattern> keyPattern = boost::none);
 
 std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngoingQueries(
     const UUID& collectionUUID,
     const BSONObj& min,
     const BSONObj& max,
     CleanWhenEnum whenToClean = CleanWhenEnum::kNow,
-    bool pending = true);
+    bool pending = true,
+    boost::optional<KeyPattern> keyPattern = boost::none);
 
 SharedSemiFuture<void> registerAndCreatePersistentTask(
     OperationContext* opCtx,
@@ -107,6 +109,9 @@ int insertDocsWithinRange(
 void verifyRangeDeletionTasks(OperationContext* opCtx,
                               UUID uuidColl,
                               std::vector<ChunkRange> expectedChunkRanges);
+
+/* Unset any filtering metadata associated with the specified collection */
+void _clearFilteringMetadataByUUID(OperationContext* opCtx, const UUID& uuid);
 
 // CRUD operation over `config.rangeDeletions`
 void insertRangeDeletionTaskDocument(OperationContext* opCtx, const RangeDeletionTask& rdt);

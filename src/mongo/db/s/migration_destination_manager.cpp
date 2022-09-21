@@ -1283,6 +1283,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             recipientDeletionTask.setPending(true);
             const auto currentTime = VectorClock::get(outerOpCtx)->getTime();
             recipientDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
+            recipientDeletionTask.setKeyPattern(KeyPattern(_shardKeyPattern));
 
             // It is illegal to wait for write concern with a session checked out, so persist the
             // range deletion task with an immediately satsifiable write concern and then wait for

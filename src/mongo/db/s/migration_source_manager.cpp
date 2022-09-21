@@ -289,6 +289,7 @@ void MigrationSourceManager::startClone() {
                              *_collectionUUID,
                              ChunkRange(*_args.getMin(), *_args.getMax()),
                              *_chunkVersion,
+                             KeyPattern(metadata.getKeyPattern()),
                              _args.getWaitForDelete());
 
         _state = kCloning;

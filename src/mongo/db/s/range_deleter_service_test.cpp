@@ -61,13 +61,13 @@ void RangeDeleterServiceTest::setUp() {
         AutoGetCollection autoColl(opCtx, nsCollA, MODE_IX);
         uuidCollA = autoColl.getCollection()->uuid();
         nssWithUuid[uuidCollA] = nsCollA;
-        _setFilteringMetadataWithUUID(opCtx, uuidCollA);
+        _setFilteringMetadataByUUID(opCtx, uuidCollA);
     }
     {
         AutoGetCollection autoColl(opCtx, nsCollB, MODE_IX);
         uuidCollB = autoColl.getCollection()->uuid();
         nssWithUuid[uuidCollB] = nsCollB;
-        _setFilteringMetadataWithUUID(opCtx, uuidCollB);
+        _setFilteringMetadataByUUID(opCtx, uuidCollB);
     }
 
     rangeDeletionTask0ForCollA = createRangeDeletionTaskWithOngoingQueries(
@@ -85,8 +85,8 @@ void RangeDeleterServiceTest::tearDown() {
     ShardServerTestFixture::tearDown();
 }
 
-void RangeDeleterServiceTest::_setFilteringMetadataWithUUID(OperationContext* opCtx,
-                                                            const UUID& uuid) {
+void RangeDeleterServiceTest::_setFilteringMetadataByUUID(OperationContext* opCtx,
+                                                          const UUID& uuid) {
     const OID epoch = OID::gen();
     NamespaceString nss = nssWithUuid[uuid];
 
@@ -746,5 +746,70 @@ TEST_F(RangeDeleterServiceTest, OnlyRemoveDocumentsInRangeToDelete) {
     ASSERT_EQUALS(dbclient.count(nss), numDocsToKeep);
     ASSERT_EQUALS(dbclient.count(NamespaceString::kRangeDeletionNamespace), 0);
 }
+
+TEST_F(RangeDeleterServiceTest, RegisterAndProcessSingleTaskWithKeyPattern) {
+    auto rds = RangeDeleterService::get(opCtx);
+    auto taskWithOngoingQueries =
+        createRangeDeletionTaskWithOngoingQueries(uuidCollA,
+                                                  BSON(kShardKey << 0),
+                                                  BSON(kShardKey << 10),
+                                                  CleanWhenEnum::kNow,
+                                                  false,
+                                                  KeyPattern(kShardKeyPattern));
+
+    auto completionFuture =
+        registerAndCreatePersistentTask(opCtx,
+                                        taskWithOngoingQueries->getTask(),
+                                        taskWithOngoingQueries->getOngoingQueriesFuture());
+
+    // The task can't be processed (hence completed) before ongoing queries drain
+    ASSERT(!completionFuture.isReady());
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+
+    // Make sure deletion can proceed even without filtering metadata
+    _clearFilteringMetadataByUUID(opCtx, uuidCollA);
+
+    // Pretend ongoing queries have drained and check task is processed
+    taskWithOngoingQueries->drainOngoingQueries();
+    completionFuture.get(opCtx);
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+}  // namespace mongo
+
+TEST_F(RangeDeleterServiceTest, PerformActualRangeDeletionWithKeyPattern) {
+    auto rds = RangeDeleterService::get(opCtx);
+    auto taskWithOngoingQueries =
+        createRangeDeletionTaskWithOngoingQueries(uuidCollA,
+                                                  BSON(kShardKey << 0),
+                                                  BSON(kShardKey << 10),
+                                                  CleanWhenEnum::kNow,
+                                                  false,
+                                                  KeyPattern(kShardKeyPattern));
+    auto nss = nssWithUuid[uuidCollA];
+    DBDirectClient dbclient(opCtx);
+
+    insertDocsWithinRange(opCtx, nss, 0, 10, 10);
+    ASSERT_EQUALS(dbclient.count(nss, BSONObj()), 10);
+
+    auto completionFuture =
+        registerAndCreatePersistentTask(opCtx,
+                                        taskWithOngoingQueries->getTask(),
+                                        taskWithOngoingQueries->getOngoingQueriesFuture());
+
+    // The task can't be processed (hence completed) before ongoing queries drain
+    ASSERT(!completionFuture.isReady());
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQUALS(dbclient.count(NamespaceString::kRangeDeletionNamespace), 1);
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {taskWithOngoingQueries->getTask().getRange()});
+
+    // Make sure deletion can proceed even without filtering metadata
+    _clearFilteringMetadataByUUID(opCtx, uuidCollA);
+
+    // Pretend ongoing queries have drained and check task is processed
+    taskWithOngoingQueries->drainOngoingQueries();
+    completionFuture.get(opCtx);
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQUALS(dbclient.count(nss), 0);
+
+}  // namespace mongo
 
 }  // namespace mongo

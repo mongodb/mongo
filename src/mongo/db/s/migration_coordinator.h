@@ -49,6 +49,7 @@ public:
                          UUID collectionUuid,
                          ChunkRange range,
                          ChunkVersion preMigrationChunkVersion,
+                         const KeyPattern& shardKeyPattern,
                          bool waitForDelete);
 
     MigrationCoordinator(const MigrationCoordinatorDocument& doc);
@@ -123,6 +124,7 @@ private:
     void _waitForReleaseRecipientCriticalSectionFutureIgnoreShardNotFound(OperationContext* opCtx);
 
     MigrationCoordinatorDocument _migrationInfo;
+    boost::optional<KeyPattern> _shardKeyPattern;
     bool _waitForDelete = false;
     boost::optional<ExecutorFuture<void>> _releaseRecipientCriticalSectionFuture;
 };

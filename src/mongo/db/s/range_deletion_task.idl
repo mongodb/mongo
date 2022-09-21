@@ -34,6 +34,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/keypattern.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/s/chunk_range.idl"
@@ -85,3 +86,7 @@ structs:
                 type: safeInt64
                 description: "The estimated number of orphaned documents in the range"
                 default: 0
+            keyPattern:
+                type: KeyPattern
+                description: "The shard key pattern at the moment the range deletion task was created"
+                optional: true

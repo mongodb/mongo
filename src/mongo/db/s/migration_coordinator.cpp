@@ -75,6 +75,7 @@ MigrationCoordinator::MigrationCoordinator(MigrationSessionId sessionId,
                                            UUID collectionUuid,
                                            ChunkRange range,
                                            ChunkVersion preMigrationChunkVersion,
+                                           const KeyPattern& shardKeyPattern,
                                            bool waitForDelete)
     : _migrationInfo(UUID::gen(),
                      std::move(sessionId),
@@ -86,6 +87,7 @@ MigrationCoordinator::MigrationCoordinator(MigrationSessionId sessionId,
                      std::move(recipientShard),
                      std::move(range),
                      std::move(preMigrationChunkVersion)),
+      _shardKeyPattern(shardKeyPattern),
       _waitForDelete(waitForDelete) {}
 
 MigrationCoordinator::MigrationCoordinator(const MigrationCoordinatorDocument& doc)
@@ -122,6 +124,7 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
                                         _waitForDelete ? CleanWhenEnum::kNow
                                                        : CleanWhenEnum::kDelayed);
     donorDeletionTask.setPending(true);
+    donorDeletionTask.setKeyPattern(*_shardKeyPattern);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     donorDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
     migrationutil::persistRangeDeletionTaskLocally(

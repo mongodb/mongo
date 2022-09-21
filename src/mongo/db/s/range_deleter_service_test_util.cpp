@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/range_deleter_service_test.h"
 
 namespace mongo {
@@ -57,7 +59,8 @@ RangeDeletionTask createRangeDeletionTask(const UUID& collectionUUID,
                                           const BSONObj& min,
                                           const BSONObj& max,
                                           CleanWhenEnum whenToClean,
-                                          bool pending) {
+                                          bool pending,
+                                          boost::optional<KeyPattern> keyPattern) {
     RangeDeletionTask rdt;
     rdt.setId(UUID::gen());
     rdt.setNss(RangeDeleterServiceTest::nssWithUuid[collectionUUID]);
@@ -66,6 +69,8 @@ RangeDeletionTask createRangeDeletionTask(const UUID& collectionUUID,
     rdt.setRange(ChunkRange(min, max));
     rdt.setWhenToClean(whenToClean);
     rdt.setPending(pending);
+    rdt.setKeyPattern(keyPattern);
+
     return rdt;
 }
 
@@ -74,9 +79,10 @@ std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngo
     const BSONObj& min,
     const BSONObj& max,
     CleanWhenEnum whenToClean,
-    bool pending) {
+    bool pending,
+    boost::optional<KeyPattern> keyPattern) {
     return std::make_shared<RangeDeletionWithOngoingQueries>(
-        createRangeDeletionTask(collectionUUID, min, max, whenToClean, pending));
+        createRangeDeletionTask(collectionUUID, min, max, whenToClean, pending, keyPattern));
 }
 
 // TODO review this method: the task may be registered, finish and be recreated by inserting the
@@ -172,6 +178,13 @@ void verifyRangeDeletionTasks(OperationContext* opCtx,
             << "Expected " << ChunkRange::fromBSONThrowing(chunkRanges[i].Obj()).toBSON()
             << " == " << expectedChunkRanges[i].toBSON();
     }
+}
+
+void _clearFilteringMetadataByUUID(OperationContext* opCtx, const UUID& uuid) {
+    NamespaceString nss = RangeDeleterServiceTest::nssWithUuid[uuid];
+
+    AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
+    CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
 }
 
 }  // namespace mongo

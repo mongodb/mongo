@@ -320,7 +320,8 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
             .then([this,
                    dbName = rdt.getNss().dbName(),
                    collectionUuid = rdt.getCollectionUuid(),
-                   range = rdt.getRange()]() {
+                   range = rdt.getRange(),
+                   optKeyPattern = rdt.getKeyPattern()]() {
                 return withTemporaryOperationContext(
                     [&](OperationContext* opCtx) {
                         // A task is considered completed when all the following conditions are met:
@@ -344,10 +345,16 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
                                             "range"_attr = redact(range.toString()));
 
                                         auto shardKeyPattern =
-                                            getShardKeyPattern(opCtx, dbName, collectionUuid);
+                                            (optKeyPattern ? *optKeyPattern
+                                                           : getShardKeyPattern(
+                                                                 opCtx, dbName, collectionUuid));
 
-                                        uassertStatusOK(deleteRangeInBatches(
-                                            opCtx, dbName, collectionUuid, shardKeyPattern, range));
+                                        uassertStatusOK(
+                                            deleteRangeInBatches(opCtx,
+                                                                 dbName,
+                                                                 collectionUuid,
+                                                                 shardKeyPattern.toBSON(),
+                                                                 range));
                                         orphansRemovalCompleted = true;
                                     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                                         // No orphaned documents to remove from a dropped collection
