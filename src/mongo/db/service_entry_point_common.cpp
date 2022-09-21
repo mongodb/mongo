@@ -1793,16 +1793,10 @@ Future<void> ExecCommandDatabase::_commandExec() {
                 auto sce = s.extraInfo<StaleDbRoutingVersion>();
                 invariant(sce);
 
-                if (sce->getCriticalSectionSignal()) {
-                    // The shard is in a critical section, so we cannot retry locally
-                    OperationShardingState::waitForCriticalSectionToComplete(
-                        opCtx, *sce->getCriticalSectionSignal())
-                        .ignore();
-                    return s;
-                }
+                bool stableLocalVersion =
+                    !sce->getCriticalSectionSignal() && sce->getVersionWanted();
 
-                if (sce->getVersionWanted() &&
-                    sce->getVersionReceived() < sce->getVersionWanted()) {
+                if (stableLocalVersion && sce->getVersionReceived() < sce->getVersionWanted()) {
                     // The shard is recovered and the router is staler than the shard, so we cannot
                     // retry locally
                     return s;
@@ -1811,7 +1805,8 @@ Future<void> ExecCommandDatabase::_commandExec() {
                 const auto refreshed = _execContext->behaviors->refreshDatabase(opCtx, *sce);
                 if (refreshed) {
                     _refreshedDatabase = true;
-                    if (!opCtx->isContinuingMultiDocumentTransaction()) {
+                    if (!opCtx->isContinuingMultiDocumentTransaction() &&
+                        !sce->getCriticalSectionSignal()) {
                         _resetLockerStateAfterShardingUpdate(opCtx);
                         return _commandExec();
                     }

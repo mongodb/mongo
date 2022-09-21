@@ -101,16 +101,10 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
                   "Failed to handle stale version exception as part of the current operation",
                   "error"_attr = redact(handleMismatchStatus));
     } else if (auto staleInfo = status->extraInfo<StaleDbRoutingVersion>()) {
-        if (staleInfo->getCriticalSectionSignal()) {
-            // The shard is in a critical section
-            OperationShardingState::waitForCriticalSectionToComplete(
-                _opCtx, *staleInfo->getCriticalSectionSignal())
-                .ignore();
-            return;
-        }
+        bool stableLocalVersion =
+            !staleInfo->getCriticalSectionSignal() && staleInfo->getVersionWanted();
 
-        if (staleInfo->getVersionWanted() &&
-            staleInfo->getVersionReceived() < staleInfo->getVersionWanted()) {
+        if (stableLocalVersion && staleInfo->getVersionReceived() < staleInfo->getVersionWanted()) {
             // Shard is recovered and the router is staler than the shard
             return;
         }
