@@ -32,6 +32,7 @@
 #include <functional>  // std::greater
 
 #include "mongo/db/query/optimizer/utils/ce_math.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::ce {
 
@@ -44,6 +45,9 @@ bool validCardinality(CEType card) {
 }
 
 SelectivityType conjExponentialBackoff(std::vector<SelectivityType> conjSelectivities) {
+    uassert(6749501,
+            "The array of conjunction selectivities may not be empty.",
+            !conjSelectivities.empty());
     size_t actualMaxBackoffElements = std::min(conjSelectivities.size(), kMaxBackoffElements);
     std::partial_sort(conjSelectivities.begin(),
                       conjSelectivities.begin() + actualMaxBackoffElements,
@@ -60,6 +64,9 @@ SelectivityType conjExponentialBackoff(std::vector<SelectivityType> conjSelectiv
 }
 
 SelectivityType disjExponentialBackoff(std::vector<SelectivityType> disjSelectivities) {
+    uassert(6749502,
+            "The array of disjunction selectivities may not be empty.",
+            !disjSelectivities.empty());
     size_t actualMaxBackoffElements = std::min(disjSelectivities.size(), kMaxBackoffElements);
     std::partial_sort(disjSelectivities.begin(),
                       disjSelectivities.begin() + actualMaxBackoffElements,

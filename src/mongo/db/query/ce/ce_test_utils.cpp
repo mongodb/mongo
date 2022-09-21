@@ -134,6 +134,10 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
 
     ASSERT_NOT_EQUALS(outCard, kInvalidCardinality);
 
+    if constexpr (kCETestLogOnly) {
+        std::cout << "CE: " << outCard << std::endl;
+    }
+
     return outCard;
 }
 

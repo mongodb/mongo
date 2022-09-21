@@ -73,17 +73,28 @@ const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
 
 #define _ASSERT_MATCH_CE(ce, predicate, expectedCE)                        \
     if constexpr (kCETestLogOnly) {                                        \
-        ce.getCE(predicate);                                               \
+        if (std::abs(ce.getCE(predicate) - expectedCE) > kMaxCEError) {    \
+            std::cout << "ERROR: expected " << expectedCE << std::endl;    \
+        }                                                                  \
         ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError);                        \
     } else {                                                               \
         ASSERT_APPROX_EQUAL(expectedCE, ce.getCE(predicate), kMaxCEError); \
     }
+#define _PREDICATE(field, predicate) (str::stream() << "{" << field << ": " << predicate "}")
+#define _ELEMMATCH_PREDICATE(field, predicate) \
+    (str::stream() << "{" << field << ": {$elemMatch: " << predicate << "}}")
 
+// This macro verifies the cardinality of a pipeline with a single $match predicate.
 #define ASSERT_MATCH_CE(ce, predicate, expectedCE) _ASSERT_MATCH_CE(ce, predicate, expectedCE)
 
 #define ASSERT_MATCH_CE_CARD(ce, predicate, expectedCE, collCard) \
     ce.setCollCard(collCard);                                     \
     ASSERT_MATCH_CE(ce, predicate, expectedCE)
+
+// This macro tests cardinality of two versions of the predicate; with and without $elemMatch.
+#define ASSERT_EQ_ELEMMATCH_CE(tester, expectedCE, elemMatchExpectedCE, field, predicate) \
+    ASSERT_MATCH_CE(tester, _PREDICATE(field, predicate), expectedCE);                    \
+    ASSERT_MATCH_CE(tester, _ELEMMATCH_PREDICATE(field, predicate), elemMatchExpectedCE)
 
 /**
  * A test utility class for helping verify the cardinality of CE transports on a given $match

@@ -38,12 +38,17 @@
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 
+#include "mongo/db/pipeline/abt/utils.h"
+
 namespace mongo::optimizer::cascades {
 
 using namespace properties;
 
 namespace {
-// This transport combines chains of PathGets and PathTraverses into an MQL-like string path.
+
+/**
+ * This transport combines chains of PathGets and PathTraverses into an MQL-like string path.
+ */
 class PathDescribeTransport {
 public:
     std::string transport(const optimizer::PathTraverse& /*node*/, std::string childResult) {
@@ -75,12 +80,15 @@ std::string serializePath(const optimizer::ABT& path) {
     auto str = optimizer::algebra::transport<false>(path, pdt);
     return str;
 }
+
 }  // namespace
 
 class CEHistogramTransportImpl {
 public:
     CEHistogramTransportImpl(std::shared_ptr<ce::CollectionStatistics> stats)
-        : _heuristicCE(), _stats(stats) {}
+        : _heuristicCE(),
+          _stats(stats),
+          _arrayOnlyInterval(*defaultConvertPathToInterval(make<PathArr>())) {}
 
     ~CEHistogramTransportImpl() {}
 
@@ -91,6 +99,18 @@ public:
                      CEType /*bindResult*/) {
         return _stats->getCardinality();
     }
+
+    /**
+     * This struct is used to track an intermediate representation of the intervals in the
+     * requirements map. In particular, grouping intervals along each path in the map allows us to
+     * determine which paths should be estimated as $elemMatches without relying on a particular
+     * order of entries in the requirements map.
+     */
+    struct SargableConjunct {
+        bool includeScalar;
+        const ce::ArrayHistogram& histogram;
+        std::vector<std::reference_wrapper<const IntervalReqExpr::Node>> intervals;
+    };
 
     CEType transport(const ABT& n,
                      const SargableNode& node,
@@ -104,13 +124,32 @@ public:
             return 0.0;
         }
 
-        std::vector<double> topLevelSelectivities;
+        // Initial first pass through the requirements map to extract information about each path.
+        std::map<std::string, SargableConjunct> conjunctRequirements;
         for (const auto& [key, req] : node.getReqMap()) {
-            std::vector<double> disjSelectivities;
-            auto path = serializePath(key._path.ref());
+            const auto serializedPath = serializePath(key._path.ref());
+            const auto& interval = req.getIntervals();
+            const bool isPathArrInterval =
+                (_arrayOnlyInterval == interval) && !pathEndsInTraverse(key._path.ref());
+
+            // Check if we have already seen this path.
+            if (auto conjunctIt = conjunctRequirements.find({serializedPath});
+                conjunctIt != conjunctRequirements.end()) {
+                auto& conjunctReq = conjunctIt->second;
+                if (isPathArrInterval) {
+                    // We should estimate this path's intervals using $elemMatch semantics.
+                    // Don't push back the interval for estimation; instead, we use it to change how
+                    // we estimate other intervals along this path.
+                    conjunctReq.includeScalar = false;
+                } else {
+                    // We will need to estimate this interval.
+                    conjunctReq.intervals.push_back(interval);
+                }
+                continue;
+            }
 
             // Fallback to heuristic if no histogram.
-            auto histogram = _stats->getHistogram(path);
+            auto histogram = _stats->getHistogram(serializedPath);
             if (!histogram) {
                 // For now, because of the structure of SargableNode and the implementation of
                 // HeuristicCE, we can't combine heuristic & histogram estimates. In this case,
@@ -118,30 +157,56 @@ public:
                 return _heuristicCE.deriveCE(memo, logicalProps, n.ref());
             }
 
-            // Intervals are in DNF.
-            const auto intervalDNF = req.getIntervals();
-            const auto disjuncts = intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes();
-            for (const auto& disjunct : disjuncts) {
-                const auto& conjuncts = disjunct.cast<IntervalReqExpr::Conjunction>()->nodes();
+            // Add this path to the map. If this is not a 'PathArr' interval, add it to the vector
+            // of intervals we will be estimating.
+            SargableConjunct sc{!isPathArrInterval, *histogram, {}};
+            if (sc.includeScalar) {
+                sc.intervals.push_back(interval);
+            }
+            conjunctRequirements.emplace(serializedPath, std::move(sc));
+        }
 
-                std::vector<double> conjSelectivities;
-                for (const auto& conjunct : conjuncts) {
-                    const auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
-                    auto cardinality =
-                        ce::estimateIntervalCardinality(*histogram, interval, childResult);
+        std::vector<double> topLevelSelectivities;
+        for (const auto& [_, conjunctReq] : conjunctRequirements) {
+            const CEType totalCard = _stats->getCardinality();
 
-                    // We have to convert the cardinality to a selectivity. The histogram returns
-                    // the cardinality for the entire collection; however, fewer records may be
-                    // expected at the SargableNode.
-                    conjSelectivities.push_back(cardinality / _stats->getCardinality());
-                }
-
-                auto backoff = ce::conjExponentialBackoff(std::move(conjSelectivities));
-                disjSelectivities.push_back(backoff);
+            if (conjunctReq.intervals.empty() && !conjunctReq.includeScalar) {
+                // TODO SERVER-69795: handle the case where we have a single 'PathArr' interval for
+                // this field by returning the number of arrays we expect in the output based on
+                // histogram type counters.
+                topLevelSelectivities.push_back(1.0);
             }
 
-            auto backoff = ce::disjExponentialBackoff(std::move(disjSelectivities));
-            topLevelSelectivities.push_back(backoff);
+            // Intervals are in DNF.
+            for (const IntervalReqExpr::Node& intervalDNF : conjunctReq.intervals) {
+                std::vector<double> disjSelectivities;
+
+                const auto disjuncts = intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes();
+                for (const auto& disjunct : disjuncts) {
+                    const auto& conjuncts = disjunct.cast<IntervalReqExpr::Conjunction>()->nodes();
+
+                    std::vector<double> conjSelectivities;
+                    for (const auto& conjunct : conjuncts) {
+                        const auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
+                        auto cardinality =
+                            ce::estimateIntervalCardinality(conjunctReq.histogram,
+                                                            interval,
+                                                            childResult,
+                                                            conjunctReq.includeScalar);
+
+                        // We have to convert the cardinality to a selectivity. The histogram
+                        // returns the cardinality for the entire collection; however, fewer records
+                        // may be expected at the SargableNode.
+                        conjSelectivities.push_back(cardinality / totalCard);
+                    }
+
+                    auto backoff = ce::conjExponentialBackoff(std::move(conjSelectivities));
+                    disjSelectivities.push_back(backoff);
+                }
+
+                auto backoff = ce::disjExponentialBackoff(std::move(disjSelectivities));
+                topLevelSelectivities.push_back(backoff);
+            }
         }
 
         // The elements of the PartialSchemaRequirements map represent an implicit conjunction.
@@ -177,6 +242,10 @@ public:
 private:
     HeuristicCE _heuristicCE;
     std::shared_ptr<ce::CollectionStatistics> _stats;
+
+    // This is a special interval indicating that we expect to use $elemMatch semantics when
+    // estimating the current path.
+    const IntervalReqExpr::Node _arrayOnlyInterval;
 };
 
 CEHistogramTransport::CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats)

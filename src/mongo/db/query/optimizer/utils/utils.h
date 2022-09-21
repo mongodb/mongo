@@ -346,5 +346,9 @@ ABT lowerIntervals(PrefixId& prefixId,
                    CEType scanGroupCE,
                    NodeCEMap& nodeCEMap);
 
+/**
+ * This helper checks to see if we have a PathTraverse + PathId at the end of the path.
+ */
+bool pathEndsInTraverse(const optimizer::ABT& path);
 
 }  // namespace mongo::optimizer

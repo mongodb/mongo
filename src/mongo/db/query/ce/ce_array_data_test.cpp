@@ -172,28 +172,28 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysSmall10Buckets) {
     for (const auto q : querySet) {
         // $match query, includeScalar = true.
         double estCard = estimateCardRange(arrHist,
-                                           true,
-                                           false,
+                                           false /* lowInclusive */,
                                            value::TypeTags::NumberInt32,
                                            sbe::value::bitcastFrom<int32_t>(q.low),
-                                           false,
+                                           false /* highInclusive */,
                                            value::TypeTags::NumberInt32,
-                                           sbe::value::bitcastFrom<int32_t>(q.high));
+                                           sbe::value::bitcastFrom<int32_t>(q.high),
+                                           true /* includeScalar */);
         ASSERT_APPROX_EQUAL(estCard, q.estMatch, 0.1);
 
         // $elemMatch query, includeScalar = false.
         estCard = estimateCardRange(arrHist,
-                                    false,
-                                    false,
+                                    false /* lowInclusive */,
                                     value::TypeTags::NumberInt32,
                                     sbe::value::bitcastFrom<int32_t>(q.low),
-                                    false,
+                                    false /* highInclusive */,
                                     value::TypeTags::NumberInt32,
-                                    sbe::value::bitcastFrom<int32_t>(q.high));
+                                    sbe::value::bitcastFrom<int32_t>(q.high),
+                                    false /* includeScalar */);
         ASSERT_APPROX_EQUAL(estCard, q.estElemMatch, 0.1);
     }
-    std::cout << computeRMSE(querySet, false) << std::endl;
-    std::cout << computeRMSE(querySet, true) << std::endl;
+    std::cout << computeRMSE(querySet, false /* isElemMatch */) << std::endl;
+    std::cout << computeRMSE(querySet, true /* isElemMatch */) << std::endl;
 }
 
 TEST(EstimatorArrayDataTest, Histogram1000ArraysLarge10Buckets) {
@@ -258,28 +258,28 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysLarge10Buckets) {
     for (const auto q : querySet) {
         // $match query, includeScalar = true.
         double estCard = estimateCardRange(arrHist,
-                                           true,
-                                           false,
+                                           false /* lowInclusive */,
                                            value::TypeTags::NumberInt32,
                                            sbe::value::bitcastFrom<int32_t>(q.low),
-                                           false,
+                                           false /* highInclusive */,
                                            value::TypeTags::NumberInt32,
-                                           sbe::value::bitcastFrom<int32_t>(q.high));
+                                           sbe::value::bitcastFrom<int32_t>(q.high),
+                                           true /* includeScalar */);
         ASSERT_APPROX_EQUAL(estCard, q.estMatch, 0.1);
 
         // $elemMatch query, includeScalar = false.
         estCard = estimateCardRange(arrHist,
-                                    false,
-                                    false,
+                                    false /* lowInclusive */,
                                     value::TypeTags::NumberInt32,
                                     sbe::value::bitcastFrom<int32_t>(q.low),
-                                    false,
+                                    false /* highInclusive */,
                                     value::TypeTags::NumberInt32,
-                                    sbe::value::bitcastFrom<int32_t>(q.high));
+                                    sbe::value::bitcastFrom<int32_t>(q.high),
+                                    false /* includeScalar */);
         ASSERT_APPROX_EQUAL(estCard, q.estElemMatch, 0.1);
     }
-    std::cout << computeRMSE(querySet, false) << std::endl;
-    std::cout << computeRMSE(querySet, true) << std::endl;
+    std::cout << computeRMSE(querySet, false /* isElemMatch */) << std::endl;
+    std::cout << computeRMSE(querySet, true /* isElemMatch */) << std::endl;
 }
 }  // namespace
 }  // namespace mongo::ce

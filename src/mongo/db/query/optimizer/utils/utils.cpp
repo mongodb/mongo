@@ -1854,4 +1854,29 @@ ABT lowerIntervals(PrefixId& prefixId,
     return lowerTransport.lower(intervals);
 }
 
+/**
+ * Checks if a path ends in a Traverse + PathId.
+ */
+class PathEndsInTraverseId {
+public:
+    bool transport(const optimizer::PathTraverse& node, bool childResult) {
+        return node.getPath().is<PathIdentity>() ? true : childResult;
+    }
+    bool transport(const optimizer::PathGet& /*node*/, bool childResult) {
+        return childResult;
+    }
+    bool transport(const optimizer::PathIdentity& /*node*/) {
+        return false;
+    }
+    template <typename T, typename... Ts>
+    bool transport(const T& node, Ts&&... /* args */) {
+        uasserted(6749500, "Unexpected node in transport to check if path is $elemMatch.");
+    }
+};
+
+bool pathEndsInTraverse(const optimizer::ABT& path) {
+    PathEndsInTraverseId t;
+    return optimizer::algebra::transport<false>(path, t);
+}
+
 }  // namespace mongo::optimizer

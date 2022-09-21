@@ -67,25 +67,17 @@ struct TestBucket {
     int ndv = 1; /* ndv including bucket boundary*/
 };
 
-std::unique_ptr<ArrayHistogram> getHistogramFromData(std::vector<TestBucket> testBuckets) {
+ScalarHistogram getHistogramFromData(std::vector<TestBucket> testBuckets) {
     sbe::value::Array bounds;
     std::vector<Bucket> buckets;
-    TypeCounts typeCounts;
 
     int cumulativeFreq = 0;
     int cumulativeNDV = 0;
     for (auto b : testBuckets) {
         // Add bucket boundary value to bounds.
-        auto sbeVal = stage_builder::makeValue(b.val);
-        auto [tag, val] = sbeVal;
+        auto [tag, val] = stage_builder::makeValue(b.val);
         bounds.push_back(tag, val);
 
-        // Increment count of values for each type tag.
-        if (auto it = typeCounts.find(tag); it != typeCounts.end()) {
-            it->second += b.equalFreq + b.rangeFreq;
-        } else {
-            typeCounts[tag] = b.equalFreq + b.rangeFreq;
-        }
         cumulativeFreq += b.equalFreq + b.rangeFreq;
         cumulativeNDV += b.ndv;
 
@@ -97,8 +89,43 @@ std::unique_ptr<ArrayHistogram> getHistogramFromData(std::vector<TestBucket> tes
                              cumulativeNDV);
     }
 
-    return std::make_unique<ArrayHistogram>(ScalarHistogram(std::move(bounds), std::move(buckets)),
-                                            std::move(typeCounts));
+    return ScalarHistogram(std::move(bounds), std::move(buckets));
+}
+
+TypeCounts getTypeCountsFromData(std::vector<TestBucket> testBuckets) {
+    TypeCounts typeCounts;
+    for (const auto& b : testBuckets) {
+        // Add bucket boundary value to bounds.
+        auto sbeVal = stage_builder::makeValue(b.val);
+        auto [tag, val] = sbeVal;
+
+        // Increment count of values for each type tag.
+        if (auto it = typeCounts.find(tag); it != typeCounts.end()) {
+            it->second += b.equalFreq + b.rangeFreq;
+        } else {
+            typeCounts[tag] = b.equalFreq + b.rangeFreq;
+        }
+    }
+    return typeCounts;
+}
+
+std::unique_ptr<ArrayHistogram> getArrayHistogramFromData(std::vector<TestBucket> testBuckets) {
+    return std::make_unique<ArrayHistogram>(getHistogramFromData(testBuckets),
+                                            getTypeCountsFromData(testBuckets));
+}
+
+std::unique_ptr<ArrayHistogram> getArrayHistogramFromData(
+    std::vector<TestBucket> scalarBuckets,
+    std::vector<TestBucket> arrayUniqueBuckets,
+    std::vector<TestBucket> arrayMinBuckets,
+    std::vector<TestBucket> arrayMaxBuckets,
+    TypeCounts arrayTypeCounts) {
+    return std::make_unique<ArrayHistogram>(getHistogramFromData(scalarBuckets),
+                                            getTypeCountsFromData(scalarBuckets),
+                                            getHistogramFromData(arrayUniqueBuckets),
+                                            getHistogramFromData(arrayMinBuckets),
+                                            getHistogramFromData(arrayMaxBuckets),
+                                            std::move(arrayTypeCounts));
 }
 
 TEST(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
@@ -110,7 +137,7 @@ TEST(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
     // equal to "ing".
     const std::string& str = "ing";
     collStats->addHistogram("a",
-                            getHistogramFromData({
+                            getArrayHistogramFromData({
                                 {Value(1), 3 /* frequency */},
                                 {Value(str), 5 /* frequency */},
                             }));
@@ -166,7 +193,7 @@ TEST(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
 
     // Construct a histogram with three int buckets for field 'a'.
     collStats->addHistogram("a",
-                            getHistogramFromData({
+                            getArrayHistogramFromData({
                                 {Value(1), 3 /* frequency */},
                                 {Value(2), 5 /* frequency */},
                                 {Value(3), 1 /* frequency */},
@@ -174,7 +201,7 @@ TEST(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
 
     // Construct a histogram with two int buckets for field 'b'.
     collStats->addHistogram("b",
-                            getHistogramFromData({
+                            getArrayHistogramFromData({
                                 {Value(22), 3 /* frequency */},
                                 {Value(33), 6 /* frequency */},
                             }));
@@ -223,7 +250,8 @@ TEST(CEHistogramTest, SanityTestEmptyHistogram) {
     ASSERT_MATCH_CE(t, "{other: {$eq: \"anything\"}, empty: {$eq: 1.0}}", 0.0);
 }
 
-TEST(CEHistogramTest, AssertOneBucketOneIntHistogram) {
+TEST(CEHistogramTest, TestOneBucketOneIntHistogram) {
+    const auto collName = "test";
     const auto collCardinality = 50;
 
     std::shared_ptr<CollectionStatistics> collStats(new CollectionStatisticsMock(collCardinality));
@@ -231,7 +259,7 @@ TEST(CEHistogramTest, AssertOneBucketOneIntHistogram) {
     // Create a histogram with a single bucket that contains exactly one int (42) with a frequency
     // of 50 (equal to the collection cardinality).
     collStats->addHistogram("soloInt",
-                            getHistogramFromData({
+                            getArrayHistogramFromData({
                                 {Value(42), collCardinality /* frequency */},
                             }));
 
@@ -272,23 +300,20 @@ TEST(CEHistogramTest, AssertOneBucketOneIntHistogram) {
     ASSERT_MATCH_CE(t, "{soloInt: {$gte: 41}, soloInt: {$lte: 43}}", collCardinality);
 
     // Check against different types.
-    // TODO: investigate why this returns 5?
-    // ASSERT_MATCH_CE(t, "{soloInt: {$eq: [42]}}", 0.0);
-    // TODO: investigate why this line triggers an out of memory exception.
-    // ASSERT_MATCH_CE(t, "{soloInt: {$eq: {soloInt: 42}}}", 0.0);
     ASSERT_MATCH_CE(t, "{soloInt: {$eq: \"42\"}}", 0.0);
     ASSERT_MATCH_CE(t, "{soloInt: {$lt: \"42\"}}", 0.0);
     ASSERT_MATCH_CE(t, "{soloInt: {$lt: 42.1}}", collCardinality);
 }
 
-TEST(CEHistogramTest, AssertOneBoundIntRangeHistogram) {
+TEST(CEHistogramTest, TestOneBoundIntRangeHistogram) {
+    const auto collName = "test";
     const auto collCardinality = 51;
 
     std::shared_ptr<CollectionStatistics> collStats(new CollectionStatisticsMock(collCardinality));
 
     collStats->addHistogram(
         "intRange",
-        getHistogramFromData({
+        getArrayHistogramFromData({
             {Value(10), 5 /* frequency */},
             {Value(20), 1 /* frequency */, 45 /* range frequency */, 10 /* ndv */},
         }));
@@ -391,11 +416,11 @@ TEST(CEHistogramTest, TestHistogramOnNestedPaths) {
     // Create a histogram with a single bucket that contains exactly one int (42) with a frequency
     // of 50 (equal to the collection cardinality).
     collStats->addHistogram("path",
-                            getHistogramFromData({
+                            getArrayHistogramFromData({
                                 {Value(42), collCardinality /* frequency */},
                             }));
     collStats->addHistogram("a.histogram.path",
-                            getHistogramFromData({
+                            getArrayHistogramFromData({
                                 {Value(42), collCardinality /* frequency */},
                             }));
 
@@ -405,6 +430,298 @@ TEST(CEHistogramTest, TestHistogramOnNestedPaths) {
     ASSERT_MATCH_CE(t, "{\"a.histogram.path\": {$eq: 42}}", collCardinality);
     ASSERT_MATCH_CE(
         t, "{\"a.histogram.path.with.no.histogram\": {$eq: 42}}", 7.071 /* heuristic */);
+
+    // TODO SERVER-68596: this doesn't generate a SargableNode. When it does, it should return 0.0.
+    // Currently, this estimate falls back to heuristic CE.
+    ASSERT_MATCH_CE(t, "{\"a.histogram.path\": {$elemMatch: {$eq: 42}}}", 6.21);
+}
+
+TEST(CEHistogramTest, TestArrayHistogramOnAtomicPredicates) {
+    const auto collName = "test";
+    const auto collCardinality = 6;
+
+    std::shared_ptr<CollectionStatistics> collStats(new CollectionStatisticsMock(collCardinality));
+
+    collStats->addHistogram(
+        "a",
+        // Generate a histogram for this data:
+        // {a: 1}, {a: 2}, {a: [1, 2, 3, 2, 2]}, {a: [10]}, {a: [2, 3, 3, 4, 5, 5, 6]}, {a: []}
+        //  - scalars: [1, 2]
+        //  - unique values: [1], [2], [1, 2, 3], [10], [2, 3, 4, 5, 6]
+        //      -> [1, 1, 2, 2, 2, 3, 3, 4, 5, 6, 10]
+        //  - min values: [1], [10], [2] -> [1, 1, 2, 2, 10]
+        //  - max values: [3], [10], [6] -> [1, 2, 3, 6, 10]
+        getArrayHistogramFromData(
+            {// Scalar buckets.
+             {Value(1), 1 /* frequency */},
+             {Value(2), 1 /* frequency */}},
+            {
+                // Array unique buckets.
+                {Value(1), 1 /* frequency */},
+                {Value(2), 2 /* frequency */},
+                {Value(3), 2 /* frequency */},
+                {Value(4), 1 /* frequency */},
+                {Value(5), 1 /* frequency */},
+                {Value(6), 1 /* frequency */},
+                {Value(10), 1 /* frequency */},
+            },
+            {
+                // Array min buckets.
+                {Value(1), 1 /* frequency */},
+                {Value(2), 1 /* frequency */},
+                {Value(10), 1 /* frequency */},
+            },
+            {
+                // Array max buckets.
+                {Value(3), 1 /* frequency */},
+                {Value(6), 1 /* frequency */},
+                {Value(10), 1 /* frequency */},
+            },
+            {{sbe::value::TypeTags::NumberInt32, 4}}  // Array type counts.
+            ));
+
+    CEHistogramTester t(collName, collCardinality, collStats);
+
+    // Test simple predicates against 'a'. Note: in the $elemMatch case, we exclude scalar
+    // estimates. Without $elemMatch, we add the array histogram and scalar histogram estimates
+    // together.
+
+    // Test equality predicates.
+    ASSERT_EQ_ELEMMATCH_CE(t, 0.0 /* CE */, 0.0 /* $elemMatch CE */, "a", "{$eq: 0}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.0 /* CE */, 1.0 /* $elemMatch CE */, "a", "{$eq: 1}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 3.0 /* CE */, 2.0 /* $elemMatch CE */, "a", "{$eq: 2}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.0 /* CE */, 2.0 /* $elemMatch CE */, "a", "{$eq: 3}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 1.0 /* CE */, 1.0 /* $elemMatch CE */, "a", "{$eq: 4}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 1.0 /* CE */, 1.0 /* $elemMatch CE */, "a", "{$eq: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 1.0 /* CE */, 1.0 /* $elemMatch CE */, "a", "{$eq: 6}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 1.0 /* CE */, 1.0 /* $elemMatch CE */, "a", "{$eq: 10}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 0.0 /* CE */, 0.0 /* $elemMatch CE */, "a", "{$eq: 11}");
+
+    // Test histogram boundary values.
+    ASSERT_EQ_ELEMMATCH_CE(t, 0.0 /* CE */, 0.0 /* $elemMatch CE */, "a", "{$lt: 1}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.0 /* CE */, 1.0 /* $elemMatch CE */, "a", "{$lte: 1}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 0.0 /* CE */, 0.0 /* $elemMatch CE */, "a", "{$gt: 10}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 1.0 /* CE */, 1.0 /* $elemMatch CE */, "a", "{$gte: 10}");
+
+    ASSERT_EQ_ELEMMATCH_CE(t, 5.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lte: 10}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lt: 10}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gt: 1}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 5.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gte: 1}");
+
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lte: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lt: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.0 /* CE */, 2.0 /* $elemMatch CE */, "a", "{$gt: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.0 /* CE */, 2.41 /* $elemMatch CE */, "a", "{$gte: 5}");
+
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.45 /* CE */, 2.41 /* $elemMatch CE */, "a", "{$gt: 2, $lt: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 3.27 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gte: 2, $lt: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.45 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gt: 2, $lte: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 3.27 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gte: 2, $lte: 5}");
+}
+
+TEST(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
+    const auto collName = "test";
+    const auto collCardinality = 175;
+
+    std::shared_ptr<CollectionStatistics> collStats(new CollectionStatisticsMock(collCardinality));
+
+    // A scalar histogram with values in the range [1,10], most of which are in the middle bucket.
+    collStats->addHistogram(
+        "scalar",
+        getArrayHistogramFromData({
+            {Value(1), 10 /* frequency */},
+            {Value(2), 10 /* frequency */},
+            {Value(3), 20 /* frequency */, 120 /* range frequency */, 5 /* ndv */},
+            {Value(8), 5 /* frequency */, 10 /* range frequency */, 3 /* ndv */},
+        }));
+
+    // An array histogram built on the following arrays with 35 occurrences of each:
+    //  [[1, 2, 3], [5, 5, 5, 5, 5], [6], [], [8, 9, 10]]
+    collStats->addHistogram(
+        "array",
+        getArrayHistogramFromData(
+            {/* No scalar buckets. */},
+            {
+                // Array unique buckets.
+                {Value(1), 35 /* frequency */},
+                {Value(2), 35 /* frequency */, 35 /* range frequency */, 2 /* ndv */},
+                {Value(5), 35 /* frequency */},
+                {Value(6), 35 /* frequency */, 105 /* range frequency */, 4 /* ndv */},
+            },
+            {
+                // Array min buckets.
+                {Value(1), 35 /* frequency */},
+                {Value(5), 35 /* frequency */},
+                {Value(6), 35 /* frequency */},
+                {Value(8), 35 /* frequency */},
+            },
+            {
+                // Array max buckets.
+                {Value(3), 35 /* frequency */},
+                {Value(5), 35 /* frequency */},
+                {Value(6), 35 /* frequency */},
+                {Value(10), 35 /* frequency */},
+            },
+            {{sbe::value::TypeTags::NumberInt32, collCardinality}}  // Array type counts.
+            ));
+
+    collStats->addHistogram(
+        "mixed",
+        // The mixed histogram has 87 scalars that follow approximately the same distribution as
+        // in the pure scalar case, and 88 arrays with the following distribution:
+        //  [{[1, 2, 3]: 17}, {[5, 5, 5, 5, 5]: 17}, {[6]: 17}, {[]: 20}, {[8, 9, 10]: 17}]
+        getArrayHistogramFromData(
+            {
+                // Scalar buckets.
+                {Value(1), 5 /* frequency */},
+                {Value(2), 5 /* frequency */},
+                {Value(3), 10 /* frequency */, 60 /* range frequency */, 5 /* ndv */},
+                {Value(8), 2 /* frequency */, 5 /* range frequency */, 3 /* ndv */},
+            },
+            {
+                // Array unique buckets.
+                {Value(1), 17 /* frequency */, 34 /* range frequency */, 3 /* ndv */},
+                {Value(5), 17 /* frequency */},
+                {Value(6), 17 /* frequency */, 51 /* range frequency */, 4 /* ndv */},
+            },
+            {
+                // Array min buckets.
+                {Value(1), 17 /* frequency */},
+                {Value(5), 17 /* frequency */},
+                {Value(6), 17 /* frequency */},
+                {Value(8), 17 /* frequency */},
+            },
+            {
+                // Array max buckets.
+                {Value(3), 17 /* frequency */},
+                {Value(5), 17 /* frequency */},
+                {Value(6), 17 /* frequency */},
+                {Value(10), 17 /* frequency */},
+            },
+            {{sbe::value::TypeTags::NumberInt32, 88}}  // Array type counts.
+            ));
+
+    CEHistogramTester t(collName, collCardinality, collStats);
+
+    // Test cardinality of individual predicates.
+    ASSERT_EQ_ELEMMATCH_CE(t, 5.0 /* CE */, 0.0 /* $elemMatch CE */, "scalar", "{$eq: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 35.0 /* CE */, 35.0 /* $elemMatch CE */, "array", "{$eq: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 19.5 /* CE */, 17.0 /* $elemMatch CE */, "mixed", "{$eq: 5}");
+
+    // Test cardinality of predicate combinations; the following tests make sure we correctly track
+    // which paths have $elemMatches and which don't. Some notes:
+    //  - Whenever we use 'scalar' + $elemMatch, we expect an estimate of 0 because $elemMatch never
+    // returns documents on non-array paths.
+    //  - Whenever we use 'mixed' + $elemMatch, we expect the estimate to decrease because we omit
+    // scalar values in 'mixed' from our estimate.
+    //  - We do not expect the estimate on 'array' to be affected by the presence of $elemMatch,
+    // since we only have array values for this field.
+
+    // Composite predicate on 'scalar' and 'array' fields.
+    ASSERT_MATCH_CE(t, "{scalar: {$eq: 5}, array: {$eq: 5}}", 2.236);
+    ASSERT_MATCH_CE(t, "{scalar: {$eq: 5}, array: {$elemMatch: {$eq: 5}}}", 2.236);
+    ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$eq: 5}}, array: {$eq: 5}}", 0.0);
+
+    // Composite predicate on 'mixed' and 'array' fields.
+    ASSERT_MATCH_CE(t, "{mixed: {$eq: 5}, array: {$eq: 5}}", 8.721);
+    ASSERT_MATCH_CE(t, "{mixed: {$eq: 5}, array: {$elemMatch: {$eq: 5}}}", 8.721);
+    ASSERT_MATCH_CE(t, "{mixed: {$elemMatch: {$eq: 5}}, array: {$eq: 5}}", 7.603);
+
+    // Composite predicate on 'scalar' and 'mixed' fields.
+    ASSERT_MATCH_CE(t, "{scalar: {$eq: 5}, mixed: {$eq: 5}}", 1.669);
+    ASSERT_MATCH_CE(t, "{scalar: {$eq: 5}, mixed: {$elemMatch: {$eq: 5}}}", 1.559);
+    ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$eq: 5}}, mixed: {$eq: 5}}", 0.0);
+
+    // Composite predicate on all three fields without '$elemMatch' on 'array'.
+    ASSERT_MATCH_CE(t, "{scalar: {$eq: 5}, mixed: {$eq: 5}, array: {$eq: 5}}", 1.116);
+    ASSERT_MATCH_CE(t, "{scalar: {$eq: 5}, mixed: {$elemMatch: {$eq: 5}}, array: {$eq: 5}}", 1.042);
+    ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$eq: 5}}, mixed: {$eq: 5}, array: {$eq: 5}}", 0.0);
+
+    // Composite predicate on all three fields with '$elemMatch' on 'array' (same expected results
+    // as above).
+    ASSERT_MATCH_CE(t, "{scalar: {$eq: 5}, mixed: {$eq: 5}, array: {$elemMatch: {$eq: 5}}}", 1.116);
+
+    // Test case where the same path has both $match and $elemMatch (same as $elemMatch case).
+    ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$eq: 5}}, scalar: {$eq: 5}}", 0.0);
+    ASSERT_MATCH_CE(t, "{mixed: {$elemMatch: {$eq: 5}}, mixed: {$eq: 5}}", 17.0);
+    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$eq: 5}}, array: {$eq: 5}}", 35.0);
+
+    // Test case with multiple predicates and ranges.
+    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$lt: 5}}", 67.88);
+    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$gt: 5}}", 28.19);
+
+    // Test multiple $elemMatches.
+    ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$eq: 5}}, array: {$elemMatch: {$eq: 5}}}", 0.0);
+    ASSERT_MATCH_CE(t, "{mixed: {$elemMatch: {$eq: 5}}, array: {$elemMatch: {$eq: 5}}}", 7.603);
+    ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$eq: 5}}, mixed: {$elemMatch: {$eq: 5}}}", 0.0);
+    ASSERT_MATCH_CE(
+        t, "{scalar: {$elemMatch: {$eq: 5}}, mixed: {$elemMatch: {$eq: 5}}, array: {$eq: 5}}", 0.0);
+    ASSERT_MATCH_CE(
+        t,
+        "{scalar: {$eq: 5}, mixed: {$elemMatch: {$eq: 5}}, array: {$elemMatch: {$eq: 5}}}",
+        1.042);
+    ASSERT_MATCH_CE(
+        t, "{scalar: {$elemMatch: {$eq: 5}}, mixed: {$eq: 5}, array: {$elemMatch: {$eq: 5}}}", 0.0);
+    ASSERT_MATCH_CE(t,
+                    "{scalar: {$elemMatch: {$eq: 5}}, mixed: {$elemMatch: {$eq: 5}}, array: "
+                    "{$elemMatch: {$eq: 5}}}",
+                    0.0);
+    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$elemMatch: {$lt: 5}}}", 32.09);
+    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$elemMatch: {$gt: 5}}}", 42.78);
+
+    // Verify that we still return an estimate of 0.0 for any $elemMatch predicate on a scalar
+    // field when we have a non-multikey index.
+    t.setIndexes({{"aScalarIndex",
+                   makeIndexDefinition("scalar", CollationOp::Ascending, /* isMultiKey */ false)}});
+    ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$eq: 5}}}", 0.0);
+    ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$gt: 1, $lt: 10}}}", 0.0);
+}
+
+TEST(CEHistogramTest, TestMixedElemMatchAndNonElemMatch) {
+    const auto collName = "test";
+    const auto collCardinality = 1;
+
+    std::shared_ptr<CollectionStatistics> collStats(new CollectionStatisticsMock(collCardinality));
+
+    // A very simple histogram encoding a collection with one document {a: [3, 10]}.
+    collStats->addHistogram("a",
+                            getArrayHistogramFromData({/* No scalar buckets. */},
+                                                      {
+                                                          // Array unique buckets.
+                                                          {Value(3), 1 /* frequency */},
+                                                          {Value(10), 1 /* frequency */},
+                                                      },
+                                                      {
+                                                          // Array min buckets.
+                                                          {Value(3), 1 /* frequency */},
+                                                      },
+                                                      {
+                                                          // Array max buckets.
+                                                          {Value(10), 1 /* frequency */},
+                                                      },
+                                                      {{sbe::value::TypeTags::NumberInt32,
+                                                        collCardinality}}  // Array type counts.
+                                                      ));
+
+    CEHistogramTester t(collName, collCardinality, collStats);
+
+    // Tests without indexes.
+    ASSERT_MATCH_CE(t, "{a: {$elemMatch: {$gt: 3, $lt: 10}}}", 0.0);
+    ASSERT_MATCH_CE(t, "{a: {$gt: 3, $lt: 10}}", 1.0);
+    ASSERT_MATCH_CE(t, "{a: {$elemMatch: {$eq: 3}, $gt: 3, $lt: 10}}", 1.0);
+    ASSERT_MATCH_CE(t, "{a: {$gt: 3, $lt: 10, $elemMatch: {$eq: 3}}}", 1.0);
+    ASSERT_MATCH_CE(t, "{a: {$gt: 3, $lt: 10, $elemMatch: {$gt: 3, $lt: 10}}}", 0.0);
+    ASSERT_MATCH_CE(t, "{a: {$elemMatch: {$gt: 3, $lt: 10}, $gt: 3, $lt: 10}}", 0.0);
+
+    // Tests with multikey index (note that the index on "a" must be multikey due to arrays).
+    t.setIndexes(
+        {{"anIndex", makeIndexDefinition("a", CollationOp::Ascending, /* isMultiKey */ true)}});
+    ASSERT_MATCH_CE(t, "{a: {$elemMatch: {$gt: 3, $lt: 10}}}", 0.0);
+    ASSERT_MATCH_CE(t, "{a: {$gt: 3, $lt: 10}}", 1.0);
+    ASSERT_MATCH_CE(t, "{a: {$elemMatch: {$eq: 3}, $gt: 3, $lt: 10}}", 1.0);
+    ASSERT_MATCH_CE(t, "{a: {$gt: 3, $lt: 10, $elemMatch: {$eq: 3}}}", 1.0);
+    ASSERT_MATCH_CE(t, "{a: {$gt: 3, $lt: 10, $elemMatch: {$gt: 3, $lt: 10}}}", 0.0);
+    ASSERT_MATCH_CE(t, "{a: {$elemMatch: {$gt: 3, $lt: 10}, $gt: 3, $lt: 10}}", 0.0);
 }
 
 }  // namespace

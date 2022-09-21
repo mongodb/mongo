@@ -74,13 +74,17 @@ EstimationResult estimate(const ScalarHistogram& h,
  */
 double estimateIntervalCardinality(const ArrayHistogram& estimator,
                                    const optimizer::IntervalRequirement& interval,
-                                   optimizer::CEType inputCardinality);
+                                   optimizer::CEType inputCardinality,
+                                   bool includeScalar);
 
 /**
  * Estimates the cardinality of an equality predicate given an ArrayHistogram and an SBE value and
  * type tag pair.
  */
-double estimateCardEq(const ArrayHistogram& ah, sbe::value::TypeTags tag, sbe::value::Value val);
+double estimateCardEq(const ArrayHistogram& ah,
+                      sbe::value::TypeTags tag,
+                      sbe::value::Value val,
+                      bool includeScalar);
 
 /**
  * Estimates the cardinality of a range predicate given an ArrayHistogram and a range predicate.
@@ -88,13 +92,13 @@ double estimateCardEq(const ArrayHistogram& ah, sbe::value::TypeTags tag, sbe::v
  * values. The other fields define the range of the estimation.
  */
 double estimateCardRange(const ArrayHistogram& ah,
-                         bool includeScalar,
                          bool lowInclusive,
                          sbe::value::TypeTags tagLow,
                          sbe::value::Value valLow,
                          bool highInclusive,
                          sbe::value::TypeTags tagHigh,
                          sbe::value::Value valHigh,
+                         bool includeScalar,
                          EstimationAlgo estAlgo = EstimationAlgo::HistogramV2);
 
 }  // namespace mongo::ce

@@ -184,11 +184,17 @@ EstimationResult estimate(const ScalarHistogram& h,
     }
 }
 
-double estimateCardEq(const ArrayHistogram& ah, value::TypeTags tag, value::Value val) {
+double estimateCardEq(const ArrayHistogram& ah,
+                      value::TypeTags tag,
+                      value::Value val,
+                      bool includeScalar) {
     if (tag != value::TypeTags::Null) {
-        double card = estimate(ah.getScalar(), tag, val, EstimationType::kEqual).card;
+        double card = 0.0;
+        if (includeScalar) {
+            card = estimate(ah.getScalar(), tag, val, EstimationType::kEqual).card;
+        }
         if (ah.isArray()) {
-            return card + estimate(ah.getArrayUnique(), tag, val, EstimationType::kEqual).card;
+            card += estimate(ah.getArrayUnique(), tag, val, EstimationType::kEqual).card;
         }
         return card;
     } else {
@@ -251,7 +257,6 @@ static EstimationResult estimateRangeQueryOnArray(const ScalarHistogram& histogr
 }
 
 double estimateCardRange(const ArrayHistogram& ah,
-                         bool includeScalar,
                          /* Define lower bound. */
                          bool lowInclusive,
                          value::TypeTags tagLow,
@@ -260,6 +265,7 @@ double estimateCardRange(const ArrayHistogram& ah,
                          bool highInclusive,
                          value::TypeTags tagHigh,
                          value::Value valHigh,
+                         bool includeScalar,
                          EstimationAlgo estimationAlgo) {
     uassert(6695701,
             "Low bound must not be higher than high",
@@ -335,7 +341,8 @@ double estimateCardRange(const ArrayHistogram& ah,
 
 double estimateIntervalCardinality(const ce::ArrayHistogram& ah,
                                    const optimizer::IntervalRequirement& interval,
-                                   optimizer::CEType childResult) {
+                                   optimizer::CEType childResult,
+                                   bool includeScalar) {
     auto getBound = [](const optimizer::BoundRequirement& boundReq) {
         return boundReq.getBound().cast<optimizer::Constant>()->get();
     };
@@ -344,7 +351,7 @@ double estimateIntervalCardinality(const ce::ArrayHistogram& ah,
         return childResult;
     } else if (interval.isEquality()) {
         auto [tag, val] = getBound(interval.getLowBound());
-        return estimateCardEq(ah, tag, val);
+        return estimateCardEq(ah, tag, val, includeScalar);
     }
 
     // Otherwise, we have a range.
@@ -355,13 +362,13 @@ double estimateIntervalCardinality(const ce::ArrayHistogram& ah,
     auto [highTag, highVal] = getBound(highBound);
 
     return estimateCardRange(ah,
-                             true /*includeScalar*/,
                              lowBound.isInclusive(),
                              lowTag,
                              lowVal,
                              highBound.isInclusive(),
                              highTag,
-                             highVal);
+                             highVal,
+                             includeScalar);
 }
 
 }  // namespace mongo::ce

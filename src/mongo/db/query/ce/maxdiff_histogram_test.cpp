@@ -207,7 +207,7 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
 
         const auto [tag, val] = makeInt64Value(2);
         value::ValueGuard vg(tag, val);
-        const double expectedCard = estimateCardEq(estimator, tag, val);
+        const double expectedCard = estimateCardEq(estimator, tag, val, true /* includeScalar */);
 
         ASSERT_APPROX_EQUAL(4.0, expectedCard, kTolerance);
         ASSERT_EQ(4, actualCard);
@@ -220,13 +220,13 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         const auto [tag, val] = makeInt64Value(3);
         value::ValueGuard vg(tag, val);
         const double expectedCard = estimateCardRange(estimator,
-                                                      true /*includeScalar*/,
                                                       false /*lowInclusive*/,
                                                       value::TypeTags::MinKey,
                                                       0,
                                                       false /*highInclusive*/,
                                                       tag,
-                                                      val);
+                                                      val,
+                                                      true /* includeScalar */);
 
         ASSERT_APPROX_EQUAL(4.6667, expectedCard, kTolerance);
         ASSERT_EQ(6, actualCard);
@@ -242,13 +242,13 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         value::ValueGuard vgHigh(highTag, highVal);
 
         const double expectedCard = estimateCardRange(estimator,
-                                                      false /*includeScalar*/,
                                                       false /*lowInclusive*/,
                                                       lowTag,
                                                       lowVal,
                                                       false /*highInclusive*/,
                                                       highTag,
-                                                      highVal);
+                                                      highVal,
+                                                      false /* includeScalar */);
 
         ASSERT_APPROX_EQUAL(1.76505, expectedCard, kTolerance);
         ASSERT_EQ(3, actualCard);

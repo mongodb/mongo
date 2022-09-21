@@ -282,31 +282,57 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
 
     // Type bracketing: low value of different type than the bucket bound.
     // Query: [{$match: {a: {$eq: 100000000}}}].
-    expectedCard = estimateCardEq(arrHist, lowTag, lowVal);
+    expectedCard = estimateCardEq(arrHist, lowTag, lowVal, true /* includeScalar */);
     ASSERT_APPROX_EQUAL(0.0, expectedCard, 0.1);  // Actual: 0.
 
     // No interpolation for inequality to values inside the first string bucket, fallback to half of
     // the bucket frequency.
 
     // Query: [{$match: {a: {$lt: '04e'}}}].
-    expectedCard = estimateCardRange(arrHist, true, false, lowTag, lowVal, false, tag, value);
+    expectedCard = estimateCardRange(arrHist,
+                                     false /* lowInclusive */,
+                                     lowTag,
+                                     lowVal,
+                                     false /* highInclusive */,
+                                     tag,
+                                     value,
+                                     true /* includeScalar */);
     ASSERT_APPROX_EQUAL(13.3, expectedCard, 0.1);  // Actual: 0.
 
     // Query: [{$match: {a: {$lte: '04e'}}}].
-    expectedCard = estimateCardRange(
-        arrHist, true, false, lowTag, lowVal, true /* highInclusive */, tag, value);
+    expectedCard = estimateCardRange(arrHist,
+                                     false /* lowInclusive */,
+                                     lowTag,
+                                     lowVal,
+                                     true /* highInclusive */,
+                                     tag,
+                                     value,
+                                     true /* includeScalar */);
     ASSERT_APPROX_EQUAL(15.5, expectedCard, 0.1);  // Actual: 3.
 
     // Value towards the end of the bucket gets the same half bucket estimate.
     std::tie(tag, value) = value::makeNewString("8B5"_sd);
 
     // Query: [{$match: {a: {$lt: '8B5'}}}].
-    expectedCard = estimateCardRange(arrHist, true, false, lowTag, lowVal, false, tag, value);
+    expectedCard = estimateCardRange(arrHist,
+                                     false /* lowInclusive */,
+                                     lowTag,
+                                     lowVal,
+                                     false /* highInclusive */,
+                                     tag,
+                                     value,
+                                     true /* includeScalar */);
     ASSERT_APPROX_EQUAL(13.3, expectedCard, 0.1);  // Actual: 24.
 
     // Query: [{$match: {a: {$lte: '8B5'}}}].
-    expectedCard = estimateCardRange(
-        arrHist, true, false, lowTag, lowVal, true /* highInclusive */, tag, value);
+    expectedCard = estimateCardRange(arrHist,
+                                     false /* lowInclusive */,
+                                     lowTag,
+                                     lowVal,
+                                     true /* highInclusive */,
+                                     tag,
+                                     value,
+                                     true /* includeScalar */);
     ASSERT_APPROX_EQUAL(15.5, expectedCard, 0.1);  // Actual: 29.
 }
 
@@ -351,14 +377,27 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
     value::Value highVal = 600;
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 600}}}}].
-    double expectedCard =
-        estimateCardRange(arrHist, false, false, lowTag, lowVal, false, highTag, highVal);
+    double expectedCard = estimateCardRange(arrHist,
+                                            false /* lowInclusive */,
+                                            lowTag,
+                                            lowVal,
+                                            false /* highInclusive */,
+                                            highTag,
+                                            highVal,
+                                            false /* includeScalar */);
     ASSERT_APPROX_EQUAL(27.0, expectedCard, 0.1);  // actual 21.
 
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 600}}}].
     // Note: although there are no scalars, the estimate is different than the
     // above since we use different formulas.
-    expectedCard = estimateCardRange(arrHist, true, false, lowTag, lowVal, false, highTag, highVal);
+    expectedCard = estimateCardRange(arrHist,
+                                     false /* lowInclusive */,
+                                     lowTag,
+                                     lowVal,
+                                     false /* highInclusive */,
+                                     highTag,
+                                     highVal,
+                                     true /* includeScalar */);
     ASSERT_APPROX_EQUAL(92.0, expectedCard, 0.1);  // actual 92.
 
     // Query at the end of the domain: more precise estimates from ArrayMin, ArrayMax histograms.
@@ -366,12 +405,25 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
     highVal = 110;
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 10, $lt: 110}}}}].
-    expectedCard =
-        estimateCardRange(arrHist, false, false, lowTag, lowVal, false, highTag, highVal);
+    expectedCard = estimateCardRange(arrHist,
+                                     false /* lowInclusive */,
+                                     lowTag,
+                                     lowVal,
+                                     false /* highInclusive */,
+                                     highTag,
+                                     highVal,
+                                     false /* includeScalar */);
     ASSERT_APPROX_EQUAL(24.1, expectedCard, 0.1);  // actual 29.
 
     // Test interpolation for query: [{$match: {a: {$gt: 10, $lt: 110}}}].
-    expectedCard = estimateCardRange(arrHist, true, false, lowTag, lowVal, false, highTag, highVal);
+    expectedCard = estimateCardRange(arrHist,
+                                     false /* lowInclusive */,
+                                     lowTag,
+                                     lowVal,
+                                     false /* highInclusive */,
+                                     highTag,
+                                     highVal,
+                                     true /* includeScalar */);
     ASSERT_APPROX_EQUAL(27.8, expectedCard, 0.1);  // actual 31.
 }
 
@@ -422,13 +474,25 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
     value::Value highVal = 550;
 
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 550}}}].
-    double expectedCard =
-        estimateCardRange(arrHist, true, false, lowTag, lowVal, false, highTag, highVal);
+    double expectedCard = estimateCardRange(arrHist,
+                                            false /* lowInclusive */,
+                                            lowTag,
+                                            lowVal,
+                                            false /* highInclusive */,
+                                            highTag,
+                                            highVal,
+                                            true /* includeScalar */);
     ASSERT_APPROX_EQUAL(90.9, expectedCard, 0.1);  // Actual: 94.
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 550}}}}].
-    expectedCard =
-        estimateCardRange(arrHist, false, false, lowTag, lowVal, false, highTag, highVal);
+    expectedCard = estimateCardRange(arrHist,
+                                     false /* lowInclusive */,
+                                     lowTag,
+                                     lowVal,
+                                     false /* highInclusive */,
+                                     highTag,
+                                     highVal,
+                                     false /* includeScalar */);
     ASSERT_APPROX_EQUAL(11.0, expectedCard, 0.1);  // Actual: 8.
 }
 
