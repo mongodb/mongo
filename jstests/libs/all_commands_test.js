@@ -63,8 +63,8 @@ const AllCommandsTest = (function() {
             }
 
             // Run logic specified by caller.
-            jsTestName("Testing " + command);
-            testFn(test);
+            jsTestLog("Testing " + command);
+            testFn(test, conn);
         }
     }
 
