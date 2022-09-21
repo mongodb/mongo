@@ -109,6 +109,12 @@ reshardingTest.withReshardingInBackground(
             const idx = reshardCollectionJoinedFailPointsList.findIndex(fp => fp.conn.host ===
                                                                             configsvrPrimary.host);
             reshardCollectionJoinedFailPointsList[idx].wait();
+
+            // Wait for secondaries to recover and catchup with primary before turning off the
+            // failpoints as a replication roll back can disconnect the test client.
+            const configRS = reshardingTest.getReplSetForShard(reshardingTest.configShardName);
+            configRS.awaitSecondaryNodes();
+            configRS.awaitReplication();
             reshardCollectionJoinedFailPointsList.forEach(fp => fp.off());
             shardsvrAbortReshardCollectionFailpoint.off();
         },
