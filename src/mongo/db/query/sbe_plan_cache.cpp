@@ -43,8 +43,8 @@ const auto sbePlanCacheDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<sbe::PlanCache>>();
 
 size_t convertToSizeInBytes(const plan_cache_util::PlanCacheSizeParameter& param) {
-    constexpr size_t kBytesInMB = 1014 * 1024;
-    constexpr size_t kMBytesInGB = 1014;
+    constexpr size_t kBytesInMB = 1024 * 1024;
+    constexpr size_t kMBytesInGB = 1024;
 
     double sizeInMB = param.size;
 
