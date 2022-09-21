@@ -43,6 +43,7 @@
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
@@ -319,9 +320,39 @@ public:
         return *_tla;
     }
 
+    void setUpHangDuringAcceptingFirstConnection() {
+        _hangDuringAcceptTimesEntered = _hangDuringAccept.setMode(FailPoint::alwaysOn);
+    }
+
+    void waitForHangDuringAcceptingFirstConnection() {
+        _hangDuringAccept.waitForTimesEntered(_hangDuringAcceptTimesEntered + 1);
+    }
+
+    void waitForHangDuringAcceptingNextConnection() {
+        _hangBeforeAcceptTimesEntered = _hangBeforeAccept.setMode(FailPoint::alwaysOn);
+        _hangDuringAccept.setMode(FailPoint::off);
+        _hangBeforeAccept.waitForTimesEntered(_hangBeforeAcceptTimesEntered + 1);
+
+        _hangDuringAcceptTimesEntered = _hangDuringAccept.setMode(FailPoint::alwaysOn);
+        _hangBeforeAccept.setMode(FailPoint::off);
+        _hangDuringAccept.waitForTimesEntered(_hangDuringAcceptTimesEntered + 1);
+    }
+
+    void stopHangDuringAcceptingConnection() {
+        _hangDuringAccept.setMode(FailPoint::off);
+    }
+
 private:
+    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagConnHealthMetrics",
+                                                                true};
     std::unique_ptr<transport::TransportLayerASIO> _tla;
     MockSEP _sep;
+
+    FailPoint& _hangBeforeAccept = transport::transportLayerASIOhangBeforeAcceptCallback;
+    FailPoint& _hangDuringAccept = transport::transportLayerASIOhangDuringAcceptCallback;
+
+    FailPoint::EntryCountT _hangBeforeAcceptTimesEntered{0};
+    FailPoint::EntryCountT _hangDuringAcceptTimesEntered{0};
 };
 
 TEST(TransportLayerASIO, ListenerPortZeroTreatedAsEphemeral) {
@@ -361,7 +392,7 @@ TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
     tf.sep().setOnStartSession([&](auto&&) { sessionsCreated.fetchAndAdd(1); });
 
     LOGV2(6109515, "connecting");
-    auto& fp = transport::transportLayerASIOhangBeforeAccept;
+    auto& fp = transport::transportLayerASIOhangDuringAcceptCallback;
     auto timesEntered = fp.setMode(FailPoint::alwaysOn);
     ConnectionThread connectThread(tf.tla().listenerPort(), &setNoLinger);
     fp.waitForTimesEntered(timesEntered + 1);
@@ -375,6 +406,59 @@ TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
 
     ASSERT_EQ(sessionsCreated.load(), 0);
 }
+
+#ifdef __linux__
+/**
+ * Test that the server successfully captures the TCP socket queue depth, and places the value both
+ * into the TransportLayerASIO class and FTDC output.
+ */
+TEST(TransportLayerASIO, TCPCheckQueueDepth) {
+    // Set the listenBacklog to a parameter greater than the number of connection threads we intend
+    // to create.
+    serverGlobalParams.listenBacklog = 10;
+    TestFixture tf;
+
+    LOGV2(6400501, "Starting and hanging three connection threads");
+    tf.setUpHangDuringAcceptingFirstConnection();
+
+    ConnectionThread connectThread1(tf.tla().listenerPort());
+    ConnectionThread connectThread2(tf.tla().listenerPort());
+    ConnectionThread connectThread3(tf.tla().listenerPort());
+
+    tf.waitForHangDuringAcceptingFirstConnection();
+    connectThread1.wait();
+    connectThread2.wait();
+    connectThread3.wait();
+
+    LOGV2(6400502, "Processing one connection thread");
+
+    tf.waitForHangDuringAcceptingNextConnection();
+
+    const auto& depths = tf.tla().getListenerSocketBacklogQueueDepths();
+    ASSERT_EQ(depths.size(), 1);
+
+    auto depth = depths[0];
+    ASSERT_EQ(depth.first.getPort(), tf.tla().listenerPort());
+    ASSERT_EQ(depth.second, 2);
+
+
+    BSONObjBuilder tlaFTDCBuilder;
+    tf.tla().appendStatsForFTDC(tlaFTDCBuilder);
+    BSONObj tlaFTDCStats = tlaFTDCBuilder.obj();
+
+    const auto& queueDepthsArray =
+        tlaFTDCStats.getField("listenerSocketBacklogQueueDepths").Array();
+    ASSERT_EQ(queueDepthsArray.size(), 1);
+
+    const auto& queueDepthObj = queueDepthsArray[0].Obj();
+    ASSERT_EQ(HostAndPort(queueDepthObj.firstElementFieldName()).port(), tf.tla().listenerPort());
+    ASSERT_EQ(queueDepthObj.firstElement().Int(), 2);
+
+    LOGV2(6400503, "Stopping failpoints, shutting down test");
+
+    tf.stopHangDuringAcceptingConnection();
+}
+#endif
 
 TEST(TransportLayerASIO, ThrowOnNetworkErrorInEnsureSync) {
     TestFixture tf;

@@ -74,7 +74,10 @@ extern FailPoint transportLayerASIOshortOpportunisticReadWrite;
 // Cause an asyncConnect to timeout after it's successfully connected to the remote peer
 extern FailPoint transportLayerASIOasyncConnectTimesOut;
 
-extern FailPoint transportLayerASIOhangBeforeAccept;
+extern FailPoint transportLayerASIOhangBeforeAcceptCallback;
+
+extern FailPoint transportLayerASIOhangDuringAcceptCallback;
+
 
 /**
  * A TransportLayer implementation based on ASIO networking primitives.
@@ -198,7 +201,9 @@ public:
 
     void shutdown() final;
 
-    void appendStats(BSONObjBuilder* bob) const override;
+    void appendStatsForServerStatus(BSONObjBuilder* bob) const override;
+
+    void appendStatsForFTDC(BSONObjBuilder& bob) const override;
 
     int listenerPort() const {
         return _listenerPort;
@@ -207,6 +212,8 @@ public:
     boost::optional<int> loadBalancerPort() const {
         return _listenerOptions.loadBalancerPort;
     }
+
+    std::vector<std::pair<SockAddr, int>> getListenerSocketBacklogQueueDepths() const;
 
 #ifdef __linux__
     BatonHandle makeBaton(OperationContext* opCtx) const override;
@@ -251,6 +258,8 @@ private:
 
     void _runListener() noexcept;
 
+    void _trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor) noexcept;
+
 #ifdef MONGO_CONFIG_SSL
     SSLParams::SSLModes _sslMode() const;
 #endif
@@ -287,7 +296,8 @@ private:
     synchronized_value<std::shared_ptr<const SSLConnectionContext>> _sslContext;
 #endif
 
-    std::vector<std::pair<SockAddr, GenericAcceptor>> _acceptors;
+    struct AcceptorRecord;
+    std::vector<std::unique_ptr<AcceptorRecord>> _acceptorRecords;
 
     // Only used if _listenerOptions.async is false.
     struct Listener {

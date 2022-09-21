@@ -95,7 +95,7 @@ public:
             }
         }
         if (auto tl = svcCtx->getTransportLayer())
-            tl->appendStats(&b);
+            tl->appendStatsForServerStatus(&b);
 
         return b.obj();
     }

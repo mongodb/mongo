@@ -127,6 +127,7 @@ struct SockAddr {
     sa_family_t getType() const;
 
     unsigned getPort() const;
+    void setPort(int port);
 
     std::string getAddr() const;
 

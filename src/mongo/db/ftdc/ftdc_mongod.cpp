@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/transport/transport_layer_ftdc_collector.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -128,6 +129,8 @@ void registerMongoDCollectors(FTDCController* controller) {
     }
 
     controller->addPeriodicCollector(std::make_unique<FTDCCollectionStatsCollector>());
+
+    controller->addPeriodicCollector(std::make_unique<transport::TransportLayerFTDCCollector>());
 }
 
 }  // namespace

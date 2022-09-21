@@ -117,8 +117,12 @@ Status TransportLayerManager::setup() {
     return Status::OK();
 }
 
-void TransportLayerManager::appendStats(BSONObjBuilder* bob) const {
-    _foreach([&](const TransportLayer* tl) { tl->appendStats(bob); });
+void TransportLayerManager::appendStatsForServerStatus(BSONObjBuilder* bob) const {
+    _foreach([&](const TransportLayer* tl) { tl->appendStatsForServerStatus(bob); });
+}
+
+void TransportLayerManager::appendStatsForFTDC(BSONObjBuilder& bob) const {
+    _foreach([&](const TransportLayer* tl) { tl->appendStatsForFTDC(bob); });
 }
 
 Status TransportLayerManager::addAndStartTransportLayer(std::unique_ptr<TransportLayer> tl) {

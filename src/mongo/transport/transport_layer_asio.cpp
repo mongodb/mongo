@@ -123,7 +123,8 @@ boost::optional<Status> maybeTcpFastOpenStatus;
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOdelayConnection);
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOhangBeforeAccept);
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOhangBeforeAcceptCallback);
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOhangDuringAcceptCallback);
 
 #ifdef MONGO_CONFIG_SSL
 SSLConnectionContext::~SSLConnectionContext() = default;
@@ -391,6 +392,17 @@ TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
       _timerService(std::make_unique<TimerService>()) {}
 
 TransportLayerASIO::~TransportLayerASIO() = default;
+
+struct TransportLayerASIO::AcceptorRecord {
+    AcceptorRecord(SockAddr address, GenericAcceptor acceptor)
+        : address(std::move(address)), acceptor(std::move(acceptor)) {}
+
+    SockAddr address;
+    GenericAcceptor acceptor;
+    // Tracks the amount of incoming connections waiting to be accepted by the server on this
+    // acceptor.
+    AtomicWord<int> backlogQueueDepth{0};
+};
 
 class WrappedEndpoint {
 public:
@@ -1262,24 +1274,29 @@ Status TransportLayerASIO::setup() {
             }
         }
 #endif
+        auto endpoint = acceptor.local_endpoint(ec);
+        if (ec) {
+            return errorCodeToStatus(ec);
+        }
+        auto hostAndPort = endpointToHostAndPort(endpoint);
+
+        auto record = std::make_unique<AcceptorRecord>(SockAddr(addr->data(), addr->size()),
+                                                       std::move(acceptor));
+
         if (_listenerOptions.port == 0 && (addr.family() == AF_INET || addr.family() == AF_INET6)) {
             if (_listenerPort != _listenerOptions.port) {
                 return Status(ErrorCodes::BadValue,
                               "Port 0 (ephemeral port) is not allowed when"
                               " listening on multiple IP interfaces");
             }
-            std::error_code ec;
-            auto endpoint = acceptor.local_endpoint(ec);
-            if (ec) {
-                return errorCodeToStatus(ec);
-            }
-            _listenerPort = endpointToHostAndPort(endpoint).port();
+            _listenerPort = hostAndPort.port();
+            record->address.setPort(_listenerPort);
         }
 
-        _acceptors.emplace_back(SockAddr(addr->data(), addr->size()), std::move(acceptor));
+        _acceptorRecords.push_back(std::move(record));
     }
 
-    if (_acceptors.empty() && _listenerOptions.isIngress()) {
+    if (_acceptorRecords.empty() && _listenerOptions.isIngress()) {
         return Status(ErrorCodes::SocketException, "No available addresses/ports to bind to");
     }
 
@@ -1294,9 +1311,31 @@ Status TransportLayerASIO::setup() {
     return Status::OK();
 }
 
-void TransportLayerASIO::appendStats(BSONObjBuilder* bob) const {
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV())
+std::vector<std::pair<SockAddr, int>> TransportLayerASIO::getListenerSocketBacklogQueueDepths()
+    const {
+    std::vector<std::pair<SockAddr, int>> queueDepths;
+    for (auto&& record : _acceptorRecords) {
+        queueDepths.push_back({SockAddr(record->address), record->backlogQueueDepth.load()});
+    }
+    return queueDepths;
+}
+
+void TransportLayerASIO::appendStatsForServerStatus(BSONObjBuilder* bob) const {
+    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
         bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
+    }
+}
+
+void TransportLayerASIO::appendStatsForFTDC(BSONObjBuilder& bob) const {
+    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
+        BSONArrayBuilder queueDepthsArrayBuilder(
+            bob.subarrayStart("listenerSocketBacklogQueueDepths"));
+        for (const auto& record : _acceptorRecords) {
+            BSONObjBuilder{queueDepthsArrayBuilder.subobjStart()}.append(
+                record->address.toString(), record->backlogQueueDepth.load());
+        }
+        queueDepthsArrayBuilder.done();
+    }
 }
 
 void TransportLayerASIO::_runListener() noexcept {
@@ -1307,19 +1346,19 @@ void TransportLayerASIO::_runListener() noexcept {
         return;
     }
 
-    for (auto& acceptor : _acceptors) {
+    for (auto& acceptorRecord : _acceptorRecords) {
         asio::error_code ec;
-        acceptor.second.listen(serverGlobalParams.listenBacklog, ec);
+        acceptorRecord->acceptor.listen(serverGlobalParams.listenBacklog, ec);
         if (ec) {
             LOGV2_FATAL(31339,
                         "Error listening for new connections on {listenAddress}: {error}",
                         "Error listening for new connections on listen address",
-                        "listenAddrs"_attr = acceptor.first,
+                        "listenAddrs"_attr = acceptorRecord->address,
                         "error"_attr = ec.message());
         }
 
-        _acceptConnection(acceptor.second);
-        LOGV2(23015, "Listening on", "address"_attr = acceptor.first.getAddr());
+        _acceptConnection(acceptorRecord->acceptor);
+        LOGV2(23015, "Listening on", "address"_attr = acceptorRecord->address.getAddr());
     }
 
     const char* ssl = "off";
@@ -1345,9 +1384,9 @@ void TransportLayerASIO::_runListener() noexcept {
 
     // Loop through the acceptors and cancel their calls to async_accept. This will prevent new
     // connections from being opened.
-    for (auto& acceptor : _acceptors) {
-        acceptor.second.cancel();
-        auto& addr = acceptor.first;
+    for (auto& acceptorRecord : _acceptorRecords) {
+        acceptorRecord->acceptor.cancel();
+        auto& addr = acceptorRecord->address;
         if (addr.getType() == AF_UNIX && !addr.isAnonymousUNIXSocket()) {
             auto path = addr.getAddr();
             LOGV2(
@@ -1376,7 +1415,7 @@ Status TransportLayerASIO::start() {
         return Status::OK();
     }
 
-    invariant(_acceptors.empty());
+    invariant(_acceptorRecords.empty());
     return Status::OK();
 }
 
@@ -1428,11 +1467,25 @@ ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
     MONGO_UNREACHABLE;
 }
 
+namespace {
+void handleConnectionAcceptASIOError(const asio::system_error& e) {
+    // Swallow connection reset errors. Connection reset errors classically present as
+    // asio::error::eof, but can bubble up as asio::error::invalid_argument when calling
+    // into socket.set_option().
+    if (e.code() != asio::error::eof && e.code() != asio::error::invalid_argument) {
+        LOGV2_WARNING(5746600,
+                      "Error accepting new connection: {error}",
+                      "Error accepting new connection",
+                      "error"_attr = e.code().message());
+    }
+}
+}  // namespace
+
 void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
     auto acceptCb = [this, &acceptor](const std::error_code& ec,
                                       ASIOSession::GenericSocket peerSocket) mutable {
         Timer timer;
-        transportLayerASIOhangBeforeAccept.pauseWhileSet();
+        transportLayerASIOhangDuringAcceptCallback.pauseWhileSet();
 
         if (auto lk = stdx::lock_guard(_mutex); _isShutdown) {
             return;
@@ -1472,15 +1525,7 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
                 _sep->startSession(std::move(session));
             }
         } catch (const asio::system_error& e) {
-            // Swallow connection reset errors. Connection reset errors classically present as
-            // asio::error::eof, but can bubble up as asio::error::invalid_argument when calling
-            // into socket.set_option().
-            if (e.code() != asio::error::eof && e.code() != asio::error::invalid_argument) {
-                LOGV2_WARNING(5746600,
-                              "Error accepting new connection: {error}",
-                              "Error accepting new connection",
-                              "error"_attr = e.code().message());
-            }
+            handleConnectionAcceptASIOError(e);
         } catch (const DBException& e) {
             LOGV2_WARNING(23023,
                           "Error accepting new connection: {error}",
@@ -1494,7 +1539,30 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
         _acceptConnection(acceptor);
     };
 
+    transportLayerASIOhangBeforeAcceptCallback.pauseWhileSet();
+
+    _trySetListenerSocketBacklogQueueDepth(acceptor);
+
     acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
+}
+
+void TransportLayerASIO::_trySetListenerSocketBacklogQueueDepth(
+    GenericAcceptor& acceptor) noexcept {
+#ifdef __linux__
+    try {
+        auto matchingRecord =
+            std::find_if(begin(_acceptorRecords), end(_acceptorRecords), [&](const auto& record) {
+                return acceptor.local_endpoint() == record->acceptor.local_endpoint();
+            });
+        invariant(matchingRecord != std::end(_acceptorRecords));
+
+        TcpInfoOption tcpi;
+        acceptor.get_option(tcpi);
+        (*matchingRecord)->backlogQueueDepth.store(tcpi->tcpi_unacked);
+    } catch (const asio::system_error& e) {
+        handleConnectionAcceptASIOError(e);
+    }
+#endif
 }
 
 #ifdef MONGO_CONFIG_SSL

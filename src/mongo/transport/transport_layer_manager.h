@@ -81,7 +81,8 @@ public:
     Status start() override;
     void shutdown() override;
     Status setup() override;
-    void appendStats(BSONObjBuilder* bob) const override;
+    void appendStatsForServerStatus(BSONObjBuilder* bob) const override;
+    void appendStatsForFTDC(BSONObjBuilder& bob) const override;
 
     ReactorHandle getReactor(WhichReactor which) override;
 
