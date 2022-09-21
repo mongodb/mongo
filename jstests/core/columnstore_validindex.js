@@ -6,6 +6,8 @@
  *   requires_fcv_62,
  *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
+ *   # TODO SERVER-69884: featureFlag guarded tests shouldn't require explicit 'no_selinux' tag.
+ *   no_selinux,
  * ]
  */
 (function() {
