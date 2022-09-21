@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_fcv_51,
- *   __TEMPORARILY_DISABLED__,
  * ]
  */
 
