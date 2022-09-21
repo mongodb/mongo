@@ -27,15 +27,10 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/metadata_manager.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deleter_service.h"
@@ -43,12 +38,8 @@
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {

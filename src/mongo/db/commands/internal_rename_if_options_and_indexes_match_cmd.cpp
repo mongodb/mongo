@@ -27,31 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/internal_rename_if_options_and_indexes_match_gen.h"
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/internal_rename_if_options_and_indexes_match_gen.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 
 namespace mongo {
-MONGO_FAIL_POINT_DEFINE(blockBeforeInternalRenameIfOptionsAndIndexesMatch);
-
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(blockBeforeInternalRenameIfOptionsAndIndexesMatch);
 
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead lock(opCtx, nss);
     return opCtx->writesAreReplicated() &&
         CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx).isSharded();
 }
-
-}  // namespace
 
 /**
  * Rename a collection while checking collection option and indexes.
@@ -165,4 +159,6 @@ public:
     }
 
 } internalRenameIfOptionsAndIndexesMatchCmd;
+
+}  // namespace
 }  // namespace mongo

@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/base/checked_cast.h"
-#include "mongo/db/audit.h"
+#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_operation_source.h"
@@ -59,7 +53,6 @@
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -74,7 +67,6 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/stats/top.h"
@@ -89,14 +81,11 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
-
 
 namespace mongo::write_ops_exec {
 
@@ -225,13 +214,13 @@ private:
     repl::OpTime _opTimeAtLastOpStart;
 };
 
-void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
+void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) {
     uassert(ErrorCodes::PrimarySteppedDown,
-            str::stream() << "Not primary while writing to " << ns.ns(),
+            str::stream() << "Not primary while writing to " << nss.ns(),
             repl::ReplicationCoordinator::get(opCtx->getServiceContext())
-                ->canAcceptWritesFor(opCtx, ns));
+                ->canAcceptWritesFor(opCtx, nss));
 
-    CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
+    CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
 }
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {

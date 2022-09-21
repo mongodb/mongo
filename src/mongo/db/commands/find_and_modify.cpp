@@ -27,24 +27,19 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <boost/optional.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/update_stage.h"
-#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
@@ -65,7 +60,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/top.h"
@@ -76,10 +70,8 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/log_and_backoff.h"
-#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 namespace {
@@ -222,13 +214,13 @@ write_ops::FindAndModifyCommandReply buildResponse(const PlanExecutor* exec,
     return result;
 }
 
-void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nsString) {
+void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) {
     uassert(ErrorCodes::NotWritablePrimary,
             str::stream() << "Not primary while running findAndModify command on collection "
-                          << nsString.ns(),
-            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nsString));
+                          << nss.ns(),
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
-    CollectionShardingState::get(opCtx, nsString)->checkShardVersionOrThrow(opCtx);
+    CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
 }
 
 void recordStatsForTopCommand(OperationContext* opCtx) {
@@ -559,28 +551,28 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                                            ExplainOptions::Verbosity verbosity,
                                            rpc::ReplyBuilderInterface* result) {
 
-    const BSONObj& cmdObj = this->request().toBSON(BSONObj() /* commandPassthroughFields */);
-    validate(this->request());
+    validate(request());
+    const BSONObj& cmdObj = request().toBSON(BSONObj() /* commandPassthroughFields */);
 
     auto requestAndMsg = [&]() {
-        if (this->request().getEncryptionInformation().has_value() &&
-            !this->request().getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
-            return processFLEFindAndModifyExplainMongod(opCtx, this->request());
+        if (request().getEncryptionInformation() &&
+            !request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+            return processFLEFindAndModifyExplainMongod(opCtx, request());
         } else {
-            return std::pair{this->request(), OpMsgRequest()};
+            return std::pair{request(), OpMsgRequest()};
         }
     }();
     auto request = requestAndMsg.first;
 
-    const NamespaceString& nsString = request.getNamespace();
-    uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
+    const NamespaceString& nss = request.getNamespace();
+    uassertStatusOK(userAllowedWriteNS(opCtx, nss));
     auto const curOp = CurOp::get(opCtx);
     OpDebug* const opDebug = &curOp->debug();
     const std::string dbName = request.getDbName().toString();
 
     if (request.getRemove().value_or(false)) {
         auto deleteRequest = DeleteRequest{};
-        deleteRequest.setNsString(nsString);
+        deleteRequest.setNsString(nss);
         const bool isExplain = true;
         makeDeleteRequest(opCtx, request, isExplain, &deleteRequest);
 
@@ -589,12 +581,12 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
         // Explain calls of the findAndModify command are read-only, but we take write
         // locks so that the timing information is more accurate.
-        AutoGetCollection collection(opCtx, nsString, MODE_IX);
+        AutoGetCollection collection(opCtx, nss, MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName << " does not exist",
                 collection.getDb());
 
-        CollectionShardingState::get(opCtx, nsString)->checkShardVersionOrThrow(opCtx);
+        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
 
         const auto exec = uassertStatusOK(
             getExecutorDelete(opDebug, &collection.getCollection(), &parsedDelete, verbosity));
@@ -604,7 +596,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
             exec.get(), collection.getCollection(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
     } else {
         auto updateRequest = UpdateRequest();
-        updateRequest.setNamespaceString(nsString);
+        updateRequest.setNamespaceString(nss);
         makeUpdateRequest(opCtx, request, verbosity, &updateRequest);
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
@@ -613,12 +605,12 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
         // Explain calls of the findAndModify command are read-only, but we take write
         // locks so that the timing information is more accurate.
-        AutoGetCollection collection(opCtx, nsString, MODE_IX);
+        AutoGetCollection collection(opCtx, nss, MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName << " does not exist",
                 collection.getDb());
 
-        CollectionShardingState::get(opCtx, nsString)->checkShardVersionOrThrow(opCtx);
+        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
 
         const auto exec = uassertStatusOK(
             getExecutorUpdate(opDebug, &collection.getCollection(), &parsedUpdate, verbosity));

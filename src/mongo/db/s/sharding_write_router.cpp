@@ -29,11 +29,6 @@
 
 #include "mongo/db/s/sharding_write_router.h"
 
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
-
 namespace mongo {
 
 ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx,
@@ -62,10 +57,6 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx,
                     _reshardingChunkMgr->isSharded());
         }
     }
-}
-
-CollectionShardingState* ShardingWriteRouter::getCollectionShardingState() const {
-    return _css;
 }
 
 boost::optional<ShardId> ShardingWriteRouter::getReshardingDestinedRecipient(

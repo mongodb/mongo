@@ -31,8 +31,7 @@
 
 #include <vector>
 
-#include "mongo/db/logical_time.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 
 namespace mongo {
@@ -95,6 +94,11 @@ public:
      * Attaches info for server status.
      */
     static void appendInfoForServerStatus(OperationContext* opCtx, BSONObjBuilder* builder);
+
+    /**
+     * Returns the namespace to which this CSS corresponds.
+     */
+    virtual const NamespaceString& nss() const = 0;
 
     /**
      * If the shard currently doesn't know whether the collection is sharded or not, it will throw a

@@ -27,33 +27,24 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/split_vector.h"
 
-#include "mongo/base/status_with.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
 namespace {
 
 const int kMaxObjectPerChunk{250000};
-const int estimatedAdditionalBytesPerItemInBSONArray{2};
+const int kEstimatedAdditionalBytesPerItemInBSONArray{2};
 
 BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
     return key.replaceFieldNames(keyPattern).clientReadable();
@@ -90,9 +81,6 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
 
     {
         AutoGetCollection collection(opCtx, nss, MODE_IS);
-
-        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
-
         uassert(ErrorCodes::NamespaceNotFound, "ns not found", collection);
 
         // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
@@ -252,7 +240,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                         tooFrequentKeys.insert(currKey.getOwned());
                     } else {
                         auto additionalKeySize =
-                            currKey.objsize() + estimatedAdditionalBytesPerItemInBSONArray;
+                            currKey.objsize() + kEstimatedAdditionalBytesPerItemInBSONArray;
                         if (splitVectorResponseSize + additionalKeySize > BSONObjMaxUserSize) {
                             if (splitKeys.empty()) {
                                 // Keep trying until we get at least one split point that isn't

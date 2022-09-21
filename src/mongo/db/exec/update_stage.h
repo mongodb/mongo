@@ -29,23 +29,17 @@
 
 #pragma once
 
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/write_stage_common.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/update_result.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/update/update_driver.h"
 
 namespace mongo {
 
-class OperationContext;
 class OpDebug;
 struct PlanSummaryStats;
-class ShardingWriteRouter;
 
 struct UpdateStageParams {
     using DocumentCounter = std::function<size_t(const BSONObj&)>;

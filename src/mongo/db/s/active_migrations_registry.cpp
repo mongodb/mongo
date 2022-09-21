@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/active_migrations_registry.h"
 
 #include "mongo/db/catalog_raii.h"
@@ -41,7 +38,6 @@
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
-
 
 namespace mongo {
 namespace {

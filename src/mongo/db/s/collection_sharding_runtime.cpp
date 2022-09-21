@@ -27,25 +27,18 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/s/collection_sharding_runtime.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/global_settings.h"
-#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
-#include "mongo/db/s/sharding_data_transform_metrics.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/util/duration.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {

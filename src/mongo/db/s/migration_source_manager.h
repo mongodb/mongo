@@ -31,6 +31,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/client/connection_string.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_coordinator.h"

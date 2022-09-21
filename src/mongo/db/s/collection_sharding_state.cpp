@@ -27,18 +27,12 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/collection_sharding_state.h"
 
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/util/fail_point.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {

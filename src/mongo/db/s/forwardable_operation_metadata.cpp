@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/forwardable_operation_metadata.h"
 
 #include "mongo/db/auth/authorization_session.h"

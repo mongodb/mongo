@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/s/catalog/type_database_gen.h"
 
 namespace mongo {
 
@@ -44,12 +43,12 @@ enum class DSSAcquisitionMode { kShared, kExclusive };
  * Synchronizes access to this shard server's cached database version for Database.
  */
 class DatabaseShardingState {
-    DatabaseShardingState(const DatabaseShardingState&) = delete;
-    DatabaseShardingState& operator=(const DatabaseShardingState&) = delete;
-
 public:
     DatabaseShardingState(const DatabaseName& dbName);
-    ~DatabaseShardingState() = default;
+    virtual ~DatabaseShardingState() = default;
+
+    DatabaseShardingState(const DatabaseShardingState&) = delete;
+    DatabaseShardingState& operator=(const DatabaseShardingState&) = delete;
 
     /**
      * Obtains the sharding state for the specified database along with a resource lock protecting
@@ -162,10 +161,6 @@ private:
         // Cancellation source to cancel the ongoing database metadata refresh.
         CancellationSource cancellationSource;
     };
-
-    // Object-wide ResourceMutex to protect changes to the DatabaseShardingState or objects held
-    // within.
-    Lock::ResourceMutex _stateChangeMutex{"DatabaseShardingState"};
 
     const DatabaseName _dbName;
 

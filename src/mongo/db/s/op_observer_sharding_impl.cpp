@@ -27,23 +27,17 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/op_observer_sharding_impl.h"
 
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_source_manager.h"
-#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -128,7 +122,7 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
     if (nss == NamespaceString::kSessionTransactionsTableNamespace || fromMigrate)
         return;
 
-    auto css = shardingWriteRouter.getCollectionShardingState();
+    auto* const css = shardingWriteRouter.getCss();
     auto* const csr = CollectionShardingRuntime::get(css);
     csr->checkShardVersionOrThrow(opCtx);
 
@@ -165,7 +159,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   const ShardingWriteRouter& shardingWriteRouter,
                                                   const repl::OpTime& prePostImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
-    auto css = shardingWriteRouter.getCollectionShardingState();
+    auto* const css = shardingWriteRouter.getCss();
     auto* const csr = CollectionShardingRuntime::get(css);
     csr->checkShardVersionOrThrow(opCtx);
 
@@ -201,7 +195,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
                                                   const ShardingWriteRouter& shardingWriteRouter,
                                                   const repl::OpTime& preImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
-    auto css = shardingWriteRouter.getCollectionShardingState();
+    auto* const css = shardingWriteRouter.getCss();
     auto* const csr = CollectionShardingRuntime::get(css);
     csr->checkShardVersionOrThrow(opCtx);
 

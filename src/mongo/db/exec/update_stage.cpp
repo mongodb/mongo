@@ -27,57 +27,34 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/update_stage.h"
 
 #include <algorithm>
-#include <memory>
 
 #include "mongo/base/status_with.h"
-#include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/shard_filterer_impl.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/sharding_write_router.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/update/path_support.h"
-#include "mongo/db/update/storage_validation.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
-
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(hangBeforeThrowWouldChangeOwningShard);
-
-using std::string;
-using std::unique_ptr;
-using std::vector;
 
 namespace mb = mutablebson;
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeThrowWouldChangeOwningShard);
 
 const char idFieldName[] = "_id";
 const FieldRef idFieldRef(idFieldName);
@@ -112,6 +89,7 @@ CollectionUpdateArgs::StoreDocOption getStoreDocMode(const UpdateRequest& update
     invariant(!updateRequest.shouldReturnAnyDocs());
     return CollectionUpdateArgs::StoreDocOption::None;
 }
+
 }  // namespace
 
 // Public constructor.
@@ -212,7 +190,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
         dassert(cq);
         verify(cq->root()->matchesBSON(oldObj.value(), &matchDetails));
 
-        string matchedField;
+        std::string matchedField;
         if (matchDetails.hasElemMatchKey())
             matchedField = matchDetails.elemMatchKey();
 
@@ -252,9 +230,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
     }
 
     if (docWasModified) {
-
         // Prepare to write back the modified document
-
         RecordId newRecordId;
         CollectionUpdateArgs args;
 
@@ -680,9 +656,9 @@ void UpdateStage::doRestoreStateRequiresCollection() {
     _preWriteFilter.restoreState();
 }
 
-unique_ptr<PlanStageStats> UpdateStage::getStats() {
+std::unique_ptr<PlanStageStats> UpdateStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_UPDATE);
+    auto ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_UPDATE);
     ret->specific = std::make_unique<UpdateStats>(_specificStats);
     ret->children.emplace_back(child()->getStats());
     return ret;
@@ -696,7 +672,6 @@ void UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out) {
     _idRetrying = idToRetry;
     *out = WorkingSet::INVALID_ID;
 }
-
 
 void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     const ScopedCollectionDescription& collDesc, const FieldRefSet& shardKeyPaths) {
@@ -738,7 +713,6 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     }
 }
 
-
 bool UpdateStage::wasReshardingKeyUpdated(const ShardingWriteRouter& shardingWriteRouter,
                                           const ScopedCollectionDescription& collDesc,
                                           const BSONObj& newObj,
@@ -772,7 +746,7 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj
                                                    const Snapshotted<BSONObj>& oldObj) {
     ShardingWriteRouter shardingWriteRouter(
         opCtx(), collection()->ns(), Grid::get(opCtx())->catalogCache());
-    auto css = shardingWriteRouter.getCollectionShardingState();
+    auto* const css = shardingWriteRouter.getCss();
 
     // css can be null when this is a config server.
     if (css == nullptr) {
@@ -804,7 +778,7 @@ bool UpdateStage::wasExistingShardKeyUpdated(const ShardingWriteRouter& sharding
                                              const ScopedCollectionDescription& collDesc,
                                              const BSONObj& newObj,
                                              const Snapshotted<BSONObj>& oldObj) {
-    const auto css = shardingWriteRouter.getCollectionShardingState();
+    auto* const css = shardingWriteRouter.getCss();
 
     const ShardKeyPattern& shardKeyPattern = collDesc.getShardKeyPattern();
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldObj.value());

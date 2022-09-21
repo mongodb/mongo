@@ -30,12 +30,10 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/s/sharding_state_lock.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/s/global_index_cache.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/decorable.h"
@@ -73,11 +71,15 @@ public:
      */
     static CollectionShardingRuntime* get(CollectionShardingState* css);
 
+    const NamespaceString& nss() const override {
+        return _nss;
+    }
+
+    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) override;
+
     ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
                                               OrphanCleanupPolicy orphanCleanupPolicy,
                                               bool supportNonVersionedOperations) override;
-
-    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) override;
 
     void checkShardVersionOrThrow(OperationContext* opCtx) override;
 

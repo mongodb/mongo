@@ -30,14 +30,10 @@
 #pragma once
 
 #include <list>
-#include <memory>
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/util/concurrency/with_lock.h"

@@ -285,12 +285,11 @@ env.Library(
         'forwardable_operation_metadata.cpp',
         'forwardable_operation_metadata.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/s/grid',
-    ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/write_block_bypass',
+        '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
     ],
 )
 
