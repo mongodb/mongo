@@ -39,15 +39,6 @@ selector:
   - jstests/core/profile_query_hash.js
   - jstests/core/sbe/plan_cache_sbe_with_or_queries.js
   - jstests/core/sbe_plan_cache_autoparameterize_collscan.js
-  # TODO SERVER-67596 Allow reads to system.js collection.
-  - jstests/core/where_system_js.js
-  - jstests/core/find_and_modify_concurrent_update.js
-  - jstests/core/find_and_modify_where.js
-  # TODO SERVER-67637 Verify projection and sort for find command.
-  - jstests/core/plan_cache_positional_projection.js
-  - jstests/core/projection_meta_index_key.js
-  - jstests/core/positional_projection.js
-  - jstests/core/positional_projection_multiple_array_fields.js
   # TODO SERVER-62034 Prevent distinct() from using CQF.
   - jstests/core/profile_distinct.js
   # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
