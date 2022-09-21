@@ -8,15 +8,6 @@ set -o verbose
 
 rm -rf ${install_directory}
 
-# Use hardlinks to reduce the disk space impact of installing
-# all of the binaries and associated debug info.
-
-# The expansion here is a workaround to let us set a different install-action
-# for tasks that don't support the one we set here. A better plan would be
-# to support install-action for Ninja builds directly.
-# TODO: https://jira.mongodb.org/browse/SERVER-48203
-extra_args="--install-action=${task_install_action}"
-
 # By default, limit link jobs to one quarter of our overall -j
 # concurrency unless locally overridden. We do this because in
 # static link environments, the memory consumption of each

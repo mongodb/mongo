@@ -22,7 +22,6 @@ continue_on_failure: "true"
 install_dir: dist-test/bin
 is_patch: "false"
 install_directory: /data/mongo-install-directory
-task_install_action: hardlink
 num_scons_link_jobs_available: "0.25"
 show_scons_timings: "true"
 compiling_for_test: "false"
