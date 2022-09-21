@@ -357,7 +357,7 @@ struct FixUpInfo {
 class RSFatalException : public std::exception {
 public:
     RSFatalException(std::string m = "replica set fatal exception") : msg(m) {}
-    virtual const char* what() const throw() {
+    const char* what() const noexcept override {
         return msg.c_str();
     }
 

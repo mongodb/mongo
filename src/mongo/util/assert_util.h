@@ -66,7 +66,7 @@ std::string causedBy(const std::string& e);
 /** Most mongo exceptions inherit from this; this is commonly caught in most threads */
 class DBException : public std::exception {
 public:
-    const char* what() const throw() final {
+    const char* what() const noexcept final {
         return reason().c_str();
     }
 
