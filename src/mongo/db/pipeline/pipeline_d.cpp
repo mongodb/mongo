@@ -185,7 +185,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
         // $lookup pushdown logic.
         if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(itr->get())) {
-            CurOp::get(expCtx->opCtx)->debug().pipelineUsesLookup = true;
             if (disallowLookupPushdown) {
                 break;
             }
