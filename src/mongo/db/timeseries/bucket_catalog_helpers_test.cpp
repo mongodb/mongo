@@ -485,5 +485,74 @@ TEST_F(BucketCatalogHelpersTest, IncompatibleBucketsForNewMeasurements) {
     }
 }
 
+TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
+    ASSERT_OK(createCollection(
+        operationContext(),
+        kNss.dbName(),
+        BSON("create" << kNss.coll() << "timeseries"
+                      << BSON("timeField" << _timeField << "metaField" << _metaField))));
+
+    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IX);
+    ASSERT(autoColl->getTimeseriesOptions() && autoColl->getTimeseriesOptions()->getMetaField());
+
+    std::vector<BSONObj> bucketDocs = {mongo::fromjson(
+                                           R"({
+            "_id":{"$oid":"62e7e6ec27c28d338ab29200"},
+            "control":{"version":1,"min":{"_id":1,"time":{"$date":"2021-08-01T11:00:00Z"},"a":1},
+                                   "max":{"_id":3,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3},
+                       "closed":false},
+            "meta":1,
+            "data":{"time":{"0":{"$date":"2021-08-01T11:00:00Z"},
+                            "1":{"$date":"2021-08-01T11:00:00Z"},
+                            "2":{"$date":"2021-08-01T11:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3}}})"),
+                                       mongo::fromjson(
+                                           R"(
+            {"_id":{"$oid":"62e7eee4f33f295800073138"},
+            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2022-08-01T12:00:00Z"},"a":1},
+                                   "max":{"_id":10,"time":{"$date":"2022-08-01T13:00:00Z"},"a":3}},
+            "meta":2,
+            "data":{"time":{"0":{"$date":"2022-08-01T12:00:00Z"},
+                            "1":{"$date":"2022-08-01T12:00:00Z"},
+                            "2":{"$date":"2022-08-01T12:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3}}})"),
+                                       mongo::fromjson(
+                                           R"({
+            "_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
+                                   "max":{"_id":10,"time":{"$date":"2023-08-01T14:00:00Z"},"a":3},
+                       "closed":false},
+            "meta":3,
+            "data":{"time":{"0":{"$date":"2023-08-01T13:00:00Z"},
+                            "1":{"$date":"2023-08-01T13:00:00Z"},
+                            "2":{"$date":"2023-08-01T13:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3}}})")};
+
+    // Insert bucket documents into the system.buckets collection.
+    for (const auto& doc : bucketDocs) {
+        _insertIntoBucketColl(doc);
+    }
+
+    // Given a valid OID for a bucket document, we should be able to retrieve the full bucket
+    // document.
+    for (const auto& doc : bucketDocs) {
+        const auto bucketId = doc["_id"].OID();
+        auto retrievedBucket =
+            timeseries::findDocFromOID(operationContext(), (*autoColl).get(), bucketId);
+        ASSERT(!retrievedBucket.isEmpty());
+        ASSERT_BSONOBJ_EQ(retrievedBucket, doc);
+    }
+
+    // For non-existent OIDs, we don't expect to retrieve anything.
+    std::vector<OID> nonExistentOIDs = {OID("26e7e6ec27c28d338ab29200"),
+                                        OID("90e7e6ec27c28d338ab29200"),
+                                        OID("00e7e6ec27c28d338ab29200")};
+    for (const auto& oid : nonExistentOIDs) {
+        auto retrievedBucket =
+            timeseries::findDocFromOID(operationContext(), (*autoColl).get(), oid);
+        ASSERT(retrievedBucket.isEmpty());
+    }
+}
+
 }  // namespace
 }  // namespace mongo

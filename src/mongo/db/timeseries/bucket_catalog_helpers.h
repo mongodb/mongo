@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/timeseries/flat_bson.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 
@@ -62,6 +63,12 @@ StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
  */
 StatusWith<std::pair<Date_t, boost::optional<BSONElement>>> extractTimeAndMeta(
     const BSONObj& doc, const TimeseriesOptions& options);
+
+
+/**
+ * Retrieves a document from the record store based off of the bucket ID.
+ */
+BSONObj findDocFromOID(OperationContext* opCtx, const Collection* coll, const OID& bucketId);
 
 /**
  * Executes a 'find' query on the timeseries bucket collection to find a bucket eligible to

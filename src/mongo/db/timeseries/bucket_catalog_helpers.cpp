@@ -29,6 +29,7 @@
 
 #include "mongo/db/timeseries/bucket_catalog_helpers.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/logv2/redaction.h"
 
@@ -133,6 +134,14 @@ StatusWith<std::pair<Date_t, boost::optional<BSONElement>>> extractTimeAndMeta(
         return std::make_pair(time, doc[*metaFieldName]);
     }
     return std::make_pair(time, boost::none);
+}
+
+BSONObj findDocFromOID(OperationContext* opCtx, const Collection* coll, const OID& bucketId) {
+    Snapshotted<BSONObj> bucketObj;
+    auto rid = record_id_helpers::keyForOID(bucketId);
+    auto foundDoc = coll->findDoc(opCtx, rid, &bucketObj);
+
+    return (foundDoc) ? bucketObj.value() : BSONObj();
 }
 
 BSONObj findSuitableBucket(OperationContext* opCtx,
