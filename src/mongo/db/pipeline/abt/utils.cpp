@@ -215,17 +215,24 @@ public:
 
     PathToIntervalTransport() {}
 
-    ResultType transport(const ABT& /*n*/, const PathArr& /*node*/) {
-        auto [lowBound, lowInclusive] =
-            getMinMaxBoundForType(true /*isMin*/, sbe::value::TypeTags::Array);
+    template <sbe::value::TypeTags tag>
+    ResultType getBoundsForNode() {
+        auto [lowBound, lowInclusive] = getMinMaxBoundForType(true /*isMin*/, tag);
         invariant(lowBound);
 
-        auto [highBound, highInclusive] =
-            getMinMaxBoundForType(false /*isMin*/, sbe::value::TypeTags::Array);
+        auto [highBound, highInclusive] = getMinMaxBoundForType(false /*isMin*/, tag);
         invariant(highBound);
 
         return IntervalReqExpr::makeSingularDNF(IntervalRequirement{
             {lowInclusive, std::move(*lowBound)}, {highInclusive, std::move(*highBound)}});
+    }
+
+    ResultType transport(const ABT& /*n*/, const PathArr& /*node*/) {
+        return getBoundsForNode<sbe::value::TypeTags::Array>();
+    }
+
+    ResultType transport(const ABT& /*n*/, const PathObj& /*node*/) {
+        return getBoundsForNode<sbe::value::TypeTags::Object>();
     }
 
     template <typename T, typename... Ts>

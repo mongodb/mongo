@@ -1351,6 +1351,9 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
         if (auto conversion = pathToInterval(make<PathArr>());
             conversion && *conversion == req.getIntervals()) {
             path = make<PathArr>();
+        } else if (auto conversion = pathToInterval(make<PathObj>());
+                   conversion && *conversion == req.getIntervals()) {
+            path = make<PathObj>();
         }
     }
     if (path.is<PathIdentity>()) {

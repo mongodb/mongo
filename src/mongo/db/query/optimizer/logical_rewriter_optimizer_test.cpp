@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
+#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"

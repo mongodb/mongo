@@ -3622,6 +3622,81 @@ TEST(PhysRewriter, ObjectElemMatch) {
         optimized);
 }
 
+TEST(PhysRewriter, ObjectElemMatchPathObj) {
+    using namespace properties;
+    PrefixId prefixId;
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>(
+                "a",
+                make<PathComposeM>(
+                    make<PathObj>(),
+                    make<PathTraverse>(
+                        make<PathComposeM>(
+                            make<PathGet>("b",
+                                          make<PathTraverse>(
+                                              make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                              PathTraverse::kSingleLevel)),
+                            make<PathGet>("c",
+                                          make<PathTraverse>(
+                                              make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                              PathTraverse::kSingleLevel))),
+                        PathTraverse::kSingleLevel))),
+            make<Variable>("root")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
+
+    OptPhaseManager phaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        false /*requireRID*/,
+        {{{"c1",
+           ScanDefinition{{},
+                          {{"index1",
+                            makeCompositeIndexDefinition(
+                                {{"b", CollationOp::Ascending, true /*isMultiKey*/},
+                                 {"a", CollationOp::Ascending, true /*isMultiKey*/}})}}}}}},
+        std::make_unique<HeuristicCE>(),
+        std::make_unique<DefaultCosting>(),
+        defaultConvertPathToInterval,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
+    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    // We currently cannot use indexes with ObjectElemMatch.
+    ASSERT_EXPLAIN_V2Compact(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a] PathTraverse [1] PathComposeM []\n"
+        "|   |   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [2]\n"
+        "|   PathGet [b] PathTraverse [1] PathCompare [Eq] Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_0]\n"
+        "|   PathObj []\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
+        "    BindBlock:\n"
+        "        [evalTemp_0]\n"
+        "            Source []\n"
+        "        [root]\n"
+        "            Source []\n",
+        optimized);
+}
+
 TEST(PhysRewriter, ArrayConstantIndex) {
     using namespace properties;
     PrefixId prefixId;
