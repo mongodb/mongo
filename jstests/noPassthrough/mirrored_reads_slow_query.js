@@ -25,7 +25,7 @@ function verifySlowLogsIndicateMirroredReads(rst, cmd) {
     rst.getPrimary().getDB(kDbName).runCommand(cmd);
 
     const logId = 51803;
-    // Check that the primary slow log messages do not print with mirror: true.
+    // Check that the primary slow log messages do not print with mirrored: true.
     assert(checkLog.checkContainsWithCountJson(primaryAdminDb,
                                                logId,
                                                {mirrored: true},
@@ -34,12 +34,13 @@ function verifySlowLogsIndicateMirroredReads(rst, cmd) {
                                                /*isRelaxed=*/true));
     assert.soon(() => {
         // Check that the secondary slow log message is printed with mirrored: true.
-        return checkLog.checkContainsWithCountJson(secondaryAdminDb,
-                                                   logId,
-                                                   {mirrored: true},
-                                                   /*expectedCount=*/1,
-                                                   /*severity=*/null,
-                                                   /*isRelaxed=*/true);
+        return checkLog.checkContainsWithCountJson(
+            secondaryAdminDb,
+            logId,
+            {mirrored: true, ns: kDbName.concat(".", kCollName)},
+            /*expectedCount=*/1,
+            /*severity=*/null,
+            /*isRelaxed=*/true);
     });
     assert.commandWorked(secondaryAdminDb.adminCommand({clearLog: "global"}));
 }
