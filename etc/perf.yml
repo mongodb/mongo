@@ -875,7 +875,7 @@ buildvariants:
   - <<: *linux-wt-standalone
     name: linux-wt-standalone-sbe
     display_name: Standalone Linux inMemory (SBE)
-    cron: "0 0 * * 4" # 00:00 on Thursday
+    cron: "0 0 * * *" # Run it every day for now to get a stable baseline and then change it back to 00:00 on Thursday
     expansions:
       mongodb_setup: microbenchmarks_standalone-sbe
 

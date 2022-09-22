@@ -1151,7 +1151,7 @@ buildvariants:
 
   - name: linux-standalone
     display_name: Linux Standalone
-    cron: "0 0 * * *" # Everyday at 00:00
+    cron: "0 0 * * 2,4,6" # Tuesday, Thursday and Saturday at 00:00
     modules: *modules
     expansions:
       mongodb_setup: standalone
@@ -1190,7 +1190,7 @@ buildvariants:
 
   - name: linux-standalone-all-feature-flags
     display_name: Linux Standalone (all feature flags)
-    cron: "0 0 * * *" # Everyday at 00:00
+    cron: "0 0 * * 2,4,6" # Tuesday, Thursday and Saturday at 00:00
     modules: *modules
     expansions:
       mongodb_setup: standalone-all-feature-flags
@@ -1259,7 +1259,7 @@ buildvariants:
 
   - name: linux-standalone-sbe
     display_name: Linux Standalone (SBE)
-    cron: "0 0 * * 4" # 00:00 on Thursday
+    cron: "0 0 * * *" # Run it every day for now to get a stable baseline and then change it back to 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: standalone-sbe
@@ -1295,7 +1295,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-sbe
     display_name: Linux 1-Node ReplSet (SBE)
-    cron: "0 0 * * 4" # 00:00 on Thursday
+    cron: "0 0 * * *" # Run it every day for now to get a stable baseline and then change it back to 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-sbe
@@ -1420,7 +1420,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-audit-log-encryption-no-compression
     display_name: Linux Single-node Replica Set Audit w/ At-Rest Log Encryption (No compression)
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-audit-log-encryption-no-compression
@@ -1436,7 +1436,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-audit
     display_name: Linux Single-node Replica Set Audit
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-audit
@@ -1452,7 +1452,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-audit-log-encryption-compression
     display_name: Linux Single-node Replica Set Audit w/ At-Rest Log Encryption (With compression)
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-audit-log-encryption-compression
@@ -1509,7 +1509,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-ese-cbc
     display_name: Linux 1-Node ReplSet ESE CBC
-    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-ese-cbc
@@ -1531,7 +1531,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-ese-gcm
     display_name: Linux 1-Node ReplSet ESE GCM
-    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-ese-gcm
@@ -1553,7 +1553,7 @@ buildvariants:
 
   - name: linux-1-node-15gbwtcache
     display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache
-    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
+    cron: "0 0 * * 2,4" # 00:00 on Tuesday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-15gbwtcache
@@ -1758,7 +1758,7 @@ buildvariants:
 
   - name: linux-shard-single
     display_name: Linux Shard Single
-    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
+    cron: "0 0 * * 2,4" # 00:00 on Tuesday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-single
@@ -1776,7 +1776,7 @@ buildvariants:
 
   - name: linux-3-node-replSet
     display_name: Linux 3-Node ReplSet
-    cron: "0 0 * * *" # Everyday at 00:00
+    cron: "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
     modules: *modules
     expansions:
       mongodb_setup: replica
@@ -2090,7 +2090,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-initialsync
     display_name: Linux 3-Node ReplSet Initial Sync
-    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
+    cron: "0 0 * * 2,4" # 00:00 on Tuesday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-2node
