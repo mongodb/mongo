@@ -383,6 +383,11 @@ public:
         SelectivityType topLevelSel = 1.0;
         std::vector<SelectivityType> topLevelSelectivities;
         for (const auto& [key, req] : node.getReqMap()) {
+            if (req.getIsPerfOnly()) {
+                // Ignore perf-only requirements.
+                continue;
+            }
+
             SelectivityType disjSel = 1.0;
             std::vector<SelectivityType> disjSelectivities;
             // Intervals are in DNF.
@@ -404,6 +409,9 @@ public:
             topLevelSelectivities.push_back(disjSel);
         }
 
+        if (topLevelSelectivities.empty()) {
+            return 1.0;
+        }
         // The elements of the PartialSchemaRequirements map represent an implicit conjunction.
         topLevelSel = ce::conjExponentialBackoff(std::move(topLevelSelectivities));
         CEType card = std::max(topLevelSel * childResult, kMinCard);

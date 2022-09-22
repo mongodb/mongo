@@ -35,7 +35,6 @@ namespace mongo::optimizer::cascades {
 
 LogicalRewriter::RewriteSet LogicalRewriter::_explorationSet = {
     {LogicalRewriteType::GroupByExplore, 1},
-    {LogicalRewriteType::FilterExplore, 1},
     {LogicalRewriteType::SargableSplit, 2},
     {LogicalRewriteType::FilterRIDIntersectReorder, 2},
     {LogicalRewriteType::EvaluationRIDIntersectReorder, 2}};
@@ -583,7 +582,7 @@ static boost::optional<ABT> mergeSargableNodes(
         return createEmptyValueScanNode(ctx);
     }
 
-    if (mergedReqs.size() > LogicalRewriter::kMaxPartialSchemaReqCount) {
+    if (mergedReqs.size() > SargableNode::kMaxPartialSchemaReqs) {
         return {};
     }
 
@@ -651,13 +650,6 @@ struct SubstituteConvert<LimitSkipNode> {
     }
 };
 
-static void addSargableChildNode(const ABT& node, ABT sargableNode, RewriteContext& ctx) {
-    ABT newNode = node;
-    newNode.cast<FilterNode>()->getChild() = std::move(sargableNode);
-    ctx.addNode(newNode, false /*substitute*/, true /*addExistingNodeWithNewChild*/);
-}
-
-template <bool isSubstitution>
 static void convertFilterToSargableNode(ABT::reference_type node,
                                         const FilterNode& filterNode,
                                         RewriteContext& ctx) {
@@ -702,17 +694,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
     // predicate using the constant True.
     if (conversion->_reqMap.empty()) {
         ctx.addNode(make<FilterNode>(Constant::boolean(true), filterNode.getChild()),
-                    isSubstitution);
-        return;
-    }
-
-    // If in substitution mode, disallow retaining original predicate. If in exploration mode, only
-    // allow retaining the original predicate and if we have at least one index available.
-    if constexpr (isSubstitution) {
-        if (conversion->_retainPredicate) {
-            return;
-        }
-    } else if (!conversion->_retainPredicate || scanDef.getIndexDefs().empty()) {
+                    true /*subtitute*/);
         return;
     }
 
@@ -723,7 +705,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         addEmptyValueScanNode(ctx);
         return;
     }
-    if (conversion->_reqMap.size() > LogicalRewriter::kMaxPartialSchemaReqCount) {
+    if (conversion->_reqMap.size() > SargableNode::kMaxPartialSchemaReqs) {
         // Too many requirements.
         return;
     }
@@ -746,32 +728,12 @@ static void convertFilterToSargableNode(ABT::reference_type node,
                                           std::move(scanParams),
                                           IndexReqTarget::Complete,
                                           filterNode.getChild());
-    if (!conversion->_retainPredicate) {
-        ctx.addNode(sargableNode, isSubstitution);
-        return;
-    }
-
-    const GroupIdType childGroupId =
-        filterNode.getChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
-    if (childGroupId == indexingAvailability.getScanGroupId()) {
-        // Add node directly.
-        addSargableChildNode(node, std::move(sargableNode), ctx);
+    if (conversion->_retainPredicate) {
+        ABT newNode = node;
+        newNode.cast<FilterNode>()->getChild() = std::move(sargableNode);
+        ctx.addNode(newNode, true /*substitute*/, true /*addExistingNodeWithNewChild*/);
     } else {
-        // Look at the child group to find SargableNodes and attempt to combine.
-        const auto& logicalNodes = ctx.getMemo().getGroup(childGroupId)._logicalNodes;
-        for (const ABT& childNode : logicalNodes.getVector()) {
-            if (auto childSargableNode = childNode.cast<SargableNode>();
-                childSargableNode != nullptr) {
-                const auto& result = mergeSargableNodes(indexingAvailability,
-                                                        scanDef.getNonMultiKeyPathSet(),
-                                                        *sargableNode.cast<SargableNode>(),
-                                                        *childSargableNode,
-                                                        ctx);
-                if (result) {
-                    addSargableChildNode(node, std::move(*result), ctx);
-                }
-            }
-        }
+        ctx.addNode(sargableNode, true /*substitute*/);
     }
 }
 
@@ -819,7 +781,7 @@ struct SubstituteConvert<FilterNode> {
             }
         }
 
-        convertFilterToSargableNode<true /*isSubstitution*/>(node, filterNode, ctx);
+        convertFilterToSargableNode(node, filterNode, ctx);
     }
 };
 
@@ -853,7 +815,7 @@ struct SubstituteConvert<EvaluationNode> {
                 inputPtr != nullptr && inputPtr->name() == scanProjName) {
                 if (auto pathKeepPtr = evalPathPtr->getPath().cast<PathKeep>();
                     pathKeepPtr != nullptr &&
-                    pathKeepPtr->getNames().size() < LogicalRewriter::kMaxPartialSchemaReqCount) {
+                    pathKeepPtr->getNames().size() < SargableNode::kMaxPartialSchemaReqs) {
                     // Optimization. If we are retaining fields on the root level, generate
                     // EvalNodes with the intention of converting later to a SargableNode after
                     // reordering, in order to be able to cover the fields using a physical scan or
@@ -905,7 +867,8 @@ struct SubstituteConvert<EvaluationNode> {
         }
 
         for (auto& [key, req] : conversion->_reqMap) {
-            req.setBoundProjectionName(evalNode.getProjectionName());
+            req = {
+                evalNode.getProjectionName(), std::move(req.getIntervals()), req.getIsPerfOnly()};
 
             uassert(6624114,
                     "Eval partial schema requirement must contain a variable name.",
@@ -952,6 +915,110 @@ struct ExploreConvert {
     void operator()(ABT::reference_type nodeRef, RewriteContext& ctx) = delete;
 };
 
+struct SplitRequirementsResult {
+    PartialSchemaRequirements _leftReqs;
+    PartialSchemaRequirements _rightReqs;
+
+    bool _hasFieldCoverage = true;
+    bool _hasLeftIntervals = false;
+    bool _hasRightIntervals = false;
+};
+
+/**
+ * Used to split requirements into left and right side. If "isIndex" is false, this is a separation
+ * between "index" and "fetch" predicates, otherwise it is a separation between the two sides of
+ * index intersection. The separation handles cases where we may have intervals which include Null
+ * and return the value, in which case instead of moving the requirement on the left, we insert a
+ * copy on the right side which will fetch the value from the collection. We convert perf-only
+ * requirements to non-perf when inserting on the left under "isIndex", otherwise we drop them. The
+ * mask parameter represents a bitmask indicating which requirements go on the left (bit is 1) and
+ * which go on the right.
+ */
+static SplitRequirementsResult splitRequirements(
+    const size_t mask,
+    const bool isIndex,
+    const bool fastIndexNullHandling,
+    const bool disableYieldingTolerantPlans,
+    const std::vector<bool>& isFullyOpen,
+    const std::vector<bool>& mayReturnNull,
+    const boost::optional<opt::unordered_set<FieldNameType>>& indexFieldPrefixMapForScanDef,
+    const PartialSchemaRequirements& reqMap) {
+    SplitRequirementsResult result;
+    auto& leftReqs = result._leftReqs;
+    auto& rightReqs = result._rightReqs;
+
+    const auto addRequirement = [](PartialSchemaRequirements& reqMap,
+                                   PartialSchemaKey key,
+                                   ProjectionName projName,
+                                   IntervalReqExpr::Node intervals) {
+        // We always strip out the perf-only flag.
+        reqMap.emplace(key,
+                       PartialSchemaRequirement{
+                           std::move(projName), std::move(intervals), false /*isPerfOnly*/});
+    };
+
+    size_t index = 0;
+    for (const auto& [key, req] : reqMap) {
+        const bool fullyOpenInterval = isFullyOpen.at(index);
+
+        if (((1ull << index) & mask) != 0) {
+            bool addedToLeft = false;
+            if (isIndex || fastIndexNullHandling || !mayReturnNull.at(index)) {
+                // We can never return Null values from the requirement.
+                if (isIndex || disableYieldingTolerantPlans || req.getIsPerfOnly()) {
+                    // Insert into left side unchanged.
+                    addRequirement(leftReqs, key, req.getBoundProjectionName(), req.getIntervals());
+                } else {
+                    // Insert a requirement on the right side too, left side is non-binding.
+                    addRequirement(leftReqs, key, "" /*boundProjectionName*/, req.getIntervals());
+                    addRequirement(
+                        rightReqs, key, req.getBoundProjectionName(), req.getIntervals());
+                }
+                addedToLeft = true;
+            } else {
+                // At this point we should not be seeing perf-only predicates.
+                invariant(!req.getIsPerfOnly());
+
+                // We cannot return index values if our interval can possibly contain Null. Instead,
+                // we remove the output binding for the left side, and return the value from the
+                // right (seek) side.
+                if (!fullyOpenInterval) {
+                    addRequirement(leftReqs, key, "" /*boundProjectionName*/, req.getIntervals());
+                    addedToLeft = true;
+                }
+                addRequirement(rightReqs,
+                               key,
+                               req.getBoundProjectionName(),
+                               disableYieldingTolerantPlans ? IntervalReqExpr::makeSingularDNF()
+                                                            : req.getIntervals());
+            }
+
+            if (addedToLeft) {
+                if (!fullyOpenInterval) {
+                    result._hasLeftIntervals = true;
+                }
+                if (indexFieldPrefixMapForScanDef) {
+                    if (auto pathPtr = key._path.cast<PathGet>(); pathPtr != nullptr &&
+                        indexFieldPrefixMapForScanDef->count(pathPtr->name()) == 0) {
+                        // We have found a left requirement which cannot be covered with an
+                        // index.
+                        result._hasFieldCoverage = false;
+                        break;
+                    }
+                }
+            }
+        } else if (isIndex || !req.getIsPerfOnly()) {
+            addRequirement(rightReqs, key, req.getBoundProjectionName(), req.getIntervals());
+            if (!fullyOpenInterval) {
+                result._hasRightIntervals = true;
+            }
+        }
+        index++;
+    }
+
+    return result;
+}
+
 template <>
 struct ExploreConvert<SargableNode> {
     void operator()(ABT::reference_type node, RewriteContext& ctx) {
@@ -997,15 +1064,19 @@ struct ExploreConvert<SargableNode> {
         const bool isIndex = target == IndexReqTarget::Index;
 
         const auto& indexFieldPrefixMap = ctx.getIndexFieldPrefixMap();
-        const auto indexFieldPrefixMapIt =
-            isIndex ? indexFieldPrefixMap.cend() : indexFieldPrefixMap.find(scanDefName);
-        const bool indexFieldMapHasScanDef = indexFieldPrefixMapIt != indexFieldPrefixMap.cend();
+        boost::optional<opt::unordered_set<FieldNameType>> indexFieldPrefixMapForScanDef;
+        if (auto it = indexFieldPrefixMap.find(scanDefName);
+            it != indexFieldPrefixMap.cend() && !isIndex) {
+            indexFieldPrefixMapForScanDef = it->second;
+        }
 
         const auto& reqMap = sargableNode.getReqMap();
 
         const bool fastIndexNullHandling = ctx.getHints()._fastIndexNullHandling;
+        const bool disableYieldingTolerantPlans = ctx.getHints()._disableYieldingTolerantPlans;
+
         std::vector<bool> isFullyOpen;
-        std::vector<bool> maybeHasNullAndBinds;
+        std::vector<bool> mayReturnNull;
         {
             // Pre-compute if a requirement's interval is fully open.
             isFullyOpen.reserve(reqMap.size());
@@ -1016,87 +1087,41 @@ struct ExploreConvert<SargableNode> {
             if (!fastIndexNullHandling && !isIndex) {
                 // Pre-compute if needed if a requirement's interval may contain nulls, and also has
                 // an output binding.
-                maybeHasNullAndBinds.reserve(reqMap.size());
+                mayReturnNull.reserve(reqMap.size());
                 for (const auto& [key, req] : reqMap) {
-                    maybeHasNullAndBinds.push_back(req.hasBoundProjectionName() &&
-                                                   checkMaybeHasNull(req.getIntervals()));
+                    mayReturnNull.push_back(req.mayReturnNull());
                 }
             }
         }
 
         // We iterate over the possible ways to split N predicates into 2^N subsets, one goes to the
-        // left, and the other to the right side.
+        // left, and the other to the right side. If splitting into Index+Seek (isIndex = false), we
+        // try having at least one predicate on the left (mask = 1), and we try all possible
+        // subsets. For index intersection however (isIndex = true), we try symmetric partitioning
+        // (thus the high bound is 2^(N-1)).
         const size_t reqSize = reqMap.size();
         const size_t highMask = isIndex ? (1ull << (reqSize - 1)) : (1ull << reqSize);
         for (size_t mask = 1; mask < highMask; mask++) {
-            PartialSchemaRequirements leftReqs;
-            PartialSchemaRequirements rightReqs;
-            bool hasFieldCoverage = true;
-            bool hasLeftIntervals = false;
-            bool hasRightIntervals = false;
+            SplitRequirementsResult splitResult = splitRequirements(mask,
+                                                                    isIndex,
+                                                                    fastIndexNullHandling,
+                                                                    disableYieldingTolerantPlans,
+                                                                    isFullyOpen,
+                                                                    mayReturnNull,
+                                                                    indexFieldPrefixMapForScanDef,
+                                                                    reqMap);
 
-            size_t index = 0;
-            for (const auto& [key, req] : reqMap) {
-                const bool fullyOpenInterval = isFullyOpen.at(index);
-
-                if (((1ull << index) & mask) != 0) {
-                    bool addedToLeft = false;
-                    if (fastIndexNullHandling || isIndex) {
-                        leftReqs.emplace(key, req);
-                        addedToLeft = true;
-                    } else if (maybeHasNullAndBinds.at(index)) {
-                        // We cannot return index values if our interval can possibly contain Null.
-                        // Instead, we remove the output binding for the left side, and return the
-                        // value from the right (seek) side.
-                        if (!fullyOpenInterval) {
-                            leftReqs.emplace(key, PartialSchemaRequirement{"", req.getIntervals()});
-                            addedToLeft = true;
-                        }
-                        rightReqs.emplace(
-                            key,
-                            PartialSchemaRequirement{req.getBoundProjectionName(),
-                                                     IntervalReqExpr::makeSingularDNF()});
-                    } else {
-                        leftReqs.emplace(key, req);
-                        addedToLeft = true;
-                    }
-
-                    if (addedToLeft) {
-                        if (!fullyOpenInterval) {
-                            hasLeftIntervals = true;
-                        }
-
-                        if (indexFieldMapHasScanDef) {
-                            if (auto pathPtr = key._path.cast<PathGet>(); pathPtr != nullptr &&
-                                indexFieldPrefixMapIt->second.count(pathPtr->name()) == 0) {
-                                // We have found a left requirement which cannot be covered with an
-                                // index.
-                                hasFieldCoverage = false;
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    rightReqs.emplace(key, req);
-
-                    if (!fullyOpenInterval) {
-                        hasRightIntervals = true;
-                    }
-                }
-                index++;
-            }
-
-            if (leftReqs.empty()) {
+            if (splitResult._leftReqs.empty()) {
                 // Can happen if we have intervals containing null.
                 invariant(!fastIndexNullHandling && !isIndex);
                 continue;
             }
 
-            if (isIndex && (!hasLeftIntervals || !hasRightIntervals)) {
+            if (isIndex && (!splitResult._hasLeftIntervals || !splitResult._hasRightIntervals)) {
                 // Reject. Must have at least one proper interval on either side.
                 continue;
             }
-            if (!hasFieldCoverage) {
+            if (!splitResult._hasFieldCoverage) {
                 // Reject rewrite. No suitable indexes.
                 continue;
             }
@@ -1104,7 +1129,7 @@ struct ExploreConvert<SargableNode> {
             bool hasEmptyLeftInterval = false;
             auto leftCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
                                                                 scanProjectionName,
-                                                                leftReqs,
+                                                                splitResult._leftReqs,
                                                                 scanDef,
                                                                 fastIndexNullHandling,
                                                                 hasEmptyLeftInterval);
@@ -1116,7 +1141,7 @@ struct ExploreConvert<SargableNode> {
             bool hasEmptyRightInterval = false;
             auto rightCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
                                                                  scanProjectionName,
-                                                                 rightReqs,
+                                                                 splitResult._rightReqs,
                                                                  scanDef,
                                                                  fastIndexNullHandling,
                                                                  hasEmptyRightInterval);
@@ -1129,25 +1154,25 @@ struct ExploreConvert<SargableNode> {
                     !hasEmptyLeftInterval && !hasEmptyRightInterval);
 
             ABT scanDelegator = make<MemoLogicalDelegatorNode>(scanGroupId);
-            ABT leftChild = make<SargableNode>(std::move(leftReqs),
+            ABT leftChild = make<SargableNode>(std::move(splitResult._leftReqs),
                                                std::move(leftCandidateIndexes),
                                                boost::none,
                                                IndexReqTarget::Index,
                                                scanDelegator);
 
             auto rightScanParams =
-                computeScanParams(ctx.getPrefixId(), rightReqs, scanProjectionName);
-            ABT rightChild = rightReqs.empty()
+                computeScanParams(ctx.getPrefixId(), splitResult._rightReqs, scanProjectionName);
+            ABT rightChild = splitResult._rightReqs.empty()
                 ? scanDelegator
-                : make<SargableNode>(std::move(rightReqs),
+                : make<SargableNode>(std::move(splitResult._rightReqs),
                                      std::move(rightCandidateIndexes),
                                      std::move(rightScanParams),
                                      isIndex ? IndexReqTarget::Index : IndexReqTarget::Seek,
                                      scanDelegator);
 
             ABT newRoot = make<RIDIntersectNode>(scanProjectionName,
-                                                 hasLeftIntervals,
-                                                 hasRightIntervals,
+                                                 splitResult._hasLeftIntervals,
+                                                 splitResult._hasRightIntervals,
                                                  std::move(leftChild),
                                                  std::move(rightChild));
 
@@ -1158,13 +1183,6 @@ struct ExploreConvert<SargableNode> {
                 }
             }
         }
-    }
-};
-
-template <>
-struct ExploreConvert<FilterNode> {
-    void operator()(ABT::reference_type node, RewriteContext& ctx) {
-        convertFilterToSargableNode<false /*isSubstitution*/>(node, *node.cast<FilterNode>(), ctx);
     }
 };
 
@@ -1362,8 +1380,6 @@ void LogicalRewriter::initializeRewrites() {
         LogicalRewriteType::ExchangeValueScanPropagate,
         &LogicalRewriter::bindAboveBelow<ExchangeNode, ValueScanNode, SubstituteReorder>);
 
-    registerRewrite(LogicalRewriteType::FilterExplore,
-                    &LogicalRewriter::bindSingleNode<FilterNode, ExploreConvert>);
     registerRewrite(LogicalRewriteType::GroupByExplore,
                     &LogicalRewriter::bindSingleNode<GroupByNode, ExploreConvert>);
     registerRewrite(LogicalRewriteType::SargableSplit,

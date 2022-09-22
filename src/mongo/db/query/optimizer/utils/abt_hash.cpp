@@ -127,6 +127,7 @@ static size_t computePartialSchemaReqHash(const PartialSchemaRequirements& reqMa
         updateHash(result, ABTHashGenerator::generate(key._path));
         updateHash(result, std::hash<ProjectionName>()(req.getBoundProjectionName()));
         updateHash(result, intervalHasher.compute(req.getIntervals()));
+        updateHash(result, std::hash<bool>()(req.getIsPerfOnly()));
     }
     return result;
 }

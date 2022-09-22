@@ -41,12 +41,6 @@ class LogicalRewriter {
     friend class RewriteContext;
 
 public:
-    /**
-     * Maximum size of PartialSchemaRequirements for a SargableNode.
-     * This limits the number of splits for index intersection.
-     */
-    static constexpr size_t kMaxPartialSchemaReqCount = 10;
-
     /*
      * How many times are we allowed to split a sargable node to facilitate index intersection.
      * Results in at most 2^N index intersections.

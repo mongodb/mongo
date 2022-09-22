@@ -790,6 +790,13 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
 
+  internalCascadesOptimizerDisableYieldingTolerantPlans:
+    description: "Controls if we prefer to insert redundant index predicates on the Seek side in order to prevent issues arising from yielding."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerDisableYieldingTolerantPlans"
+    cpp_vartype: AtomicWord<bool>
+    default: true
+
   internalCascadesOptimizerStdCoutDebugOutput:
     description: "Enables verbose, non-JSON, debug output for Cascades optimizer."
     set_at: [ startup, runtime ]

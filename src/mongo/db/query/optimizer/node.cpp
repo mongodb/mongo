@@ -282,6 +282,7 @@ EvaluationNode::EvaluationNode(ProjectionName projectionName, ProjectionType pro
     : Base(std::move(child),
            make<ExpressionBinder>(std::move(projectionName), std::move(projection))) {
     assertNodeSort(getChild());
+    tassert(6684504, "Empty projection name", !getProjectionName().empty());
 }
 
 bool EvaluationNode::operator==(const EvaluationNode& other) const {
@@ -371,27 +372,35 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
     tassert(6624085, "SargableNode requires at least one predicate", !_reqMap.empty());
     tassert(6624086,
             str::stream() << "SargableNode has too many predicates: " << _reqMap.size(),
-            _reqMap.size() < kMaxPartialSchemaRequirements);
+            _reqMap.size() <= kMaxPartialSchemaReqs);
 
     // Assert merged map does not contain duplicate bound projections.
     ProjectionNameSet boundsProjectionNameSet;
-    for (const auto& entry : _reqMap) {
-        if (entry.second.hasBoundProjectionName()) {
-            const bool inserted =
-                boundsProjectionNameSet.insert(entry.second.getBoundProjectionName()).second;
+    for (const auto& [key, req] : _reqMap) {
+        const bool reqHasBoundProj = req.hasBoundProjectionName();
+        if (reqHasBoundProj) {
+            const ProjectionName& projName = req.getBoundProjectionName();
+
+            tassert(6624094,
+                    "SargableNode has a multikey requirement with a non-trivial interval which "
+                    "also binds",
+                    isIntervalReqFullyOpenDNF(req.getIntervals()) ||
+                        !checkPathContainsTraverse(key._path));
+            tassert(
+                6624095, "SargableNode has a perf only binding requirement", !req.getIsPerfOnly());
+
+            const bool inserted = boundsProjectionNameSet.insert(projName).second;
             tassert(6624087,
-                    str::stream() << "SargableNode has duplicate bound projection: "
-                                  << entry.second.getBoundProjectionName(),
+                    str::stream() << "SargableNode has duplicate bound projection: " << projName,
                     inserted);
         }
     }
 
     // Assert there are no references to internally bound projections.
-    for (const auto& entry : _reqMap) {
+    for (const auto& [key, req] : _reqMap) {
         tassert(6624088,
                 "SargableNode cannot reference an internally bound projection",
-                boundsProjectionNameSet.find(entry.first._projectionName) ==
-                    boundsProjectionNameSet.cend());
+                boundsProjectionNameSet.count(key._projectionName) == 0);
     }
 }
 

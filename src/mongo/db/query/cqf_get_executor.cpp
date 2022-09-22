@@ -195,9 +195,10 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
                 ExtensionsCallbackNoop(),
                 MatchExpressionParser::kBanAllSpecialFeatures);
 
+            // We need a non-empty root projection name.
             ABT exprABT = generateMatchExpression(expr.get(),
                                                   false /*allowAggExpression*/,
-                                                  "" /*rootProjection*/,
+                                                  "<root>" /*rootProjection*/,
                                                   "" /*uniquePrefix*/);
             exprABT = make<EvalFilter>(std::move(exprABT), make<Variable>(scanProjName));
 
@@ -245,6 +246,8 @@ static QueryHints getHintsFromQueryKnobs() {
     hints._keepRejectedPlans = internalCascadesOptimizerKeepRejectedPlans.load();
     hints._disableBranchAndBound = internalCascadesOptimizerDisableBranchAndBound.load();
     hints._fastIndexNullHandling = internalCascadesOptimizerFastIndexNullHandling.load();
+    hints._disableYieldingTolerantPlans =
+        internalCascadesOptimizerDisableYieldingTolerantPlans.load();
 
     return hints;
 }

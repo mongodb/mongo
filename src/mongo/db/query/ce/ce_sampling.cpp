@@ -80,7 +80,8 @@ public:
                 lowerPartialSchemaRequirement(
                     key,
                     PartialSchemaRequirement{req.getBoundProjectionName(),
-                                             IntervalReqExpr::makeSingularDNF()},
+                                             IntervalReqExpr::makeSingularDNF(),
+                                             req.getIsPerfOnly()},
                     result,
                     _phaseManager.getPathToInterval());
             }
@@ -159,14 +160,20 @@ public:
         // TODO: consider estimating together the entire set of requirements (but caching!)
         CEType result = childResult;
         for (const auto& [key, req] : node.getReqMap()) {
+            if (req.getIsPerfOnly()) {
+                // Ignore perf-only requirements.
+                continue;
+            }
+
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
                 ABT lowered = extracted;
                 // Lower requirement without an output binding.
-                lowerPartialSchemaRequirement(
-                    key,
-                    PartialSchemaRequirement{"" /*boundProjectionName*/, req.getIntervals()},
-                    lowered,
-                    _phaseManager.getPathToInterval());
+                lowerPartialSchemaRequirement(key,
+                                              PartialSchemaRequirement{"" /*boundProjectionName*/,
+                                                                       req.getIntervals(),
+                                                                       req.getIsPerfOnly()},
+                                              lowered,
+                                              _phaseManager.getPathToInterval());
                 uassert(6624243, "Expected a filter node", lowered.is<FilterNode>());
                 result = estimateFilterCE(memo, logicalProps, n, std::move(lowered), result);
             }

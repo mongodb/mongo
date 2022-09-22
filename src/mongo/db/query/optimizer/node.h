@@ -435,10 +435,9 @@ class SargableNode final : public Operator<3>, public ExclusivelyLogicalNode {
 
 public:
     /**
-     * Maximum size of the PartialSchemaRequirements that can be used to create a SargableNode. We
-     * use a 64-bit mask when splitting into left and right requirements.
+     * Maximum size of the PartialSchemaRequirements that can be used to create a SargableNode.
      */
-    static constexpr size_t kMaxPartialSchemaRequirements = 64;
+    static constexpr size_t kMaxPartialSchemaReqs = 10;
 
     SargableNode(PartialSchemaRequirements reqMap,
                  CandidateIndexes candidateIndexes,

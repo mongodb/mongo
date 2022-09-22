@@ -1760,6 +1760,130 @@ TEST(PhysRewriter, FilterIndexingMaxKey) {
         optimized);
 }
 
+TEST(PhysRewriter, SargableProjectionRenames) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    ABT evalNode1 = make<EvaluationNode>(
+        "pa",
+        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
+        std::move(scanNode));
+
+    ABT filterNode1 =
+        make<FilterNode>(make<EvalFilter>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                          make<Variable>("pa")),
+                         std::move(evalNode1));
+
+    ABT evalNode2 = make<EvaluationNode>(
+        "pa1",
+        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
+        std::move(filterNode1));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(evalNode2));
+
+    PrefixId prefixId;
+    OptPhaseManager phaseManager(
+        {OptPhase::MemoSubstitutionPhase},
+        prefixId,
+        {{{"c1", {{}, {}}}}},
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
+
+    // Demonstrate we can combine the field access to "a" into a single entry and provide two output
+    // projections.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [pa1]\n"
+        "|           Variable [pa]\n"
+        "Sargable [Complete]\n"
+        "|   |   |   |   |   requirementsMap: \n"
+        "|   |   |   |   |       refProjection: root, path: 'PathGet [a] PathIdentity []', "
+        "boundProjection: pa, intervals: {{{[Const [1], Const [1]]}}}\n"
+        "|   |   |   |   candidateIndexes: \n"
+        "|   |   |   scanParams: \n"
+        "|   |   |       {'a': pa}\n"
+        "|   |   |           residualReqs: \n"
+        "|   |   |               refProjection: pa, path: 'PathIdentity []', intervals: {{{[Const "
+        "[1], Const [1]]}}}, entryIndex: 0\n"
+        "|   |   BindBlock:\n"
+        "|   |       [pa]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Scan [c1]\n"
+        "    BindBlock:\n"
+        "        [root]\n"
+        "            Source []\n",
+        optimized);
+}
+
+TEST(PhysRewriter, SargableAcquireProjection) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(make<PathGet>("a", make<PathCompare>(Operations::Eq, Constant::int64(1))),
+                         make<Variable>("root")),
+        std::move(scanNode));
+
+    ABT evalNode = make<EvaluationNode>(
+        "pa",
+        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
+        std::move(filterNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(evalNode));
+
+    PrefixId prefixId;
+    OptPhaseManager phaseManager(
+        {OptPhase::MemoSubstitutionPhase},
+        prefixId,
+        {{{"c1", {{}, {}}}}},
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
+
+    // Demonstrate that we combine the field access for the filter and eval nodes.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Sargable [Complete]\n"
+        "|   |   |   |   |   requirementsMap: \n"
+        "|   |   |   |   |       refProjection: root, path: 'PathGet [a] PathIdentity []', "
+        "boundProjection: pa, intervals: {{{[Const [1], Const [1]]}}}\n"
+        "|   |   |   |   candidateIndexes: \n"
+        "|   |   |   scanParams: \n"
+        "|   |   |       {'a': pa}\n"
+        "|   |   |           residualReqs: \n"
+        "|   |   |               refProjection: pa, path: 'PathIdentity []', intervals: {{{[Const "
+        "[1], Const [1]]}}}, entryIndex: 0\n"
+        "|   |   BindBlock:\n"
+        "|   |       [pa]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Scan [c1]\n"
+        "    BindBlock:\n"
+        "        [root]\n"
+        "            Source []\n",
+        optimized);
+}
+
 TEST(PhysRewriter, FilterReorder) {
     using namespace properties;
     PrefixId prefixId;
@@ -3747,7 +3871,7 @@ TEST(PhysRewriter, ArrayConstantIndex) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(10, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(7, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate we get index bounds to handle the array constant, while we also retain the
     // original filter. We have index bound with the array itself unioned with bound using the first
@@ -3801,6 +3925,86 @@ TEST(PhysRewriter, ArrayConstantIndex) {
         "[0], Const [0]], [Const [[1, 2, 3]], Const [[1, 2, 3]]]}]\n"
         "    BindBlock:\n"
         "        [rid_0]\n"
+        "            Source []\n",
+        optimized);
+}
+
+TEST(PhysRewriter, ArrayConstantNoIndex) {
+    using namespace properties;
+    PrefixId prefixId;
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    ABT filterNode1 = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)),
+                                             PathTraverse::kSingleLevel)),
+            make<Variable>("root")),
+        std::move(scanNode));
+
+    const auto [tag, val] = sbe::value::makeNewArray();
+    sbe::value::Array* arr = sbe::value::getArrayView(val);
+    for (int i = 0; i < 3; i++) {
+        arr->push_back(sbe::value::TypeTags::NumberInt32, i + 1);
+    }
+    ABT arrayConst = make<Constant>(tag, val);
+
+    // This encodes a match against an array constant.
+    ABT filterNode2 = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>(
+                "a",
+                make<PathComposeA>(make<PathTraverse>(make<PathCompare>(Operations::Eq, arrayConst),
+                                                      PathTraverse::kSingleLevel),
+                                   make<PathCompare>(Operations::Eq, arrayConst))),
+            make<Variable>("root")),
+        std::move(filterNode1));
+
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"root"}},
+                                  std::move(filterNode2));
+
+    OptPhaseManager phaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1", {{}, {}}}}},
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
+    ASSERT_EQ(3, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // Without an index, we retain the original array bounds predicate, and do not duplicate the
+    // predicates in the sargable node (they are perf only)
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [[1, 2, 3]]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [[1, 2, 3]]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_1]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [0]\n"
+        "PhysicalScan [{'<root>': root, 'b': evalTemp_1}, c1]\n"
+        "    BindBlock:\n"
+        "        [evalTemp_1]\n"
+        "            Source []\n"
+        "        [root]\n"
         "            Source []\n",
         optimized);
 }
@@ -5176,6 +5380,206 @@ TEST(PhysRewriter, IndexSubfieldCovered) {
         "[1], Const [1]]}]\n"
         "    BindBlock:\n"
         "        [pa]\n"
+        "            Source []\n",
+        optimized);
+}
+
+TEST(PhysRewriter, PerfOnlyPreds1) {
+    using namespace properties;
+
+    PartialSchemaSelHints hints;
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())}, 0.01);
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())}, 0.02);
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    ABT evalNode = make<EvaluationNode>(
+        "pa",
+        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
+        std::move(scanNode));
+    ABT filterNode1 = make<FilterNode>(
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(1)),
+                                            PathTraverse::kSingleLevel),
+                         make<Variable>("pa")),
+        std::move(evalNode));
+
+    ABT filterNode2 = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                             PathTraverse::kSingleLevel)),
+            make<Variable>("root")),
+        std::move(filterNode1));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(filterNode2));
+
+    PrefixId prefixId;
+    OptPhaseManager phaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        false /*requireRID*/,
+        {{{"c1",
+           ScanDefinition{
+               {},
+               {{"index1",
+                 makeCompositeIndexDefinition({{"b", CollationOp::Ascending, false /*isMultiKey*/},
+                                               {"a", CollationOp::Ascending, false /*isMultiKey*/}},
+                                              false /*isMultiKey*/)}}}}}},
+        std::make_unique<HintedCE>(std::move(hints)),
+        std::make_unique<DefaultCosting>(),
+        {} /*pathToInterval*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.getHints()._disableYieldingTolerantPlans = false;
+    phaseManager.optimize(optimized);
+    ASSERT_BETWEEN(10, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // Demonstrate predicates are repeated on the Seek side. Also demonstrate null handling, and the
+    // fact that we apply the predicates on the Seek side in increasing selectivity order.
+    ASSERT_EXPLAIN_V2Compact(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       pa\n"
+        "|   RefBlock: \n"
+        "|       Variable [pa]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_3]\n"
+        "|   |   PathCompare [Eq] Const [2]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [pa]\n"
+        "|   |   PathCompare [Lt] Const [1]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'a': pa, 'b': evalTemp_3}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [evalTemp_3]\n"
+        "|   |           Source []\n"
+        "|   |       [pa]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[2], Const [2]], [Const [minKey], Const [1])}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimized);
+}
+
+TEST(PhysRewriter, PerfOnlyPreds2) {
+    using namespace properties;
+
+    PartialSchemaSelHints hints;
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())}, 0.001);
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())}, 0.001);
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    ABT evalNode = make<EvaluationNode>(
+        "pa",
+        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
+        std::move(scanNode));
+    ABT filterNode1 = make<FilterNode>(
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                            PathTraverse::kSingleLevel),
+                         make<Variable>("pa")),
+        std::move(evalNode));
+
+    ABT filterNode2 = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                             PathTraverse::kSingleLevel)),
+            make<Variable>("root")),
+        std::move(filterNode1));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(filterNode2));
+
+    PrefixId prefixId;
+    OptPhaseManager phaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        false /*requireRID*/,
+        {{{"c1",
+           ScanDefinition{
+               {},
+               {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)},
+                {"index2",
+                 makeIndexDefinition("b", CollationOp::Ascending, false /*isMultiKey*/)}}}}}},
+        std::make_unique<HintedCE>(std::move(hints)),
+        std::make_unique<DefaultCosting>(),
+        {} /*pathToInterval*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.getHints()._disableYieldingTolerantPlans = false;
+    phaseManager.optimize(optimized);
+    ASSERT_BETWEEN(10, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // Demonstrate an intersection plan, with predicates repeated on the Seek side.
+    ASSERT_EXPLAIN_V2Compact(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       pa\n"
+        "|   RefBlock: \n"
+        "|       Variable [pa]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_2]\n"
+        "|   |   PathCompare [Eq] Const [2]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [pa]\n"
+        "|   |   PathCompare [Eq] Const [1]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'a': pa, 'b': evalTemp_2}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [evalTemp_2]\n"
+        "|   |           Source []\n"
+        "|   |       [pa]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "MergeJoin []\n"
+        "|   |   |   Condition\n"
+        "|   |   |       rid_0 = rid_3\n"
+        "|   |   Collation\n"
+        "|   |       Ascending\n"
+        "|   Union []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [rid_3]\n"
+        "|   |           Source []\n"
+        "|   Evaluation []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [rid_3]\n"
+        "|   |           Variable [rid_0]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: {[Const "
+        "[2], Const [2]]}]\n"
+        "|       BindBlock:\n"
+        "|           [rid_0]\n"
+        "|               Source []\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[1], Const [1]]}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
         "            Source []\n",
         optimized);
 }

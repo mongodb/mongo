@@ -30,6 +30,7 @@
 #include "mongo/db/query/optimizer/index_bounds.h"
 
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 
 
 namespace mongo::optimizer {
@@ -103,11 +104,6 @@ void IntervalRequirement::reverse() {
     std::swap(_lowBound, _highBound);
 }
 
-PartialSchemaKey::PartialSchemaKey() : PartialSchemaKey({}, make<PathIdentity>()) {}
-
-PartialSchemaKey::PartialSchemaKey(ProjectionName projectionName)
-    : PartialSchemaKey(std::move(projectionName), make<PathIdentity>()) {}
-
 PartialSchemaKey::PartialSchemaKey(ProjectionName projectionName, ABT path)
     : _projectionName(std::move(projectionName)), _path(std::move(path)) {
     assertPathSort(_path);
@@ -124,15 +120,20 @@ bool isIntervalReqFullyOpenDNF(const IntervalReqExpr::Node& n) {
     return false;
 }
 
-PartialSchemaRequirement::PartialSchemaRequirement()
-    : _intervals(IntervalReqExpr::makeSingularDNF()) {}
-
 PartialSchemaRequirement::PartialSchemaRequirement(ProjectionName boundProjectionName,
-                                                   IntervalReqExpr::Node intervals)
-    : _boundProjectionName(std::move(boundProjectionName)), _intervals(std::move(intervals)) {}
+                                                   IntervalReqExpr::Node intervals,
+                                                   const bool isPerfOnly)
+    : _boundProjectionName(std::move(boundProjectionName)),
+      _intervals(std::move(intervals)),
+      _isPerfOnly(isPerfOnly) {
+    tassert(6624154,
+            "Cannot have perf only requirement which also binds",
+            !_isPerfOnly || !hasBoundProjectionName());
+}
 
 bool PartialSchemaRequirement::operator==(const PartialSchemaRequirement& other) const {
-    return _boundProjectionName == other._boundProjectionName && _intervals == other._intervals;
+    return _boundProjectionName == other._boundProjectionName && _intervals == other._intervals &&
+        _isPerfOnly == other._isPerfOnly;
 }
 
 bool PartialSchemaRequirement::hasBoundProjectionName() const {
@@ -143,17 +144,17 @@ const ProjectionName& PartialSchemaRequirement::getBoundProjectionName() const {
     return _boundProjectionName;
 }
 
-void PartialSchemaRequirement::setBoundProjectionName(ProjectionName boundProjectionName) {
-    _boundProjectionName = std::move(boundProjectionName);
-}
-
 const IntervalReqExpr::Node& PartialSchemaRequirement::getIntervals() const {
     return _intervals;
 }
 
-IntervalReqExpr::Node& PartialSchemaRequirement::getIntervals() {
-    return _intervals;
+bool PartialSchemaRequirement::getIsPerfOnly() const {
+    return _isPerfOnly;
 }
+
+bool PartialSchemaRequirement::mayReturnNull() const {
+    return hasBoundProjectionName() && checkMaybeHasNull(getIntervals());
+};
 
 /**
  * Helper class used to compare PartialSchemaKey objects.

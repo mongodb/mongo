@@ -79,8 +79,6 @@ private:
 };
 
 struct PartialSchemaKey {
-    PartialSchemaKey();
-    PartialSchemaKey(ProjectionName projectionName);
     PartialSchemaKey(ProjectionName projectionName, ABT path);
 
     bool operator==(const PartialSchemaKey& other) const;
@@ -97,23 +95,31 @@ bool isIntervalReqFullyOpenDNF(const IntervalReqExpr::Node& n);
 
 class PartialSchemaRequirement {
 public:
-    PartialSchemaRequirement();
-    PartialSchemaRequirement(ProjectionName boundProjectionName, IntervalReqExpr::Node intervals);
+    PartialSchemaRequirement(ProjectionName boundProjectionName,
+                             IntervalReqExpr::Node intervals,
+                             bool isPerfOnly);
 
     bool operator==(const PartialSchemaRequirement& other) const;
 
     bool hasBoundProjectionName() const;
     const ProjectionName& getBoundProjectionName() const;
-    void setBoundProjectionName(ProjectionName boundProjectionName);
 
     const IntervalReqExpr::Node& getIntervals() const;
-    IntervalReqExpr::Node& getIntervals();
+
+    bool getIsPerfOnly() const;
+
+    bool mayReturnNull() const;
 
 private:
     // Bound, or output projection name.
     ProjectionName _boundProjectionName;
 
     IntervalReqExpr::Node _intervals;
+
+    // If set, this requirement exists for performance reasons (as opposed to correctness). We will
+    // attempt to incorporate it into index bounds, otherwise will not add it to residual
+    // predicates.
+    bool _isPerfOnly;
 };
 
 /**

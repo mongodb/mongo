@@ -127,6 +127,11 @@ public:
         // Initial first pass through the requirements map to extract information about each path.
         std::map<std::string, SargableConjunct> conjunctRequirements;
         for (const auto& [key, req] : node.getReqMap()) {
+            if (req.getIsPerfOnly()) {
+                // Ignore perf-only requirements.
+                continue;
+            }
+
             const auto serializedPath = serializePath(key._path.ref());
             const auto& interval = req.getIntervals();
             const bool isPathArrInterval =

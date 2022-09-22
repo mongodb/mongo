@@ -258,6 +258,10 @@ struct QueryHints {
     // Controls if we prefer to cover queries which may return nulls with indexes, even though we
     // may not distinguish between null and missing. Alternatively we always fetch (slower).
     bool _fastIndexNullHandling = false;
+
+    // Controls if we prefer to insert redundant index predicates on the Seek side in order to
+    // prevent issues arising from yielding.
+    bool _disableYieldingTolerantPlans = true;
 };
 
 }  // namespace mongo::optimizer

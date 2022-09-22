@@ -1060,6 +1060,8 @@ public:
                 local.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
             }
 
+            printBooleanFlag(local, "perfOnly", req.getIsPerfOnly());
+
             printers.push_back(std::move(local));
         }
 
