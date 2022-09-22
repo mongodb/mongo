@@ -168,7 +168,9 @@ main(int argc, char *argv[])
 static void
 wt_connect(SHARED_CONFIG *cfg, char *config_open)
 {
-    static WT_EVENT_HANDLER event_handler = {handle_error, handle_message, NULL, NULL, NULL};
+    static WT_EVENT_HANDLER event_handler = {
+      handle_error, handle_message, NULL, NULL /* Close handler. */
+    };
     char config[512];
 
     testutil_clean_work_dir(home);

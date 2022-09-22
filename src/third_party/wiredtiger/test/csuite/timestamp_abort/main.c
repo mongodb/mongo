@@ -71,7 +71,6 @@ static char home[1024]; /* Program working dir */
 /* Include worker threads and prepare extra sessions */
 #define SESSION_MAX (MAX_TH + 3 + MAX_TH * PREPARE_PCT)
 #define STAT_WAIT 1
-#define USEC_STAT 10000
 
 static const char *table_pfx = "table";
 static const char *const uri_collection = "collection";
@@ -134,105 +133,6 @@ static wt_timestamp_t *active_timestamps; /* Oldest timestamps still in use. */
 static void handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
-static void handle_conn_close(void);
-static void handle_conn_ready(WT_CONNECTION *);
-static int handle_general(WT_EVENT_HANDLER *, WT_CONNECTION *, WT_SESSION *, WT_EVENT_TYPE);
-
-static WT_CONNECTION *stat_conn = NULL;
-static WT_SESSION *stat_session = NULL;
-static volatile bool stat_run = false;
-static wt_thread_t stat_th;
-
-static WT_EVENT_HANDLER my_event = {NULL, NULL, NULL, NULL, handle_general};
-/*
- * stat_func --
- *     Function to run with the early connection and gather statistics.
- */
-static WT_THREAD_RET
-stat_func(void *arg)
-{
-    WT_CURSOR *stat_c;
-    int64_t last, value;
-    const char *desc, *pvalue;
-
-    WT_UNUSED(arg);
-    testutil_assert(stat_conn != NULL);
-    testutil_check(stat_conn->open_session(stat_conn, NULL, NULL, &stat_session));
-    desc = pvalue = NULL;
-    /* Start last and value at different numbers so we print the first value, likely 0. */
-    last = -1;
-    value = 0;
-    while (stat_run) {
-        testutil_check(stat_session->open_cursor(stat_session, "statistics:", NULL, NULL, &stat_c));
-
-        /* Pick some statistic that is likely changed during recovery RTS. */
-        stat_c->set_key(stat_c, WT_STAT_CONN_TXN_RTS_PAGES_VISITED);
-        testutil_check(stat_c->search(stat_c));
-        testutil_check(stat_c->get_value(stat_c, &desc, &pvalue, &value));
-        testutil_check(stat_c->close(stat_c));
-        if (desc != NULL && value != last)
-            printf("%s: %" PRId64 "\n", desc, value);
-        last = value;
-        usleep(USEC_STAT);
-    }
-    testutil_check(stat_session->close(stat_session, NULL));
-    return (WT_THREAD_RET_VALUE);
-}
-
-/*
- * handle_conn_close --
- *     Function to handle connection close callbacks from WiredTiger.
- */
-static void
-handle_conn_close(void)
-{
-    /*
-     * Signal the statistics thread to exit and clear the global connection. This function cannot
-     * return until the user thread stops using the connection.
-     */
-    stat_run = false;
-    testutil_check(__wt_thread_join(NULL, &stat_th));
-    stat_conn = NULL;
-}
-
-/*
- * handle_conn_ready --
- *     Function to handle connection ready callbacks from WiredTiger.
- */
-static void
-handle_conn_ready(WT_CONNECTION *conn)
-{
-    int unused;
-
-    /*
-     * Set the global connection for statistics and then start a statistics thread.
-     */
-    unused = 0;
-    testutil_assert(stat_conn == NULL);
-    memset(&stat_th, 0, sizeof(stat_th));
-    stat_conn = conn;
-    stat_run = true;
-    testutil_check(__wt_thread_create(NULL, &stat_th, stat_func, (void *)&unused));
-}
-
-/*
- * handle_general --
- *     Function to handle general event callbacks.
- */
-static int
-handle_general(
-  WT_EVENT_HANDLER *handler, WT_CONNECTION *conn, WT_SESSION *session, WT_EVENT_TYPE type)
-{
-    WT_UNUSED(handler);
-    WT_UNUSED(session);
-
-    if (type == WT_EVENT_CONN_CLOSE)
-        handle_conn_close();
-    else if (type == WT_EVENT_CONN_READY)
-        handle_conn_ready(conn);
-    return (0);
-}
-
 /*
  * usage --
  *     TODO: Add a comment describing this function.
@@ -270,8 +170,7 @@ thread_ts_run(void *arg)
     __wt_seconds((WT_SESSION_IMPL *)session, &last_reconfig);
     /* Update the oldest/stable timestamps every 1 millisecond. */
     for (last_ts = 0;; __wt_sleep(0, 1000)) {
-        /* Get the last committed timestamp periodically in order to update the oldest
-         * timestamp. */
+        /* Get the last committed timestamp periodically in order to update the oldest timestamp. */
         ts = maximum_stable_ts(active_timestamps, nth);
         if (ts == last_ts)
             continue;
@@ -898,15 +797,12 @@ main(int argc, char *argv[])
     /* Copy the data to a separate folder for debugging purpose. */
     testutil_copy_data(home);
 
-    printf("Open database and run recovery\n");
+    printf("Open database, run recovery and verify content\n");
 
     /*
      * Open the connection which forces recovery to be run.
      */
-    testutil_check(wiredtiger_open(NULL, &my_event, ENV_CONFIG_REC, &conn));
-    printf("Connection open and recovery complete. Verify content\n");
-    /* Sleep to guarantee the statistics thread has enough time to run. */
-    usleep(USEC_STAT + 10);
+    testutil_check(wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     /*
      * Open a cursor on all the tables.

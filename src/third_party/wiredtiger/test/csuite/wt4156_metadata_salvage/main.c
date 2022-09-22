@@ -67,7 +67,7 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const 
     return (0);
 }
 
-static WT_EVENT_HANDLER event_handler = {handle_message, NULL, NULL, NULL, NULL};
+static WT_EVENT_HANDLER event_handler = {handle_message, NULL, NULL, NULL};
 
 typedef struct table_info {
     const char *name;
