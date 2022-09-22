@@ -1247,7 +1247,7 @@ buildvariants:
       --ssl
       -j$(sysctl -n hw.logicalcpu)
       --libc++
-      -variables-files=etc/scons/xcode_macosx.vars
+      --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
