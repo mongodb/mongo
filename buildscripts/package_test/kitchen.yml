@@ -79,6 +79,12 @@ platforms:
       instance_type: m6g.medium
     transport:
       username: ec2-user
+  - name: rhel90-x86-64
+    driver:
+      image_id: ami-0c41531b8d18cc72b
+      user_data: rhel-user-data.sh
+    transport:
+      username: ec2-user
   - name: suse11-x86-64
     driver:
       image_id: ami-7f2e6015
