@@ -43,6 +43,17 @@ __rec_child_deleted(
         visible = visible_all = __wt_page_del_visible_all(session, page_del, true);
 
     /*
+     * If an earlier reconciliation chose to write the fast truncate information to the page, we
+     * should select it regardless of visibility unless it is visible globally visible. This is
+     * important as it is never ok to shift the on-disk value backwards.
+     */
+    if (page_del->selected_for_write && !visible_all) {
+        cmsp->del = *page_del;
+        cmsp->state = WT_CHILD_PROXY;
+        return (0);
+    }
+
+    /*
      * The truncate may not yet be visible to us. In that case, we proceed as with any change not
      * visible during reconciliation by ignoring the change for the purposes of writing the internal
      * page.
@@ -55,6 +66,7 @@ __rec_child_deleted(
      * truncation is lost.
      */
     if (!visible) {
+        WT_ASSERT(session, !visible_all);
         if (F_ISSET(r, WT_REC_VISIBILITY_ERR))
             WT_RET_PANIC(session, EINVAL, "reconciliation illegally skipped an update");
         /*
@@ -97,6 +109,7 @@ __rec_child_deleted(
     if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
         WT_ASSERT_ALWAYS(session, !F_ISSET(r, WT_REC_EVICT),
           "In progress prepares should never be seen in eviction");
+        WT_ASSERT(session, !visible_all);
 
         cmsp->state = WT_CHILD_ORIGINAL;
         r->leave_dirty = true;
@@ -114,6 +127,7 @@ __rec_child_deleted(
     if (!visible_all) {
         cmsp->del = *page_del;
         cmsp->state = WT_CHILD_PROXY;
+        page_del->selected_for_write = true;
         return (0);
     }
 

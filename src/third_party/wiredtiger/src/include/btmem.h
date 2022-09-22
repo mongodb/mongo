@@ -890,6 +890,9 @@ struct __wt_page_deleted {
      * entire structure is discarded, that is, the flag is set only on commit and not on rollback.)
      */
     bool committed;
+
+    /* Flag to indicate fast-truncate is written to disk. */
+    bool selected_for_write;
 };
 
 /*
