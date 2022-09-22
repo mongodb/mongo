@@ -1,4 +1,6 @@
 import time
+import sys
+import subprocess
 
 _BUILD_METRIC_DATA = {}
 
@@ -33,6 +35,23 @@ class CaptureAtexits:
     def __eq__(self, other):
         self.captured.append(other)
         return False
+
+
+def mem_adjustment(mem_usage):
+    # apparently macos big sur (11) changed some of the api for getting memory,
+    # so the memory comes up a bit larger than expected. Testing shows it about
+    # 10 times large then what native macos tools report, so we will do some
+    # adjustment in the mean time until its fixed:
+    # https://github.com/giampaolo/psutil/issues/1908
+    try:
+        if sys.platform == "darwin":
+            mem_adjust_version = subprocess.run(['sw_vers', '-productVersion'], capture_output=True,
+                                                text=True, check=False).stdout.split('.')[0]
+            if int(mem_adjust_version) > 10:
+                return int(mem_usage / 10)
+    except (IndexError, ValueError):
+        pass
+    return mem_usage
 
 
 def get_build_metric_dict():

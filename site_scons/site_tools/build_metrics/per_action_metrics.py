@@ -1,13 +1,13 @@
 import functools
 import time
 import psutil
-import platform
+import subprocess
 
 import memory_profiler
 import SCons
 import sys
 
-from .util import fullname
+from .util import fullname, mem_adjustment
 from .protocol import BuildMetricsCollector
 
 
@@ -180,14 +180,8 @@ class PerActionMetrics(BuildMetricsCollector):
 
         task_metrics['end_time'] = time.time_ns()
         task_metrics['cpu_time'] = int(cpu_usage * (10.0**9.0))
-        # apparently macos big sur (11) changed some of the api for getting memory,
-        # so the memory comes up a bit larger than expected:
-        # https://github.com/giampaolo/psutil/issues/1908
-        if sys.platform == "darwin" and platform.mac_ver()[0] and int(
-                platform.mac_ver()[0].split('.')[0]) > 10:
-            task_metrics['mem_usage'] = int(mem_usage / 1024.0)
-        else:
-            task_metrics['mem_usage'] = int(mem_usage)
+        task_metrics['mem_usage'] = mem_adjustment(int(mem_usage))
+
         self.build_tasks_metrics.append(task_metrics)
         task_metrics['array_index'] = self.build_tasks_metrics.index(task_metrics)
 
