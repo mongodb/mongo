@@ -1253,16 +1253,16 @@ public:
  */
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr);
 
-struct ParsedFindPayload {
+struct ParsedFindEqualityPayload {
     ESCDerivedFromDataToken escToken;
     ECCDerivedFromDataToken eccToken;
     EDCDerivedFromDataToken edcToken;
     boost::optional<ServerDataEncryptionLevel1Token> serverToken;
     boost::optional<std::int64_t> maxCounter;
 
-    explicit ParsedFindPayload(BSONElement fleFindPayload);
-    explicit ParsedFindPayload(const Value& fleFindPayload);
-    explicit ParsedFindPayload(ConstDataRange cdr);
+    explicit ParsedFindEqualityPayload(BSONElement fleFindPayload);
+    explicit ParsedFindEqualityPayload(const Value& fleFindPayload);
+    explicit ParsedFindEqualityPayload(ConstDataRange cdr);
 };
 
 

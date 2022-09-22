@@ -3136,13 +3136,13 @@ StringMap<FLEDeleteToken> EncryptionInformationHelpers::getDeleteTokens(
     return map;
 }
 
-ParsedFindPayload::ParsedFindPayload(BSONElement fleFindPayload)
-    : ParsedFindPayload(binDataToCDR(fleFindPayload)){};
+ParsedFindEqualityPayload::ParsedFindEqualityPayload(BSONElement fleFindPayload)
+    : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload)){};
 
-ParsedFindPayload::ParsedFindPayload(const Value& fleFindPayload)
-    : ParsedFindPayload(binDataToCDR(fleFindPayload)){};
+ParsedFindEqualityPayload::ParsedFindEqualityPayload(const Value& fleFindPayload)
+    : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload)){};
 
-ParsedFindPayload::ParsedFindPayload(ConstDataRange cdr) {
+ParsedFindEqualityPayload::ParsedFindEqualityPayload(ConstDataRange cdr) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
 

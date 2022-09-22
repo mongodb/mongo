@@ -40,19 +40,16 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/count_command_gen.h"
+#include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/db/transaction/transaction_api.h"
 
+/**
+ * This file contains the interface for rewriting filters within CRUD commands for FLE2.
+ */
 namespace mongo {
 class FLEQueryInterface;
 namespace fle {
 
-/**
- * Low Selectivity rewrites use $expr which is not supported in all commands such as upserts.
- */
-enum class EncryptedCollScanModeAllowed {
-    kAllow,
-    kDisallow,
-};
 
 /**
  * Make a collator object from its BSON representation. Useful when creating ExpressionContext
@@ -116,152 +113,5 @@ BSONObj rewriteEncryptedFilterInsideTxn(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     BSONObj filter,
     EncryptedCollScanModeAllowed mode = EncryptedCollScanModeAllowed::kDisallow);
-
-/**
- * Class which handles rewriting filter MatchExpressions for FLE2. The functionality is encapsulated
- * as a class rather than just a namespace so that the collection readers don't have to be passed
- * around as extra arguments to every function.
- *
- * Exposed in the header file for unit testing purposes. External callers should use the
- * rewriteEncryptedFilterInsideTxn() helper function defined above.
- */
-class FLEQueryRewriter {
-public:
-    enum class EncryptedCollScanMode {
-        // Always use high cardinality filters, used by tests
-        kForceAlways,
-
-        // Use high cardinality mode if $in rewrites do not fit in the
-        // internalQueryFLERewriteMemoryLimit memory limit
-        kUseIfNeeded,
-
-        // Do not rewrite into high cardinality filter, throw exceptions instead
-        // Some contexts like upsert do not support $expr
-        kDisallow,
-    };
-
-    /**
-     * Takes in references to collection readers for the ESC and ECC that are used during tag
-     * computation.
-     */
-    FLEQueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx,
-                     const FLEStateCollectionReader& escReader,
-                     const FLEStateCollectionReader& eccReader,
-                     EncryptedCollScanModeAllowed mode = EncryptedCollScanModeAllowed::kAllow)
-        : _expCtx(expCtx), _escReader(&escReader), _eccReader(&eccReader) {
-
-        if (internalQueryFLEAlwaysUseEncryptedCollScanMode.load()) {
-            _mode = EncryptedCollScanMode::kForceAlways;
-        }
-
-        if (mode == EncryptedCollScanModeAllowed::kDisallow) {
-            _mode = EncryptedCollScanMode::kDisallow;
-        }
-
-        // This isn't the "real" query so we don't want to increment Expression
-        // counters here.
-        _expCtx->stopExpressionCounters();
-    }
-
-    /**
-     * Accepts a BSONObj holding a MatchExpression, and returns BSON representing the rewritten
-     * expression. Returns boost::none if no rewriting was done.
-     *
-     * Rewrites the match expression with FLE find payloads into a disjunction on the
-     * __safeContent__ array of tags.
-     *
-     * Will rewrite top-level $eq and $in expressions, as well as recursing through $and, $or, $not
-     * and $nor. Also handles similarly limited rewriting under $expr. All other MatchExpressions,
-     * notably $elemMatch, are ignored.
-     */
-    boost::optional<BSONObj> rewriteMatchExpression(const BSONObj& filter);
-
-    /**
-     * Accepts an expression to be re-written. Will rewrite top-level expressions including $eq and
-     * $in, as well as recursing through other expressions. Returns a new pointer if the top-level
-     * expression must be changed. A nullptr indicates that the modifications happened in-place.
-     */
-    std::unique_ptr<Expression> rewriteExpression(Expression* expression);
-
-    /**
-     * Determine whether a given BSONElement is in fact a FLE find payload by checking that it is
-     * the same type as the given EncryptedBinDataType. Sub-type 6, sub-sub-type determined by
-     * "type."
-     */
-    virtual bool isFleFindPayload(const BSONElement& elt, EncryptedBinDataType type) const {
-        if (!elt.isBinData(BinDataType::Encrypt)) {
-            return false;
-        }
-        int dataLen;
-        auto data = elt.binData(dataLen);
-        return dataLen >= 1 && data[0] == static_cast<uint8_t>(type);
-    }
-
-    /**
-     * Determine whether a given Value is in fact a FLE find payload by checking that it is the same
-     * type as the given EncryptedBinDataType. Sub-type 6, sub-sub-type determined by "type."
-     */
-    bool isFleFindPayload(const Value& v, EncryptedBinDataType type) const {
-        if (v.getType() != BSONType::BinData) {
-            return false;
-        }
-
-        auto binData = v.getBinData();
-        return binData.type == BinDataType::Encrypt && binData.length >= 1 &&
-            static_cast<uint8_t>(type) == static_cast<const uint8_t*>(binData.data)[0];
-    }
-
-    std::vector<Value> rewriteEqualityPayloadAsTags(Value fleFindPayload) const;
-    std::vector<Value> rewriteRangePayloadAsTags(Value fleFindPayload) const;
-
-    ExpressionContext* expCtx() {
-        return _expCtx.get();
-    }
-
-    bool isForceEncryptedCollScan() const {
-        return _mode == EncryptedCollScanMode::kForceAlways;
-    }
-
-    void setForceEncryptedCollScanForTest() {
-        _mode = EncryptedCollScanMode::kForceAlways;
-    }
-
-    EncryptedCollScanMode getEncryptedCollScanMode() const {
-        return _mode;
-    }
-
-protected:
-    // This constructor should only be used for mocks in testing.
-    FLEQueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx)
-        : _expCtx(expCtx), _escReader(nullptr), _eccReader(nullptr) {}
-
-private:
-    /**
-     * A single rewrite step, called recursively on child expressions.
-     */
-    std::unique_ptr<MatchExpression> _rewrite(MatchExpression* me);
-
-    virtual BSONObj rewriteEqualityPayloadAsTags(BSONElement fleFindPayload) const;
-
-    virtual BSONObj rewriteRangePayloadAsTags(BSONElement fleFindPayload) const;
-    std::unique_ptr<MatchExpression> rewriteEq(const EqualityMatchExpression* expr);
-    std::unique_ptr<MatchExpression> rewriteIn(const InMatchExpression* expr);
-    std::unique_ptr<MatchExpression> rewriteRange(const EncryptedBetweenMatchExpression* expr);
-
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
-
-    // Holds a pointer so that these can be null for tests, even though the public constructor
-    // takes a const reference.
-    const FLEStateCollectionReader* _escReader;
-    const FLEStateCollectionReader* _eccReader;
-
-    // True if the last Expression or MatchExpression processed by this rewriter was rewritten.
-    bool _rewroteLastExpression = false;
-
-    // Controls how query rewriter rewrites the query
-    EncryptedCollScanMode _mode{EncryptedCollScanMode::kUseIfNeeded};
-};
-
-
 }  // namespace fle
 }  // namespace mongo

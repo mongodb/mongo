@@ -880,6 +880,10 @@ env.Library(
     target='fle_crud',
     source=[
         'fle_crud.cpp',
+        'query/fle/encrypted_predicate.cpp',
+        'query/fle/equality_predicate.cpp',
+        'query/fle/query_rewriter.cpp',
+        'query/fle/range_predicate.cpp',
         'query/fle/server_rewrite.cpp',
     ],
     LIBDEPS=[
@@ -2515,7 +2519,9 @@ if wiredtiger:
             'operation_id_test.cpp',
             'operation_time_tracker_test.cpp',
             'persistent_task_store_test.cpp',
-            'query/fle/server_rewrite_test.cpp',
+            'query/fle/equality_predicate_test.cpp',
+            'query/fle/range_predicate_test.cpp',
+            'query/fle/query_rewriter_test.cpp',
             'range_arithmetic_test.cpp',
             'read_write_concern_defaults_test.cpp',
             'read_write_concern_provenance_test.cpp',
