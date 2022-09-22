@@ -342,13 +342,6 @@ function runEncryptedTest(db, dbName, collName, encryptedFields, runTestsCallbac
 }
 
 /**
- * @returns Returns true if talking to a sharded cluster
- */
-function isFLE2ShardingEnabled() {
-    return typeof (testingFLESharding) == "undefined" || testingFLESharding === true;
-}
-
-/**
  * @returns Returns true if talking to a replica set
  */
 function isFLE2ReplicationEnabled() {

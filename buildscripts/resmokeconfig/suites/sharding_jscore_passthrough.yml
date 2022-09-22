@@ -4,7 +4,7 @@ selector:
   roots:
   - jstests/core/**/*.js
   - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/*.js
+  - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
   # These tests are run in sharded_jscore_txns.
   - jstests/core/txns/**/*.js

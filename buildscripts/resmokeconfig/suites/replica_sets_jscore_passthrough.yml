@@ -4,7 +4,7 @@ selector:
   roots:
   - jstests/core/**/*.js
   - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/*.js
+  - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
   # These tests change the transactionLifetimeLimitSeconds server parameter which conflicts with how
   # the CheckReplDBHashInBackground hook doesn't want transactions to be reaped while it is running.

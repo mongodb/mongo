@@ -2,8 +2,7 @@ test_kind: js_test
 selector:
   roots:
   - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/*.js
-  - src/mongo/db/modules/*/jstests/fle2/query/*.js
+  - src/mongo/db/modules/*/jstests/fle2/**/*.js
 
 executor:
   archive:
@@ -11,7 +10,7 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: "testingReplication = true; testingFLESharding = false; testingFLE2Range = true;"
+      eval: "testingReplication = true; testingFLE2Range = true;"
       setShellParameter: featureFlagFLE2Range=true
   hooks:
   # We don't execute dbHash or oplog consistency checks since there is only a single replica set
