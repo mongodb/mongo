@@ -55,12 +55,4 @@ public:
     StringData getForCollectionCloningTotalLocalInserts() const;
 };
 
-class ShardingDataTransformCumulativeMetricsFieldNamePlaceholder
-    : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
-public:
-    virtual ~ShardingDataTransformCumulativeMetricsFieldNamePlaceholder() = default;
-    virtual StringData getForDocumentsProcessed() const override;
-    virtual StringData getForBytesWritten() const override;
-};
-
 }  // namespace mongo

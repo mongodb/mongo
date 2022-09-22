@@ -270,8 +270,7 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& p
     auto batch = resharding::data_copy::fillBatchForInsert(
         pipeline, resharding::gReshardingCollectionClonerBatchSizeInBytes.load());
 
-    _metrics->onCloningTotalRemoteBatchRetrieval(
-        duration_cast<Milliseconds>(latencyTimer.elapsed()));
+    _metrics->onCloningRemoteBatchRetrieval(duration_cast<Milliseconds>(latencyTimer.elapsed()));
 
     if (batch.empty()) {
         return false;

@@ -164,6 +164,14 @@ public:
             std::move(fieldNameProvider),
             std::move(mock));
     }
+
+    void createMetricsAndAssertIncrementsCumulativeMetricsField(
+        const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutate,
+        Section section,
+        const StringData& fieldName) {
+        auto metrics = createInstanceMetrics(UUID::gen(), Role::kCoordinator);
+        assertIncrementsCumulativeMetricsField(metrics.get(), mutate, section, fieldName);
+    }
 };
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, RegisterAndDeregisterMetrics) {
@@ -360,6 +368,105 @@ TEST_F(ShardingDataTransformInstanceMetricsTest,
     auto metrics = createInstanceMetrics(UUID::gen(), Role::kCoordinator);
     auto report = metrics->reportForCurrentOp();
     ASSERT_FALSE(report.hasField("allShardsLowestRemainingOperationTimeEstimatedSecs"));
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, OnStartedIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onStarted(); }, Section::kRoot, "countStarted");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, OnSuccessIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onSuccess(); }, Section::kRoot, "countSucceeded");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, OnFailureIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onFailure(); }, Section::kRoot, "countFailed");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, OnCanceledIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onCanceled(); }, Section::kRoot, "countCanceled");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, SetChunkImbalanceIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->setLastOpEndingChunkImbalance(1); },
+        Section::kRoot,
+        "lastOpEndingChunkImbalance");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       OnReadDuringCriticalSectionIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onReadDuringCriticalSection(); },
+        Section::kActive,
+        "countReadsDuringCriticalSection");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       OnWriteDuringCriticalSectionIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onWriteDuringCriticalSection(); },
+        Section::kActive,
+        "countWritesDuringCriticalSection");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       OnWriteToStashCollectionsIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onWriteToStashedCollections(); },
+        Section::kActive,
+        "countWritesToStashCollections");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       OnCloningRemoteBatchRetrievalIncrementsCumulativeMetricsCount) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onCloningRemoteBatchRetrieval(Milliseconds{0}); },
+        Section::kLatencies,
+        "collectionCloningTotalRemoteBatchesRetrieved");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       OnCloningRemoteBatchRetrievalIncrementsCumulativeMetricsTime) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onCloningRemoteBatchRetrieval(Milliseconds{1}); },
+        Section::kLatencies,
+        "collectionCloningTotalRemoteBatchRetrievalTimeMillis");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       OnDocumentsProcessedIncrementsCumulativeMetricsDocumentCount) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onDocumentsProcessed(1, 0, Milliseconds{0}); },
+        Section::kActive,
+        "documentsProcessed");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       OnDocumentsProcessedIncrementsCumulativeMetricsLocalInserts) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onDocumentsProcessed(1, 0, Milliseconds{0}); },
+        Section::kLatencies,
+        "collectionCloningTotalLocalInserts");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       OnDocumentsProcessedIncrementsCumulativeMetricsByteCount) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onDocumentsProcessed(0, 1, Milliseconds{0}); },
+        Section::kActive,
+        "bytesWritten");
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       OnDocumentsProcessedIncrementsCumulativeMetricsLocalInsertTime) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onDocumentsProcessed(0, 0, Milliseconds{1}); },
+        Section::kLatencies,
+        "collectionCloningTotalLocalInsertTimeMillis");
 }
 
 }  // namespace
