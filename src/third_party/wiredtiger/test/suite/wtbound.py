@@ -108,10 +108,18 @@ class bound_base(wttest.WiredTigerTestCase):
     end_key = 79
     lower_inclusive = True
     upper_inclusive = True
+    flcs = False
 
     def create_session_and_cursor(self, cursor_config=None):
         uri = self.uri + self.file_name
         create_params = 'value_format={},key_format={}'.format(self.value_format, self.key_format)
+
+        if (self.value_format == '8t'):
+            # Colgroups generation doesn't seem to work with 8t format.
+            self.use_colgroup = False
+            if (self.key_format == 'r'):
+                self.flcs = True
+
         if self.use_colgroup:
             create_params += self.gen_colgroup_create_param()
         self.session.create(uri, create_params)
@@ -127,7 +135,7 @@ class bound_base(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
 
         for i in range(self.start_key, self.end_key + 1):
-            cursor[self.gen_key(i)] = self.gen_val("value" + str(i))
+            cursor[self.gen_key(i)] = self.gen_val(str(i))
         self.session.commit_transaction()
 
         if (self.evict):
@@ -182,7 +190,8 @@ class bound_base(wttest.WiredTigerTestCase):
                 tuple_val.append(self.recno(i))
             elif key == "i":
                 tuple_val.append(i)
-        
+        if (self.value_format == '8t'):
+            return int(int(i) & 0xff)
         if (len(self.value_format) == 1):
             return tuple_val[0]
         else:
@@ -226,10 +235,11 @@ class bound_base(wttest.WiredTigerTestCase):
     
     def cursor_traversal_bound(self, cursor, lower_key, upper_key, next=None, expected_count=None):
         if next == None:
-            next = self.direction
+            next = self.next
 
         start_range = self.start_key
         end_range = self.end_key
+        flcs_start_range = start_range
 
         if (upper_key):
             if (upper_key < end_range):
@@ -243,6 +253,15 @@ class bound_base(wttest.WiredTigerTestCase):
                 if (not self.lower_inclusive):
                     start_range += 1
 
+        # Special handling for fixed length column store where implicit records may exist.
+        if (self.flcs):
+            if (lower_key is not None):
+                if (lower_key < start_range):
+                    flcs_start_range = lower_key
+                    if (not self.lower_inclusive):
+                        flcs_start_range += 1
+            else:
+                flcs_start_range = 1
 
         count = ret = 0
         while True:
@@ -269,4 +288,12 @@ class bound_base(wttest.WiredTigerTestCase):
         if (expected_count != None):
             self.assertEqual(expected_count, count)
         else:
-            self.assertEqual(end_range - start_range + 1, count)
+            # As a result of fix length column store creating implicit records during eviction we
+            # have assert that we either walked the expected range or a range with additional
+            # implicit records.
+            if (self.flcs):
+                range_without_implicit = end_range - start_range + 1
+                range_with_implicit = end_range - flcs_start_range + 1
+                self.assertTrue(count == range_with_implicit or count == range_without_implicit)
+            else:
+                self.assertEqual(end_range - start_range + 1, count)

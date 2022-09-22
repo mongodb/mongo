@@ -46,6 +46,7 @@ class test_cursor_bound02(bound_base):
     key_formats = [
         ('string', dict(key_format='S')),
         ('var', dict(key_format='r')),
+        ('fix', dict(key_format='r')),
         ('int', dict(key_format='i')),
         ('bytes', dict(key_format='u')),
         ('composite_string', dict(key_format='SSS')),
@@ -55,6 +56,7 @@ class test_cursor_bound02(bound_base):
 
     value_formats = [
         ('string', dict(value_format='S')),
+        ('fix-byte', dict(value_format='8t')),
         ('complex-string', dict(value_format='SS')),
     ]
 
@@ -67,8 +69,10 @@ class test_cursor_bound02(bound_base):
     def test_bound_api(self):
         uri = self.uri + self.file_name
         create_params = 'value_format={},key_format={}'.format(self.value_format, self.key_format)
-        if self.use_colgroup:
+        if self.use_colgroup and self.value_format != '8t':
             create_params += self.gen_colgroup_create_param()
+        else:
+            self.use_colgroup = False
         self.session.create(uri, create_params)
 
         # Add in column groups.
@@ -138,10 +142,15 @@ class test_cursor_bound02(bound_base):
 
 
     def test_bound_api_reset(self):
+        # Fixed length bit arrays don't work well with colgroups.
+        if (self.value_format == '8t' and self.use_colgroup):
+            return
         uri = self.uri + self.file_name
         create_params = 'value_format={},key_format={}'.format(self.value_format, self.key_format)
-        if self.use_colgroup:
+        if self.use_colgroup and self.value_format != '8t':
             create_params += self.gen_colgroup_create_param()
+        else:
+            self.use_colgroup = False
         self.session.create(uri, create_params)
         # Add in column groups.
         if self.use_colgroup:
@@ -164,7 +173,7 @@ class test_cursor_bound02(bound_base):
         cursor.reset()
         self.assertEqual(self.set_bounds(cursor, 99, "lower"), 0)
     
-        # Test bound API: Test that cursor reset works the clearing bounds both ways. 
+        # Test bound API: Test that cursor reset works the clearing bounds both ways.
         self.assertEqual(self.set_bounds(cursor, 50, "lower"), 0)
         cursor.reset()
         self.assertEqual(self.set_bounds(cursor, 20, "lower"), 0)
@@ -191,10 +200,15 @@ class test_cursor_bound02(bound_base):
         cursor.reset()
 
     def test_bound_api_clear(self):
+        # Fixed length bit arrays don't work well with colgroups.
+        if (self.value_format == '8t' and self.use_colgroup):
+            return
         uri = self.uri + self.file_name
         create_params = 'value_format={},key_format={}'.format(self.value_format, self.key_format)
-        if self.use_colgroup:
+        if self.use_colgroup and self.value_format != '8t':
             create_params += self.gen_colgroup_create_param()
+        else:
+            self.use_colgroup = False
         self.session.create(uri, create_params)
         # Add in column groups.
         if self.use_colgroup:
@@ -213,12 +227,12 @@ class test_cursor_bound02(bound_base):
         self.assertEqual(cursor.bound("action=clear,bound=lower"), 0)
         self.assertEqual(self.set_bounds(cursor, 10, "upper"), 0)
 
-        # Test bound API: Test that clearing the upper bound works. 
+        # Test bound API: Test that clearing the upper bound works.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 99, "lower"), '/Invalid argument/')
         self.assertEqual(cursor.bound("action=clear,bound=upper"), 0)
         self.assertEqual(self.set_bounds(cursor, 99, "lower"), 0)
     
-        # Test bound API: Test that clearing both of the bounds works. 
+        # Test bound API: Test that clearing both of the bounds works.
         cursor.reset()
         self.assertEqual(self.set_bounds(cursor, 50, "upper"), 0)
         self.assertEqual(cursor.bound("action=clear"), 0)

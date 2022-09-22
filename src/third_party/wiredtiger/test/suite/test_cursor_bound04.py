@@ -56,6 +56,7 @@ class test_cursor_bound04(bound_base):
 
     value_formats = [
         ('string', dict(value_format='S')),
+        ('fix', dict(value_format='8t'))
         # FIX-ME-WT-9589: Fix bug complex colgroups not returning records within bounds.
         # ('complex-string', dict(value_format='SS')),
     ]
@@ -82,7 +83,7 @@ class test_cursor_bound04(bound_base):
         cursor.bound("action=clear,bound=lower")
         self.assertEqual(cursor.next(), 0)
         key = cursor.get_key()
-        self.assertEqual(key, self.check_key(self.start_key))
+        self.assertEqual(key, self.check_key(1 if self.flcs else self.start_key))
         cursor.reset()
 
         # Test bound api: Test lower bound setting with positioned cursor.
@@ -114,7 +115,7 @@ class test_cursor_bound04(bound_base):
         self.set_bounds(cursor, 55, "upper")
         self.assertEqual(cursor.next(), 0)
         key = cursor.get_key()
-        self.assertEqual(key, self.check_key(self.start_key))
+        self.assertEqual(key, self.check_key(1 if self.flcs else self.start_key))
         cursor.set_key(self.gen_key(60))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 50, "upper"), '/Invalid argument/')
         cursor.reset()
@@ -122,7 +123,7 @@ class test_cursor_bound04(bound_base):
         self.set_bounds(cursor, 55, "upper")
         self.assertEqual(cursor.next(), 0)
         key = cursor.get_key()
-        self.assertEqual(key, self.check_key(self.start_key))
+        self.assertEqual(key, self.check_key(1 if self.flcs else self.start_key))
         cursor.set_key(self.gen_key(90))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 50, "upper"),
             '/Invalid argument/')
@@ -131,7 +132,7 @@ class test_cursor_bound04(bound_base):
         self.set_bounds(cursor, 55, "upper")
         self.assertEqual(cursor.next(), 0)
         key = cursor.get_key()
-        self.assertEqual(key, self.check_key(self.start_key))
+        self.assertEqual(key, self.check_key(1 if self.flcs else self.start_key))
         cursor.set_key(self.gen_key(10))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 50, "upper"),
             '/Invalid argument/')
@@ -150,7 +151,7 @@ class test_cursor_bound04(bound_base):
         self.set_bounds(cursor, 55, "upper")
         self.assertEqual(cursor.next(), 0)
         key = cursor.get_key()
-        self.assertEqual(key, self.check_key(self.start_key))
+        self.assertEqual(key, self.check_key(1 if self.flcs else self.start_key))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: cursor.bound("bound=upper,inclusive=false"),
             '/Invalid argument/')
         cursor.reset()
@@ -167,9 +168,9 @@ class test_cursor_bound04(bound_base):
         self.set_bounds(cursor, 55, "upper")
         self.assertEqual(cursor.next(), 0)
         key = cursor.get_key()
-        self.assertEqual(key, self.check_key(self.start_key))
+        self.assertEqual(key, self.check_key(1 if self.flcs else self.start_key))
         self.assertEqual(cursor.bound("action=clear"), 0)
-        self.cursor_traversal_bound(cursor, None, None, True,  self.end_key - self.start_key)
+        self.cursor_traversal_bound(cursor, None, None, True,  self.end_key - 1 if self.flcs else self.end_key - self.start_key)
         cursor.reset()
         cursor.close()
 
@@ -229,7 +230,7 @@ class test_cursor_bound04(bound_base):
         key = cursor.get_key()
         self.assertEqual(key, self.check_key(45))
         self.assertEqual(cursor.bound("action=clear"), 0)
-        self.cursor_traversal_bound(cursor, None, None, False,  45 - self.start_key)
+        self.cursor_traversal_bound(cursor, None, None, False,  45 - self.start_key if not self.flcs else 45 - 1)
         cursor.reset()
 
         self.set_bounds(cursor, 45, "upper")

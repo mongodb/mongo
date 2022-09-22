@@ -13,8 +13,9 @@
  *     Return the next entry on the append list.
  */
 static inline int
-__cursor_fix_append_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
+__cursor_fix_append_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, bool *key_out_of_boundsp)
 {
+    WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
     session = CUR2S(cbt);
@@ -38,7 +39,9 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
      * it to 1, which is correct.
      */
     __cursor_set_recno(cbt, cbt->recno + 1);
-
+    if ((ret = __wt_btcur_bounds_early_exit(session, cbt, true, key_out_of_boundsp)) == WT_NOTFOUND)
+        WT_STAT_CONN_DATA_INCR(session, cursor_bounds_next_early_exit);
+    WT_RET(ret);
     /*
      * Fixed-width column store appends are inherently non-transactional. Even a non-visible update
      * by a concurrent or aborted transaction changes the effective end of the data. The effect is
@@ -75,8 +78,9 @@ restart_read:
  *     Move to the next, fixed-length column-store item.
  */
 static inline int
-__cursor_fix_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
+__cursor_fix_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, bool *key_out_of_boundsp)
 {
+    WT_DECL_RET;
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
 
@@ -107,6 +111,9 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
 
 new_page:
 restart_read:
+    if ((ret = __wt_btcur_bounds_early_exit(session, cbt, true, key_out_of_boundsp)) == WT_NOTFOUND)
+        WT_STAT_CONN_DATA_INCR(session, cursor_bounds_next_early_exit);
+    WT_RET(ret);
     /* We only have one slot. */
     cbt->slot = 0;
 
@@ -833,7 +840,7 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
             WT_ASSERT(session, page != NULL);
             switch (page->type) {
             case WT_PAGE_COL_FIX:
-                ret = __cursor_fix_append_next(cbt, newpage, restart);
+                ret = __cursor_fix_append_next(cbt, newpage, restart, &key_out_of_bounds);
                 break;
             case WT_PAGE_COL_VAR:
                 ret = __cursor_var_append_next(cbt, newpage, restart, &skipped, &key_out_of_bounds);
@@ -859,7 +866,7 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
         } else if (page != NULL) {
             switch (page->type) {
             case WT_PAGE_COL_FIX:
-                ret = __cursor_fix_next(cbt, newpage, restart);
+                ret = __cursor_fix_next(cbt, newpage, restart, &key_out_of_bounds);
                 break;
             case WT_PAGE_COL_VAR:
                 ret = __cursor_var_next(cbt, newpage, restart, &skipped, &key_out_of_bounds);
