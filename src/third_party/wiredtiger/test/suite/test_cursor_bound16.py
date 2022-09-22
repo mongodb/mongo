@@ -46,6 +46,7 @@ class test_cursor_bound16(bound_base):
     dump_options = [
         ('dump_print', dict(dumpopt='print')),
         ('dump_hex', dict(dumpopt='hex')),
+        ('dump_json', dict(dumpopt='json')),
     ]
 
     scenarios = make_scenarios(dump_options, types)
@@ -68,8 +69,12 @@ class test_cursor_bound16(bound_base):
     def gen_dump_key(self, key):
         if (self.dumpopt == "hex"):
             return str(key).encode().hex() + "00"
-        else:
+        elif (self.dumpopt == "print"):
             return str(key) + "\\00"
+        elif (self.dumpopt == 'json'):
+            return '"key0" : "{0}"'.format(str(key))
+        
+        return None
 
     def test_dump_cursor(self):
         self.create_session_and_cursor()
