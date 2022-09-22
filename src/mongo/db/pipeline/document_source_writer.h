@@ -106,7 +106,7 @@ public:
           _outputNs(std::move(outputNs)),
           _writeConcern(expCtx->opCtx->getWriteConcern()),
           _writeSizeEstimator(
-              expCtx->mongoProcessInterface->getWriteSizeEstimator(expCtx->opCtx, outputNs)) {}
+              expCtx->mongoProcessInterface->getWriteSizeEstimator(expCtx->opCtx, _outputNs)) {}
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
         deps->needWholeDocument = true;
