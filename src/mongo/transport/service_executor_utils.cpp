@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/transport/service_executor_utils.h"
 
 #include <fmt/format.h>
@@ -56,11 +53,11 @@
 #define __has_feature(x) 0
 #endif
 
-using namespace fmt::literals;
-
-namespace mongo {
+namespace mongo::transport {
 
 namespace {
+using namespace fmt::literals;
+
 void* runFunc(void* ctx) {
     auto taskPtr =
         std::unique_ptr<unique_function<void()>>(static_cast<unique_function<void()>*>(ctx));
@@ -70,7 +67,7 @@ void* runFunc(void* ctx) {
 }
 }  // namespace
 
-Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
+Status launchServiceWorkerThread(unique_function<void()> task) {
 
     try {
 #if defined(_WIN32)
@@ -160,9 +157,9 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
     return Status::OK();
 }
 
-void scheduleCallbackOnDataAvailable(const transport::SessionHandle& session,
+void scheduleCallbackOnDataAvailable(const SessionHandle& session,
                                      unique_function<void(Status)> callback,
-                                     transport::ServiceExecutor* executor) noexcept {
+                                     ServiceExecutor* executor) {
     invariant(session);
     executor->schedule([session, callback = std::move(callback), executor](Status status) {
         executor->yieldIfAppropriate();
@@ -176,4 +173,4 @@ void scheduleCallbackOnDataAvailable(const transport::SessionHandle& session,
     });
 }
 
-}  // namespace mongo
+}  // namespace mongo::transport
