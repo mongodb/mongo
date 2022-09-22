@@ -52,7 +52,6 @@ statistics.server=1
 stress.aggressive_sweep=0
 stress.checkpoint=0
 stress.checkpoint_evict_page=0
-stress.checkpoint_reserved_txnid_delay=0
 stress.checkpoint_prepare=0
 stress.evict_reposition=0
 stress.failpoint_eviction_fail_after_reconciliation=1

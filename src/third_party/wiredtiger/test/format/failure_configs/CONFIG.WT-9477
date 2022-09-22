@@ -50,7 +50,6 @@ statistics.server=0
 stress.aggressive_sweep=0
 stress.checkpoint=0
 stress.checkpoint_evict_page=1
-stress.checkpoint_reserved_txnid_delay=0
 stress.checkpoint_prepare=0
 stress.evict_reposition=0
 stress.failpoint_hs_delete_key_from_ts=1

@@ -517,7 +517,6 @@ config_backward_compatible(void)
 
     BC_CHECK("disk.mmap_all", DISK_MMAP_ALL);
     BC_CHECK("block_cache", BLOCK_CACHE);
-    BC_CHECK("stress.checkpoint_reserved_txnid_delay", STRESS_CHECKPOINT_RESERVED_TXNID_DELAY);
     BC_CHECK("stress.hs_checkpoint_delay", STRESS_HS_CHECKPOINT_DELAY);
     BC_CHECK("stress.hs_search", STRESS_HS_SEARCH);
     BC_CHECK("stress.hs_sweep", STRESS_HS_SWEEP);

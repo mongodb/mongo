@@ -154,9 +154,8 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
     confchk_WT_CONNECTION_reconfigure_tiered_storage_subconfigs, 1},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"backup_rename\","
-    "\"checkpoint_evict_page\",\"checkpoint_reserved_txnid_delay\","
-    "\"checkpoint_slow\",\"checkpoint_stop\",\"compact_slow\","
-    "\"evict_reposition\","
+    "\"checkpoint_evict_page\",\"checkpoint_slow\","
+    "\"checkpoint_stop\",\"compact_slow\",\"evict_reposition\","
     "\"failpoint_eviction_fail_after_reconciliation\","
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
@@ -897,9 +896,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
   {"tiered_storage", "category", NULL, NULL, confchk_tiered_storage_subconfigs, 7},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"backup_rename\","
-    "\"checkpoint_evict_page\",\"checkpoint_reserved_txnid_delay\","
-    "\"checkpoint_slow\",\"checkpoint_stop\",\"compact_slow\","
-    "\"evict_reposition\","
+    "\"checkpoint_evict_page\",\"checkpoint_slow\","
+    "\"checkpoint_stop\",\"compact_slow\",\"evict_reposition\","
     "\"failpoint_eviction_fail_after_reconciliation\","
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
@@ -982,9 +980,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
   {"tiered_storage", "category", NULL, NULL, confchk_tiered_storage_subconfigs, 7},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"backup_rename\","
-    "\"checkpoint_evict_page\",\"checkpoint_reserved_txnid_delay\","
-    "\"checkpoint_slow\",\"checkpoint_stop\",\"compact_slow\","
-    "\"evict_reposition\","
+    "\"checkpoint_evict_page\",\"checkpoint_slow\","
+    "\"checkpoint_stop\",\"compact_slow\",\"evict_reposition\","
     "\"failpoint_eviction_fail_after_reconciliation\","
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
@@ -1065,9 +1062,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
   {"tiered_storage", "category", NULL, NULL, confchk_tiered_storage_subconfigs, 7},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"backup_rename\","
-    "\"checkpoint_evict_page\",\"checkpoint_reserved_txnid_delay\","
-    "\"checkpoint_slow\",\"checkpoint_stop\",\"compact_slow\","
-    "\"evict_reposition\","
+    "\"checkpoint_evict_page\",\"checkpoint_slow\","
+    "\"checkpoint_stop\",\"compact_slow\",\"evict_reposition\","
     "\"failpoint_eviction_fail_after_reconciliation\","
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
@@ -1146,9 +1142,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
   {"tiered_storage", "category", NULL, NULL, confchk_tiered_storage_subconfigs, 7},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"backup_rename\","
-    "\"checkpoint_evict_page\",\"checkpoint_reserved_txnid_delay\","
-    "\"checkpoint_slow\",\"checkpoint_stop\",\"compact_slow\","
-    "\"evict_reposition\","
+    "\"checkpoint_evict_page\",\"checkpoint_slow\","
+    "\"checkpoint_stop\",\"compact_slow\",\"evict_reposition\","
     "\"failpoint_eviction_fail_after_reconciliation\","
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","

@@ -71,7 +71,7 @@ main(int argc, char *argv[])
     g.sweep_stress = g.use_timestamps = false;
     g.failpoint_eviction_fail_after_reconciliation = false;
     g.failpoint_hs_delete_key_from_ts = false;
-    g.hs_checkpoint_timing_stress = g.reserved_txnid_timing_stress = false;
+    g.hs_checkpoint_timing_stress = false;
     g.checkpoint_slow_timing_stress = false;
     g.no_ts_deletes = false;
     runs = 1;
@@ -125,9 +125,6 @@ main(int argc, char *argv[])
                 break;
             case '3':
                 g.hs_checkpoint_timing_stress = true;
-                break;
-            case '4':
-                g.reserved_txnid_timing_stress = true;
                 break;
             case '5':
                 g.checkpoint_slow_timing_stress = true;
@@ -305,9 +302,8 @@ wt_connect(const char *config_open)
 
     if (g.evict_reposition_timing_stress || g.sweep_stress ||
       g.failpoint_eviction_fail_after_reconciliation || g.failpoint_hs_delete_key_from_ts ||
-      g.hs_checkpoint_timing_stress || g.reserved_txnid_timing_stress ||
-      g.checkpoint_slow_timing_stress) {
-        testutil_check(__wt_snprintf(buf, sizeof(buf), ",timing_stress_for_test=[%s%s%s%s%s%s%s]",
+      g.hs_checkpoint_timing_stress || g.checkpoint_slow_timing_stress) {
+        testutil_check(__wt_snprintf(buf, sizeof(buf), ",timing_stress_for_test=[%s%s%s%s%s%s]",
           g.checkpoint_slow_timing_stress ? "checkpoint_slow" : "",
           g.evict_reposition_timing_stress ? "evict_reposition" : "",
           g.failpoint_eviction_fail_after_reconciliation ?
@@ -315,7 +311,6 @@ wt_connect(const char *config_open)
             "",
           g.failpoint_hs_delete_key_from_ts ? "failpoint_history_store_delete_key_from_ts" : "",
           g.hs_checkpoint_timing_stress ? "history_store_checkpoint_delay" : "",
-          g.reserved_txnid_timing_stress ? "checkpoint_reserved_txnid_delay" : "",
           g.sweep_stress ? "aggressive_sweep" : ""));
         strcat(config, buf);
     }
@@ -626,7 +621,6 @@ usage(void)
       "\t\t1: sweep_stress\n"
       "\t\t2: failpoint_hs_delete_key_from_ts\n"
       "\t\t3: hs_checkpoint_timing_stress\n"
-      "\t\t4: reserved_txnid_timing_stress\n"
       "\t\t5: checkpoint_slow_timing_stress\n"
       "\t\t6: evict_reposition_timing_stress\n"
       "\t\t7: failpoint_eviction_fail_after_reconciliation\n"

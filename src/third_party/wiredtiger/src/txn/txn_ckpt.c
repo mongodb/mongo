@@ -631,34 +631,6 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     __wt_writeunlock(session, &txn_global->rwlock);
 
     /*
-     * Allocate a reserved transaction id that will be used for removing history entries when a
-     * prepare transaction rollback occurs in parallel to a checkpoint. Ensure that this transaction
-     * id is published before taking the checkpoint's snapshot.
-     *
-     * Other alternatives to solve the issue is by using a transaction id that is allocated after
-     * the second checkpoint snapshot. This approach has issues of using a stale reserved
-     * transaction id for the history store updates and the data store page is skipped in the
-     * checkpoint. To address the use of stale reserved transaction id, all the data store pages
-     * that have restored prepared updates need to get checkpointed forcefully.
-     *
-     * The checkpoint snapshot max can also be used for this purpose, instead of allocating a new
-     * reserved transaction id. This solution also have to force all the pages with restored
-     * prepared updates to be part of the current checkpoint. Therefore, we think it is better to
-     * use a dedicated transaction id as the checkpoint snapshot max is allocated to a session and
-     * used for other operations can lead to confusion when an issue occurs.
-     */
-    if (conn->ckpt_reserved_session != NULL) {
-        WT_RET(__wt_txn_begin(conn->ckpt_reserved_session, NULL));
-        WT_ERR(__wt_txn_id_check(conn->ckpt_reserved_session));
-        txn_global->checkpoint_reserved_txn_id = conn->ckpt_reserved_session->txn->id;
-
-        /* Add a one second wait to simulate reserved transaction id race with prepared rollback. */
-        tsp.tv_sec = 1;
-        tsp.tv_nsec = 0;
-        __checkpoint_timing_stress(session, WT_TIMING_STRESS_CHECKPOINT_RESERVED_TXNID_DELAY, &tsp);
-    }
-
-    /*
      * Refresh our snapshot here without publishing our shared ids to the world, doing so prevents
      * us from racing with the stable timestamp moving ahead of current snapshot. i.e. if the stable
      * timestamp moves after we begin the checkpoint transaction but before we set the checkpoint
@@ -670,13 +642,6 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     WT_ASSERT(session, session->txn->snap_min >= original_snap_min);
     /* Flag as unused for non diagnostic builds. */
     WT_UNUSED(original_snap_min);
-
-    /* Assert that the checkpoint reserved transaction id not visible in the checkpoint snapshot. */
-    WT_ASSERT(session,
-      conn->ckpt_reserved_session == NULL ||
-        !__wt_txn_visible_id_snapshot(txn_global->checkpoint_reserved_txn_id,
-          session->txn->snap_min, session->txn->snap_max, session->txn->snapshot,
-          session->txn->snapshot_count));
 
     if (use_timestamp)
         __wt_verbose_timestamp(
@@ -696,9 +661,6 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     __wt_epoch(session, &conn->ckpt_prep_end);
     WT_STAT_CONN_SET(session, txn_checkpoint_prep_running, 0);
 
-err:
-    if (conn->ckpt_reserved_session != NULL)
-        __wt_txn_release(conn->ckpt_reserved_session);
     return (ret);
 }
 
