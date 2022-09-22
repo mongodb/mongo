@@ -1066,6 +1066,10 @@ void BucketCatalog::appendStateManagementStats(BSONObjBuilder* builder) const {
     _bucketStateManager.appendStats(builder);
 }
 
+long long BucketCatalog::memoryUsage() const {
+    return _memoryUsage.load();
+}
+
 BucketCatalog::BucketMetadata::BucketMetadata(BSONElement elem,
                                               const StringData::ComparatorInterface* comparator)
     : _metadataElement(elem), _comparator(comparator) {
@@ -1251,13 +1255,23 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     std::unique_ptr<Bucket> bucket =
         std::make_unique<Bucket>(bucketId, stripeNumber, key.hash, &_bucketStateManager);
 
+    const bool isCompressed = timeseries::isCompressedBucket(bucketDoc);
+
     // Initialize the remaining member variables from the bucket document.
     bucket->setNamespace(ns);
     bucket->_metadata = key.metadata;
     bucket->_timeField = options.getTimeField().toString();
-    bucket->_size = bucketDoc.objsize();
-    bucket->_minTime = bucketDoc.getObjectField(timeseries::kBucketControlFieldName)
-                           .getObjectField(timeseries::kBucketControlMinFieldName)
+    if (isCompressed) {
+        auto decompressed = timeseries::decompressBucket(bucketDoc);
+        if (!decompressed.has_value()) {
+            return Status{ErrorCodes::BadValue, "Bucket could not be decompressed"};
+        }
+        bucket->_size = decompressed.value().objsize();
+    } else {
+        bucket->_size = bucketDoc.objsize();
+    }
+    auto controlField = bucketDoc.getObjectField(timeseries::kBucketControlFieldName);
+    bucket->_minTime = controlField.getObjectField(timeseries::kBucketControlMinFieldName)
                            .getField(options.getTimeField())
                            .Date();
 
@@ -1281,7 +1295,6 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     bucket->_schema = std::move(swSchema.getValue());
 
     uint32_t numMeasurements = 0;
-    const bool isCompressed = timeseries::isCompressedBucket(bucketDoc);
     const BSONElement timeColumnElem = dataObj.getField(options.getTimeField());
 
     if (dataObj.isEmpty() || !timeColumnElem.ok()) {
@@ -1295,6 +1308,16 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
 
     bucket->_numMeasurements = numMeasurements;
     bucket->_numCommittedMeasurements = numMeasurements;
+
+    // The namespace is stored two times: the bucket itself and openBuckets. We don't have a great
+    // approximation for the _schema or _minmax data structure size, so we use the control field
+    // size as an approximation for _minmax, and half that size for _schema. Since the metadata
+    // is stored in the bucket, we need to add that as well. A unique pointer to the bucket is
+    // stored once: allBuckets. A raw pointer to the bucket is stored at most twice: openBuckets,
+    // idleBuckets.
+    bucket->_memoryUsage += (key.ns.size() * 2) + 1.5 * controlField.objsize() +
+        key.metadata.toBSON().objsize() + sizeof(Bucket) + sizeof(std::unique_ptr<Bucket>) +
+        (sizeof(Bucket*) * 2);
 
     return {std::move(bucket)};
 }
@@ -1354,6 +1377,8 @@ BucketCatalog::Bucket* BucketCatalog::_reopenBucket(Stripe* stripe,
     // Now actually mark this bucket as open.
     stripe->openBuckets[key] = unownedBucket;
     stats.incNumBucketsReopened();
+
+    _memoryUsage.addAndFetch(unownedBucket->_memoryUsage);
 
     return unownedBucket;
 }

@@ -1095,9 +1095,12 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    auto memUsageBefore = _bucketCatalog->memoryUsage();
     Status status = _bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), bucketDoc);
+    auto memUsageAfter = _bucketCatalog->memoryUsage();
     ASSERT_OK(status);
     ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
+    ASSERT_GT(memUsageAfter, memUsageBefore);
 
     // Insert a measurement that is compatible with the reopened bucket.
     auto result =
@@ -1148,9 +1151,12 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasureme
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    auto memUsageBefore = _bucketCatalog->memoryUsage();
     Status status = _bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), bucketDoc);
+    auto memUsageAfter = _bucketCatalog->memoryUsage();
     ASSERT_OK(status);
     ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
+    ASSERT_GT(memUsageAfter, memUsageBefore);
 
     // Insert a measurement that is incompatible with the reopened bucket.
     auto result =
@@ -1203,10 +1209,13 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    auto memUsageBefore = _bucketCatalog->memoryUsage();
     Status status =
         _bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), compressedBucketDoc);
+    auto memUsageAfter = _bucketCatalog->memoryUsage();
     ASSERT_OK(status);
     ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
+    ASSERT_GT(memUsageAfter, memUsageBefore);
 
     // Insert a measurement that is compatible with the reopened bucket.
     auto result =
@@ -1265,10 +1274,13 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    auto memUsageBefore = _bucketCatalog->memoryUsage();
     Status status =
         _bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), compressedBucketDoc);
+    auto memUsageAfter = _bucketCatalog->memoryUsage();
     ASSERT_OK(status);
     ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
+    ASSERT_GT(memUsageAfter, memUsageBefore);
 
     // Insert a measurement that is incompatible with the reopened bucket.
     auto result =

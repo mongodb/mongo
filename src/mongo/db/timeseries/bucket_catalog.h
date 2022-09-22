@@ -385,6 +385,11 @@ public:
      */
     void appendStateManagementStats(BSONObjBuilder* builder) const;
 
+    /**
+     * Reports the current memory usage.
+     */
+    long long memoryUsage() const;
+
 protected:
     enum class BucketState {
         // Bucket can be inserted into, and does not have an outstanding prepared commit
