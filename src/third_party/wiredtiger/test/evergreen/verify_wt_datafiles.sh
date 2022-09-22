@@ -56,14 +56,15 @@ for d in ${dirs_include_datafile}
 do
 	echo "${d}"
 
-	${wt_binary} -h ${d} printlog > /dev/null
-	if [ "$?" -ne "0" ]; then
-		echo "Failed to dump '${d}' log files, exiting ..."
-		exit 1
+	# Make sure logging is enabled before running the printlog command.
+	if grep -q -E "logging=(1|on)" ${d}/CONFIG; then
+		if ! ${wt_binary} -h ${d} printlog > /dev/null; then
+			echo "Failed to dump '${d}' log files, exiting ..."
+			exit 1
+		fi
 	fi
 
-	tables=$(${wt_binary} -h "${d}" list)
-	if [ "$?" -ne "0" ]; then 
+	if ! tables=$(${wt_binary} -h "${d}" list); then
 		echo "Failed to list '${d}' directory, exiting ..."
 		exit 1
 	fi

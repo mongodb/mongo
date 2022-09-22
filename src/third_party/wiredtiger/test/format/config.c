@@ -1179,8 +1179,10 @@ config_transaction(void)
         config_off(NULL, "transaction.timestamps");
         config_off(NULL, "ops.prepare");
     }
-    if (GV(LOGGING) && config_explicit(NULL, "logging"))
+    if (GV(LOGGING) && config_explicit(NULL, "logging")) {
+        config_off(NULL, "transaction.timestamps");
         config_off(NULL, "ops.prepare");
+    }
     if (GV(OPS_SALVAGE) && config_explicit(NULL, "ops.salvage")) { /* FIXME WT-6431 */
         config_off(NULL, "transaction.timestamps");
         config_off(NULL, "ops.prepare");
