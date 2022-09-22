@@ -599,3 +599,10 @@ if get_option('ssl') == 'on':
         ])
 
     kmsEnv.ShimLibrary(name="kms_message", )
+
+
+cares_env = env.Clone()
+
+#kmsEnv.InjectThirdParty(libraries=['kms-message'])
+cares_env.SConscript('cares/SConscript', exports={'env': cares_env})
+
