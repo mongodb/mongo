@@ -521,7 +521,7 @@ public:
         return _admCtx.getPriority();
     }
 
-    bool shouldAcquireTicket() const {
+    bool shouldWaitForTicket() const {
         return _admCtx.getPriority() != AdmissionContext::Priority::kImmediate;
     }
 

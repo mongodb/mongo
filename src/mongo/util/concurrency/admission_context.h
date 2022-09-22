@@ -57,13 +57,11 @@ public:
      * user and internal, should use this priority unless they qualify as 'kLow' or 'kImmediate'
      * priority.
      *
-     * 'kImmediate': It's crucial that the operation makes forward progress - bypassing ticket
-     * acquisition. Reserved for operations critical to availability (e.g. replication workers) or
-     * observability (e.g. FTDC), and any operation that is releasing resources (e.g. committing or
-     * aborting prepared transactions). Should be used sparingly.
-     *
-     * TODO SERVER-67951: Update comment to address that kImmediate priority operations are always
-     * granted a ticket immediately upon request.
+     * 'kImmediate': It's crucial that the operation makes forward progress - and acquire a ticket
+     * immediately upon request, without waiting.
+     * Reserved for operations critical to availability (e.g. replication workers) or observability
+     * (e.g. FTDC), and any operation that is releasing resources (e.g. committing or aborting
+     * prepared transactions). Should be used sparingly.
      */
     enum class Priority { kLow, kNormal, kImmediate };
 

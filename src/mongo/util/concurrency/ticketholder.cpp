@@ -41,12 +41,33 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
+namespace mongo {
+
 namespace {
 const auto ticketHolderDecoration =
     mongo::ServiceContext::declareDecoration<std::unique_ptr<mongo::TicketHolder>>();
+
+void updateQueueStatsOnRelease(ServiceContext* serviceContext,
+                               TicketHolderWithQueueingStats::QueueStats& queueStats,
+                               AdmissionContext* admCtx) {
+    queueStats.totalFinishedProcessing.fetchAndAddRelaxed(1);
+    auto startTime = admCtx->getStartProcessingTime();
+    auto tickSource = serviceContext->getTickSource();
+    auto delta = tickSource->spanTo<Microseconds>(startTime, tickSource->getTicks());
+    queueStats.totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
 }
 
-namespace mongo {
+void updateQueueStatsOnTicketAcquisition(ServiceContext* serviceContext,
+                                         TicketHolderWithQueueingStats::QueueStats& queueStats,
+                                         AdmissionContext* admCtx) {
+    if (admCtx->getAdmissions() == 0) {
+        queueStats.totalNewAdmissions.fetchAndAddRelaxed(1);
+    }
+    admCtx->start(serviceContext->getTickSource());
+    queueStats.totalStartedProcessing.fetchAndAddRelaxed(1);
+}
+
+}  // namespace
 
 TicketHolder* TicketHolder::get(ServiceContext* svcCtx) {
     return ticketHolderDecoration(svcCtx).get();
@@ -57,6 +78,21 @@ void TicketHolder::use(ServiceContext* svcCtx, std::unique_ptr<TicketHolder> new
 }
 
 ReaderWriterTicketHolder::~ReaderWriterTicketHolder(){};
+
+Ticket ReaderWriterTicketHolder::acquireImmediateTicket(AdmissionContext* admCtx) {
+    switch (admCtx->getLockMode()) {
+        case MODE_IS:
+        case MODE_S:
+            return _reader->acquireImmediateTicket(admCtx);
+        case MODE_IX:
+            return _writer->acquireImmediateTicket(admCtx);
+        default:
+            // Tickets are linked to the GlobalLock and a MODE_X lock is already exclusive - all
+            // other operations waiting for MODE_X will be blocked so no need to go through the
+            // ticketing mechanism.
+            MONGO_UNREACHABLE;
+    }
+}
 
 boost::optional<Ticket> ReaderWriterTicketHolder::tryAcquire(AdmissionContext* admCtx) {
 
@@ -115,13 +151,25 @@ void ReaderWriterTicketHolder::appendStats(BSONObjBuilder& b) const {
     }
 }
 
-void ReaderWriterTicketHolder::_release(AdmissionContext* admCtx) noexcept {
+void ReaderWriterTicketHolder::_releaseImmediateTicket(AdmissionContext* admCtx) noexcept {
     switch (admCtx->getLockMode()) {
         case MODE_IS:
         case MODE_S:
-            return _reader->_release(admCtx);
+            return _reader->_releaseImmediateTicket(admCtx);
         case MODE_IX:
-            return _writer->_release(admCtx);
+            return _writer->_releaseImmediateTicket(admCtx);
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+void ReaderWriterTicketHolder::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
+    switch (admCtx->getLockMode()) {
+        case MODE_IS:
+        case MODE_S:
+            return _reader->_releaseToTicketPool(admCtx);
+        case MODE_IX:
+            return _writer->_releaseToTicketPool(admCtx);
         default:
             MONGO_UNREACHABLE;
     }
@@ -133,6 +181,15 @@ void ReaderWriterTicketHolder::resizeReaders(int newSize) {
 
 void ReaderWriterTicketHolder::resizeWriters(int newSize) {
     return _writer->resize(newSize);
+}
+
+Ticket TicketHolderWithQueueingStats::acquireImmediateTicket(AdmissionContext* admCtx) {
+    invariant(admCtx->getPriority() == AdmissionContext::Priority::kImmediate);
+    if (recordImmediateTicketStatistics()) {
+        auto& queueStats = _getQueueStatsToUse(admCtx);
+        updateQueueStatsOnTicketAcquisition(_serviceContext, queueStats, admCtx);
+    }
+    return Ticket{this, admCtx};
 }
 
 void TicketHolderWithQueueingStats::resize(int newSize) noexcept {
@@ -149,14 +206,17 @@ void TicketHolderWithQueueingStats::appendStats(BSONObjBuilder& b) const {
     _appendImplStats(b);
 }
 
-void TicketHolderWithQueueingStats::_release(AdmissionContext* admCtx) noexcept {
+void TicketHolderWithQueueingStats::_releaseImmediateTicket(AdmissionContext* admCtx) noexcept {
+    if (recordImmediateTicketStatistics()) {
+        auto& queueStats = _getQueueStatsToUse(admCtx);
+        updateQueueStatsOnRelease(_serviceContext, queueStats, admCtx);
+    }
+}
+
+void TicketHolderWithQueueingStats::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
     auto& queueStats = _getQueueStatsToUse(admCtx);
-    queueStats.totalFinishedProcessing.fetchAndAddRelaxed(1);
-    auto startTime = admCtx->getStartProcessingTime();
-    auto tickSource = _serviceContext->getTickSource();
-    auto delta = tickSource->spanTo<Microseconds>(startTime, tickSource->getTicks());
-    queueStats.totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
-    _releaseQueue(admCtx);
+    updateQueueStatsOnRelease(_serviceContext, queueStats, admCtx);
+    _releaseToTicketPoolImpl(admCtx);
 }
 
 Ticket TicketHolderWithQueueingStats::waitForTicket(OperationContext* opCtx,
@@ -168,17 +228,14 @@ Ticket TicketHolderWithQueueingStats::waitForTicket(OperationContext* opCtx,
 }
 
 boost::optional<Ticket> TicketHolderWithQueueingStats::tryAcquire(AdmissionContext* admCtx) {
-    invariant(admCtx);
-
+    // kImmediate operations don't need to 'try' to acquire a ticket, they should always get a
+    // ticket immediately.
+    invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
     auto ticket = _tryAcquireImpl(admCtx);
-    // Track statistics.
+
     if (ticket) {
         auto& queueStats = _getQueueStatsToUse(admCtx);
-        if (admCtx->getAdmissions() == 0) {
-            queueStats.totalNewAdmissions.fetchAndAddRelaxed(1);
-        }
-        admCtx->start(_serviceContext->getTickSource());
-        queueStats.totalStartedProcessing.fetchAndAddRelaxed(1);
+        updateQueueStatsOnTicketAcquisition(_serviceContext, queueStats, admCtx);
     }
     return ticket;
 }
@@ -218,11 +275,7 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(Operat
 
     if (ticket) {
         cancelWait.dismiss();
-        if (admCtx->getAdmissions() == 0) {
-            queueStats.totalNewAdmissions.fetchAndAddRelaxed(1);
-        }
-        admCtx->start(_serviceContext->getTickSource());
-        queueStats.totalStartedProcessing.fetchAndAddRelaxed(1);
+        updateQueueStatsOnTicketAcquisition(_serviceContext, queueStats, admCtx);
         return ticket;
     } else {
         return boost::none;
@@ -329,7 +382,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
     return Ticket{this, admCtx};
 }
 
-void SemaphoreTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
+void SemaphoreTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
     check(sem_post(&_sem));
 }
 
@@ -394,7 +447,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
     return Ticket{this, admCtx};
 }
 
-void SemaphoreTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
+void SemaphoreTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _numTickets++;
@@ -455,8 +508,11 @@ int SchedulingTicketHolder::queued() const {
     return _enqueuedElements.loadRelaxed();
 }
 
-void SchedulingTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
-    invariant(admCtx);
+void SchedulingTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
+    // Tickets acquired with priority kImmediate are not generated from the pool of available
+    // tickets, and thus should never be returned to the pool of available tickets.
+    invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
+
     // The idea behind the release mechanism consists of a consistent view of queued elements
     // waiting for a ticket and many threads releasing tickets simultaneously. The releasers will
     // proceed to attempt to dequeue an element by seeing if there are threads not woken and waking
@@ -598,10 +654,12 @@ bool SchedulingTicketHolder::Queue::enqueue(OperationContext* opCtx,
 }
 
 PriorityTicketHolder::PriorityTicketHolder(int numTickets, ServiceContext* serviceContext)
-    : SchedulingTicketHolder(numTickets, 2, serviceContext) {}
+    : SchedulingTicketHolder(numTickets, 3, serviceContext) {}
 
 void PriorityTicketHolder::_dequeueWaitingThread() {
-    int currentIndexQueue = static_cast<unsigned int>(QueueType::QueueTypeSize) - 1;
+    // There should never be anything to dequeue from 'QueueType::ImmediatePriorityNoOpQueue' since
+    // 'kImmediate' operations should always bypass the need to queue.
+    int currentIndexQueue = static_cast<unsigned int>(QueueType::ImmediatePriorityNoOpQueue) - 1;
     while (!_queues[currentIndexQueue].attemptToDequeue()) {
         if (currentIndexQueue == 0)
             break;
@@ -613,16 +671,33 @@ void PriorityTicketHolder::_dequeueWaitingThread() {
 void PriorityTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
     {
         BSONObjBuilder bbb(b.subobjStart("lowPriority"));
-        auto& queueStats =
+        auto& lowPriorityTicketStats =
             _queues[static_cast<unsigned int>(QueueType::LowPriorityQueue)].getStats();
-        _appendPriorityStats(bbb, queueStats);
+        _appendPriorityStats(bbb, lowPriorityTicketStats);
         bbb.done();
     }
     {
         BSONObjBuilder bbb(b.subobjStart("normalPriority"));
-        auto& queueStats =
+        auto& normalPriorityTicketStats =
             _queues[static_cast<unsigned int>(QueueType::NormalPriorityQueue)].getStats();
-        _appendPriorityStats(bbb, queueStats);
+        _appendPriorityStats(bbb, normalPriorityTicketStats);
+        bbb.done();
+    }
+    {
+        BSONObjBuilder bbb(b.subobjStart("immediatePriority"));
+        // Since 'kImmediate' priority operations will never queue, omit queueing statistics that
+        // will always be 0.
+        auto& immediateTicketStats =
+            _queues[static_cast<unsigned int>(QueueType::ImmediatePriorityNoOpQueue)].getStats();
+
+        auto finished = immediateTicketStats.totalFinishedProcessing.loadRelaxed();
+        auto started = immediateTicketStats.totalStartedProcessing.loadRelaxed();
+        bbb.append("startedProcessing", started);
+        bbb.append("processing", std::max(static_cast<int>(started - finished), 0));
+        bbb.append("finishedProcessing", finished);
+        bbb.append("totalTimeProcessingMicros",
+                   immediateTicketStats.totalTimeProcessingMicros.loadRelaxed());
+        bbb.append("newAdmissions", immediateTicketStats.totalNewAdmissions.loadRelaxed());
         bbb.done();
     }
 }
@@ -654,9 +729,11 @@ SchedulingTicketHolder::Queue& PriorityTicketHolder::_getQueueToUse(
             return _queues[static_cast<unsigned int>(QueueType::LowPriorityQueue)];
         case AdmissionContext::Priority::kNormal:
             return _queues[static_cast<unsigned int>(QueueType::NormalPriorityQueue)];
-        default:
-            MONGO_UNREACHABLE;
+        case AdmissionContext::Priority::kImmediate:
+            return _queues[static_cast<unsigned int>(QueueType::ImmediatePriorityNoOpQueue)];
     }
+
+    MONGO_UNREACHABLE;
 }
 
 TicketHolderWithQueueingStats::QueueStats& PriorityTicketHolder::_getQueueStatsToUse(

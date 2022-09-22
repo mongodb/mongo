@@ -368,10 +368,15 @@ void LockerImpl::reacquireTicket(OperationContext* opCtx) {
 
 bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline) {
     _admCtx.setLockMode(mode);
+
+    // Upon startup, the holder is not guaranteed to be initialized.
+    auto holder = _ticketHolder;
     const bool reader = isSharedLockMode(mode);
-    auto holder = shouldAcquireTicket() ? _ticketHolder : nullptr;
-    // MODE_X is exclusive of all other locks, thus acquiring a ticket is unnecessary.
-    if (mode != MODE_X && mode != MODE_NONE && holder) {
+
+    if (!shouldWaitForTicket() && holder) {
+        _ticket = holder->acquireImmediateTicket(&_admCtx);
+    } else if (mode != MODE_X && mode != MODE_NONE && holder) {
+        // MODE_X is exclusive of all other locks, thus acquiring a ticket is unnecessary.
         _clientState.store(reader ? kQueuedReader : kQueuedWriter);
         // If the ticket wait is interrupted, restore the state of the client.
         ScopeGuard restoreStateOnErrorGuard([&] {
@@ -396,6 +401,7 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
         }
         restoreStateOnErrorGuard.dismiss();
     }
+
     _clientState.store(reader ? kActiveReader : kActiveWriter);
     return true;
 }

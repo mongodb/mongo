@@ -1241,27 +1241,27 @@ TEST_F(LockerImplTest, SetTicketAcquisitionForLockRAIIType) {
     auto opCtx = makeOperationContext();
 
     // By default, ticket acquisition is required.
-    ASSERT_TRUE(opCtx->lockState()->shouldAcquireTicket());
+    ASSERT_TRUE(opCtx->lockState()->shouldWaitForTicket());
 
     {
         SetTicketAquisitionPriorityForLock setTicketAquisition(
             opCtx.get(), AdmissionContext::Priority::kImmediate);
-        ASSERT_FALSE(opCtx->lockState()->shouldAcquireTicket());
+        ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
     }
 
-    ASSERT_TRUE(opCtx->lockState()->shouldAcquireTicket());
+    ASSERT_TRUE(opCtx->lockState()->shouldWaitForTicket());
 
     // If ticket acquisitions are disabled on the lock state, the RAII type has no effect.
     opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
-    ASSERT_FALSE(opCtx->lockState()->shouldAcquireTicket());
+    ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
 
     {
         SetTicketAquisitionPriorityForLock setTicketAquisition(
             opCtx.get(), AdmissionContext::Priority::kImmediate);
-        ASSERT_FALSE(opCtx->lockState()->shouldAcquireTicket());
+        ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
     }
 
-    ASSERT_FALSE(opCtx->lockState()->shouldAcquireTicket());
+    ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
 }
 
 // This test exercises the lock dumping code in ~LockerImpl in case locks are held on destruction.
