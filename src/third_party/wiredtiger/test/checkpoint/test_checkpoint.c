@@ -275,9 +275,7 @@ run_complete:
 static int
 wt_connect(const char *config_open)
 {
-    static WT_EVENT_HANDLER event_handler = {
-      handle_error, handle_message, NULL, NULL /* Close handler. */
-    };
+    static WT_EVENT_HANDLER event_handler = {handle_error, handle_message, NULL, NULL, NULL};
     WT_RAND_STATE rnd;
     int ret;
     char buf[512], config[1024];

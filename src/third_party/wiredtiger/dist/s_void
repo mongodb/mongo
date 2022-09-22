@@ -40,6 +40,7 @@ func_ok()
 	    -e '/int __cursor_fix_implicit$/d' \
 	    -e '/int __delete_redo_window_cleanup_skip$/d' \
 	    -e '/int __handle_close_default$/d' \
+	    -e '/int __handle_general_default$/d' \
 	    -e '/int __handle_progress_default$/d' \
 	    -e '/int __im_file_close$/d' \
 	    -e '/int __im_file_lock$/d' \
@@ -108,6 +109,7 @@ func_ok()
 	    -e '/int fail_fs_exist$/d' \
 	    -e '/int fail_fs_simulate_fail$/d' \
 	    -e '/int fail_fs_terminate$/d' \
+	    -e '/int handle_general$/d' \
 	    -e '/int handle_message$/d' \
 	    -e '/int handle_progress$/d' \
 	    -e '/int index_compare_S$/d' \

@@ -66,7 +66,7 @@ static WT_THREAD_RET monitor(void *);
  */
 #define RUNTIME 900.0
 
-static WT_EVENT_HANDLER event_handler = {handle_op_error, handle_op_message, NULL, NULL};
+static WT_EVENT_HANDLER event_handler = {handle_op_error, handle_op_message, NULL, NULL, NULL};
 
 /*
  * main --
