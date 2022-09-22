@@ -61,24 +61,7 @@ private:
     ShardingDataTransformCumulativeMetrics::UniqueScopedObserver _scopedOpObserver;
 };
 
-class ShardingDataTransformCumulativeMetricsTest : public ShardingDataTransformMetricsTestFixture {
-public:
-    static BSONObj getLatencySection(const ShardingDataTransformCumulativeMetrics& metrics) {
-        BSONObjBuilder bob;
-        metrics.reportForServerStatus(&bob);
-        auto report = bob.done();
-        return report.getObjectField(kTestMetricsName).getObjectField("latencies").getOwned();
-    }
-
-    static BSONObj getActiveSection(const ShardingDataTransformCumulativeMetrics& metrics) {
-        BSONObjBuilder bob;
-        metrics.reportForServerStatus(&bob);
-        auto report = bob.done();
-        return report.getObjectField(kTestMetricsName).getObjectField("active").getOwned();
-    }
-};
-
-TEST_F(ShardingDataTransformCumulativeMetricsTest, AddAndRemoveMetrics) {
+TEST_F(ShardingDataTransformMetricsTestFixture, AddAndRemoveMetrics) {
     auto deregister = _cumulativeMetrics->registerInstanceMetrics(getOldestObserver());
     ASSERT_EQ(_cumulativeMetrics->getObservedMetricsCount(), 1);
     deregister.reset();
@@ -320,23 +303,23 @@ TEST_F(ShardingDataTransformMetricsTestFixture, ReportContainsInsertsDuringCloni
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _cumulativeMetrics->registerInstanceMetrics(&recipient);
 
-    auto latencySection = getLatencySection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalLocalInserts"), 0);
-    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalLocalInsertTimeMillis"), 0);
+    auto latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("collectionCloningTotalLocalInserts"), 0);
+    ASSERT_EQ(latencies.getIntField("collectionCloningTotalLocalInsertTimeMillis"), 0);
 
-    auto activeSection = getActiveSection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(activeSection.getIntField("documentsCopied"), 0);
-    ASSERT_EQ(activeSection.getIntField("bytesCopied"), 0);
+    auto active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("documentsProcessed"), 0);
+    ASSERT_EQ(active.getIntField("bytesWritten"), 0);
 
     _cumulativeMetrics->onInsertsDuringCloning(140, 20763, Milliseconds(15));
 
-    latencySection = getLatencySection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalLocalInserts"), 1);
-    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalLocalInsertTimeMillis"), 15);
+    latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("collectionCloningTotalLocalInserts"), 1);
+    ASSERT_EQ(latencies.getIntField("collectionCloningTotalLocalInsertTimeMillis"), 15);
 
-    activeSection = getActiveSection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(activeSection.getIntField("documentsCopied"), 140);
-    ASSERT_EQ(activeSection.getIntField("bytesCopied"), 20763);
+    active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("documentsProcessed"), 140);
+    ASSERT_EQ(active.getIntField("bytesWritten"), 20763);
 }
 
 TEST_F(ShardingDataTransformMetricsTestFixture, ReportContainsReadDuringCriticalSection) {
@@ -344,13 +327,13 @@ TEST_F(ShardingDataTransformMetricsTestFixture, ReportContainsReadDuringCritical
     ObserverMock donor{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kDonor};
     auto ignore = _cumulativeMetrics->registerInstanceMetrics(&donor);
 
-    auto activeSection = getActiveSection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(activeSection.getIntField("countReadsDuringCriticalSection"), 0);
+    auto active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("countReadsDuringCriticalSection"), 0);
 
     _cumulativeMetrics->onReadDuringCriticalSection();
 
-    activeSection = getActiveSection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(activeSection.getIntField("countReadsDuringCriticalSection"), 1);
+    active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("countReadsDuringCriticalSection"), 1);
 }
 
 TEST_F(ShardingDataTransformMetricsTestFixture, ReportContainsWriteDuringCriticalSection) {
@@ -358,13 +341,13 @@ TEST_F(ShardingDataTransformMetricsTestFixture, ReportContainsWriteDuringCritica
     ObserverMock donor{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kDonor};
     auto ignore = _cumulativeMetrics->registerInstanceMetrics(&donor);
 
-    auto activeSection = getActiveSection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(activeSection.getIntField("countWritesDuringCriticalSection"), 0);
+    auto active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("countWritesDuringCriticalSection"), 0);
 
     _cumulativeMetrics->onWriteDuringCriticalSection();
 
-    activeSection = getActiveSection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(activeSection.getIntField("countWritesDuringCriticalSection"), 1);
+    active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("countWritesDuringCriticalSection"), 1);
 }
 
 TEST_F(ShardingDataTransformMetricsTestFixture, ReportContainsWriteToStashedCollection) {
@@ -372,13 +355,13 @@ TEST_F(ShardingDataTransformMetricsTestFixture, ReportContainsWriteToStashedColl
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kRecipient};
     auto ignore = _cumulativeMetrics->registerInstanceMetrics(&recipient);
 
-    auto activeSection = getActiveSection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(activeSection.getIntField("countWritesToStashCollections"), 0);
+    auto active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("countWritesToStashCollections"), 0);
 
     _cumulativeMetrics->onWriteToStashedCollections();
 
-    activeSection = getActiveSection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(activeSection.getIntField("countWritesToStashCollections"), 1);
+    active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("countWritesToStashCollections"), 1);
 }
 
 TEST_F(ShardingDataTransformMetricsTestFixture, ReportContainsBatchRetrievedDuringCloning) {
@@ -386,17 +369,15 @@ TEST_F(ShardingDataTransformMetricsTestFixture, ReportContainsBatchRetrievedDuri
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _cumulativeMetrics->registerInstanceMetrics(&recipient);
 
-    auto latencySection = getLatencySection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalRemoteBatchesRetrieved"), 0);
-    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalRemoteBatchRetrievalTimeMillis"),
-              0);
+    auto latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("collectionCloningTotalRemoteBatchesRetrieved"), 0);
+    ASSERT_EQ(latencies.getIntField("collectionCloningTotalRemoteBatchRetrievalTimeMillis"), 0);
 
-    _cumulativeMetrics->onCloningTotalRemoteBatchRetrieval(Milliseconds(19));
+    _cumulativeMetrics->onCloningRemoteBatchRetrieval(Milliseconds(19));
 
-    latencySection = getLatencySection(kTestMetricsName, _cumulativeMetrics.get());
-    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalRemoteBatchesRetrieved"), 1);
-    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalRemoteBatchRetrievalTimeMillis"),
-              19);
+    latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("collectionCloningTotalRemoteBatchesRetrieved"), 1);
+    ASSERT_EQ(latencies.getIntField("collectionCloningTotalRemoteBatchRetrievalTimeMillis"), 19);
 }
 
 }  // namespace

@@ -318,9 +318,8 @@ void ShardingDataTransformInstanceMetrics::onReadDuringCriticalSection() {
     _cumulativeMetrics->onReadDuringCriticalSection();
 }
 
-void ShardingDataTransformInstanceMetrics::onCloningTotalRemoteBatchRetrieval(
-    Milliseconds elapsed) {
-    _cumulativeMetrics->onCloningTotalRemoteBatchRetrieval(elapsed);
+void ShardingDataTransformInstanceMetrics::onCloningRemoteBatchRetrieval(Milliseconds elapsed) {
+    _cumulativeMetrics->onCloningRemoteBatchRetrieval(elapsed);
 }
 
 ShardingDataTransformCumulativeMetrics*

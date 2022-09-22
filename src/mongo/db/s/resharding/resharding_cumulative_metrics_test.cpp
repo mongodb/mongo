@@ -52,6 +52,10 @@ protected:
         return std::make_unique<ReshardingCumulativeMetrics>();
     }
 
+    virtual StringData getRootSectionName() override {
+        return kResharding;
+    }
+
     using CoordinatorStateEnum = ReshardingCumulativeMetrics::CoordinatorStateEnum;
     using DonorStateEnum = ReshardingCumulativeMetrics::DonorStateEnum;
     using RecipientStateEnum = ReshardingCumulativeMetrics::RecipientStateEnum;
@@ -180,15 +184,15 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsInsertsDuringFetching) {
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
-    auto latencySection = getLatencySection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalLocalInserts"), 0);
-    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalLocalInsertTimeMillis"), 0);
+    auto latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("oplogFetchingTotalLocalInserts"), 0);
+    ASSERT_EQ(latencies.getIntField("oplogFetchingTotalLocalInsertTimeMillis"), 0);
 
     _reshardingCumulativeMetrics->onLocalInsertDuringOplogFetching(Milliseconds(17));
 
-    latencySection = getLatencySection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalLocalInserts"), 1);
-    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalLocalInsertTimeMillis"), 17);
+    latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("oplogFetchingTotalLocalInserts"), 1);
+    ASSERT_EQ(latencies.getIntField("oplogFetchingTotalLocalInsertTimeMillis"), 17);
 }
 
 
@@ -197,15 +201,15 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsBatchRetrievedDuringApplyi
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
-    auto latencySection = getLatencySection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchesRetrieved"), 0);
-    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchRetrievalTimeMillis"), 0);
+    auto latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("oplogApplyingTotalLocalBatchesRetrieved"), 0);
+    ASSERT_EQ(latencies.getIntField("oplogApplyingTotalLocalBatchRetrievalTimeMillis"), 0);
 
     _reshardingCumulativeMetrics->onBatchRetrievedDuringOplogApplying(Milliseconds(39));
 
-    latencySection = getLatencySection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchesRetrieved"), 1);
-    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchRetrievalTimeMillis"), 39);
+    latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("oplogApplyingTotalLocalBatchesRetrieved"), 1);
+    ASSERT_EQ(latencies.getIntField("oplogApplyingTotalLocalBatchRetrievalTimeMillis"), 39);
 }
 
 
@@ -214,15 +218,15 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsBatchApplied) {
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
-    auto latencySection = getLatencySection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchesApplied"), 0);
-    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchApplyTimeMillis"), 0);
+    auto latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("oplogApplyingTotalLocalBatchesApplied"), 0);
+    ASSERT_EQ(latencies.getIntField("oplogApplyingTotalLocalBatchApplyTimeMillis"), 0);
 
     _reshardingCumulativeMetrics->onOplogLocalBatchApplied(Milliseconds(333));
 
-    latencySection = getLatencySection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchesApplied"), 1);
-    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchApplyTimeMillis"), 333);
+    latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("oplogApplyingTotalLocalBatchesApplied"), 1);
+    ASSERT_EQ(latencies.getIntField("oplogApplyingTotalLocalBatchApplyTimeMillis"), 333);
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsInsertsApplied) {
@@ -230,13 +234,13 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsInsertsApplied) {
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
-    auto activeSection = getActiveSection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(activeSection.getIntField("insertsApplied"), 0);
+    auto active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("insertsApplied"), 0);
 
     _reshardingCumulativeMetrics->onInsertApplied();
 
-    activeSection = getActiveSection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(activeSection.getIntField("insertsApplied"), 1);
+    active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("insertsApplied"), 1);
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsUpdatesApplied) {
@@ -244,13 +248,13 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsUpdatesApplied) {
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
-    auto activeSection = getActiveSection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(activeSection.getIntField("updatesApplied"), 0);
+    auto active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("updatesApplied"), 0);
 
     _reshardingCumulativeMetrics->onUpdateApplied();
 
-    activeSection = getActiveSection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(activeSection.getIntField("updatesApplied"), 1);
+    active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("updatesApplied"), 1);
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsDeletesApplied) {
@@ -258,13 +262,13 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsDeletesApplied) {
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
-    auto activeSection = getActiveSection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(activeSection.getIntField("deletesApplied"), 0);
+    auto active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("deletesApplied"), 0);
 
     _reshardingCumulativeMetrics->onDeleteApplied();
 
-    activeSection = getActiveSection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(activeSection.getIntField("deletesApplied"), 1);
+    active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("deletesApplied"), 1);
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsOplogEntriesFetched) {
@@ -272,21 +276,21 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsOplogEntriesFetched) {
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
-    auto activeSection = getActiveSection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(activeSection.getIntField("oplogEntriesFetched"), 0);
+    auto active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("oplogEntriesFetched"), 0);
 
-    auto latencySection = getLatencySection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalRemoteBatchesRetrieved"), 0);
-    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalRemoteBatchRetrievalTimeMillis"), 0);
+    auto latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("oplogFetchingTotalRemoteBatchesRetrieved"), 0);
+    ASSERT_EQ(latencies.getIntField("oplogFetchingTotalRemoteBatchRetrievalTimeMillis"), 0);
 
     _reshardingCumulativeMetrics->onOplogEntriesFetched(123, Milliseconds(43));
 
-    activeSection = getActiveSection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(activeSection.getIntField("oplogEntriesFetched"), 123);
+    active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("oplogEntriesFetched"), 123);
 
-    latencySection = getLatencySection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalRemoteBatchesRetrieved"), 1);
-    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalRemoteBatchRetrievalTimeMillis"), 43);
+    latencies = getCumulativeMetricsReportForSection(kLatencies);
+    ASSERT_EQ(latencies.getIntField("oplogFetchingTotalRemoteBatchesRetrieved"), 1);
+    ASSERT_EQ(latencies.getIntField("oplogFetchingTotalRemoteBatchRetrievalTimeMillis"), 43);
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsOplogEntriesApplied) {
@@ -294,13 +298,13 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsOplogEntriesApplied) {
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
-    auto activeSection = getActiveSection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(activeSection.getIntField("oplogEntriesApplied"), 0);
+    auto active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("oplogEntriesApplied"), 0);
 
     _reshardingCumulativeMetrics->onOplogEntriesApplied(99);
 
-    activeSection = getActiveSection(kResharding, _reshardingCumulativeMetrics);
-    ASSERT_EQ(activeSection.getIntField("oplogEntriesApplied"), 99);
+    active = getCumulativeMetricsReportForSection(kActive);
+    ASSERT_EQ(active.getIntField("oplogEntriesApplied"), 99);
 }
 
 TEST_F(ReshardingCumulativeMetricsTest,

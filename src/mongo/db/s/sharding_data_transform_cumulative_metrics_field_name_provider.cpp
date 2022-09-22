@@ -33,7 +33,6 @@ namespace mongo {
 
 namespace {
 using Provider = ShardingDataTransformCumulativeMetricsFieldNameProvider;
-using Placeholder = ShardingDataTransformCumulativeMetricsFieldNamePlaceholder;
 constexpr auto kCountStarted = "countStarted";
 constexpr auto kCountSucceeded = "countSucceeded";
 constexpr auto kCountFailed = "countFailed";
@@ -104,13 +103,6 @@ StringData Provider::getForCollectionCloningTotalLocalInsertTimeMillis() const {
 }
 StringData Provider::getForCollectionCloningTotalLocalInserts() const {
     return kCollectionCloningTotalLocalInserts;
-}
-
-StringData Placeholder::getForDocumentsProcessed() const {
-    return kDocumentsCopied;
-}
-StringData Placeholder::getForBytesWritten() const {
-    return kBytesCopied;
 }
 
 }  // namespace mongo

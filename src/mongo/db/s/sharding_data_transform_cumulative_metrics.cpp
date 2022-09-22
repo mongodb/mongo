@@ -275,8 +275,7 @@ void ShardingDataTransformCumulativeMetrics::onWriteToStashedCollections() {
     _writesToStashedCollections.fetchAndAdd(1);
 }
 
-void ShardingDataTransformCumulativeMetrics::onCloningTotalRemoteBatchRetrieval(
-    Milliseconds elapsed) {
+void ShardingDataTransformCumulativeMetrics::onCloningRemoteBatchRetrieval(Milliseconds elapsed) {
     _totalBatchRetrievedDuringClone.fetchAndAdd(1);
     _totalBatchRetrievedDuringCloneMillis.fetchAndAdd(durationCount<Milliseconds>(elapsed));
 }

@@ -87,6 +87,18 @@ private:
     ShardingDataTransformMetrics::Role _role;
 };
 
+class ShardingDataTransformCumulativeMetricsFieldNameProviderForTest
+    : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
+public:
+    virtual ~ShardingDataTransformCumulativeMetricsFieldNameProviderForTest() = default;
+    virtual StringData getForDocumentsProcessed() const override {
+        return "documentsProcessed";
+    }
+    virtual StringData getForBytesWritten() const override {
+        return "bytesWritten";
+    }
+};
+
 class ShardingDataTransformMetricsTestFixture : public unittest::Test {
 
 public:
@@ -138,20 +150,86 @@ protected:
         _cumulativeMetrics = initializeCumulativeMetrics();
     }
 
-    static BSONObj getLatencySection(StringData rootName,
-                                     const ShardingDataTransformCumulativeMetrics* metrics) {
-        BSONObjBuilder bob;
-        metrics->reportForServerStatus(&bob);
-        auto report = bob.done();
-        return report.getObjectField(rootName).getObjectField("latencies").getOwned();
+    virtual StringData getRootSectionName() {
+        return kTestMetricsName;
     }
 
-    static BSONObj getActiveSection(StringData rootName,
-                                    const ShardingDataTransformCumulativeMetrics* metrics) {
+    enum Section { kRoot, kActive, kLatencies, kCurrentInSteps };
+
+    StringData getSectionName(Section section) {
+        switch (section) {
+            case kRoot:
+                return getRootSectionName();
+            case kActive:
+                return "active";
+            case kLatencies:
+                return "latencies";
+            case kCurrentInSteps:
+                return "currentInSteps";
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    BSONObj getCumulativeMetricsReport() {
         BSONObjBuilder bob;
-        metrics->reportForServerStatus(&bob);
-        auto report = bob.done();
-        return report.getObjectField(rootName).getObjectField("active").getOwned();
+        getCumulativeMetrics()->reportForServerStatus(&bob);
+        return bob.obj().getObjectField(getSectionName(kRoot)).getOwned();
+    }
+
+    BSONObj getReportSection(BSONObj report, Section section) {
+        if (section == kRoot) {
+            return report.getOwned();
+        }
+        return report.getObjectField(getSectionName(section)).getOwned();
+    }
+
+    BSONObj getCumulativeMetricsReportForSection(Section section) {
+        return getReportSection(getCumulativeMetricsReport(), section);
+    }
+
+    void assertAltersCumulativeMetrics(
+        ShardingDataTransformInstanceMetrics* metrics,
+        const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutateFn,
+        const std::function<bool(BSONObj, BSONObj)>& verifyFn) {
+        auto before = getCumulativeMetricsReport();
+        mutateFn(metrics);
+        auto after = getCumulativeMetricsReport();
+        ASSERT_TRUE(verifyFn(before, after));
+    }
+
+    void assertAltersCumulativeMetricsField(
+        ShardingDataTransformInstanceMetrics* metrics,
+        const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutateFn,
+        Section section,
+        const StringData& fieldName,
+        const std::function<bool(int, int)>& verifyFn) {
+        assertAltersCumulativeMetrics(metrics, mutateFn, [&](auto reportBefore, auto reportAfter) {
+            auto before = getReportSection(reportBefore, section).getIntField(fieldName);
+            auto after = getReportSection(reportAfter, section).getIntField(fieldName);
+            return verifyFn(before, after);
+        });
+    }
+
+    void assertIncrementsCumulativeMetricsField(
+        ShardingDataTransformInstanceMetrics* metrics,
+        const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutateFn,
+        Section section,
+        const StringData& fieldName) {
+        assertAltersCumulativeMetricsField(
+            metrics, mutateFn, section, fieldName, [](auto before, auto after) {
+                return after > before;
+            });
+    }
+
+    void assertDecrementsCumulativeMetricsField(
+        ShardingDataTransformInstanceMetrics* metrics,
+        const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutateFn,
+        Section section,
+        const StringData& fieldName) {
+        assertAltersCumulativeMetricsField(
+            metrics, mutateFn, section, fieldName, [](auto before, auto after) {
+                return after < before;
+            });
     }
 
     constexpr static auto kTestMetricsName = "testMetrics";
@@ -168,7 +246,7 @@ protected:
     virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() {
         return std::make_unique<ShardingDataTransformCumulativeMetrics>(
             kTestMetricsName,
-            std::make_unique<ShardingDataTransformCumulativeMetricsFieldNamePlaceholder>());
+            std::make_unique<ShardingDataTransformCumulativeMetricsFieldNameProviderForTest>());
     }
 
     const ObserverMock* getYoungestObserver() {

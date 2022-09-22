@@ -92,7 +92,7 @@ public:
     void setDocumentsToProcessCounts(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds milliseconds);
     void setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds milliseconds);
-    void onCloningTotalRemoteBatchRetrieval(Milliseconds elapsed);
+    void onCloningRemoteBatchRetrieval(Milliseconds elapsed);
     void onWriteToStashedCollections();
 
     void onReadDuringCriticalSection();

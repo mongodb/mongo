@@ -107,7 +107,7 @@ public:
     void onWriteDuringCriticalSection();
     void onWriteToStashedCollections();
 
-    void onCloningTotalRemoteBatchRetrieval(Milliseconds elapsed);
+    void onCloningRemoteBatchRetrieval(Milliseconds elapsed);
     void onInsertsDuringCloning(int64_t count, int64_t bytes, const Milliseconds& elapsedTime);
 
 protected:
