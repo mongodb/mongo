@@ -81,6 +81,49 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv6) {
 #endif
 }
 
+TEST_F(ServiceContextTest, RetryOnTransientDNSErrorsInFastPathEnoughAttempts) {
+#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
+    bool wasEnabled = IPv6Enabled();
+    enableIPv6(true);
+    ON_BLOCK_EXIT([&] { enableIPv6(wasEnabled); });
+
+    // First we get the addrs bound on this host
+    const std::vector<std::string> addrs = getBoundAddrs(true);
+
+    auto failResolution = globalFailPointRegistry().find("transientDNSErrorInFastPath");
+    failResolution->setMode(FailPoint::nTimes, 3);
+
+    // Fastpath should agree with the result of getBoundAddrs and should be able to resolve
+    // the addresses even with the (transient) failures.
+    for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
+        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
+    }
+#else
+    ASSERT(true);
+#endif
+}
+
+TEST_F(ServiceContextTest, RetryOnTransientDNSErrorsInFastPathAttemptsExhausted) {
+#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
+    bool wasEnabled = IPv6Enabled();
+    enableIPv6(true);
+    ON_BLOCK_EXIT([&] { enableIPv6(wasEnabled); });
+
+    // First we get the addrs bound on this host
+    const std::vector<std::string> addrs = getBoundAddrs(true);
+
+    auto failResolution = globalFailPointRegistry().find("transientDNSErrorInFastPath");
+    failResolution->setMode(FailPoint::nTimes, 5 * addrs.size());
+
+    // Fastpath should not be able to resolve any of the addresses.
+    for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
+        ASSERT_FALSE(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
+    }
+#else
+    ASSERT(true);
+#endif
+}
+
 }  // namespace
 
 }  // namespace repl

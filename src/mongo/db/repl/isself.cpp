@@ -81,6 +81,7 @@ namespace mongo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(failIsSelfCheck);
+MONGO_FAIL_POINT_DEFINE(transientDNSErrorInFastPath);
 
 OID instanceId;
 
@@ -104,9 +105,35 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
 
     const std::string portNum = std::to_string(port);
 
-    std::vector<std::string> out;
+    int err = 0;
+    int attempts = 0;
+    int maxAttempts = 4;
 
-    int err = getaddrinfo(iporhost.c_str(), portNum.c_str(), &hints, &addrs);
+    while (true) {
+        err = getaddrinfo(iporhost.c_str(), portNum.c_str(), &hints, &addrs);
+
+        // We do not sleep for as long in tests.
+        auto waitCoefficient = 1.0;
+
+        // Simulate transient DNS error if set.
+        if (MONGO_unlikely(transientDNSErrorInFastPath.shouldFail())) {
+            waitCoefficient = 0.1;
+            err = EAI_AGAIN;
+        }
+
+        // Skip waiting if we succeed, get a different error, or run out of attempts.
+        if (err != EAI_AGAIN || attempts == maxAttempts) {
+            break;
+        }
+
+        // Free what we have ahead of the next getaddrinfo call.
+        freeaddrinfo(addrs);
+
+        // Wait 1, 2, 4, 8 seconds (and a tenth of that in tests).
+        sleepmillis(std::pow(2, attempts++) * 1000 * waitCoefficient);
+    }
+
+    std::vector<std::string> out;
 
     if (err) {
         auto ec = addrInfoError(err);
@@ -114,7 +141,9 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
                       "getaddrinfo(\"{host}\") failed: {error}",
                       "getaddrinfo() failed",
                       "host"_attr = iporhost,
-                      "error"_attr = errorMessage(ec));
+                      "error"_attr = errorMessage(ec),
+                      "timedOut"_attr = (attempts == maxAttempts));
+        freeaddrinfo(addrs);
         return out;
     }
 
