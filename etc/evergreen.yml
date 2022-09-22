@@ -3712,6 +3712,22 @@ buildvariants:
 #    distros:
 #      - rhel80-xlarge
 
+- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
+  name: enterprise-rhel-80-64-bit-dynamic-required-security-patch-only-unittests
+  display_name: "~ Shared Library Enterprise RHEL 8.0 Security Patch Only (Unittests)"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
+    target_resmoke_time: 15
+    max_sub_suites: 15
+  tasks:
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+      - rhel80-xlarge
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+      - rhel80-xlarge
+
 - name: enterprise-ubuntu1804-64-libvoidstar
   display_name: ~ Enterprise Ubuntu 18.04 w/ libvoidstar
   modules:
