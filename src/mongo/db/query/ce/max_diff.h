@@ -42,7 +42,7 @@ namespace mongo::ce {
 struct ValFreq {
     ValFreq(size_t idx, size_t freq) : _idx(idx), _freq(freq), _area(-1.0), _normArea(-1) {}
 
-    const std::string toString() const {
+    std::string toString() const {
         std::ostringstream os;
         os << "idx: " << _idx << ", freq: " << _freq << ", area: " << _area
            << ", normArea: " << _normArea;

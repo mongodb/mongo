@@ -47,7 +47,7 @@ std::vector<repl::MemberConfig> getRecipientMembers(const repl::ReplSetConfig& c
                                                     const StringData& recipientTagName) {
     std::vector<repl::MemberConfig> result;
     const auto& tagConfig = config.getTagConfig();
-    for (auto member : config.members()) {
+    for (const auto& member : config.members()) {
         auto matchesTag =
             std::any_of(member.tagsBegin(), member.tagsEnd(), [&](const repl::ReplSetTag& tag) {
                 return tagConfig.getTagKey(tag) == recipientTagName;

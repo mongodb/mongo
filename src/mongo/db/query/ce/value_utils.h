@@ -64,12 +64,12 @@ private:
     Generate an SBE Value pair that represents the supplied int with
     type Int64
 */
-const std::pair<value::TypeTags, value::Value> makeInt64Value(int v);
+std::pair<value::TypeTags, value::Value> makeInt64Value(int v);
 
 /**
     Generate an SBE Value pair representing a BSON null value
 */
-const std::pair<value::TypeTags, value::Value> makeNullValue();
+std::pair<value::TypeTags, value::Value> makeNullValue();
 
 /**
     Do the supplied type tags represent the same BSON type?

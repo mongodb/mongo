@@ -56,7 +56,7 @@ TopologyDescription::TopologyDescription(SdamConfiguration config)
     : _type(config.getInitialType()), _setName(config.getSetName()) {
     if (auto seeds = config.getSeedList()) {
         _servers.clear();
-        for (auto address : *seeds) {
+        for (const auto& address : *seeds) {
             _servers.push_back(std::make_shared<ServerDescription>(address));
         }
     }

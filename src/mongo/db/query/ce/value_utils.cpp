@@ -91,11 +91,11 @@ value::Value SBEValue::getValue() const {
     return _val;
 }
 
-const std::pair<value::TypeTags, value::Value> makeInt64Value(int v) {
+std::pair<value::TypeTags, value::Value> makeInt64Value(int v) {
     return std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(v));
 };
 
-const std::pair<value::TypeTags, value::Value> makeNullValue() {
+std::pair<value::TypeTags, value::Value> makeNullValue() {
     return std::make_pair(value::TypeTags::Null, 0);
 };
 

@@ -96,7 +96,7 @@ std::string makeMatchExpr(const SBEValue& val, EstimationType cmpOp) {
     return matchExpr.str();
 }
 
-const ScalarHistogram makeHistogram(std::vector<SBEValue>& randData, size_t nBuckets) {
+ScalarHistogram makeHistogram(std::vector<SBEValue>& randData, size_t nBuckets) {
     sortValueVector(randData);
     const DataDistribution& dataDistrib = getDataDistribution(randData);
     return genMaxDiffHistogram(dataDistrib, nBuckets);

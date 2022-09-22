@@ -48,7 +48,7 @@ protected:
     std::unique_ptr<QuerySolutionNode> makeHashAndTree(
         std::vector<std::vector<BSONArray>> docsVec) {
         auto andHashNode = std::make_unique<AndHashNode>();
-        for (auto docs : docsVec) {
+        for (const auto& docs : docsVec) {
             auto virtScan =
                 std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, true);
             andHashNode->children.push_back(std::move(virtScan));

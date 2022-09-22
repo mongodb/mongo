@@ -73,7 +73,7 @@ ScalarHistogram getHistogramFromData(std::vector<TestBucket> testBuckets) {
 
     int cumulativeFreq = 0;
     int cumulativeNDV = 0;
-    for (auto b : testBuckets) {
+    for (const auto& b : testBuckets) {
         // Add bucket boundary value to bounds.
         auto [tag, val] = stage_builder::makeValue(b.val);
         bounds.push_back(tag, val);

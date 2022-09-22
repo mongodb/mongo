@@ -311,7 +311,7 @@ void basicTests(int line,
     for (auto&& [keyGen, expectedPaths] : expected) {
         StringMap<UnencodedCellValue_ForTest> expected;
         // Create expected by retrieving flags and vals from expected paths
-        for (auto path : expectedPaths) {
+        for (const auto& path : expectedPaths) {
             expected.insert({path, pathMap.find(path)->second});
         }
         // Add in the RowID column. Since it is always the same, tests shouldn't include it.
@@ -961,7 +961,7 @@ void updateTest(
     std::vector<BSONElement> elems;
     for (auto&& [keyGen, expectedPaths] : projPairs) {
         StringMap<std::pair<ColumnKeyGenerator::DiffAction, UnencodedCellValue_ForTest>> expected;
-        for (auto path : expectedPaths) {
+        for (const auto& path : expectedPaths) {
             expected.insert({path, pathMap.find(path)->second});
         }
         StringSet seenPaths;

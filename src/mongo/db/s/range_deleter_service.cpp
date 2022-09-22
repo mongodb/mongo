@@ -48,9 +48,9 @@ namespace mongo {
 namespace {
 const auto rangeDeleterServiceDecorator = ServiceContext::declareDecoration<RangeDeleterService>();
 
-const BSONObj getShardKeyPattern(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const UUID& collectionUuid) {
+BSONObj getShardKeyPattern(OperationContext* opCtx,
+                           const DatabaseName& dbName,
+                           const UUID& collectionUuid) {
     while (true) {
         opCtx->checkForInterrupt();
         boost::optional<NamespaceString> optNss;

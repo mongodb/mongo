@@ -73,7 +73,7 @@ std::string makeMatchExpr(const SBEValue& val, EstimationType cmpOp);
     Given a vector of values, create a histogram reflection the distribution of the vector
     with the supplied number of buckets.
 */
-const ScalarHistogram makeHistogram(std::vector<SBEValue>& randData, size_t nBuckets);
+ScalarHistogram makeHistogram(std::vector<SBEValue>& randData, size_t nBuckets);
 
 /**
     Serialize a vector of values.

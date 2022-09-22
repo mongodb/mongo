@@ -65,7 +65,7 @@ std::vector<AsyncRequestsSender::Request> createShardCleanupRequests(
 
     auto participants = getAllParticipantsFromCoordDoc(doc);
     std::vector<AsyncRequestsSender::Request> requests;
-    for (auto participant : participants) {
+    for (const auto& participant : participants) {
         requests.emplace_back(participant,
                               ShardsvrCleanupReshardCollection(nss, reshardingUUID).toBSON({}));
     }
