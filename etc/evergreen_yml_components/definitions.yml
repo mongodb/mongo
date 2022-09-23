@@ -2628,26 +2628,6 @@ tasks:
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
   tags: []
-  exec_timeout_secs: 3600 # 1 hour timeout for the task overall
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
-  commands:
-  - func: "scons compile"
-    vars:
-      targets: compiledb
-      compiling_for_test: true
-  - command: subprocess.exec
-    type: test
-    timeout_secs: 3600 # 1 hour timeout for no output
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/run_clang_tidy.sh"
-
-## clang_tidy_condensed - run clang_tidy with python making the results clearer
-- name: clang_tidy_condensed
-  tags: []
   exec_timeout_secs: 7200 # 1 hour timeout for the task overall
   depends_on:
   - name: version_expansions_gen
@@ -2663,7 +2643,7 @@ tasks:
     params:
       binary: bash
       args:
-      - "./src/evergreen/run_clang_tidy_condensed.sh"
+      - "./src/evergreen/run_clang_tidy.sh"
 
 ## compile_unittests ##
 - &compile_unittests
@@ -7985,39 +7965,8 @@ task_groups:
   tasks:
   - build_metrics_tasks_gen
 
-- name: clang_tidy_TG
-  setup_group_can_fail_task: true
-  setup_group:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  - func: "kill processes"
-  - func: "cleanup environment"
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "configure evergreen api credentials"
-  - func: "get buildnumber"
-  - func: "f_expansions_write"
-  - func: "set up credentials"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"
-  teardown_group:
-  - func: "f_expansions_write"
-  - func: "attach report"
-  - func: "umount shared scons directory"
-  - func: "cleanup environment"
-  setup_task:
-  - func: "apply compile expansions"
-  - func: "f_expansions_write"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  teardown_task:
-  tasks:
-  - clang_tidy
 
-# This is a copy of clang_tidy_TG and will hopefully replace it
-- name: clang_tidy_condensed_TG
+- name: clang_tidy_TG
   setup_group_can_fail_task: true
   setup_group:
   - command: manifest.load
@@ -8047,7 +7996,7 @@ task_groups:
   - func: "f_expansions_write"
   teardown_task:
   tasks:
-  - clang_tidy_condensed
+  - clang_tidy
 
 - name: visibility_test_TG
   setup_group_can_fail_task: true
