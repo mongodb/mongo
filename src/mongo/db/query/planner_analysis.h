@@ -130,6 +130,15 @@ public:
         std::unique_ptr<QuerySolution> soln);
 
     /**
+     * Walks the QuerySolutionNode tree rooted in 'soln', and looks for a ColumnScan that
+     * is a child of either a Group or Projection.  If the ColumnScan's parent will ignore
+     * extra fields, then eliminate its row store expression, allowing it to return extra fields
+     * in cases when it falls back to pulling the full document from the row store.
+     * If these conditions are not met this is a noop.
+     */
+    static void removeUselessColumnScanRowStoreExpression(QuerySolutionNode& root);
+
+    /**
      * For the provided 'foreignCollName' and 'foreignFieldName' corresponding to an EqLookupNode,
      * returns what join algorithm should be used to execute it. In particular:
      * - An empty array is produced for each document if the foreign collection does not exist.

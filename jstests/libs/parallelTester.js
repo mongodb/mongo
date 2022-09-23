@@ -260,6 +260,7 @@ if (typeof _threadInject != "undefined") {
             "columnstore_index_per_path_filters.js",
             "columnstore_large_array_index_correctness.js",
             "columnstore_validindex.js",
+            "column_scan_skip_row_store_projection.js",
         ]);
 
         // Get files, including files in subdirectories.

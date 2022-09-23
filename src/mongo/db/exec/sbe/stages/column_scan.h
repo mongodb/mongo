@@ -52,8 +52,9 @@ namespace sbe {
  *
  * Debug string representation:
  *
- *  COLUMN_SCAN reconstructedRecordSlot|none recordIdSlot|none [path_1, ..., path_n]
- *              [filter_path_1: filterSlot_1, filterExpr_1; ...]? [roStoreSlot, rowStoreExpr]?
+ *  COLUMN_SCAN reconstructedRecordSlot|none recordIdSlot|none paths[path_1, ..., path_n]
+ *              pathFilters[filter_path_1: filterSlot_1, filterExpr_1; ...]
+ *              rowStoreExpr[slot, expr]|rowStoreExpr[]
  *              collectionUuid indexName
  */
 class ColumnScanStage final : public PlanStage {

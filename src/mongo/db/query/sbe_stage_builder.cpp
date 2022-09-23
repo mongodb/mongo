@@ -883,16 +883,23 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                    });
     }
 
-    // Generate the expression that is applied to the row store record(in the case when the result
+    // Generate the expression that is applied to the row store record (in the case when the result
     // cannot be reconstructed from the index).
-    optimizer::SlotVarMap slotMap{};
-    slotMap[rootStr] = rowStoreSlot;
-    auto abt = builder.generateABT();
-    // We might get null abt if no paths were added to the builder. It means we should be projecting
-    // an empty object.
-    tassert(6935000, "ABT must be valid if have fields to project", fieldsToProject.empty() || abt);
-    auto rowStoreExpr = abt ? abtToExpr(*abt, slotMap)
-                            : sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
+    std::unique_ptr<sbe::EExpression> rowStoreExpr = nullptr;
+
+    // Avoid generating the row store expression if the projection is not necessary, as indicated by
+    // the extraFieldsPermitted flag of the column store node.
+    if (boost::optional<optimizer::ABT> abt;
+        !csn->extraFieldsPermitted && (abt = builder.generateABT())) {
+        // We might get null abt if no paths were added to the builder. It means we should be
+        // projecting an empty object.
+        tassert(
+            6935000, "ABT must be valid if have fields to project", fieldsToProject.empty() || abt);
+        optimizer::SlotVarMap slotMap{};
+        slotMap[rootStr] = rowStoreSlot;
+        rowStoreExpr = abt ? abtToExpr(*abt, slotMap)
+                           : sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
+    }
 
     std::unique_ptr<sbe::PlanStage> stage =
         std::make_unique<sbe::ColumnScanStage>(getCurrentCollection(reqs)->uuid(),

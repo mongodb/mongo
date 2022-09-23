@@ -659,11 +659,15 @@ PlanState ColumnScanStage::getNext() {
                                  value::bitcastFrom<const char*>(record->data.data()));
 
         if (_reconstructedRecordAccessor) {
-            // TODO: in absence of record expression set the reconstructed record to be the same
-            // as the record, retrieved from the row store.
-            invariant(_rowStoreExpr);
-            auto [owned, tag, val] = _bytecode.run(_rowStoreExprCode.get());
-            _reconstructedRecordAccessor->reset(owned, tag, val);
+            if (_rowStoreExpr) {
+                auto [owned, tag, val] = _bytecode.run(_rowStoreExprCode.get());
+                _reconstructedRecordAccessor->reset(owned, tag, val);
+            } else {
+                _reconstructedRecordAccessor->reset(
+                    false,
+                    value::TypeTags::bsonObject,
+                    value::bitcastFrom<const char*>(record->data.data()));
+            }
         }
     } else {
         if (_reconstructedRecordAccessor) {
@@ -762,7 +766,7 @@ std::vector<DebugPrinter::Block> ColumnScanStage::debugPrint() const {
     }
 
     // Print out paths.
-    ret.emplace_back(DebugPrinter::Block("[`"));
+    ret.emplace_back(DebugPrinter::Block("paths[`"));
     for (size_t idx = 0; idx < _paths.size(); ++idx) {
         if (idx) {
             ret.emplace_back(DebugPrinter::Block("`,"));
@@ -772,30 +776,28 @@ std::vector<DebugPrinter::Block> ColumnScanStage::debugPrint() const {
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
-    // Print out per-path filters (if any).
-    if (!_filteredPaths.empty()) {
-        ret.emplace_back(DebugPrinter::Block("[`"));
-        for (size_t idx = 0; idx < _filteredPaths.size(); ++idx) {
-            if (idx) {
-                ret.emplace_back(DebugPrinter::Block("`;"));
-            }
-
-            ret.emplace_back(str::stream()
-                             << "\"" << _paths[_filteredPaths[idx].pathIndex] << "\": ");
-            DebugPrinter::addIdentifier(ret, _filteredPaths[idx].inputSlotId);
-            ret.emplace_back(DebugPrinter::Block("`,"));
-            DebugPrinter::addBlocks(ret, _filteredPaths[idx].filterExpr->debugPrint());
+    // Print out per-path filters.
+    ret.emplace_back(DebugPrinter::Block("pathFilters[`"));
+    for (size_t idx = 0; idx < _filteredPaths.size(); ++idx) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`;"));
         }
-        ret.emplace_back(DebugPrinter::Block("`]"));
-    }
 
+        ret.emplace_back(str::stream() << "\"" << _paths[_filteredPaths[idx].pathIndex] << "\": ");
+        DebugPrinter::addIdentifier(ret, _filteredPaths[idx].inputSlotId);
+        ret.emplace_back(DebugPrinter::Block("`,"));
+        DebugPrinter::addBlocks(ret, _filteredPaths[idx].filterExpr->debugPrint());
+    }
+    ret.emplace_back(DebugPrinter::Block("`]"));
+
+    // Print out rowStoreExpression as [rowStoreSlot, rowStoreExpression]
+    ret.emplace_back(DebugPrinter::Block("rowStoreExpr[`"));
     if (_rowStoreExpr) {
-        ret.emplace_back(DebugPrinter::Block("[`"));
         DebugPrinter::addIdentifier(ret, _rowStoreSlot);
         ret.emplace_back(DebugPrinter::Block("`,"));
         DebugPrinter::addBlocks(ret, _rowStoreExpr->debugPrint());
-        ret.emplace_back(DebugPrinter::Block("`]"));
     }
+    ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back("@\"`");
     DebugPrinter::addIdentifier(ret, _collUuid.toString());

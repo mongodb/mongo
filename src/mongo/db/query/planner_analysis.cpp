@@ -626,26 +626,20 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
         auto groupNode = static_cast<GroupNode*>(solnRoot);
 
         QuerySolutionNode* projectNodeCandidate = groupNode->children[0].get();
-        if (projectNodeCandidate->getType() == StageType::STAGE_GROUP) {
-            // Multiple $group stages may be pushed down. So, if the child is a GROUP, then recurse.
-            return removeInclusionProjectionBelowGroupRecursive(projectNodeCandidate);
-        } else if (auto projection = attemptToGetProjectionFromQuerySolution(*projectNodeCandidate);
-                   projection && projection.value()->isInclusionOnly()) {
-            // Check to see if the projectNode's field set is a super set of the groupNodes.
-            if (!isSubset(groupNode->requiredFields, projection.value()->getRequiredFields())) {
-                // The dependency set of the GROUP stage is wider than the projectNode field set.
-                return;
-            }
-
+        if (auto projection = attemptToGetProjectionFromQuerySolution(*projectNodeCandidate);
+            // only eliminate inclusion projections
+            projection && projection.value()->isInclusionOnly() &&
+            // only eliminate projections which preserve all fields used by the group
+            isSubset(groupNode->requiredFields, projection.value()->getRequiredFields())) {
             // Attach the projectNode's child directly as the groupNode's child, eliminating the
             // project node.
             groupNode->children[0] = std::move(projectNodeCandidate->children[0]);
         }
-    } else {
-        // Keep traversing the tree in search of a GROUP stage.
-        for (size_t i = 0; i < solnRoot->children.size(); ++i) {
-            removeInclusionProjectionBelowGroupRecursive(solnRoot->children[i].get());
-        }
+    }
+
+    // Keep traversing the tree in search of GROUP stages.
+    for (size_t i = 0; i < solnRoot->children.size(); ++i) {
+        removeInclusionProjectionBelowGroupRecursive(solnRoot->children[i].get());
     }
 }
 
@@ -679,6 +673,44 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeInclusionProjectionBe
 
     soln->setRoot(std::move(root));
     return soln;
+}
+
+// static
+void QueryPlannerAnalysis::removeUselessColumnScanRowStoreExpression(QuerySolutionNode& root) {
+    // If a group or projection's child is a COLUMN_SCAN node, try to eliminate the
+    // expression that projects documents retrieved from row store fallback. In other words, the
+    // COLUMN_SCAN's rowStoreExpression can be removed if it does not affect the group or
+    // project above.
+    for (auto& child : root.children) {
+        if (child->getType() == STAGE_COLUMN_SCAN) {
+            auto childColumnScan = static_cast<ColumnIndexScanNode*>(child.get());
+
+            // Look for group above column scan.
+            if (root.getType() == STAGE_GROUP) {
+                auto& parentGroup = static_cast<GroupNode&>(root);
+                // A row store expression that preserves all fields used by the parent $group is
+                // redundant and can be removed.
+                if (!childColumnScan->extraFieldsPermitted &&
+                    isSubset(parentGroup.requiredFields, childColumnScan->outputFields)) {
+                    childColumnScan->extraFieldsPermitted = true;
+                }
+            }
+            // Look for projection above column scan.
+            else if (root.getType() == STAGE_PROJECTION_SIMPLE ||
+                     root.getType() == STAGE_PROJECTION_DEFAULT) {
+                auto& parentProjection = static_cast<ProjectionNode&>(root);
+                // A row store expression that preserves all fields used by the parent projection is
+                // redundant and can be removed.
+                if (!childColumnScan->extraFieldsPermitted &&
+                    isSubset(parentProjection.proj.getRequiredFields(),
+                             childColumnScan->outputFields)) {
+                    childColumnScan->extraFieldsPermitted = true;
+                }
+            }
+        }
+        // Recur on child.
+        removeUselessColumnScanRowStoreExpression(*child);
+    }
 }
 
 // static
@@ -1190,6 +1222,8 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     }
 
     solnRoot = tryPushdownProjectBeneathSort(std::move(solnRoot));
+
+    QueryPlannerAnalysis::removeUselessColumnScanRowStoreExpression(*solnRoot);
 
     soln->setRoot(std::move(solnRoot));
     return soln;

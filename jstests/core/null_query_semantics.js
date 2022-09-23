@@ -4,6 +4,8 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For 'resultsEq'.
+// For areAllCollectionsClustered.
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 function extractAValues(results) {
     return results.map(function(res) {
@@ -699,6 +701,11 @@ const keyPatterns = [
     {keyPattern: {"$**": 1}},
     {keyPattern: {"a.$**": 1}}
 ];
+// Include Columnstore Index only if FF is enabled and collection is not clustered.
+if (TestData.setParameters.hasOwnProperty("featureFlagColumnstoreIndexes") &&
+    !ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo())) {
+    keyPatterns.push({keyPattern: {"$**": "columnstore"}});
+}
 
 // Test with a variety of other indexes.
 for (let indexSpec of keyPatterns) {

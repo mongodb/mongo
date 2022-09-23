@@ -516,7 +516,8 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
                         OrderedPathSet matchFields,
                         OrderedPathSet allFields,
                         StringMap<std::unique_ptr<MatchExpression>> filtersByPath,
-                        std::unique_ptr<MatchExpression> postAssemblyFilter);
+                        std::unique_ptr<MatchExpression> postAssemblyFilter,
+                        bool extraFieldsPermitted = false);
 
     virtual StageType getType() const {
         return STAGE_COLUMN_SCAN;
@@ -549,7 +550,8 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
                                                      matchFields,
                                                      allFields,
                                                      std::move(clonedFiltersByPath),
-                                                     postAssemblyFilter->shallowClone());
+                                                     postAssemblyFilter->shallowClone(),
+                                                     extraFieldsPermitted);
     }
 
     ColumnIndexEntry indexEntry;
@@ -575,6 +577,10 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
     // An optional filter to apply after assembling a document from all scanned columns. For
     // example: {$or: [{a: 2}, {b: 2}]}.
     std::unique_ptr<MatchExpression> postAssemblyFilter;
+
+    // If set to true, we can include extra fields rather than project them out because projection
+    // happens anyway in a later stage (such a group stage).
+    bool extraFieldsPermitted;
 };
 
 /**

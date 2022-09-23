@@ -1102,13 +1102,15 @@ ColumnIndexScanNode::ColumnIndexScanNode(ColumnIndexEntry indexEntry,
                                          OrderedPathSet matchFieldsIn,
                                          OrderedPathSet allFieldsIn,
                                          StringMap<std::unique_ptr<MatchExpression>> filtersByPath,
-                                         std::unique_ptr<MatchExpression> postAssemblyFilter)
+                                         std::unique_ptr<MatchExpression> postAssemblyFilter,
+                                         bool extraFieldsPermitted)
     : indexEntry(std::move(indexEntry)),
       outputFields(std::move(outputFieldsIn)),
       matchFields(std::move(matchFieldsIn)),
       allFields(std::move(allFieldsIn)),
       filtersByPath(std::move(filtersByPath)),
-      postAssemblyFilter(std::move(postAssemblyFilter)) {}
+      postAssemblyFilter(std::move(postAssemblyFilter)),
+      extraFieldsPermitted(extraFieldsPermitted) {}
 
 void ColumnIndexScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
