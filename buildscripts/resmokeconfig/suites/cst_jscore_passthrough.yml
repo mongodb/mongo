@@ -255,9 +255,6 @@ selector:
   - jstests/core/index_check6.js
   - jstests/core/index_check7.js
   - jstests/core/index_decimal.js
-  - jstests/core/index_elemmatch1.js
-  - jstests/core/index_elemmatch2.js
-  - jstests/core/index_elemmatch2.js
   - jstests/core/index_filter_commands.js
   - jstests/core/index_filter_on_hidden_index.js
   - jstests/core/index_multiple_compatibility.js
@@ -507,8 +504,6 @@ selector:
   - jstests/core/in7.js
   - jstests/core/index13.js
   - jstests/core/index_check2.js
-  - jstests/core/index_elemmatch1.js
-  - jstests/core/index_elemmatch2.js
   - jstests/core/indexl.js
   - jstests/core/json_schema/misc_validation.js
   - jstests/core/ne_array.js
@@ -759,7 +754,6 @@ selector:
   - jstests/core/geonear_key.js
   - jstests/core/getmore_invalidated_documents.js
   - jstests/core/hidden_index.js
-  - jstests/core/index_elemmatch2.js
   - jstests/core/index_partial_2dsphere.js
   - jstests/core/json_schema/misc_validation.js
   - jstests/core/list_collections_filter.js
