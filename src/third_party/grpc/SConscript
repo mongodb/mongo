@@ -1,0 +1,56 @@
+Import('env')
+
+grpc_env = env.Clone()
+
+grpc_root = grpc_env.Dir(".").srcnode()
+grpc_platform = grpc_root.Dir("platform/${TARGET_OS}_${TARGET_ARCH}")
+grpc_env.Append(CPPPATH=[grpc_root.Dir('dist'),])
+
+upb_env = grpc_env.Clone()
+upb_env.Append(
+    CPPPATH=[
+        grpc_root.Dir('dist/third_party/upb'),
+        grpc_root.Dir('dist/src/core/ext/upb-generated'),
+        grpc_root.Dir('dist/src/core/ext/upbdefs-generated')],
+    CCFLAGS=[
+        '-Wno-sign-compare',
+    ]
+)
+
+upb_source = [
+    "dist/third_party/upb/upb/decode_fast.c",
+    "dist/third_party/upb/upb/decode.c",
+    "dist/third_party/upb/upb/def.c",
+    "dist/third_party/upb/upb/encode.c",
+    "dist/third_party/upb/upb/msg.c",
+    "dist/third_party/upb/upb/reflection.c",
+    "dist/third_party/upb/upb/table.c",
+    "dist/third_party/upb/upb/text_encode.c",
+    "dist/third_party/upb/upb/upb.c",
+    "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
+    "dist/src/core/ext/upbdefs-generated/google/protobuf/descriptor.upbdefs.c",
+]
+
+upb_env.Library(
+    target='upb',
+    source=upb_source
+)
+
+address_sorting_env = grpc_env.Clone()
+address_sorting_env.Append(
+    CPPPATH=[
+        grpc_root.Dir('dist/third_party/address_sorting/include')
+    ],
+)
+
+address_sorting_source = [
+    "dist/third_party/address_sorting/address_sorting.c",
+    "dist/third_party/address_sorting/address_sorting_posix.c",
+    "dist/third_party/address_sorting/address_sorting_windows.c",
+]
+
+address_sorting_env.Library(
+    target='address_sorting',
+    source=address_sorting_source
+)
+

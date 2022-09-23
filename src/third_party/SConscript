@@ -353,9 +353,11 @@ abseilEnv = env.Clone()
 abseilEnv.InjectThirdParty(libraries=['abseil-cpp'])
 abseilEnv.SConscript(abseilDirectory + '/SConscript', exports={'env': abseilEnv})
 abseilEnv = abseilEnv.Clone(LIBDEPS_INTERFACE=[
-    abseilDirectory + '/absl_container',
+    abseilDirectory + '/absl_city',
     abseilDirectory + '/absl_hash',
-    abseilDirectory + '/absl_numeric',
+    abseilDirectory + '/absl_int128',
+    abseilDirectory + '/absl_raw_hash_set',
+    abseilDirectory + '/absl_wyhash',
 ])
 
 abseilEnv.ShimLibrary(name="abseil")
@@ -613,3 +615,7 @@ re2_env.SConscript('re2/SConscript', exports={'env': re2_env})
 protobuf_env = env.Clone()
 #kmsEnv.InjectThirdParty(libraries=['kms-message'])
 protobuf_env.SConscript('protobuf/SConscript', exports={'env': protobuf_env})
+
+grpc_env = env.Clone()
+#kmsEnv.InjectThirdParty(libraries=['kms-message'])
+grpc_env.SConscript('grpc/SConscript', exports={'env': grpc_env})
