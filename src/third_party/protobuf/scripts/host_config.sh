@@ -1,5 +1,5 @@
 #!/bin/bash
-# Configures a cares suitable for use in the mongo server, built on the host machine.
+# Configures a protobuf suitable for use in the mongo server, built on the host machine.
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -9,7 +9,7 @@ set -vx
 TOOLCHAIN_ROOT=/opt/mongodbtoolchain/v3
 PATH="$TOOLCHAIN_ROOT/bin:$PATH"
 
-DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/cares
+DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf
 
 HOST_OS="$(uname -s|tr A-Z a-z)"
 HOST_ARCH="$(uname -m)"
@@ -40,6 +40,7 @@ $SRC_DIR/configure \
 
 CC=$TOOLCHAIN_ROOT/bin/gcc
 CXX=$TOOLCHAIN_ROOT/bin/g++
-
-make CC=$CC CXX=$CXX -j16 install
+pushd src
+make CC=$CC CXX=$CXX -j16 protoc V=1
+popd
 popd

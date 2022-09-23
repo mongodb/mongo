@@ -609,3 +609,7 @@ cares_env.SConscript('cares/SConscript', exports={'env': cares_env})
 re2_env = env.Clone()
 #kmsEnv.InjectThirdParty(libraries=['kms-message'])
 re2_env.SConscript('re2/SConscript', exports={'env': re2_env})
+
+protobuf_env = env.Clone()
+#kmsEnv.InjectThirdParty(libraries=['kms-message'])
+protobuf_env.SConscript('protobuf/SConscript', exports={'env': protobuf_env})
