@@ -3125,7 +3125,7 @@ tasks:
       task_compile_flags: >-
         --allocator=system
         --enable-free-mon=off
-        --enterprise-features=fle
+        --enterprise-features=fle,search
         --js-engine=none
         --link-model=dynamic-sdk
         --enable-http-client=off
@@ -3163,7 +3163,7 @@ tasks:
         --opt=off
         --allocator=system
         --enable-free-mon=off
-        --enterprise-features=fle
+        --enterprise-features=fle,search
         --js-engine=none
         --link-model=dynamic-sdk
         DESTDIR='$BUILD_ROOT/crypt-lib-$MONGO_VERSION'
@@ -3201,7 +3201,7 @@ tasks:
       task_compile_flags: >-
         --allocator=system
         --enable-free-mon=off
-        --enterprise-features=fle
+        --enterprise-features=fle,search
         --js-engine=none
         --link-model=static
         DESTDIR='$BUILD_ROOT/crypt-lib-$MONGO_VERSION'
