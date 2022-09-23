@@ -932,7 +932,7 @@ public:
     void visit(const TwoDPtInAnnulusExpression* expr) final {
         MONGO_UNREACHABLE_TASSERT(6142133);
     }
-    void visit(const EncryptedBetweenMatchExpression* expr) final {
+    void visit(const BetweenMatchExpression* expr) final {
         MONGO_UNREACHABLE_TASSERT(6762801);
     }
 

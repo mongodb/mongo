@@ -119,10 +119,9 @@ TEST_F(RangePredicateRewriteTest, BasicRangeRewrite) {
     // The field redundancy is so that we can pull out the field
     // name in the mock version of rewriteRangePayloadAsTags.
     BSONObj query =
-        BSON(encField << BSON("$encryptedBetween" << BSON(encField << BSON_ARRAY(start << end))));
+        BSON(encField << BSON("$between" << BSON(encField << BSON_ARRAY(start << end))));
 
-    auto inputExpr =
-        EncryptedBetweenMatchExpression(encField, query[encField]["$encryptedBetween"], nullptr);
+    auto inputExpr = BetweenMatchExpression(encField, query[encField]["$between"], nullptr);
 
     assertRewriteToTags(_predicate, &inputExpr, toBSONArray(std::move(allTags)));
 }

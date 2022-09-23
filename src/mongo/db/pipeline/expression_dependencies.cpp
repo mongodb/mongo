@@ -181,7 +181,7 @@ public:
     void visit(const ExpressionObject*) {}
     void visit(const ExpressionInternalFLEEqual*) {}
     void visit(const ExpressionInternalFLEBetween*) {}
-    void visit(const ExpressionEncryptedBetween*) {}
+    void visit(const ExpressionBetween*) {}
 };
 
 class DependencyVisitor : public DefaultDependencyVisitor {

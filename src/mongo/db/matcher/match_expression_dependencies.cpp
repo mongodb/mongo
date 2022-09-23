@@ -327,7 +327,7 @@ public:
 
     void visit(const WhereNoOpMatchExpression* expr) override {}
 
-    void visit(const EncryptedBetweenMatchExpression* expr) override {
+    void visit(const BetweenMatchExpression* expr) override {
         visitPathExpression(expr);
     }
 

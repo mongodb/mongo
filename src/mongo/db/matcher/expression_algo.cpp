@@ -580,7 +580,7 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
         case MatchExpression::ALWAYS_TRUE:
         case MatchExpression::ELEM_MATCH_OBJECT:
         case MatchExpression::ELEM_MATCH_VALUE:  // This one should be feasible. May be valuable.
-        case MatchExpression::ENCRYPTED_BETWEEN:
+        case MatchExpression::BETWEEN:
         case MatchExpression::EXPRESSION:
         case MatchExpression::GEO:
         case MatchExpression::GEO_NEAR:

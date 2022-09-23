@@ -1743,8 +1743,8 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             return {Status(ErrorCodes::BadValue,
                            str::stream() << "near must be first in: " << context)};
 
-        case PathAcceptingKeyword::ENCRYPTED_BETWEEN:
-            return std::make_unique<EncryptedBetweenMatchExpression>(
+        case PathAcceptingKeyword::BETWEEN:
+            return std::make_unique<BetweenMatchExpression>(
                 name,
                 e,
                 doc_validation_error::createAnnotation(
@@ -2146,7 +2146,7 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
             {"bitsAnyClear", PathAcceptingKeyword::BITS_ANY_CLEAR},
             {"bitsAnySet", PathAcceptingKeyword::BITS_ANY_SET},
             {"elemMatch", PathAcceptingKeyword::ELEM_MATCH},
-            {"encryptedBetween", PathAcceptingKeyword::ENCRYPTED_BETWEEN},
+            {"between", PathAcceptingKeyword::BETWEEN},
             {"eq", PathAcceptingKeyword::EQUALITY},
             {"exists", PathAcceptingKeyword::EXISTS},
             {"geoIntersects", PathAcceptingKeyword::GEO_INTERSECTS},

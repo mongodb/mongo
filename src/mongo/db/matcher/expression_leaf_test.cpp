@@ -2267,47 +2267,47 @@ DEATH_TEST_REGEX(ComparisonMatchExpression,
     ASSERT_THROWS_CODE(eq.getChild(0), AssertionException, 6400209);
 }
 
-TEST(EncryptedBetweenMatchExpression, EqualWithoutCollator) {
+TEST(BetweenMatchExpression, EqualWithoutCollator) {
     BSONObj operand = BSON("a" << 5);
-    EncryptedBetweenMatchExpression eb1("a", operand["a"]);
-    EncryptedBetweenMatchExpression eb2("a", operand["a"]);
+    BetweenMatchExpression eb1("a", operand["a"]);
+    BetweenMatchExpression eb2("a", operand["a"]);
     ASSERT(eb1.equivalent(&eb2));
 }
 
 
-TEST(EncryptedBetweenMatchExpression, UnequalWithoutCollator) {
+TEST(BetweenMatchExpression, UnequalWithoutCollator) {
     BSONObj operand = BSON("a" << 5 << "b" << 10);
-    EncryptedBetweenMatchExpression eb1("a", operand["a"]);
-    EncryptedBetweenMatchExpression eb2("a", operand["b"]);
+    BetweenMatchExpression eb1("a", operand["a"]);
+    BetweenMatchExpression eb2("a", operand["b"]);
     ASSERT_FALSE(eb1.equivalent(&eb2));
 }
 
 
-TEST(EncryptedBetweenMatchExpression, UnequalDueToPath) {
+TEST(BetweenMatchExpression, UnequalDueToPath) {
     BSONObj operand = BSON("a" << 5 << "b" << 10);
-    EncryptedBetweenMatchExpression eb1("a", operand["a"]);
-    EncryptedBetweenMatchExpression eb2("b", operand["a"]);
+    BetweenMatchExpression eb1("a", operand["a"]);
+    BetweenMatchExpression eb2("b", operand["a"]);
     ASSERT_FALSE(eb1.equivalent(&eb2));
 }
 
-TEST(EncryptedBetweenMatchExpression, UnequalDueToRhs) {
+TEST(BetweenMatchExpression, UnequalDueToRhs) {
     BSONObj operand = BSON("a" << 5 << "b" << 10);
-    EncryptedBetweenMatchExpression eb1("a", operand["a"]);
-    EncryptedBetweenMatchExpression eb2("a", operand["b"]);
+    BetweenMatchExpression eb1("a", operand["a"]);
+    BetweenMatchExpression eb2("a", operand["b"]);
     ASSERT_FALSE(eb1.equivalent(&eb2));
 }
 
-TEST(EncryptedBetweenMatchExpression, CanSerializeToBSON) {
-    auto op = BSON("$encryptedBetween" << BSON_ARRAY(1 << 5));
-    EncryptedBetweenMatchExpression eb("a", op.firstElement());
+TEST(BetweenMatchExpression, CanSerializeToBSON) {
+    auto op = BSON("$between" << BSON_ARRAY(1 << 5));
+    BetweenMatchExpression eb("a", op.firstElement());
     BSONObjBuilder bob;
     eb.serialize(&bob, true);
     ASSERT_BSONOBJ_EQ(bob.obj(), BSON("a" << op));
 }
 
-TEST(EncryptedBetweenMatchExpression, CanSerializeToBSONInsideAnd) {
-    auto op = BSON("$encryptedBetween" << BSON_ARRAY(1 << 5));
-    auto eb = std::make_unique<EncryptedBetweenMatchExpression>("a", op.firstElement());
+TEST(BetweenMatchExpression, CanSerializeToBSONInsideAnd) {
+    auto op = BSON("$between" << BSON_ARRAY(1 << 5));
+    auto eb = std::make_unique<BetweenMatchExpression>("a", op.firstElement());
     auto v = std::vector<std::unique_ptr<MatchExpression>>();
     v.push_back(std::move(eb));
     AndMatchExpression nd(std::move(v));
@@ -2316,11 +2316,11 @@ TEST(EncryptedBetweenMatchExpression, CanSerializeToBSONInsideAnd) {
     ASSERT_BSONOBJ_EQ(bob.obj(), BSON("$and" << BSON_ARRAY(BSON("a" << op))));
 }
 
-TEST(EncryptedBetweenMatchExpression, ErrorsOnEvaluation) {
-    auto op = BSON("$encryptedBetween" << BSON_ARRAY(1 << 5));
-    auto obj = BSON("$encryptedBetween" << 2);
-    EncryptedBetweenMatchExpression eb("", op.firstElement());
-    ASSERT_THROWS_CODE(eb.matchesSingleElement(obj.firstElement()), AssertionException, 6762800);
+DEATH_TEST_REGEX(BetweenMatchExpression, ErrorsOnEvaluation, "*.6762800") {
+    auto op = BSON("$between" << BSON_ARRAY(1 << 5));
+    auto obj = BSON("$between" << 2);
+    BetweenMatchExpression eb("", op.firstElement());
+    ASSERT_THROWS_CODE(eb.matchesSingleElement(obj.firstElement()), DBException, 6762800);
 }
 
 }  // namespace mongo

@@ -1179,7 +1179,7 @@ public:
     void visit(const WhereNoOpMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
-    void visit(const EncryptedBetweenMatchExpression* expr) final {
+    void visit(const BetweenMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
 
@@ -1701,7 +1701,7 @@ public:
     }
 
     void visit(const WhereNoOpMatchExpression* expr) final {}
-    void visit(const EncryptedBetweenMatchExpression* expr) final {}
+    void visit(const BetweenMatchExpression* expr) final {}
 
 private:
     MatchExpressionVisitorContext* _context;
@@ -1817,7 +1817,7 @@ public:
     void visit(const TypeMatchExpression* expr) final {}
     void visit(const WhereMatchExpression* expr) final {}
     void visit(const WhereNoOpMatchExpression* expr) final {}
-    void visit(const EncryptedBetweenMatchExpression* expr) final {}
+    void visit(const BetweenMatchExpression* expr) final {}
 
 private:
     MatchExpressionVisitorContext* _context;

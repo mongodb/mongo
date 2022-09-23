@@ -43,6 +43,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/summation.h"
 #include "mongo/util/time_support.h"
@@ -4162,8 +4163,8 @@ TEST(ExpressionFLETest, TestBinData_RoundTrip) {
     ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
 }
 
-TEST(ExpressionEncryptedBetweenTest, ParseRoundTrip) {
-    auto input = fromjson(R"({$encryptedBetween: [
+TEST(ExpressionBetweenTest, ParseRoundTrip) {
+    auto input = fromjson(R"({$between: [
         "age",
         {$binary: {
             "base64": "ZW5jcnlwdGVkIHBheWxvYWQ=",
@@ -4171,9 +4172,9 @@ TEST(ExpressionEncryptedBetweenTest, ParseRoundTrip) {
         }}]})");
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
-    auto expr = ExpressionEncryptedBetween::parse(&expCtx, input.firstElement(), vps);
+    auto expr = ExpressionBetween::parse(&expCtx, input.firstElement(), vps);
     auto serializedExpr = expr->serialize(false);
-    auto expectedExpr = fromjson(R"({$encryptedBetween: [
+    auto expectedExpr = fromjson(R"({$between: [
         {$const: "age"},
         { $const: 
             {$binary: {
@@ -4185,10 +4186,11 @@ TEST(ExpressionEncryptedBetweenTest, ParseRoundTrip) {
     ASSERT_BSONOBJ_EQ(expectedExpr, serializedExpr.getDocument().toBson());
 }
 
-TEST(ExpressionEncryptedBetweenTest, EvaluateFails) {
+DEATH_TEST_REGEX(ExpressionBetweenTest, EvaluateFails, "*.6882800") {
     ASSERT_THROWS_CODE(
-        evaluateExpression("$encryptedBetween", {"fieldpath"_sd, 1}), AssertionException, 6882800);
+        evaluateExpression("$between", {"fieldpath"_sd, 1}), AssertionException, 6882800);
 }
+
 
 TEST(ExpressionFLETest, ParseAndSerializeBetween) {
     auto expCtx = ExpressionContextForTest();

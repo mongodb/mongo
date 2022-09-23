@@ -878,8 +878,7 @@ bool BitTestMatchExpression::equivalent(const MatchExpression* other) const {
     return path() == realOther->path() && myBitPositions == otherBitPositions;
 }
 
-void EncryptedBetweenMatchExpression::debugString(StringBuilder& debug,
-                                                  int indentationLevel) const {
+void BetweenMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " " << kName;
     debug << " " << rhs().toString(false);

@@ -334,7 +334,7 @@ public:
     void visit(const ExpressionDateToString* expr) final {}
     void visit(const ExpressionDateTrunc* expr) final {}
     void visit(const ExpressionDivide* expr) final {}
-    void visit(const ExpressionEncryptedBetween* expr) final {}
+    void visit(const ExpressionBetween* expr) final {}
     void visit(const ExpressionExp* expr) final {}
     void visit(const ExpressionFieldPath* expr) final {}
     void visit(const ExpressionFilter* expr) final {
@@ -511,7 +511,7 @@ public:
     void visit(const ExpressionDateToString* expr) final {}
     void visit(const ExpressionDateTrunc*) final {}
     void visit(const ExpressionDivide* expr) final {}
-    void visit(const ExpressionEncryptedBetween* expr) final {}
+    void visit(const ExpressionBetween* expr) final {}
     void visit(const ExpressionExp* expr) final {}
     void visit(const ExpressionFieldPath* expr) final {}
     void visit(const ExpressionFilter* expr) final {
@@ -1797,8 +1797,8 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(expExpr)));
     }
-    void visit(const ExpressionEncryptedBetween* expr) final {
-        unsupportedExpression("$_encryptedBetween");
+    void visit(const ExpressionBetween* expr) final {
+        unsupportedExpression("$_between");
     }
     void visit(const ExpressionFieldPath* expr) final {
         // There's a chance that we've already generated a SBE plan stage tree for this field path,

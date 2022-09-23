@@ -4278,14 +4278,14 @@ public:
     }
 };
 
-class ExpressionEncryptedBetween : public ExpressionFixedArity<ExpressionEncryptedBetween, 2> {
+class ExpressionBetween : public ExpressionFixedArity<ExpressionBetween, 2> {
 public:
-    static constexpr const char* const opName = "$encryptedBetween";
-    explicit ExpressionEncryptedBetween(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionEncryptedBetween, 2>(expCtx) {}
+    static constexpr const char* const opName = "$between";
+    explicit ExpressionBetween(ExpressionContext* const expCtx)
+        : ExpressionFixedArity<ExpressionBetween, 2>(expCtx) {}
 
-    ExpressionEncryptedBetween(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionEncryptedBetween, 2>(expCtx, std::move(children)) {}
+    ExpressionBetween(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionBetween, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
 

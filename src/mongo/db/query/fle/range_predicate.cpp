@@ -35,7 +35,7 @@
 
 namespace mongo::fle {
 
-REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(ENCRYPTED_BETWEEN,
+REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(BETWEEN,
                                                      RangePredicate,
                                                      gFeatureFlagFLE2Range);
 
@@ -46,8 +46,8 @@ std::vector<PrfBlock> RangePredicate::generateTags(BSONValue payload) const {
 
 std::unique_ptr<MatchExpression> RangePredicate::rewriteToTagDisjunction(
     MatchExpression* expr) const {
-    invariant(expr->matchType() == MatchExpression::ENCRYPTED_BETWEEN);
-    auto betExpr = static_cast<EncryptedBetweenMatchExpression*>(expr);
+    invariant(expr->matchType() == MatchExpression::BETWEEN);
+    auto betExpr = static_cast<BetweenMatchExpression*>(expr);
     auto ffp = betExpr->rhs();
 
     if (!isPayload(ffp)) {
@@ -64,19 +64,19 @@ std::unique_ptr<MatchExpression> RangePredicate::rewriteToTagDisjunction(
     return inExpr;
 }
 
-// TODO: SERVER-67209 Server-side rewrite for agg expressions with $encryptedBetween.
+// TODO: SERVER-67209 Server-side rewrite for agg expressions with $between.
 std::unique_ptr<Expression> RangePredicate::rewriteToTagDisjunction(Expression* expr) const {
     return nullptr;
 }
 
-// TODO: SERVER-67267 Rewrite $encryptedBetween to $_internalFleBetween when number of tags exceeds
+// TODO: SERVER-67267 Rewrite $between to $_internalFleBetween when number of tags exceeds
 // limit.
 std::unique_ptr<MatchExpression> RangePredicate::rewriteToRuntimeComparison(
     MatchExpression* expr) const {
     return nullptr;
 }
 
-// TODO: SERVER-67267 Rewrite $encryptedBetween to $_internalFleBetween when number of tags exceeds
+// TODO: SERVER-67267 Rewrite $between to $_internalFleBetween when number of tags exceeds
 // limit.
 std::unique_ptr<Expression> RangePredicate::rewriteToRuntimeComparison(Expression* expr) const {
     return nullptr;

@@ -243,7 +243,7 @@ public:
     void visit(const TextNoOpMatchExpression* expr) final {}
     void visit(const TwoDPtInAnnulusExpression* expr) final {}
     void visit(const WhereNoOpMatchExpression* expr) final {}
-    void visit(const EncryptedBetweenMatchExpression* expr) final {}
+    void visit(const BetweenMatchExpression* expr) final {}
 
 private:
     void visitComparisonMatchExpression(const ComparisonMatchExpressionBase* expr) {

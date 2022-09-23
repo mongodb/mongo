@@ -223,7 +223,7 @@ public:
         pushArithmeticBinaryExpr(expr, Operations::Div);
     }
 
-    void visit(const ExpressionEncryptedBetween* expr) override final {
+    void visit(const ExpressionBetween* expr) override final {
         unsupportedExpression(expr->getOpName());
     }
 

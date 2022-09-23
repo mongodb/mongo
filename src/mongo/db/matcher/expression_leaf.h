@@ -1056,16 +1056,16 @@ public:
 
 /**
  * MatchExpression that represents a filter for a range of values. Similar semantics to the BETWEEN
- * SQL operator. Used for encoding a range query against an encrypted field.
+ * SQL operator.
  */
-class EncryptedBetweenMatchExpression final : public LeafMatchExpression {
+class BetweenMatchExpression final : public LeafMatchExpression {
 public:
-    static constexpr StringData kName = "$encryptedBetween"_sd;
+    static constexpr StringData kName = "$between"_sd;
 
-    EncryptedBetweenMatchExpression(StringData path,
-                                    BSONElement rhs,
-                                    clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : LeafMatchExpression(ENCRYPTED_BETWEEN, path, annotation) {
+    BetweenMatchExpression(StringData path,
+                           BSONElement rhs,
+                           clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : LeafMatchExpression(BETWEEN, path, annotation) {
         _backingBSON = BSON("" << rhs);
     }
 
@@ -1075,8 +1075,8 @@ public:
     }
 
     bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
-        // TODO: SERVER-67627 Implement runtime tag generation for $encryptedBetween.
-        uasserted(6762800, "Not implemented");
+        // TODO: SERVER-67627 Implement runtime tag generation for $between.
+        tasserted(6762800, "$between should be rewritten before execution.");
     }
 
     BSONObj getSerializedRightHandSide() const final {
@@ -1084,8 +1084,8 @@ public:
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
-        std::unique_ptr<EncryptedBetweenMatchExpression> e =
-            std::make_unique<EncryptedBetweenMatchExpression>(path(), rhs(), _errorAnnotation);
+        std::unique_ptr<BetweenMatchExpression> e =
+            std::make_unique<BetweenMatchExpression>(path(), rhs(), _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -1096,7 +1096,7 @@ public:
         if (matchType() != other->matchType()) {
             return false;
         }
-        auto otherCast = static_cast<const EncryptedBetweenMatchExpression*>(other);
+        auto otherCast = static_cast<const BetweenMatchExpression*>(other);
         return path() == otherCast->path() && rhs().binaryEqual(otherCast->rhs());
     };
 

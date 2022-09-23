@@ -442,7 +442,7 @@ public:
         unsupportedExpression(expr);
     }
 
-    void visit(const EncryptedBetweenMatchExpression* expr) override {
+    void visit(const BetweenMatchExpression* expr) override {
         unsupportedExpression(expr);
     }
 
