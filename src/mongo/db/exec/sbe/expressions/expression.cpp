@@ -239,7 +239,6 @@ std::vector<DebugPrinter::Block> EPrimBinary::debugPrint() const {
 
     invariant(!hasCollatorArg || isComparisonOp(_op));
 
-    ret.emplace_back("(`");
     DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
 
     switch (_op) {
@@ -293,7 +292,6 @@ std::vector<DebugPrinter::Block> EPrimBinary::debugPrint() const {
     }
 
     DebugPrinter::addBlocks(ret, _nodes[1]->debugPrint());
-    ret.emplace_back("`)");
 
     return ret;
 }
@@ -337,9 +335,7 @@ std::vector<DebugPrinter::Block> EPrimUnary::debugPrint() const {
             MONGO_UNREACHABLE;
     }
 
-    ret.emplace_back("`(`");
     DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
-    ret.emplace_back("`)");
 
     return ret;
 }
@@ -737,7 +733,7 @@ std::vector<DebugPrinter::Block> EFunction::debugPrint() const {
     std::vector<DebugPrinter::Block> ret;
     DebugPrinter::addKeyword(ret, _name);
 
-    ret.emplace_back("`(`");
+    ret.emplace_back("(`");
     for (size_t idx = 0; idx < _nodes.size(); ++idx) {
         if (idx) {
             ret.emplace_back("`,");
@@ -784,24 +780,20 @@ vm::CodeFragment EIf::compileDirect(CompileCtx& ctx) const {
 
 std::vector<DebugPrinter::Block> EIf::debugPrint() const {
     std::vector<DebugPrinter::Block> ret;
+    DebugPrinter::addKeyword(ret, "if");
 
-    ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
+    ret.emplace_back("(`");
 
     // Print the condition.
-    DebugPrinter::addKeyword(ret, "if");
     DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
-    DebugPrinter::addNewLine(ret);
-
+    ret.emplace_back("`,");
     // Print thenBranch.
-    DebugPrinter::addKeyword(ret, "then");
     DebugPrinter::addBlocks(ret, _nodes[1]->debugPrint());
-    DebugPrinter::addNewLine(ret);
-
+    ret.emplace_back("`,");
     // Print elseBranch.
-    DebugPrinter::addKeyword(ret, "else");
     DebugPrinter::addBlocks(ret, _nodes[2]->debugPrint());
 
-    ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
+    ret.emplace_back("`)");
 
     return ret;
 }
@@ -844,29 +836,21 @@ vm::CodeFragment ELocalBind::compileDirect(CompileCtx& ctx) const {
 std::vector<DebugPrinter::Block> ELocalBind::debugPrint() const {
     std::vector<DebugPrinter::Block> ret;
 
-    ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-
     DebugPrinter::addKeyword(ret, "let");
-    ret.emplace_back("[`");
-    ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
 
+    ret.emplace_back("[`");
     for (size_t idx = 0; idx < _nodes.size() - 1; ++idx) {
         if (idx != 0) {
-            DebugPrinter::addNewLine(ret);
+            ret.emplace_back("`,");
         }
 
         DebugPrinter::addIdentifier(ret, _frameId, idx);
         ret.emplace_back("=");
         DebugPrinter::addBlocks(ret, _nodes[idx]->debugPrint());
     }
-    ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
-    ret.emplace_back("]");
-    DebugPrinter::addNewLine(ret);
+    ret.emplace_back("`]");
 
-    DebugPrinter::addKeyword(ret, "in");
     DebugPrinter::addBlocks(ret, _nodes.back()->debugPrint());
-
-    ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     return ret;
 }
@@ -912,13 +896,10 @@ vm::CodeFragment ELocalLambda::compileDirect(CompileCtx& ctx) const {
 std::vector<DebugPrinter::Block> ELocalLambda::debugPrint() const {
     std::vector<DebugPrinter::Block> ret;
 
-    DebugPrinter::addKeyword(ret, "lambda");
-    ret.emplace_back("`(`");
+    DebugPrinter::addKeyword(ret, "\\");
     DebugPrinter::addIdentifier(ret, _frameId, 0);
-    ret.emplace_back("`)");
-    ret.emplace_back("{");
+    ret.emplace_back(".");
     DebugPrinter::addBlocks(ret, _nodes.back()->debugPrint());
-    ret.emplace_back("}");
 
     return ret;
 }
@@ -949,13 +930,11 @@ std::vector<DebugPrinter::Block> EFail::debugPrint() const {
     std::vector<DebugPrinter::Block> ret;
     DebugPrinter::addKeyword(ret, "fail");
 
-    ret.emplace_back("`(`");
+    ret.emplace_back("(");
 
     ret.emplace_back(std::to_string(_code));
-    ret.emplace_back("`,");
-    ret.emplace_back("\"`");
+    ret.emplace_back(",`");
     ret.emplace_back(getStringView(_messageTag, _messageVal));
-    ret.emplace_back("`\"`");
 
     ret.emplace_back("`)");
 

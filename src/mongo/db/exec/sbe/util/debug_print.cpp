@@ -38,7 +38,6 @@ namespace sbe {
 std::string DebugPrinter::print(const std::vector<Block>& blocks) {
     std::string ret;
     int ident = 0;
-    size_t blockIndex = 0;
     for (auto& b : blocks) {
         bool addSpace = true;
         switch (b.cmd) {
@@ -49,13 +48,8 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
                 break;
             case Block::cmdDecIndent:
                 --ident;
-                // Avoid unnecessary whitespace if there are multiple adjacent "decrement indent"
-                // tokens.
-                if (blockIndex == blocks.size() ||
-                    blocks[blockIndex + 1].cmd != Block::cmdDecIndent) {
-                    ret.append("\n");
-                    addIndent(ident, ret);
-                }
+                ret.append("\n");
+                addIndent(ident, ret);
                 break;
             case Block::cmdNewLine:
                 ret.append("\n");
@@ -117,7 +111,6 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
                 }
             }
         }
-        ++blockIndex;
     }
 
     return ret;
