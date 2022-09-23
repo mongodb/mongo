@@ -548,7 +548,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
 
     CollectionWriter collection(opCtx, nss);
     {
-        // TODO SERVER-64760: Remove this usage of `allowUntimestampedWrite`. We often have a valid
+        // TODO SERVER-69877: Remove this usage of `allowUntimestampedWrite`. We often have a valid
         // timestamp for this write, but the callers of this function don't pass it through.
         opCtx->recoveryUnit()->allowUntimestampedWrite();
 
@@ -2000,13 +2000,11 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
     CollectionWriter collection(opCtx, coll);
     CollectionShardingState::get(opCtx, collection->ns())->checkShardVersionOrThrow(opCtx);
 
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool replSetAndNotPrimary = !replCoord->canAcceptWritesFor(opCtx, collection->ns());
-
     // We will not have a start timestamp if we are newly a secondary (i.e. we started as
     // primary but there was a stepdown). We will be unable to timestamp the initial catalog write,
     // so we must fail the index build. During initial sync, there is no commit timestamp set.
-    if (replSetAndNotPrimary &&
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->canAcceptWritesFor(opCtx, collection->ns()) &&
         indexBuildOptions.applicationMode != ApplicationMode::kInitialSync) {
         uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Replication state changed while setting up the index build: "
@@ -2072,13 +2070,12 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
     options.protocol = replState->protocol;
 
     try {
-        // TODO SERVER-64760: Remove this usage of `allowUntimestampedWrite`. There are cases where
-        // a timestamp is available to use, but the information is not passed through.
-        opCtx->recoveryUnit()->allowUntimestampedWrite();
-
-        if (!replSetAndNotPrimary) {
+        if (replCoord->canAcceptWritesFor(opCtx, collection->ns()) &&
+            !replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
             // On standalones and primaries, call setUpIndexBuild(), which makes the initial catalog
-            // write. On primaries, this replicates the startIndexBuild oplog entry.
+            // write. On primaries, this replicates the startIndexBuild oplog entry. The start
+            // timestamp is only set during oplog application.
+            invariant(startTimestamp.isNull(), startTimestamp.toString());
             uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
                 opCtx, collection, replState->indexSpecs, replState->buildUUID, onInitFn, options));
         } else {
@@ -2087,10 +2084,10 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
             repl::UnreplicatedWritesBlock uwb(opCtx);
 
             boost::optional<TimestampBlock> tsBlock;
-            if (indexBuildOptions.applicationMode != ApplicationMode::kInitialSync) {
-                // Use the provided timestamp to write the initial catalog entry. Initial sync does
-                // not set a commit timestamp.
-                invariant(!startTimestamp.isNull());
+            if (!startTimestamp.isNull()) {
+                // Use the provided timestamp to write the initial catalog entry. This is also the
+                // case when recovering from the oplog as a standalone. In general, if a timestamp
+                // is provided, it should be used to avoid untimestamped writes.
                 tsBlock.emplace(opCtx, startTimestamp);
             }
 
