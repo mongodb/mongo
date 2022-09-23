@@ -255,15 +255,11 @@ void QueryPlannerIXSelect::getFields(const MatchExpression* node,
     // Leaf nodes with a path and some array operators.
     if (Indexability::nodeCanUseIndexOnOwnField(node)) {
         out->insert(prefix + node->path().toString());
-    } else if (Indexability::arrayUsesIndexOnChildren(node)) {
+    } else if (Indexability::arrayUsesIndexOnChildren(node) && !node->path().empty()) {
         // If the array uses an index on its children, it's something like
         // {foo : {$elemMatch: {bar: 1}}}, in which case the predicate is really over foo.bar.
-        //
-        // When we have {foo: {$all: [{$elemMatch: {a: 1}}], the path of the embedded elemMatch
-        // is empty. We don't want to append a dot in that case as the field would be foo..a.
-        if (!node->path().empty()) {
-            prefix += node->path().toString() + ".";
-        }
+        // Note we skip empty path components since they are not allowed in index key patterns.
+        prefix += node->path().toString() + ".";
 
         for (size_t i = 0; i < node->numChildren(); ++i) {
             getFields(node->getChild(i), prefix, out);
@@ -780,7 +776,8 @@ void QueryPlannerIXSelect::_rateIndices(MatchExpression* node,
             childRt->path = rt->path;
             node->getChild(0)->setTag(childRt);
         }
-    } else if (Indexability::arrayUsesIndexOnChildren(node)) {
+    } else if (Indexability::arrayUsesIndexOnChildren(node) && !node->path().empty()) {
+        // Note we skip empty path components since they are not allowed in index key patterns.
         const auto newPath = prefix + node->path().toString();
         ElemMatchContext newContext;
         // Note this StringData is unowned and references the string declared on the stack here.
@@ -791,12 +788,7 @@ void QueryPlannerIXSelect::_rateIndices(MatchExpression* node,
 
         // If the array uses an index on its children, it's something like
         // {foo: {$elemMatch: {bar: 1}}}, in which case the predicate is really over foo.bar.
-        //
-        // When we have {foo: {$all: [{$elemMatch: {a: 1}}], the path of the embedded elemMatch
-        // is empty. We don't want to append a dot in that case as the field would be foo..a.
-        if (!node->path().empty()) {
-            prefix += node->path().toString() + ".";
-        }
+        prefix += node->path().toString() + ".";
         for (size_t i = 0; i < node->numChildren(); ++i) {
             _rateIndices(node->getChild(i), prefix, indices, collator, newContext);
         }
