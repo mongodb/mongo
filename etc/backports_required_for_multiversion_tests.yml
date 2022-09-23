@@ -150,6 +150,8 @@ all:
     test_file: jstests/sharding/append_oplog_note_mongos.js
   - ticket: SERVER-63732
     test_file: jstests/sharding/shard_collection_basic.js
+  - ticket: SERVER-68115
+    test_file: jstests/core/elemmatch_index.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
