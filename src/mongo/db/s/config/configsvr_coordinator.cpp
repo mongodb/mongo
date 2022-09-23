@@ -42,6 +42,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningConfigsvrCoordinatorInstance);
+MONGO_FAIL_POINT_DEFINE(hangAndEndBeforeRunningConfigsvrCoordinatorInstance);
 
 namespace {
 
@@ -101,6 +102,11 @@ void ConfigsvrCoordinator::interrupt(Status status) noexcept {
 
 SemiFuture<void> ConfigsvrCoordinator::run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                            const CancellationToken& token) noexcept {
+    if (hangAndEndBeforeRunningConfigsvrCoordinatorInstance.shouldFail()) {
+        hangAndEndBeforeRunningConfigsvrCoordinatorInstance.pauseWhileSet();
+        _completionPromise.emplaceValue();
+        return Status::OK();
+    }
     return ExecutorFuture<void>(**executor)
         .then([this, executor, token, anchor = shared_from_this()] {
             hangBeforeRunningConfigsvrCoordinatorInstance.pauseWhileSet();
