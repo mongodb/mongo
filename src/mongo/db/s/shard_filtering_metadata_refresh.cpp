@@ -183,7 +183,7 @@ SharedSemiFuture<void> recoverRefreshDbVersion(OperationContext* opCtx,
                     str::stream() << "Canceled metadata refresh for database " << dbName,
                     !cancellationToken.isCanceled());
 
-            if (status.isOK()) {
+            if (status.isOK() || status == ErrorCodes::NamespaceNotFound) {
                 LOGV2(6697204, "Refreshed database metadata", "db"_attr = dbName);
             } else {
                 LOGV2_ERROR(6697205,
