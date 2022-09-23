@@ -830,129 +830,84 @@ private:
     size_t _stackSize{0};
 };
 
+namespace {
+template <typename T>
+T readFromMemory(const uint8_t* ptr) noexcept {
+    static_assert(!IsEndian<T>::value);
+
+    T val;
+    memcpy(&val, ptr, sizeof(T));
+    return val;
+}
+
+template <typename T>
+size_t writeToMemory(uint8_t* ptr, const T val) noexcept {
+    static_assert(!IsEndian<T>::value);
+
+    memcpy(ptr, &val, sizeof(T));
+    return sizeof(T);
+}
+}  // namespace
+
 class ByteCode {
+    static constexpr size_t sizeOfElement =
+        sizeof(bool) + sizeof(value::TypeTags) + sizeof(value::Value);
+    static_assert(sizeOfElement == 10);
+    static_assert(std::is_trivially_copyable_v<FastTuple<bool, value::TypeTags, value::Value>>);
+
 public:
-    std::tuple<uint8_t, value::TypeTags, value::Value> run(const CodeFragment* code);
+    ByteCode() {
+        _argStack = reinterpret_cast<uint8_t*>(mongoMalloc(sizeOfElement * 4));
+        _argStackEnd = _argStack + sizeOfElement * 4;
+        _argStackTop = _argStack - sizeOfElement;
+    }
+
+    ~ByteCode() {
+        std::free(_argStack);
+    }
+
+    FastTuple<bool, value::TypeTags, value::Value> run(const CodeFragment* code);
     bool runPredicate(const CodeFragment* code);
 
 private:
-    // The VM stack is used to pass inputs to instructions and hold the outputs produced by
-    // instructions. Each element of the VM stack is 3-tuple comprised of a boolean ('owned'),
-    // a value::TypeTags ('tag'), and a value::Value ('value').
-    //
-    // In order to make the VM stack cache-friendly, for each element we want 'owned', 'tag',
-    // and 'value' to be located relatively close together, and we also want to avoid wasting
-    // any bytes due to padding.
-    //
-    // To achieve these goals, the VM stack is organized as a vector of "stack segments". Each
-    // "segment" is large enough to hold 4 elements. The first 8 bytes of a segment holds the
-    // 'owned' and 'tag' components, and the remaining 32 bytes hold the 'value' components.
-    static constexpr size_t ElementsPerSegment = 4;
-
-    struct OwnedAndTag {
-        uint8_t owned;
-        value::TypeTags tag;
-    };
-
-    struct StackSegment {
-        OwnedAndTag ownedAndTags[ElementsPerSegment];
-        value::Value values[ElementsPerSegment];
-    };
-
-    class Stack {
-    public:
-        static constexpr size_t kMaxCapacity =
-            ((std::numeric_limits<size_t>::max() / 2) / sizeof(StackSegment)) * ElementsPerSegment;
-
-        const auto& ownedAndTag(size_t index) const {
-            return _segments[index / ElementsPerSegment].ownedAndTags[index % ElementsPerSegment];
-        }
-        auto& ownedAndTag(size_t index) {
-            return _segments[index / ElementsPerSegment].ownedAndTags[index % ElementsPerSegment];
-        }
-
-        const auto& owned(size_t index) const {
-            return ownedAndTag(index).owned;
-        }
-        auto& owned(size_t index) {
-            return ownedAndTag(index).owned;
-        }
-
-        const auto& tag(size_t index) const {
-            return ownedAndTag(index).tag;
-        }
-        auto& tag(size_t index) {
-            return ownedAndTag(index).tag;
-        }
-
-        const auto& value(size_t index) const {
-            return _segments[index / ElementsPerSegment].values[index % ElementsPerSegment];
-        }
-        auto& value(size_t index) {
-            return _segments[index / ElementsPerSegment].values[index % ElementsPerSegment];
-        }
-
-        auto size() const {
-            return _size;
-        }
-
-        auto capacity() const {
-            return _capacity;
-        }
-
-        void resize(size_t newSize) {
-            if (MONGO_likely(newSize <= capacity())) {
-                _size = newSize;
-                return;
-            }
-            growAndResize(newSize);
-        }
-
-        void resizeDown() {
-            --_size;
-        }
-
-    private:
-        MONGO_COMPILER_NOINLINE void growAndResize(size_t newSize);
-
-        std::unique_ptr<StackSegment[]> _segments;
-        size_t _size = 0;
-        size_t _capacity = 0;
-    };
-
-    Stack _argStack;
-
     void runInternal(const CodeFragment* code, int64_t position);
     void runLambdaInternal(const CodeFragment* code, int64_t position);
 
-    std::tuple<bool, value::TypeTags, value::Value> genericDiv(value::TypeTags lhsTag,
+    MONGO_COMPILER_NORETURN void runFailInstruction();
+    void runClassicMatcher(const MatchExpression* matcher);
+
+    template <typename T>
+    void runTagCheck(T&& predicate);
+    void runTagCheck(value::TypeTags tagRhs);
+
+    FastTuple<bool, value::TypeTags, value::Value> genericDiv(value::TypeTags lhsTag,
+                                                              value::Value lhsValue,
+                                                              value::TypeTags rhsTag,
+                                                              value::Value rhsValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericIDiv(value::TypeTags lhsTag,
                                                                value::Value lhsValue,
                                                                value::TypeTags rhsTag,
                                                                value::Value rhsValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericIDiv(value::TypeTags lhsTag,
-                                                                value::Value lhsValue,
-                                                                value::TypeTags rhsTag,
-                                                                value::Value rhsValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericMod(value::TypeTags lhsTag,
-                                                               value::Value lhsValue,
-                                                               value::TypeTags rhsTag,
-                                                               value::Value rhsValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericAbs(value::TypeTags operandTag,
-                                                               value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericCeil(value::TypeTags operandTag,
-                                                                value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericFloor(value::TypeTags operandTag,
-                                                                 value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericTrunc(value::TypeTags operandTag,
-                                                                 value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericExp(value::TypeTags operandTag,
-                                                               value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericLn(value::TypeTags operandTag,
+    FastTuple<bool, value::TypeTags, value::Value> genericMod(value::TypeTags lhsTag,
+                                                              value::Value lhsValue,
+                                                              value::TypeTags rhsTag,
+                                                              value::Value rhsValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericAbs(value::TypeTags operandTag,
                                                               value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericLog10(value::TypeTags operandTag,
-                                                                 value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericSqrt(value::TypeTags operandTag,
+    FastTuple<bool, value::TypeTags, value::Value> genericCeil(value::TypeTags operandTag,
+                                                               value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericFloor(value::TypeTags operandTag,
                                                                 value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericTrunc(value::TypeTags operandTag,
+                                                                value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericExp(value::TypeTags operandTag,
+                                                              value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericLn(value::TypeTags operandTag,
+                                                             value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericLog10(value::TypeTags operandTag,
+                                                                value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericSqrt(value::TypeTags operandTag,
+                                                               value::Value operandValue);
     std::pair<value::TypeTags, value::Value> genericNot(value::TypeTags tag, value::Value value);
     std::pair<value::TypeTags, value::Value> genericIsMember(value::TypeTags lhsTag,
                                                              value::Value lhsVal,
@@ -965,9 +920,9 @@ private:
                                                              value::Value rhsVal,
                                                              value::TypeTags collTag,
                                                              value::Value collVal);
-    std::tuple<bool, value::TypeTags, value::Value> genericNumConvert(value::TypeTags lhsTag,
-                                                                      value::Value lhsValue,
-                                                                      value::TypeTags rhsTag);
+    FastTuple<bool, value::TypeTags, value::Value> genericNumConvert(value::TypeTags lhsTag,
+                                                                     value::Value lhsValue,
+                                                                     value::TypeTags rhsTag);
 
     std::pair<value::TypeTags, value::Value> compare3way(
         value::TypeTags lhsTag,
@@ -983,23 +938,23 @@ private:
                                                          value::TypeTags collTag,
                                                          value::Value collValue);
 
-    std::tuple<bool, value::TypeTags, value::Value> getField(value::TypeTags objTag,
-                                                             value::Value objValue,
-                                                             value::TypeTags fieldTag,
-                                                             value::Value fieldValue);
+    FastTuple<bool, value::TypeTags, value::Value> getField(value::TypeTags objTag,
+                                                            value::Value objValue,
+                                                            value::TypeTags fieldTag,
+                                                            value::Value fieldValue);
 
-    std::tuple<bool, value::TypeTags, value::Value> getField(value::TypeTags objTag,
-                                                             value::Value objValue,
-                                                             StringData fieldStr);
+    FastTuple<bool, value::TypeTags, value::Value> getField(value::TypeTags objTag,
+                                                            value::Value objValue,
+                                                            StringData fieldStr);
 
-    std::tuple<bool, value::TypeTags, value::Value> getElement(value::TypeTags objTag,
-                                                               value::Value objValue,
-                                                               value::TypeTags fieldTag,
-                                                               value::Value fieldValue);
-    std::tuple<bool, value::TypeTags, value::Value> getFieldOrElement(value::TypeTags objTag,
-                                                                      value::Value objValue,
-                                                                      value::TypeTags fieldTag,
-                                                                      value::Value fieldValue);
+    FastTuple<bool, value::TypeTags, value::Value> getElement(value::TypeTags objTag,
+                                                              value::Value objValue,
+                                                              value::TypeTags fieldTag,
+                                                              value::Value fieldValue);
+    FastTuple<bool, value::TypeTags, value::Value> getFieldOrElement(value::TypeTags objTag,
+                                                                     value::Value objValue,
+                                                                     value::TypeTags fieldTag,
+                                                                     value::Value fieldValue);
 
     void traverseP(const CodeFragment* code);
     void traverseP(const CodeFragment* code, int64_t position, int64_t maxDepth);
@@ -1012,15 +967,15 @@ private:
     void traverseF(const CodeFragment* code);
     void traverseF(const CodeFragment* code, int64_t position, bool compareArray);
     void traverseFInArray(const CodeFragment* code, int64_t position, bool compareArray);
-    std::tuple<bool, value::TypeTags, value::Value> setField();
+    FastTuple<bool, value::TypeTags, value::Value> setField();
 
-    std::tuple<bool, value::TypeTags, value::Value> getArraySize(value::TypeTags tag,
-                                                                 value::Value val);
+    FastTuple<bool, value::TypeTags, value::Value> getArraySize(value::TypeTags tag,
+                                                                value::Value val);
 
-    std::tuple<bool, value::TypeTags, value::Value> aggSum(value::TypeTags accTag,
-                                                           value::Value accValue,
-                                                           value::TypeTags fieldTag,
-                                                           value::Value fieldValue);
+    FastTuple<bool, value::TypeTags, value::Value> aggSum(value::TypeTags accTag,
+                                                          value::Value accValue,
+                                                          value::TypeTags fieldTag,
+                                                          value::Value fieldValue);
 
     void aggDoubleDoubleSumImpl(value::Array* arr, value::TypeTags rhsTag, value::Value rhsValue);
 
@@ -1028,214 +983,239 @@ private:
     // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
     void aggStdDevImpl(value::Array* arr, value::TypeTags rhsTag, value::Value rhsValue);
 
-    std::tuple<bool, value::TypeTags, value::Value> aggStdDevFinalizeImpl(value::Value fieldValue,
-                                                                          bool isSamp);
+    FastTuple<bool, value::TypeTags, value::Value> aggStdDevFinalizeImpl(value::Value fieldValue,
+                                                                         bool isSamp);
 
-    std::tuple<bool, value::TypeTags, value::Value> aggMin(value::TypeTags accTag,
-                                                           value::Value accValue,
-                                                           value::TypeTags fieldTag,
-                                                           value::Value fieldValue,
-                                                           CollatorInterface* collator = nullptr);
+    FastTuple<bool, value::TypeTags, value::Value> aggMin(value::TypeTags accTag,
+                                                          value::Value accValue,
+                                                          value::TypeTags fieldTag,
+                                                          value::Value fieldValue,
+                                                          CollatorInterface* collator = nullptr);
 
-    std::tuple<bool, value::TypeTags, value::Value> aggMax(value::TypeTags accTag,
-                                                           value::Value accValue,
-                                                           value::TypeTags fieldTag,
-                                                           value::Value fieldValue,
-                                                           CollatorInterface* collator = nullptr);
+    FastTuple<bool, value::TypeTags, value::Value> aggMax(value::TypeTags accTag,
+                                                          value::Value accValue,
+                                                          value::TypeTags fieldTag,
+                                                          value::Value fieldValue,
+                                                          CollatorInterface* collator = nullptr);
 
-    std::tuple<bool, value::TypeTags, value::Value> aggFirst(value::TypeTags accTag,
-                                                             value::Value accValue,
-                                                             value::TypeTags fieldTag,
-                                                             value::Value fieldValue);
-
-    std::tuple<bool, value::TypeTags, value::Value> aggLast(value::TypeTags accTag,
+    FastTuple<bool, value::TypeTags, value::Value> aggFirst(value::TypeTags accTag,
                                                             value::Value accValue,
                                                             value::TypeTags fieldTag,
                                                             value::Value fieldValue);
 
-    std::tuple<bool, value::TypeTags, value::Value> genericAcos(value::TypeTags operandTag,
-                                                                value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericAcosh(value::TypeTags operandTag,
-                                                                 value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericAsin(value::TypeTags operandTag,
-                                                                value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericAsinh(value::TypeTags operandTag,
-                                                                 value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericAtan(value::TypeTags operandTag,
-                                                                value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericAtanh(value::TypeTags operandTag,
-                                                                 value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericAtan2(value::TypeTags operandTag1,
-                                                                 value::Value operandValue1,
-                                                                 value::TypeTags operandTag2,
-                                                                 value::Value operandValue2);
-    std::tuple<bool, value::TypeTags, value::Value> genericCos(value::TypeTags operandTag,
-                                                               value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericCosh(value::TypeTags operandTag,
-                                                                value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericDegreesToRadians(
-        value::TypeTags operandTag, value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericRadiansToDegrees(
-        value::TypeTags operandTag, value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericSin(value::TypeTags operandTag,
-                                                               value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericSinh(value::TypeTags operandTag,
-                                                                value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericTan(value::TypeTags operandTag,
-                                                               value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericTanh(value::TypeTags operandTag,
-                                                                value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> aggLast(value::TypeTags accTag,
+                                                           value::Value accValue,
+                                                           value::TypeTags fieldTag,
+                                                           value::Value fieldValue);
 
-    std::tuple<bool, value::TypeTags, value::Value> genericDayOfYear(value::TypeTags timezoneDBTag,
+    FastTuple<bool, value::TypeTags, value::Value> genericAcos(value::TypeTags operandTag,
+                                                               value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericAcosh(value::TypeTags operandTag,
+                                                                value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericAsin(value::TypeTags operandTag,
+                                                               value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericAsinh(value::TypeTags operandTag,
+                                                                value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericAtan(value::TypeTags operandTag,
+                                                               value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericAtanh(value::TypeTags operandTag,
+                                                                value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericAtan2(value::TypeTags operandTag1,
+                                                                value::Value operandValue1,
+                                                                value::TypeTags operandTag2,
+                                                                value::Value operandValue2);
+    FastTuple<bool, value::TypeTags, value::Value> genericCos(value::TypeTags operandTag,
+                                                              value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericCosh(value::TypeTags operandTag,
+                                                               value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericDegreesToRadians(
+        value::TypeTags operandTag, value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericRadiansToDegrees(
+        value::TypeTags operandTag, value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericSin(value::TypeTags operandTag,
+                                                              value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericSinh(value::TypeTags operandTag,
+                                                               value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericTan(value::TypeTags operandTag,
+                                                              value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericTanh(value::TypeTags operandTag,
+                                                               value::Value operandValue);
+
+    FastTuple<bool, value::TypeTags, value::Value> genericDayOfYear(value::TypeTags timezoneDBTag,
+                                                                    value::Value timezoneDBValue,
+                                                                    value::TypeTags dateTag,
+                                                                    value::Value dateValue,
+                                                                    value::TypeTags timezoneTag,
+                                                                    value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericDayOfMonth(value::TypeTags timezoneDBTag,
                                                                      value::Value timezoneDBValue,
                                                                      value::TypeTags dateTag,
                                                                      value::Value dateValue,
                                                                      value::TypeTags timezoneTag,
                                                                      value::Value timezoneValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericDayOfMonth(value::TypeTags timezoneDBTag,
-                                                                      value::Value timezoneDBValue,
-                                                                      value::TypeTags dateTag,
-                                                                      value::Value dateValue,
-                                                                      value::TypeTags timezoneTag,
-                                                                      value::Value timezoneValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericDayOfWeek(value::TypeTags timezoneDBTag,
-                                                                     value::Value timezoneDBValue,
-                                                                     value::TypeTags dateTag,
-                                                                     value::Value dateValue,
-                                                                     value::TypeTags timezoneTag,
-                                                                     value::Value timezoneValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericNewKeyString(
+    FastTuple<bool, value::TypeTags, value::Value> genericDayOfWeek(value::TypeTags timezoneDBTag,
+                                                                    value::Value timezoneDBValue,
+                                                                    value::TypeTags dateTag,
+                                                                    value::Value dateValue,
+                                                                    value::TypeTags timezoneTag,
+                                                                    value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericNewKeyString(
         ArityType arity, CollatorInterface* collator = nullptr);
 
-    std::tuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDateWeekYear(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDateDiff(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDateToParts(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinIsoDateToParts(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDayOfYear(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDayOfMonth(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDayOfWeek(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinRegexMatch(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinKeepFields(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinReplaceOne(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDropFields(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinNewArray(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinNewArrayFromRange(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinNewObj(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinKeyStringToString(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinNewKeyString(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCollNewKeyString(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAbs(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCeil(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinFloor(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinTrunc(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinExp(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinLn(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinLog10(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinSqrt(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAddToArray(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAddToArrayCapped(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinMergeObjects(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAddToSet(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCollAddToSet(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> addToSetCappedImpl(value::TypeTags tagNewElem,
-                                                                       value::Value valNewElem,
-                                                                       int32_t sizeCap,
-                                                                       CollatorInterface* collator);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAddToSetCapped(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAggDoubleDoubleSum(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSumFinalize(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoublePartialSumFinalize(
+    FastTuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDateWeekYear(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDateDiff(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDateToParts(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinIsoDateToParts(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDayOfYear(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDayOfMonth(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDayOfWeek(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinRegexMatch(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinKeepFields(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinReplaceOne(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDropFields(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinNewArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinNewArrayFromRange(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinNewObj(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinKeyStringToString(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinNewKeyString(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCollNewKeyString(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAbs(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCeil(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinFloor(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinTrunc(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinExp(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinLn(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinLog10(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSqrt(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAddToArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAddToArrayCapped(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinMergeObjects(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAddToSet(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSet(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> addToSetCappedImpl(value::TypeTags tagNewElem,
+                                                                      value::Value valNewElem,
+                                                                      int32_t sizeCap,
+                                                                      CollatorInterface* collator);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAddToSetCapped(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggDoubleDoubleSum(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSumFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoublePartialSumFinalize(
         ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAggStdDev(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinStdDevPopFinalize(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinStdDevSampFinalize(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinBitTestZero(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinBitTestMask(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinBitTestPosition(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinBsonSize(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinToUpper(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinToLower(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCoerceToString(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAcos(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAcosh(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAsin(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAsinh(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAtan(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAtanh(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinAtan2(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCos(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCosh(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDegreesToRadians(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinRadiansToDegrees(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinSin(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinSinh(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinTan(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinTanh(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinRound(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinIsDayOfWeek(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinIsTimeUnit(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinIsTimezone(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinSetUnion(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinSetIntersection(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinSetDifference(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinSetEquals(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCollSetUnion(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCollSetIntersection(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCollSetDifference(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinCollSetEquals(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinRunJsPredicate(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinRegexCompile(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinRegexFind(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinRegexFindAll(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinShardFilter(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinShardHash(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinExtractSubArray(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinIsArrayEmpty(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinReverseArray(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinSortArray(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinDateAdd(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinHasNullBytes(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinGetRegexPattern(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinGetRegexFlags(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinHash(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinFtsMatch(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinGenerateSortKey(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinMakeBsonObj(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinTsIncrement(ArityType arity);
-    std::tuple<bool, value::TypeTags, value::Value> builtinTypeMatch(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggStdDev(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinStdDevPopFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinStdDevSampFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinBitTestZero(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinBitTestMask(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinBitTestPosition(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinBsonSize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinToUpper(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinToLower(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCoerceToString(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAcos(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAcosh(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAsin(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAsinh(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAtan(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAtanh(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAtan2(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCos(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCosh(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDegreesToRadians(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinRadiansToDegrees(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSin(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSinh(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinTan(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinTanh(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinRound(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinIsDayOfWeek(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinIsTimeUnit(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinIsTimezone(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSetUnion(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSetIntersection(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSetDifference(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSetEquals(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCollSetUnion(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCollSetIntersection(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCollSetDifference(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCollSetEquals(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinRunJsPredicate(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinRegexCompile(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinRegexFind(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinRegexFindAll(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinShardFilter(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinShardHash(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinExtractSubArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinIsArrayEmpty(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinReverseArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSortArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDateAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinHasNullBytes(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinGetRegexPattern(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinGetRegexFlags(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinHash(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinFtsMatch(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinGenerateSortKey(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinMakeBsonObj(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinTsIncrement(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinTypeMatch(ArityType arity);
 
-    std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 
-    std::tuple<bool, value::TypeTags, value::Value> getFromStack(size_t offset) {
-        auto backOffset = _argStack.size() - 1 - offset;
+    static constexpr size_t offsetOwned = 0;
+    static constexpr size_t offsetTag = 1;
+    static constexpr size_t offsetVal = 2;
 
-        auto [owned, tag] = _argStack.ownedAndTag(backOffset);
-        auto val = _argStack.value(backOffset);
-
+    MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> readTuple(
+        uint8_t* ptr) noexcept {
+        auto owned = readFromMemory<bool>(ptr + offsetOwned);
+        auto tag = readFromMemory<value::TypeTags>(ptr + offsetTag);
+        auto val = readFromMemory<value::Value>(ptr + offsetVal);
         return {owned, tag, val};
     }
 
-    std::tuple<bool, value::TypeTags, value::Value> moveFromStack(size_t offset) {
-        auto backOffset = _argStack.size() - 1 - offset;
-
-        auto [owned, tag] = _argStack.ownedAndTag(backOffset);
-        auto val = _argStack.value(backOffset);
-        _argStack.owned(backOffset) = false;
-
-        return {owned, tag, val};
+    MONGO_COMPILER_ALWAYS_INLINE void writeTuple(uint8_t* ptr,
+                                                 bool owned,
+                                                 value::TypeTags tag,
+                                                 value::Value val) noexcept {
+        writeToMemory(ptr + offsetOwned, owned);
+        writeToMemory(ptr + offsetTag, tag);
+        writeToMemory(ptr + offsetVal, val);
+    }
+    MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> getFromStack(
+        size_t offset) noexcept {
+        if (MONGO_likely(offset == 0)) {
+            return readTuple(_argStackTop);
+        } else {
+            return readTuple(_argStackTop - offset * sizeOfElement);
+        }
     }
 
-    std::pair<value::TypeTags, value::Value> moveOwnedFromStack(size_t offset) {
+    MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> moveFromStack(
+        size_t offset) noexcept {
+        if (MONGO_likely(offset == 0)) {
+            auto [owned, tag, val] = readTuple(_argStackTop);
+            writeToMemory(_argStackTop + offsetOwned, false);
+            return {owned, tag, val};
+        } else {
+            auto ptr = _argStackTop - offset * sizeOfElement;
+            auto [owned, tag, val] = readTuple(ptr);
+            writeToMemory(ptr + offsetOwned, false);
+            return {owned, tag, val};
+        }
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> moveOwnedFromStack(
+        size_t offset) {
         auto [owned, tag, val] = moveFromStack(offset);
         if (!owned) {
             std::tie(tag, val) = value::copyValue(tag, val);
@@ -1244,39 +1224,57 @@ private:
         return {tag, val};
     }
 
-    void setStack(size_t offset, bool owned, value::TypeTags tag, value::Value val) {
-        auto backOffset = _argStack.size() - 1 - offset;
-        _argStack.ownedAndTag(backOffset) = {owned, tag};
-        _argStack.value(backOffset) = val;
+    MONGO_COMPILER_ALWAYS_INLINE void setStack(size_t offset,
+                                               bool owned,
+                                               value::TypeTags tag,
+                                               value::Value val) noexcept {
+        if (MONGO_likely(offset == 0)) {
+            topStack(owned, tag, val);
+        } else {
+            writeTuple(_argStackTop - offset * sizeOfElement, owned, tag, val);
+        }
     }
 
-    void pushStack(bool owned, value::TypeTags tag, value::Value val) {
-        _argStack.resize(_argStack.size() + 1);
+    MONGO_COMPILER_ALWAYS_INLINE void pushStack(bool owned,
+                                                value::TypeTags tag,
+                                                value::Value val) noexcept {
+        _argStackTop += sizeOfElement;
+        if (MONGO_unlikely(_argStackTop == _argStackEnd)) {
+            growAndResize();
+        }
         topStack(owned, tag, val);
     }
 
-    void topStack(bool owned, value::TypeTags tag, value::Value val) {
-        size_t index = _argStack.size() - 1;
-        _argStack.ownedAndTag(index) = {owned, tag};
-        _argStack.value(index) = val;
+    MONGO_COMPILER_ALWAYS_INLINE void topStack(bool owned,
+                                               value::TypeTags tag,
+                                               value::Value val) noexcept {
+        writeTuple(_argStackTop, owned, tag, val);
     }
 
-    void popStack() {
-        _argStack.resizeDown();
+    MONGO_COMPILER_ALWAYS_INLINE void popStack() noexcept {
+        _argStackTop -= sizeOfElement;
     }
 
-    void popAndReleaseStack() {
-        size_t index = _argStack.size() - 1;
-        auto [owned, tag] = _argStack.ownedAndTag(index);
-
+    MONGO_COMPILER_ALWAYS_INLINE void popAndReleaseStack() noexcept {
+        auto [owned, tag, val] = getFromStack(0);
         if (owned) {
-            value::releaseValue(tag, _argStack.value(index));
+            value::releaseValue(tag, val);
         }
 
         popStack();
     }
 
+    void stackReset() noexcept {
+        _argStackTop = _argStack - sizeOfElement;
+    }
+
+    void growAndResize() noexcept;
+
     void swapStack();
+
+    uint8_t* _argStackTop{nullptr};
+    uint8_t* _argStack{nullptr};
+    uint8_t* _argStackEnd{nullptr};
 };
 }  // namespace vm
 }  // namespace sbe

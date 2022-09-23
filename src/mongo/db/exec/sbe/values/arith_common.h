@@ -32,16 +32,16 @@
 
 namespace mongo::sbe::value {
 
-std::tuple<bool, value::TypeTags, value::Value> genericAdd(value::TypeTags lhsTag,
-                                                           value::Value lhsValue,
-                                                           value::TypeTags rhsTag,
-                                                           value::Value rhsValue);
-std::tuple<bool, value::TypeTags, value::Value> genericSub(value::TypeTags lhsTag,
-                                                           value::Value lhsValue,
-                                                           value::TypeTags rhsTag,
-                                                           value::Value rhsValue);
-std::tuple<bool, value::TypeTags, value::Value> genericMul(value::TypeTags lhsTag,
-                                                           value::Value lhsValue,
-                                                           value::TypeTags rhsTag,
-                                                           value::Value rhsValue);
+FastTuple<bool, value::TypeTags, value::Value> genericAdd(value::TypeTags lhsTag,
+                                                          value::Value lhsValue,
+                                                          value::TypeTags rhsTag,
+                                                          value::Value rhsValue);
+FastTuple<bool, value::TypeTags, value::Value> genericSub(value::TypeTags lhsTag,
+                                                          value::Value lhsValue,
+                                                          value::TypeTags rhsTag,
+                                                          value::Value rhsValue);
+FastTuple<bool, value::TypeTags, value::Value> genericMul(value::TypeTags lhsTag,
+                                                          value::Value lhsValue,
+                                                          value::TypeTags rhsTag,
+                                                          value::Value rhsValue);
 }  // namespace mongo::sbe::value

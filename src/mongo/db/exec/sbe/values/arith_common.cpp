@@ -115,10 +115,10 @@ struct Multiplication {
  * standard numeric types and also operations on the Date type.
  */
 template <typename Op>
-std::tuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeTags lhsTag,
-                                                                    value::Value lhsValue,
-                                                                    value::TypeTags rhsTag,
-                                                                    value::Value rhsValue) {
+FastTuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeTags lhsTag,
+                                                                   value::Value lhsValue,
+                                                                   value::TypeTags rhsTag,
+                                                                   value::Value rhsValue) {
     if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
         switch (getWidestNumericalType(lhsTag, rhsTag)) {
             case value::TypeTags::NumberInt32: {
@@ -247,24 +247,24 @@ std::tuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeT
     return {false, value::TypeTags::Nothing, 0};
 }
 
-std::tuple<bool, value::TypeTags, value::Value> genericAdd(value::TypeTags lhsTag,
-                                                           value::Value lhsValue,
-                                                           value::TypeTags rhsTag,
-                                                           value::Value rhsValue) {
+FastTuple<bool, value::TypeTags, value::Value> genericAdd(value::TypeTags lhsTag,
+                                                          value::Value lhsValue,
+                                                          value::TypeTags rhsTag,
+                                                          value::Value rhsValue) {
     return genericArithmeticOp<Addition>(lhsTag, lhsValue, rhsTag, rhsValue);
 }
 
-std::tuple<bool, value::TypeTags, value::Value> genericSub(value::TypeTags lhsTag,
-                                                           value::Value lhsValue,
-                                                           value::TypeTags rhsTag,
-                                                           value::Value rhsValue) {
+FastTuple<bool, value::TypeTags, value::Value> genericSub(value::TypeTags lhsTag,
+                                                          value::Value lhsValue,
+                                                          value::TypeTags rhsTag,
+                                                          value::Value rhsValue) {
     return genericArithmeticOp<Subtraction>(lhsTag, lhsValue, rhsTag, rhsValue);
 }
 
-std::tuple<bool, value::TypeTags, value::Value> genericMul(value::TypeTags lhsTag,
-                                                           value::Value lhsValue,
-                                                           value::TypeTags rhsTag,
-                                                           value::Value rhsValue) {
+FastTuple<bool, value::TypeTags, value::Value> genericMul(value::TypeTags lhsTag,
+                                                          value::Value lhsValue,
+                                                          value::TypeTags rhsTag,
+                                                          value::Value rhsValue) {
     return genericArithmeticOp<Multiplication>(lhsTag, lhsValue, rhsTag, rhsValue);
 }
 

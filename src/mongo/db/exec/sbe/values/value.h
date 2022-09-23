@@ -69,6 +69,22 @@ class TimeZoneDatabase;
 class JsFunction;
 
 namespace sbe {
+/**
+ * Trivially copyable variation on a tuple theme. This allow us to return tuples through registers.
+ */
+template <typename...>
+struct FastTuple;
+
+template <typename... Ts>
+FastTuple(Ts...)->FastTuple<Ts...>;
+
+template <typename A, typename B, typename C>
+struct FastTuple<A, B, C> {
+    A a;
+    B b;
+    C c;
+};
+
 using FrameId = int64_t;
 using SpoolId = int64_t;
 
@@ -1474,7 +1490,7 @@ inline T numericCast(TypeTags tag, Value val) noexcept {
  * TypeTag. In the case that a conversion is lossy, we return Nothing.
  */
 template <typename T>
-inline std::tuple<bool, value::TypeTags, value::Value> numericConvLossless(
+inline FastTuple<bool, value::TypeTags, value::Value> numericConvLossless(
     T value, value::TypeTags targetTag) {
     switch (targetTag) {
         case value::TypeTags::NumberInt32: {
