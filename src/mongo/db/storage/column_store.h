@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
+#include <stack>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -382,6 +383,56 @@ protected:
     std::shared_ptr<Ident> _ident;
 };
 
+/*
+ * Array info reader based on a string representation of arrayInfo. Allows for reading/peeking of
+ * individual components.
+ */
+class ArrInfoReader {
+public:
+    explicit ArrInfoReader(StringData arrInfoStr) : _arrInfo(arrInfoStr) {}
+
+    char nextChar() const {
+        if (_offsetInArrInfo == _arrInfo.size()) {
+            // Reaching the end of the array info means an unlimited number of '|'s.
+            return '|';
+        }
+        return _arrInfo[_offsetInArrInfo];
+    }
+
+    char takeNextChar() {
+        if (_offsetInArrInfo == _arrInfo.size()) {
+            // Reaching the end of the array info means an unlimited number of '|'s.
+            return '|';
+        }
+        return _arrInfo[_offsetInArrInfo++];
+    }
+
+    size_t takeNumber() {
+        return ColumnStore::readArrInfoNumber(_arrInfo, &_offsetInArrInfo);
+    }
+
+    bool empty() const {
+        return _arrInfo.empty();
+    }
+
+    /*
+     * Returns whether more explicit components are yet to be consumed. Since array info logically
+     * ends with an infinite stream of |, this function indicates whether there are more components
+     * which are physically present to be read, not including the infinite sequence of |.
+     */
+    bool moreExplicitComponents() const {
+        return _offsetInArrInfo < _arrInfo.size();
+    }
+
+    StringData rawArrInfo() const {
+        return _arrInfo;
+    }
+
+private:
+    StringData _arrInfo;
+    size_t _offsetInArrInfo = 0;
+};
+
 struct SplitCellView {
     StringData arrInfo;  // rawData() is 1-past-end of range starting with firstValuePtr.
     const char* firstValuePtr = nullptr;
@@ -422,6 +473,108 @@ struct SplitCellView {
     auto subcellValuesGenerator(ValueEncoder* valEncoder) const {
         return Cursor<ValueEncoder>{firstValuePtr, arrInfo.rawData(), valEncoder};
     }
+
+    template <class ValueEncoder>
+    struct CursorWithArrayDepth {
+        CursorWithArrayDepth(const char* elemPtr,
+                             const StringData& arrayInfo,
+                             ValueEncoder* encoder)
+            : elemPtr(elemPtr),
+              end(arrayInfo.rawData()),
+              encoder(encoder),
+              arrInfoReader(arrayInfo) {}
+
+        bool hasNext() const {
+            return elemPtr < end;
+        }
+
+        using Out = typename std::remove_reference_t<ValueEncoder>::Out;
+        /**
+         * Returns the next value with its array-nestedness level.
+         */
+        std::pair<Out /*decoded value*/, int /*depth*/> nextValue() {
+            invariant(elemPtr < end, "The client should have checked 'hasNext()'");
+
+            // The expected most common case: implicit tail of values at the same depth.
+            if (!arrInfoReader.moreExplicitComponents()) {
+                return {decodeAndAdvance(elemPtr, *encoder), depth};
+            }
+
+            // The next expected most common case: a range of values at the same depth.
+            if (repeats > 0) {
+                repeats--;
+                return {decodeAndAdvance(elemPtr, *encoder), depth};
+            }
+
+            // An end of a range means we have to check for structural changes and update depth.
+            while (arrInfoReader.moreExplicitComponents()) {
+                switch (arrInfoReader.takeNextChar()) {
+                    case '[': {
+                        // A '[' can be followed by a number if there are objects in the array,
+                        // that should be retrieved from other paths when reconstructing the
+                        // record. We can ignore them as they don't contribute to the values.
+                        (void)arrInfoReader.takeNumber();
+                        if (!inArray.empty() && inArray.top()) {
+                            depth++;
+                        }
+                        inArray.push(true);
+                        break;
+                    }
+                    case '|': {
+                        repeats = arrInfoReader.takeNumber();
+                        return {decodeAndAdvance(elemPtr, *encoder), depth};
+                    }
+                    case '{': {
+                        // We consider as nested only the arrays that are elements of other
+                        // arrays. When there is an array of objects and some of the fields of
+                        // these objects are arrays, the latter aren't nested.
+                        inArray.push(false);
+                        break;
+                    }
+                    case ']': {
+                        invariant(inArray.size() > 0 && inArray.top());
+                        inArray.pop();
+                        if (inArray.size() > 0 && inArray.top()) {
+                            invariant(depth > 0);
+                            depth--;
+                        }
+
+                        // Closing an array implicitly closes all objects on the path between it
+                        // and the previous array.
+                        while (inArray.size() > 0 && !inArray.top()) {
+                            inArray.pop();
+                        }
+                        break;
+                    }
+                    case '+': {
+                        // Indicates elements in arrays that are objects that don't have the
+                        // path. These objects don't contribute to the cell's values, so we can
+                        // ignore them.
+                        (void)arrInfoReader.takeNumber();
+                        break;
+                    }
+                    case 'o': {
+                        // Indicates the start of a nested object inside the cell. We don't need
+                        // to track this info because the nested objects don't contribute to the
+                        // values in the cell.
+                        (void)arrInfoReader.takeNumber();
+                        break;
+                    }
+                }
+            }
+
+            // Start consuming the implicit tail range.
+            return {decodeAndAdvance(elemPtr, *encoder), depth};
+        }
+
+        const char* elemPtr;
+        const char* end;
+        ValueEncoder* encoder;
+        ArrInfoReader arrInfoReader;
+        int depth = 0;
+        std::stack<bool, absl::InlinedVector<bool, 64>> inArray;
+        size_t repeats = 0;
+    };
 
     static SplitCellView parse(CellView cell) {
         using Bytes = ColumnStore::Bytes;

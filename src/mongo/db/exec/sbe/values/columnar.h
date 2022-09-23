@@ -39,56 +39,6 @@
  */
 
 namespace mongo::sbe {
-/*
- * Array info reader based on a string representation of arrayInfo. Allows for reading/peeking of
- * individual components.
- */
-class ArrInfoReader {
-public:
-    explicit ArrInfoReader(StringData arrInfoStr) : _arrInfo(arrInfoStr) {}
-
-    char nextChar() const {
-        if (_offsetInArrInfo == _arrInfo.size()) {
-            // Reaching the end of the array info means an unlimited number of '|'s.
-            return '|';
-        }
-        return _arrInfo[_offsetInArrInfo];
-    }
-
-    char takeNextChar() {
-        if (_offsetInArrInfo == _arrInfo.size()) {
-            // Reaching the end of the array info means an unlimited number of '|'s.
-            return '|';
-        }
-        return _arrInfo[_offsetInArrInfo++];
-    }
-
-    size_t takeNumber() {
-        return ColumnStore::readArrInfoNumber(_arrInfo, &_offsetInArrInfo);
-    }
-
-    bool empty() const {
-        return _arrInfo.empty();
-    }
-
-    /*
-     * Returns whether more explicit components are yet to be consumed. Since array info logically
-     * ends with an infinite stream of |, this function indicates whether there are more components
-     * which are physically present to be read, not including the infinite sequence of |.
-     */
-    bool moreExplicitComponents() const {
-        return _offsetInArrInfo < _arrInfo.size();
-    }
-
-    StringData rawArrInfo() const {
-        return _arrInfo;
-    }
-
-private:
-    StringData _arrInfo;
-    size_t _offsetInArrInfo = 0;
-};
-
 /**
  * Represents a cell in a columnar index with ability to retrieve values in an SBE native format.
  */

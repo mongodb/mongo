@@ -354,106 +354,22 @@ void ColumnScanStage::readParentsIntoObj(StringData path,
 
 // The result of the filter predicate will be the same regardless of sparseness or sub objects,
 // therefore we don't look at the parents and don't consult the row store.
-// (TODO SERVER-68792) Refactor the iteration over values into its own type.
 bool ColumnScanStage::checkFilter(CellView cell, size_t filterIndex, const PathValue& path) {
     auto splitCellView = SplitCellView::parse(cell);
-    auto translatedCell = translateCell(path, splitCellView);
 
-    if (!translatedCell.moreValues()) {
-        return false;
-    }
+    SplitCellView::CursorWithArrayDepth<value::ColumnStoreEncoder> cellCursor{
+        splitCellView.firstValuePtr, splitCellView.arrInfo, &_encoder};
 
-    if (translatedCell.arrInfo.empty()) {
-        // Have a single non-nested value -- evaluate the filter on it.
-        // (TODO SERVER-68792) Could we avoid copying by using a non-owning accessor? Same question
-        // for other locations in this function when the predicate is evaluated immediately after
-        // setting the slot.
-        auto [tag, val] = translatedCell.nextValue();
-        _filterInputAccessors[filterIndex].reset(tag, val);
-        return _bytecode.runPredicate(_filterExprsCode[filterIndex].get());
-    } else {
-        ArrInfoReader arrInfoReader{translatedCell.arrInfo};
-        int depth = 0;
+    while (cellCursor.hasNext()) {
+        auto [val, depth] = cellCursor.nextValue();
+        if (depth > 0)
+            continue;
 
-        // Avoid allocating memory for this stack except in the rare case of deeply nested
-        // documents.
-        std::stack<bool, absl::InlinedVector<bool, 64>> inArray;
-        while (arrInfoReader.moreExplicitComponents()) {
-            switch (arrInfoReader.takeNextChar()) {
-                case '{': {
-                    // We consider as nested only the arrays that are elements of other arrays. When
-                    // there is an array of objects and some of the fields of these objects are
-                    // arrays, the latter aren't nested.
-                    inArray.push(false);
-                    break;
-                }
-                case '[': {
-                    // A '[' can be followed by a number if there are objects in the array, that
-                    // should be retrieved from other paths when reconstructing the record. We can
-                    // ignore them as they don't contribute to the values.
-                    (void)arrInfoReader.takeNumber();
-                    if (!inArray.empty() && inArray.top()) {
-                        depth++;
-                    }
-                    inArray.push(true);
-                    break;
-                }
-                case '+': {
-                    // Indicates elements in arrays that are objects that don't have the path. These
-                    // objects don't contribute to the cell's values, so we can ignore them.
-                    (void)arrInfoReader.takeNumber();
-                    break;
-                }
-                case '|': {
-                    auto repeats = arrInfoReader.takeNumber();
-                    for (size_t i = 0; i < repeats + 1; i++) {
-                        auto [tag, val] = translatedCell.nextValue();
-                        if (depth == 0) {
-                            _filterInputAccessors[filterIndex].reset(tag, val);
-                            if (_bytecode.runPredicate(_filterExprsCode[filterIndex].get())) {
-                                return true;
-                            }
-                        }
-                    }
-                    break;
-                }
-                case 'o': {
-                    // Indicates the start of a nested object inside the cell. We don't need to
-                    // track this info because the nested objects don't contribute to the values in
-                    // the cell.
-                    (void)arrInfoReader.takeNumber();
-                    break;
-                }
-                case ']': {
-                    invariant(inArray.size() > 0 && inArray.top());
-                    inArray.pop();
-                    if (inArray.size() > 0 && inArray.top()) {
-                        invariant(depth > 0);
-                        depth--;
-                    }
-
-                    // Closing an array implicitly closes all objects on the path between it and the
-                    // previous array.
-                    while (inArray.size() > 0 && !inArray.top()) {
-                        inArray.pop();
-                    }
-                }
-            }
-        }
-        if (depth == 0) {
-            // For the remaining values the depth isn't going to change so we don't need to advance
-            // the value iterator if the values are too deep.
-            while (translatedCell.moreValues()) {
-                auto [tag, val] = translatedCell.nextValue();
-                _filterInputAccessors[filterIndex].reset(tag, val);
-                if (_bytecode.runPredicate(_filterExprsCode[filterIndex].get())) {
-                    return true;
-                }
-            }
+        _filterInputAccessors[filterIndex].reset(val->first, val->second);
+        if (_bytecode.runPredicate(_filterExprsCode[filterIndex].get())) {
+            return true;
         }
     }
-
-    // None of the values matched the filter.
     return false;
 }
 
