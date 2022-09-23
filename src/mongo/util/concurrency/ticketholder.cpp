@@ -67,6 +67,28 @@ void updateQueueStatsOnTicketAcquisition(ServiceContext* serviceContext,
     queueStats.totalStartedProcessing.fetchAndAddRelaxed(1);
 }
 
+/**
+ * Appends the standard statistics stored in QueueStats to BSONObjBuilder b;
+ */
+void appendCommonQueueImplStats(BSONObjBuilder& b,
+                                const TicketHolderWithQueueingStats::QueueStats& stats) {
+    auto removed = stats.totalRemovedQueue.loadRelaxed();
+    auto added = stats.totalAddedQueue.loadRelaxed();
+
+    b.append("addedToQueue", added);
+    b.append("removedFromQueue", removed);
+    b.append("queueLength", std::max(static_cast<int>(added - removed), 0));
+
+    auto finished = stats.totalFinishedProcessing.loadRelaxed();
+    auto started = stats.totalStartedProcessing.loadRelaxed();
+    b.append("startedProcessing", started);
+    b.append("processing", std::max(static_cast<int>(started - finished), 0));
+    b.append("finishedProcessing", finished);
+    b.append("totalTimeProcessingMicros", stats.totalTimeProcessingMicros.loadRelaxed());
+    b.append("canceled", stats.totalCanceled.loadRelaxed());
+    b.append("newAdmissions", stats.totalNewAdmissions.loadRelaxed());
+    b.append("totalTimeQueuedMicros", stats.totalTimeQueuedMicros.loadRelaxed());
+}
 }  // namespace
 
 TicketHolder* TicketHolder::get(ServiceContext* svcCtx) {
@@ -283,20 +305,7 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(Operat
 }
 
 void SemaphoreTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
-    auto removed = _semaphoreStats.totalRemovedQueue.loadRelaxed();
-    auto added = _semaphoreStats.totalAddedQueue.loadRelaxed();
-    b.append("addedToQueue", added);
-    b.append("removedFromQueue", removed);
-    b.append("queueLength", std::max(static_cast<int>(added - removed), 0));
-    auto finished = _semaphoreStats.totalFinishedProcessing.loadRelaxed();
-    auto started = _semaphoreStats.totalStartedProcessing.loadRelaxed();
-    b.append("startedProcessing", started);
-    b.append("processing", std::max(static_cast<int>(started - finished), 0));
-    b.append("finishedProcessing", finished);
-    b.append("totalTimeProcessingMicros", _semaphoreStats.totalTimeProcessingMicros.loadRelaxed());
-    b.append("canceled", _semaphoreStats.totalCanceled.loadRelaxed());
-    b.append("newAdmissions", _semaphoreStats.totalNewAdmissions.loadRelaxed());
-    b.append("totalTimeQueuedMicros", _semaphoreStats.totalTimeQueuedMicros.loadRelaxed());
+    appendCommonQueueImplStats(b, _semaphoreStats);
 }
 #if defined(__linux__)
 namespace {
@@ -486,11 +495,9 @@ void SemaphoreTicketHolder::_resize(int newSize, int oldSize) noexcept {
 }
 #endif
 
-SchedulingTicketHolder::SchedulingTicketHolder(int numTickets,
-                                               unsigned int numQueues,
-                                               ServiceContext* serviceContext)
+PriorityTicketHolder::PriorityTicketHolder(int numTickets, ServiceContext* serviceContext)
     : TicketHolderWithQueueingStats(numTickets, serviceContext), _serviceContext(serviceContext) {
-    for (std::size_t i = 0; i < numQueues; i++) {
+    for (std::size_t i = 0; i < static_cast<unsigned int>(QueueType::QueueTypeSize); i++) {
         _queues.emplace_back(this);
     }
     _queues.shrink_to_fit();
@@ -498,17 +505,17 @@ SchedulingTicketHolder::SchedulingTicketHolder(int numTickets,
     _enqueuedElements.store(0);
 }
 
-SchedulingTicketHolder::~SchedulingTicketHolder() {}
+PriorityTicketHolder::~PriorityTicketHolder() {}
 
-int SchedulingTicketHolder::available() const {
+int PriorityTicketHolder::available() const {
     return _ticketsAvailable.load();
 }
 
-int SchedulingTicketHolder::queued() const {
+int PriorityTicketHolder::queued() const {
     return _enqueuedElements.loadRelaxed();
 }
 
-void SchedulingTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
+void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
     // Tickets acquired with priority kImmediate are not generated from the pool of available
     // tickets, and thus should never be returned to the pool of available tickets.
     invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
@@ -533,7 +540,7 @@ void SchedulingTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) 
     _dequeueWaitingThread();
 }
 
-bool SchedulingTicketHolder::_tryAcquireTicket() {
+bool PriorityTicketHolder::_tryAcquireTicket() {
     auto remaining = _ticketsAvailable.subtractAndFetch(1);
     if (remaining < 0) {
         _ticketsAvailable.addAndFetch(1);
@@ -542,7 +549,7 @@ bool SchedulingTicketHolder::_tryAcquireTicket() {
     return true;
 }
 
-boost::optional<Ticket> SchedulingTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
+boost::optional<Ticket> PriorityTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
     invariant(admCtx);
 
     auto hasAcquired = _tryAcquireTicket();
@@ -552,10 +559,10 @@ boost::optional<Ticket> SchedulingTicketHolder::_tryAcquireImpl(AdmissionContext
     return boost::none;
 }
 
-boost::optional<Ticket> SchedulingTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
-                                                                        AdmissionContext* admCtx,
-                                                                        Date_t until,
-                                                                        WaitMode waitMode) {
+boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
+                                                                      AdmissionContext* admCtx,
+                                                                      Date_t until,
+                                                                      WaitMode waitMode) {
     invariant(admCtx);
 
     auto& queue = _getQueueToUse(admCtx);
@@ -574,7 +581,7 @@ boost::optional<Ticket> SchedulingTicketHolder::_waitForTicketUntilImpl(Operatio
     }
 }
 
-void SchedulingTicketHolder::_resize(int newSize, int oldSize) noexcept {
+void PriorityTicketHolder::_resize(int newSize, int oldSize) noexcept {
     auto difference = newSize - oldSize;
 
     _ticketsAvailable.fetchAndAdd(difference);
@@ -592,7 +599,7 @@ void SchedulingTicketHolder::_resize(int newSize, int oldSize) noexcept {
     // have to wait until the current ticket holders release their tickets.
 }
 
-bool SchedulingTicketHolder::Queue::attemptToDequeue() {
+bool PriorityTicketHolder::Queue::attemptToDequeue() {
     auto threadsToBeWoken = _threadsToBeWoken.load();
     while (threadsToBeWoken < _queuedThreads) {
         auto canDequeue = _threadsToBeWoken.compareAndSwap(&threadsToBeWoken, threadsToBeWoken + 1);
@@ -604,7 +611,7 @@ bool SchedulingTicketHolder::Queue::attemptToDequeue() {
     return false;
 }
 
-void SchedulingTicketHolder::Queue::_signalThreadWoken() {
+void PriorityTicketHolder::Queue::_signalThreadWoken() {
     auto currentThreadsToBeWoken = _threadsToBeWoken.load();
     while (currentThreadsToBeWoken > 0) {
         if (_threadsToBeWoken.compareAndSwap(&currentThreadsToBeWoken,
@@ -614,10 +621,10 @@ void SchedulingTicketHolder::Queue::_signalThreadWoken() {
     }
 }
 
-bool SchedulingTicketHolder::Queue::enqueue(OperationContext* opCtx,
-                                            EnqueuerLockGuard& queueLock,
-                                            const Date_t& until,
-                                            WaitMode waitMode) {
+bool PriorityTicketHolder::Queue::enqueue(OperationContext* opCtx,
+                                          EnqueuerLockGuard& queueLock,
+                                          const Date_t& until,
+                                          WaitMode waitMode) {
     _queuedThreads++;
     // Before exiting we remove ourselves from the count of queued threads, we are still holding the
     // lock here so this is safe.
@@ -653,9 +660,6 @@ bool SchedulingTicketHolder::Queue::enqueue(OperationContext* opCtx,
     return true;
 }
 
-PriorityTicketHolder::PriorityTicketHolder(int numTickets, ServiceContext* serviceContext)
-    : SchedulingTicketHolder(numTickets, 3, serviceContext) {}
-
 void PriorityTicketHolder::_dequeueWaitingThread() {
     // There should never be anything to dequeue from 'QueueType::ImmediatePriorityNoOpQueue' since
     // 'kImmediate' operations should always bypass the need to queue.
@@ -673,14 +677,14 @@ void PriorityTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
         BSONObjBuilder bbb(b.subobjStart("lowPriority"));
         auto& lowPriorityTicketStats =
             _queues[static_cast<unsigned int>(QueueType::LowPriorityQueue)].getStats();
-        _appendPriorityStats(bbb, lowPriorityTicketStats);
+        appendCommonQueueImplStats(bbb, lowPriorityTicketStats);
         bbb.done();
     }
     {
         BSONObjBuilder bbb(b.subobjStart("normalPriority"));
         auto& normalPriorityTicketStats =
             _queues[static_cast<unsigned int>(QueueType::NormalPriorityQueue)].getStats();
-        _appendPriorityStats(bbb, normalPriorityTicketStats);
+        appendCommonQueueImplStats(bbb, normalPriorityTicketStats);
         bbb.done();
     }
     {
@@ -702,27 +706,7 @@ void PriorityTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
     }
 }
 
-void PriorityTicketHolder::_appendPriorityStats(BSONObjBuilder& b, const QueueStats& stats) const {
-    auto removed = stats.totalRemovedQueue.loadRelaxed();
-    auto added = stats.totalAddedQueue.loadRelaxed();
-
-    b.append("addedToQueue", added);
-    b.append("removedFromQueue", removed);
-    b.append("queueLength", std::max(static_cast<int>(added - removed), 0));
-
-    auto finished = stats.totalFinishedProcessing.loadRelaxed();
-    auto started = stats.totalStartedProcessing.loadRelaxed();
-    b.append("startedProcessing", started);
-    b.append("processing", std::max(static_cast<int>(started - finished), 0));
-    b.append("finishedProcessing", finished);
-    b.append("totalTimeProcessingMicros", stats.totalTimeProcessingMicros.loadRelaxed());
-    b.append("canceled", stats.totalCanceled.loadRelaxed());
-    b.append("newAdmissions", stats.totalNewAdmissions.loadRelaxed());
-    b.append("totalTimeQueuedMicros", stats.totalTimeQueuedMicros.loadRelaxed());
-}
-
-SchedulingTicketHolder::Queue& PriorityTicketHolder::_getQueueToUse(
-    const AdmissionContext* admCtx) noexcept {
+PriorityTicketHolder::Queue& PriorityTicketHolder::_getQueueToUse(const AdmissionContext* admCtx) {
     auto priority = admCtx->getPriority();
     switch (priority) {
         case AdmissionContext::Priority::kLow:

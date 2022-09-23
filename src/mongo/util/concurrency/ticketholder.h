@@ -324,7 +324,21 @@ private:
  * Waiters will get placed in a specific internal queue according to some logic.
  * Releasers will wake up a waiter from a group chosen according to some logic.
  */
-class SchedulingTicketHolder : public TicketHolderWithQueueingStats {
+class PriorityTicketHolder : public TicketHolderWithQueueingStats {
+protected:
+public:
+    explicit PriorityTicketHolder(int numTickets, ServiceContext* serviceContext);
+    ~PriorityTicketHolder() override;
+
+    int available() const override final;
+
+    int queued() const override final;
+
+    bool recordImmediateTicketStatistics() noexcept override final {
+        return true;
+    };
+
+private:
     // Using a shared_mutex is fine here because usual considerations for avoiding them do not apply
     // in this case:
     //   * Operations are short and do not block while holding the lock (i.e. they only do CPU-bound
@@ -338,10 +352,10 @@ class SchedulingTicketHolder : public TicketHolderWithQueueingStats {
     using QueueMutex = std::shared_mutex;                    // NOLINT
     using ReleaserLockGuard = std::shared_lock<QueueMutex>;  // NOLINT
     using EnqueuerLockGuard = std::unique_lock<QueueMutex>;  // NOLINT
-protected:
+
     class Queue {
     public:
-        Queue(SchedulingTicketHolder* holder) : _holder(holder){};
+        Queue(PriorityTicketHolder* holder) : _holder(holder){};
 
         Queue(Queue&& other)
             : _queuedThreads(other._queuedThreads),
@@ -378,28 +392,19 @@ protected:
         int _queuedThreads{0};
         AtomicWord<int> _threadsToBeWoken{0};
         stdx::condition_variable _cv;
-        SchedulingTicketHolder* _holder;
+        PriorityTicketHolder* _holder;
         QueueStats _stats;
     };
 
-    std::vector<Queue> _queues;
-
-public:
-    explicit SchedulingTicketHolder(int numTickets,
-                                    unsigned int numQueues,
-                                    ServiceContext* serviceContext);
-    ~SchedulingTicketHolder() override;
-
-    int available() const override final;
-
-    int queued() const override final;
-
-    bool recordImmediateTicketStatistics() noexcept override final {
-        return true;
+    enum class QueueType : unsigned int {
+        LowPriorityQueue = 0,
+        NormalPriorityQueue = 1,
+        // Exclusively used for statistics tracking. This queue should never have any processes
+        // 'queued'.
+        ImmediatePriorityNoOpQueue = 2,
+        QueueTypeSize = 3
     };
 
-private:
-    bool _tryAcquireTicket();
 
     boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override final;
 
@@ -412,7 +417,11 @@ private:
 
     void _resize(int newSize, int oldSize) noexcept override final;
 
-    QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override = 0;
+    QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override final;
+
+    void _appendImplStats(BSONObjBuilder& b) const override final;
+
+    bool _tryAcquireTicket();
 
     /**
      * Wakes up a waiting thread (if it exists) in order for it to attempt to obtain a ticket.
@@ -426,42 +435,19 @@ private:
      * - The number of items in each queue will not change during the execution
      * - No other thread will proceed to wait during the execution of the method
      */
-    virtual void _dequeueWaitingThread() = 0;
-
-    void _appendImplStats(BSONObjBuilder& b) const override = 0;
+    void _dequeueWaitingThread();
 
     /**
      * Selects the queue to use for the current thread given the provided arguments.
      */
-    virtual Queue& _getQueueToUse(const AdmissionContext* admCtx) noexcept = 0;
+    Queue& _getQueueToUse(const AdmissionContext* admCtx);
+
+    std::vector<Queue> _queues;
 
     QueueMutex _queueMutex;
     AtomicWord<int> _ticketsAvailable;
     AtomicWord<int> _enqueuedElements;
     ServiceContext* _serviceContext;
-};
-
-class PriorityTicketHolder final : public SchedulingTicketHolder {
-public:
-    explicit PriorityTicketHolder(int numTickets, ServiceContext* serviceContext);
-
-private:
-    enum class QueueType : unsigned int {
-        LowPriorityQueue = 0,
-        NormalPriorityQueue = 1,
-        // Exclusively used for statistics tracking. This queue should never have any processes
-        // 'queued'.
-        ImmediatePriorityNoOpQueue = 2,
-        QueueTypeSize = 3
-    };
-
-    void _dequeueWaitingThread() override final;
-    QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override final;
-
-    void _appendImplStats(BSONObjBuilder& b) const override final;
-    void _appendPriorityStats(BSONObjBuilder& b, const QueueStats& stats) const;
-
-    Queue& _getQueueToUse(const AdmissionContext* admCtx) noexcept override final;
 };
 
 /**
@@ -473,7 +459,7 @@ class Ticket {
     friend class ReaderWriterTicketHolder;
     friend class TicketHolderWithQueueingStats;
     friend class SemaphoreTicketHolder;
-    friend class SchedulingTicketHolder;
+    friend class PriorityTicketHolder;
 
 public:
     Ticket(Ticket&& t) : _ticketholder(t._ticketholder), _admissionContext(t._admissionContext) {
