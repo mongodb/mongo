@@ -602,7 +602,10 @@ if get_option('ssl') == 'on':
 
 
 cares_env = env.Clone()
-
 #kmsEnv.InjectThirdParty(libraries=['kms-message'])
 cares_env.SConscript('cares/SConscript', exports={'env': cares_env})
 
+
+re2_env = env.Clone()
+#kmsEnv.InjectThirdParty(libraries=['kms-message'])
+re2_env.SConscript('re2/SConscript', exports={'env': re2_env})
