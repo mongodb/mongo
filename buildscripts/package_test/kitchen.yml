@@ -139,6 +139,13 @@ platforms:
       user_data: ubuntu-user-data.sh
     transport:
       username: ubuntu
+  - name: ubuntu2204-arm64
+    driver:
+      image_id: ami-070650c005cce4203
+      instance_type: m6g.medium
+      user_data: ubuntu-user-data.sh
+    transport:
+      username: ubuntu
 
 transport:
   ssh_key: ~/.ssh/kitchen.pem
