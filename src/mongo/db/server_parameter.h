@@ -197,7 +197,7 @@ public:
      * retrieving it via this method.
      */
     virtual LogicalTime getClusterParameterTime(const boost::optional<TenantId>& tenantId) const {
-        MONGO_UNREACHABLE;
+        return LogicalTime::kUninitialized;
     }
 
     bool isTestOnly() const {
