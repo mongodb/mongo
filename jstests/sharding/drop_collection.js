@@ -5,6 +5,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
@@ -337,6 +338,55 @@ jsTest.log("Test that dropping a sharded collection, the cached metadata on shar
     for (let configDb of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
         assert.eq(configDb['cache.collections'].countDocuments({_id: coll.getFullName()}), 0);
         assert(!configDb[chunksCollName].exists());
+    }
+}
+
+jsTest.log("Test that dropping a sharded collection, the range deletion documents are deleted");
+{
+    const db = getNewDb();
+
+    // Requires all primary shard nodes to be running the latest version
+    let latestVersion = true;
+    st.rs0.nodes.forEach(function(node) {
+        const fcvDoc = node.getDB(db.getName())
+                           .adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '6.2') < 0) {
+            latestVersion = false;
+        }
+    });
+
+    if (latestVersion) {
+        jsTest.log("All primary shard nodes are running the latest version");
+
+        // Create a sharded collection
+        const coll = db['shardedColl'];
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+        const collUUID = st.config.collections.findOne({_id: coll.getFullName()}).uuid;
+
+        // Pause before first range deletion task
+        let suspendRangeDeletion = configureFailPoint(st.shard0, "suspendRangeDeletion");
+
+        // Distribute the chunks among the shards
+        assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: -10}}));
+        assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 10}}));
+        assert.commandWorked(st.s.adminCommand(
+            {moveChunk: coll.getFullName(), find: {_id: -10}, to: st.shard1.shardName}));
+        assert.commandWorked(st.s.adminCommand(
+            {moveChunk: coll.getFullName(), find: {_id: 10}, to: st.shard1.shardName}));
+
+        assert.eq(2, st.shard0.getDB("config").rangeDeletions.count({collectionUuid: collUUID}));
+
+        // Drop the collection
+        assert.commandWorked(db.runCommand({drop: coll.getName()}));
+
+        // Verify that the range deletion documents are deleted
+        assert.eq(0, st.shard0.getDB("config").rangeDeletions.count({collectionUuid: collUUID}));
+
+        // Allow everything to finish
+        suspendRangeDeletion.off();
     }
 }
 

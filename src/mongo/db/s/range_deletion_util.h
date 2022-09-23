@@ -116,6 +116,12 @@ void removePersistentRangeDeletionTask(OperationContext* opCtx,
                                        const ChunkRange& range);
 
 /**
+ * Removes all range deletion task documents from `config.rangeDeletions` for the specified
+ * collection
+ */
+void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUID& collectionUuid);
+
+/**
  * Wrapper to run a safer step up/step down killable task within an operation context
  */
 template <typename Callable>

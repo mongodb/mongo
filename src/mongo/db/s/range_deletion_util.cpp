@@ -610,4 +610,10 @@ void removePersistentRangeDeletionTask(OperationContext* opCtx,
     store.remove(opCtx, overlappingRangeQuery);
 }
 
+void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUID& collectionUuid) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    auto query = BSON(RangeDeletionTask::kCollectionUuidFieldName << collectionUuid);
+    store.remove(opCtx, query);
+}
+
 }  // namespace mongo

@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
@@ -46,10 +47,23 @@ namespace mongo {
 
 DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
+
+    boost::optional<UUID> collectionUUID;
     {
-        // Clear CollectionShardingRuntime entry
         Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+
+        // Get collectionUUID
+        collectionUUID = [&]() -> boost::optional<UUID> {
+            auto localCatalog = CollectionCatalog::get(opCtx);
+            const auto coll = localCatalog->lookupCollectionByNamespace(opCtx, nss);
+            if (coll) {
+                return coll->uuid();
+            }
+            return boost::none;
+        }();
+
+        // Clear CollectionShardingRuntime entry
         auto* csr = CollectionShardingRuntime::get(opCtx, nss);
         csr->clearFilteringMetadataForDroppedCollection(opCtx);
     }
@@ -57,6 +71,27 @@ DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opC
     DropReply result;
     uassertStatusOK(dropCollection(
         opCtx, nss, &result, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+
+    // Remove all range deletion task documents present on disk for the dropped collection
+    if (collectionUUID) {
+        // The multi-document remove command cannot be run in  transactions, so run it using
+        // an alternative client.
+        auto client = opCtx->getServiceContext()->makeClient("removeRangeDeletions-" +
+                                                             collectionUUID->toString());
+        auto alternativeOpCtx = client->makeOperationContext();
+        AlternativeClientRegion acr{client};
+
+        try {
+            removePersistentRangeDeletionTasksByUUID(alternativeOpCtx.get(), *collectionUUID);
+        } catch (const DBException& e) {
+            LOGV2_ERROR(6501601,
+                        "Failed to remove persistent range deletion tasks on drop collection",
+                        logAttrs(nss),
+                        "collectionUUID"_attr = (*collectionUUID).toString(),
+                        "error"_attr = e);
+            throw;
+        }
+    }
 
     // Force the refresh of the catalog cache to purge outdated information
     const auto catalog = Grid::get(opCtx)->catalogCache();
