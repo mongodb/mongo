@@ -41,5 +41,5 @@ $SRC_DIR/configure \
 CC=$TOOLCHAIN_ROOT/bin/gcc
 CXX=$TOOLCHAIN_ROOT/bin/g++
 
-make CC=$CC CXX=$CXX -j16 install
+make CC=$CC CXX=$CXX install
 popd

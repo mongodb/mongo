@@ -21,7 +21,10 @@ variantSuffix = '-1.4.0'
 
 thirdPartyEnvironmentModifications = {
     'abseil-cpp': {'CPPPATH': ['#/src/third_party/abseil-cpp-master/abseil-cpp'], },
+    'cares': {'CPPPATH': ['#src/third_party/cares/dist/include', '#src/third_party/cares/platform/${TARGET_OS}_${TARGET_ARCH}/install/include'], },
     'fmt': {'CPPPATH': ['#src/third_party/fmt/dist/include'], },
+    'protobuf': {'CPPPATH': ['#src/third_party/protobuf/dist/src'], },
+    're2': {'CPPPATH': ['#src/third_party/re2/dist'], },
     's2': {'CPPPATH': ['#src/third_party/s2'], },
     'safeint': {
         'CPPPATH': ['#src/third_party/SafeInt'],
@@ -602,20 +605,13 @@ if get_option('ssl') == 'on':
 
     kmsEnv.ShimLibrary(name="kms_message", )
 
-
-cares_env = env.Clone()
-#kmsEnv.InjectThirdParty(libraries=['kms-message'])
-cares_env.SConscript('cares/SConscript', exports={'env': cares_env})
-
-
-re2_env = env.Clone()
-#kmsEnv.InjectThirdParty(libraries=['kms-message'])
-re2_env.SConscript('re2/SConscript', exports={'env': re2_env})
-
-protobuf_env = env.Clone()
-#kmsEnv.InjectThirdParty(libraries=['kms-message'])
-protobuf_env.SConscript('protobuf/SConscript', exports={'env': protobuf_env})
-
-grpc_env = env.Clone()
-#kmsEnv.InjectThirdParty(libraries=['kms-message'])
-grpc_env.SConscript('grpc/SConscript', exports={'env': grpc_env})
+env.SConscript(
+    dirs=[
+        'cares',
+        're2',
+        'protobuf',
+        'grpc',
+    ],
+    duplicate=False,
+    exports={'env': env}
+)

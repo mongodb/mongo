@@ -886,6 +886,7 @@ def variable_tools_converter(val):
         "distsrc",
         "gziptool",
         "idl_tool",
+        "protobuf_compiler",
         "jsheader",
         "mongo_test_execution",
         "mongo_test_list",
@@ -1326,6 +1327,12 @@ env_vars.Add(
 env_vars.Add(
     'STRIP',
     help='Path to the strip utility (non-darwin platforms probably use OBJCOPY for this)',
+)
+
+env_vars.Add(
+    'PROTOC',
+    default="$DESTDIR/bin/protoc",
+    help='Path to protobuf compiler.',
 )
 
 env_vars.Add(
@@ -2008,7 +2015,7 @@ env['BUILDERS']['SharedArchive'] = SCons.Builder.Builder(
 # Teach builders how to build idl files
 for builder in ['SharedObject', 'StaticObject']:
     env['BUILDERS'][builder].add_src_builder("Idlc")
-
+    env['BUILDERS'][builder].add_src_builder("Protoc")
 if link_model.startswith("dynamic"):
 
     if link_model == "dynamic" and visibility_annotations_enabled:
