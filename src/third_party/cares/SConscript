@@ -10,6 +10,13 @@ cares_env.Append(CPPDEFINES=[
 ])
 
 cares_root = cares_env.Dir(".").srcnode()
+if cares_env.ToolchainIs('msvc'):
+    cares_env.Append(
+        CCFLAGS=[
+            '/wd4996', # The POSIX name for this item is deprecated
+        ],
+    )
+
 cares_platform = cares_root.Dir("platform/${TARGET_OS}_${TARGET_ARCH}")
 cares_env.Append(
     CPPPATH=[

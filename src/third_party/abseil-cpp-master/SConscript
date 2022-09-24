@@ -4,6 +4,15 @@ env = env.Clone()
 
 env.InjectThirdParty(libraries=['abseil-cpp'])
 
+if env.ToolchainIs('msvc'):
+    env.Append(
+        CPPDEFINES=[
+            'NOMINMAX',
+        ],
+        CCFLAGS=[
+        ],
+    )
+    
 env.Library(
     target='absl_strerror',
     source=[

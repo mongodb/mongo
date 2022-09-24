@@ -4,6 +4,8 @@ import os
 
 grpc_env = env.Clone()
 
+grpc_env.InjectThirdParty(libraries=['abseil-cpp', 're2', 'cares', 'protobuf', 'zlib'])
+
 if grpc_env.ToolchainIs('gcc', 'clang'):
     grpc_env.Append(
         CCFLAGS=[
@@ -13,6 +15,16 @@ if grpc_env.ToolchainIs('gcc', 'clang'):
 
 if grpc_env.ToolchainIs('msvc'):
     grpc_env.Append(
+        CCFLAGS=[
+            '/wd4334', # '<<': result of 32-bit shift implicitly converted to 64 bits (was 64-bit shift intended?)
+            '/wd4116', # unnamed type definition in parentheses
+            '/wd4146', # unary minus operator applied to unsigned type, result still unsigned
+            '/wd4715', # not all control paths return a value
+            '/wd4200', # nonstandard extension used: zero-sized array in struct/union
+            '/wd4312', # 'reinterpret_cast': conversion from 'unsigned int' to 'void *' of greater size
+            '/wd4090', # 'function': different 'const' qualifiers
+
+        ],
         CPPDEFINES=[
             '_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING',
         ],
@@ -65,7 +77,7 @@ address_sorting_env.Library(
     target='address_sorting',
     source=address_sorting_source,
 )
-grpc_env.InjectThirdParty(libraries=['abseil-cpp', 're2', 'cares', 'protobuf'])
+
 
 grpc_env.Append(CPPPATH=[
     grpc_root.Dir('dist'),

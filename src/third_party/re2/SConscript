@@ -7,6 +7,16 @@ re2_env.Append(CPPPATH=[re2_root.Dir("dist"),])
 
 if re2_env.ToolchainIs('gcc', 'clang'):
     re2_env.Append(CCFLAGS=['-pthread'])
+if re2_env.ToolchainIs('msvc'):
+    re2_env.Append(
+        CPPDEFINES=[
+            'NOMINMAX',
+        ],
+        CCFLAGS=[
+            '/wd4996', # The POSIX name for this item is deprecated
+        ],
+    )
+
 
 re2_env.Library(
     target="re2",
