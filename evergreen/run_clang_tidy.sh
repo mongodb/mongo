@@ -5,5 +5,10 @@ set -o pipefail
 set -o verbose
 
 cd src
+bash buildscripts/clang_tidy.sh ${clang_tidy_toolchain} | tee clang-tidy.log
+exit_code=$?
+
 activate_venv
-$python buildscripts/clang_tidy.py --clang-tidy-cfg ${clang_tidy_file} --clang-tidy-toolchain ${clang_tidy_toolchain}
+$python ./buildscripts/simple_report.py --test-name clang_tidy --log-file clang-tidy.log --exit-code $exit_code --dedup-lines
+echo $?
+exit $exit_code
