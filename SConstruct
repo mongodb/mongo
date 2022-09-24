@@ -1331,7 +1331,7 @@ env_vars.Add(
 
 env_vars.Add(
     'PROTOC',
-    default="$DESTDIR/bin/protoc",
+    default="$DESTDIR/bin/protobuf_compiler$PROGSUFFIX",
     help='Path to protobuf compiler.',
 )
 

@@ -2,19 +2,39 @@ Import('env')
 
 protobuf_env = env.Clone()
 
+protobuf_env.InjectThirdParty(libraries=['zlib'])
+
 protobuf_env.Append(
     CPPDEFINES=[
         'HAVE_CONFIG_H',
-        ('HAVE_PTHREAD', '1'),
         ('HAVE_ZLIB', '1'),
         ('PIC', '1'),
     ],
-    CCFLAGS=[
-        '-Wno-sign-compare',
-        '-Wno-overloaded-virtual',
-        '-Wno-stringop-overflow',
-    ],
 )
+
+if protobuf_env.ToolchainIs('gcc', 'clang'):
+    protobuf_env.Append(
+        CPPDEFINES=[
+            ('HAVE_PTHREAD', '1'),
+        ],
+        CCFLAGS=[
+            '-Wno-sign-compare',
+            '-Wno-overloaded-virtual',
+            '-Wno-stringop-overflow',
+        ],
+    )
+
+if protobuf_env.ToolchainIs('msvc'):
+    protobuf_env.Append(
+        CCFLAGS=[
+            '/wd4018', # signed/unsigned mismatch
+            '/wd4065', # switch statement contains 'default' but no 'case' labels
+            '/wd4146', # unary minus operator applied to unsigned type, result still unsigned
+        ],
+        CPPDEFINES=[
+            '_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING',
+        ],
+    )
 
 protobuf_root = protobuf_env.Dir(".").srcnode()
 protobuf_platform = protobuf_root.Dir("platform/${TARGET_OS}_${TARGET_ARCH}")
@@ -206,7 +226,7 @@ protobuf_env.Library(
 )
 
 protobuf_env.Program(
-    target='protoc',
+    target='protobuf_compiler',
     source=['dist/src/google/protobuf/compiler/main.cc'],
     LIBDEPS=[
         'protobuf',

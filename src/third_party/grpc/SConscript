@@ -4,6 +4,20 @@ import os
 
 grpc_env = env.Clone()
 
+if grpc_env.ToolchainIs('gcc', 'clang'):
+    grpc_env.Append(
+        CCFLAGS=[
+            '-Wno-sign-compare',
+        ],
+    )
+
+if grpc_env.ToolchainIs('msvc'):
+    grpc_env.Append(
+        CPPDEFINES=[
+            '_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING',
+        ],
+    )
+
 grpc_root = grpc_env.Dir(".").srcnode()
 
 upb_env = grpc_env.Clone()
@@ -12,9 +26,6 @@ upb_env.Append(
         grpc_root.Dir('dist/third_party/upb'),
         grpc_root.Dir('dist/src/core/ext/upb-generated'),
         grpc_root.Dir('dist/src/core/ext/upbdefs-generated'),
-    ],
-    CCFLAGS=[
-        '-Wno-sign-compare',
     ],
 )
 

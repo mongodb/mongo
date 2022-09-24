@@ -77,7 +77,8 @@ if env.TargetOSIs('windows'):
 
     # warning C4141: 'inline': used more than once
     # warning C4305: 'argument': truncation from 'ssize_t' to 'double'
-    env.Append(CXXFLAGS=["/wd4141", "/wd4305"])
+    # warning C4003: not enough arguments for function-like macro invocation
+    env.Append(CXXFLAGS=["/wd4141", "/wd4305", '/wd4003'])
 
 else:
     files += [

@@ -42,7 +42,8 @@ thirdPartyEnvironmentModifications = {
             "/include",
         ],
         'FORCEINCLUDES': ['js-config.h', ],
-    }
+    },
+    'zlib': {'CPPPATH': ['#/src/third_party/zlib'], },
 }
 
 
