@@ -18,8 +18,6 @@ cares_env.Append(
     ],
 )
 
-source_files = [
-
 cares_env.Library(
     target='cares',
     source=[
