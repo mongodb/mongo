@@ -17,6 +17,13 @@ if cares_env.ToolchainIs('msvc'):
         ],
     )
 
+if cares_env.TargetOSIs('darwin'):
+    cares_env.Append(
+        CPPDEFINES=[
+            '_DARWIN_C_SOURCE',
+        ],
+    )
+
 cares_platform = cares_root.Dir("platform/${TARGET_OS}_${TARGET_ARCH}")
 cares_env.Append(
     CPPPATH=[
