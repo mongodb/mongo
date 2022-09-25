@@ -52,9 +52,13 @@
 /* Generic option parsing structure shared by all test cases. */
 typedef struct {
     char *home;
-    const char *argv0;    /* Exec name */
-    const char *progname; /* Truncated program name */
-    char *build_dir;      /* Build directory path */
+    const char *argv0; /* Exec name */
+    char **nargv;      /* New argument vector */
+    int nargc;         /* New argument count */
+
+    const char *progname;        /* Truncated program name */
+    char *build_dir;             /* Build directory path */
+    char *tiered_storage_source; /* Tiered storage source */
 
     enum {
         TABLE_COL = 1, /* Fixed-length column store */
@@ -67,7 +71,7 @@ typedef struct {
 
     bool do_data_ops;          /* Have schema ops use data */
     bool preserve;             /* Don't remove files on exit */
-    bool tiered;               /* Configure tiered storage */
+    bool tiered_storage;       /* Configure tiered storage */
     bool verbose;              /* Run in verbose mode */
     uint64_t nrecords;         /* Number of records */
     uint64_t nops;             /* Number of operations */

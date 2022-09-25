@@ -26,8 +26,78 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 #include "test_util.h"
+#define DIR_STORE "dir_store"
 
 extern char *__wt_optarg; /* argument associated with option */
+
+/*
+ * parse_tiered_opts --
+ *     Parse command line options for the tiered storage configurations.
+ */
+static inline void
+parse_tiered_opts(int argc, char *const *argv, TEST_OPTS *opts)
+{
+    int index, i;
+    int number_of_tiered_options;
+
+    number_of_tiered_options = 0;
+    index = 0;
+    opts->tiered_storage = false;
+    opts->tiered_storage_source = NULL;
+
+    for (i = 1; i < argc; i++) {
+        /* Tiered storage command line options starts with -P. */
+        if (strstr(argv[i], "-P")) {
+            /* Many more options to come here. */
+            if (argv[i][2] == 'o') {
+                if (argv[i + 1] == NULL)
+                    testutil_die(
+                      EINVAL, "%s option requires an argument %s", opts->progname, argv[i]);
+                number_of_tiered_options += 2;
+            } else if (argv[i][2] == 'T') {
+                /* This parsing is different because -PT does not accept any arguments. */
+                ++number_of_tiered_options;
+                opts->tiered_storage = true;
+            }
+        }
+    }
+
+    /* Return from here if tiered arguments are not passed. */
+    if (!opts->tiered_storage) {
+        if (number_of_tiered_options == 0)
+            return;
+        else
+            testutil_die(
+              EINVAL, "Error - Tiered storage command line arguments are passed without -PT.");
+    }
+
+    opts->nargc = argc - number_of_tiered_options;
+
+    /* Allocate the memory for the new argv without tiered options. */
+    opts->nargv = dmalloc(((size_t)opts->nargc + 1) * sizeof(char *));
+
+    /* Copy other command line arguments except tiered. */
+    for (i = 0; i < argc; ++i) {
+        if (strcmp(argv[i], "-Po") == 0) {
+            opts->tiered_storage_source = dstrdup(argv[i + 1]);
+            /* Move the index because this option has an argument. */
+            i++;
+        } else if (strcmp(argv[i], "-PT") == 0)
+            continue;
+        else
+            opts->nargv[index++] = dstrdup(argv[i]);
+    }
+
+    testutil_assert(index == opts->nargc);
+    /*
+     * Allocating an extra empty space at the end of the new argv just to replicate the system argv
+     * implementation.
+     */
+    opts->nargv[index++] = dstrdup("");
+
+    if (opts->tiered_storage_source == NULL)
+        opts->tiered_storage_source = dstrdup(DIR_STORE);
+}
 
 /*
  * testutil_parse_opts --
@@ -39,6 +109,8 @@ testutil_parse_opts(int argc, char *const *argv, TEST_OPTS *opts)
     size_t len;
     int ch;
 
+    opts->nargc = 0;
+    opts->nargv = NULL;
     opts->do_data_ops = false;
     opts->preserve = false;
     opts->running = true;
@@ -49,13 +121,18 @@ testutil_parse_opts(int argc, char *const *argv, TEST_OPTS *opts)
 
     testutil_print_command_line(argc, argv);
 
-    while ((ch = __wt_getopt(opts->progname, argc, argv, "A:Bb:dh:n:o:pR:T:t:vW:")) != EOF)
+    parse_tiered_opts(argc, argv, opts);
+
+    if (!opts->tiered_storage) {
+        opts->nargv = (char **)argv;
+        opts->nargc = argc;
+    }
+
+    while (
+      (ch = __wt_getopt(opts->progname, opts->nargc, opts->nargv, "A:b:dh:n:o:pR:T:t:vW:")) != EOF)
         switch (ch) {
         case 'A': /* Number of append threads */
             opts->n_append_threads = (uint64_t)atoll(__wt_optarg);
-            break;
-        case 'B': /* Use tiered storage objects and buckets. */
-            opts->tiered = true;
             break;
         case 'b': /* Build directory */
             opts->build_dir = dstrdup(__wt_optarg);
