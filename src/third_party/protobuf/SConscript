@@ -20,6 +20,14 @@ if protobuf_env.ToolchainIs('gcc', 'clang'):
         CCFLAGS=[
             '-Wno-sign-compare',
             '-Wno-overloaded-virtual',
+        ],
+    )
+
+if protobuf_env.ToolchainIs('gcc'):
+    protobuf_env.Append(
+        CPPDEFINES=[
+        ],
+        CCFLAGS=[
             '-Wno-stringop-overflow',
         ],
     )
