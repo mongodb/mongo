@@ -47,8 +47,8 @@ class test_flcs05(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.get_value(), v)
 
     # Evict the page to force reconciliation.
-    def evict(self, uri, key, check_value):
-        evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
+    def evict(self, ds, key, check_value):
+        evict_cursor = ds.open_cursor(ds.uri, None, "debug=(release_evict)")
         self.session.begin_transaction()
         v = evict_cursor[key]
         self.assertEqual(v, check_value)
@@ -56,6 +56,7 @@ class test_flcs05(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
         evict_cursor.close()
 
+    @wttest.skip_for_hook("tiered", "fails at begin_transaction")  # FIXME-WT-9809
     def test_flcs(self):
         uri = "table:test_flcs05"
         nrows = 44
@@ -67,7 +68,7 @@ class test_flcs05(wttest.WiredTigerTestCase):
         updatekey2 = 37
         appendkey1 = nrows + 10
 
-        cursor = self.session.open_cursor(uri, None, 'overwrite=false')
+        cursor = ds.open_cursor(uri, None, 'overwrite=false')
 
         # Write a few records.
         #self.session.begin_transaction()
@@ -94,7 +95,7 @@ class test_flcs05(wttest.WiredTigerTestCase):
         self.tryread(cursor, updatekey2, 0)
 
         # Deleted value that has been reconciled.
-        self.evict(ds.uri, updatekey2, 0)
+        self.evict(ds, updatekey2, 0)
         self.tryread(cursor, updatekey2, 0)
 
         # Deleted value in the append list.

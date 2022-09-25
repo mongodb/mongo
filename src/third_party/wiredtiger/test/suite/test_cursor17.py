@@ -60,11 +60,12 @@ class test_cursor17(wttest.WiredTigerTestCase):
             self.ds = self.dataset(self, self.type + self.tablename, rownum, key_format=self.keyformat)
         self.ds.populate()
 
+    @wttest.skip_for_hook("tiered", "fails assertion 99")  # FIXME-WT-9809
     def test_globally_deleted_key(self):
         self.populate(100)
 
         # Delete the largest key.
-        cursor = self.session.open_cursor(self.type + self.tablename, None)
+        cursor = self.ds.open_cursor(self.type + self.tablename, None)
         self.session.begin_transaction()
         cursor.set_key(100)
         self.assertEqual(cursor.remove(), 0)
@@ -95,7 +96,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
         # Use evict cursor to evict the key from memory.
-        evict_cursor = self.session.open_cursor(self.type + self.tablename, None, "debug=(release_evict)")
+        evict_cursor = self.ds.open_cursor(self.type + self.tablename, None, "debug=(release_evict)")
         evict_cursor.set_key(100)
         if self.valueformat != '8t':
             self.assertEquals(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
@@ -223,6 +224,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         self.assertEquals(cursor.largest_key(), wiredtiger.WT_NOTFOUND)
         self.session.rollback_transaction()
 
+    @wttest.prevent(["timestamp"])  # this test uses timestamps, hooks should not
     def test_fast_truncate(self):
         self.populate(100)
 
@@ -248,6 +250,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.get_key(), 100)
         self.session.rollback_transaction()
 
+    @wttest.prevent(["timestamp"])  # this test uses timestamps, hooks should not
     def test_slow_truncate(self):
         self.populate(100)
 

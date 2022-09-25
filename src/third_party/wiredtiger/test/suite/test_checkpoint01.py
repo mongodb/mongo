@@ -295,7 +295,7 @@ class test_checkpoint_last(wttest.WiredTigerTestCase):
 
         for value in ('FIRST', 'SECOND', 'THIRD', 'FOURTH', 'FIFTH'):
             # Update the object.
-            cursor = self.session.open_cursor(uri, None, "overwrite")
+            cursor = ds.open_cursor(uri, None, "overwrite")
             cursor[ds.key(10)] = value
             cursor.close()
 
@@ -303,7 +303,7 @@ class test_checkpoint_last(wttest.WiredTigerTestCase):
             self.session.checkpoint()
 
             # Verify the "last" checkpoint sees the correct value.
-            cursor = self.session.open_cursor(
+            cursor = ds.open_cursor(
                 uri, None, "checkpoint=WiredTigerCheckpoint")
             self.assertEquals(cursor[ds.key(10)], value)
             # Don't close the checkpoint cursor, we want it to remain open until

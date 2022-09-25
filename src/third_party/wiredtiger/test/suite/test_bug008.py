@@ -54,7 +54,7 @@ class test_bug008(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, self.uri, 0, key_format=self.key_format,
                            value_format=self.value_format)
         ds.create()
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
 
         # Search for a record past the end of the table, which should fail.
         cursor.set_key(ds.key(100))
@@ -75,7 +75,7 @@ class test_bug008(wttest.WiredTigerTestCase):
         self.reopen_conn()
 
         # Open a cursor.
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
 
         # Search for a record at the end of the table, which should succeed.
         cursor.set_key(ds.key(100))
@@ -114,7 +114,7 @@ class test_bug008(wttest.WiredTigerTestCase):
 
         # Set up deleted records before and after a set of duplicate records,
         # and make sure search/search-near returns the correct record.
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         for i in range(20, 100):
             cursor[ds.key(i)] = '=== IDENTICAL VALUE ==='
         for i in range(15, 25):
@@ -130,7 +130,7 @@ class test_bug008(wttest.WiredTigerTestCase):
         self.reopen_conn()
 
         # Open a cursor.
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
 
         # Search-near for a record in the deleted set before the duplicate set,
         # which should succeed, returning the first record in the duplicate set.
@@ -154,7 +154,7 @@ class test_bug008(wttest.WiredTigerTestCase):
 
         # Delete a range of records.
         for i in range(5, 10):
-            cursor = self.session.open_cursor(self.uri, None)
+            cursor = ds.open_cursor(self.uri, None)
             cursor.set_key(ds.key(i))
             self.assertEqual(cursor.remove(), 0)
 
@@ -166,7 +166,7 @@ class test_bug008(wttest.WiredTigerTestCase):
         # range), as well as some new records after the end. Put the updates in
         # a separate transaction so they're invisible to another cursor.
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         for i in range(5, 10):
             cursor[ds.key(i)] = ds.value(i + 1000)
         for i in range(30, 40):
@@ -176,7 +176,7 @@ class test_bug008(wttest.WiredTigerTestCase):
 
         # Open a separate session and cursor.
         s = self.conn.open_session()
-        cursor = s.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None, session=s)
 
         # Search for an existing record in the deleted range, should not find
         # it.
@@ -265,20 +265,20 @@ class test_bug008(wttest.WiredTigerTestCase):
         self.reopen_conn()
 
         # Add some additional visible records.
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         for i in range(100, 120):
             cursor[ds.key(i)] = ds.value(i)
         cursor.close()
 
         # Begin a transaction, and add some additional records.
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         for i in range(120, 140):
             cursor[ds.key(i)] = ds.value(i)
 
         # Open a separate session and cursor.
         s = self.conn.open_session()
-        cursor = s.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None, session=s)
 
         # Search for an invisible record.
         cursor.set_key(ds.key(130))

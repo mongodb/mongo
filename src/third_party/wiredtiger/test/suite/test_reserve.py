@@ -69,7 +69,7 @@ class test_reserve(wttest.WiredTigerTestCase):
         ds = self.ds(self, uri, 500, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
         s = self.conn.open_session()
-        c = s.open_cursor(uri, None)
+        c = ds.open_cursor(uri, None, session=s)
 
         # Repeatedly update a record.
         for i in range(1, 5):
@@ -121,7 +121,7 @@ class test_reserve(wttest.WiredTigerTestCase):
         # transaction (which should fail), repeatedly update a record and
         # commit.
         s2 = self.conn.open_session()
-        c2 = s2.open_cursor(uri, None)
+        c2 = ds.open_cursor(uri, None, session=s2)
         for i in range(1, 2):
             s.begin_transaction()
             c.set_key(ds.key(100))
@@ -146,7 +146,7 @@ class test_reserve(wttest.WiredTigerTestCase):
         ds = self.ds(self, uri, 10, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
         s = self.conn.open_session()
-        c = s.open_cursor(uri, None)
+        c = ds.open_cursor(uri, None, session=s)
         s.begin_transaction()
         msg = "/requires key be set/"
         self.assertRaisesWithMessage(
@@ -160,7 +160,7 @@ class test_reserve(wttest.WiredTigerTestCase):
         ds = self.ds(self, uri, 10, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
         s = self.conn.open_session()
-        c = s.open_cursor(uri, None)
+        c = ds.open_cursor(uri, None, session=s)
         c.set_key(ds.key(5))
         msg = "/only permitted in a running transaction/"
         self.assertRaisesWithMessage(
@@ -174,7 +174,7 @@ class test_reserve(wttest.WiredTigerTestCase):
         ds = self.ds(self, uri, 10, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
         s = self.conn.open_session()
-        c = s.open_cursor(uri, None)
+        c = ds.open_cursor(uri, None, session=s)
         s.begin_transaction()
         c.set_key(ds.key(5))
         self.assertEquals(c.reserve(), 0)

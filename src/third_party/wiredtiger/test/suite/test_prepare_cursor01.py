@@ -63,6 +63,8 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
     #   between cursor : with timestamp between prepare and commit timestamps.
     #   after cursor   : with timestamp after commit timestamp.
     # Cursor with out read timestamp behaviour should be same after cursor behavior.
+    #
+    @wttest.prevent(["timestamp"])  # prevent the use of hooks that manage timestamps
     def test_cursor_navigate_prepare_transaction(self):
 
         # Build an object.

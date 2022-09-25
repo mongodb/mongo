@@ -25,6 +25,7 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+import wttest
 from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 from wiredtiger import stat
@@ -53,6 +54,7 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
         config = 'cache_size=50MB,statistics=(all)'
         return config
 
+    @wttest.prevent(["timestamp"])  # prevent the use of hooks that manage timestamps
     def test_rollback_to_stable(self):
         nrows = 1000
 
@@ -108,6 +110,7 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
         restored_tombstones = stat_cursor[stat.conn.txn_rts_hs_restore_tombstones][2]
         self.assertEqual(restored_tombstones, nrows)
 
+    @wttest.prevent(["timestamp"])  # prevent the use of hooks that manage timestamps
     def test_rollback_to_stable_with_aborted_updates(self):
         nrows = 1000
 
@@ -183,6 +186,7 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
         restored_tombstones = stat_cursor[stat.conn.txn_rts_hs_restore_tombstones][2]
         self.assertEqual(restored_tombstones, nrows)
 
+    @wttest.prevent(["timestamp"])  # prevent the use of hooks that manage timestamps
     def test_rollback_to_stable_with_history_tombstone(self):
         nrows = 1000
 
@@ -252,6 +256,7 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
         restored_tombstones = stat_cursor[stat.conn.txn_rts_hs_restore_tombstones][2]
         self.assertEqual(restored_tombstones, nrows)
 
+    @wttest.prevent(["timestamp"])  # prevent the use of hooks that manage timestamps
     def test_rollback_to_stable_with_stable_remove(self):
         nrows = 1000
         # Create a table.

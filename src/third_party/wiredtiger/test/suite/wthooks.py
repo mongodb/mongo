@@ -246,6 +246,14 @@ class WiredTigerHookManager(object):
     def get_platform_api(self):
         return self.platform_api
 
+    # Returns a list of hook names that use something on the list
+    def hooks_using(self, use_list):
+        ret = []
+        for hook in self.hooks:
+            if hook.uses(use_list):
+                ret.append(hook.name)
+        return ret
+
 class HookCreatorProxy(object):
     def __init__(self, hookmgr, clazz):
         self.hookmgr = hookmgr
@@ -284,7 +292,22 @@ class WiredTigerHookCreator(ABC):
         """Set up all hooks using add_*_hook methods."""
         return
 
+    # default version of uses, can be overridden.  If the hook uses or provides
+    # a capability on the list, it should return True.
+    def uses(self, use_list):
+        return False
+
 class WiredTigerHookPlatformAPI(ABC):
+    @abstractmethod
+    def setUp(self):
+        """Called at the beginning of a test case"""
+        pass
+
+    @abstractmethod
+    def tearDown(self):
+        """Called at the termination of a test case"""
+        pass
+
     @abstractmethod
     def tableExists(self, name):
         """Return boolean if local files exist for the table with the given base name"""
@@ -295,7 +318,18 @@ class WiredTigerHookPlatformAPI(ABC):
         """The first local backing file name created for this URI."""
         pass
 
+    @abstractmethod
+    def getTimestamp(self):
+        """The timestamp generator for this test case."""
+        pass
+
 class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
     def tableExists(self, name):
         tablename = name + ".wt"
         return os.path.exists(tablename)
@@ -307,3 +341,7 @@ class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
             return uri[5:]
         else:
             raise Exception('bad uri')
+
+    # By default, there is no automatic timestamping by test infrastructure classes.
+    def getTimestamp(self):
+        return None

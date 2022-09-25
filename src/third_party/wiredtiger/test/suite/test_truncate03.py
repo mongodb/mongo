@@ -73,11 +73,11 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
 
         # Truncate a big range of rows; the leaf pages aren't in memory, so
         # leaf page references will be deleted without being read.
-        start = self.session.open_cursor(self.uri, None)
+        start = ds.open_cursor(self.uri, None)
         start.set_key(ds.key(10))
-        end = self.session.open_cursor(self.uri, None)
+        end = ds.open_cursor(self.uri, None)
         end.set_key(ds.key(self.nentries - 10))
-        self.session.truncate(None, start, end, None)
+        ds.truncate(None, start, end, None)
         self.assertEqual(start.close(), 0)
         self.assertEqual(end.close(), 0)
 
@@ -92,7 +92,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
         # mark pages with address-deleted cells dirty), then walk the tree so
         # we get a good look at all the internal pages and the address-deleted
         # cells.
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         cursor.set_key(ds.key(5))
         cursor.set_value(changed_value)
         self.assertEqual(cursor.update(), 0)
@@ -129,7 +129,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
         # creation of empty pages (once the underlying leaf page is freed, we
         # have to magic up a page if we need it).  Confirm we can read/write
         # the value as well as write the page and get it back.
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         for i in range(3000, 7000, 137):
             k = ds.key(i)
             if self.value_format == '8t':
@@ -152,7 +152,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
         self.reopen_conn()
         self.session.verify(self.uri)
 
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         for i in range(3000, 7000, 137):
             k = ds.key(i)
             if self.value_format == '8t':

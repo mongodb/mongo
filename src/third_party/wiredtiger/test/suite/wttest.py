@@ -337,6 +337,10 @@ class WiredTigerTestCase(unittest.TestCase):
     def initialFileName(self, name):
         return self.platform_api.initialFileName(name)
 
+    # Return the WiredTigerTimestamp for this testcase, or None if there is none.
+    def getTimestamp(self):
+        return self.platform_api.getTimestamp()
+
     def __str__(self):
         # when running with scenarios, if the number_scenarios() method
         # is used, then each scenario is given a number, which can
@@ -570,6 +574,8 @@ class WiredTigerTestCase(unittest.TestCase):
         # tearDown needs connections list, set it here in case the open fails.
         self._connections = []
         self._failed = None   # set to True/False during teardown.
+
+        self.platform_api.setUp()
         self.origcwd = os.getcwd()
         shutil.rmtree(self.testdir, ignore_errors=True)
         if os.path.exists(self.testdir):
@@ -634,6 +640,8 @@ class WiredTigerTestCase(unittest.TestCase):
 
         self._failed = error or failure or exc_failure
         passed = not self._failed
+
+        self.platform_api.tearDown()
 
         # Download the files from the S3 bucket for tiered tests if the test fails or preserve is
         # turned on.
@@ -1024,6 +1032,33 @@ def longtest(description):
         return func
     if not WiredTigerTestCase._longtest:
         return unittest.skip(description + ' (enable with --long)')
+    else:
+        return runit_decorator
+
+def prevent(what):
+    """
+    Used as a function decorator, for example, @wttest.prevent("timestamp").
+    The decorator indicates that this test function uses some facility (in the
+    example, it uses its own timestamps), and prevents hooks that try to manage
+    timestamps from running the test.
+    """
+    def runit_decorator(func):
+        return func
+    hooks_using = WiredTigerTestCase._hookmgr.hooks_using(what)
+    if len(hooks_using) > 0:
+        return unittest.skip("function uses {}, which is incompatible with hooks: {}".format(what, hooks_using))
+    else:
+        return runit_decorator
+
+def skip_for_hook(hookname, description):
+    """
+    Used as a function decorator, for example, @wttest.skip_for_hook("tiered", "fails at commit_transaction").
+    The decorator indicates that this test function fails with the hook, which should be investigated.
+    """
+    def runit_decorator(func):
+        return func
+    if hookname in WiredTigerTestCase.hook_names:
+        return unittest.skip("because running with hook '{}': {}".format(hookname, description))
     else:
         return runit_decorator
 
