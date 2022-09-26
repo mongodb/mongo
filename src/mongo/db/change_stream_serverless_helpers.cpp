@@ -33,6 +33,8 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_settings.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -41,13 +43,10 @@ namespace mongo {
 namespace change_stream_serverless_helpers {
 
 bool isChangeCollectionsModeActive() {
-    // A change collection must not be enabled on the config server.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        return false;
-    }
-
-    // TODO SERVER-67267 guard with 'multitenancySupport' and 'isServerless' flag.
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+    // A change collection mode is declared as active if the required services can be initialized,
+    // the feature flag is enabled and the FCV version is already initialized.
+    return canInitializeServices() &&
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         feature_flags::gFeatureFlagServerlessChangeStreams.isEnabled(
             serverGlobalParams.featureCompatibility);
 }
@@ -63,6 +62,20 @@ bool isChangeStreamEnabled(OperationContext* opCtx, const TenantId& tenantId) {
             opCtx, NamespaceString::makeChangeCollectionNSS(tenantId))) &&
         static_cast<bool>(catalog->lookupCollectionByNamespace(
             opCtx, NamespaceString::makePreImageCollectionNSS(boost::none)));
+}
+
+bool canInitializeServices() {
+    // A change collection must not be enabled on the config server.
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        return false;
+    }
+
+    // A change stream services are enabled only in the multitenant serverless settings. For the
+    // sharded cluster, 'internalChangeStreamUseTenantIdForTesting' maybe provided for the testing
+    // purposes until the support is available.
+    const auto isMultiTenantServerless =
+        getGlobalReplSettings().isServerless() && gMultitenancySupport;
+    return isMultiTenantServerless || internalChangeStreamUseTenantIdForTesting.load();
 }
 
 const TenantId& getTenantIdForTesting() {
