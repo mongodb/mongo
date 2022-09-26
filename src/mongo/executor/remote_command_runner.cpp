@@ -30,7 +30,6 @@
 #include "mongo/executor/remote_command_runner.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/remote_command_runner_error_info.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
@@ -39,14 +38,6 @@
 namespace mongo::executor::remote_command_runner {
 namespace detail {
 namespace {
-Status makeErrorIfNeeded(TaskExecutor::ResponseOnAnyStatus r) {
-    if (r.status.isOK() && getStatusFromCommandResult(r.data).isOK() &&
-        getWriteConcernStatusFromCommandResult(r.data).isOK() &&
-        getFirstWriteErrorStatusFromCommandResult(r.data).isOK()) {
-        return Status::OK();
-    }
-    return {RemoteCommandExecutionErrorInfo(r), "Remote command execution failed"};
-}
 const auto getRCRImpl = ServiceContext::declareDecoration<std::unique_ptr<RemoteCommandRunner>>();
 }  // namespace
 

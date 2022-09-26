@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/remote_command_runner_error_info.h"
 #include "mongo/executor/remote_command_targeter.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -74,6 +75,19 @@ public:
     static RemoteCommandRunner* get(ServiceContext* serviceContext);
     static void set(ServiceContext* serviceContext, std::unique_ptr<RemoteCommandRunner> theRunner);
 };
+
+/**
+ * Returns a RemoteCommandExecutionError with ErrorExtraInfo populated to contain
+ * details about any error, local or remote, contained in `r`.
+ */
+inline Status makeErrorIfNeeded(TaskExecutor::ResponseOnAnyStatus r) {
+    if (r.status.isOK() && getStatusFromCommandResult(r.data).isOK() &&
+        getWriteConcernStatusFromCommandResult(r.data).isOK() &&
+        getFirstWriteErrorStatusFromCommandResult(r.data).isOK()) {
+        return Status::OK();
+    }
+    return {RemoteCommandExecutionErrorInfo(r), "Remote command execution failed"};
+}
 }  // namespace detail
 
 template <typename CommandReplyType>
