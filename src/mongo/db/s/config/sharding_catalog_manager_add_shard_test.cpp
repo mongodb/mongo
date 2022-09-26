@@ -1288,7 +1288,6 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
                                                     existingShard.toBSON(),
                                                     ShardingCatalogClient::kMajorityWriteConcern));
     assertShardExists(existingShard);
-
     // Adding the same connection string with a different shard name should fail.
     std::string differentName = "anotherShardName";
     auto future1 = launchAsync([&] {
@@ -1302,6 +1301,18 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
+
+    // Adding a different connection string with the same shard name should fail.
+    ConnectionString otherHostConnString2 =
+        assertGet(ConnectionString::parse("mySet1/host2:12345"));
+    auto future2 = launchAsync([&] {
+        ThreadClient tc(getServiceContext());
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+        ASSERT_EQUALS(ErrorCodes::IllegalOperation,
+                      ShardingCatalogManager::get(opCtx.get())
+                          ->addShard(opCtx.get(), &existingShardName, otherHostConnString2));
+    });
+    future2.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
@@ -1367,7 +1378,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     assertShardExists(existingShard);
 
     // Adding the same replica set but different host membership (but otherwise the same options)
-    // should succeed
+    // should fail.
     auto otherHost = connString.getServers().back();
     ConnectionString otherHostConnString = assertGet(ConnectionString::parse("mySet/host2:12345"));
     {
@@ -1381,9 +1392,9 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     auto future7 = launchAsync([&] {
         ThreadClient tc(getServiceContext());
         auto opCtx = Client::getCurrent()->makeOperationContext();
-        auto shardName = assertGet(ShardingCatalogManager::get(opCtx.get())
-                                       ->addShard(opCtx.get(), nullptr, otherHostConnString));
-        ASSERT_EQUALS(existingShardName, shardName);
+        ASSERT_EQUALS(ErrorCodes::IllegalOperation,
+                      ShardingCatalogManager::get(opCtx.get())
+                          ->addShard(opCtx.get(), nullptr, otherHostConnString));
     });
     future7.timed_get(kLongFutureTimeout);
 
@@ -1391,5 +1402,77 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     assertShardExists(existingShard);
 }
 
+// Tests both that trying to add a shard with a different replica set as an existing shard but with
+// overlapping hosts fails, and that adding a shard with the same replica set as an existing shard
+// with overlapping hosts succeeds.
+TEST_F(AddShardTest, AddShardWithOverlappingHosts) {
+    std::unique_ptr<RemoteCommandTargeterMock> replsetTargeter(
+        std::make_unique<RemoteCommandTargeterMock>());
+    ConnectionString connString =
+        assertGet(ConnectionString::parse("mySet/host1:12345,host2:12345,host3:12345"));
+    replsetTargeter->setConnectionStringReturnValue(connString);
+    HostAndPort shardTarget = connString.getServers().front();
+    replsetTargeter->setFindHostReturnValue(shardTarget);
+    targeterFactory()->addTargeterToReturn(connString, std::move(replsetTargeter));
+
+    std::string existingShardName = "myShard";
+    ShardType existingShard;
+    existingShard.setName(existingShardName);
+    existingShard.setHost(connString.toString());
+    existingShard.setState(ShardType::ShardState::kShardAware);
+
+    // Make sure the shard already exists.
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    existingShard.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+    assertShardExists(existingShard);
+
+    // Adding a shard with a different replica set name but with some common hosts should fail.
+    auto otherHost = connString.getServers().front();
+    ConnectionString otherHostConnString =
+        assertGet(ConnectionString::parse("mySet1/host1:12345,host2:12345,host4:12345"));
+    {
+        // Add a targeter for the different seed string this addShard request will use.
+        std::unique_ptr<RemoteCommandTargeterMock> otherHostTargeter(
+            std::make_unique<RemoteCommandTargeterMock>());
+        otherHostTargeter->setConnectionStringReturnValue(otherHostConnString);
+        otherHostTargeter->setFindHostReturnValue(otherHost);
+        targeterFactory()->addTargeterToReturn(otherHostConnString, std::move(otherHostTargeter));
+    }
+    auto future1 = launchAsync([&] {
+        ThreadClient tc(getServiceContext());
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+        ASSERT_EQUALS(ErrorCodes::IllegalOperation,
+                      ShardingCatalogManager::get(opCtx.get())
+                          ->addShard(opCtx.get(), nullptr, otherHostConnString));
+    });
+    future1.timed_get(kLongFutureTimeout);
+    // Ensure that the shard document was unchanged.
+    assertShardExists(existingShard);
+
+    // Adding a shard with the same replica set name and some common hosts should pass.
+    ConnectionString otherHostConnString1 =
+        assertGet(ConnectionString::parse("mySet/host1:12345,host2:12345,host4:12345"));
+    {
+        // Add a targeter for the different seed string this addShard request will use.
+        std::unique_ptr<RemoteCommandTargeterMock> otherHostTargeter(
+            std::make_unique<RemoteCommandTargeterMock>());
+        otherHostTargeter->setConnectionStringReturnValue(otherHostConnString1);
+        otherHostTargeter->setFindHostReturnValue(otherHost);
+        targeterFactory()->addTargeterToReturn(otherHostConnString1, std::move(otherHostTargeter));
+    }
+    auto future2 = launchAsync([&] {
+        ThreadClient tc(getServiceContext());
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+        auto shardName =
+            assertGet(ShardingCatalogManager::get(opCtx.get())
+                          ->addShard(opCtx.get(), &existingShardName, otherHostConnString1));
+        ASSERT_EQUALS(existingShardName, shardName);
+    });
+    future2.timed_get(kLongFutureTimeout);
+    // Ensure that the shard document was unchanged.
+    assertShardExists(existingShard);
+}
 }  // namespace
 }  // namespace mongo

@@ -262,15 +262,55 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
             return true;
         };
 
+        // Function for determining if there is an overlap amongst the hosts of the existing shard
+        // and the propsed shard.
+        auto checkIfHostsAreEquivalent =
+            [&](bool checkShardEquivalency) -> StatusWith<boost::optional<ShardType>> {
+            for (const auto& existingHost : existingShardConnStr.getServers()) {
+                for (const auto& addingHost : proposedShardConnectionString.getServers()) {
+                    if (existingHost == addingHost) {
+                        if (checkShardEquivalency) {
+                            // At least one of the hosts in the shard being added already exists in
+                            // an existing shard. If the options aren't the same, then this is an
+                            // error, but if the options match then the addShard operation should be
+                            // immediately considered a success and terminated.
+                            if (shardsAreEquivalent()) {
+                                return {existingShard};
+                            } else {
+                                return {ErrorCodes::IllegalOperation,
+                                        str::stream()
+                                            << "'" << addingHost.toString() << "' "
+                                            << "is already a member of the existing shard '"
+                                            << existingShard.getHost() << "' ("
+                                            << existingShard.getName() << ")."};
+                            }
+                        } else {
+                            return {existingShard};
+                        }
+                    }
+                }
+            }
+            return {boost::none};
+        };
+
         if (existingShardConnStr.type() == ConnectionString::ConnectionType::kReplicaSet &&
             proposedShardConnectionString.type() == ConnectionString::ConnectionType::kReplicaSet &&
             existingShardConnStr.getSetName() == proposedShardConnectionString.getSetName()) {
             // An existing shard has the same replica set name as the shard being added.
-            // If the options aren't the same, then this is an error,
-            // but if the options match then the addShard operation should be immediately
-            // considered a success and terminated.
+            // If the options aren't the same, then this is an error.
+            // If the shards are equivalent, there must be some overlap amongst their hosts, if not
+            // then addShard results in an error.
             if (shardsAreEquivalent()) {
-                return {existingShard};
+                auto hostsAreEquivalent = checkIfHostsAreEquivalent(false);
+                if (hostsAreEquivalent.isOK() && hostsAreEquivalent.getValue() != boost::none) {
+                    return {existingShard};
+                } else {
+                    return {ErrorCodes::IllegalOperation,
+                            str::stream()
+                                << "A shard named " << existingShardConnStr.getSetName()
+                                << " containing the replica set '"
+                                << existingShardConnStr.getSetName() << "' already exists"};
+                }
             } else {
                 return {ErrorCodes::IllegalOperation,
                         str::stream() << "A shard already exists containing the replica set '"
@@ -278,32 +318,17 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
             }
         }
 
-        for (const auto& existingHost : existingShardConnStr.getServers()) {
-            // Look if any of the hosts in the existing shard are present within the shard trying
-            // to be added.
-            for (const auto& addingHost : proposedShardConnectionString.getServers()) {
-                if (existingHost == addingHost) {
-                    // At least one of the hosts in the shard being added already exists in an
-                    // existing shard.  If the options aren't the same, then this is an error,
-                    // but if the options match then the addShard operation should be immediately
-                    // considered a success and terminated.
-                    if (shardsAreEquivalent()) {
-                        return {existingShard};
-                    } else {
-                        return {ErrorCodes::IllegalOperation,
-                                str::stream() << "'" << addingHost.toString() << "' "
-                                              << "is already a member of the existing shard '"
-                                              << existingShard.getHost() << "' ("
-                                              << existingShard.getName() << ")."};
-                    }
-                }
-            }
+        // Look if any of the hosts in the existing shard are present within the shard trying
+        // to be added.
+        auto hostsAreEquivalent = checkIfHostsAreEquivalent(true);
+        if (!hostsAreEquivalent.isOK() || hostsAreEquivalent.getValue() != boost::none) {
+            return hostsAreEquivalent;
         }
 
         if (proposedShardName && *proposedShardName == existingShard.getName()) {
-            // If we get here then we're trying to add a shard with the same name as an existing
-            // shard, but there was no overlap in the hosts between the existing shard and the
-            // proposed connection string for the new shard.
+            // If we get here then we're trying to add a shard with the same name as an
+            // existing shard, but there was no overlap in the hosts between the existing
+            // shard and the proposed connection string for the new shard.
             return {ErrorCodes::IllegalOperation,
                     str::stream() << "A shard named " << *proposedShardName << " already exists"};
         }
