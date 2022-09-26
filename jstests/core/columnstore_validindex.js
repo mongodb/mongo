@@ -3,9 +3,10 @@
  * @tags: [
  *   # Uses index building in background.
  *   requires_background_index,
- *   requires_fcv_62,
+ *   # column store indexes are still under a feature flag and require full sbe
  *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
  *   # TODO SERVER-69884: featureFlag guarded tests shouldn't require explicit 'no_selinux' tag.
  *   no_selinux,
  * ]

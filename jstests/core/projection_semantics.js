@@ -5,12 +5,10 @@
  * TODO SERVER-63947 these tags shouldn't be necessary if we remove the explicit columnstore index
  * mention.
  * @tags: [
- *   # columnstore indexes are new in 6.1.
- *   requires_fcv_61,
+ *   uses_column_store_index,
  *   # We could potentially need to resume an index build in the event of a stepdown, which is not
  *   # yet implemented.
  *   does_not_support_stepdowns,
- *   uses_column_store_index,
  * ]
  */
 (function() {

@@ -6,7 +6,7 @@
  *   does_not_support_stepdowns,
  *   # Cannot run aggregate with explain in a transaction.
  *   does_not_support_transactions,
- *   requires_fcv_62,
+ *   # column store indexes are still under a feature flag and require full sbe
  *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
  *   featureFlagSbeFull,

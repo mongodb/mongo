@@ -2,8 +2,14 @@
  * Tests that a columnstore index can be persisted and found in listIndexes after a server restart.
  *
  * @tags: [
- *  requires_persistence,
- *  requires_replication,
+ *   requires_persistence,
+ *   requires_replication,
+ *   # column store indexes are still under a feature flag and require full sbe
+ *   uses_column_store_index,
+ *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
+ *   # TODO SERVER-69884: featureFlag guarded tests shouldn't require explicit 'no_selinux' tag.
+ *   no_selinux,
  * ]
  */
 
@@ -17,15 +23,6 @@ rst.startSet();
 rst.initiate();
 
 let primary = rst.getPrimary();
-const columnstoreIndexesEnabled =
-    assert.commandWorked(primary.adminCommand({getParameter: 1, featureFlagColumnstoreIndexes: 1}))
-        .featureFlagColumnstoreIndexes.value;
-
-if (!columnstoreIndexesEnabled) {
-    jsTestLog('Skipping test because the columnstore index feature flag is disabled');
-    rst.stopSet();
-    return;
-}
 
 const collName = 'columnstore_index_persistence';
 let db_primary = primary.getDB('test');

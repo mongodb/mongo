@@ -6,6 +6,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
+ *   uses_column_store_index,
  * ]
  */
 (function() {
@@ -23,8 +24,9 @@ rst.initiate();
 
 let primary = rst.getPrimary();
 let coll = primary.getDB(dbName).getCollection(collName);
-const columnstoreEnabled = checkSBEEnabled(
-    primary.getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true);
+const columnstoreEnabled = checkSBEEnabled(primary.getDB(dbName),
+                                           ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"],
+                                           true /* checkAllNodes */);
 
 assert.commandWorked(coll.insert({a: 1}));
 

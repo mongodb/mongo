@@ -1,27 +1,23 @@
 /**
  * Tests to ensure that COLUMN_SCAN plan and scanned columns appear in slow query log lines when
  * the columstore index is the winning plan.
+ * @tags: [
+ *   # column store indexes are still under a feature flag and require full sbe
+ *   uses_column_store_index,
+ *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
+ *   # TODO SERVER-69884: featureFlag guarded tests shouldn't require explicit 'no_selinux' tag.
+ *   no_selinux,
+ * ]
  */
 (function() {
 "use strict";
-
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
 
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB(jsTestName());
-
-const columnstoreEnabled =
-    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"]);
-if (!columnstoreEnabled) {
-    jsTestLog("Skipping columnstore index validation test since the feature flag is not enabled.");
-    MongoRunner.stopMongod(conn);
-    return;
-}
-
 assert.commandWorked(db.dropDatabase());
-
 const coll = db.collection;
 
 // Set logLevel to 1 so that all queries will be logged.

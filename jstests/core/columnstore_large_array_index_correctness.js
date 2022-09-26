@@ -1,8 +1,7 @@
 /**
  * Testing of just the query layer's integration for columnar indexes that encode large arrays.
  * @tags: [
- *   # columnstore indexes are new in 6.1.
- *   requires_fcv_61,
+ *   # column store indexes are still under a feature flag and require full sbe
  *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
  *   featureFlagSbeFull,

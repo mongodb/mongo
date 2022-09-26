@@ -7,6 +7,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
+ *   uses_column_store_index,
  * ]
  */
 (function() {
@@ -24,6 +25,7 @@ rst.initiate();
 
 const columnstoreEnabled = checkSBEEnabled(
     rst.getPrimary().getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true);
+
 // Insert enough data so that the collection scan spills to disk.
 const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName());
 const bulk = coll.initializeUnorderedBulkOp();

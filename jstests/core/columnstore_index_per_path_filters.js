@@ -3,9 +3,9 @@
  * might be pushed down into the column scan stage.
  *
  * @tags: [
- *   requires_fcv_62,
  *   # Runs explain on an aggregate command which is only compatible with readConcern local.
  *   assumes_read_concern_unchanged,
+ *   # column store indexes are still under a feature flag and require full sbe
  *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
  *   featureFlagSbeFull,

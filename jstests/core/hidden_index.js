@@ -6,7 +6,6 @@
  *   # CollMod is not retryable.
  *   requires_non_retryable_commands,
  *   uses_column_store_index,
- *   requires_fcv_62,
  * ]
  */
 
