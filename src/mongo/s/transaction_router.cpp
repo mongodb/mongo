@@ -39,7 +39,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id.h"

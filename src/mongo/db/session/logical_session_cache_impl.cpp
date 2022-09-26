@@ -32,7 +32,6 @@
 
 #include "mongo/db/session/logical_session_cache_impl.h"
 
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"

@@ -34,7 +34,6 @@
 
 #include <memory>
 
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_helpers.h"

@@ -32,7 +32,6 @@
 
 #include "mongo/db/s/transaction_coordinator_service.h"
 
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_params_gen.h"

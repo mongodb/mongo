@@ -38,7 +38,6 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"

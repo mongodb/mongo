@@ -32,7 +32,6 @@
 #include "mongo/db/session/initialize_operation_session_info.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_id_helpers.h"

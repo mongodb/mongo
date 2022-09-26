@@ -50,7 +50,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/multitenancy_gen.h"
