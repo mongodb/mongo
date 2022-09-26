@@ -932,8 +932,7 @@ private:
     }
 
     void doCheckAuthorization(OperationContext* opCtx) const override {
-        uassertStatusOK(_command->checkAuthForOperation(
-            opCtx, _request.getDatabase().toString(), _request.body));
+        uassertStatusOK(_command->checkAuthForOperation(opCtx, _dbName, _request.body));
     }
 
     const BSONObj& cmdObj() const {
@@ -996,9 +995,9 @@ Status BasicCommandWithReplyBuilderInterface::explain(OperationContext* opCtx,
 }
 
 Status BasicCommandWithReplyBuilderInterface::checkAuthForOperation(OperationContext* opCtx,
-                                                                    const std::string& dbname,
+                                                                    const DatabaseName& dbname,
                                                                     const BSONObj& cmdObj) const {
-    return checkAuthForCommand(opCtx->getClient(), dbname, cmdObj);
+    return checkAuthForCommand(opCtx->getClient(), dbname.db(), cmdObj);
 }
 
 Status BasicCommandWithReplyBuilderInterface::checkAuthForCommand(Client* client,

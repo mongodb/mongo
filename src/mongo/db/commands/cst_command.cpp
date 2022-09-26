@@ -54,14 +54,14 @@ public:
     // Test commands should never be enabled in production, but we try to require auth on new
     // test commands anyway, just in case someone enables them by mistake.
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) const override {
+                                 const DatabaseName& dbname,
+                                 const BSONObj&) const override {
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
         // This auth check is more restrictive than necessary, to make it simpler.
         // The CST command constructs a Pipeline, which might hold execution resources.
         // We could do fine-grained permission checking similar to the find or aggregate commands,
         // but that seems more complicated than necessary since this is only a test command.
-        if (!authSession->isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
+        if (!authSession->isAuthorizedForAnyActionOnAnyResourceInDB(dbname.db())) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();

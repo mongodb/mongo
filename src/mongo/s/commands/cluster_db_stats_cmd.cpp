@@ -113,10 +113,10 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) const final {
+                                 const DatabaseName& dbname,
+                                 const BSONObj&) const final {
         auto as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname.db()),
                                                   ActionType::dbStats)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }

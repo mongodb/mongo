@@ -86,10 +86,9 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbName,
+                                 const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
-        const NamespaceString nss(
-            CommandHelpers::parseNsCollectionRequired({boost::none, dbName}, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         if (!AuthorizationSession::get(opCtx->getClient())
                  ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(nss),
                                                     ActionType::createIndex)) {

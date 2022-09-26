@@ -905,7 +905,7 @@ public:
      * command. Default implementation defers to checkAuthForCommand.
      */
     virtual Status checkAuthForOperation(OperationContext* opCtx,
-                                         const std::string& dbname,
+                                         const DatabaseName& dbname,
                                          const BSONObj& cmdObj) const;
 
     /**
