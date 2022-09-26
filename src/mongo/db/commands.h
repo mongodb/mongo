@@ -902,10 +902,10 @@ public:
 
     /**
      * Checks if the client associated with the given OperationContext is authorized to run this
-     * command. Default implementation defers to checkAuthForCommand.
+     * command. Default implementation checks via addRequiredPrivileges().
      */
     virtual Status checkAuthForOperation(OperationContext* opCtx,
-                                         const DatabaseName& dbname,
+                                         const DatabaseName& dbName,
                                          const BSONObj& cmdObj) const;
 
     /**
@@ -973,16 +973,6 @@ private:
     //
     // Deprecated virtual methods.
     //
-
-    /**
-     * Checks if the given client is authorized to run this command on database "dbname"
-     * with the invocation described by "cmdObj".
-     *
-     * NOTE: Implement checkAuthForOperation that takes an OperationContext* instead.
-     */
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const;
 
     /**
      * Appends to "*out" the privileges required to run this command on database "dbname" with

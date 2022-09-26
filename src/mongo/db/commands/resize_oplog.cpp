@@ -67,10 +67,10 @@ public:
         return "Resize oplog using size (in MBs) and optionally, retention (in terms of hours)";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const final {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName&,
+                                 const BSONObj&) const final {
+        AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
         if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                            ActionType::replSetResizeOplog)) {
             return Status::OK();

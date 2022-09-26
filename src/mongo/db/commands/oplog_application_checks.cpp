@@ -43,7 +43,7 @@ UUID OplogApplicationChecks::getUUIDFromOplogEntry(const BSONObj& oplogEntry) {
 };
 
 Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opCtx,
-                                                           const std::string& dbname,
+                                                           const DatabaseName&,
                                                            const BSONObj& oplogEntry,
                                                            AuthorizationSession* authSession,
                                                            bool alwaysUpsert) {
@@ -206,10 +206,10 @@ Status OplogApplicationChecks::checkOperation(const BSONElement& e) {
     return Status::OK();
 }
 
-Status OplogApplicationChecks::checkAuthForCommand(OperationContext* opCtx,
-                                                   const std::string& dbname,
-                                                   const BSONObj& cmdObj,
-                                                   OplogApplicationValidity validity) {
+Status OplogApplicationChecks::checkAuthForOperation(OperationContext* opCtx,
+                                                     const DatabaseName& dbName,
+                                                     const BSONObj& cmdObj,
+                                                     OplogApplicationValidity validity) {
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
     if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                        ActionType::applyOps)) {
@@ -252,7 +252,7 @@ Status OplogApplicationChecks::checkAuthForCommand(OperationContext* opCtx,
     for (const BSONElement& e : cmdObj.firstElement().Array()) {
         checkBSONType(BSONType::Object, e);
         Status status = OplogApplicationChecks::checkOperationAuthorization(
-            opCtx, dbname, e.Obj(), authSession, alwaysUpsert);
+            opCtx, dbName, e.Obj(), authSession, alwaysUpsert);
         if (!status.isOK()) {
             return status;
         }

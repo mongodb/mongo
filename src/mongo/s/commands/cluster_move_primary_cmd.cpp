@@ -70,12 +70,13 @@ public:
         return " example: { moveprimary : 'foo' , to : 'localhost:9999' }";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(parseNs({boost::none, dbname}, cmdObj).db()),
-                ActionType::moveChunk)) {
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const {
+        if (!AuthorizationSession::get(opCtx->getClient())
+                 ->isAuthorizedForActionsOnResource(
+                     ResourcePattern::forDatabaseName(parseNs(dbName, cmdObj).db()),
+                     ActionType::moveChunk)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 

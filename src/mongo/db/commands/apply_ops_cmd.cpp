@@ -203,10 +203,10 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbname,
+                                 const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
         OplogApplicationValidity validity = validateApplyOpsCommand(cmdObj);
-        return OplogApplicationChecks::checkAuthForCommand(opCtx, dbname.db(), cmdObj, validity);
+        return OplogApplicationChecks::checkAuthForOperation(opCtx, dbName, cmdObj, validity);
     }
 
     bool run(OperationContext* opCtx,

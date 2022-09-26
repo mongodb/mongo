@@ -109,11 +109,11 @@ std::string IndexFilterCommand::help() const {
     return helpText;
 }
 
-Status IndexFilterCommand::checkAuthForCommand(Client* client,
-                                               const std::string& dbname,
-                                               const BSONObj& cmdObj) const {
-    AuthorizationSession* authzSession = AuthorizationSession::get(client);
-    ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
+Status IndexFilterCommand::checkAuthForOperation(OperationContext* opCtx,
+                                                 const DatabaseName& dbName,
+                                                 const BSONObj& cmdObj) const {
+    AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
+    ResourcePattern pattern = parseResourcePattern(dbName.db(), cmdObj);
 
     if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::planCacheIndexFilter)) {
         return Status::OK();

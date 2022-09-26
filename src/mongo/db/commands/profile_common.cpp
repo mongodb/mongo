@@ -44,10 +44,10 @@
 
 namespace mongo {
 
-Status ProfileCmdBase::checkAuthForCommand(Client* client,
-                                           const std::string& dbName,
-                                           const BSONObj& cmdObj) const {
-    AuthorizationSession* authzSession = AuthorizationSession::get(client);
+Status ProfileCmdBase::checkAuthForOperation(OperationContext* opCtx,
+                                             const DatabaseName& dbName,
+                                             const BSONObj& cmdObj) const {
+    AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
 
     auto request = ProfileCmdRequest::parse(IDLParserContext("profile"), cmdObj);
     const auto profilingLevel = request.getCommandParameter();
@@ -61,8 +61,8 @@ Status ProfileCmdBase::checkAuthForCommand(Client* client,
         }
     }
 
-    return authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbName),
-                                                          ActionType::enableProfiler)
+    return authzSession->isAuthorizedForActionsOnResource(
+               ResourcePattern::forDatabaseName(dbName.db()), ActionType::enableProfiler)
         ? Status::OK()
         : Status(ErrorCodes::Unauthorized, "unauthorized");
 }

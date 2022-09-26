@@ -50,10 +50,10 @@ class CurrentOpCommand final : public CurrentOpCommandBase {
 public:
     CurrentOpCommand() = default;
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbName,
-                               const BSONObj& cmdObj) const final {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName&,
+                                 const BSONObj& cmdObj) const final {
+        AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
         if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                            ActionType::inprog)) {
             return Status::OK();

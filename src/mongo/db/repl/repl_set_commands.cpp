@@ -93,17 +93,19 @@ public:
     std::string help() const override {
         return "Just for tests.\n";
     }
+
     // No auth needed because it only works when enabled via command line.
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
         return Status::OK();
     }
+
     CmdReplSetTest() : ReplSetCommand("replSetTest") {}
-    virtual bool run(OperationContext* opCtx,
-                     const DatabaseName&,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         LOGV2(21573,
               "replSetTest command received: {cmdObj}",
               "replSetTest command received",

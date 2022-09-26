@@ -251,14 +251,15 @@ public:
         return h.str();
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(),
-                ActionType::setFeatureCompatibilityVersion)) {
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        if (!AuthorizationSession::get(opCtx->getClient())
+                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                    ActionType::setFeatureCompatibilityVersion)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
+
         return Status::OK();
     }
 

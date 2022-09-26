@@ -995,19 +995,15 @@ Status BasicCommandWithReplyBuilderInterface::explain(OperationContext* opCtx,
 }
 
 Status BasicCommandWithReplyBuilderInterface::checkAuthForOperation(OperationContext* opCtx,
-                                                                    const DatabaseName& dbname,
+                                                                    const DatabaseName& dbName,
                                                                     const BSONObj& cmdObj) const {
-    return checkAuthForCommand(opCtx->getClient(), dbname.db(), cmdObj);
-}
-
-Status BasicCommandWithReplyBuilderInterface::checkAuthForCommand(Client* client,
-                                                                  const std::string& dbname,
-                                                                  const BSONObj& cmdObj) const {
     std::vector<Privilege> privileges;
-    this->addRequiredPrivileges(dbname, cmdObj, &privileges);
-    if (AuthorizationSession::get(client)->isAuthorizedForPrivileges(privileges))
-        return Status::OK();
-    return Status(ErrorCodes::Unauthorized, "unauthorized");
+    this->addRequiredPrivileges(dbName.db(), cmdObj, &privileges);
+    if (!AuthorizationSession::get(opCtx->getClient())->isAuthorizedForPrivileges(privileges)) {
+        return {ErrorCodes::Unauthorized, "unauthorized"};
+    }
+
+    return Status::OK();
 }
 
 void Command::generateHelpResponse(OperationContext* opCtx,

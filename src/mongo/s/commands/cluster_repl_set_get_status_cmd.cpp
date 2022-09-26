@@ -57,9 +57,9 @@ public:
         return "Not supported through mongos";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
         // Require no auth since this command isn't supported in mongos
         return Status::OK();
     }

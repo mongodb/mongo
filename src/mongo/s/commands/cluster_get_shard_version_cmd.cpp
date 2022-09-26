@@ -64,12 +64,13 @@ public:
         return " example: { getShardVersion : 'alleyinsider.foo'  } ";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(parseNs({boost::none, dbname}, cmdObj)),
-                ActionType::getShardVersion)) {
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        if (!AuthorizationSession::get(opCtx->getClient())
+                 ->isAuthorizedForActionsOnResource(
+                     ResourcePattern::forExactNamespace(parseNs(dbName, cmdObj)),
+                     ActionType::getShardVersion)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 

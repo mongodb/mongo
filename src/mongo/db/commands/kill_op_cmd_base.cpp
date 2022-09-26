@@ -76,9 +76,10 @@ void KillOpCmdBase::reportSuccessfulCompletion(OperationContext* opCtx,
 }
 
 
-Status KillOpCmdBase::checkAuthForCommand(Client* worker,
-                                          const std::string& dbname,
-                                          const BSONObj& cmdObj) const {
+Status KillOpCmdBase::checkAuthForOperation(OperationContext* workerOpCtx,
+                                            const DatabaseName&,
+                                            const BSONObj& cmdObj) const {
+    auto* worker = workerOpCtx->getClient();
     auto opKiller = OperationKiller(worker);
 
     if (opKiller.isGenerallyAuthorizedToKill()) {
@@ -87,7 +88,7 @@ Status KillOpCmdBase::checkAuthForCommand(Client* worker,
 
     if (isKillingLocalOp(cmdObj.getField("op"))) {
         // Look up the OperationContext and see if we have permission to kill it. This is done once
-        // here and again in the command body. The check here in the checkAuthForCommand() function
+        // here and again in the command body. The check here in the checkAuthForOperation function
         // is necessary because if the check fails, it will be picked up by the auditing system.
         long long opId = parseOpId(cmdObj);
         auto target = worker->getServiceContext()->getLockedClient(opId);

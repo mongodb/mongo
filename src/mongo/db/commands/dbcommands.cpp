@@ -432,9 +432,9 @@ public:
     using Request = CollStatsCommand;
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbname,
+                                 const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const final {
-        const auto nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
+        const auto nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
         auto as = AuthorizationSession::get(opCtx->getClient());
         if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(nss),
                                                   ActionType::collStats)) {
@@ -513,10 +513,11 @@ public:
                "Example: { collMod: 'foo', index: {name: 'bar', expireAfterSeconds: 600} }\n";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto client = opCtx->getClient();
+        auto nss = parseNs(dbName, cmdObj);
         return auth::checkAuthForCollMod(
             client->getOperationContext(), AuthorizationSession::get(client), nss, cmdObj, false);
     }

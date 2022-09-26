@@ -87,10 +87,10 @@ public:
         return "removes a shard from the zone";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const final {
-        auto* as = AuthorizationSession::get(client);
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName&,
+                                 const BSONObj&) const final {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
 
         if (as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                  ActionType::enableSharding)) {

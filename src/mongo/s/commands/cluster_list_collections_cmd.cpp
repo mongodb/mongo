@@ -209,11 +209,11 @@ public:
         return false;
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const final {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-        return authzSession->checkAuthorizedToListCollections(dbname, cmdObj).getStatus();
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const final {
+        auto* authzSession = AuthorizationSession::get(opCtx->getClient());
+        return authzSession->checkAuthorizedToListCollections(dbName.db(), cmdObj).getStatus();
     }
 
     bool runWithRequestParser(OperationContext* opCtx,

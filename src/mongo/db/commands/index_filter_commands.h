@@ -80,9 +80,9 @@ public:
      * One action type defined for index filter commands:
      * - planCacheIndexFilter
      */
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override;
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override;
 
     virtual Status runIndexFilterCommand(OperationContext* opCtx,
                                          const CollectionPtr& collection,

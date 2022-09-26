@@ -35,6 +35,7 @@
 namespace mongo {
 class BSONElement;
 class BSONObj;
+class DatabaseName;
 class OperationContext;
 
 // OplogApplicationValidity represents special conditions relevant to authorization for
@@ -58,10 +59,10 @@ public:
     /**
      * Checks the authorization for an entire oplog application command.
      */
-    static Status checkAuthForCommand(OperationContext* opCtx,
-                                      const std::string& dbname,
-                                      const BSONObj& cmdObj,
-                                      OplogApplicationValidity validity);
+    static Status checkAuthForOperation(OperationContext* opCtx,
+                                        const DatabaseName& dbName,
+                                        const BSONObj& cmdObj,
+                                        OplogApplicationValidity validity);
 
     /**
      * Checks that 'opsElement' is an array and all elements of the array are valid operations.
@@ -76,7 +77,7 @@ private:
      * command.
      */
     static Status checkOperationAuthorization(OperationContext* opCtx,
-                                              const std::string& dbname,
+                                              const DatabaseName& dbName,
                                               const BSONObj& oplogEntry,
                                               AuthorizationSession* authSession,
                                               bool alwaysUpsert);

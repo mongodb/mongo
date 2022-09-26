@@ -69,10 +69,11 @@ public:
                "directly. Modifies collection.";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* client = opCtx->getClient();
+        const NamespaceString nss(parseNs(dbName, cmdObj));
         return auth::checkAuthForCollMod(
             client->getOperationContext(), AuthorizationSession::get(client), nss, cmdObj, false);
     }

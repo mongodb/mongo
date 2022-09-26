@@ -50,11 +50,12 @@ class ClusterCurrentOpCommand final : public CurrentOpCommandBase {
 public:
     ClusterCurrentOpCommand() = default;
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbName,
-                               const BSONObj& cmdObj) const final {
-        bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-            ResourcePattern::forClusterResource(), ActionType::inprog);
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName&,
+                                 const BSONObj&) const final {
+        bool isAuthorized = AuthorizationSession::get(opCtx->getClient())
+                                ->isAuthorizedForActionsOnResource(
+                                    ResourcePattern::forClusterResource(), ActionType::inprog);
 
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }

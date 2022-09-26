@@ -668,12 +668,12 @@ public:
                "Invoke with {dbCheck: 1} to check all collections in the database.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        const bool isAuthorized =
-            AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forAnyResource(), ActionType::dbCheck);
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        const bool isAuthorized = AuthorizationSession::get(opCtx->getClient())
+                                      ->isAuthorizedForActionsOnResource(
+                                          ResourcePattern::forAnyResource(), ActionType::dbCheck);
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 

@@ -154,20 +154,20 @@ public:
         return AllowedOnSecondary::kOptIn;
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override;
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override;
 
     std::string help() const override {
         return "Drops one or all plan cache entries in a collection.";
     }
 } planCacheClearCommand;
 
-Status PlanCacheClearCommand::checkAuthForCommand(Client* client,
-                                                  const std::string& dbname,
-                                                  const BSONObj& cmdObj) const {
-    AuthorizationSession* authzSession = AuthorizationSession::get(client);
-    ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
+Status PlanCacheClearCommand::checkAuthForOperation(OperationContext* opCtx,
+                                                    const DatabaseName& dbName,
+                                                    const BSONObj& cmdObj) const {
+    AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
+    ResourcePattern pattern = parseResourcePattern(dbName.db(), cmdObj);
 
     if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::planCacheWrite)) {
         return Status::OK();
