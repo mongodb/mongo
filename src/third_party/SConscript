@@ -15,7 +15,7 @@ Import([
 
 snappySuffix = '-1.1.7'
 icuSuffix = '-57.1'
-timelibSuffix = '-2021.06'
+timelibSuffix = '-2022.02'
 tomcryptSuffix = '-1.18.2'
 variantSuffix = '-1.4.0'
 

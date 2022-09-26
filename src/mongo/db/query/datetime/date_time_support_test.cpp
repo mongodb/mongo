@@ -2629,7 +2629,10 @@ TEST(DateAdd, DateAddWithTimezoneDST) {
         {europeAmsterdamZone.createFromDateParts(2020, 10, 24, 2, 0, 1, 0),
          TimeUnit::day,
          1,
-         europeAmsterdamZone.createFromDateParts(2020, 10, 25, 2, 0, 1, 0)},
+         europeAmsterdamZone.createFromDateParts(2020, 10, 25, 1, 59, 59, 0) +
+             Milliseconds{2000}},  // as this date is ambiguous (it could in both timezones, with or
+                                   // without DST) and the computation is expected to return the
+                                   // "with DST" one, obtain it via a computation
         {europeAmsterdamZone.createFromDateParts(2020, 10, 24, 3, 0, 1, 0),
          TimeUnit::day,
          1,
@@ -2721,10 +2724,13 @@ TEST(DateAdd, DateAddWithTimezoneDST) {
          TimeUnit::day,
          1,
          newYorkZone.createFromDateParts(2020, 11, 2, 1, 30, 0, 0)},
-        {newYorkZone.createFromDateParts(2020, 10, 31, 1, 30, 0, 0),
+        {newYorkZone.createFromDateParts(2020, 10, 31, 1, 0, 1, 0),
          TimeUnit::day,
          1,
-         newYorkZone.createFromDateParts(2020, 11, 1, 1, 30, 0, 0)},
+         newYorkZone.createFromDateParts(2020, 11, 1, 0, 59, 59, 0) +
+             Milliseconds{2000}},  // as this date is ambiguous (it could in both timezones, with or
+                                   // without DST) and the computation is expected to return the
+                                   // "with DST" one, obtain it via a computation
         {newYorkZone.createFromDateParts(2020, 11, 1, 3, 0, 0, 0),
          TimeUnit::day,
          -1,
@@ -2785,15 +2791,20 @@ TEST(DateAdd, DateAdd_LordHoweTimezoneDST) {
     auto australiaLordHoweZone = kDefaultTimeZoneDatabase.getTimeZone("Australia/Lord_Howe");
     std::vector<TestCase> tests{
         // DST to Standard change: 2021-04-04T02:00:00 -> 2021-04-04T01:30:00 Lord Howe timezone.
-        {australiaLordHoweZone.createFromDateParts(2021, 4, 4, 1, 30, 0, 0),
+        {australiaLordHoweZone.createFromDateParts(2021, 4, 4, 1, 29, 59, 0) +
+             Milliseconds{1000},  // as this date is ambiguous (it could in both timezones, with or
+                                  // without DST) and the computation is expected to start from the
+                                  // "with DST" one, obtain it via a computation
          TimeUnit::day,
          1,
          australiaLordHoweZone.createFromDateParts(2021, 4, 5, 1, 30, 0, 0)},
-        {australiaLordHoweZone.createFromDateParts(2021, 4, 3, 1, 45, 0, 0),
+        {australiaLordHoweZone.createFromDateParts(2021, 4, 3, 1, 30, 1, 0),
          TimeUnit::day,
          1,
-         // Computed time falls into the repeated 1/2 hour.
-         australiaLordHoweZone.createFromDateParts(2021, 4, 4, 1, 45, 0, 0)},
+         australiaLordHoweZone.createFromDateParts(2021, 4, 4, 1, 29, 59, 0) +
+             Milliseconds{2000}},  // as this date is ambiguous (it could in both timezones, with or
+                                   // without DST) and the computation is expected to return the
+                                   // "with DST" one, obtain it via a computation
         {australiaLordHoweZone.createFromDateParts(2021, 4, 5, 1, 0, 0, 0),
          TimeUnit::day,
          -1,
