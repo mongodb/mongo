@@ -78,7 +78,10 @@ void createCollections(OperationContext* opCtx, int numCollections) {
     for (auto i = 0; i < numCollections; i++) {
         const NamespaceString nss("collection_catalog_bm", std::to_string(i));
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(opCtx, UUID::gen(), std::make_shared<CollectionMock>(nss));
+            catalog.registerCollection(opCtx,
+                                       UUID::gen(),
+                                       std::make_shared<CollectionMock>(nss),
+                                       /*ts=*/boost::none);
         });
     }
 }

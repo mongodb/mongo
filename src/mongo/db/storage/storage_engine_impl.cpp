@@ -93,6 +93,19 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
           [serviceContext = opCtx->getServiceContext()](Timestamp timestamp) {
               HistoricalIdentTracker::get(serviceContext).removeEntriesOlderThan(timestamp);
           }),
+      _collectionCatalogCleanupTimestampListener(
+          TimestampMonitor::TimestampType::kOldest,
+          [serviceContext = opCtx->getServiceContext()](Timestamp timestamp) {
+              // The global lock is held by the timestamp monitor while callbacks are executed, so
+              // there can be no batched CollectionCatalog writer and we are thus safe to write
+              // using the service context.
+              if (CollectionCatalog::get(serviceContext)
+                      ->needsCleanupForOldestTimestamp(timestamp)) {
+                  CollectionCatalog::write(serviceContext, [timestamp](CollectionCatalog& catalog) {
+                      catalog.cleanupForOldestTimestampAdvanced(timestamp);
+                  });
+              }
+          }),
       _supportsCappedCollections(_engine->supportsCappedCollections()) {
     uassert(28601,
             "Storage engine does not support --directoryperdb",
@@ -114,11 +127,14 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked() || opCtx->lockState()->isW());
     Lock::GlobalWrite globalLk(opCtx);
     loadCatalog(opCtx,
+                _engine->getRecoveryTimestamp(),
                 _options.lockFileCreatedByUncleanShutdown ? LastShutdownState::kUnclean
                                                           : LastShutdownState::kClean);
 }
 
-void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) {
+void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
+                                    boost::optional<Timestamp> stableTs,
+                                    LastShutdownState lastShutdownState) {
     bool catalogExists = _engine->hasIdent(opCtx, kCatalogInfo);
     if (_options.forRepair && catalogExists) {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
@@ -344,7 +360,10 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
         }
 
         Timestamp minVisibleTs = Timestamp::min();
-        Timestamp minValidTs = minVisibleTs;
+        // Use the stable timestamp as minValid. We know for a fact that the collection exist at
+        // this point and is in sync. If we use an earlier timestamp than replication rollback we
+        // may be out-of-order for the collection catalog managing this namespace.
+        Timestamp minValidTs = stableTs ? *stableTs : Timestamp::min();
         // If there's no recovery timestamp, every collection is available.
         if (boost::optional<Timestamp> recoveryTs = _engine->getRecoveryTimestamp()) {
             // Otherwise choose a minimum visible timestamp that's at least as large as the true
@@ -353,10 +372,6 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
             // `oldestTimestamp` and conservatively choose the `recoveryTimestamp` for everything
             // else.
             minVisibleTs = recoveryTs.value();
-            // Minimum valid timestamp is always set to the recovery timestamp. Even if the
-            // collection exists at the oldest timestamp we do not know if it would be in sync with
-            // the durable catalog due to collMod or index changes.
-            minValidTs = minVisibleTs;
             if (existedAtOldestTs.find(entry.catalogId) != existedAtOldestTs.end()) {
                 // Collections found at the `oldestTimestamp` on startup can have their minimum
                 // visible timestamp pulled back to that value.
@@ -410,10 +425,10 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     auto collectionFactory = Collection::Factory::get(getGlobalServiceContext());
     auto collection = collectionFactory->make(opCtx, nss, catalogId, md, std::move(rs));
     collection->setMinimumVisibleSnapshot(minVisibleTs);
-    collection->setMinimumValidSnapshot(minValidTs);
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, md->options.uuid.value(), std::move(collection));
+        catalog.registerCollection(
+            opCtx, md->options.uuid.value(), std::move(collection), /*commitTime*/ minValidTs);
     });
 }
 
@@ -840,6 +855,7 @@ void StorageEngineImpl::startTimestampMonitor() {
 
     _timestampMonitor->addListener(&_minOfCheckpointAndOldestTimestampListener);
     _timestampMonitor->addListener(&_historicalIdentTimestampListener);
+    _timestampMonitor->addListener(&_collectionCatalogCleanupTimestampListener);
 }
 
 void StorageEngineImpl::notifyStartupComplete() {
@@ -1019,7 +1035,8 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
     // After repairing, re-initialize the collection with a valid RecordStore.
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
         auto uuid = catalog.lookupUUIDByNSS(opCtx, nss).value();
-        catalog.deregisterCollection(opCtx, uuid, /*isDropPending=*/false);
+        catalog.deregisterCollection(
+            opCtx, uuid, /*isDropPending=*/false, /*commitTime*/ boost::none);
     });
 
     // When repairing a record store, keep the existing behavior of not installing a minimum visible

@@ -53,7 +53,9 @@ public:
     bool isEphemeral() const final {
         return true;
     }
-    void loadCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final {}
+    void loadCatalog(OperationContext* opCtx,
+                     boost::optional<Timestamp> stableTs,
+                     LastShutdownState lastShutdownState) final {}
     void closeCatalog(OperationContext* opCtx) final {}
     Status closeDatabase(OperationContext* opCtx, const DatabaseName& dbName) final {
         return Status::OK();

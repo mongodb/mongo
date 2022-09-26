@@ -226,7 +226,9 @@ public:
      * caller. For example, on starting from a previous unclean shutdown, we may try to recover
      * orphaned idents, which are known to the storage engine but not referenced in the catalog.
      */
-    virtual void loadCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) = 0;
+    virtual void loadCatalog(OperationContext* opCtx,
+                             boost::optional<Timestamp> stableTs,
+                             LastShutdownState lastShutdownState) = 0;
     virtual void closeCatalog(OperationContext* opCtx) = 0;
 
     /**

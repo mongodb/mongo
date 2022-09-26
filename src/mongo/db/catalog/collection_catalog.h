@@ -38,7 +38,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/service_context.h"
-// TODO SERVER-68265: remove include.
+// TODO SERVER-69372: remove include.
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
@@ -210,7 +210,7 @@ public:
     /**
      * Returns the collection instance representative of 'entry' at the provided read timestamp.
      *
-     * TODO SERVER-68265:
+     * TODO SERVER-69372:
      * - Use NamespaceString instead of DurableCatalog::Entry.
      * - Remove DurableCatalog dependency.
      *
@@ -288,7 +288,8 @@ public:
      */
     void registerCollection(OperationContext* opCtx,
                             const UUID& uuid,
-                            std::shared_ptr<Collection> collection);
+                            std::shared_ptr<Collection> collection,
+                            boost::optional<Timestamp> commitTime);
 
     /**
      * Deregister the collection.
@@ -297,7 +298,8 @@ public:
      */
     std::shared_ptr<Collection> deregisterCollection(OperationContext* opCtx,
                                                      const UUID& uuid,
-                                                     bool isDropPending);
+                                                     bool isDropPending,
+                                                     boost::optional<Timestamp> commitTime);
 
     /**
      * Create a temporary record of an uncommitted view namespace to aid in detecting a simultaneous
@@ -399,6 +401,17 @@ public:
      */
     boost::optional<UUID> lookupUUIDByNSS(OperationContext* opCtx,
                                           const NamespaceString& nss) const;
+
+    /**
+     * Returns the CatalogId for a given 'nss' at timestamp 'ts'.
+     *
+     * Timestamp must be in the range [oldest_timestamp, now)
+     * If 'ts' is boost::none the latest CatalogId is returned.
+     *
+     * Returns boost::none if no namespace exist at the timestamp or if 'ts' is out of range.
+     */
+    boost::optional<RecordId> lookupCatalogIdByNSS(
+        const NamespaceString& nss, boost::optional<Timestamp> ts = boost::none) const;
 
     /**
      * Iterates through the views in the catalog associated with database `dbName`, applying
@@ -566,6 +579,23 @@ public:
     iterator end(OperationContext* opCtx) const;
 
     /**
+     * Checks if 'cleanupForOldestTimestampAdvanced' should be called when the oldest timestamp
+     * advanced. Used to avoid a potentially expensive call to 'cleanupForOldestTimestampAdvanced'
+     * if no write is needed.
+     */
+    bool needsCleanupForOldestTimestamp(Timestamp oldest) const;
+
+    /**
+     * Cleans up internal structures when the oldest timestamp advances
+     */
+    void cleanupForOldestTimestampAdvanced(Timestamp oldest);
+
+    /**
+     * Cleans up internal structures after catalog reopen
+     */
+    void cleanupForCatalogReopen(Timestamp stable);
+
+    /**
      * Ensures we have a MODE_X lock on a collection or MODE_IX lock for newly created collections.
      */
     static void invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
@@ -628,6 +658,33 @@ private:
                                       NamespaceType type) const;
 
     /**
+     * CatalogId with Timestamp
+     */
+    struct TimestampedCatalogId {
+        boost::optional<RecordId> id;
+        Timestamp ts;
+    };
+
+    // Push a catalogId for namespace at given Timestamp. Timestamp needs to be larger than other
+    // entries for this namespace. boost::none for catalogId represent drop, boost::none for
+    // timestamp turns this operation into a no-op.
+    void _pushCatalogIdForNSS(const NamespaceString& nss,
+                              boost::optional<RecordId> catalogId,
+                              boost::optional<Timestamp> ts);
+
+    // Push a catalogId for 'from' and 'to' for a rename operation at given Timestamp. Timestamp
+    // needs to be larger than other entries for these namespaces. boost::none for timestamp turns
+    // this operation into a no-op.
+    void _pushCatalogIdForRename(const NamespaceString& from,
+                                 const NamespaceString& to,
+                                 boost::optional<Timestamp> ts);
+
+    // Helper to calculate if a namespace needs to be marked for cleanup for a set of timestamped
+    // catalogIds
+    void _markNamespaceForCatalogIdCleanupIfNeeded(const NamespaceString& nss,
+                                                   const std::vector<TimestampedCatalogId>& ids);
+
+    /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID
      * to pre-close NSS. See also onCloseCatalog.
      */
@@ -646,6 +703,15 @@ private:
     OrderedCollectionMap _orderedCollections;  // Ordered by <dbName, collUUID> pair
     NamespaceCollectionMap _collections;
     UncommittedViewsSet _uncommittedViews;
+
+    // CatalogId mappings for all known namespaces for the CollectionCatalog. The vector is sorted
+    // on timestamp.
+    absl::flat_hash_map<NamespaceString, std::vector<TimestampedCatalogId>> _catalogIds;
+    // Set of namespaces that need cleanup when the oldest timestamp advances sufficiently.
+    absl::flat_hash_set<NamespaceString> _catalogIdChanges;
+    // Point at which the oldest timestamp need to advance for there to be any catalogId namespace
+    // that can be cleaned up
+    Timestamp _lowestCatalogIdTimestampForCleanup = Timestamp::max();
 
     // Map of database names to their corresponding views and other associated state.
     ViewsForDatabaseMap _viewsForDatabase;

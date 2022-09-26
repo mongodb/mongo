@@ -150,8 +150,10 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
 
     auto uuid = UUID::gen();
     CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(
-            operationContext(), uuid, std::make_shared<CollectionMock>(kNamespace));
+        catalog.registerCollection(operationContext(),
+                                   uuid,
+                                   std::make_shared<CollectionMock>(kNamespace),
+                                   /*ts=*/boost::none);
     });
 
     auto future = launchAsync([&] {

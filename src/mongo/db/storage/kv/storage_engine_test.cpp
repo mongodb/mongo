@@ -110,7 +110,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         _storageEngine->closeCatalog(opCtx.get());
-        _storageEngine->loadCatalog(opCtx.get(), StorageEngine::LastShutdownState::kUnclean);
+        _storageEngine->loadCatalog(
+            opCtx.get(), boost::none, StorageEngine::LastShutdownState::kUnclean);
     }
 
     ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
@@ -408,7 +409,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         _storageEngine->closeCatalog(opCtx.get());
-        _storageEngine->loadCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+        _storageEngine->loadCatalog(
+            opCtx.get(), boost::none, StorageEngine::LastShutdownState::kClean);
     }
 
     ASSERT(identExists(opCtx.get(), swCollInfo.getValue().ident));
@@ -464,7 +466,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     // When in a repair context, loadCatalog() recreates catalog entries for orphaned idents.
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
-        _storageEngine->loadCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+        _storageEngine->loadCatalog(
+            opCtx.get(), boost::none, StorageEngine::LastShutdownState::kClean);
     }
     auto identNs = swCollInfo.getValue().ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
@@ -500,7 +503,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     // orphaned idents.
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
-        _storageEngine->loadCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+        _storageEngine->loadCatalog(
+            opCtx.get(), boost::none, StorageEngine::LastShutdownState::kClean);
     }
     // reconcileCatalogAndIdents() drops orphaned idents.
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));

@@ -350,7 +350,9 @@ public:
     /**
      * When loading after an unclean shutdown, this performs cleanup on the DurableCatalogImpl.
      */
-    void loadCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final;
+    void loadCatalog(OperationContext* opCtx,
+                     boost::optional<Timestamp> stableTs,
+                     LastShutdownState lastShutdownState) final;
 
     void closeCatalog(OperationContext* opCtx) final;
 
@@ -453,6 +455,9 @@ private:
     // Listener for checkpoint timestamp changes to remove historical ident entries older than the
     // checkpoint timestamp.
     TimestampMonitor::TimestampListener _historicalIdentTimestampListener;
+
+    // Listener for cleanup of CollectionCatalog when oldest timestamp advances.
+    TimestampMonitor::TimestampListener _collectionCatalogCleanupTimestampListener;
 
     const bool _supportsCappedCollections;
 

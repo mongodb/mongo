@@ -243,9 +243,15 @@ void openCatalog(OperationContext* opCtx,
     // Load the catalog in the storage engine.
     LOGV2(20273, "openCatalog: loading storage engine catalog");
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
+    // Remove catalogId mappings for larger timestamp than 'stableTimestamp'.
+    CollectionCatalog::write(opCtx, [stableTimestamp](CollectionCatalog& catalog) {
+        catalog.cleanupForCatalogReopen(stableTimestamp);
+    });
+
     // Ignore orphaned idents because this function is used during rollback and not at
     // startup recovery, when we may try to recover orphaned idents.
-    storageEngine->loadCatalog(opCtx, StorageEngine::LastShutdownState::kClean);
+    storageEngine->loadCatalog(opCtx, stableTimestamp, StorageEngine::LastShutdownState::kClean);
 
     LOGV2(20274, "openCatalog: reconciling catalog and idents");
     auto reconcileResult = fassert(
