@@ -8,6 +8,7 @@ let MongosAPIParametersUtil = (function() {
 
     load('jstests/replsets/rslib.js');
     load('jstests/sharding/libs/last_lts_mongos_commands.js');
+    load('jstests/sharding/libs/remove_shard_util.js');
     load('jstests/sharding/libs/sharded_transactions_helpers.js');
     load('jstests/libs/auto_retry_transaction_in_sharding.js');
 
@@ -76,15 +77,7 @@ let MongosAPIParametersUtil = (function() {
     function awaitRemoveShard(shardName) {
         assert.commandWorked(st.startBalancer());
         st.awaitBalancerRound();
-        assert.soon(() => {
-            const res = st.s.adminCommand({removeShard: shardName});
-            jsTestLog(`removeShard result: ${tojson(res)}`);
-            if (!res.ok && res.code === ErrorCodes.ShardNotFound) {
-                return true;
-            }
-
-            return 'completed' === res.state;
-        }, "removeShard never completed for shard " + shardName, 10 * 60 * 1000, 1000);
+        removeShard(st, shardName);
         assert.commandWorked(st.stopBalancer());
     }
 

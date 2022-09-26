@@ -13,6 +13,7 @@
 'use strict';
 
 load('jstests/libs/fail_point_util.js');
+load('jstests/sharding/libs/remove_shard_util.js');
 
 const clusterParameter1Value = {
     intData: 42
@@ -185,10 +186,7 @@ const checkClusterParameters =
                                st.configRS.getPrimary(),
                                newShard.getPrimary());
 
-        assert.soon(() => {
-            let res = st.s.adminCommand({removeShard: newShardName});
-            return res.state == 'completed';
-        });
+        removeShard(st, newShardName);
 
         newShard.stopSet();
 
@@ -290,11 +288,7 @@ const checkClusterParameters =
                   }));
 
         // Well behaved test, remove shard and stop the set.
-        assert.soon(() => {
-            let res = assert.commandWorked(st2.s.adminCommand({removeShard: newShard3Name}));
-
-            return 'completed' === res.state;
-        });
+        removeShard(st2, newShard3Name);
 
         newShard3.stopSet();
     }

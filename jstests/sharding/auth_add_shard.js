@@ -3,6 +3,7 @@
 // up a sharded system, then adds/removes a shard.
 (function() {
 'use strict';
+load('jstests/sharding/libs/remove_shard_util.js');
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -90,15 +91,7 @@ st.startBalancer();
 
 //--------------- Test 3 --------------------
 // now drain the shard
-assert.commandWorked(admin.runCommand({removeShard: rst.getURL()}));
-
-// give it some time to drain
-assert.soon(function() {
-    var result = admin.runCommand({removeShard: rst.getURL()});
-    printjson(result);
-
-    return result.ok && result.state == "completed";
-}, "failed to drain shard completely", 5 * 60 * 1000);
+removeShard(st, rst.getURL());
 
 // create user directly on new shard to allow direct reads from config.migrationCoordinators
 rst.getPrimary()

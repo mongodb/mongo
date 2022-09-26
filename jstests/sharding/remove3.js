@@ -1,6 +1,7 @@
 // Validates the remove/drain shard functionality when there is data on the shard being removed
 (function() {
 'use strict';
+load('jstests/sharding/libs/remove_shard_util.js');
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -37,8 +38,7 @@ assert.commandWorked(st.s0.adminCommand(
     {moveChunk: 'TestDB.Coll', find: {_id: 1}, to: st.shard0.shardName, _waitForDelete: true}));
 
 // Remove shard must succeed now
-removeRes = assert.commandWorked(st.s0.adminCommand({removeShard: st.shard1.shardName}));
-assert.eq('completed', removeRes.state);
+removeShard(st, st.shard1.shardName);
 
 // Make sure both mongos instance refresh their metadata and do not reference the missing shard
 assert.eq(2, st.s0.getDB('TestDB').Coll.find({}).toArray().length);

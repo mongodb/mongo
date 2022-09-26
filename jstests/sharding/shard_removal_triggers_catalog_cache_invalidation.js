@@ -4,6 +4,7 @@
  */
 (function() {
 'use strict';
+load('jstests/sharding/libs/remove_shard_util.js');
 
 // Checking UUID consistency involves talking to shards, but this test shuts down shards.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
@@ -63,19 +64,7 @@ const dbName = 'TestDB';
     st.startBalancer();
 
     // Remove shard0.
-    assert.soon(() => {
-        const removeRes = st.s0.adminCommand({removeShard: st.shard0.shardName});
-        if (!removeRes.ok && removeRes.code === ErrorCodes.ShardNotFound) {
-            // If the config server primary steps down right after removing the config.shards doc
-            // for the shard but before responding with "state": "completed", the mongos would retry
-            // the _configsvrRemoveShard command against the new config server primary, which would
-            // not find the removed shard in its ShardRegistry if it has done a ShardRegistry reload
-            // after the config.shards doc for the shard was removed. This would cause the command
-            // to fail with ShardNotFound.
-            return true;
-        }
-        return removeRes.state === 'completed';
-    });
+    removeShard(st, st.shard0.shardName);
 
     // Stop the replica set so that future requests to this shard will be unsuccessful.
     st.rs0.stopSet();

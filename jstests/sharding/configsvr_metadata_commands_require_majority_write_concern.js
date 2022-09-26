@@ -6,6 +6,7 @@
  */
 (function() {
 'use strict';
+load('jstests/sharding/libs/remove_shard_util.js');
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -72,9 +73,7 @@ const cleanupFuncs = {
         }
         assert.commandWorked(res);
         assert.eq('started', res.state);
-        res = st.s.adminCommand({removeShard: newShardName});
-        assert.commandWorked(res);
-        assert.eq('completed', res.state);
+        removeShard(st, newShardName);
     },
 };
 

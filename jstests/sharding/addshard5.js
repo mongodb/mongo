@@ -2,6 +2,7 @@
 // migrations
 (function() {
 'use strict';
+load('jstests/sharding/libs/remove_shard_util.js');
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -31,8 +32,7 @@ assert.commandWorked(mongos.adminCommand(
     {moveChunk: coll + '', find: {_id: 0}, to: st.shard0.shardName, _waitForDelete: true}));
 
 // Drop and re-add shard with the same name but a new host.
-assert.commandWorked(mongos.adminCommand({removeShard: st.shard1.shardName}));
-assert.commandWorked(mongos.adminCommand({removeShard: st.shard1.shardName}));
+removeShard(st, st.shard1.shardName);
 
 let shard2 = new ReplSetTest({nodes: 2, nodeOptions: {shardsvr: ""}});
 shard2.startSet();

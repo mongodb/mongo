@@ -8,6 +8,7 @@
 
 load("jstests/libs/feature_flag_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
+load('jstests/sharding/libs/remove_shard_util.js');
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -56,21 +57,7 @@ function addShardToCluster() {
  * decrements numShards.
  */
 function removeShardFromCluster(shardName) {
-    assert.commandWorked(st.s.adminCommand({removeShard: shardName}));
-    assert.soon(function() {
-        const res = st.s.adminCommand({removeShard: shardName});
-        if (!res.ok && res.code === ErrorCodes.ShardNotFound) {
-            // If the config server primary steps down right after removing the config.shards doc
-            // for the shard but before responding with "state": "completed", the mongos would retry
-            // the _configsvrRemoveShard command against the new config server primary, which would
-            // not find the removed shard in its ShardRegistry if it has done a ShardRegistry reload
-            // after the config.shards doc for the shard was removed. This would cause the command
-            // to fail with ShardNotFound.
-            return true;
-        }
-        assert.commandWorked(res);
-        return ("completed" == res.state);
-    }, "failed to remove shard " + shardName, kBalancerTimeoutMS);
+    removeShard(st, shardName);
     numShards--;
 }
 

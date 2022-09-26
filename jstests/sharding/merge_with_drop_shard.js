@@ -4,6 +4,7 @@
 'use strict';
 
 load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
+load('jstests/sharding/libs/remove_shard_util.js');   // For removeShard.
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -26,17 +27,10 @@ function setAggHang(mode) {
         {configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}));
 }
 
-function removeShard(shard) {
+function removeShardAndRefreshRouter(shard) {
     // We need the balancer to drain all the chunks out of the shard that is being removed.
     assert.commandWorked(st.startBalancer());
-    var res = st.s.adminCommand({removeShard: shard.shardName});
-    assert.commandWorked(res);
-    assert.eq('started', res.state);
-    assert.soon(function() {
-        res = st.s.adminCommand({removeShard: shard.shardName});
-        assert.commandWorked(res);
-        return ('completed' === res.state);
-    }, "removeShard never completed for shard " + shard.shardName);
+    removeShard(st, shard.shardName);
 
     // Drop the test database on the removed shard so it does not interfere with addShard later.
     assert.commandWorked(shard.getDB(mongosDB.getName()).dropDatabase());
@@ -103,7 +97,7 @@ function runMergeWithMode(
         });
 
     if (dropShard) {
-        removeShard(st.shard0);
+        removeShardAndRefreshRouter(st.shard0);
     } else {
         addShard(st.rs0.getURL());
     }

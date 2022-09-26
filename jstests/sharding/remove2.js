@@ -14,6 +14,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 'use strict';
 load("jstests/replsets/rslib.js");
 load("jstests/sharding/libs/find_chunks_util.js");
+load('jstests/sharding/libs/remove_shard_util.js');
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -73,7 +74,7 @@ function setupInitialData(st, coll) {
     st.printShardingStatus();
 }
 
-function removeShard(st, coll, replTest) {
+function removeShardAndCleanup(st, coll, replTest) {
     jsTest.log("Moving chunk from shard1 to shard0");
     assert.commandWorked(st.moveChunk(coll.getFullName(), {i: 6}, st.shard0.shardName));
 
@@ -85,15 +86,7 @@ function removeShard(st, coll, replTest) {
                   st.s0.getDB('config'), coll.getFullName(), {shard: st.shard1.shardName}));
 
     jsTest.log("Removing shard with name: " + replTest.name);
-    var res = st.s.adminCommand({removeShard: replTest.name});
-    assert.commandWorked(res);
-    assert.eq('started', res.state);
-    assert.soon(function() {
-        jsTest.log("Removing shard in assert soon: " + replTest.name);
-        res = st.s.adminCommand({removeShard: replTest.name});
-        assert.commandWorked(res);
-        return ('completed' === res.state);
-    }, "failed to remove shard: " + tojson(res));
+    removeShard(st, replTest.name);
 
     // Drop the database so the shard can be re-added.
     assert.commandWorked(replTest.getPrimary().getDB(coll.getDB().getName()).dropDatabase());
@@ -126,14 +119,14 @@ setupInitialData(st, coll);
 jsTestLog("Test basic removal and re-addition of shard without shutting down.");
 
 let rst1 = st.rs1;
-removeShard(st, coll, rst1);
+removeShardAndCleanup(st, coll, rst1);
 addShard(st, coll, rst1);
 
 jsTestLog("Test basic removal and re-addition of shard with shutting down the replica set.");
 
 const originalSeed = seedString(rst1);
 
-removeShard(st, coll, rst1);
+removeShardAndCleanup(st, coll, rst1);
 rst1.stopSet();
 
 // Await that both mongos and rs0 remove RSM for removed replicaset
@@ -149,7 +142,7 @@ addShard(st, coll, rst1);
 jsTestLog(
     "Test removal and re-addition of shard with an identical replica set name and different port.");
 
-removeShard(st, coll, rst1);
+removeShardAndCleanup(st, coll, rst1);
 rst1.stopSet();
 
 // Await that both mongos and rs0 remove RSM for removed replicaset
@@ -172,7 +165,7 @@ assert.eq(1, st.s.getDB('test2').foo.find().itcount());
 // Have to take out rst2 and put rst1 back into the set so that it can clean up.
 jsTestLog("Resetting the sharding test to its initial state to allow the test to shut down.");
 assert.commandWorked(st.admin.runCommand({movePrimary: 'test2', to: st.rs0.name}));
-removeShard(st, coll, rst2);
+removeShardAndCleanup(st, coll, rst2);
 rst2.stopSet();
 
 // Await that both mongos and rs0 remove RSM for removed replicaset

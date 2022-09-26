@@ -5,6 +5,7 @@
  */
 (function() {
 "use strict";
+load('jstests/sharding/libs/remove_shard_util.js');
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -96,15 +97,10 @@ for (x = 0; x < 2; x++) {
 checkBasicCRUD(st.s.getDB('test').unsharded);
 checkBasicCRUD(st.s.getDB('test').sharded);
 
-assert.commandWorked(st.s.adminCommand({removeShard: 'toRemoveLater'}));
-
 // Start the balancer to start draining the chunks.
 st.startBalancer();
 
-assert.soon(function() {
-    var res = st.s.adminCommand({removeShard: 'toRemoveLater'});
-    return res.state == 'completed';
-});
+removeShard(st, 'toRemoveLater');
 
 newShard.stopSet();
 
