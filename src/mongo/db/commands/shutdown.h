@@ -114,13 +114,6 @@ public:
     Command::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return Command::AllowedOnSecondary::kAlways;
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::shutdown);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-    }
 };
 
 }  // namespace mongo

@@ -36,6 +36,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/global_conn_pool.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/executor/connection_pool_stats.h"
@@ -62,12 +63,16 @@ public:
         return false;
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::connPoolStats);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::connPoolStats)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,

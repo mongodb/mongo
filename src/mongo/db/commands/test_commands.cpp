@@ -64,19 +64,25 @@ using std::stringstream;
 class GodInsert : public BasicCommand {
 public:
     GodInsert() : BasicCommand("godinsert") {}
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return false;
     }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
+
     // No auth needed because it only works when enabled via command line.
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+
     std::string help() const override {
         return "internal. for testing only.";
     }
@@ -120,20 +126,26 @@ MONGO_REGISTER_TEST_COMMAND(GodInsert);
 class CapTrunc : public BasicCommand {
 public:
     CapTrunc() : BasicCommand("captrunc") {}
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
+
     // No auth needed because it only works when enabled via command line.
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}
-    virtual bool run(OperationContext* opCtx,
-                     const DatabaseName& dbName,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
         if (!fullNs.isValid()) {
             uasserted(ErrorCodes::InvalidNamespace,
@@ -195,18 +207,22 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
-    // No auth needed because it only works when enabled via command line.
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}
 
-    virtual bool run(OperationContext* opCtx,
-                     const DatabaseName& dbName,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+    // No auth needed because it only works when enabled via command line.
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
         uassertStatusOK(emptyCapped(opCtx, nss));
@@ -237,9 +253,11 @@ public:
     }
 
     // No auth needed because it only works when enabled via command line.
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {}
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
 
     std::string help() const override {
         return "pins the oldest timestamp";

@@ -87,9 +87,11 @@ public:
     }
 
     // No auth needed because it only works when enabled via command line.
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {}
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        return Status::OK();
+    }
 
     std::string help() const override {
         return "modifies the settings of a fail point";

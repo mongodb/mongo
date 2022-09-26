@@ -52,17 +52,23 @@ using std::stringstream;
 // Testing only, enabled via command-line.
 class CmdHashElt : public BasicCommand {
 public:
-    CmdHashElt() : BasicCommand("_hashBSONElement"){};
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    CmdHashElt() : BasicCommand("_hashBSONElement") {}
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
+
     // No auth needed because it only works when enabled via command line.
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+
     std::string help() const override {
         return "returns the hash of the first BSONElement val in a BSONObj";
     }

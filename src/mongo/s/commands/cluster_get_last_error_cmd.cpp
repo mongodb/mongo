@@ -39,7 +39,7 @@ class GetLastErrorCmd : public BasicCommand {
 public:
     GetLastErrorCmd() : BasicCommand("getLastError", "getlasterror") {}
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -51,17 +51,17 @@ public:
         return "no longer supported";
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        // No auth required for getlasterror
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
     }
 
     bool requiresAuth() const override {
         return false;
     }
 
-    virtual bool run(OperationContext*, const DatabaseName&, const BSONObj&, BSONObjBuilder&) {
+    bool run(OperationContext*, const DatabaseName&, const BSONObj&, BSONObjBuilder&) override {
         uasserted(5739001, "getLastError command is not supported");
         return false;
     }

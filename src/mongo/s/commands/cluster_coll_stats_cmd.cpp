@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/logv2/log.h"
@@ -182,12 +183,16 @@ public:
         return false;
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::collStats);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName.db(), cmdObj),
+                                                  ActionType::collStats)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,

@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/free_mon/free_mon_controller.h"
 #include "mongo/db/free_mon/free_mon_options.h"
@@ -44,9 +45,14 @@ public:
         return true;
     }
 
-    void addRequiredPrivileges(std::vector<Privilege>* out) final {
-        out->push_back(Privilege(ResourcePattern::forClusterResource(),
-                                 ActionType::checkFreeMonitoringStatus));
+    Status checkAuthForOperation(OperationContext* opCtx) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::checkFreeMonitoringStatus)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {

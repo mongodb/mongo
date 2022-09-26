@@ -45,13 +45,16 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
+
     virtual bool isWriteCommandForConfigServer() const {
         return false;
     }
+
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
         return true;
     }
+
     std::string help() const override {
         return "internal. for testing only."
                "{ cpuload : 1, cpuFactor : 1 } Runs a straight CPU load. Length of execution "
@@ -59,13 +62,17 @@ public:
                "Useful for testing the stability of the performance of the underlying system,"
                "by running the command repeatedly and observing the variation in execution time.";
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
-    virtual bool run(OperationContext* txn,
-                     const DatabaseName&,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
+    }
+
+    bool run(OperationContext* txn,
+             const DatabaseName&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         double cpuFactor = 1;
         if (cmdObj["cpuFactor"].isNumber()) {
             cpuFactor = cmdObj["cpuFactor"].number();

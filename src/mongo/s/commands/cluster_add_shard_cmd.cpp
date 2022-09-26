@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -65,12 +66,16 @@ public:
         return "add a new shard to the system";
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::addShard);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::addShard)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,

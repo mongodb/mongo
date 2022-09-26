@@ -65,10 +65,12 @@ public:
     virtual bool includeByDefault() const = 0;
 
     /**
-     * Adds the privileges that are required to view this section
+     * Perform authorization checks required to show this status section.
      * TODO: Remove this empty default implementation and implement for every section.
      */
-    virtual void addRequiredPrivileges(std::vector<Privilege>* out){};
+    virtual Status checkAuthForOperation(OperationContext* opCtx) const {
+        return Status::OK();
+    }
 
     /**
      * actually generate the result

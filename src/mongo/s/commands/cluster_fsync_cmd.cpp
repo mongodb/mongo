@@ -31,6 +31,7 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -59,12 +60,16 @@ public:
         return false;
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::fsync);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::fsync)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     bool errmsgRun(OperationContext* opCtx,

@@ -49,22 +49,30 @@ using std::stringstream;
 
 class CompactCmd : public BasicCommand {
 public:
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual bool adminOnly() const {
+
+    bool adminOnly() const override {
         return false;
     }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::compact);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName.db(), cmdObj),
+                                                  ActionType::compact)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
+
     std::string help() const override {
         return "compact collection\n"
                "warning: this operation locks the database and is slow. you can cancel with "
@@ -72,6 +80,7 @@ public:
                "{ compact : <collection_name>, [force:<bool>] }\n"
                "  force - allows to run on a replica set primary\n";
     }
+
     CompactCmd() : BasicCommand("compact") {}
 
     bool run(OperationContext* opCtx,

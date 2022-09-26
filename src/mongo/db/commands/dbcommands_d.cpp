@@ -217,7 +217,7 @@ public:
     }
 
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -225,8 +225,7 @@ public:
         return true;
     }
 
-    virtual NamespaceString parseNs(const DatabaseName& dbName,
-                                    const BSONObj& cmdObj) const override {
+    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
         std::string collectionName;
         if (const auto rootElt = cmdObj["root"]) {
             uassert(ErrorCodes::InvalidNamespace,
@@ -240,16 +239,22 @@ public:
         return NamespaceString(dbName, collectionName);
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), ActionType::find));
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName.db(), cmdObj),
+                                                  ActionType::find)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
              const BSONObj& jsobj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, jsobj));
 
         md5digest d;

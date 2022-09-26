@@ -82,10 +82,10 @@ public:
         return true;
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        map_reduce_common::addPrivilegesRequiredForMapReduce(this, dbname, cmdObj, out);
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        return map_reduce_common::checkAuthForMapReduce(this, opCtx, dbName, cmdObj);
     }
 
     virtual void _explainImpl(OperationContext* opCtx,

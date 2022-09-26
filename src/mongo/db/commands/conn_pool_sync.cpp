@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/global_conn_pool.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 
 namespace mongo {
@@ -51,12 +52,16 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::connPoolSync);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::connPoolSync)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,

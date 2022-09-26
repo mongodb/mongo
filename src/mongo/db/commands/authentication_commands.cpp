@@ -113,11 +113,13 @@ public:
     bool requiresAuth() const override {
         return false;
     }
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const final {
+
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
         // No auth required since this command was explicitly part
         // of an authentication workflow.
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,

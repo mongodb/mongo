@@ -34,6 +34,7 @@
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
@@ -330,18 +331,22 @@ OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdOb
     return outputOptions;
 }
 
-void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-    OutputOptions outputOptions = parseOutputOptions(dbname, cmdObj);
+Status checkAuthForMapReduce(const BasicCommand* commandTemplate,
+                             OperationContext* opCtx,
+                             const DatabaseName& dbName,
+                             const BSONObj& cmdObj) {
+    OutputOptions outputOptions = parseOutputOptions(dbName.db(), cmdObj);
 
-    ResourcePattern inputResource(commandTemplate->parseResourcePattern(dbname, cmdObj));
+    ResourcePattern inputResource(commandTemplate->parseResourcePattern(dbName.db(), cmdObj));
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid input namespace " << inputResource.databaseToMatch() << "."
                           << cmdObj["mapReduce"].String(),
             inputResource.isExactNamespacePattern());
-    out->push_back(Privilege(inputResource, ActionType::find));
+
+    auto* as = AuthorizationSession::get(opCtx->getClient());
+    if (!as->isAuthorizedForActionsOnResource(inputResource, ActionType::find)) {
+        return {ErrorCodes::Unauthorized, "unauthorized"};
+    }
 
     if (outputOptions.outType != OutputType::InMemory) {
         ActionSet outputActions;
@@ -363,8 +368,12 @@ void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
                 outputResource.ns().isValid());
 
         // TODO: check if outputNs exists and add createCollection privilege if not
-        out->push_back(Privilege(outputResource, outputActions));
+        if (!as->isAuthorizedForActionsOnResource(outputResource, outputActions)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
     }
+
+    return Status::OK();
 }
 
 bool mrSupportsWriteConcern(const BSONObj& cmd) {

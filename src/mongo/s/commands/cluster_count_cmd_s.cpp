@@ -42,10 +42,9 @@ struct ClusterCountCmdS {
         return kApiVersions1;
     }
 
-    static void addRequiredPrivileges(const std::string& dbname,
-                                      const BSONObj& cmdObj,
-                                      std::vector<Privilege>* out) {
+    static Status checkAuthForOperation(OperationContext*) {
         // No additional required privileges on a mongos.
+        return Status::OK();
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {

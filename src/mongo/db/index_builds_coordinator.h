@@ -497,8 +497,6 @@ public:
             return true;
         }
 
-        void addRequiredPrivileges(std::vector<Privilege>* out) final {}
-
         BSONObj generateSection(OperationContext* opCtx,
                                 const BSONElement& configElement) const final {
             BSONObjBuilder indexBuilds;

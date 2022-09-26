@@ -347,12 +347,12 @@ public:
                 {{ErrorCodes::InvalidOptions, "default read concern not permitted"}}};
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        bool update = cmdObj["update"].trueValue();
-        bool upsert = cmdObj["upsert"].trueValue();
-        bool remove = cmdObj["remove"].trueValue();
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        const bool update = cmdObj["update"].trueValue();
+        const bool upsert = cmdObj["upsert"].trueValue();
+        const bool remove = cmdObj["remove"].trueValue();
 
         ActionSet actions;
         actions.addAction(ActionType::find);
@@ -369,12 +369,18 @@ public:
             actions.addAction(ActionType::bypassDocumentValidation);
         }
 
-        std::string ns = CommandHelpers::parseNsFromCommand(dbname, cmdObj);
-        ResourcePattern resource(CommandHelpers::resourcePatternForNamespace(ns));
+        auto nss = CommandHelpers::parseNsFromCommand(dbName, cmdObj);
+        ResourcePattern resource(CommandHelpers::resourcePatternForNamespace(nss.ns()));
         uassert(17137,
                 "Invalid target namespace " + resource.toString(),
                 resource.isExactNamespacePattern());
-        out->push_back(Privilege(resource, actions));
+
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(resource, actions)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     Status explain(OperationContext* opCtx,

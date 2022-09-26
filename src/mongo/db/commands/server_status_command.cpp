@@ -66,24 +66,26 @@ public:
                "retrieve all server status sections.";
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const final {
-        ActionSet actions;
-        actions.addAction(ActionType::serverStatus);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::serverStatus)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,
-             const DatabaseName&,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         const auto service = opCtx->getServiceContext();
         const auto clock = service->getFastClockSource();
         const auto runStart = clock->now();
         BSONObjBuilder timeBuilder(256);
-
-        const auto authSession = AuthorizationSession::get(Client::getCurrent());
 
         // This command is important to observability, and like FTDC, does not need to acquire the
         // PBWM lock to return correct results.
@@ -115,10 +117,9 @@ public:
         for (auto i = registry->begin(); i != registry->end(); ++i) {
             ServerStatusSection* section = i->second;
 
-            std::vector<Privilege> requiredPrivileges;
-            section->addRequiredPrivileges(&requiredPrivileges);
-            if (!authSession->isAuthorizedForPrivileges(requiredPrivileges))
+            if (!section->checkAuthForOperation(opCtx).isOK()) {
                 continue;
+            }
 
             bool include = section->includeByDefault();
             const auto& elem = cmdObj[section->getSectionName()];
@@ -263,8 +264,6 @@ public:
     bool includeByDefault() const final {
         return false;
     }
-
-    void addRequiredPrivileges(std::vector<Privilege>* out) final {}
 
     BSONObj generateSection(OperationContext*, const BSONElement& configElement) const final {
         return HttpClient::getServerStatus();

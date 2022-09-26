@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -50,34 +51,40 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
+
     std::string help() const override {
         return "{ cloneCollectionAsCapped:<fromName>, toCollection:<toName>, size:<sizeInBytes> }";
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet sourceActions;
-        sourceActions.addAction(ActionType::find);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), sourceActions));
 
-        ActionSet targetActions;
-        targetActions.addAction(ActionType::insert);
-        targetActions.addAction(ActionType::createIndex);
-        targetActions.addAction(ActionType::convertToCapped);
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName.db(), cmdObj),
+                                                  ActionType::find)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
 
         const auto nssElt = cmdObj["toCollection"];
         uassert(ErrorCodes::TypeMismatch,
                 "'toCollection' must be of type String",
                 nssElt.type() == BSONType::String);
-        const NamespaceString nss(dbname, nssElt.valueStringData());
+        const NamespaceString nss(dbName, nssElt.valueStringData());
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid target namespace: " << nss.ns(),
                 nss.isValid());
 
-        out->push_back(Privilege(ResourcePattern::forExactNamespace(nss), targetActions));
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forExactNamespace(nss),
+                {ActionType::insert, ActionType::createIndex, ActionType::convertToCapped})) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,
@@ -154,12 +161,17 @@ public:
     std::string help() const override {
         return "{ convertToCapped:<fromCollectionName>, size:<sizeInBytes> }";
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::convertToCapped);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName.db(), cmdObj),
+                                                  ActionType::convertToCapped)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,

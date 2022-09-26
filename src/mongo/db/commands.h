@@ -902,11 +902,13 @@ public:
 
     /**
      * Checks if the client associated with the given OperationContext is authorized to run this
-     * command. Default implementation checks via addRequiredPrivileges().
+     * command.
+     * Command imlpementations MUST provide a method here, even if no authz checks are required.
+     * Such commands should return Status::OK(), with a comment stating "No auth required".
      */
     virtual Status checkAuthForOperation(OperationContext* opCtx,
                                          const DatabaseName& dbName,
-                                         const BSONObj& cmdObj) const;
+                                         const BSONObj& cmdObj) const = 0;
 
     /**
      * supportsWriteConcern returns true if this command should be parsed for a writeConcern
@@ -969,22 +971,6 @@ public:
 private:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) final;
-
-    //
-    // Deprecated virtual methods.
-    //
-
-    /**
-     * Appends to "*out" the privileges required to run this command on database "dbname" with
-     * the invocation described by "cmdObj".  New commands shouldn't implement this, they should
-     * implement checkAuthForOperation (which takes an OperationContext*), instead.
-     */
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        // The default implementation of addRequiredPrivileges should never be hit.
-        fassertFailed(16940);
-    }
 };
 
 /**

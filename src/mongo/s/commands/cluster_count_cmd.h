@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/query/count_command_as_aggregation_command.h"
@@ -86,13 +87,16 @@ public:
                 Status::OK()};
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::find);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-        Impl::addRequiredPrivileges(dbname, cmdObj, out);
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName.db(), cmdObj),
+                                                  ActionType::find)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Impl::checkAuthForOperation(opCtx);
     }
 
     bool errmsgRun(OperationContext* opCtx,

@@ -60,9 +60,11 @@ public:
         return false;
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {}
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
 
     std::string help() const override {
         return "replies with the values of the OperationContext's API parameters";

@@ -35,6 +35,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/parameters_gen.h"
 #include "mongo/db/commands/parse_log_component_settings.h"
@@ -206,19 +207,27 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool adminOnly() const {
+
+    bool adminOnly() const override {
         return true;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::getParameter);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::getParameter)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
+
     std::string help() const override {
         std::string h =
             "get administrative option(s)\nexample:\n"
@@ -265,19 +274,27 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool adminOnly() const {
+
+    bool adminOnly() const override {
         return true;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::setParameter);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::setParameter)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
+
     std::string help() const override {
         std::string h =
             "set administrative option(s)\n"

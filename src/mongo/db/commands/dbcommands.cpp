@@ -729,9 +729,12 @@ public:
         return false;
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const final {}  // No auth required
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+
     std::string help() const final {
         return "get version #, etc.\n"
                "{ buildinfo:1 }";

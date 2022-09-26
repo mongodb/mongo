@@ -148,26 +148,35 @@ public:
     std::string help() const override {
         return "get a list of all db commands";
     }
+
     ListCommandsCmd() : BasicCommand("listCommands") {}
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool adminOnly() const {
+
+    bool adminOnly() const override {
         return false;
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
+
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
+    }
+
     bool requiresAuth() const final {
         return false;
     }
-    virtual bool run(OperationContext* opCtx,
-                     const DatabaseName&,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         // Sort the command names before building the result BSON.
         std::vector<Command*> commands;
         for (const auto& command : globalCommandRegistry()->allCommands()) {

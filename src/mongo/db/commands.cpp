@@ -994,18 +994,6 @@ Status BasicCommandWithReplyBuilderInterface::explain(OperationContext* opCtx,
     return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};
 }
 
-Status BasicCommandWithReplyBuilderInterface::checkAuthForOperation(OperationContext* opCtx,
-                                                                    const DatabaseName& dbName,
-                                                                    const BSONObj& cmdObj) const {
-    std::vector<Privilege> privileges;
-    this->addRequiredPrivileges(dbName.db(), cmdObj, &privileges);
-    if (!AuthorizationSession::get(opCtx->getClient())->isAuthorizedForPrivileges(privileges)) {
-        return {ErrorCodes::Unauthorized, "unauthorized"};
-    }
-
-    return Status::OK();
-}
-
 void Command::generateHelpResponse(OperationContext* opCtx,
                                    rpc::ReplyBuilderInterface* replyBuilder,
                                    const Command& command) {

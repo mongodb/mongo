@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/commands/cluster_count_cmd.h"
 #include "mongo/s/grid.h"
@@ -44,12 +45,14 @@ struct ClusterCountCmdD {
         return kNoApiVersions;
     }
 
-    static void addRequiredPrivileges(const std::string& dbname,
-                                      const BSONObj& cmdObj,
-                                      std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::internal);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    static Status checkAuthForOperation(OperationContext* opCtx) {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::internal)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {

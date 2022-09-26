@@ -116,11 +116,12 @@ public:
         return {};
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        // Command is testing-only, and can only be enabled at command line.  Hence, no auth
-        // check needed.
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        // Command is testing-only, and can only be enabled at command line.
+        //  Hence, no auth check needed.
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,

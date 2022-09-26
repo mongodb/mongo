@@ -32,6 +32,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -50,26 +51,35 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool adminOnly() const {
+
+    bool adminOnly() const override {
         return true;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+
     std::string help() const override {
         return "usage by collection, in micros ";
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::top);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::top)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
-    virtual bool run(OperationContext* opCtx,
-                     const DatabaseName&,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         {
             BSONObjBuilder b(result.subobjStart("totals"));
             b.append("note", "all times in microseconds");

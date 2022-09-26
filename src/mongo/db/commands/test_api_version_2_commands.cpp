@@ -51,6 +51,12 @@ public:
         return false;
     }
 
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
@@ -75,6 +81,12 @@ public:
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
+    }
+
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
     }
 
     bool run(OperationContext* opCtx,
@@ -107,6 +119,12 @@ public:
         return false;
     }
 
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
@@ -131,6 +149,12 @@ public:
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
+    }
+
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
     }
 
     bool run(OperationContext* opCtx,
