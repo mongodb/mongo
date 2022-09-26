@@ -2353,9 +2353,9 @@ buildvariants:
     - rhel72-zseries-build
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &enterprise-rhel-80-64-dynamic-clang-tidy-condensed
-  name: enterprise-rhel80-dynamic-clang-tidy-condensed
-  display_name: "Enterprise Clang Tidy With Extra Checks"
+- &enterprise-rhel-80-64-dynamic-clang-tidy
+  name: enterprise-rhel80-dynamic-clang-tidy-required
+  display_name: "! Enterprise Clang Tidy"
   cron: "0 4 * * *"
   modules:
   - enterprise
@@ -2371,18 +2371,11 @@ buildvariants:
     scons_cache_mode: all
     show_scons_timings: false
     clang_tidy_toolchain: v3
-    clang_tidy_file: .clang-tidy-extra-checks
-  tasks:
-  - name: clang_tidy_condensed_TG
-
-- <<: *enterprise-rhel-80-64-dynamic-clang-tidy-condensed
-  name: enterprise-rhel80-dynamic-clang-tidy-required
-  display_name: "! Enterprise Clang Tidy"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    clang_tidy_file: .clang-tidy
   tasks:
   - name: clang_tidy_TG
 
-- <<: *enterprise-rhel-80-64-dynamic-clang-tidy-condensed
+- <<: *enterprise-rhel-80-64-dynamic-clang-tidy
   name: enterprise-rhel80-dynamic-clang-tidy-v4
   display_name: "Enterprise Clang Tidy v4 Toolchain"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter

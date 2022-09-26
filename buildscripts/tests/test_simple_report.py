@@ -33,9 +33,9 @@ class TestSimpleReport(unittest.TestCase):
         for _ in range(0, 100):
             self._test_trivial_report()  # pylint: disable=no-value-for-parameter
 
-    @patch(ns("_try_combine_reports"))
+    @patch(ns("try_combine_reports"))
     @patch(ns("_clean_log_file"))
-    @patch(ns("_put_report"))
+    @patch(ns("put_report"))
     def _test_trivial_report(self, mock_put_report, mock_clean_log_file, _mock_try_combine_reports):
         exit_code = self.rng.randint(0, 254)
         print(f"Trying exit code: {exit_code}")
@@ -55,8 +55,8 @@ class TestSimpleReport(unittest.TestCase):
             self.assertEqual(report["failures"], 1)
         self.assertEqual(result.exit_code, 0)
 
-    @patch(ns("_try_combine_reports"))
-    @patch(ns("_put_report"))
+    @patch(ns("try_combine_reports"))
+    @patch(ns("put_report"))
     def test_truncate_scons(self, mock_put_report, _mock_try_combine_reports):
         exit_code = 0
         data = fix_newlines(
@@ -82,8 +82,8 @@ interesting part"""))
         self.assertEqual(report["failures"], 0)
         self.assertEqual(result.exit_code, 0)
 
-    @patch(ns("_try_combine_reports"))
-    @patch(ns("_put_report"))
+    @patch(ns("try_combine_reports"))
+    @patch(ns("put_report"))
     def test_non_scons_log(self, mock_put_report, _mock_try_combine_reports):
         exit_code = 0
         data = fix_newlines(
