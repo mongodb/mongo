@@ -61,7 +61,7 @@ ScalarHistogram::ScalarHistogram() : ScalarHistogram({}, {}) {}
 
 ScalarHistogram::ScalarHistogram(std::vector<StatsBucket> buckets) {
 
-    for (auto bucket : buckets) {
+    for (const auto& bucket : buckets) {
         Bucket b(bucket.getBoundaryCount(),
                  bucket.getRangeCount(),
                  bucket.getCumulativeCount(),

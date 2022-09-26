@@ -228,7 +228,6 @@ TEST(OplogEntryTest, ParseReplOperationIncludesTidField) {
     ASSERT_EQ(replOp.getTid(), tid);
     ASSERT_EQ(replOp.getNss(), nssWithTid);
 }
-
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

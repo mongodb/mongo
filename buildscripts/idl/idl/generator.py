@@ -35,10 +35,19 @@ import re
 import sys
 import textwrap
 from abc import ABCMeta, abstractmethod
+from enum import Enum
 from typing import Dict, Iterable, List, Mapping, Tuple, Union, cast
 
 from . import (ast, bson, common, cpp_types, enum_types, generic_field_list_types, struct_types,
                writer)
+
+
+class _StructDataOwnership(Enum):
+    """Enumerates the ways a struct may participate in ownership of it's data."""
+
+    VIEW = 1  # Doesn't participate in ownership
+    SHARED = 2  # Participates in non-exclusive ownership
+    OWNER = 3  # Takes ownership of underlying data
 
 
 def _get_field_member_name(field):
@@ -467,26 +476,64 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
     def gen_serializer_methods(self, struct):
         # type: (ast.Struct) -> None
-        """Generate a serializer method declarations."""
-
+        """Generate serializer method declarations."""
         struct_type_info = struct_types.get_struct_info(struct)
-
-        parse_method = struct_type_info.get_deserializer_static_method()
-        if parse_method:
-            self._writer.write_line(parse_method.get_declaration())
-
-        parse_method = struct_type_info.get_op_msg_request_deserializer_static_method()
-        if parse_method:
-            self._writer.write_line(parse_method.get_declaration())
-
         self._writer.write_line(struct_type_info.get_serializer_method().get_declaration())
 
-        parse_method = struct_type_info.get_op_msg_request_serializer_method()
-        if parse_method:
-            self._writer.write_line(parse_method.get_declaration())
+        maybe_op_msg_serializer = struct_type_info.get_op_msg_request_serializer_method()
+        if maybe_op_msg_serializer:
+            self._writer.write_line(maybe_op_msg_serializer.get_declaration())
 
         self._writer.write_line(struct_type_info.get_to_bson_method().get_declaration())
 
+        self._writer.write_empty_line()
+
+    def gen_deserializer_methods(self, struct):
+        # type: (ast.Struct) -> None
+        """Generate deserializer method declarations."""
+        struct_type_info = struct_types.get_struct_info(struct)
+        possible_deserializer_methods = [
+            struct_type_info.get_deserializer_static_method(),
+            struct_type_info.get_owned_deserializer_static_method(),
+            struct_type_info.get_sharing_deserializer_static_method(),
+            struct_type_info.get_op_msg_request_deserializer_static_method()
+        ]
+        for maybe_parse_method in possible_deserializer_methods:
+            if maybe_parse_method:
+                comment = maybe_parse_method.get_desc_for_comment()
+                if comment:
+                    self.gen_description_comment(comment)
+                self._writer.write_line(maybe_parse_method.get_declaration())
+
+        self._writer.write_empty_line()
+
+    def gen_ownership_getter(self):
+        # type: () -> None
+        """Generate a getter that returns true if this IDL object owns its underlying data."""
+        self.gen_description_comment(
+            textwrap.dedent("""\
+        An IDL struct can either provide a view onto some underlying BSON data, or it can
+        participate in owning that data. This function returns true if the struct participates in
+        owning the underlying data. 
+
+        Note that the underlying data is not synchronized with the IDL struct over its lifetime; to
+        generate a BSON representation of an IDL struct, use its `serialize` member functions.
+        Participating in ownership of the underlying data merely allows the struct to ensure that
+        struct members that are pointers-into-BSON (i.e. BSONElement and BSONObject) are valid for
+        the lifetime of the struct itself."""))
+        self._writer.write_line("bool isOwned() const { return _anchorObj.isOwned(); }")
+
+    def gen_private_ownership_setters(self):
+        # type: () -> None
+        """Generate a setter that can be used to allow this IDL struct to particpate in the ownership of some BSON that the struct's members refer to."""
+        with self._block('void setAnchor(const BSONObj& obj) {', '}'):
+            self._writer.write_line("invariant(obj.isOwned());")
+            self._writer.write_line("_anchorObj = obj;")
+        self._writer.write_empty_line()
+
+        with self._block('void setAnchor(BSONObj&& obj) {', '}'):
+            self._writer.write_line("invariant(obj.isOwned());")
+            self._writer.write_line("_anchorObj = std::move(obj);")
         self._writer.write_empty_line()
 
     def gen_protected_serializer_methods(self, struct):
@@ -1075,8 +1122,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     # Write serialization
                     self.gen_serializer_methods(struct)
 
+                    # Write deserialization
+                    self.gen_deserializer_methods(struct)
+
                     if isinstance(struct, ast.Command):
                         self.gen_op_msg_request_methods(struct)
+
+                    self.gen_ownership_getter()
 
                     # Write getters & setters
                     for field in struct.fields:
@@ -1103,6 +1155,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
                     self.write_unindented_line('private:')
 
+                    self.gen_private_ownership_setters()
+
                     if struct.generate_comparison_operators:
                         self.gen_comparison_operators_declarations(struct)
 
@@ -1124,7 +1178,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     for field in struct.fields:
                         if _is_required_serializer_field(field):
                             self.gen_serializer_member(field)
-
+                    self._writer.write_line("BSONObj _anchorObj;")
                     # Write constexpr struct data
                     self.gen_constexpr_members(struct)
 
@@ -1696,8 +1750,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         return field_usage_check
 
-    def get_bson_deserializer_static_common(self, struct, static_method_info, method_info):
-        # type: (ast.Struct, struct_types.MethodInfo, struct_types.MethodInfo) -> None
+    def get_bson_deserializer_static_common(self, struct, static_method_info, method_info,
+                                            ownership):
+        # type: (ast.Struct, struct_types.MethodInfo, struct_types.MethodInfo, _StructDataOwnership) -> None
         """Generate the C++ deserializer static method."""
         func_def = static_method_info.get_definition()
 
@@ -1730,7 +1785,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                         common.title_case(struct.cpp_name))
 
             self._writer.write_line(method_info.get_call('object'))
+
+            if ownership == _StructDataOwnership.OWNER:
+                self._writer.write_line('object.setAnchor(std::move(bsonObject));')
+
+            elif ownership == _StructDataOwnership.SHARED:
+                self._writer.write_line('object.setAnchor(bsonObject);')
+
             self._writer.write_line('return object;')
+
+        self.write_empty_line()
 
     def _compare_and_return_status(self, op, limit, field, optional_param):
         # type: (str, ast.Expression, ast.Field, str) -> None
@@ -1791,20 +1855,30 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (ast.Struct) -> None
         """Generate the C++ deserializer method definitions."""
         struct_type_info = struct_types.get_struct_info(struct)
+        method = struct_type_info.get_deserializer_method()
 
         self.get_bson_deserializer_static_common(struct,
                                                  struct_type_info.get_deserializer_static_method(),
-                                                 struct_type_info.get_deserializer_method())
+                                                 method, _StructDataOwnership.VIEW)
+        self.get_bson_deserializer_static_common(
+            struct, struct_type_info.get_sharing_deserializer_static_method(), method,
+            _StructDataOwnership.SHARED)
+        self.get_bson_deserializer_static_common(
+            struct, struct_type_info.get_owned_deserializer_static_method(), method,
+            _StructDataOwnership.OWNER)
 
-        func_def = struct_type_info.get_deserializer_method().get_definition()
+        func_def = method.get_definition()
+
+        # Name of the variable that we are deserialzing from
+        variable_name = "bsonObject"
+
         with self._block('%s {' % (func_def), '}'):
-
             # If the struct contains no fields, there's nothing to deserialize, so we write an empty function stub.
             if not struct.fields:
                 return
 
             # Deserialize all the fields
-            field_usage_check = self._gen_fields_deserializer_common(struct, "bsonObject",
+            field_usage_check = self._gen_fields_deserializer_common(struct, variable_name,
                                                                      "ctxt.getTenantId()")
 
             # Check for required fields
@@ -1814,7 +1888,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if struct.cpp_validator_func is not None:
                 self._writer.write_line(struct.cpp_validator_func + "(this);")
 
-            self._gen_command_deserializer(struct, "bsonObject")
+            self._gen_command_deserializer(struct, variable_name)
 
     def gen_op_msg_request_deserializer_methods(self, struct):
         # type: (ast.Struct) -> None
@@ -1828,7 +1902,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self.get_bson_deserializer_static_common(
             struct, struct_type_info.get_op_msg_request_deserializer_static_method(),
-            struct_type_info.get_op_msg_request_deserializer_method())
+            struct_type_info.get_op_msg_request_deserializer_method(), _StructDataOwnership.VIEW)
 
         func_def = struct_type_info.get_op_msg_request_deserializer_method().get_definition()
         with self._block('%s {' % (func_def), '}'):
@@ -2695,7 +2769,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self.gen_field_validators(struct)
                 self.write_empty_line()
 
-                # Write deserializers
                 self.gen_bson_deserializer_methods(struct)
                 self.write_empty_line()
 

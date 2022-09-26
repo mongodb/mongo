@@ -4089,5 +4089,39 @@ TEST(IDLFieldTests, TenantOverrideFieldWithInvalidValue) {
     }
 }
 
+TEST(IDLOwnershipTests, ParseOwnAssumesOwnership) {
+    IDLParserContext ctxt("root");
+    One_plain_object idlStruct;
+    {
+        auto tmp = BSON("value" << BSON("x" << 42));
+        idlStruct = One_plain_object::parseOwned(ctxt, std::move(tmp));
+    }
+    // Now that tmp is out of scope, if idlStruct didn't retain ownership, it would be accessing
+    // free'd memory which should error on ASAN and debug builds.
+    auto obj = idlStruct.getValue();
+    ASSERT_BSONOBJ_EQ(obj, BSON("x" << 42));
+}
+
+TEST(IDLOwnershipTests, ParseSharingOwnershipTmpBSON) {
+    IDLParserContext ctxt("root");
+    One_plain_object idlStruct;
+    {
+        auto tmp = BSON("value" << BSON("x" << 42));
+        idlStruct = One_plain_object::parseSharingOwnership(ctxt, tmp);
+    }
+    // Now that tmp is out of scope, if idlStruct didn't particpate in ownership, it would be
+    // accessing free'd memory which should error on ASAN and debug builds.
+    auto obj = idlStruct.getValue();
+    ASSERT_BSONOBJ_EQ(obj, BSON("x" << 42));
+}
+
+TEST(IDLOwnershipTests, ParseSharingOwnershipTmpIDLStruct) {
+    IDLParserContext ctxt("root");
+    auto bson = BSON("value" << BSON("x" << 42));
+    { auto idlStruct = One_plain_object::parseSharingOwnership(ctxt, bson); }
+    // Now that idlStruct is out of scope, if bson didn't particpate in ownership, it would be
+    // accessing free'd memory which should error on ASAN and debug builds.
+    ASSERT_BSONOBJ_EQ(bson["value"].Obj(), BSON("x" << 42));
+}
 }  // namespace
 }  // namespace mongo

@@ -27,6 +27,7 @@
 #
 """Provide code generation information for structs and commands in a polymorphic way."""
 
+import textwrap
 from abc import ABCMeta, abstractmethod
 from typing import Optional, List
 
@@ -80,9 +81,12 @@ class ArgumentInfo(object):
 class MethodInfo(object):
     """Class that encapslates information about a method and how to declare, define, and call it."""
 
+    # pylint: disable=too-many-instance-attributes
+
     def __init__(self, class_name, method_name, args, return_type=None, static=False, const=False,
-                 explicit=False):
-        # type: (str, str, List[str], str, bool, bool, bool) -> None
+                 explicit=False, desc_for_comment=None):
+        # type: (str, str, List[str], str, bool, bool, bool, Optional[str]) -> None
+        # pylint: disable=too-many-arguments
         """Create a MethodInfo instance."""
         self.class_name = class_name
         self.method_name = method_name
@@ -91,6 +95,7 @@ class MethodInfo(object):
         self.static = static
         self.const = const
         self.explicit = explicit
+        self.desc_for_comment = desc_for_comment
 
     def get_declaration(self):
         # type: () -> str
@@ -137,7 +142,7 @@ class MethodInfo(object):
 
     def get_call(self, obj):
         # type: (Optional[str]) -> str
-        """Generate a simply call to the method using the defined args list."""
+        """Generate a simple call to the method using the defined args list."""
 
         args = ', '.join([arg.name for arg in self.args])
 
@@ -147,6 +152,11 @@ class MethodInfo(object):
 
         return common.template_args("${method_name}(${args});", method_name=self.method_name,
                                     args=args)
+
+    def get_desc_for_comment(self):
+        # type: () -> Optional[str]
+        """Get the description of this method suitable for commenting it."""
+        return self.desc_for_comment
 
 
 class StructTypeInfoBase(object, metaclass=ABCMeta):
@@ -180,6 +190,18 @@ class StructTypeInfoBase(object, metaclass=ABCMeta):
     def get_deserializer_static_method(self):
         # type: () -> MethodInfo
         """Get the public static deserializer method for a struct."""
+        pass
+
+    @abstractmethod
+    def get_sharing_deserializer_static_method(self):
+        # type: () -> MethodInfo
+        """Get the public static deserializer method for a struct that participates in shared ownership of underlying data we are deserializing from."""
+        pass
+
+    @abstractmethod
+    def get_owned_deserializer_static_method(self):
+        # type: () -> MethodInfo
+        """Get the public static deserializer method for a struct that takes exclusive ownership of underlying data we are deserializing from."""
         pass
 
     @abstractmethod
@@ -249,12 +271,38 @@ class _StructTypeInfo(StructTypeInfoBase):
         class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(class_name, class_name, _get_required_parameters(self._struct))
 
+    def get_sharing_deserializer_static_method(self):
+        # type: () -> MethodInfo
+        class_name = common.title_case(self._struct.cpp_name)
+        comment = textwrap.dedent(f"""\
+                Factory function that parses a {class_name} from a BSONObj. A {class_name} parsed
+                this way participates in ownership of the data underlying the BSONObj.""")
+        return MethodInfo(class_name, 'parseSharingOwnership',
+                          ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], class_name,
+                          static=True, desc_for_comment=comment)
+
+    def get_owned_deserializer_static_method(self):
+        # type: () -> MethodInfo
+        class_name = common.title_case(self._struct.cpp_name)
+        comment = textwrap.dedent(f"""\
+                Factory function that parses a {class_name} from a BSONObj. A {class_name} parsed
+                this way takes ownership of the data underlying the BSONObj.""")
+        return MethodInfo(class_name, 'parseOwned',
+                          ['const IDLParserContext& ctxt', 'BSONObj&& bsonObject'], class_name,
+                          static=True, desc_for_comment=comment)
+
     def get_deserializer_static_method(self):
         # type: () -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
+        comment = textwrap.dedent(f"""\
+                Factory function that parses a {class_name} from a BSONObj. A {class_name} parsed
+                this way is strictly a view onto that BSONObj; the BSONObj must be kept valid to
+                ensure the validity any members of this struct that point-into the BSONObj (i.e.
+                unowned
+                objects).""")
         return MethodInfo(class_name, 'parse',
                           ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], class_name,
-                          static=True)
+                          static=True, desc_for_comment=comment)
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
