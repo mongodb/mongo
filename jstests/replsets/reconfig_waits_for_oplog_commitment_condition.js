@@ -144,6 +144,6 @@ rst.awaitLastOpCommitted();
 // Reconfig should now succeed.
 config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
-assert(isConfigCommitted(primary));
+assert.soon(() => isConfigCommitted(primary));
 rst.stopSet();
 }());
