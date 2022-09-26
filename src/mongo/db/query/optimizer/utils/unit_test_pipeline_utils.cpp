@@ -191,11 +191,6 @@ void serializeMetadata(std::ostream& stream, Metadata metadata) {
             explainPreserveIndentation(stream, "\t\t\t\t\t", serializedReqMap);
         }
 
-        stream << "\t\t\tnon multi-key index paths: " << std::endl;
-        for (const auto& indexPath : scanDef.getNonMultiKeyPathSet()) {
-            explainPreserveIndentation(stream, "\t\t\t\t", ExplainGenerator::explainV2(indexPath));
-        }
-
         stream << "\t\t\tcollection exists: " << scanDef.exists() << std::endl;
         stream << "\t\t\tCE type: " << scanDef.getCE() << std::endl;
     }

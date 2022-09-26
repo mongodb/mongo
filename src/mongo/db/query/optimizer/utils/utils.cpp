@@ -483,8 +483,10 @@ public:
             return {};
         }
         if (inputResult->_reqMap.size() > 1) {
-            // Cannot append traverse if we have more than one requirement.
-            return {};
+            // More than one requirement means we are handling a conjunction inside a traverse.
+            // We can change it to a traverse inside a conjunction, but that's an
+            // over-approximation, so we have to keep the original predicate.
+            inputResult->_retainPredicate = true;
         }
 
         auto result = handleGetAndTraverse<PathTraverse>(n, std::move(inputResult));
@@ -695,65 +697,64 @@ bool checkPathContainsTraverse(const ABT& path) {
 }
 
 /**
- * Fuses an index path and a query path to determine a residual path to apply over the index
- * results. Checks if one index path is a prefix of another. Considers only Get, Traverse, and Id.
- * Return the suffix that doesn't match.
+ * Removes Traverse nodes from a single path, using MultikeynessTrie which tells us
+ * which child paths are never applied to an array.
  */
-class IndexPathFusor {
+class MultikeynessSimplifier {
 public:
-    struct ResultType {
-        boost::optional<ABT::reference_type> _prefix;
-        size_t _numTraversesSkipped = 0;
-    };
-
-    /**
-     * 'n' - The complete index path being compared to, can be modified if needed.
-     * 'node' - Same as 'n' but cast to a specific type by the caller in order to invoke the
-     *   correct operator.
-     * 'other' - The query that is checked if it is a prefix of the index.
-     */
-    ResultType operator()(const ABT& n, const PathGet& node, const ABT& other) {
-        if (auto otherGet = other.cast<PathGet>();
-            otherGet != nullptr && otherGet->name() == node.name()) {
-            if (auto otherChildTraverse = otherGet->getPath().cast<PathTraverse>();
-                otherChildTraverse != nullptr && !node.getPath().is<PathTraverse>()) {
-                // If a query path has a Traverse, but the index path doesn't, the query can
-                // still be evaluated by this index. Skip the Traverse node, and continue matching.
-                auto result = node.getPath().visit(*this, otherChildTraverse->getPath());
-                result._numTraversesSkipped++;
-                return result;
-            } else {
-                return node.getPath().visit(*this, otherGet->getPath());
-            }
+    bool operator()(ABT&, PathIdentity&, const MultikeynessTrie&) {
+        // No simplifications apply here.
+        return false;
+    }
+    bool operator()(ABT& path, PathGet& get, const MultikeynessTrie& trie) {
+        if (auto it = trie.children.find(get.name()); it != trie.children.end()) {
+            return get.getPath().visit(*this, it->second);
+        } else {
+            return false;
         }
-        return {};
     }
+    bool operator()(ABT& path, PathTraverse& traverse, const MultikeynessTrie& trie) {
+        // TODO SERVER-69591 Simplify non-Sargable paths.
+        tassert(6859603,
+                "Unexpected maxDepth for Traverse in MultikeynessSimplifier",
+                traverse.getMaxDepth() == PathTraverse::kSingleLevel);
 
-    ResultType operator()(const ABT& n, const PathTraverse& node, const ABT& other) {
-        if (auto otherTraverse = other.cast<PathTraverse>();
-            otherTraverse != nullptr && otherTraverse->getMaxDepth() == node.getMaxDepth()) {
-            return node.getPath().visit(*this, otherTraverse->getPath());
+        if (!trie.isMultiKey) {
+            // This path is never applied to an array: we can remove any number of Traverse nodes,
+            // of any maxDepth.
+            path = std::exchange(traverse.getPath(), make<Blackhole>());
+            path.visit(*this, trie);
+            return true;
+        } else if (traverse.getMaxDepth() == PathTraverse::kSingleLevel &&
+                   traverse.getPath().is<PathGet>()) {
+            // This path is possibly multikey, so we can't remove any Traverse nodes.
+            // But each edge in the trie represents a 'Traverse [1] Get [a]', so we can
+            // skip a single Traverse [1] node.
+            return traverse.getPath().visit(*this, trie);
+        } else {
+            // We have no information about multikeyness of the child path.
+            return false;
         }
-        return {};
     }
-
-    ResultType operator()(const ABT& n, const PathIdentity& node, const ABT& other) {
-        return {other.ref()};
-    }
-
     template <typename T, typename... Ts>
-    ResultType operator()(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
-        uasserted(6624152, "Unexpected node type");
+    bool operator()(ABT& n, T& /*node*/, Ts&&...) {
+        // TODO SERVER-69591 Simplify non-Sargable paths.
+        tasserted(6859604, "Unexpected path element in MultikeynessSimplifier");
+
+        // Some other cases to consider:
+        // - Remove PathArr for non-multikey paths.
+        // - Descend into conjunction and disjunction.
+        // - Descend into PathLambda and simplify expressions, especially Not and EvalFilter.
     }
 
-    static ResultType fuse(const ABT& node, const ABT& candidatePrefix) {
-        IndexPathFusor instance;
-        return candidatePrefix.visit(instance, node);
+    static bool simplify(ABT& path, const MultikeynessTrie& trie) {
+        MultikeynessSimplifier instance;
+        return path.visit(instance, trie);
     }
 };
 
 bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
-                                   const IndexPathSet& nonMultiKeyPaths,
+                                   const MultikeynessTrie& multikeynessTrie,
                                    PartialSchemaRequirements& reqMap,
                                    const ConstFoldFn& constFold) {
     PartialSchemaRequirements result;
@@ -773,31 +774,13 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
     // Simplify paths by eliminating unnecessary Traverse elements.
     for (const auto& [key, req] : reqMap) {
         PartialSchemaKey newKey = key;
-        bool updateToNonMultiKey = false;
-
+        bool simplified = false;
         if (key._projectionName == scanProjName && checkPathContainsTraverse(newKey._path)) {
-            ABT bestPath = make<Blackhole>();
-            size_t maxTraversesSkipped = 0;
-            for (const ABT& nonMultiKeyPath : nonMultiKeyPaths) {
-                // Attempt to fuse with each non-multikey path and observe how many traverses we can
-                // erase.
-                // TODO: we probably need a more efficient way to do this instead of iterating.
-                if (const auto fused = IndexPathFusor::fuse(newKey._path, nonMultiKeyPath);
-                    fused._prefix && fused._numTraversesSkipped > maxTraversesSkipped) {
-                    maxTraversesSkipped = fused._numTraversesSkipped;
-                    bestPath = nonMultiKeyPath;
-                    PathAppender appender(std::move(*fused._prefix));
-                    appender.append(bestPath);
-                }
-            }
-            if (maxTraversesSkipped > 0) {
-                updateToNonMultiKey = true;
-                newKey._path = std::move(bestPath);
-            }
+            simplified |= MultikeynessSimplifier::simplify(newKey._path, multikeynessTrie);
         }
 
         if (prevEntry) {
-            if (updateToNonMultiKey && prevEntry->first == newKey) {
+            if (simplified && prevEntry->first == newKey) {
                 auto& prevReq = prevEntry->second;
 
                 boost::optional<ProjectionName> resultBoundProjName;
@@ -1005,6 +988,66 @@ const ProjectionName& getExistingOrTempProjForFieldName(PrefixId& prefixId,
     return result.first->second;
 }
 
+/**
+ * Fuses an index path and a query path to determine a residual path to apply over the index
+ * results. Checks if one index path is a prefix of another. Considers only Get, Traverse, and Id.
+ * Return the suffix that doesn't match.
+ */
+class IndexPathFusor {
+public:
+    struct ResultType {
+        boost::optional<ABT::reference_type> _suffix;
+        size_t _numTraversesSkipped = 0;
+    };
+
+    /**
+     * 'n' - The complete index path being compared to, can be modified if needed.
+     * 'node' - Same as 'n' but cast to a specific type by the caller in order to invoke the
+     *   correct operator.
+     * 'other' - The query path, of which the index may satisfy a prefix.
+     */
+    ResultType operator()(const ABT& n, const PathGet& node, const ABT& other) {
+        if (auto otherGet = other.cast<PathGet>();
+            otherGet != nullptr && otherGet->name() == node.name()) {
+            if (auto otherChildTraverse = otherGet->getPath().cast<PathTraverse>();
+                otherChildTraverse != nullptr && !node.getPath().is<PathTraverse>()) {
+                // If a query path has a Traverse, but the index path doesn't, the query can
+                // still be evaluated by this index. Skip the Traverse node, and continue matching.
+                // This works because we know the Traverse will never be applied to an array,
+                // so 'Traverse [anything] p == p'.
+                auto result = node.getPath().visit(*this, otherChildTraverse->getPath());
+                result._numTraversesSkipped++;
+                return result;
+            } else {
+                return node.getPath().visit(*this, otherGet->getPath());
+            }
+        }
+        return {};
+    }
+
+    ResultType operator()(const ABT& n, const PathTraverse& node, const ABT& other) {
+        if (auto otherTraverse = other.cast<PathTraverse>();
+            otherTraverse != nullptr && otherTraverse->getMaxDepth() == node.getMaxDepth()) {
+            return node.getPath().visit(*this, otherTraverse->getPath());
+        }
+        return {};
+    }
+
+    ResultType operator()(const ABT& n, const PathIdentity& node, const ABT& other) {
+        return {other.ref()};
+    }
+
+    template <typename T, typename... Ts>
+    ResultType operator()(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
+        uasserted(6624152, "Unexpected node type");
+    }
+
+    static ResultType fuse(const ABT& node, const ABT& candidatePrefix) {
+        IndexPathFusor instance;
+        return candidatePrefix.visit(instance, node);
+    }
+};
+
 CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const ProjectionName& scanProjectionName,
                                          const PartialSchemaRequirements& reqMap,
@@ -1089,7 +1132,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                 const auto& indexCollationEntry = indexCollationSpec.at(indexField);
                 const auto fusedPath =
                     IndexPathFusor::fuse(queryKey._path, indexCollationEntry._path);
-                if (!fusedPath._prefix) {
+                if (!fusedPath._suffix) {
                     continue;
                 }
 
@@ -1103,7 +1146,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                     const ProjectionName& tempProjName = getExistingOrTempProjForFieldName(
                         prefixId, encodeIndexKeyName(indexField), fieldProjMap);
                     entry._residualRequirements.emplace_back(
-                        PartialSchemaKey{tempProjName, std::move(*fusedPath._prefix)},
+                        PartialSchemaKey{tempProjName, std::move(*fusedPath._suffix)},
                         req,
                         std::distance(reqMap.cbegin(), it));
                 }
@@ -1258,8 +1301,11 @@ bool checkMaybeHasNull(const IntervalReqExpr::Node& intervals, const ConstFoldFn
 
 class PartialSchemaReqLowerTransport {
 public:
-    PartialSchemaReqLowerTransport(const bool hasBoundProjName)
-        : _hasBoundProjName(hasBoundProjName) {}
+    PartialSchemaReqLowerTransport(const bool hasBoundProjName,
+                                   const PathToIntervalFn& pathToInterval)
+        : _hasBoundProjName(hasBoundProjName),
+          _intervalArr(getInterval(pathToInterval, make<PathArr>())),
+          _intervalObj(getInterval(pathToInterval, make<PathObj>())) {}
 
     ABT transport(const IntervalReqExpr::Atom& node) {
         const auto& interval = node.getExpr();
@@ -1279,6 +1325,13 @@ public:
                         !_hasBoundProjName);
                 return make<PathCompare>(Operations::Eq, lowBound.getBound());
             }
+        }
+
+        if (interval == _intervalArr) {
+            return make<PathArr>();
+        }
+        if (interval == _intervalObj) {
+            return make<PathObj>();
         }
 
         ABT result = make<PathIdentity>();
@@ -1319,7 +1372,25 @@ public:
     }
 
 private:
+    /**
+     * Convenience for looking up the singular interval that corresponds to either PathArr or
+     * PathObj.
+     */
+    static boost::optional<IntervalRequirement> getInterval(const PathToIntervalFn& pathToInterval,
+                                                            const ABT& path) {
+        if (pathToInterval) {
+            if (auto intervalExpr = pathToInterval(path)) {
+                if (auto interval = IntervalReqExpr::getSingularDNF(*intervalExpr)) {
+                    return *interval;
+                }
+            }
+        }
+        return boost::none;
+    }
+
     const bool _hasBoundProjName;
+    const boost::optional<IntervalRequirement> _intervalArr;
+    const boost::optional<IntervalRequirement> _intervalObj;
 };
 
 void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
@@ -1327,22 +1398,9 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
                                    ABT& node,
                                    const PathToIntervalFn& pathToInterval,
                                    const std::function<void(const ABT& node)>& visitor) {
-    ABT path = make<PathIdentity>();
-    if (pathToInterval) {
-        // If we have a path converter, attempt to convert bounds back into a path element.
-        if (auto conversion = pathToInterval(make<PathArr>()); *conversion == req.getIntervals()) {
-            path = make<PathArr>();
-        } else if (auto conversion = pathToInterval(make<PathObj>());
-                   *conversion == req.getIntervals()) {
-            path = make<PathObj>();
-        } else if (auto conversion = coerceIntervalToPathCompareEqMember(req.getIntervals())) {
-            path = std::move(*conversion);
-        }
-    }
-    if (path.is<PathIdentity>()) {
-        PartialSchemaReqLowerTransport transport(req.getBoundProjectionName().has_value());
-        path = transport.lower(req.getIntervals());
-    }
+    PartialSchemaReqLowerTransport transport(req.getBoundProjectionName().has_value(),
+                                             pathToInterval);
+    ABT path = transport.lower(req.getIntervals());
     const bool pathIsId = path.is<PathIdentity>();
 
     if (const auto& boundProjName = req.getBoundProjectionName()) {

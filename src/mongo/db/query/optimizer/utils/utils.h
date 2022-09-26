@@ -146,10 +146,10 @@ CollationSplitResult splitCollationSpec(const ProjectionName& ridProjName,
  */
 class PathAppender {
 public:
-    PathAppender(ABT toAppend) : _toAppend(std::move(toAppend)) {}
+    PathAppender(ABT suffix) : _suffix(std::move(suffix)) {}
 
     void transport(ABT& n, const PathIdentity& node) {
-        n = _toAppend;
+        n = _suffix;
     }
 
     template <typename T, typename... Ts>
@@ -157,12 +157,12 @@ public:
         // noop
     }
 
-    void append(ABT& path) {
-        return algebra::transport<true>(path, *this);
+    void append(ABT& prefix) {
+        return algebra::transport<true>(prefix, *this);
     }
 
 private:
-    ABT _toAppend;
+    ABT _suffix;
 };
 
 struct PartialSchemaReqConversion {
@@ -206,7 +206,7 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
  * Schema Requirement structure. Returns true if we have an empty result after simplification.
  */
 bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
-                                   const IndexPathSet& nonMultiKeyPaths,
+                                   const MultikeynessTrie& multikeynessTrie,
                                    PartialSchemaRequirements& reqMap,
                                    const ConstFoldFn& constFold);
 

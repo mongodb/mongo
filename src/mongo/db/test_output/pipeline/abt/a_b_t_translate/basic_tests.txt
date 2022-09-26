@@ -10,7 +10,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -43,7 +42,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -78,7 +76,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -113,7 +110,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -148,7 +144,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -189,7 +184,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -228,7 +222,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -285,7 +278,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -319,7 +311,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -365,7 +356,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -417,7 +407,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -477,7 +466,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -517,7 +505,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -569,7 +556,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -603,7 +589,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -638,7 +623,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -680,7 +664,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -714,7 +697,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -754,7 +736,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -817,7 +798,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -885,7 +865,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -958,7 +937,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1027,7 +1005,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1089,7 +1066,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1144,7 +1120,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1219,7 +1194,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1299,7 +1273,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1334,7 +1307,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1381,7 +1353,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1429,7 +1400,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1471,7 +1441,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1546,7 +1515,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1599,7 +1567,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 		collB: 
@@ -1608,7 +1575,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 
@@ -1657,7 +1623,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 

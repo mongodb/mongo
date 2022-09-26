@@ -50,28 +50,33 @@ ScanDefinition createScanDef(ScanDefOptions options,
                              DistributionAndPaths distributionAndPaths,
                              const bool exists,
                              const CEType ce) {
-    IndexPathSet nonMultiKeyPathSet;
+    MultikeynessTrie multikeynessTrie;
 
     // Collect non-multiKeyPaths from each index.
     for (const auto& [indexDefName, indexDef] : indexDefs) {
-        for (const auto& collation : indexDef.getCollationSpec()) {
-            if (!checkPathContainsTraverse(collation._path)) {
-                nonMultiKeyPathSet.insert(collation._path);
-            }
+        // Skip partial indexes. A path could be non-multikey on a partial index (subset of the
+        // collection), but still be multikey on the overall collection.
+        if (!indexDef.getPartialReqMap().empty()) {
+            continue;
+        }
+
+        for (const auto& component : indexDef.getCollationSpec()) {
+            multikeynessTrie.add(component._path.ref());
         }
     }
+    // The empty path refers to the whole document, which can't be an array.
+    multikeynessTrie.isMultiKey = false;
 
     // Simplify partial filter requirements using the non-multikey paths.
     for (auto& [indexDefName, indexDef] : indexDefs) {
         [[maybe_unused]] const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
-            "" /*scanProjName*/, nonMultiKeyPathSet, indexDef.getPartialReqMap(), constFold);
+            "" /*scanProjName*/, multikeynessTrie, indexDef.getPartialReqMap(), constFold);
         // If "hasEmptyInterval" is set, we have a partial filter index with an unsatisfiable
         // condition, which is thus guaranteed to never contain any documents.
     }
-
     return {std::move(options),
             std::move(indexDefs),
-            std::move(nonMultiKeyPathSet),
+            std::move(multikeynessTrie),
             std::move(distributionAndPaths),
             exists,
             ce};

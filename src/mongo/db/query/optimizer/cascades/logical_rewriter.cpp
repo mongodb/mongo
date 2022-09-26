@@ -574,7 +574,7 @@ struct SubstituteMerge<LimitSkipNode, LimitSkipNode> {
 
 static boost::optional<ABT> mergeSargableNodes(
     const properties::IndexingAvailability& indexingAvailability,
-    const IndexPathSet& nonMultiKeyPaths,
+    const MultikeynessTrie& multikeynessTrie,
     const SargableNode& aboveNode,
     const SargableNode& belowNode,
     RewriteContext& ctx) {
@@ -593,7 +593,7 @@ static boost::optional<ABT> mergeSargableNodes(
 
     const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
     bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
-        scanProjName, nonMultiKeyPaths, mergedReqs, ctx.getConstFold());
+        scanProjName, multikeynessTrie, mergedReqs, ctx.getConstFold());
     if (hasEmptyInterval) {
         return createEmptyValueScanNode(ctx);
     }
@@ -643,7 +643,7 @@ struct SubstituteMerge<SargableNode, SargableNode> {
         tassert(6624171, "At this point the collection must exist", scanDef.exists());
 
         const auto& result = mergeSargableNodes(indexingAvailability,
-                                                scanDef.getNonMultiKeyPathSet(),
+                                                scanDef.getMultikeynessTrie(),
                                                 *aboveNode.cast<SargableNode>(),
                                                 *belowNode.cast<SargableNode>(),
                                                 ctx);
@@ -719,7 +719,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
 
     const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
     bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
-        scanProjName, scanDef.getNonMultiKeyPathSet(), conversion->_reqMap, ctx.getConstFold());
+        scanProjName, scanDef.getMultikeynessTrie(), conversion->_reqMap, ctx.getConstFold());
     if (hasEmptyInterval) {
         addEmptyValueScanNode(ctx);
         return;

@@ -57,6 +57,44 @@ struct IndexCollationEntry {
 using IndexCollationSpec = std::vector<IndexCollationEntry>;
 
 /**
+ * Represents a set of paths that are known to be 'non-multikey'--which in this context
+ * is defined as 'do not apply their child path to an array'.
+ *
+ * For example, in this document: {a: [ {b: 3}, {b: 4} ]}
+ * - 'a' is multikey
+ * - 'a.b' is non-multikey
+ *
+ * We say 'a.b' is non-multikey, because even though 'Get [a] Traverse [1] Get [b] p'
+ * applies 'p' to two different values (3 and 4), neither one is an array.
+ * Therefore if 'p' starts with Traverse (of any maxDepth), we can remove it.
+ * If 'p' starts with more than one Traverse, we can apply the rule repeatedly.
+ *
+ * This also implies that 'Get [a] Get [b] p' is non-multikey.
+ * (Because: if Get [a] produces an array, then Get [b] applies 'p' to Nothing.
+ *  In other words: replacing Traverse Get with Get can only make a path be Nothing
+ *  in more cases.)
+ *
+ * However, this doesn't tell us anything about 'Get [a] Traverse [inf] Get [b] p',
+ * where the intermediate Traverse has maxDepth > 1. For example, consider this document:
+ *     {a: [ {b: 5}, [ {b: [6, 7]} ] ]}
+ * We'd still say 'a.b' is non-multikey, because 'Get [a] Traverse [1] Get [b] p' doesn't
+ * reach into the nested array, and doesn't find [6, 7].
+ * But 'Get [a] Traverse [inf] Get [b] p' does reach into the nested array, so it does
+ * apply 'p' to [6, 7], so we can't remove Traverse nodes from 'p'.
+ */
+struct MultikeynessTrie {
+    static MultikeynessTrie fromIndexPath(const ABT& path);
+
+    void merge(const MultikeynessTrie& other);
+    void add(const ABT& path);
+
+    opt::unordered_map<std::string, MultikeynessTrie> children;
+    // An empty trie doesn't know whether anything is multikey.
+    // 'true' means "not sure" while 'false' means "definitely no arrays".
+    bool isMultiKey = true;
+};
+
+/**
  * Defines an available system index.
  */
 class IndexDefinition {
@@ -110,7 +148,7 @@ public:
 
     ScanDefinition(ScanDefOptions options,
                    opt::unordered_map<std::string, IndexDefinition> indexDefs,
-                   IndexPathSet nonMultiKeyPathSet,
+                   MultikeynessTrie multikeynessTrie,
                    DistributionAndPaths distributionAndPaths,
                    bool exists,
                    CEType ce);
@@ -122,7 +160,7 @@ public:
     const opt::unordered_map<std::string, IndexDefinition>& getIndexDefs() const;
     opt::unordered_map<std::string, IndexDefinition>& getIndexDefs();
 
-    const IndexPathSet& getNonMultiKeyPathSet() const;
+    const MultikeynessTrie& getMultikeynessTrie() const;
 
     bool exists() const;
 
@@ -137,10 +175,7 @@ private:
      */
     opt::unordered_map<std::string, IndexDefinition> _indexDefs;
 
-    /**
-     * Which index paths are NOT multi-key.
-     */
-    IndexPathSet _nonMultiKeyPathSet;
+    MultikeynessTrie _multikeynessTrie;
 
     /**
      * True if the collection exists.

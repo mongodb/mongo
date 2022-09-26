@@ -27,7 +27,6 @@ metadata:
 					requirementsMap: 
 					    refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [2], Const [2]]}}}
 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -104,7 +103,6 @@ metadata:
 					requirementsMap: 
 					    refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [2], Const [2]]}}}
 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 

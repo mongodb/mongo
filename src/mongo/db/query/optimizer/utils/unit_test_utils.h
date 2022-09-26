@@ -84,6 +84,9 @@ ABT makeIndexPath(FieldPathType fieldPath, bool isMultiKey = true);
 ABT makeIndexPath(FieldNameType fieldName);
 ABT makeNonMultikeyIndexPath(FieldNameType fieldName);
 
+/**
+ * Constructs metadata for an an index on a single, non-dotted field.
+ */
 IndexDefinition makeIndexDefinition(FieldNameType fieldName,
                                     CollationOp op,
                                     bool isMultiKey = true);

@@ -53,7 +53,9 @@ function leftmostLeafStage(node) {
 /**
  * Get a very simplified version of a plan, which only includes nodeType and nesting structure.
  */
-function getPlanSkeleton(node, recursiveKeepKeys = [], addToKeepKeys = []) {
+function getPlanSkeleton(node, options = {}) {
+    const {extraKeepKeys = [], keepKeysDeep = []} = options;
+
     const keepKeys = [
         'nodeType',
 
@@ -64,23 +66,134 @@ function getPlanSkeleton(node, recursiveKeepKeys = [], addToKeepKeys = []) {
         'children',
         'leftChild',
         'rightChild',
-    ].concat(addToKeepKeys);
+    ].concat(extraKeepKeys);
 
     if (Array.isArray(node)) {
-        return node.map(n => getPlanSkeleton(n));
+        return node.map(n => getPlanSkeleton(n, options));
     } else if (node === null || typeof node !== 'object') {
         return node;
     } else {
         return Object.fromEntries(
             Object.keys(node)
-                .filter(key => (keepKeys.includes(key) || recursiveKeepKeys.includes(key)))
+                .filter(key => (keepKeys.includes(key) || keepKeysDeep.includes(key)))
                 .map(key => {
-                    if (recursiveKeepKeys.includes(key)) {
+                    if (keepKeysDeep.includes(key)) {
                         return [key, node[key]];
+                    } else if (key === 'interval') {
+                        return [key, prettyInterval(node[key])];
+                    } else if (key === 'filter') {
+                        return [key, prettyExpression(node[key])];
                     } else {
-                        return [key, getPlanSkeleton(node[key], recursiveKeepKeys, addToKeepKeys)];
+                        return [key, getPlanSkeleton(node[key], options)];
                     }
                 }));
+    }
+}
+
+function prettyInterval(compoundInterval) {
+    // Takes an array of intervals, each one applying to one component of a compound index key.
+    // Try to format it as a string.
+    // If either bound is not Constant, return the original JSON unchanged.
+    let result = '';
+    for (const {lowBound, highBound} of compoundInterval) {
+        if (lowBound.bound.nodeType !== 'Const' || highBound.bound.nodeType !== 'Const') {
+            return compoundInterval;
+        }
+
+        const lowInclusive = lowBound.inclusive;
+        const highInclusive = highBound.inclusive;
+        assert.eq(typeof lowInclusive, 'boolean');
+        assert.eq(typeof highInclusive, 'boolean');
+
+        result += ' ';
+        result += lowInclusive ? '[ ' : '( ';
+        result += tojson(lowBound.bound.value);
+        result += ', ';
+        result += tojson(highBound.bound.value);
+        result += highInclusive ? ' ]' : ' )';
+    }
+    return result.trim();
+}
+
+function prettyExpression(expr) {
+    switch (expr.nodeType) {
+        case 'Variable':
+            return expr.name;
+        case 'Const':
+            return tojson(expr.value);
+        case 'FunctionCall':
+            return `${expr.name}(${expr.arguments.map(a => prettyExpression(a)).join(', ')})`;
+        case 'If': {
+            const if_ = prettyExpression(expr.condition);
+            const then_ = prettyExpression(expr.then);
+            const else_ = prettyExpression(expr.else);
+            return `if ${if_} then ${then_} else ${else_}`;
+        }
+        case 'Let': {
+            const x = expr.variable;
+            const b = prettyExpression(expr.bind);
+            const e = prettyExpression(expr.expression);
+            return `let ${x} = ${b} in ${e}`;
+        }
+        case 'LambdaAbstraction': {
+            return `(${expr.variable} -> ${prettyExpression(expr.input)})`;
+        }
+        case 'BinaryOp': {
+            const left = prettyExpression(expr.left);
+            const right = prettyExpression(expr.right);
+            const op = prettyOp(expr.op);
+            return `(${left} ${op} ${right})`;
+        }
+        default:
+            return tojson(expr);
+    }
+}
+
+function prettyOp(op) {
+    // See src/mongo/db/query/optimizer/syntax/syntax.h, PATHSYNTAX_OPNAMES.
+    switch (op) {
+        /* comparison operations */
+        case 'Eq':
+            return '==';
+        case 'EqMember':
+            return 'in';
+        case 'Neq':
+            return '!=';
+        case 'Gt':
+            return '>';
+        case 'Gte':
+            return '>=';
+        case 'Lt':
+            return '<';
+        case 'Lte':
+            return '<=';
+        case 'Cmp3w':
+            return '<=>';
+
+        /* binary operations */
+        case 'Add':
+            return '+';
+        case 'Sub':
+            return '-';
+        case 'Mult':
+            return '*';
+        case 'Div':
+            return '/';
+
+        /* unary operations */
+        case 'Neg':
+            return '-';
+
+        /* logical operations */
+        case 'And':
+            return 'and';
+        case 'Or':
+            return 'or';
+        case 'Not':
+            return 'not';
+
+        default:
+            return op;
     }
 }
 

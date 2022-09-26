@@ -217,8 +217,11 @@ public:
         }
 
         // The elements of the PartialSchemaRequirements map represent an implicit conjunction.
-        auto backoff = ce::conjExponentialBackoff(std::move(topLevelSelectivities));
-        return backoff * childResult;
+        if (!topLevelSelectivities.empty()) {
+            auto backoff = ce::conjExponentialBackoff(std::move(topLevelSelectivities));
+            childResult *= backoff;
+        }
+        return childResult;
     }
 
     CEType transport(const ABT& n,

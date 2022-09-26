@@ -3142,9 +3142,9 @@ TEST(PhysRewriter, IndexBoundsIntersect3) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_EQ(3, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(10, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-    // We do not intersect indexes because the outer composition is over the different fields.
+    // We do not intersect the bounds, because the outer composition is over the different fields.
     ASSERT_EXPLAIN_V2(
         "Root []\n"
         "|   |   projections: \n"
@@ -3690,12 +3690,20 @@ TEST(PhysRewriter, ElemMatchIndexNoArrays) {
         optimized);
 }
 
-TEST(PhysRewriter, ObjectElemMatch) {
+TEST(PhysRewriter, ObjectElemMatchResidual) {
     using namespace properties;
     PrefixId prefixId;
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
+    ABT bPred =
+        make<PathGet>("b",
+                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                         PathTraverse::kSingleLevel));
+    ABT cPred =
+        make<PathGet>("c",
+                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                         PathTraverse::kSingleLevel));
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
             make<PathGet>(
@@ -3703,15 +3711,8 @@ TEST(PhysRewriter, ObjectElemMatch) {
                 make<PathComposeM>(
                     make<PathArr>(),
                     make<PathTraverse>(
-                        make<PathComposeM>(
-                            make<PathGet>("b",
-                                          make<PathTraverse>(
-                                              make<PathCompare>(Operations::Eq, Constant::int64(1)),
-                                              PathTraverse::kSingleLevel)),
-                            make<PathGet>("c",
-                                          make<PathTraverse>(
-                                              make<PathCompare>(Operations::Eq, Constant::int64(2)),
-                                              PathTraverse::kSingleLevel))),
+                        make<PathComposeM>(make<PathComposeM>(std::move(bPred), std::move(cPred)),
+                                           make<PathComposeA>(make<PathObj>(), make<PathArr>())),
                         PathTraverse::kSingleLevel))),
             make<Variable>("root")),
         std::move(scanNode));
@@ -3739,10 +3740,12 @@ TEST(PhysRewriter, ObjectElemMatch) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(40, 50, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-    // We currently cannot use indexes with ObjectElemMatch.
-    ASSERT_EXPLAIN_V2(
+    // We should pick the index, and do at least some filtering before the fetch.
+    // We don't have index bounds, both because 'a' is not the first field of the index,
+    // and because the predicates are on child fields 'a.b' and 'a.c'.
+    ASSERT_EXPLAIN_V2Compact(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       root\n"
@@ -3751,52 +3754,85 @@ TEST(PhysRewriter, ObjectElemMatch) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [root]\n"
-        "|   PathGet [a]\n"
-        "|   PathTraverse [1]\n"
+        // TODO SERVER-70780 we could be simplifying this path:
+        // ComposeA PathArr PathObj is true when the input is an array or object.
+        // But the other 'Get Traverse Compare' here can only be true when the input is an object.
+        // So the 'ComposeA PathArr PathObj' is redundant and we could remove it.
+        "|   PathGet [a] PathTraverse [1] PathComposeM []\n"
+        "|   |   PathComposeA []\n"
+        "|   |   |   PathArr []\n"
+        "|   |   PathObj []\n"
         "|   PathComposeM []\n"
-        "|   |   PathGet [c]\n"
-        "|   |   PathTraverse [1]\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [2]\n"
-        "|   PathGet [b]\n"
-        "|   PathTraverse [1]\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [1]\n"
+        "|   |   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [1]\n"
+        "|   PathGet [b] PathTraverse [1] PathCompare [Eq] Const [1]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_3]\n"
+        "|   |   PathArr []\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_3}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [evalTemp_3]\n"
+        "|   |           Source []\n"
+        "|   |       [root]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "Unique []\n"
+        "|   projections: \n"
+        "|       rid_0\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_0]\n"
-        "|   PathArr []\n"
-        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
+        "|   |   Variable [evalTemp_20]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathArr []\n"
+        "|   PathObj []\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_20]\n"
+        "|   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_20]\n"
+        "|   PathGet [b] PathTraverse [1] PathCompare [Eq] Const [1]\n"
+        "IndexScan [{'<indexKey> 1': evalTemp_20, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
+        "index1, interval: {[Const [minKey], Const [maxKey]], [Const [minKey], Const [maxKey]]}]\n"
         "    BindBlock:\n"
-        "        [evalTemp_0]\n"
+        "        [evalTemp_20]\n"
         "            Source []\n"
-        "        [root]\n"
+        "        [rid_0]\n"
         "            Source []\n",
         optimized);
 }
 
-TEST(PhysRewriter, ObjectElemMatchPathObj) {
+TEST(PhysRewriter, ObjectElemMatchBounds) {
     using namespace properties;
     PrefixId prefixId;
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
+    ABT bPred =
+        make<PathGet>("b",
+                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)),
+                                         PathTraverse::kSingleLevel));
+    ABT cPred =
+        make<PathGet>("c",
+                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(5)),
+                                         PathTraverse::kSingleLevel));
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
             make<PathGet>(
                 "a",
                 make<PathComposeM>(
-                    make<PathObj>(),
+                    make<PathArr>(),
                     make<PathTraverse>(
-                        make<PathComposeM>(
-                            make<PathGet>("b",
-                                          make<PathTraverse>(
-                                              make<PathCompare>(Operations::Eq, Constant::int64(1)),
-                                              PathTraverse::kSingleLevel)),
-                            make<PathGet>("c",
-                                          make<PathTraverse>(
-                                              make<PathCompare>(Operations::Eq, Constant::int64(2)),
-                                              PathTraverse::kSingleLevel))),
+                        make<PathComposeM>(make<PathComposeM>(bPred, cPred),
+                                           make<PathComposeA>(make<PathObj>(), make<PathArr>())),
                         PathTraverse::kSingleLevel))),
             make<Variable>("root")),
         std::move(scanNode));
@@ -3811,11 +3847,14 @@ TEST(PhysRewriter, ObjectElemMatchPathObj) {
         prefixId,
         false /*requireRID*/,
         {{{"c1",
-           createScanDef({},
-                         {{"index1",
-                           makeCompositeIndexDefinition(
-                               {{"b", CollationOp::Ascending, true /*isMultiKey*/},
-                                {"a", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
+           createScanDef(
+               {},
+               {{"index1",
+                 IndexDefinition{{{makeIndexPath(FieldPathType{"a", "b"}, true /*isMultiKey*/),
+                                   CollationOp::Ascending}},
+                                 true /*isMultiKey*/}}}
+
+               )}}},
         std::make_unique<HeuristicCE>(),
         std::make_unique<DefaultCosting>(),
         defaultConvertPathToInterval,
@@ -3824,8 +3863,9 @@ TEST(PhysRewriter, ObjectElemMatchPathObj) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-    // We currently cannot use indexes with ObjectElemMatch.
+    ASSERT_BETWEEN(15, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // We should pick the index, and generate bounds for the 'b' predicate.
     ASSERT_EXPLAIN_V2Compact(
         "Root []\n"
         "|   |   projections: \n"
@@ -3836,17 +3876,230 @@ TEST(PhysRewriter, ObjectElemMatchPathObj) {
         "|   EvalFilter []\n"
         "|   |   Variable [root]\n"
         "|   PathGet [a] PathTraverse [1] PathComposeM []\n"
-        "|   |   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [2]\n"
-        "|   PathGet [b] PathTraverse [1] PathCompare [Eq] Const [1]\n"
+        "|   |   PathComposeA []\n"
+        "|   |   |   PathArr []\n"
+        "|   |   PathObj []\n"
+        "|   PathComposeM []\n"
+        "|   |   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [5]\n"
+        "|   PathGet [b] PathTraverse [1] PathCompare [Eq] Const [4]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_2]\n"
+        "|   |   PathArr []\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_2}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [evalTemp_2]\n"
+        "|   |           Source []\n"
+        "|   |       [root]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[4], Const [4]]}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimized);
+}
+
+TEST(PhysRewriter, NestedElemMatch) {
+    using namespace properties;
+    PrefixId prefixId;
+
+    ABT scanNode = make<ScanNode>("root", "coll1");
+
+    auto elemMatch = [](ABT path) -> ABT {
+        return make<PathComposeM>(make<PathArr>(),
+                                  make<PathTraverse>(std::move(path), PathTraverse::kSingleLevel));
+    };
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>(
+                "a", elemMatch(elemMatch(make<PathCompare>(Operations::Eq, Constant::int64(2))))),
+            make<Variable>("root")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
+
+    OptPhaseManager phaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        false /*requireRID*/,
+        {{{"coll1",
+           createScanDef(
+               {},
+               {{"index1",
+                 makeIndexDefinition("a", CollationOp::Ascending, true /*isMultiKey*/)}})}}},
+        std::make_unique<HeuristicCE>(),
+        std::make_unique<DefaultCosting>(),
+        defaultConvertPathToInterval,
+        ConstEval::constFold,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
+    ASSERT_BETWEEN(10, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // We should not generate tight index bounds [2, 2], because nested elemMatch only matches
+    // arrays of arrays, and multikey indexes only unwind one level of arrays.  We can generate
+    // PathArr bounds, but that only tells us which documents have arrays-of-arrays; then we can run
+    // a residual predicate to check that the inner array contains '2'.
+    ASSERT_EXPLAIN_V2Compact(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_0]\n"
-        "|   PathObj []\n"
-        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a] PathTraverse [1] PathComposeM []\n"
+        "|   |   PathTraverse [1] PathCompare [Eq] Const [2]\n"
+        "|   PathArr []\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_2]\n"
+        "|   |   PathArr []\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_2}, coll1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [evalTemp_2]\n"
+        "|   |           Source []\n"
+        "|   |       [root]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        // Filter GroupBy Union: this implements RIDIntersect.
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   FunctionCall [getArraySize] Variable [sides_0]\n"
+        "|   PathCompare [Eq] Const [2]\n"
+        "GroupBy []\n"
+        "|   |   groupings: \n"
+        "|   |       RefBlock: \n"
+        "|   |           Variable [rid_0]\n"
+        "|   aggregations: \n"
+        "|       [sides_0]\n"
+        "|           FunctionCall [$addToSet] Variable [sideId_0]\n"
+        "Union []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [rid_0]\n"
+        "|   |           Source []\n"
+        "|   |       [sideId_0]\n"
+        "|   |           Source []\n"
+        "|   Evaluation []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [sideId_0]\n"
+        "|   |           Const [1]\n"
+        // Scan only the array portion of the index.
+        // Since each index entry is an array element, this represents docs with arrays-of-arrays.
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: coll1, indexDefName: index1, interval: "
+        "{[Const [[]], Const [BinData(0, )])}]\n"
+        "|       BindBlock:\n"
+        "|           [rid_0]\n"
+        "|               Source []\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [sideId_0]\n"
+        "|           Const [0]\n"
+        // Keep index entries that equal-or-contain 2.
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_3]\n"
+        "|   PathTraverse [1] PathCompare [Eq] Const [2]\n"
+        // Scan the whole index.
+        "IndexScan [{'<indexKey> 0': evalTemp_3, '<rid>': rid_0}, scanDefName: coll1, "
+        "indexDefName: index1, interval: {[Const [minKey], Const [maxKey]]}]\n"
         "    BindBlock:\n"
-        "        [evalTemp_0]\n"
+        "        [evalTemp_3]\n"
         "            Source []\n"
-        "        [root]\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimized);
+}
+
+TEST(PhysRewriter, PathObj) {
+    using namespace properties;
+
+    PartialSchemaSelHints hints;
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
+                  kDefaultSelectivity);
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(make<PathGet>("a", make<PathObj>()), make<Variable>("root")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
+
+    PrefixId prefixId;
+    OptPhaseManager phaseManager{
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        false /*requireRID*/,
+        {{{"c1",
+           createScanDef({},
+                         {{"index1",
+                           makeCompositeIndexDefinition(
+                               {{"a", CollationOp::Ascending, false /*isMultiKey*/},
+                                {"b", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
+        std::make_unique<HintedCE>(std::move(hints)),
+        std::make_unique<DefaultCosting>(),
+        // The path-to-interval callback is important for this test.
+        // We want to confirm PathObj becomes an interval.
+        defaultConvertPathToInterval,
+        ConstEval::constFold,
+        DebugInfo{true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
+        {} /*hints*/};
+
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
+    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // We should get index bounds for the PathObj.
+    ASSERT_EXPLAIN_V2Compact(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [root]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "Unique []\n"
+        "|   projections: \n"
+        "|       rid_0\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[{}], Const [[]]), [Const [minKey], Const [maxKey]]}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
         "            Source []\n",
         optimized);
 }

@@ -26,7 +26,6 @@ metadata:
 						distribution paths: 
 					requirementsMap: 
 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -84,7 +83,6 @@ metadata:
 						distribution paths: 
 					requirementsMap: 
 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -126,7 +124,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -186,7 +183,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -234,7 +230,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -291,7 +286,6 @@ metadata:
 				distribution type: UnknownPartitioning
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -364,7 +358,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -447,7 +440,6 @@ metadata:
 						distribution paths: 
 					requirementsMap: 
 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -506,10 +498,6 @@ metadata:
 						distribution paths: 
 					requirementsMap: 
 
-			non multi-key index paths: 
-				PathGet [a]
-				PathIdentity []
-
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -565,10 +553,6 @@ metadata:
 						distribution type: Centralized
 						distribution paths: 
 					requirementsMap: 
-
-			non multi-key index paths: 
-				PathGet [a]
-				PathIdentity []
 
 			collection exists: 1
 			CE type: -1
@@ -630,13 +614,6 @@ metadata:
 						distribution type: Centralized
 						distribution paths: 
 					requirementsMap: 
-
-			non multi-key index paths: 
-				PathGet [a]
-				PathIdentity []
-
-				PathGet [b]
-				PathIdentity []
 
 			collection exists: 1
 			CE type: -1
@@ -703,16 +680,6 @@ metadata:
 						distribution type: Centralized
 						distribution paths: 
 					requirementsMap: 
-
-			non multi-key index paths: 
-				PathGet [a]
-				PathIdentity []
-
-				PathGet [b]
-				PathIdentity []
-
-				PathGet [c]
-				PathIdentity []
 
 			collection exists: 1
 			CE type: -1
@@ -792,16 +759,6 @@ metadata:
 						distribution paths: 
 					requirementsMap: 
 
-			non multi-key index paths: 
-				PathGet [a]
-				PathIdentity []
-
-				PathGet [b]
-				PathIdentity []
-
-				PathGet [c]
-				PathIdentity []
-
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -871,7 +828,6 @@ metadata:
 						distribution paths: 
 					requirementsMap: 
 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -938,7 +894,6 @@ metadata:
 						distribution paths: 
 					requirementsMap: 
 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -1036,7 +991,6 @@ metadata:
 						distribution paths: 
 					requirementsMap: 
 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -1096,7 +1050,6 @@ metadata:
 						distribution paths: 
 					requirementsMap: 
 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -1149,7 +1102,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -1223,7 +1175,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 		collB: 
@@ -1232,7 +1183,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -1293,7 +1243,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -1349,7 +1298,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 
@@ -1406,7 +1354,6 @@ metadata:
 				distribution type: Centralized
 				distribution paths: 
 			indexes: 
-			non multi-key index paths: 
 			collection exists: 1
 			CE type: -1
 optimization phases: 

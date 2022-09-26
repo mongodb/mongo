@@ -943,6 +943,13 @@ class IntervalPrinter(OptimizerTypePrinter):
         """Initialize IntervalPrinter."""
         super().__init__(val, "ExplainGenerator::explainInterval")
 
+class IntervalExprPrinter(OptimizerTypePrinter):
+    """Pretty-printer for mongo::optimizer::IntervalRequirement::Node."""
+
+    def __init__(self, val):
+        """Initialize IntervalExprPrinter."""
+        super().__init__(val, "ExplainGenerator::explainIntervalExpr")
+
 
 class PartialSchemaReqMapPrinter(OptimizerTypePrinter):
     """Pretty-printer for mongo::optimizer::PartialSchemaRequirements."""
@@ -965,6 +972,16 @@ def register_abt_printers(pp):
 
     # IntervalRequirement printer.
     pp.add("Interval", "mongo::optimizer::IntervalRequirement", False, IntervalPrinter)
+    # IntervalReqExpr::Node printer.
+    pp.add(
+        "IntervalExpr",
+        ("mongo::optimizer::algebra::PolyValue<" +
+         "mongo::optimizer::BoolExpr<mongo::optimizer::IntervalRequirement>::Atom, " +
+         "mongo::optimizer::BoolExpr<mongo::optimizer::IntervalRequirement>::Conjunction, " +
+         "mongo::optimizer::BoolExpr<mongo::optimizer::IntervalRequirement>::Disjunction>"),
+        False,
+        IntervalExprPrinter,
+    )
 
     # Memo printer.
     pp.add("Memo", "mongo::optimizer::cascades::Memo", False, MemoPrinter)
