@@ -116,148 +116,139 @@ TEST_F(HistogramTest, CreateFixed) {
     ASSERT_APPROX_EQUAL(50.0, estimateCard(hist, 50 * 10, EstimationType::kLess), kTolerance);
 }
 
-// TODO SERVER-69857: Uncomment test.
-// TEST_F(HistogramTest, MaxDiffTestInt) {
-//     constexpr size_t nElems = 100;
-//     constexpr size_t nBuckets = 10;
-//     constexpr size_t seed = 0;
+TEST_F(HistogramTest, MaxDiffTestInt) {
+    constexpr size_t nElems = 100;
+    constexpr size_t nBuckets = 10;
 
-//     std::vector<SBEValue> randData = genRandomValueArray(nElems, 1.0, 0.0, seed);
+    auto data = genFixedValueArray(nElems, 1.0, 0.0);
+    auto opCtx = makeOperationContext();
+    const size_t actualCard = getActualCard(opCtx.get(), data, "[{$match: {a: {$lt: 10}}}]");
 
-//     auto opCtx = makeOperationContext();
-//     const size_t actualCard = getActualCard(opCtx.get(), randData, "[{$match: {a: {$lt: 10}}}]");
+    const ScalarHistogram& hist = makeHistogram(data, nBuckets);
+    std::cout << hist.toString();
 
-//     const ScalarHistogram& hist = makeHistogram(randData, nBuckets);
-//     std::cout << hist.toString();
+    ASSERT_LTE(hist.getBuckets().size(), nBuckets);
+    const double estimatedCard = estimateCard(hist, 11, EstimationType::kLess);
 
-//     ASSERT_GTE(hist.getBuckets().size(), nBuckets);
-//     const double expectedCard = estimateCard(hist, 10, EstimationType::kLess);
+    ASSERT_EQ(36, actualCard);
+    ASSERT_APPROX_EQUAL(39.73333, estimatedCard, kTolerance);
+}
 
-//     ASSERT_EQ(36, actualCard);
-//     ASSERT_APPROX_EQUAL(32.8667, expectedCard, kTolerance);
-// }
+TEST_F(HistogramTest, MaxDiffTestString) {
+    constexpr size_t nElems = 100;
+    constexpr size_t nBuckets = 10;
 
-// TODO SERVER-69857: Uncomment test.
-// TEST_F(HistogramTest, MaxDiffTestString) {
-//     constexpr size_t nElems = 100;
-//     constexpr size_t nBuckets = 10;
-//     constexpr size_t seed = 0;
+    auto randData = genFixedValueArray(nElems, 0.0, 1.0);
+    std::cout << "Generated " << nElems << " random values:\n"
+              << printValueArray(randData) << "\n"
+              << std::flush;
 
-//     auto randData = genRandomValueArray(nElems, 0.0, 1.0, seed);
-//     std::cout << "Generated " << nElems << " random values:\n"
-//               << printValueArray(randData) << "\n"
-//               << std::flush;
+    auto opCtx = makeOperationContext();
+    const size_t actualCard =
+        getActualCard(opCtx.get(), randData, "[{$match: {a: {$lt: '91YgOvBB'}}}]");
 
-//     auto opCtx = makeOperationContext();
-//     const size_t actualCard =
-//         getActualCard(opCtx.get(), randData, "[{$match: {a: {$lt: '91YgOvBB'}}}]");
+    sortValueVector(randData);
+    const DataDistribution& dataDistrib = getDataDistribution(randData);
 
-//     sortValueVector(randData);
-//     const DataDistribution& dataDistrib = getDataDistribution(randData);
+    const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets);
+    std::cout << hist.toString();
+    ASSERT_LTE(hist.getBuckets().size(), nBuckets);
 
-//     const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets);
-//     std::cout << hist.toString();
-//     ASSERT_GTE(hist.getBuckets().size(), nBuckets);
+    const auto [tag, val] = value::makeNewString("91YgOvBB"_sd);
+    value::ValueGuard vg(tag, val);
+    const double estimatedCard = estimate(hist, tag, val, EstimationType::kLess).card;
 
-//     const auto [tag, val] = value::makeNewString("91YgOvBB"_sd);
-//     value::ValueGuard vg(tag, val);
-//     const double expectedCard = estimate(hist, tag, val, EstimationType::kLess).card;
+    ASSERT_EQ(15, actualCard);
+    ASSERT_APPROX_EQUAL(10.9443, estimatedCard, kTolerance);
+}
 
-//     ASSERT_EQ(13, actualCard);
-//     ASSERT_APPROX_EQUAL(11.0783, expectedCard, kTolerance);
-// }
+TEST_F(HistogramTest, MaxDiffTestMixedTypes) {
+    constexpr size_t nElems = 100;
+    constexpr size_t nBuckets = 10;
 
-// TEST_F(HistogramTest, MaxDiffTestMixedTypes) {
-//     constexpr size_t nElems = 100;
-//     constexpr size_t nBuckets = 10;
-//     constexpr size_t seed = 0;
+    auto randData = genFixedValueArray(nElems, 0.5, 0.5);
+    std::cout << "Generated " << nElems << " random values:\n"
+              << printValueArray(randData) << "\n"
+              << std::flush;
 
-//     auto randData = genRandomValueArray(nElems, 0.5, 0.5, seed);
-//     std::cout << "Generated " << nElems << " random values:\n"
-//               << printValueArray(randData) << "\n"
-//               << std::flush;
+    auto opCtx = makeOperationContext();
+    const size_t actualCard = getActualCard(opCtx.get(), randData, "[{$match: {a: {$lt: 10}}}]");
 
-//     auto opCtx = makeOperationContext();
-//     const size_t actualCard = getActualCard(opCtx.get(), randData, "[{$match: {a: {$lt: 10}}}]");
+    sortValueVector(randData);
+    const DataDistribution& dataDistrib = getDataDistribution(randData);
 
-//     sortValueVector(randData);
-//     const DataDistribution& dataDistrib = getDataDistribution(randData);
+    const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets);
+    std::cout << hist.toString();
+    ASSERT_LTE(hist.getBuckets().size(), nBuckets);
+    const double estimatedCard = estimateCard(hist, 10, EstimationType::kLess);
 
-//     const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets);
-//     std::cout << hist.toString();
-//     ASSERT_GTE(hist.getBuckets().size(), nBuckets);
-//     const double expectedCard = estimateCard(hist, 10, EstimationType::kLess);
+    ASSERT_EQ(18, actualCard);
+    ASSERT_APPROX_EQUAL(18.0, estimatedCard, kTolerance);
+}
 
-//     ASSERT_EQ(18, actualCard);
-//     ASSERT_APPROX_EQUAL(17.0833, expectedCard, kTolerance);
-// }
+TEST_F(HistogramTest, MaxDiffIntArrays) {
+    constexpr size_t nElems = 100;
+    constexpr size_t nBuckets = 10;
 
-// TODO SERVER-69857: Uncomment test.
-// TEST_F(HistogramTest, MaxDiffIntArrays) {
-//     constexpr size_t nElems = 100;
-//     constexpr size_t nBuckets = 10;
-//     constexpr size_t seed = 0;
+    auto rawData = genFixedValueArray(nElems, 1.0, 0.0);
+    auto arrayData = nestArrays(rawData);
 
-//     auto rawData = genRandomValueArray(nElems, 1.0, 0.0, seed);
-//     auto arrayData = genRandomValueArrayWithArrays(rawData);
+    ArrayHistogram estimator = createArrayEstimator(arrayData, nBuckets);
 
-//     ArrayHistogram estimator = createArrayEstimator(arrayData, nBuckets);
+    auto opCtx = makeOperationContext();
+    {
+        const size_t actualCard =
+            getActualCard(opCtx.get(), arrayData, "[{$match: {a: {$eq: 2}}}]");
 
-//     auto opCtx = makeOperationContext();
-//     {
-//         const size_t actualCard =
-//             getActualCard(opCtx.get(), arrayData, "[{$match: {a: {$eq: 2}}}]");
+        const auto [tag, val] = makeInt64Value(2);
+        value::ValueGuard vg(tag, val);
+        const double estimatedCard = estimateCardEq(estimator, tag, val, true /* includeScalar
+        */);
 
-//         const auto [tag, val] = makeInt64Value(2);
-//         value::ValueGuard vg(tag, val);
-//         const double expectedCard = estimateCardEq(estimator, tag, val, true /* includeScalar
-//         */);
+        ASSERT_APPROX_EQUAL(4.0, estimatedCard, kTolerance);
+        ASSERT_EQ(4, actualCard);
+    }
 
-//         ASSERT_APPROX_EQUAL(4.0, expectedCard, kTolerance);
-//         ASSERT_EQ(4, actualCard);
-//     }
+    {
+        const size_t actualCard =
+            getActualCard(opCtx.get(), arrayData, "[{$match: {a: {$lt: 3}}}]");
 
-//     {
-//         const size_t actualCard =
-//             getActualCard(opCtx.get(), arrayData, "[{$match: {a: {$lt: 3}}}]");
+        const auto [tag, val] = makeInt64Value(3);
+        value::ValueGuard vg(tag, val);
+        const double estimatedCard = estimateCardRange(estimator,
+                                                       false /*lowInclusive*/,
+                                                       value::TypeTags::MinKey,
+                                                       0,
+                                                       false /*highInclusive*/,
+                                                       tag,
+                                                       val,
+                                                       true /* includeScalar */);
+        ASSERT_EQ(6, actualCard);
+        ASSERT_APPROX_EQUAL(6.0, estimatedCard, kTolerance);
+    }
 
-//         const auto [tag, val] = makeInt64Value(3);
-//         value::ValueGuard vg(tag, val);
-//         const double expectedCard = estimateCardRange(estimator,
-//                                                       false /*lowInclusive*/,
-//                                                       value::TypeTags::MinKey,
-//                                                       0,
-//                                                       false /*highInclusive*/,
-//                                                       tag,
-//                                                       val,
-//                                                       true /* includeScalar */);
+    {
+        const size_t actualCard = getActualCard(
+            opCtx.get(), arrayData, "[{$match: {a: {$elemMatch: {$gt: 2, $lt: 5}}}}]");
 
-//         ASSERT_APPROX_EQUAL(4.6667, expectedCard, kTolerance);
-//         ASSERT_EQ(6, actualCard);
-//     }
+        const auto [lowTag, lowVal] = makeInt64Value(2);
+        value::ValueGuard vgLow(lowTag, lowVal);
+        const auto [highTag, highVal] = makeInt64Value(5);
+        value::ValueGuard vgHigh(highTag, highVal);
 
-//     {
-//         const size_t actualCard = getActualCard(
-//             opCtx.get(), arrayData, "[{$match: {a: {$elemMatch: {$gt: 2, $lt: 5}}}}]");
+        const double estimatedCard = estimateCardRange(estimator,
+                                                       false /*lowInclusive*/,
+                                                       lowTag,
+                                                       lowVal,
+                                                       false /*highInclusive*/,
+                                                       highTag,
+                                                       highVal,
+                                                       false /* includeScalar */);
 
-//         const auto [lowTag, lowVal] = makeInt64Value(2);
-//         value::ValueGuard vgLow(lowTag, lowVal);
-//         const auto [highTag, highVal] = makeInt64Value(5);
-//         value::ValueGuard vgHigh(highTag, highVal);
-
-//         const double expectedCard = estimateCardRange(estimator,
-//                                                       false /*lowInclusive*/,
-//                                                       lowTag,
-//                                                       lowVal,
-//                                                       false /*highInclusive*/,
-//                                                       highTag,
-//                                                       highVal,
-//                                                       false /* includeScalar */);
-
-//         ASSERT_APPROX_EQUAL(1.76505, expectedCard, kTolerance);
-//         ASSERT_EQ(3, actualCard);
-//     }
-// }
+        ASSERT_EQ(2, actualCard);
+        ASSERT_APPROX_EQUAL(3.15479, estimatedCard, kTolerance);
+    }
+}
 
 }  // namespace
 }  // namespace mongo::ce::statistics

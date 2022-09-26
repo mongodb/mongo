@@ -143,25 +143,49 @@ private:
 };  // namespace mongo::ce
 
 /**
-    Generate a random string of length len.
+    Generate a pseudorandom string of length n
     * The alphabet is fixed as [0-9][a-z][A-Z]
     * Characters are chosed uniformly from the alphabet
+    * Randomness is implemented such that it is independent of the platform,
+        i.e. given the same length and seed on any platform, we will produce the
+        same string.
+*/
+std::string genString(size_t len, size_t seed);
+
+/**
+    Generate a set of elements consisting of strings and ints in the
+    requested ratio. The generated array will contain the same values given the same
+    inputs on all platforms.
  */
-auto genRandomString(size_t len, std::mt19937_64& gen, size_t seed);
+std::vector<SBEValue> genFixedValueArray(size_t nElems, double intRatio, double strRatio);
+
+/**
+    Generate a random string of length len.
+    * The alphabet is fixed as [0-9][a-z][A-Z].
+    * Characters are chosed uniformly from the alphabet.
+    * Generated strings are likely to differ by platform, so derived values depending on them
+      are also likely to change.
+ */
+std::string genRandomString(size_t len, std::mt19937_64& gen, size_t seed);
+
 
 /**
     Generate a uniformly random set of elements consisting of string and ints in the
-    requested ratio
+    requested ratio. The resulting array is very likely to differ between platforms, even
+    with the same seed. Thus, derived values are also likely to change.
+
+    Prefer genFixedValueArray when comparing derived values against constants.
  */
 std::vector<SBEValue> genRandomValueArray(size_t nElems,
                                           double intRatio,
                                           double strRatio,
                                           size_t seed);
-/**
-    Generate a set up values consisting of half scalars, and half arrays of length 10
 
-    Values contained in the result will be drawn from the input vector
+/**
+    Generate a set up values consisting of half scalars, and half arrays of length 10.
+
+    Values contained in the result will be drawn from the input vector.
  */
-std::vector<SBEValue> genRandomValueArrayWithArrays(const std::vector<SBEValue>& input);
+std::vector<SBEValue> nestArrays(const std::vector<SBEValue>& input);
 
 }  // namespace mongo::ce

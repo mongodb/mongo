@@ -226,8 +226,11 @@ void DatasetDescriptor::fillRandomArraySet() {
     }
 }
 
-///// Old implementation //////
-auto genRandomString(size_t len, std::mt19937_64& gen, size_t seed) {
+/**
+    Generate a random string. It is possible (even expected) that the same parameters
+    will generate different strings on successive calls
+*/
+std::string genRandomString(size_t len, std::mt19937_64& gen, size_t seed) {
     std::string randStr;
     randStr.reserve(len);
     const constexpr char* kAlphabet =
@@ -241,6 +244,73 @@ auto genRandomString(size_t len, std::mt19937_64& gen, size_t seed) {
     }
 
     return randStr;
+}
+
+/**
+    Generate a string. This string will be deterministic in that the same
+    parameters will always generate the same string, even on different platforms.
+*/
+std::string genString(size_t len, size_t seed) {
+    std::string str;
+    str.reserve(len);
+
+    const constexpr char* kAlphabet =
+        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    const int kAlphabetLength = strlen(kAlphabet);
+
+    unsigned long long rand = seed;
+    for (size_t i = 0; i < len; ++i) {
+        // Library implementations of rand vary by compiler, naturally, Since we still
+        // want the appearance of randomness, but consistency across compilers, we use a linear
+        // congruential generator to choose characters for the string. The parameters chosen
+        // are from Numerical Recipes. We use the upper 32 bits when calculating the character
+        // index, as the lower 32 are essentially nonrandom -- a weakness of LCGs in general.
+        rand = 3935559000370003845ULL * rand + 269134368944950781ULL;
+
+        int idx = (rand >> 32) % kAlphabetLength;
+        str += kAlphabet[idx];
+    }
+
+    return str;
+}
+
+/**
+    Generate an array of values with the required ratio of int to string. This array will be
+    deterministic in that the same parameters will always generate the same array, even on
+    different platforms.
+*/
+std::vector<SBEValue> genFixedValueArray(size_t nElems, double intRatio, double strRatio) {
+
+    std::vector<SBEValue> values;
+
+    const int intNDV = static_cast<int>(nElems) / 4;
+    for (size_t i = 0; i < std::round(nElems * intRatio); ++i) {
+        const auto [tag, val] = makeInt64Value((i % intNDV) + 1);
+        values.emplace_back(tag, val);
+    }
+
+    if (strRatio == 0.0) {
+        return values;
+    }
+
+    // Generate a set of strings so that each string can be chosen multiple times in the test
+    // data set.
+    const size_t strNDV = nElems / 5;
+    std::vector<std::string> stringSet;
+    stringSet.reserve(strNDV);
+    for (size_t i = 0; i < strNDV; ++i) {
+        const auto randStr = genString(8, i);
+        stringSet.push_back(randStr);
+    }
+
+    for (size_t i = 0; i < std::round(nElems * strRatio); ++i) {
+        size_t idx = i % stringSet.size();
+        const auto randStr = stringSet[idx];
+        const auto [tag, val] = value::makeNewString(randStr);
+        values.emplace_back(tag, val);
+    }
+
+    return values;
 }
 
 std::vector<SBEValue> genRandomValueArray(size_t nElems,
@@ -273,14 +343,13 @@ std::vector<SBEValue> genRandomValueArray(size_t nElems,
         size_t idx = idxDistr(gen);
         const auto randStr = stringSet[idx];
         const auto [tag, val] = value::makeNewString(randStr);
-        const auto [copyTag, copyVal] = value::copyValue(tag, val);
-        randValues.emplace_back(copyTag, copyVal);
+        randValues.emplace_back(tag, val);
     }
 
     return randValues;
 }
 
-std::vector<SBEValue> genRandomValueArrayWithArrays(const std::vector<SBEValue>& input) {
+std::vector<SBEValue> nestArrays(const std::vector<SBEValue>& input) {
     std::vector<SBEValue> result;
     auto [arrayTag, arrayVal] = value::makeNewArray();
 
@@ -300,6 +369,15 @@ std::vector<SBEValue> genRandomValueArrayWithArrays(const std::vector<SBEValue>&
                 std::tie(arrayTag, arrayVal) = value::makeNewArray();
             }
         }
+    }
+
+    // It's possible that the array still contains something. If it's empty,
+    // we can safely release it. If not, append it to the result.
+    value::Array* arr = value::getArrayView(arrayVal);
+    if (arr->size() > 0) {
+        result.emplace_back(arrayTag, arrayVal);
+    } else {
+        value::releaseValue(arrayTag, arrayVal);
     }
 
     return result;
