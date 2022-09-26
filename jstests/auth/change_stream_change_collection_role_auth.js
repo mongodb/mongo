@@ -157,14 +157,10 @@ function removeChangeCollectionDoc(authDb) {
 
 // Start a replica-set test with one-node and authentication enabled. Connect to the primary node
 // and create users.
-const replSetTest = new ReplSetTest({
-    name: "shard",
-    nodes: 1,
-    useHostName: true,
-    waitForKeys: false,
-    serverless: true,
-});
+const replSetTest =
+    new ReplSetTest({name: "shard", nodes: 1, useHostName: true, waitForKeys: false});
 
+// TODO SERVER-67267: Add 'serverless' flags.
 replSetTest.startSet({
     keyFile: keyFile,
     setParameter: {

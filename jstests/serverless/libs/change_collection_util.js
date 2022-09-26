@@ -66,12 +66,11 @@ function verifyChangeCollectionEntries(
 // This class also provides helpers that are commonly used when working with change collections.
 class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
     constructor(config) {
-        // Instantiate the 'ReplSetTest' with 'serverless' as an option.
-        const newConfig = Object.assign(
-            {name: "ChangeStreamMultitenantReplicaSetTest", serverless: true}, config);
-        super(newConfig);
+        // Instantiate the 'ReplSetTest'.
+        super(config);
 
         // Start and initialize the replica set.
+        // TODO SERVER-67267 Add 'serverless' flag.
         const setParameter = Object.assign({}, config.setParameter || {}, {
             featureFlagServerlessChangeStreams: true,
             multitenancySupport: true,

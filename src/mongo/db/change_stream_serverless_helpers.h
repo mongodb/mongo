@@ -51,12 +51,6 @@ bool isChangeCollectionsModeActive();
 bool isChangeStreamEnabled(OperationContext* opCtx, const TenantId& tenantId);
 
 /**
- * Returns true if services related to the serverless change stream can be initialized.
- * TODO SERVER-69960 Remove this function and use 'isChangeCollectionsModeActive' instead.
- */
-bool canInitializeServices();
-
-/**
  * Returns an internal tenant id that will be used for testing purposes. This tenant id will not
  * conflict with any other tenant id.
  */

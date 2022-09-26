@@ -7,15 +7,9 @@
 const originalReplSet = ReplSetTest;
 
 ReplSetTest = function(opts) {
-    // Setup the 'serverless' environment if the 'opts' is not a connection string, ie. the
-    // replica-set does not already exist and the replica-set is not part of the sharded cluster,
-    // ie. 'setParametersMongos' property does not exist.
-    const newOpts = typeof opts !== "string" && !TestData.hasOwnProperty("setParametersMongos")
-        ? Object.assign({name: "OverridenServerlessChangeStreamReplSet", serverless: true}, opts)
-        : opts;
-
     // Call the constructor with the original 'ReplSetTest' to populate 'this' with required fields.
-    originalReplSet.apply(this, [newOpts]);
+    // TODO SERVER-67267 add {serverless:true} to the 'opts'.
+    originalReplSet.apply(this, [opts]);
 
     // Make a copy of the original 'startSetAsync' function and then override it to include the
     // required parameters.

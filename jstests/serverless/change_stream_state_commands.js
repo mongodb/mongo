@@ -12,10 +12,10 @@ load('jstests/libs/parallel_shell_helpers.js');  // For funWithArgs.
 
 const replSetTest = new ReplSetTest({nodes: 2});
 
-// TODO SERVER-69115 Remove '__TEMPORARILY_DISABLED__ and use
-// 'ChangeStreamMultitenantReplicaSetTest'.
+// TODO SERVER-67267 Add 'serverless' flag.
+// TODO SERVER-68947 Add 'featureFlagRequireTenantID' flag.
+// TODO SERVER-69115 Remove '__TEMPORARILY_DISABLED__'
 replSetTest.startSet({
-    serverless: true,
     setParameter: {
         featureFlagServerlessChangeStreams: true,
         multitenancySupport: true,

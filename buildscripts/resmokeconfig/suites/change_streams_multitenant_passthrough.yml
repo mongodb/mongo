@@ -50,10 +50,8 @@ executor:
   - class: EnableChangeStream
   fixture:
     class: ReplicaSetFixture
-    replset_name: "ChangeStreamMultitenantReplSet"
     mongod_options:
       bind_ip_all: ''
-      serverless: true
       set_parameters:
         enableTestCommands: 1
         featureFlagServerlessChangeStreams: true
