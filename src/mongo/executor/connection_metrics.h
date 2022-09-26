@@ -34,6 +34,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -111,6 +112,14 @@ public:
         _connectionHook = _finishPhase();
     }
 
+    void startConnAcquiredTimer() {
+        _fromConnAcquiredTimer.reset();
+    }
+
+    Timer* getConnAcquiredTimer() {
+        return &_fromConnAcquiredTimer;
+    }
+
 private:
     Milliseconds _finishPhase() {
         auto elapsed = _stopWatch->elapsed();
@@ -126,6 +135,9 @@ private:
     boost::optional<Milliseconds> _tlsHandshake;
     boost::optional<Milliseconds> _auth;
     boost::optional<Milliseconds> _connectionHook;
+    // A timer that is initialized from when an egress connection is acquired from the connection
+    // pool.
+    Timer _fromConnAcquiredTimer;
     Milliseconds _total{0};
 };
 

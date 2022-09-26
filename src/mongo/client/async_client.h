@@ -51,7 +51,10 @@ public:
     explicit AsyncDBClient(const HostAndPort& peer,
                            transport::SessionHandle session,
                            ServiceContext* svcCtx)
-        : _peer(std::move(peer)), _session(std::move(session)), _svcCtx(svcCtx) {}
+        : _peer(std::move(peer)),
+          _session(std::move(session)),
+          _svcCtx(svcCtx),
+          _random{PseudoRandom(SecureRandom().nextInt64())} {}
 
     using Handle = std::shared_ptr<AsyncDBClient>;
 
@@ -65,10 +68,14 @@ public:
         std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = nullptr);
 
     Future<executor::RemoteCommandResponse> runCommandRequest(
-        executor::RemoteCommandRequest request, const BatonHandle& baton = nullptr);
-    Future<rpc::UniqueReply> runCommand(OpMsgRequest request,
-                                        const BatonHandle& baton = nullptr,
-                                        bool fireAndForget = false);
+        executor::RemoteCommandRequest request,
+        const BatonHandle& baton = nullptr,
+        boost::optional<std::shared_ptr<Timer>> fromConnAcquiredTimer = boost::none);
+    Future<rpc::UniqueReply> runCommand(
+        OpMsgRequest request,
+        const BatonHandle& baton = nullptr,
+        bool fireAndForget = false,
+        boost::optional<std::shared_ptr<Timer>> fromConnAcquiredTimer = boost::none);
 
     Future<executor::RemoteCommandResponse> beginExhaustCommandRequest(
         executor::RemoteCommandRequest request, const BatonHandle& baton = nullptr);
@@ -116,6 +123,7 @@ private:
     transport::SessionHandle _session;
     ServiceContext* const _svcCtx;
     MessageCompressorManager _compressorManager;
+    PseudoRandom _random;
 };
 
 }  // namespace mongo

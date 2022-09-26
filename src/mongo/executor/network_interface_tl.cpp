@@ -707,8 +707,11 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequest(
     std::shared_ptr<RequestState> requestState) {
     return makeReadyFutureWith([this, requestState] {
                setTimer();
+               const auto connAcquiredTimer =
+                   checked_cast<connection_pool_tl::TLConnection*>(requestState->conn.get())
+                       ->getConnAcquiredTimer();
                return RequestState::getClient(requestState->conn)
-                   ->runCommandRequest(*requestState->request, baton);
+                   ->runCommandRequest(*requestState->request, baton, std::move(connAcquiredTimer));
            })
         .then([this, requestState](RemoteCommandResponse response) {
             catchingInvoke(
@@ -865,6 +868,8 @@ void NetworkInterfaceTL::RequestManager::trySend(
         return;
     }
 
+    checked_cast<connection_pool_tl::TLConnection*>(swConn.getValue().get())
+        ->startConnAcquiredTimer();
     std::shared_ptr<RequestState> requestState;
 
     {

@@ -177,6 +177,8 @@ public:
     bool maybeHealthy() override;
     AsyncDBClient* client();
     Date_t now() override;
+    void startConnAcquiredTimer();
+    std::shared_ptr<Timer> getConnAcquiredTimer();
 
 private:
     void setTimeout(Milliseconds timeout, TimeoutCallback cb) override;

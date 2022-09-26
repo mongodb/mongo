@@ -501,6 +501,15 @@ void TLConnection::cancelAsync() {
         _client->cancel();
 }
 
+void TLConnection::startConnAcquiredTimer() {
+    _connMetrics.startConnAcquiredTimer();
+}
+
+std::shared_ptr<Timer> TLConnection::getConnAcquiredTimer() {
+    auto anchor = shared_from_this();
+    return std::shared_ptr<Timer>{anchor, _connMetrics.getConnAcquiredTimer()};
+}
+
 auto TLTypeFactory::reactor() {
     return checked_pointer_cast<transport::Reactor>(_executor);
 }

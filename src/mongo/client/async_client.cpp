@@ -35,12 +35,15 @@
 #include <memory>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/async_client_gen.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
@@ -55,11 +58,19 @@
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/version.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(pauseBeforeMarkKeepOpen);
+
+namespace {
+bool connHealthMetricsEnabled() {
+    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV();
+}
+CounterMetric totalTimeForEgressConnectionAcquiredToWireMicros(
+    "network.totalTimeForEgressConnectionAcquiredToWireMicros", connHealthMetricsEnabled);
+}  // namespace
 
 Future<AsyncDBClient::Handle> AsyncDBClient::connect(
     const HostAndPort& peer,
@@ -288,18 +299,40 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
         });
 }
 
-Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
-                                                   const BatonHandle& baton,
-                                                   bool fireAndForget) {
+Future<rpc::UniqueReply> AsyncDBClient::runCommand(
+    OpMsgRequest request,
+    const BatonHandle& baton,
+    bool fireAndForget,
+    boost::optional<std::shared_ptr<Timer>> fromConnAcquiredTimer) {
     auto requestMsg = request.serialize();
     if (fireAndForget) {
         OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
     }
     auto msgId = nextMessageId();
     auto future = _call(std::move(requestMsg), msgId, baton);
+    auto logMetrics = [this, fromConnAcquiredTimer] {
+        if (fromConnAcquiredTimer) {
+            const auto timeElapsedMicros =
+                durationCount<Microseconds>(fromConnAcquiredTimer.get()->elapsed());
+            totalTimeForEgressConnectionAcquiredToWireMicros.increment(timeElapsedMicros);
+            if (timeElapsedMicros >= 1000 ||
+                _random.nextCanonicalDouble() <= gConnectionAcquisitionToWireLoggingRate.load()) {
+                LOGV2_INFO(6496702,
+                           "Acquired connection for remote operation and completed writing to wire",
+                           "durationMicros"_attr = timeElapsedMicros);
+            } else {
+                LOGV2_DEBUG(
+                    6496701,
+                    2,
+                    "Acquired connection for remote operation and completed writing to wire",
+                    "durationMicros"_attr = timeElapsedMicros);
+            }
+        }
+    };
 
     if (fireAndForget) {
-        return std::move(future).then([msgId, this]() -> Future<rpc::UniqueReply> {
+        return std::move(future).then([msgId, logMetrics, this]() -> Future<rpc::UniqueReply> {
+            logMetrics();
             // Return a mock status OK response since we do not expect a real response.
             OpMsgBuilder builder;
             builder.setBody(BSON("ok" << 1));
@@ -311,19 +344,25 @@ Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
     }
 
     return std::move(future)
-        .then([msgId, baton, this]() { return _waitForResponse(msgId, baton); })
+        .then([msgId, logMetrics, baton, this]() {
+            logMetrics();
+            return _waitForResponse(msgId, baton);
+        })
         .then([this](Message response) -> Future<rpc::UniqueReply> {
             return rpc::UniqueReply(response, rpc::makeReply(&response));
         });
 }
 
 Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
-    executor::RemoteCommandRequest request, const BatonHandle& baton) {
+    executor::RemoteCommandRequest request,
+    const BatonHandle& baton,
+    boost::optional<std::shared_ptr<Timer>> fromConnAcquiredTimer) {
     auto startTimer = Timer();
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(
         std::move(request.dbname), std::move(request.cmdObj), std::move(request.metadata));
     opMsgRequest.validatedTenancyScope = request.validatedTenancyScope;
-    return runCommand(std::move(opMsgRequest), baton, request.options.fireAndForget)
+    return runCommand(
+               std::move(opMsgRequest), baton, request.options.fireAndForget, fromConnAcquiredTimer)
         .then([this, startTimer = std::move(startTimer)](rpc::UniqueReply response) {
             return executor::RemoteCommandResponse(*response, startTimer.elapsed());
         });

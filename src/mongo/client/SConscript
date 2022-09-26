@@ -254,6 +254,7 @@ env.Library(
     target='async_client',
     source=[
         'async_client.cpp',
+        env.Idlc('async_client.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/wire_version',
@@ -265,6 +266,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
         '$BUILD_DIR/mongo/transport/message_compressor',
     ],
