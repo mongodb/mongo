@@ -399,7 +399,66 @@ function runPerPathFiltersTest({docs, query, projection, expected, testDescripti
            `actual=${tojson(actual)}, expected=${tojson(expected)}${errMsg}`);
 })();
 
-// Check translation of MQL $exists, $not and $ne match expressions.
+// Check translation of MQL {$exists: true}. The tests provide coverage for various cell and array
+// info structures which would need to be handled if we push {$exists: true} into the column_scan
+// stage's per-path filters.
+(function testPerPathFilters_SupportedMatchExpressions_ExistsTrue() {
+    function findXyPath(docs, expectedToMatchCount, msg) {
+        coll_filters.drop();
+        coll_filters.insert(docs);
+        assert.commandWorked(coll_filters.createIndex({"$**": "columnstore"}));
+        let res = coll_filters.find({"x.y": {$exists: true}}, {_id: 1}).toArray();
+        assert.eq(expectedToMatchCount, res.length, msg + tojson(res));
+    }
+
+    const noMatch = [
+        {_id: 0, x: {no_y: 0}},
+        {_id: 1, x: [[{y: 0}]]},
+        {_id: 2, x: [[{y: {z: 0}}, {y: 0}]]},
+        {_id: 2, x: [[{y: {z: 0}}], [{y: 0}]]},
+    ];
+    findXyPath(noMatch, 0, "Expected to match no docs from 'noMatch' but matched: ");
+
+    // Cells that have no sub-paths. NB: empty objects are treated as values by columnstore index.
+    const onlyValues = [
+        {_id: 0, x: {y: 0}},
+        {_id: 1, x: {y: null}},
+        {_id: 2, x: {y: {}}},
+        {_id: 3, x: {y: []}},
+        {_id: 4, x: {y: [0]}},
+        {_id: 5, x: {y: [[0]]}},
+        {_id: 6, x: [[{y: 0}], {y: 0}]},      // the first value is too deep
+        {_id: 7, x: [[{y: 0}], {y: [0]}]},    // the first value is too deep
+        {_id: 8, x: [[{y: 0}], {y: [[0]]}]},  // the first value is too deep
+        {_id: 9, x: [[{y: 0}], {y: [[]]}]},   // the first value is too deep
+    ];
+    findXyPath(onlyValues, onlyValues.length, "Expected to match all 'onlyValues' but matched: ");
+
+    // Cells with no values but with sub-paths.
+    const onlySubpaths = [
+        {_id: 0, x: {y: {z: 0}}},
+        {_id: 1, x: {y: [{z: 0}]}},
+        {_id: 2, x: {y: [[{z: 0}]]}},
+        {_id: 3, x: [{y: {z: 0}}]},
+        {_id: 4, x: [{y: [{z: 0}]}]},
+        {_id: 5, x: [{y: [[{z: 0}]]}]},
+        {_id: 6, x: [[{y: {z: 0}}], {y: {z: 0}}]},      // the first object is too deep
+        {_id: 7, x: [[{y: {z: 0}}], {y: [{z: 0}]}]},    // the first object is too deep
+        {_id: 8, x: [[{y: {z: 0}}], {y: [[{z: 0}]]}]},  // the first object is too deep
+    ];
+    findXyPath(
+        onlySubpaths, onlySubpaths.length, "Expected to match all 'onlySubpaths' but matched: ");
+
+    const valuesAndSubpaths = [
+        {_id: 1, x: [[{y: {z: 0}}], {y: 0}]},  // $exist skips object and evals to "true" on value
+        {_id: 2, x: [[{y: 0}], {y: {z: 0}}]},  // $exist skips value and evals to "true" on object
+    ];
+    findXyPath(valuesAndSubpaths,
+               valuesAndSubpaths.length,
+               "Expected to match all 'valuesAndSubpaths' but matched: ");
+})();
+
+// Check translation of MQL $not and $ne match expressions.
 // NB: per SERVER-68743 the queries in this test won't be using per-path filters yet, but eventually
 // they should.
 (function testPerPathFilters_SupportedMatchExpressions_Not() {
@@ -429,12 +488,6 @@ function runPerPathFiltersTest({docs, query, projection, expected, testDescripti
     actual = coll_filters.find({x: {$not: {$eq: null}}}, {_id: 1}).toArray();
     expected = [{_id: 0}, {_id: 1}, {_id: 4}, {_id: 5}];
     errMsg = "SupportedMatchExpressions: $not + $eq";
-    assert(resultsEq(actual, expected),
-           `actual=${tojson(actual)}, expected=${tojson(expected)}${errMsg}`);
-
-    actual = coll_filters.find({x: {$exists: true}}, {_id: 1}).toArray();
-    expected = [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 4}, {_id: 5}];
-    errMsg = "SupportedMatchExpressions: $exists";
     assert(resultsEq(actual, expected),
            `actual=${tojson(actual)}, expected=${tojson(expected)}${errMsg}`);
 })();
