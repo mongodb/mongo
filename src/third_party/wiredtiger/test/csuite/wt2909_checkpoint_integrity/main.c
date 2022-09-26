@@ -485,7 +485,8 @@ subtest_error_handler(
 static WT_EVENT_HANDLER event_handler = {
   subtest_error_handler, NULL, /* Message handler */
   NULL,                        /* Progress handler */
-  NULL                         /* Close handler */
+  NULL,                        /* Close handler */
+  NULL                         /* General handler */
 };
 
 /*

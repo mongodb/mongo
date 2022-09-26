@@ -3290,6 +3290,12 @@ int wiredtiger_open(const char *home,
  */
 const char *wiredtiger_strerror(int error) WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
+/*! WT_EVENT_HANDLER::special event types */
+typedef enum {
+	WT_EVENT_CONN_CLOSE, /*!< Connection closing. */
+	WT_EVENT_CONN_READY /*!< Connection is ready. */
+} WT_EVENT_TYPE;
+
 /*!
  * The interface implemented by applications to handle error, informational and
  * progress messages.  Entries set to NULL are ignored and the default handlers
@@ -3370,6 +3376,24 @@ struct __wt_event_handler {
 	 */
 	int (*handle_close)(WT_EVENT_HANDLER *handler,
 	    WT_SESSION *session, WT_CURSOR *cursor);
+
+	/*!
+	 * Callback to handle general events. The application may choose to handle
+	 * only some types of events. An unhandled event should return 0.
+	 *
+	 * General event returns are not ignored in most cases. If the handler
+	 * returns non-zero, the error may cause the WiredTiger function posting
+	 * the event to fail.
+	 *
+	 * @param wt_conn The connection handle for the database.
+	 * @param session the WiredTiger session handle in use when the
+	 * progress message was generated. The handle may have been created by
+	 * the application or automatically by WiredTiger or may be NULL.
+	 * @param type A type indicator for what special event occurred.
+	 * (see ::WT_EVENT_TYPE for available options.)
+	 */
+        int (*handle_general)(WT_EVENT_HANDLER *handler,
+            WT_CONNECTION *wt_conn, WT_SESSION *session, WT_EVENT_TYPE type);
 };
 
 /*!

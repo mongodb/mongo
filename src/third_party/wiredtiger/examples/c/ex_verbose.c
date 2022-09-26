@@ -61,6 +61,7 @@ config_verbose(void)
     event_handler.handle_error = NULL;
     event_handler.handle_progress = NULL;
     event_handler.handle_close = NULL;
+    event_handler.handle_general = NULL;
 
     /*! [Configure verbose_messaging] */
     error_check(wiredtiger_open(
