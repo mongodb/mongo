@@ -1868,8 +1868,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
             global_index::insertKey(opCtx,
                                     *op.getUuid(),
-                                    op.getObject().getObjectField("key"),
-                                    op.getObject().getObjectField("docKey"));
+                                    op.getObject().getObjectField("ik"),
+                                    op.getObject().getObjectField("dk"));
             break;
         }
         case OpTypeEnum::kDeleteGlobalIndexKey: {
@@ -1877,8 +1877,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
             global_index::deleteKey(opCtx,
                                     *op.getUuid(),
-                                    op.getObject().getObjectField("key"),
-                                    op.getObject().getObjectField("docKey"));
+                                    op.getObject().getObjectField("ik"),
+                                    op.getObject().getObjectField("dk"));
             break;
         }
         default: {

@@ -131,9 +131,11 @@ ReplOperation makeGlobalIndexCrudOperation(const NamespaceString& indexNss,
                                            const BSONObj& key,
                                            const BSONObj& docKey) {
     ReplOperation op;
+    // The 'ns' field is technically redundant as it can be derived from the uuid, however it's a
+    // required oplog entry field.
     op.setNss(indexNss.getCommandNS());
     op.setUuid(indexUuid);
-    op.setObject(BSON("key" << key << "docKey" << docKey));
+    op.setObject(BSON("ik" << key << "dk" << docKey));
     return op;
 }
 }  // namespace

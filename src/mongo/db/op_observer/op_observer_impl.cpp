@@ -314,6 +314,8 @@ void logGlobalIndexDDLOperation(OperationContext* opCtx,
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setObject(builder.done());
+    // The 'ns' field is technically redundant as it can be derived from the uuid, however it's a
+    // required oplog entry field.
     oplogEntry.setNss(globalIndexNss.getCommandNS());
     oplogEntry.setUuid(globalIndexUUID);
 

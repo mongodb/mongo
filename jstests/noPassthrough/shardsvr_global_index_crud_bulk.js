@@ -635,12 +635,12 @@ assert.commandFailedWithCode(adminDB.runCommand({_shardsvrWriteGlobalIndexKeys: 
     delete oplogEntryPlain.wall;
     assert.docEq(oplogEntryBulk, oplogEntryPlain);
     assert.eq(oplogEntryBulk["o"]["applyOps"][0]["op"], "xi");
-    assert.docEq(oplogEntryBulk["o"]["applyOps"][0]["o"]["key"], {myKey: "insertAndRemove"});
-    assert.docEq(oplogEntryBulk["o"]["applyOps"][0]["o"]["docKey"],
+    assert.docEq(oplogEntryBulk["o"]["applyOps"][0]["o"]["ik"], {myKey: "insertAndRemove"});
+    assert.docEq(oplogEntryBulk["o"]["applyOps"][0]["o"]["dk"],
                  {shardKey: "insert", _id: "andRemove"});
     assert.eq(oplogEntryBulk["o"]["applyOps"][1]["op"], "xd");
-    assert.docEq(oplogEntryBulk["o"]["applyOps"][1]["o"]["key"], {myKey: "insertAndRemove"});
-    assert.docEq(oplogEntryBulk["o"]["applyOps"][1]["o"]["docKey"],
+    assert.docEq(oplogEntryBulk["o"]["applyOps"][1]["o"]["ik"], {myKey: "insertAndRemove"});
+    assert.docEq(oplogEntryBulk["o"]["applyOps"][1]["o"]["dk"],
                  {shardKey: "insert", _id: "andRemove"});
 }
 
