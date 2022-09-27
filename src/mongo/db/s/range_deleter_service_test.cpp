@@ -285,8 +285,8 @@ TEST_F(RangeDeleterServiceTest, ScheduledTaskInvalidatedOnStepDown) {
 
     try {
         completionFuture.get(opCtx);
-    } catch (const ExceptionForCat<ErrorCategory::CancellationError>&) {
-        // Expect a cancellation error when the service gets disabled
+    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+        // Expect an interruption error when the service gets disabled
     }
 }
 
@@ -809,7 +809,6 @@ TEST_F(RangeDeleterServiceTest, PerformActualRangeDeletionWithKeyPattern) {
     completionFuture.get(opCtx);
     ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
     ASSERT_EQUALS(dbclient.count(nss), 0);
-
-}  // namespace mongo
+}
 
 }  // namespace mongo

@@ -400,7 +400,8 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                 errorCode == ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist ||
                 errorCode == ErrorCodes::KeyPatternShorterThanBound ||
                 ErrorCodes::isShutdownError(errorCode) ||
-                ErrorCodes::isNotPrimaryError(errorCode)) {
+                ErrorCodes::isNotPrimaryError(errorCode) ||
+                !opCtx->checkForInterruptNoAssert().isOK()) {
                 return ex.toStatus();
             };
         }

@@ -54,17 +54,27 @@ private:
      */
     class RangeDeletion : public ChunkRange {
     public:
-        RangeDeletion(const RangeDeletionTask& task, SharedSemiFuture<void> completion)
-            : ChunkRange(task.getRange().getMin(), task.getRange().getMax()),
-              _completion(completion) {}
+        RangeDeletion(const RangeDeletionTask& task)
+            : ChunkRange(task.getRange().getMin(), task.getRange().getMax()) {}
+
+        ~RangeDeletion() {
+            if (!_completionPromise.getFuture().isReady()) {
+                _completionPromise.setError(
+                    Status{ErrorCodes::Interrupted, "Range deletion interrupted"});
+            }
+        }
 
         SharedSemiFuture<void> getCompletionFuture() const {
-            return _completion;
+            return _completionPromise.getFuture().semi().share();
+        }
+
+        void makeReady() {
+            _completionPromise.emplaceValue();
         }
 
     private:
         // Marked ready once the range deletion has been fully processed
-        const SharedSemiFuture<void> _completion;
+        SharedPromise<void> _completionPromise;
     };
 
     /*
@@ -79,6 +89,81 @@ private:
                         const std::shared_ptr<ChunkRange>& b) const {
             return a->getMin().woCompare(b->getMin()) < 0;
         }
+    };
+
+    /*
+     * Class enclosing a thread continuously processing "ready" range deletions, meaning tasks
+     * that are allowed to be processed (already drained ongoing queries and already waited for
+     * `orphanCleanupDelaySecs`).
+     */
+    class ReadyRangeDeletionsProcessor {
+    public:
+        ReadyRangeDeletionsProcessor(OperationContext* opCtx)
+            : _thread(stdx::thread([this] { _runRangeDeletions(); })) {
+            stdx::unique_lock<Latch> lock(_mutex);
+            opCtx->waitForConditionOrInterrupt(
+                _condVar, lock, [&] { return _threadOpCtxHolder.is_initialized(); });
+        }
+
+        ~ReadyRangeDeletionsProcessor() {
+            {
+                stdx::unique_lock<Latch> lock(_mutex);
+                // The `_threadOpCtxHolder` may have been already reset/interrupted in case the
+                // thread got interrupted due to stepdown
+                if (_threadOpCtxHolder) {
+                    stdx::lock_guard<Client> scopedClientLock(*(*_threadOpCtxHolder)->getClient());
+                    if ((*_threadOpCtxHolder)->checkForInterruptNoAssert().isOK()) {
+                        (*_threadOpCtxHolder)->markKilled(ErrorCodes::Interrupted);
+                    }
+                }
+                _condVar.notify_all();
+            }
+
+            if (_thread.joinable()) {
+                _thread.join();
+            }
+        }
+
+        /*
+         * Schedule a range deletion at the end of the queue
+         */
+        void emplaceRangeDeletion(const RangeDeletionTask& rdt) {
+            stdx::unique_lock<Latch> lock(_mutex);
+            _queue.push(rdt);
+            _condVar.notify_all();
+        }
+
+    private:
+        /*
+         * Remove a range deletion from the head of the queue. Supposed to be called only once a
+         * range deletion successfully finishes.
+         */
+        void _completedRangeDeletion() {
+            stdx::unique_lock<Latch> lock(_mutex);
+            dassert(!_queue.empty());
+            _queue.pop();
+        }
+
+        /*
+         * Code executed by the internal thread
+         */
+        void _runRangeDeletions();
+
+        /* Queue containing scheduled range deletions */
+        std::queue<RangeDeletionTask> _queue;
+        /* Thread consuming the range deletions queue */
+        stdx::thread _thread;
+        /* Pointer to the (one and only) operation context used by the thread */
+        boost::optional<ServiceContext::UniqueOperationContext> _threadOpCtxHolder;
+        /*
+         * Condition variable notified when:
+         * - The component has been initialized (the operation context has been instantiated)
+         * - The instance is shutting down (the operation context has been marked killed)
+         * - A new range deletion is scheduled (the queue size has increased by one)
+         */
+        stdx::condition_variable _condVar;
+
+        Mutex _mutex = MONGO_MAKE_LATCH("ReadyRangeDeletionsProcessor");
     };
 
     // Keeping track of per-collection registered range deletion tasks
@@ -170,9 +255,14 @@ public:
         }
     }
 
+    std::unique_ptr<ReadyRangeDeletionsProcessor> _readyRangeDeletionsProcessorPtr;
+
 private:
     /* Asynchronously register range deletions on the service. To be called on on step-up */
     void _recoverRangeDeletionsOnStepUp(OperationContext* opCtx);
+
+    /* Called by shutdown/stepdown hooks to reset the service */
+    void _stopService(bool joinExecutor);
 
     /* ReplicaSetAwareServiceShardSvr "empty implemented" methods */
     void onStartup(OperationContext* opCtx) override final{};
