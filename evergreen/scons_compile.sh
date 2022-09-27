@@ -57,6 +57,11 @@ if [ "${generating_for_ninja}" = "true" ] && [ "Windows_NT" = "$OS" ]; then
 fi
 activate_venv
 
+cd src/third_party/cares/scripts
+rm -rf ../platform
+./host_config.sh
+find ../platform -name "*.h" -exec bash -c "echo {}; cat {}" \;
+
 set -o pipefail
 eval ${compile_env} $python ./buildscripts/scons.py \
   ${compile_flags} ${task_compile_flags} ${task_compile_flags_extra} \
