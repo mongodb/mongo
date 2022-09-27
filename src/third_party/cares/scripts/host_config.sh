@@ -6,8 +6,6 @@ IFS=$'\n\t'
 
 set -vx
 
-TOOLCHAIN_ROOT=/opt/mongodbtoolchain/v3
-PATH="$TOOLCHAIN_ROOT/bin:$PATH"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/cares
 
@@ -34,12 +32,8 @@ pushd $HOST_DIR/build
 #   cxx-exceptions : intrusive exception handling runtime
 $SRC_DIR/configure \
     --prefix=$HOST_DIR/install \
-    CC=$TOOLCHAIN_ROOT/bin/gcc \
-    CXX=$TOOLCHAIN_ROOT/bin/g++
 
 
-CC=$TOOLCHAIN_ROOT/bin/gcc
-CXX=$TOOLCHAIN_ROOT/bin/g++
 
-make CC=$CC CXX=$CXX install
+make install
 popd
