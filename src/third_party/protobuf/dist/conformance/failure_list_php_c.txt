@@ -1,0 +1,2 @@
+Recommended.Proto2.JsonInput.FieldNameExtension.Validator
+Required.Proto2.JsonInput.StoresDefaultPrimitive.Validator

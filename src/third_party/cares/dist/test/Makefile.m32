@@ -1,0 +1,61 @@
+#############################################################
+#
+## Makefile for building arestest.exe with MingW32 (GCC-3.2)
+## Use: make -f Makefile.m32
+#
+########################################################
+CXX = g++
+CC = gcc
+LD = g++
+
+# Where to find the c-ares source code; needed because the tests use library-internal headers
+ARES_SRC_DIR = ..
+# Where to find the built c-ares static library
+ARES_BLD_DIR = ..
+ARESLIB = $(ARES_BLD_DIR)/src/lib/libcares.a
+GMOCK_DIR = gmock-1.8.0
+CPPFLAGS = -I$(ARES_SRC_DIR)/include -I$(ARES_SRC_DIR)/src/lib -I$(GMOCK_DIR) -DCARES_STATICLIB
+CXXFLAGS = -Wall $(PTHREAD_CFLAGS) -std=gnu++11
+LDFLAGS =
+LDLIBS = -lwsock32
+
+# Makefile.inc provides the TESTSOURCES and TESTHEADERS defines
+include Makefile.inc
+
+OBJS := $(patsubst %.cc,%.o,$(strip $(TESTSOURCES)))
+FUZZOBJS := $(patsubst %.c,%.o,$(strip $(FUZZSOURCES)))
+FUZZNAMEOBJS := $(patsubst %.c,%.o,$(strip $(FUZZNAMESOURCES)))
+DNSDUMPOBJS := $(patsubst %.cc,%.o,$(strip $(DUMPSOURCES)))
+
+all: arestest.exe aresfuzz.exe aresfuzzname.exe dnsdump.exe
+
+arestest.exe: $(OBJS) gmock-gtest-all.o
+	$(LD) $(LDFLAGS) -o $@ $^  -L$(ARES_BLD_DIR)/src/lib -lcares $(LDLIBS)
+
+aresfuzz.exe: $(FUZZOBJS)
+	$(LD) $(LDFLAGS) -o $@ $^  -L$(ARES_BLD_DIR)/src/lib -lcares $(LDLIBS)
+
+aresfuzzname.exe: $(FUZZNAMEOBJS)
+	$(LD) $(LDFLAGS) -o $@ $^  -L$(ARES_BLD_DIR)/src/lib -lcares $(LDLIBS)
+
+dnsdump.exe: $(DNSDUMPOBJS)
+	$(LD) $(LDFLAGS) -o $@ $^  -L$(ARES_BLD_DIR)/src/lib -lcares $(LDLIBS)
+
+$(OBJS): $(TESTHEADERS)
+
+.cc.o:
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $<
+.c.o:
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<
+gmock-gtest-all.o: $(GMOCK_DIR)/gmock-gtest-all.cc
+	$(CXX) -I$(GMOCK_DIR) $(CPPFLAGS) $(CXXFLAGS) -c $<
+
+test: arestest.exe
+	./arestest.exe
+vtest: arestest.exe
+	./arestest.exe -v
+
+clean:
+	$(RM) $(OBJS) gmock-gtest-all.o arestest.exe aresfuzz.exe aresfuzzname.exe dnsdump.exe
+
+
