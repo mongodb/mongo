@@ -68,11 +68,9 @@ DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opC
         csr->clearFilteringMetadataForDroppedCollection(opCtx);
     }
 
-    DropReply result;
-    uassertStatusOK(dropCollection(
-        opCtx, nss, &result, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
-
-    // Remove all range deletion task documents present on disk for the dropped collection
+    // Remove all range deletion task documents present on disk for the collection to drop. This is
+    // a best-effort tentative considering that migrations are not blocked, hence some new document
+    // may be inserted before actually dropping the collection.
     if (collectionUUID) {
         // The multi-document remove command cannot be run in  transactions, so run it using
         // an alternative client.
@@ -96,6 +94,11 @@ DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opC
             throw;
         }
     }
+
+    DropReply result;
+    uassertStatusOK(dropCollection(
+        opCtx, nss, &result, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+
 
     // Force the refresh of the catalog cache to purge outdated information
     const auto catalog = Grid::get(opCtx)->catalogCache();

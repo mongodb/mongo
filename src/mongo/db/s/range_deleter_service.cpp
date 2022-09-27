@@ -487,6 +487,9 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
 void RangeDeleterService::deregisterTask(const UUID& collUUID, const ChunkRange& range) {
     auto lock = _acquireMutexFailIfServiceNotUp();
     _rangeDeletionTasks[collUUID].erase(std::make_shared<ChunkRange>(range));
+    if (_rangeDeletionTasks[collUUID].size() == 0) {
+        _rangeDeletionTasks.erase(collUUID);
+    }
 }
 
 int RangeDeleterService::getNumRangeDeletionTasksForCollection(const UUID& collectionUUID) {
