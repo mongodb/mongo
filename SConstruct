@@ -886,6 +886,7 @@ def variable_tools_converter(val):
         "distsrc",
         "gziptool",
         "idl_tool",
+        "protobuf_compiler",
         "jsheader",
         "mongo_test_execution",
         "mongo_test_list",
@@ -1326,6 +1327,18 @@ env_vars.Add(
 env_vars.Add(
     'STRIP',
     help='Path to the strip utility (non-darwin platforms probably use OBJCOPY for this)',
+)
+
+env_vars.Add(
+    'PROTOC',
+    default="$DESTDIR/bin/protobuf_compiler$PROGSUFFIX",
+    help='Path to protobuf compiler.',
+)
+
+env_vars.Add(
+    'PROTOC_CPP_PLUGIN',
+    default="$DESTDIR/bin/grpc_cpp_plugin$PROGSUFFIX",
+    help='Path to protobuf compiler grpc plugin.',
 )
 
 env_vars.Add(
@@ -2008,6 +2021,7 @@ env['BUILDERS']['SharedArchive'] = SCons.Builder.Builder(
 # Teach builders how to build idl files
 for builder in ['SharedObject', 'StaticObject']:
     env['BUILDERS'][builder].add_src_builder("Idlc")
+    env['BUILDERS'][builder].add_src_builder("Protoc")
 
 if link_model.startswith("dynamic"):
 
@@ -2713,7 +2727,7 @@ elif env.TargetOSIs('windows'):
 
     # Enables the __cplusplus preprocessor macro to report an updated value for recent C++ language
     # standards support.
-    env.Append(CCFLAGS=["/Zc:__cplusplus"])
+    env.Append(CXXFLAGS=["/Zc:__cplusplus"])
 
     # Tells the compiler to preferentially call global operator delete or operator delete[]
     # functions that have a second parameter of type size_t when the size of the object is available.
@@ -3667,10 +3681,10 @@ def doConfigure(myenv):
 
     if myenv.ToolchainIs('msvc'):
         if get_option('cxx-std') == "17":
-            myenv.AppendUnique(CCFLAGS=['/std:c++17',
+            myenv.AppendUnique(CXXFLAGS=['/std:c++17',
                                         '/Zc:lambda'])  # /Zc:lambda is implied by /std:c++20
         elif get_option('cxx-std') == "20":
-            myenv.AppendUnique(CCFLAGS=['/std:c++20'])
+            myenv.AppendUnique(CXXFLAGS=['/std:c++20'])
     else:
         if get_option('cxx-std') == "17":
             if not myenv.AddToCXXFLAGSIfSupported('-std=c++17'):
@@ -5306,6 +5320,28 @@ if get_option('ninja') != 'disabled':
                 .format(env['ICECREAM_VERSION']))
 
     ninja_builder = Tool("ninja")
+
+    # This list is the list of targets we can build without first building
+    # all generated sources. This is list is also a list of dependencies required
+    # to build the protobuf compiler and grpc plugins. We must build protobuf
+    # before building all generated sources, because the protobuf compiler is required
+    # for generating some sources. Once we have better ways to deal with generated
+    # sources and ninja, this list can be removed.
+    env['NINJA_PREGEN_SOURCE_TARGETS'] =  [
+        'third_party/protobuf',
+        env.Dir('$DESTDIR').path,
+        'third_party/zlib',
+        'shim_zlib',
+        'shim_allocator',
+        'third_party/unwind',
+        'shim_unwind',
+        'third_party_shim',
+        'third_party/gperftools',
+        'grpc_plugin_support',
+        'third_party/grpc/dist/src/compiler',
+        'protobuf_compilier',
+        'grpc_cpp_plugin',
+    ]
     env["NINJA_BUILDDIR"] = env.Dir("$NINJA_BUILDDIR")
     ninja_builder.generate(env)
 

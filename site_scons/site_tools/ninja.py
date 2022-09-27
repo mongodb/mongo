@@ -810,15 +810,23 @@ class NinjaState:
             # cycle.
             if (generated_source_files and check_generated_source_deps(build)):
 
-                # Make all non-generated source targets depend on
-                # _generated_sources. We use order_only for generated
-                # sources so that we don't rebuild the world if one
-                # generated source was rebuilt. We just need to make
-                # sure that all of these sources are generated before
-                # other builds.
-                order_only = build.get("order_only", [])
-                order_only.append(generated_sources_alias)
-                build["order_only"] = order_only
+                depends_on_gen_source = False
+                if build['outputs']:
+                    depends_on_gen_source = all([
+                        True if gen_source_exception not in build['outputs'][0] else False
+                        for gen_source_exception in self.env.get('NINJA_PREGEN_SOURCE_TARGETS', [])
+                        ])
+
+                if depends_on_gen_source:
+                    # Make all non-generated source targets depend on
+                    # _generated_sources. We use order_only for generated
+                    # sources so that we don't rebuild the world if one
+                    # generated source was rebuilt. We just need to make
+                    # sure that all of these sources are generated before
+                    # other builds.
+                    order_only = build.get("order_only", [])
+                    order_only.append(generated_sources_alias)
+                    build["order_only"] = order_only
             if "order_only" in build:
                 build["order_only"].sort()
 
