@@ -91,8 +91,8 @@ void GlobalIndexInserter::processDoc(OperationContext* opCtx,
                     InsertGlobalIndexKey globalIndexEntryInsert(_indexUUID);
                     // Note: dbName is unused by command but required by idl.
                     globalIndexEntryInsert.setDbName({boost::none, "admin"});
-                    globalIndexEntryInsert.setDocKey(documentKey);
-                    globalIndexEntryInsert.setKey(indexKeyValues);
+                    globalIndexEntryInsert.setGlobalIndexKeyEntry(
+                        GlobalIndexKeyEntry(indexKeyValues, documentKey));
 
                     return txnClient.runCommand(_nss.db(), globalIndexEntryInsert.toBSON({}))
                         .thenRunOn(txnExec)

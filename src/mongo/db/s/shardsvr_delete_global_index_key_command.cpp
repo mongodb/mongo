@@ -56,11 +56,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-
-            uassert(ErrorCodes::CommandNotSupported,
-                    "_shardsvrDeleteGlobalIndexKey command not enabled",
-                    gFeatureFlagGlobalIndexes.isEnabledAndIgnoreFCV());
-
             uassert(6924200,
                     "_shardsvrDeleteGlobalIndexKey must run inside a multi-doc transaction.",
                     opCtx->inMultiDocumentTransaction());
@@ -94,8 +89,10 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
+};
 
-} shardsvrDeleteGlobalIndexKeyCmd;
+MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ShardsvrDeleteGlobalIndexKeyCmd,
+                                       mongo::gFeatureFlagGlobalIndexes);
 
 }  // namespace
 }  // namespace mongo

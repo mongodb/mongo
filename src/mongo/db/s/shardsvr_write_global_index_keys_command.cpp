@@ -30,21 +30,17 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_write_path.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_index.h"
 #include "mongo/db/s/global_index_crud_commands_gen.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/server_feature_flags_gen.h"
 
 namespace mongo {
 namespace {
 
-class ShardsvrInsertGlobalIndexKeyCmd final : public TypedCommand<ShardsvrInsertGlobalIndexKeyCmd> {
+class ShardsvrWriteGlobalIndexKeysCmd final : public TypedCommand<ShardsvrWriteGlobalIndexKeysCmd> {
 public:
-    using Request = InsertGlobalIndexKey;
+    using Request = WriteGlobalIndexKeys;
 
     bool allowedInTransactions() const final {
         return true;
@@ -55,14 +51,7 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext* opCtx) {
-            uassert(6789400,
-                    "_shardsvrInsertGlobalIndexKey must run inside a multi-doc transaction.",
-                    opCtx->inMultiDocumentTransaction());
-
-            global_index::insertKey(
-                opCtx, request().getCommandParameter(), request().getKey(), request().getDocKey());
-        }
+        void typedRun(OperationContext* opCtx);
 
     private:
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -74,16 +63,16 @@ public:
         }
 
         bool supportsWriteConcern() const override {
-            return true;
+            return false;
         }
 
         NamespaceString ns() const override {
-            return NamespaceString::makeGlobalIndexNSS(request().getCommandParameter());
+            return {request().getDbName(), ""};
         }
     };
 
     std::string help() const override {
-        return "Internal command to add a key to a global index data container.";
+        return "Internal command to perform multiple global index key writes in bulk.";
     }
 
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -91,7 +80,35 @@ public:
     }
 };
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ShardsvrInsertGlobalIndexKeyCmd,
+void ShardsvrWriteGlobalIndexKeysCmd::Invocation::typedRun(OperationContext* opCtx) {
+    uassert(6789500,
+            "_shardsvrWriteGlobalIndexKeys must run inside a multi-doc transaction.",
+            opCtx->inMultiDocumentTransaction());
+
+    const auto& ops = request().getOps();
+
+    uassert(6789502, "_shardsvrWriteGlobalIndexKeys 'ops' field cannot be empty", ops.size());
+
+    for (const auto& op : ops) {
+        const auto cmd = op.firstElementFieldNameStringData();
+        uassert(6789501,
+                str::stream() << "_shardsvrWriteGlobalIndexKeys ops entries must be of type "
+                              << InsertGlobalIndexKey::kCommandParameterFieldName << " or "
+                              << DeleteGlobalIndexKey::kCommandParameterFieldName,
+                cmd == InsertGlobalIndexKey::kCommandParameterFieldName ||
+                    cmd == DeleteGlobalIndexKey::kCommandParameterFieldName);
+
+        const auto uuid = uassertStatusOK(UUID::parse(op[cmd]));
+        const auto key = GlobalIndexKeyEntry::parse(IDLParserContext{"GlobalIndexKeyEntry"}, op);
+        if (cmd == InsertGlobalIndexKey::kCommandParameterFieldName) {
+            global_index::insertKey(opCtx, uuid, key.getKey(), key.getDocKey());
+        } else {
+            global_index::deleteKey(opCtx, uuid, key.getKey(), key.getDocKey());
+        }
+    }
+}
+
+MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ShardsvrWriteGlobalIndexKeysCmd,
                                        mongo::gFeatureFlagGlobalIndexes);
 
 }  // namespace

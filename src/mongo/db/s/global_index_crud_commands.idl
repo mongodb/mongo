@@ -35,6 +35,18 @@ global:
 imports:
   - "mongo/db/basic_types.idl"
 
+structs:
+  GlobalIndexKeyEntry:
+    description: "Defines the global index key to be inserted or deleted."
+    strict: false
+    fields:
+      key:
+        type: object
+        description: "The index key."
+      docKey:
+        type: object
+        description: "The document key: the document's shard key followed by its _id."
+
 commands:
   _shardsvrInsertGlobalIndexKey:
     description: "Internal command to insert a key into a global index container."
@@ -45,13 +57,9 @@ commands:
     namespace: type
     api_version: ""
     reply_type: OkReply
-    fields:
-      key:
-        type: object
-        description: "The index key."
-      docKey:
-        type: object
-        description: "The document key: the document's shard key followed by its _id."
+    inline_chained_structs: true
+    chained_structs:
+      GlobalIndexKeyEntry: GlobalIndexKeyEntry
 
   _shardsvrDeleteGlobalIndexKey:
     description: "Internal command to delete a key from a global index container."
@@ -62,10 +70,19 @@ commands:
     namespace: type
     api_version: ""
     reply_type: OkReply
+    inline_chained_structs: true
+    chained_structs:
+      GlobalIndexKeyEntry: GlobalIndexKeyEntry
+
+  _shardsvrWriteGlobalIndexKeys:
+    description: "Internal command to run _shardsvrInsertGlobalIndexKey and _shardsvrDeleteGlobalIndexKey statements in bulk."
+    command_name: _shardsvrWriteGlobalIndexKeys
+    cpp_name: WriteGlobalIndexKeys
+    namespace: ignored
+    api_version: ""
+    reply_type: OkReply
     fields:
-      key:
-        type: object
-        description: "The index key."
-      docKey:
-        type: object
-        description: "The document key: the document's shard key followed by its _id."
+      ops:
+        type: array<object>
+        cpp_name: ops
+        description: "Array of _shardsvrInsertGlobalIndexKey and _shardsvrDeleteGlobalIndexKey commands"

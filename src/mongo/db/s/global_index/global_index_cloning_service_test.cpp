@@ -318,7 +318,6 @@ private:
     const std::string _indexName{"global_x_1"};
     const StringData _indexKey{"x"};
     const BSONObj _indexSpec{BSON("key" << BSON(_indexKey << 1) << "unique" << true)};
-    const RAIIServerParameterControllerForTest _enableFeature{"featureFlagGlobalIndexes", true};
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
     std::shared_ptr<StateTransitionController> _stateTransitionController;
@@ -326,6 +325,15 @@ private:
     MockGlobalIndexClonerFetcher _mockFetcher;
     MockGlobalIndexClonerFetcher _fetcherCopyForVerification;
 };
+
+MONGO_INITIALIZER_GENERAL(EnableFeatureFlagGlobalIndexes,
+                          ("EndServerParameterRegistration"),
+                          ("default"))
+(InitializerContext*) {
+    auto* param = ServerParameterSet::getNodeParameterSet()->get("featureFlagGlobalIndexes");
+    uassertStatusOK(
+        param->set(BSON("featureFlagGlobalIndexes" << true).firstElement(), boost::none));
+}
 
 TEST_F(GlobalIndexClonerServiceTest, CloneInsertsToGlobalIndexCollection) {
     auto doc = makeStateDocument();

@@ -63,7 +63,7 @@ BSONObj buildIndexEntry(const BSONObj& key, const BSONObj& docKey) {
     // - No support for multikey indexes.
 
     KeyString::Builder ks(KeyString::Version::V1);
-    ks.resetToKey(key, KeyString::ALL_ASCENDING);
+    ks.resetToKey(BSONObj::stripFieldNames(key), KeyString::ALL_ASCENDING);
     const auto& indexTB = ks.getTypeBits();
 
     // Build the index entry, consisting of:

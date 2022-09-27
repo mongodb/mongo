@@ -81,6 +81,7 @@ rollbackTest.getTestFixture().nodes.forEach(function(node) {
 // Current test implementation makes fastcount valid due to rolling back both a delete and an
 // insert. After fixing fast count, we should make this test fail if fast count is not working
 // properly.
+// TODO (SERVER-69847): add a rollback test for _shardsvrWriteGlobalIndexKeys too.
 
 rollbackTest.stop();
 })();

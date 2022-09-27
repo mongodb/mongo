@@ -488,6 +488,7 @@ env.Library(
         'shardsvr_get_stats_for_balancing_command.cpp',
         'shardsvr_insert_global_index_key_command.cpp',
         'shardsvr_delete_global_index_key_command.cpp',
+        'shardsvr_write_global_index_keys_command.cpp',
         'shardsvr_join_migrations_command.cpp',
         'shardsvr_merge_chunks_command.cpp',
         'shardsvr_move_primary_command.cpp',

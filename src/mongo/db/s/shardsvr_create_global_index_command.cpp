@@ -84,11 +84,6 @@ public:
         }
 
         void typedRun(OperationContext* opCtx) {
-
-            uassert(ErrorCodes::CommandNotSupported,
-                    "_shardsvrCreateGlobalIndex command not enabled",
-                    gFeatureFlagGlobalIndexes.isEnabledAndIgnoreFCV());
-
             const auto indexUUID = request().getCommandParameter();
             global_index::createContainer(opCtx, indexUUID);
         }
@@ -102,7 +97,10 @@ public:
                                                            ActionType::internal));
         }
     };
-} shardsvrCreateGlobalIndexCommand;
+};
+
+MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ShardsvrCreateGlobalIndexCommand,
+                                       mongo::gFeatureFlagGlobalIndexes);
 
 }  // namespace
 }  // namespace mongo
