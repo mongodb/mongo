@@ -3292,6 +3292,7 @@ const char *wiredtiger_strerror(int error) WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*! WT_EVENT_HANDLER::special event types */
 typedef enum {
+	WT_EVENT_COMPACT_CHECK, /*!< Compact check iteration. */
 	WT_EVENT_CONN_CLOSE, /*!< Connection closing. */
 	WT_EVENT_CONN_READY /*!< Connection is ready. */
 } WT_EVENT_TYPE;

@@ -340,6 +340,13 @@ __wt_compact(WT_SESSION_IMPL *session)
         if (++i > 100) {
             bm->compact_progress(bm, session, &msg_count);
             WT_ERR(__wt_session_compact_check_timeout(session));
+            if (session->event_handler->handle_general != NULL) {
+                ret = session->event_handler->handle_general(session->event_handler,
+                  &(S2C(session))->iface, &session->iface, WT_EVENT_COMPACT_CHECK);
+                /* If the user's handler returned non-zero we return WT_ERROR to the caller. */
+                if (ret != 0)
+                    WT_ERR_MSG(session, WT_ERROR, "compact interrupted by application");
+            }
 
             if (__wt_cache_stuck(session))
                 WT_ERR(EBUSY);
