@@ -873,7 +873,7 @@ lib_node = grpcxx_env.Library(
 )
 
 grpc_unittest_env = grpcxx_env.Clone()
-grpc_unittest_env.InjectThirdParty(libraries=['fmt', 'variant'])
+grpc_unittest_env.InjectThirdParty(libraries=['fmt', 'variant', 'boost', 'safeint'])
 grpc_unittest_env.Append(
     CPPPATH=[
         '#src',
@@ -892,4 +892,8 @@ grpc_unittest_env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         'grpc++_reflection',
     ],
+    SYSLIBDEPS=[
+        'ssl',
+        'crypto'
+    ]
 )

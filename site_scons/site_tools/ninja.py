@@ -813,7 +813,7 @@ class NinjaState:
                 depends_on_gen_source = False
                 if build['outputs']:
                     depends_on_gen_source = all([
-                        True if gen_source_exception not in build['outputs'][0] else False
+                        True if gen_source_exception not in build['outputs'][0].replace('\\', '/') else False
                         for gen_source_exception in self.env.get('NINJA_PREGEN_SOURCE_TARGETS', [])
                         ])
 

@@ -5329,7 +5329,7 @@ if get_option('ninja') != 'disabled':
     # sources and ninja, this list can be removed.
     env['NINJA_PREGEN_SOURCE_TARGETS'] =  [
         'third_party/protobuf',
-        env.Dir('$DESTDIR').path,
+        env.Dir('$DESTDIR').path.replace('\\', '/'),
         'third_party/zlib',
         'shim_zlib',
         'shim_allocator',
