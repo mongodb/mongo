@@ -44,6 +44,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
@@ -152,13 +153,14 @@ DatabaseType ShardingCatalogManager::createDatabase(
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
-    // Check if a database already exists with the same name (case sensitive), and if so, return the
-    // existing entry.
+    // Check if a database already exists with the same name (case insensitive), and if so, return
+    // the existing entry.
     BSONObjBuilder queryBuilder;
     queryBuilder.appendRegex(
         DatabaseType::kNameFieldName, "^{}$"_format(pcre_util::quoteMeta(dbName)), "i");
 
     auto dbDoc = client.findOne(NamespaceString::kConfigDatabasesNamespace, queryBuilder.obj());
+    bool waitForMajorityAfterAccessingCatalog = true;
     auto const [primaryShardPtr, database] = [&] {
         if (!dbDoc.isEmpty()) {
             auto actualDb = DatabaseType::parse(IDLParserContext("DatabaseType"), dbDoc);
@@ -204,23 +206,50 @@ DatabaseType ShardingCatalogManager::createDatabase(
                   "Registering new database in sharding catalog",
                   "db"_attr = db);
 
-            // Do this write with majority writeConcern to guarantee that the shard sees the write
-            // when it receives the _flushDatabaseCacheUpdates.
-            uassertStatusOK(
-                catalogClient->insertConfigDocument(opCtx,
-                                                    NamespaceString::kConfigDatabasesNamespace,
-                                                    db.toBSON(),
-                                                    ShardingCatalogClient::kMajorityWriteConcern));
+            if (feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                NamespacePlacementType placementInfo(
+                    NamespaceString(dbName),
+                    clusterTime,
+                    std::vector<mongo::ShardId>{shardPtr->getId()});
+                withTransaction(
+                    opCtx,
+                    NamespaceString::kConfigDatabasesNamespace,
+                    [&](OperationContext* opCtx, TxnNumber txnNumber) {
+                        insertConfigDocuments(opCtx,
+                                              NamespaceString::kConfigDatabasesNamespace,
+                                              {db.toBSON()},
+                                              txnNumber);
+                        insertConfigDocuments(opCtx,
+                                              NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                                              {placementInfo.toBSON()},
+                                              txnNumber);
+                    });
+
+                // Skip the wait for majority; the transaction semantics already guarantee the
+                // needed write concern.
+                waitForMajorityAfterAccessingCatalog = false;
+            } else {
+                // Do this write with majority writeConcern to guarantee that the shard sees the
+                // write when it receives the _flushDatabaseCacheUpdates.
+                uassertStatusOK(catalogClient->insertConfigDocument(
+                    opCtx,
+                    NamespaceString::kConfigDatabasesNamespace,
+                    db.toBSON(),
+                    ShardingCatalogClient::kMajorityWriteConcern));
+            }
 
             return std::make_pair(shardPtr, db);
         }
     }();
 
-    WriteConcernResult unusedResult;
-    uassertStatusOK(waitForWriteConcern(opCtx,
-                                        replClient.getLastOp(),
-                                        ShardingCatalogClient::kMajorityWriteConcern,
-                                        &unusedResult));
+    if (waitForMajorityAfterAccessingCatalog) {
+        WriteConcernResult unusedResult;
+        uassertStatusOK(waitForWriteConcern(opCtx,
+                                            replClient.getLastOp(),
+                                            ShardingCatalogClient::kMajorityWriteConcern,
+                                            &unusedResult));
+    }
 
     // Note, making the primary shard refresh its databaseVersion here is not required for
     // correctness, since either:
