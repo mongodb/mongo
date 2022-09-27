@@ -373,24 +373,12 @@ public:
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-                // TODO SERVER-68008: Remove collMod draining mechanism after 7.0 becomes last LTS.
-                if (actualVersion > requestedVersion &&
-                    !feature_flags::gCollModCoordinatorV3.isEnabledOnVersion(requestedVersion)) {
-                    // Drain all running collMod v3 coordinator because they produce backward
-                    // incompatible on disk metadata
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kCollMod);
-                }
-
-                // TODO SERVER-68373 remove once 7.0 becomes last LTS
-                if (actualVersion > requestedVersion) {
-                    // Drain the QE compact coordinator because it persists state that is
-                    // not backwards compatible with earlier versions.
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData);
-                }
+                // This helper function is only for any actions that should be done specifically on
+                // shard servers during phase 1 of the 2-phase setFCV protocol for sharded clusters.
+                // For example, before completing phase 1, we must wait for backward incompatible
+                // ShardingDDLCoordinators to finish.
+                // We do not expect any other feature-specific work to be done in phase 1.
+                _shardServerPhase1Tasks(opCtx, actualVersion, requestedVersion);
 
                 // If we are only running phase-1, then we are done
                 return true;
@@ -400,16 +388,10 @@ public:
         invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
         invariant(!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kComplete);
 
-        // If we are downgrading to a version that doesn't support implicit translation of
-        // Timeseries collection in sharding DDL Coordinators we need to drain all ongoing
-        // coordinators
-        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-            !feature_flags::gImplicitDDLTimeseriesNssTranslation.isEnabledOnVersion(
-                requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)->waitForOngoingCoordinatorsToFinish(
-                opCtx);
-        }
-
+        // All feature-specific FCV upgrade or downgrade code should go into the respective
+        // _runUpgrade and _runDowngrade functions. Each of them have their own helper functions
+        // where all feature-specific upgrade/downgrade code should be placed. Please read the
+        // comments on the helper functions for more details on where to place the code.
         if (requestedVersion > actualVersion) {
             _runUpgrade(opCtx, request, changeTimestamp);
         } else {
@@ -447,10 +429,42 @@ public:
     }
 
 private:
+    // This helper function is only for any actions that should be done specifically on
+    // shard servers during phase 1 of the 2-phase setFCV protocol for sharded clusters.
+    // For example, before completing phase 1, we must wait for backward incompatible
+    // ShardingDDLCoordinators to finish. This is important in order to ensure that no
+    // shard that is currently a participant of such a backward-incompatible
+    // ShardingDDLCoordinator can transition to the fully downgraded state (and thus,
+    // possibly downgrade its binary) while the coordinator is still in progress.
+    // The fact that the FCV has already transitioned to kDowngrading ensures that no
+    // new backward-incompatible ShardingDDLCoordinators can start.
+    // We do not expect any other feature-specific work to be done in phase 1.
+    void _shardServerPhase1Tasks(OperationContext* opCtx,
+                                 multiversion::FeatureCompatibilityVersion actualVersion,
+                                 multiversion::FeatureCompatibilityVersion requestedVersion) {
+        // TODO SERVER-68008: Remove collMod draining mechanism after 7.0 becomes last LTS.
+        if (actualVersion > requestedVersion &&
+            !feature_flags::gCollModCoordinatorV3.isEnabledOnVersion(requestedVersion)) {
+            // Drain all running collMod v3 coordinator because they produce backward
+            // incompatible on disk metadata
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx, DDLCoordinatorTypeEnum::kCollMod);
+        }
+
+        // TODO SERVER-68373 remove once 7.0 becomes last LTS
+        if (actualVersion > requestedVersion) {
+            // Drain the QE compact coordinator because it persists state that is
+            // not backwards compatible with earlier versions.
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData);
+        }
+    }
+
     // This helper function is for any actions that should be done before taking the FCV full
     // transition lock in S mode. It is required that the code in this helper function is idempotent
     // and could be done after _runDowngrade even if it failed at any point in the middle of
-    // _userCollectionsDowngradeCleanup or _internalServerDowngradeCleanup.
+    // _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
     void _prepareForUpgrade(OperationContext* opCtx) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             return;
@@ -464,16 +478,16 @@ private:
     // This helper function is for any user collections uasserts, creations, or deletions that need
     // to happen during the upgrade. It is required that the code in this helper function is
     // idempotent and could be done after _runDowngrade even if it failed at any point in the middle
-    // of _userCollectionsDowngradeCleanup or _internalServerDowngradeCleanup.
-    void _userCollectionsUpgradeUassertsAndUpdates() {
+    // of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
+    void _userCollectionsWorkForUpgrade() {
         return;
     }
 
     // This helper function is for updating metadata to make sure the new features in the
     // upgraded version work for sharded and non-sharded clusters. It is required that the code
     // in this helper function is idempotent and could be done after _runDowngrade even if it
-    // failed at any point in the middle of _userCollectionsDowngradeCleanup or
-    // _internalServerDowngradeCleanup.
+    // failed at any point in the middle of _userCollectionsUassertsForDowngrade or
+    // _internalServerCleanupForDowngrade.
     void _completeUpgrade(OperationContext* opCtx,
                           const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
@@ -496,6 +510,17 @@ private:
         }
     }
 
+    // _runUpgrade performs all the upgrade specific code for setFCV. Any new feature specific
+    // upgrade code should be placed in the _runUpgrade helper functions:
+    //  * _prepareForUpgrade: for any upgrade actions that should be done before taking the FCV full
+    //    transition lock in S mode
+    //  * _userCollectionsWorkForUpgrade: for any user collections uasserts, creations, or deletions
+    //    that need to happen during the upgrade. This happens after the FCV full transition lock.
+    //  * _completeUpgrade: for updating metadata to make sure the new features in the upgraded
+    //  version
+    //    work for sharded and non-sharded clusters
+    // Please read the comments on those helper functions for more details on what should be placed
+    // in each function.
     void _runUpgrade(OperationContext* opCtx,
                      const SetFeatureCompatibilityVersion& request,
                      boost::optional<Timestamp> changeTimestamp) {
@@ -509,7 +534,7 @@ private:
         // This helper function is for any actions that should be done before taking the FCV full
         // transition lock in S mode. It is required that the code in this helper function is
         // idempotent and could be done after _runDowngrade even if it failed at any point in the
-        // middle of _userCollectionsDowngradeCleanup or _internalServerDowngradeCleanup.
+        // middle of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
         _prepareForUpgrade(opCtx);
 
         {
@@ -526,10 +551,10 @@ private:
         // This helper function is for any user collections uasserts, creations, or deletions that
         // need to happen during the upgrade. It is required that the code in this helper function
         // is idempotent and could be done after _runDowngrade even if it failed at any point in the
-        // middle of _userCollectionsDowngradeCleanup or _internalServerDowngradeCleanup.
+        // middle of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
             serverGlobalParams.clusterRole == ClusterRole::None) {
-            _userCollectionsUpgradeUassertsAndUpdates();
+            _userCollectionsWorkForUpgrade();
         }
 
         uassert(ErrorCodes::Error(549180),
@@ -553,8 +578,8 @@ private:
         // This helper function is for updating metadata to make sure the new features in the
         // upgraded version work for sharded and non-sharded clusters. It is required that the code
         // in this helper function is idempotent and could be done after _runDowngrade even if it
-        // failed at any point in the middle of _userCollectionsDowngradeCleanup or
-        // _internalServerDowngradeCleanup.
+        // failed at any point in the middle of _userCollectionsUassertsForDowngrade or
+        // _internalServerCleanupForDowngrade.
         _completeUpgrade(opCtx, requestedVersion);
 
         hangWhileUpgrading.pauseWhileSet(opCtx);
@@ -596,107 +621,105 @@ private:
     // InterruptedDueToReplStateChange) or ErrorCode::CannotDowngrade. The uasserts added to this
     // helper function can only have the CannotDowngrade error code indicating that the user must
     // manually clean up some user data in order to retry the FCV downgrade.
-    void _uassertUserDataAndSettingsReadyForDowngrade(
+    void _userCollectionsUassertsForDowngrade(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             return;
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
                    serverGlobalParams.clusterRole == ClusterRole::None) {
-            _userCollectionsUasserts(opCtx, requestedVersion);
-        }
-    }
+            if (!feature_flags::gTimeseriesScalabilityImprovements.isEnabledOnVersion(
+                    requestedVersion)) {
+                for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+                    catalog::forEachCollectionFromDb(
+                        opCtx,
+                        dbName,
+                        MODE_S,
+                        [&](const CollectionPtr& collection) {
+                            invariant(collection->getTimeseriesOptions());
 
-    void _userCollectionsUasserts(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (!feature_flags::gTimeseriesScalabilityImprovements.isEnabledOnVersion(
-                requestedVersion)) {
+                            auto indexCatalog = collection->getIndexCatalog();
+                            auto indexIt = indexCatalog->getIndexIterator(
+                                opCtx,
+                                IndexCatalog::InclusionPolicy::kReady |
+                                    IndexCatalog::InclusionPolicy::kUnfinished);
+
+                            while (indexIt->more()) {
+                                auto indexEntry = indexIt->next();
+                                // Fail to downgrade if the time-series collection has a partial,
+                                // TTL index.
+                                if (indexEntry->descriptor()->isPartial()) {
+                                    // TODO (SERVER-67659): Remove partial, TTL index check once
+                                    // FCV 7.0 becomes last-lts.
+                                    uassert(
+                                        ErrorCodes::CannotDowngrade,
+                                        str::stream()
+                                            << "Cannot downgrade the cluster when there are "
+                                               "secondary "
+                                               "TTL indexes with partial filters on time-series "
+                                               "collections. Drop all partial, TTL indexes on "
+                                               "time-series collections before downgrading. First "
+                                               "detected incompatible index name: '"
+                                            << indexEntry->descriptor()->indexName()
+                                            << "' on collection: '"
+                                            << collection->ns().getTimeseriesViewNamespace() << "'",
+                                        !indexEntry->descriptor()->infoObj().hasField(
+                                            IndexDescriptor::kExpireAfterSecondsFieldName));
+                                }
+                            }
+                            return true;
+                        },
+                        [&](const CollectionPtr& collection) {
+                            return collection->getTimeseriesOptions() != boost::none;
+                        });
+                }
+            }
+
+            // Block downgrade for collections with encrypted fields
+            // TODO SERVER-67760: Remove once FCV 7.0 becomes last-lts.
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
-                    opCtx,
-                    dbName,
-                    MODE_S,
-                    [&](const CollectionPtr& collection) {
-                        invariant(collection->getTimeseriesOptions());
+                    opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
+                        auto& efc = collection->getCollectionOptions().encryptedFieldConfig;
 
-                        auto indexCatalog = collection->getIndexCatalog();
-                        auto indexIt = indexCatalog->getIndexIterator(
-                            opCtx,
-                            IndexCatalog::InclusionPolicy::kReady |
-                                IndexCatalog::InclusionPolicy::kUnfinished);
-
-                        while (indexIt->more()) {
-                            auto indexEntry = indexIt->next();
-                            // Fail to downgrade if the time-series collection has a partial, TTL
-                            // index.
-                            if (indexEntry->descriptor()->isPartial()) {
-                                // TODO (SERVER-67659): Remove partial, TTL index check once FCV 7.0
-                                // becomes last-lts.
-                                uassert(
-                                    ErrorCodes::CannotDowngrade,
-                                    str::stream()
-                                        << "Cannot downgrade the cluster when there are secondary "
-                                           "TTL indexes with partial filters on time-series "
-                                           "collections. Drop all partial, TTL indexes on "
-                                           "time-series collections before downgrading. First "
-                                           "detected incompatible index name: '"
-                                        << indexEntry->descriptor()->indexName()
-                                        << "' on collection: '"
-                                        << collection->ns().getTimeseriesViewNamespace() << "'",
-                                    !indexEntry->descriptor()->infoObj().hasField(
-                                        IndexDescriptor::kExpireAfterSecondsFieldName));
-                            }
-                        }
-
-                        return true;
-                    },
-                    [&](const CollectionPtr& collection) {
-                        return collection->getTimeseriesOptions() != boost::none;
-                    });
-            }
-        }
-
-        // Block downgrade for collections with encrypted fields
-        // TODO SERVER-67760: Remove once FCV 7.0 becomes last-lts.
-        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-            Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-            catalog::forEachCollectionFromDb(
-                opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
-                    auto& efc = collection->getCollectionOptions().encryptedFieldConfig;
-
-                    uassert(ErrorCodes::CannotDowngrade,
+                        uassert(
+                            ErrorCodes::CannotDowngrade,
                             str::stream()
                                 << "Cannot downgrade the cluster as collection " << collection->ns()
                                 << " has 'encryptedFields' with range indexes",
                             !(efc.has_value() && hasQueryType(efc.get(), QueryTypeEnum::Range)));
-                    return true;
-                });
-        }
-
-        if (!feature_flags::gfeatureFlagCappedCollectionsRelaxedSize.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-                catalog::forEachCollectionFromDb(
-                    opCtx,
-                    dbName,
-                    MODE_S,
-                    [&](const CollectionPtr& collection) {
-                        uasserted(
-                            ErrorCodes::CannotDowngrade,
-                            str::stream()
-                                << "Cannot downgrade the cluster when there are capped "
-                                   "collection with a size that is non multiple of 256 bytes. "
-                                   "Drop or resize the following collection: '"
-                                << collection->ns() << "'");
                         return true;
-                    },
-                    [&](const CollectionPtr& collection) {
-                        return collection->isCapped() && collection->getCappedMaxSize() % 256 != 0;
                     });
+            }
+
+            if (!feature_flags::gfeatureFlagCappedCollectionsRelaxedSize.isEnabledOnVersion(
+                    requestedVersion)) {
+                for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+                    catalog::forEachCollectionFromDb(
+                        opCtx,
+                        dbName,
+                        MODE_S,
+                        [&](const CollectionPtr& collection) {
+                            uasserted(
+                                ErrorCodes::CannotDowngrade,
+                                str::stream()
+                                    << "Cannot downgrade the cluster when there are capped "
+                                       "collection with a size that is non multiple of 256 bytes. "
+                                       "Drop or resize the following collection: '"
+                                    << collection->ns() << "'");
+                            return true;
+                        },
+                        [&](const CollectionPtr& collection) {
+                            return collection->isCapped() &&
+                                collection->getCappedMaxSize() % 256 != 0;
+                        });
+                }
             }
         }
     }
+
 
     // This helper function is for any internal server downgrade cleanup, such as dropping
     // collections or aborting. This cleanup will happen after user collection downgrade
@@ -710,7 +733,7 @@ private:
     // is consistent on disk and for reads/writes) or with an fassert (indicating a server bug and
     // that the data is corrupted). ManualInterventionRequired and fasserts are errors that are not
     // expected to occur in practice, but if they did, they would turn into a Support case.
-    void _internalServerDowngradeCleanup(
+    void _internalServerCleanupForDowngrade(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             _dropInternalGlobalIndexesCollection(opCtx, requestedVersion);
@@ -720,6 +743,14 @@ private:
             // be able to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            // If we are downgrading to a version that doesn't support implicit translation of
+            // Timeseries collection in sharding DDL Coordinators we need to drain all ongoing
+            // coordinators
+            if (!feature_flags::gImplicitDDLTimeseriesNssTranslation.isEnabledOnVersion(
+                    requestedVersion)) {
+                ShardingDDLCoordinatorService::getService(opCtx)
+                    ->waitForOngoingCoordinatorsToFinish(opCtx);
+            }
             _dropInternalGlobalIndexesCollection(opCtx, requestedVersion);
         } else {
             return;
@@ -731,14 +762,14 @@ private:
         // TODO SERVER-67392: Remove when 7.0 branches-out.
         // Coordinators that commits indexes to the csrs must be drained before this point. Older
         // FCV's must not find cluster-wide indexes.
-        if (requestedVersion == GenericFCV::kLastLTS) {
+        if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
             NamespaceString indexCatalogNss;
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 indexCatalogNss = NamespaceString::kConfigsvrIndexCatalogNamespace;
             } else {
                 indexCatalogNss = NamespaceString::kShardIndexCatalogNamespace;
             }
-            LOGV2(6280502, "Droping global indexes collection", "nss"_attr = indexCatalogNss);
+            LOGV2(6280502, "Dropping global indexes collection", "nss"_attr = indexCatalogNss);
             DropReply dropReply;
             const auto deletionStatus =
                 dropCollection(opCtx,
@@ -785,6 +816,16 @@ private:
         }
     }
 
+    // _runDowngrade performs all the downgrade specific code for setFCV. Any new feature specific
+    // downgrade code should be placed in the _runDowngrade helper functions:
+    // * _prepareForDowngrade: Any downgrade actions that should be done before taking the FCV full
+    //   transition lock in S mode should go in this function.
+    // * _userCollectionsUassertsForDowngrade: for any checks on user data or settings that will
+    // uassert
+    //   if users need to manually clean up user data or settings.
+    // * _internalServerCleanupForDowngrade: for any internal server downgrade cleanup
+    // Please read the comments on those helper functions for more details on what should be placed
+    // in each function.
     void _runDowngrade(OperationContext* opCtx,
                        const SetFeatureCompatibilityVersion& request,
                        boost::optional<Timestamp> changeTimestamp) {
@@ -838,7 +879,7 @@ private:
         // InterruptedDueToReplStateChange) or ErrorCode::CannotDowngrade. The uasserts added to
         // this helper function can only have the CannotDowngrade error code indicating that the
         // user must manually clean up some user data in order to retry the FCV downgrade.
-        _uassertUserDataAndSettingsReadyForDowngrade(opCtx, requestedVersion);
+        _userCollectionsUassertsForDowngrade(opCtx, requestedVersion);
 
         // This helper function is for any internal server downgrade cleanup, such as dropping
         // collections or aborting. This cleanup will happen after user collection downgrade
@@ -854,13 +895,12 @@ private:
         // bug and that the data is corrupted). ManualInterventionRequired and fasserts are errors
         // that are not expected to occur in practice, but if they did, they would turn into a
         // Support case.
-        _internalServerDowngradeCleanup(opCtx, requestedVersion);
+        _internalServerCleanupForDowngrade(opCtx, requestedVersion);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-2 of setFCV (fully downgraded)
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
-
-            if (requestedVersion == GenericFCV::kLastLTS) {
+            if (!feature_flags::gNoMoreAutoSplitter.isEnabledOnVersion(requestedVersion)) {
                 // chunkResizeAsyncTask is only used by config servers as part of internal server
                 // downgrade cleanup. Waiting for the task to complete is put at the end of
                 // _runDowngrade instead of inside _internalServerDowngradeCleanup because the task

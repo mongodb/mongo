@@ -57,4 +57,9 @@ feature_flags:
         description: "Adding additional participants to existing transactions"
         cpp_varname: gFeatureFlagAdditionalParticipants
         default: false
+    featureFlagUseNewCompactStructuredEncryptionDataCoordinator:
+        description: "Use the new 6.1 compact structured encryption data coordinator"
+        cpp_varname: gFeatureFlagUseNewCompactStructuredEncryptionDataCoordinator
+        default: true
+        version: 6.1
 

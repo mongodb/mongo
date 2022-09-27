@@ -126,8 +126,8 @@ public:
             CompactStructuredEncryptionDataState compact;
             auto coordinatorType = DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData;
 
-            if (serverGlobalParams.featureCompatibility.isLessThan(
-                    multiversion::FeatureCompatibilityVersion::kVersion_6_1)) {
+            if (!gFeatureFlagUseNewCompactStructuredEncryptionDataCoordinator.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
                 // TODO SERVER-68373 remove once 7.0 becomes last LTS
                 coordinatorType =
                     DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible;
