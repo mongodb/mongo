@@ -69,6 +69,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failTimeseriesViewCreation);
 MONGO_FAIL_POINT_DEFINE(clusterAllCollectionsByDefault);
+MONGO_FAIL_POINT_DEFINE(skipIdIndex);
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -578,8 +579,12 @@ Status _createCollection(OperationContext* opCtx,
         if (idIndex == boost::none || collectionOptions.clusteredIndex) {
             status = db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
         } else {
-            status =
-                db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/true, *idIndex);
+            bool createIdIndex = true;
+            if (MONGO_unlikely(skipIdIndex.shouldFail())) {
+                createIdIndex = false;
+            }
+            status = db->userCreateNS(
+                opCtx, nss, collectionOptions, /*createIdIndex=*/createIdIndex, *idIndex);
         }
         if (!status.isOK()) {
             return status;
