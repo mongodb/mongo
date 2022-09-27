@@ -244,7 +244,7 @@ public:
     struct InsertResult {
         std::shared_ptr<WriteBatch> batch;
         ClosedBuckets closedBuckets;
-        boost::optional<OID> candidate;
+        stdx::variant<std::monostate, OID, BSONObj> candidate;
         uint64_t catalogEra = 0;
     };
 
@@ -414,6 +414,7 @@ protected:
         bool operator!=(const BucketMetadata& other) const;
 
         const BSONObj& toBSON() const;
+        const BSONElement& element() const;
 
         StringData getMetaField() const;
 
@@ -951,6 +952,14 @@ protected:
     boost::optional<OID> _findArchivedCandidate(Stripe* stripe,
                                                 WithLock stripeLock,
                                                 const CreationInfo& info);
+
+    /**
+     * Identifies a previously archived bucket that may be able to accomodate the measurement
+     * represented by 'info', if one exists.
+     */
+    stdx::variant<std::monostate, OID, BSONObj> _getReopeningCandidate(Stripe* stripe,
+                                                                       WithLock stripeLock,
+                                                                       const CreationInfo& info);
 
     /**
      * Aborts 'batch', and if the corresponding bucket still exists, proceeds to abort any other

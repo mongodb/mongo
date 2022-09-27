@@ -144,6 +144,74 @@ const expectToReopenBuckets = function() {
     jsTestLog("Exiting expectToReopenBuckets.");
 }();
 
+const expectToReopenBucketsWithComplexMeta = function() {
+    jsTestLog("Entering expectToReopenBucketsWithComplexMeta...");
+    resetCollection();
+
+    const measurement1 = {
+        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [metaField]: {b: 1, a: 1},
+    };
+    const measurement2 = {[timeField]: ISODate("2022-08-26T19:19:00Z"), [metaField]: {b: 2, a: 2}};
+
+    const bucketDoc = {
+        "_id": ObjectId("63091c2c050b7495eaef4580"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "meta": {a: 1, b: 1},
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
+
+    // Insert closed bucket into the system.buckets collection.
+    assert.commandWorked(bucketsColl.insert(bucketDoc));
+
+    // Can reopen bucket with complex metadata, even if field order in measurement is different.
+    checkIfBucketReopened(measurement1, /* willCreateBucket */ false, /* willReopenBucket */ true);
+    // Does not reopen bucket with different complex metadata value.
+    checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
+
+    jsTestLog("Exiting expectToReopenBucketsWithComplexMeta.");
+}();
+
+const expectToReopenArchivedBuckets = function() {
+    jsTestLog("Entering expectToReopenArchivedBuckets...");
+    resetCollection();
+
+    const measurement1 = {
+        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [metaField]: "meta1",
+    };
+    const measurement2 = {
+        [timeField]: ISODate("2022-08-26T21:19:00Z"),
+        [metaField]: "meta1",
+    };
+    const measurement3 = {
+        [timeField]: ISODate("2022-08-26T19:20:00Z"),
+        [metaField]: "meta1",
+    };
+
+    checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
+    // Archive the original bucket due to time forward.
+    checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
+    // Reopen original bucket.
+    checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
+
+    jsTestLog("Exiting expectToReopenArchivedBuckets.");
+}();
+
 const failToReopenNonSuitableBuckets = function() {
     jsTestLog("Entering failToReopenNonSuitableBuckets...");
     resetCollection();

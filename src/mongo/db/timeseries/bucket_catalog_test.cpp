@@ -1474,7 +1474,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT_OK(result.getStatus());
     ASSERT(result.getValue().closedBuckets.empty());
     ASSERT(!result.getValue().batch);
-    ASSERT_EQ(result.getValue().candidate, boost::none);
+    ASSERT_TRUE(stdx::holds_alternative<BSONObj>(result.getValue().candidate));
 
     // Actually insert so we do have an open bucket to test against.
     result = _bucketCatalog->insert(
@@ -1504,7 +1504,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT_OK(result.getStatus());
     ASSERT(result.getValue().closedBuckets.empty());
     ASSERT(!result.getValue().batch);
-    ASSERT_EQ(result.getValue().candidate, boost::none);
+    ASSERT_TRUE(stdx::holds_alternative<BSONObj>(result.getValue().candidate));
 
     // So should time forward.
     result = _bucketCatalog->tryInsert(
@@ -1517,7 +1517,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT_OK(result.getStatus());
     ASSERT(result.getValue().closedBuckets.empty());
     ASSERT(!result.getValue().batch);
-    ASSERT_EQ(result.getValue().candidate, boost::none);
+    ASSERT_TRUE(stdx::holds_alternative<BSONObj>(result.getValue().candidate));
 
     // Now let's insert something so we archive the existing bucket.
     result = _bucketCatalog->insert(
@@ -1548,8 +1548,8 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT_OK(result.getStatus());
     ASSERT(result.getValue().closedBuckets.empty());
     ASSERT(!result.getValue().batch);
-    ASSERT(result.getValue().candidate.has_value());
-    ASSERT_EQ(result.getValue().candidate.value(), bucketId);
+    ASSERT_TRUE(stdx::holds_alternative<OID>(result.getValue().candidate));
+    ASSERT_EQ(stdx::get<OID>(result.getValue().candidate), bucketId);
 }
 
 TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket) {
@@ -1657,8 +1657,8 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     ASSERT_OK(result.getStatus());
     ASSERT(result.getValue().closedBuckets.empty());
     ASSERT(!result.getValue().batch);
-    ASSERT(result.getValue().candidate.has_value());
-    ASSERT_EQ(result.getValue().candidate.value(), oldBucketId);
+    ASSERT_TRUE(stdx::holds_alternative<OID>(result.getValue().candidate));
+    ASSERT_EQ(stdx::get<OID>(result.getValue().candidate), oldBucketId);
 }
 
 TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {

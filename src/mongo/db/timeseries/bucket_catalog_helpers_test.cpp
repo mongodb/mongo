@@ -32,7 +32,9 @@
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/timeseries/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 
@@ -47,6 +49,10 @@ protected:
     StringData _metaField = "mm";
 
     void _insertIntoBucketColl(const BSONObj& bucketDoc);
+    BSONObj _findSuitableBucket(OperationContext* opCtx,
+                                const NamespaceString& bucketNss,
+                                const TimeseriesOptions& options,
+                                const BSONObj& measurementDoc);
 };
 
 void BucketCatalogHelpersTest::_insertIntoBucketColl(const BSONObj& bucketDoc) {
@@ -60,6 +66,40 @@ void BucketCatalogHelpersTest::_insertIntoBucketColl(const BSONObj& bucketDoc) {
             operationContext(), coll, InsertStatement(bucketDoc), nullOpDebug));
         wuow.commit();
     }
+}
+
+BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
+                                                      const NamespaceString& bucketNss,
+                                                      const TimeseriesOptions& options,
+                                                      const BSONObj& measurementDoc) {
+    uassert(ErrorCodes::InvalidOptions,
+            "Missing bucketMaxSpanSeconds option.",
+            options.getBucketMaxSpanSeconds());
+
+    auto swDocTimeAndMeta = timeseries::extractTimeAndMeta(measurementDoc, options);
+    if (!swDocTimeAndMeta.isOK()) {
+        return BSONObj();
+    }
+    auto [time, metadata] = swDocTimeAndMeta.getValue();
+    auto controlMinTimePath =
+        timeseries::kControlMinFieldNamePrefix.toString() + options.getTimeField();
+
+    boost::optional<BSONObj> normalizedMetadata;
+    if (metadata && (*metadata).ok()) {
+        BSONObjBuilder builder;
+        timeseries::normalizeMetadata(&builder, *metadata, timeseries::kBucketMetaFieldName);
+        normalizedMetadata = builder.obj();
+    }
+
+    // Generate all the filters we need to add to our 'find' query for a suitable bucket.
+    auto fullFilterExpression = timeseries::generateReopeningFilters(
+        time,
+        normalizedMetadata ? normalizedMetadata->firstElement() : metadata,
+        controlMinTimePath,
+        *options.getBucketMaxSpanSeconds());
+
+    DBDirectClient client(opCtx);
+    return client.findOne(bucketNss, fullFilterExpression);
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxBadBucketDocumentsTest) {
@@ -356,7 +396,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
     // insert into.
     for (size_t i = 0; i < docsWithSuitableBuckets.size(); ++i) {
         const auto& doc = docsWithSuitableBuckets[i];
-        auto result = timeseries::findSuitableBucket(
+        auto result = _findSuitableBucket(
             operationContext(), kNss.makeTimeseriesBucketsNamespace(), tsOptions, doc);
         ASSERT_FALSE(result.isEmpty());
         ASSERT_EQ(bucketDocs[i]["_id"].OID(), result["_id"].OID());
@@ -372,7 +412,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
 
         for (size_t i = 0; i < docsWithOutMeta.size(); ++i) {
             const auto& doc = docsWithOutMeta[i];
-            auto result = timeseries::findSuitableBucket(
+            auto result = _findSuitableBucket(
                 operationContext(), kNss.makeTimeseriesBucketsNamespace(), tsOptions, doc);
             ASSERT(result.isEmpty());
         }
@@ -392,7 +432,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
                     "a":{"0":1,"1":2,"2":3}}})");
         _insertIntoBucketColl(metalessBucket);
 
-        auto result = timeseries::findSuitableBucket(
+        auto result = _findSuitableBucket(
             operationContext(), kNss.makeTimeseriesBucketsNamespace(), tsOptions, metalessDoc);
         ASSERT_FALSE(result.isEmpty());
         ASSERT_EQ(metalessBucket["_id"].OID(), result["_id"].OID());
@@ -409,7 +449,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
     for (const auto& doc : docsWithoutSuitableBuckets) {
         BSONObj measurementMeta =
             (doc.hasField(metaFieldName)) ? doc.getField(metaFieldName).wrap() : BSONObj();
-        auto result = timeseries::findSuitableBucket(
+        auto result = _findSuitableBucket(
             operationContext(), kNss.makeTimeseriesBucketsNamespace(), tsOptions, doc);
         ASSERT(result.isEmpty());
     }
@@ -479,7 +519,7 @@ TEST_F(BucketCatalogHelpersTest, IncompatibleBucketsForNewMeasurements) {
     // bucket is compressed and/or closed, we should not see it as a candid bucket for future
     // inserts.
     for (const auto& doc : validMeasurementDocs) {
-        auto result = timeseries::findSuitableBucket(
+        auto result = _findSuitableBucket(
             operationContext(), kNss.makeTimeseriesBucketsNamespace(), tsOptions, doc);
         ASSERT(result.isEmpty());
     }

@@ -42,6 +42,7 @@
 #include "mongo/db/commands/write_commands_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/doc_validation_error.h"
@@ -1109,20 +1110,27 @@ public:
 
                         if (swResult.isOK()) {
                             const auto& insertResult = swResult.getValue();
-                            if (insertResult.candidate) {
-                                // TODO (SERVER-66685): Implement archival bucket fetching
-                                // procedure.
-                            }
 
                             // If the InsertResult doesn't contain a batch, we failed to insert the
                             // measurement into an open bucket and need to create/reopen a bucket.
                             if (!insertResult.batch) {
+                                BSONObj suitableBucket;
+
+                                if (auto* bucketId = stdx::get_if<OID>(&insertResult.candidate)) {
+                                    // Look up archived bucket by _id
+                                    DBDirectClient client{opCtx};
+                                    suitableBucket =
+                                        client.findOne(bucketsColl->ns(), BSON("_id" << *bucketId));
+
+                                } else if (auto* filter =
+                                               stdx::get_if<BSONObj>(&insertResult.candidate)) {
+                                    // Resort to Query-Based reopening approach.
+                                    DBDirectClient client{opCtx};
+                                    suitableBucket = client.findOne(bucketsColl->ns(), *filter);
+                                }
+
                                 boost::optional<BucketCatalog::BucketToReopen> bucketToReopen =
                                     boost::none;
-
-                                // Resort to Query-Based reopening approach.
-                                auto suitableBucket = timeseries::findSuitableBucket(
-                                    opCtx, bucketsNs, timeSeriesOptions, measurementDoc);
                                 if (!suitableBucket.isEmpty()) {
                                     auto validator = [&](OperationContext * opCtx,
                                                          const BSONObj& bucketDoc) -> auto {

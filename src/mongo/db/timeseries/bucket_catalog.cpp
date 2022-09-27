@@ -55,10 +55,6 @@
 
 namespace mongo {
 namespace {
-
-void normalizeArray(BSONArrayBuilder* builder, const BSONObj& obj);
-void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj);
-
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
 
@@ -69,81 +65,6 @@ uint8_t numDigits(uint32_t num) {
         ++numDigits;
     }
     return numDigits;
-}
-
-void normalizeArray(BSONArrayBuilder* builder, const BSONObj& obj) {
-    for (auto& arrayElem : obj) {
-        if (arrayElem.type() == BSONType::Array) {
-            BSONArrayBuilder subArray = builder->subarrayStart();
-            normalizeArray(&subArray, arrayElem.Obj());
-        } else if (arrayElem.type() == BSONType::Object) {
-            BSONObjBuilder subObject = builder->subobjStart();
-            normalizeObject(&subObject, arrayElem.Obj());
-        } else {
-            builder->append(arrayElem);
-        }
-    }
-}
-
-void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
-    // BSONObjIteratorSorted provides an abstraction similar to what this function does. However it
-    // is using a lexical comparison that is slower than just doing a binary comparison of the field
-    // names. That is all we need here as we are looking to create something that is binary
-    // comparable no matter of field order provided by the user.
-
-    // Helper that extracts the necessary data from a BSONElement that we can sort and re-construct
-    // the same BSONElement from.
-    struct Field {
-        BSONElement element() const {
-            return BSONElement(fieldName.rawData() - 1,  // Include type byte before field name
-                               fieldName.size() + 1,     // Include null terminator after field name
-                               totalSize);
-        }
-        bool operator<(const Field& rhs) const {
-            return fieldName < rhs.fieldName;
-        }
-        StringData fieldName;
-        int totalSize;
-    };
-
-    // Put all elements in a buffer, sort it and then continue normalize in sorted order
-    auto num = obj.nFields();
-    static constexpr std::size_t kNumStaticFields = 16;
-    boost::container::small_vector<Field, kNumStaticFields> fields;
-    fields.resize(num);
-    BSONObjIterator bsonIt(obj);
-    int i = 0;
-    while (bsonIt.more()) {
-        auto elem = bsonIt.next();
-        fields[i++] = {elem.fieldNameStringData(), elem.size()};
-    }
-    auto it = fields.begin();
-    auto end = fields.end();
-    std::sort(it, end);
-    for (; it != end; ++it) {
-        auto elem = it->element();
-        if (elem.type() == BSONType::Array) {
-            BSONArrayBuilder subArray(builder->subarrayStart(elem.fieldNameStringData()));
-            normalizeArray(&subArray, elem.Obj());
-        } else if (elem.type() == BSONType::Object) {
-            BSONObjBuilder subObject(builder->subobjStart(elem.fieldNameStringData()));
-            normalizeObject(&subObject, elem.Obj());
-        } else {
-            builder->append(elem);
-        }
-    }
-}
-
-void normalizeTopLevel(BSONObjBuilder* builder, const BSONElement& elem) {
-    if (elem.type() == BSONType::Array) {
-        BSONArrayBuilder subArray(builder->subarrayStart(elem.fieldNameStringData()));
-        normalizeArray(&subArray, elem.Obj());
-    } else if (elem.type() == BSONType::Object) {
-        BSONObjBuilder subObject(builder->subobjStart(elem.fieldNameStringData()));
-        normalizeObject(&subObject, elem.Obj());
-    } else {
-        builder->append(elem);
-    }
 }
 
 OperationId getOpId(OperationContext* opCtx,
@@ -1077,7 +998,7 @@ BucketCatalog::BucketMetadata::BucketMetadata(BSONElement elem,
         BSONObjBuilder objBuilder;
         // We will get an object of equal size, just with reordered fields.
         objBuilder.bb().reserveBytes(_metadataElement.size());
-        normalizeTopLevel(&objBuilder, _metadataElement);
+        timeseries::normalizeMetadata(&objBuilder, _metadataElement, boost::none);
         _metadata = objBuilder.obj();
     }
     // Updates the BSONElement to refer to the copied BSONObj.
@@ -1090,6 +1011,10 @@ bool BucketCatalog::BucketMetadata::operator==(const BucketMetadata& other) cons
 
 const BSONObj& BucketCatalog::BucketMetadata::toBSON() const {
     return _metadata;
+}
+
+const BSONElement& BucketCatalog::BucketMetadata::element() const {
+    return _metadataElement;
 }
 
 StringData BucketCatalog::BucketMetadata::getMetaField() const {
@@ -1297,13 +1222,14 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     uint32_t numMeasurements = 0;
     const BSONElement timeColumnElem = dataObj.getField(options.getTimeField());
 
-    if (dataObj.isEmpty() || !timeColumnElem.ok()) {
-        return {ErrorCodes::BadValue, "Bucket data field is malformed (missing a time field)"};
-    } else if (isCompressed && timeColumnElem.type() == BSONType::BinData) {
+    if (isCompressed && timeColumnElem.type() == BSONType::BinData) {
         BSONColumn storage{timeColumnElem};
         numMeasurements = storage.size();
-    } else {
+    } else if (timeColumnElem.isABSONObj()) {
         numMeasurements = timeColumnElem.Obj().nFields();
+    } else {
+        return {ErrorCodes::BadValue,
+                "Bucket data field is malformed (missing a valid time column)"};
     }
 
     bucket->_numMeasurements = numMeasurements;
@@ -1447,7 +1373,7 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
     Bucket* bucket = _useBucket(&stripe, stripeLock, info, mode);
     if (!bucket) {
         invariant(mode == AllowBucketCreation::kNo);
-        result.candidate = _findArchivedCandidate(&stripe, stripeLock, info);
+        result.candidate = _getReopeningCandidate(&stripe, stripeLock, info);
         return result;
     }
 
@@ -1455,7 +1381,7 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
         opCtx, &stripe, stripeLock, doc, combine, mode, &info, bucket, &result.closedBuckets);
     if (!result.batch) {
         invariant(mode == AllowBucketCreation::kNo);
-        result.candidate = _findArchivedCandidate(&stripe, stripeLock, info);
+        result.candidate = _getReopeningCandidate(&stripe, stripeLock, info);
     }
     return result;
 }
@@ -1633,6 +1559,24 @@ boost::optional<OID> BucketCatalog::_findArchivedCandidate(Stripe* stripe,
     }
 
     return boost::none;
+}
+
+stdx::variant<std::monostate, OID, BSONObj> BucketCatalog::_getReopeningCandidate(
+    Stripe* stripe, WithLock stripeLock, const CreationInfo& info) {
+    if (auto archived = _findArchivedCandidate(stripe, stripeLock, info)) {
+        return archived.value();
+    }
+
+    boost::optional<BSONElement> metaElement;
+    if (info.options.getMetaField().has_value()) {
+        metaElement = info.key.metadata.element();
+    }
+
+    auto controlMinTimePath =
+        timeseries::kControlMinFieldNamePrefix.toString() + info.options.getTimeField();
+
+    return timeseries::generateReopeningFilters(
+        info.time, metaElement, controlMinTimePath, *info.options.getBucketMaxSpanSeconds());
 }
 
 void BucketCatalog::_abort(Stripe* stripe,

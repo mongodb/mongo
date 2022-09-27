@@ -31,11 +31,16 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::timeseries {
 
 namespace {
+void normalizeArray(BSONArrayBuilder* builder, const BSONObj& obj);
+void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj);
 
 StatusWith<std::pair<const BSONObj, const BSONObj>> extractMinAndMax(const BSONObj& bucketDoc) {
     const BSONObj& controlObj = bucketDoc.getObjectField(kBucketControlFieldName);
@@ -56,10 +61,76 @@ StatusWith<std::pair<const BSONObj, const BSONObj>> extractMinAndMax(const BSONO
     return std::make_pair(minObj, maxObj);
 }
 
-BSONObj generateFindFilters(const Date_t& time,
-                            boost::optional<BSONElement> metadata,
-                            const std::string& controlMinTimePath,
-                            int64_t bucketMaxSpanSeconds) {
+void normalizeArray(BSONArrayBuilder* builder, const BSONObj& obj) {
+    for (auto& arrayElem : obj) {
+        if (arrayElem.type() == BSONType::Array) {
+            BSONArrayBuilder subArray = builder->subarrayStart();
+            normalizeArray(&subArray, arrayElem.Obj());
+        } else if (arrayElem.type() == BSONType::Object) {
+            BSONObjBuilder subObject = builder->subobjStart();
+            normalizeObject(&subObject, arrayElem.Obj());
+        } else {
+            builder->append(arrayElem);
+        }
+    }
+}
+
+void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
+    // BSONObjIteratorSorted provides an abstraction similar to what this function does. However it
+    // is using a lexical comparison that is slower than just doing a binary comparison of the field
+    // names. That is all we need here as we are looking to create something that is binary
+    // comparable no matter of field order provided by the user.
+
+    // Helper that extracts the necessary data from a BSONElement that we can sort and re-construct
+    // the same BSONElement from.
+    struct Field {
+        BSONElement element() const {
+            return BSONElement(fieldName.rawData() - 1,  // Include type byte before field name
+                               fieldName.size() + 1,     // Include null terminator after field name
+                               totalSize);
+        }
+        bool operator<(const Field& rhs) const {
+            return fieldName < rhs.fieldName;
+        }
+        StringData fieldName;
+        int totalSize;
+    };
+
+    // Put all elements in a buffer, sort it and then continue normalize in sorted order
+    auto num = obj.nFields();
+    static constexpr std::size_t kNumStaticFields = 16;
+    boost::container::small_vector<Field, kNumStaticFields> fields;
+    fields.resize(num);
+    BSONObjIterator bsonIt(obj);
+    int i = 0;
+    while (bsonIt.more()) {
+        auto elem = bsonIt.next();
+        fields[i++] = {elem.fieldNameStringData(), elem.size()};
+    }
+    auto it = fields.begin();
+    auto end = fields.end();
+    std::sort(it, end);
+    for (; it != end; ++it) {
+        auto elem = it->element();
+        if (elem.type() == BSONType::Array) {
+            BSONArrayBuilder subArray(builder->subarrayStart(elem.fieldNameStringData()));
+            normalizeArray(&subArray, elem.Obj());
+        } else if (elem.type() == BSONType::Object) {
+            BSONObjBuilder subObject(builder->subobjStart(elem.fieldNameStringData()));
+            normalizeObject(&subObject, elem.Obj());
+        } else {
+            builder->append(elem);
+        }
+    }
+}
+
+}  // namespace
+
+
+BSONObj generateReopeningFilters(const Date_t& time,
+                                 boost::optional<BSONElement> metadata,
+                                 const std::string& controlMinTimePath,
+                                 int64_t bucketMaxSpanSeconds) {
     // The bucket must be uncompressed.
     auto versionFilter = BSON(kControlVersionPath << kTimeseriesControlDefaultVersion);
 
@@ -70,9 +141,15 @@ BSONObj generateFindFilters(const Date_t& time,
 
     // The measurement meta field must match the bucket 'meta' field. If the field is not specified
     // we can only insert into buckets which also do not have a meta field.
-    auto metaFieldFilter = (metadata && (*metadata).ok())
-        ? (*metadata).wrap(kBucketMetaFieldName)
-        : BSON(kBucketMetaFieldName << BSON("$exists" << false));
+
+    BSONObj metaFieldFilter;
+    if (metadata && (*metadata).ok()) {
+        BSONObjBuilder builder;
+        builder.appendAs(*metadata, kBucketMetaFieldName);
+        metaFieldFilter = builder.obj();
+    } else {
+        metaFieldFilter = BSON(kBucketMetaFieldName << BSON("$exists" << false));
+    }
 
     // (minimumTs <= measurementTs) && (minimumTs + maxSpanSeconds > measurementTs)
     auto measurementMaxDifference = time - Seconds(bucketMaxSpanSeconds);
@@ -83,8 +160,6 @@ BSONObj generateFindFilters(const Date_t& time,
     return BSON("$and" << BSON_ARRAY(versionFilter << closedFlagFilter << timeRangeFilter
                                                    << metaFieldFilter));
 }
-
-}  // namespace
 
 StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
                                                const StringData::ComparatorInterface* comparator) {
@@ -136,35 +211,32 @@ StatusWith<std::pair<Date_t, boost::optional<BSONElement>>> extractTimeAndMeta(
     return std::make_pair(time, boost::none);
 }
 
+void normalizeMetadata(BSONObjBuilder* builder,
+                       const BSONElement& elem,
+                       boost::optional<StringData> as) {
+    if (elem.type() == BSONType::Array) {
+        BSONArrayBuilder subArray(
+            builder->subarrayStart(as.has_value() ? as.value() : elem.fieldNameStringData()));
+        normalizeArray(&subArray, elem.Obj());
+    } else if (elem.type() == BSONType::Object) {
+        BSONObjBuilder subObject(
+            builder->subobjStart(as.has_value() ? as.value() : elem.fieldNameStringData()));
+        normalizeObject(&subObject, elem.Obj());
+    } else {
+        if (as.has_value()) {
+            builder->appendAs(elem, as.value());
+        } else {
+            builder->append(elem);
+        }
+    }
+}
+
 BSONObj findDocFromOID(OperationContext* opCtx, const Collection* coll, const OID& bucketId) {
     Snapshotted<BSONObj> bucketObj;
     auto rid = record_id_helpers::keyForOID(bucketId);
     auto foundDoc = coll->findDoc(opCtx, rid, &bucketObj);
 
     return (foundDoc) ? bucketObj.value() : BSONObj();
-}
-
-BSONObj findSuitableBucket(OperationContext* opCtx,
-                           const NamespaceString& bucketNss,
-                           const TimeseriesOptions& options,
-                           const BSONObj& measurementDoc) {
-    uassert(ErrorCodes::InvalidOptions,
-            "Missing bucketMaxSpanSeconds option.",
-            options.getBucketMaxSpanSeconds());
-
-    auto swDocTimeAndMeta = extractTimeAndMeta(measurementDoc, options);
-    if (!swDocTimeAndMeta.isOK()) {
-        return BSONObj();
-    }
-    auto [time, metadata] = swDocTimeAndMeta.getValue();
-    auto controlMinTimePath = kControlMinFieldNamePrefix.toString() + options.getTimeField();
-
-    // Generate all the filters we need to add to our 'find' query for a suitable bucket.
-    auto fullFilterExpression =
-        generateFindFilters(time, metadata, controlMinTimePath, *options.getBucketMaxSpanSeconds());
-
-    DBDirectClient client(opCtx);
-    return client.findOne(bucketNss, fullFilterExpression);
 }
 
 }  // namespace mongo::timeseries
