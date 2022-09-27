@@ -2727,7 +2727,7 @@ elif env.TargetOSIs('windows'):
 
     # Enables the __cplusplus preprocessor macro to report an updated value for recent C++ language
     # standards support.
-    env.Append(CXXFLAGS=["/Zc:__cplusplus"])
+    env.Append(CCFLAGS=["/Zc:__cplusplus"])
 
     # Tells the compiler to preferentially call global operator delete or operator delete[]
     # functions that have a second parameter of type size_t when the size of the object is available.
@@ -3681,10 +3681,10 @@ def doConfigure(myenv):
 
     if myenv.ToolchainIs('msvc'):
         if get_option('cxx-std') == "17":
-            myenv.AppendUnique(CXXFLAGS=['/std:c++17',
+            myenv.AppendUnique(CCFLAGS=['/std:c++17',
                                         '/Zc:lambda'])  # /Zc:lambda is implied by /std:c++20
         elif get_option('cxx-std') == "20":
-            myenv.AppendUnique(CXXFLAGS=['/std:c++20'])
+            myenv.AppendUnique(CCFLAGS=['/std:c++20'])
     else:
         if get_option('cxx-std') == "17":
             if not myenv.AddToCXXFLAGSIfSupported('-std=c++17'):
