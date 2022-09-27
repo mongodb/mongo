@@ -57,6 +57,8 @@ Status errorCodeToStatus(const std::error_code& ec) {
         return {ErrorCodes::HostUnreachable, "Connection reset by peer"};
     } else if (ec == asio::error::network_reset) {
         return {ErrorCodes::HostUnreachable, "Connection reset by network"};
+    } else if (ec == asio::error::in_progress) {
+        return {ErrorCodes::ConnectionError, "Socket operation in progress"};
     }
 
     // If the ec.category() is a mongoErrorCategory() then this error was propogated from

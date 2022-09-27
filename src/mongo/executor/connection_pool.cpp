@@ -866,6 +866,17 @@ void ConnectionPool::SpecificPool::finishRefresh(ConnectionInterface* connPtr, S
         return;
     }
 
+    // If the error can be contained to one connection, drop the one connection.
+    if (status.code() == ErrorCodes::ConnectionError) {
+        LOGV2_DEBUG(6832901,
+                    kDiagnosticLogLevel,
+                    "Dropping single connection",
+                    "hostAndPort"_attr = _hostAndPort,
+                    "error"_attr = redact(status),
+                    "numOpenConns"_attr = openConnections());
+        return;
+    }
+
     // Pass a failure on through
     if (!status.isOK()) {
         LOGV2_DEBUG(22563,

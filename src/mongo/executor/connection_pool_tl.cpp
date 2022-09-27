@@ -32,6 +32,7 @@
 
 #include "mongo/executor/connection_pool_tl.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -375,7 +376,12 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
                            _transientSSLContext)
         .thenRunOn(_reactor)
         .onError([](StatusWith<AsyncDBClient::Handle> swc) -> StatusWith<AsyncDBClient::Handle> {
-            return Status(ErrorCodes::HostUnreachable, swc.getStatus().reason());
+            if (const Status& status = swc.getStatus();
+                status.code() == ErrorCodes::ConnectionError) {
+                return status;
+            } else {
+                return Status(ErrorCodes::HostUnreachable, status.reason());
+            }
         })
         .then([this, isMasterHook, instanceName = std::move(instanceName)](
                   AsyncDBClient::Handle client) {

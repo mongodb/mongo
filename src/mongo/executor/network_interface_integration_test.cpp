@@ -47,6 +47,7 @@
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -495,6 +496,28 @@ TEST_F(NetworkInterfaceTest, LateCancel) {
     ASSERT_OK(result.status);
     ASSERT(result.elapsed);
     assertNumOps(0u, 0u, 0u, 1u);
+}
+
+TEST_F(NetworkInterfaceTest, ConnectionErrorDropsSingleConnection) {
+    FailPoint* failPoint =
+        globalFailPointRegistry().find("transportLayerASIOasyncConnectReturnsConnectionError");
+    auto timesEntered = failPoint->setMode(FailPoint::nTimes, 1);
+
+    auto cbh = makeCallbackHandle();
+    auto deferred = runCommand(cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()));
+    // Wait for one of the connection attempts to fail with a `ConnectionError`.
+    failPoint->waitForTimesEntered(timesEntered + 1);
+    auto result = deferred.get();
+
+    ASSERT_OK(result.status);
+    ConnectionPoolStats stats;
+    net().appendConnectionStats(&stats);
+
+    ASSERT_EQ(stats.totalCreated, 2);
+    ASSERT_EQ(stats.totalInUse + stats.totalAvailable + stats.totalRefreshing, 1);
+    // Connection dropped during finishRefresh, so the dropped connection still
+    // counts toward the refreshed counter.
+    ASSERT_EQ(stats.totalRefreshed, 2);
 }
 
 TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {

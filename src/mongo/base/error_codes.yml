@@ -499,6 +499,8 @@ error_codes:
 
     - {code: 383, name: CollectionIsEmptyLocally, categories: [InternalOnly]}
 
+    - {code: 384, name: ConnectionError, categories: [NetworkError,RetriableError,InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
