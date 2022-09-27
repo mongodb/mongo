@@ -76,10 +76,14 @@ DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opC
     if (collectionUUID) {
         // The multi-document remove command cannot be run in  transactions, so run it using
         // an alternative client.
-        auto client = opCtx->getServiceContext()->makeClient("removeRangeDeletions-" +
-                                                             collectionUUID->toString());
-        auto alternativeOpCtx = client->makeOperationContext();
-        AlternativeClientRegion acr{client};
+        auto newClient = opCtx->getServiceContext()->makeClient("removeRangeDeletions-" +
+                                                                collectionUUID->toString());
+        {
+            stdx::lock_guard<Client> lk(*newClient.get());
+            newClient->setSystemOperationKillableByStepdown(lk);
+        }
+        auto alternativeOpCtx = newClient->makeOperationContext();
+        AlternativeClientRegion acr{newClient};
 
         try {
             removePersistentRangeDeletionTasksByUUID(alternativeOpCtx.get(), *collectionUUID);
