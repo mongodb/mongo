@@ -147,5 +147,10 @@ JournalListener* DataReplicatorExternalStateMock::getReplicationJournalListener(
     return nullptr;
 }
 
+StatusWith<LastVote> DataReplicatorExternalStateMock::loadLocalLastVoteDocument(
+    OperationContext* opCtx) const {
+    return StatusWith<LastVote>(ErrorCodes::NoMatchingDocument, "mock");
+}
+
 }  // namespace repl
 }  // namespace mongo

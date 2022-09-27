@@ -87,6 +87,8 @@ public:
 
     Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) override;
 
+    StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx) const override;
+
     JournalListener* getReplicationJournalListener() override;
 
 protected:

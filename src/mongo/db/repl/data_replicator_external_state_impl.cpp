@@ -177,6 +177,11 @@ Status DataReplicatorExternalStateImpl::storeLocalConfigDocument(OperationContex
         opCtx, config, false /* write oplog entry */);
 }
 
+StatusWith<LastVote> DataReplicatorExternalStateImpl::loadLocalLastVoteDocument(
+    OperationContext* opCtx) const {
+    return _replicationCoordinatorExternalState->loadLocalLastVoteDocument(opCtx);
+}
+
 JournalListener* DataReplicatorExternalStateImpl::getReplicationJournalListener() {
     return _replicationCoordinatorExternalState->getReplicationJournalListener();
 }
