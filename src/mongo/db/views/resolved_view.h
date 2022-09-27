@@ -48,12 +48,14 @@ public:
                  std::vector<BSONObj> pipeline,
                  BSONObj defaultCollation,
                  boost::optional<TimeseriesOptions> timeseriesOptions = boost::none,
-                 boost::optional<bool> timeseriesMayContainMixedData = boost::none)
+                 boost::optional<bool> timeseriesMayContainMixedData = boost::none,
+                 boost::optional<bool> timeseriesUsesExtendedRange = boost::none)
         : _namespace(collectionNs),
           _pipeline(std::move(pipeline)),
           _defaultCollation(std::move(defaultCollation)),
           _timeseriesOptions(timeseriesOptions),
-          _timeseriesMayContainMixedData(timeseriesMayContainMixedData) {}
+          _timeseriesMayContainMixedData(timeseriesMayContainMixedData),
+          _timeseriesUsesExtendedRange(timeseriesUsesExtendedRange) {}
 
     static ResolvedView fromBSON(const BSONObj& commandResponseObj);
 
@@ -80,6 +82,8 @@ public:
     static constexpr auto code = ErrorCodes::CommandOnShardedViewNotSupportedOnMongod;
     static constexpr StringData kTimeseriesMayContainMixedData = "timeseriesMayContainMixedData"_sd;
     static constexpr StringData kTimeseriesOptions = "timeseriesOptions"_sd;
+    static constexpr StringData kTimeseriesUsesExtendedRange = "timeseriesUsesExtendedRange"_sd;
+
     void serialize(BSONObjBuilder* bob) const final;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
@@ -97,6 +101,7 @@ private:
 
     boost::optional<TimeseriesOptions> _timeseriesOptions;
     boost::optional<bool> _timeseriesMayContainMixedData;
+    boost::optional<bool> _timeseriesUsesExtendedRange;
 };
 
 }  // namespace mongo

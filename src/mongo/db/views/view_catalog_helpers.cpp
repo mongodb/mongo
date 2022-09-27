@@ -150,6 +150,7 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
     int depth = 0;
     boost::optional<bool> mixedData = boost::none;
     boost::optional<TimeseriesOptions> tsOptions = boost::none;
+    boost::optional<bool> hasExtendedRange = boost::none;
 
     for (; depth < ViewGraph::kMaxViewDepth; depth++) {
         auto view = catalog->lookupView(opCtx, *resolvedNss);
@@ -173,7 +174,8 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
                  std::move(resolvedPipeline),
                  collation ? std::move(collation.get()) : CollationSpec::kSimpleSpec,
                  tsOptions,
-                 mixedData});
+                 mixedData,
+                 hasExtendedRange});
         }
 
         resolvedNss = &view->viewOn();
@@ -193,6 +195,7 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
             if (tsCollection) {
                 mixedData = tsCollection->getTimeseriesBucketsMayHaveMixedSchemaData();
                 tsOptions = tsCollection->getTimeseriesOptions();
+                hasExtendedRange = tsCollection->getRequiresTimeseriesExtendedRangeSupport();
             }
         }
 

@@ -47,6 +47,7 @@ public:
     static constexpr StringData kInclude = "include"_sd;
     static constexpr StringData kExclude = "exclude"_sd;
     static constexpr StringData kAssumeNoMixedSchemaData = "assumeNoMixedSchemaData"_sd;
+    static constexpr StringData kUsesExtendedRange = "usesExtendedRange"_sd;
     static constexpr StringData kBucketMaxSpanSeconds = "bucketMaxSpanSeconds"_sd;
     static constexpr StringData kIncludeMinTimeAsMetadata = "includeMinTimeAsMetadata"_sd;
     static constexpr StringData kIncludeMaxTimeAsMetadata = "includeMaxTimeAsMetadata"_sd;
@@ -247,6 +248,10 @@ private:
     // If buckets contained a mixed type schema along some path, we have to push down special
     // predicates in order to ensure correctness.
     bool _assumeNoMixedSchemaData = false;
+
+    // If any bucket contains dates outside the range of 1970-2038, we are unable to rely on
+    // the _id index, as _id is truncates to 32 bits
+    bool _usesExtendedRange = false;
 
     BucketUnpacker _bucketUnpacker;
     int _bucketMaxSpanSeconds;

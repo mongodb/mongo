@@ -58,7 +58,8 @@ public:
     BucketSpec(const std::string& timeField,
                const boost::optional<std::string>& metaField,
                const std::set<std::string>& fields = {},
-               const std::set<std::string>& computedProjections = {});
+               const std::set<std::string>& computedProjections = {},
+               bool usesExtendedRange = false);
     BucketSpec(const BucketSpec&);
     BucketSpec(BucketSpec&&);
 
@@ -102,6 +103,14 @@ public:
 
     void eraseFromComputedMetaProjFields(const std::string& field) {
         _computedMetaProjFields.erase(field);
+    }
+
+    void setUsesExtendedRange(bool usesExtendedRange) {
+        _usesExtendedRange = usesExtendedRange;
+    }
+
+    bool usesExtendedRange() const {
+        return _usesExtendedRange;
     }
 
     // Returns whether 'field' depends on a pushed down $addFields or computed $project.
@@ -194,6 +203,7 @@ private:
 
     boost::optional<std::string> _metaField = boost::none;
     boost::optional<HashedFieldName> _metaFieldHashed = boost::none;
+    bool _usesExtendedRange = false;
 };
 
 /**
