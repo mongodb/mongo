@@ -72,15 +72,30 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
         collationSpec = collationElt.embeddedObject().getOwned();
     }
 
+    boost::optional<bool> usesExtendedRange = boost::none;
+    if (auto usesExtendedRangeElem = viewDef[kTimeseriesUsesExtendedRange]) {
+        uassert(6646910,
+                str::stream() << "view definition must have " << kTimeseriesUsesExtendedRange
+                              << " of type bool or no such field",
+                usesExtendedRangeElem.type() == BSONType::Bool);
+
+        usesExtendedRange = boost::optional<bool>(usesExtendedRangeElem.boolean());
+    }
+
     return {NamespaceString(viewDef["ns"].valueStringData()),
             std::move(pipeline),
-            std::move(collationSpec)};
+            std::move(collationSpec),
+            std::move(usesExtendedRange)};
 }
 
 void ResolvedView::serialize(BSONObjBuilder* builder) const {
     BSONObjBuilder subObj(builder->subobjStart("resolvedView"));
     subObj.append("ns", _namespace.ns());
     subObj.append("pipeline", _pipeline);
+
+    if ((_timeseriesUsesExtendedRange && (*_timeseriesUsesExtendedRange)))
+        subObj.append(kTimeseriesUsesExtendedRange, *_timeseriesUsesExtendedRange);
+
     if (!_defaultCollation.isEmpty()) {
         subObj.append("collation", _defaultCollation);
     }
@@ -123,8 +138,24 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
                 builder.append(elem);
             }
         }
+
         resolvedPipeline[1] =
             BSON(DocumentSourceInternalConvertBucketIndexStats::kStageName << builder.obj());
+    } else if (resolvedPipeline.size() >= 1 &&
+               resolvedPipeline[0][DocumentSourceInternalUnpackBucket::kStageNameInternal]) {
+        auto unpackStage = resolvedPipeline[0];
+
+        BSONObjBuilder builder;
+        for (const auto& elem :
+             unpackStage[DocumentSourceInternalUnpackBucket::kStageNameInternal].Obj()) {
+            builder.append(elem);
+        }
+
+        builder.append(DocumentSourceInternalUnpackBucket::kUsesExtendedRange,
+                       ((_timeseriesUsesExtendedRange && *_timeseriesUsesExtendedRange)));
+
+        resolvedPipeline[0] =
+            BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal << builder.obj());
     }
 
     AggregateCommandRequest expandedRequest{_namespace, resolvedPipeline};

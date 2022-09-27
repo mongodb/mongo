@@ -720,6 +720,9 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
                                                   const NamespaceString& nss) const {
     _requireValidCatalog();
 
+    // We need the collection catalog to check time-series metadata.
+    auto catalog = CollectionCatalog::get(opCtx);
+
     // Keep looping until the resolution completes. If the catalog is invalidated during the
     // resolution, we start over from the beginning.
     while (true) {
@@ -740,6 +743,7 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
         std::vector<NamespaceString> dependencyChain{nss};
 
         int depth = 0;
+        boost::optional<bool> hasExtendedRange = boost::none;
         for (; depth < ViewGraph::kMaxViewDepth; depth++) {
             auto view =
                 _lookup(opCtx, resolvedNss->ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
@@ -761,10 +765,23 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
                 return StatusWith<ResolvedView>(
                     {*resolvedNss,
                      std::move(resolvedPipeline),
-                     collation ? std::move(collation.get()) : CollationSpec::kSimpleSpec});
+                     collation ? std::move(collation.get()) : CollationSpec::kSimpleSpec,
+                     hasExtendedRange});
             }
 
             resolvedNss = &view->viewOn();
+
+            if (view->timeseries()) {
+                auto tsCollection = catalog->lookupCollectionByNamespace(opCtx, *resolvedNss);
+                uassert(6067201,
+                        str::stream() << "expected time-series buckets collection " << *resolvedNss
+                                      << " to exist",
+                        tsCollection);
+                if (tsCollection) {
+                    hasExtendedRange = tsCollection->getRequiresTimeseriesExtendedRangeSupport();
+                }
+            }
+
             dependencyChain.push_back(*resolvedNss);
             if (!collation) {
                 collation = view->defaultCollator() ? view->defaultCollator()->getSpec().toBSON()

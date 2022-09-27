@@ -58,6 +58,14 @@ struct BucketSpec {
     // after unpacking.
     boost::optional<std::string> metaField;
 
+    void setUsesExtendedRange(bool usesExtendedRange) {
+        _usesExtendedRange = usesExtendedRange;
+    }
+
+    bool usesExtendedRange() const {
+        return _usesExtendedRange;
+    }
+
     // Returns whether 'field' depends on a pushed down $addFields or computed $project.
     bool fieldIsComputed(StringData field) const;
 
@@ -70,6 +78,8 @@ struct BucketSpec {
 
     bool includeMinTimeAsMetadata = false;
     bool includeMaxTimeAsMetadata = false;
+
+    bool _usesExtendedRange = false;
 };
 
 /**

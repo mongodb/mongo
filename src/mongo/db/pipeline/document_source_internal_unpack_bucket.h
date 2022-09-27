@@ -46,6 +46,7 @@ public:
     static constexpr StringData kStageNameExternal = "$_unpackBucket"_sd;
     static constexpr StringData kInclude = "include"_sd;
     static constexpr StringData kExclude = "exclude"_sd;
+    static constexpr StringData kUsesExtendedRange = "usesExtendedRange"_sd;
     static constexpr StringData kBucketMaxSpanSeconds = "bucketMaxSpanSeconds"_sd;
     static constexpr StringData kIncludeMinTimeAsMetadata = "includeMinTimeAsMetadata"_sd;
     static constexpr StringData kIncludeMaxTimeAsMetadata = "includeMaxTimeAsMetadata"_sd;
@@ -230,6 +231,10 @@ public:
 
 private:
     GetNextResult doGetNext() final;
+
+    // If any bucket contains dates outside the range of 1970-2038, we are unable to rely on
+    // the _id index, as _id is truncates to 32 bits
+    bool _usesExtendedRange = false;
 
     BucketUnpacker _bucketUnpacker;
     int _bucketMaxSpanSeconds;
