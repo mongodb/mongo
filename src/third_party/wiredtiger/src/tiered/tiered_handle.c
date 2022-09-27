@@ -841,6 +841,7 @@ __tiered_cleanup(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool final)
 int
 __wt_tiered_close(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool final)
 {
+    __wt_verbose(session, WT_VERB_TIERED, "TIERED_CLOSE: called final %d", (int) final);
     __tiered_cleanup(session, tiered, final);
 
     return (__wt_btree_close(session));
@@ -853,8 +854,8 @@ __wt_tiered_close(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool final)
 int
 __wt_tiered_discard(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool final)
 {
+    __wt_verbose(session, WT_VERB_TIERED, "TIERED_DISCARD: called final %d", (int) final);
     __tiered_cleanup(session, tiered, final);
-    __wt_verbose(session, WT_VERB_TIERED, "%s", "TIERED_CLOSE: called");
     return (__wt_btree_discard(session));
 }
 
