@@ -642,7 +642,7 @@ dir_store_file_copy(DIR_STORE *dir_store, WT_SESSION *session, const char *src_p
          * It is normal and possible that the source file was dropped. Don't print out an error
          * message in that case, but still return the ENOENT error value.
          */
-        if ((ret != 0 && ret != ENOENT) || (ret == ENOENT && !enoent_okay))
+        if ((ret == ENOENT && !enoent_okay) || (ret != 0))
             ret = dir_store_err(dir_store, session, ret, "%s: cannot open for read", src_path);
         goto err;
     }
@@ -767,7 +767,7 @@ dir_store_flush_finish(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
         goto err;
     }
     /* Set the file to readonly in the cache. */
-    if (ret == 0 && (ret = chmod(dest_path, 0444)) < 0)
+    if ((ret = chmod(dest_path, 0444)) < 0)
         ret =
           dir_store_err(dir_store, session, errno, "%s: ss_flush_finish chmod failed", dest_path);
 err:
