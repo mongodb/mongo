@@ -55,6 +55,7 @@ public:
             sbe::value::bitcastFrom<TimeZoneDatabase*>(_timeZoneDB.get()),
             false,
             &_slotIdGenerator);
+        _inputSlotAccessor = _planStageData.env->getAccessor(_inputSlotId);
     }
 
     void benchmarkExpression(BSONObj expressionSpec,
@@ -107,11 +108,9 @@ public:
 
         for (auto keepRunning : benchmarkState) {
             for (const auto& document : bsonDocuments) {
-                _planStageData.env->resetSlot(
-                    _inputSlotId,
-                    sbe::value::TypeTags::bsonObject,
-                    sbe::value::bitcastFrom<const char*>(document.objdata()),
-                    false);
+                _inputSlotAccessor->reset(false,
+                                          sbe::value::TypeTags::bsonObject,
+                                          sbe::value::bitcastFrom<const char*>(document.objdata()));
                 benchmark::DoNotOptimize(_vm.run(compiledExpr.get()));
             }
             benchmark::ClobberMemory();
@@ -139,6 +138,7 @@ private:
 
     sbe::value::SlotId _inputSlotId;
     std::unique_ptr<TimeZoneDatabase> _timeZoneDB;
+    sbe::RuntimeEnvironment::Accessor* _inputSlotAccessor;
 };
 
 BENCHMARK_EXPRESSIONS(SbeExpressionBenchmarkFixture)
