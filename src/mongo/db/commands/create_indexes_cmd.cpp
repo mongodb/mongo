@@ -482,7 +482,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     boost::optional<UUID> collectionUUID;
     CreateIndexesReply reply;
     {
-        AutoGetDb autoDb(opCtx, ns.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, ns.dbName(), MODE_IX);
         assertNoMovePrimaryInProgress(opCtx, ns);
 
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
@@ -706,6 +706,9 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
  */
 class CmdCreateIndexes : public CreateIndexesCmdVersion1Gen<CmdCreateIndexes> {
 public:
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;

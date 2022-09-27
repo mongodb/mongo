@@ -403,7 +403,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
     uassertStatusOK(checkView(opCtx, nss, collection->getCollection()));
 
     const UUID collectionUUID = (*collection)->uuid();
-    const NamespaceStringOrUUID dbAndUUID = {nss.db().toString(), collectionUUID};
+    const NamespaceStringOrUUID dbAndUUID = {nss.dbName(), collectionUUID};
     uassertStatusOK(checkReplState(opCtx, dbAndUUID, collection->getCollection()));
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(51806,

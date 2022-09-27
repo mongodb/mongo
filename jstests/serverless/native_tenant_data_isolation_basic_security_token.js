@@ -144,6 +144,46 @@ const tokenDB = tokenConn.getDB(kDbName);
         assert.commandWorked(
             tokenDB.runCommand({insert: kCollName, documents: [{_id: 0, a: 1, b: 1}]}));
     }
+
+    // Test createIndexes, listIndexes and dropIndexes command.
+    {
+        var sortIndexesByName = function(indexes) {
+            return indexes.sort(function(a, b) {
+                return a.name > b.name;
+            });
+        };
+
+        var getIndexesKeyAndName = function(indexes) {
+            return sortIndexesByName(indexes).map(function(index) {
+                return {key: index.key, name: index.name};
+            });
+        };
+
+        let res = assert.commandWorked(tokenDB.runCommand({
+            createIndexes: kCollName,
+            indexes: [{key: {a: 1}, name: "indexA"}, {key: {b: 1}, name: "indexB"}]
+        }));
+        assert.eq(3, res.numIndexesAfter);
+
+        res = assert.commandWorked(tokenDB.runCommand({listIndexes: kCollName}));
+        assert.eq(3, res.cursor.firstBatch.length);
+        assert(arrayEq(
+            [
+                {key: {"_id": 1}, name: "_id_"},
+                {key: {a: 1}, name: "indexA"},
+                {key: {b: 1}, name: "indexB"}
+            ],
+            getIndexesKeyAndName(res.cursor.firstBatch)));
+
+        // Drop those new created indexes.
+        res = assert.commandWorked(
+            tokenDB.runCommand({dropIndexes: kCollName, index: ["indexA", "indexB"]}));
+
+        res = assert.commandWorked(tokenDB.runCommand({listIndexes: kCollName}));
+        assert.eq(1, res.cursor.firstBatch.length);
+        assert(arrayEq([{key: {"_id": 1}, name: "_id_"}],
+                       getIndexesKeyAndName(res.cursor.firstBatch)));
+    }
 }
 
 // Test commands using a security token for a different tenant and check that this tenant cannot
@@ -187,6 +227,12 @@ const tokenDB = tokenConn.getDB(kDbName);
     const toName = fromName + "_renamed";
     assert.commandFailedWithCode(
         adminDb.runCommand({renameCollection: fromName, to: toName, dropTarget: true}),
+        ErrorCodes.NamespaceNotFound);
+
+    assert.commandFailedWithCode(tokenDB2.runCommand({listIndexes: kCollName}),
+                                 ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(
+        tokenDB2.runCommand({dropIndexes: kCollName, index: ["indexA", "indexB"]}),
         ErrorCodes.NamespaceNotFound);
 
     // Attempt to drop the database, then check it was not dropped.

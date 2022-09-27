@@ -211,5 +211,54 @@ const testColl = testDb.getCollection(kCollName);
         {insert: kCollName, documents: [{_id: 0, a: 1, b: 1}], '$tenant': kTenant}));
 }
 
+// Test createIndexes, listIndexes and dropIndexes command.
+{
+    var sortIndexesByName = function(indexes) {
+        return indexes.sort(function(a, b) {
+            return a.name > b.name;
+        });
+    };
+
+    var getIndexesKeyAndName = function(indexes) {
+        return sortIndexesByName(indexes).map(function(index) {
+            return {key: index.key, name: index.name};
+        });
+    };
+
+    let res = assert.commandWorked(testDb.runCommand({
+        createIndexes: kCollName,
+        indexes: [{key: {a: 1}, name: "indexA"}, {key: {b: 1}, name: "indexB"}],
+        '$tenant': kTenant
+    }));
+    assert.eq(3, res.numIndexesAfter);
+
+    res = assert.commandWorked(testDb.runCommand({listIndexes: kCollName, '$tenant': kTenant}));
+    assert.eq(3, res.cursor.firstBatch.length);
+    assert(arrayEq(
+        [
+            {key: {"_id": 1}, name: "_id_"},
+            {key: {a: 1}, name: "indexA"},
+            {key: {b: 1}, name: "indexB"}
+        ],
+        getIndexesKeyAndName(res.cursor.firstBatch)));
+
+    // These indexes should not be accessed with a different tenant.
+    assert.commandFailedWithCode(
+        testDb.runCommand({listIndexes: kCollName, '$tenant': kOtherTenant}),
+        ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(
+        testDb.runCommand(
+            {dropIndexes: kCollName, index: ["indexA", "indexB"], '$tenant': kOtherTenant}),
+        ErrorCodes.NamespaceNotFound);
+
+    // Drop those new created indexes.
+    res = assert.commandWorked(testDb.runCommand(
+        {dropIndexes: kCollName, index: ["indexA", "indexB"], '$tenant': kTenant}));
+
+    res = assert.commandWorked(testDb.runCommand({listIndexes: kCollName, '$tenant': kTenant}));
+    assert.eq(1, res.cursor.firstBatch.length);
+    assert(arrayEq([{key: {"_id": 1}, name: "_id_"}], getIndexesKeyAndName(res.cursor.firstBatch)));
+}
+
 MongoRunner.stopMongod(mongod);
 })();
