@@ -318,9 +318,12 @@ dir_store_get_directory(const char *home, const char *s, ssize_t len, bool creat
         dirname = strndup(s, (size_t)len + 1); /* Room for null */
     else {
         buflen = (size_t)len + strlen(home) + 2; /* Room for slash, null */
-        if ((dirname = malloc(buflen)) != NULL)
-            if (snprintf(dirname, buflen, "%s/%.*s", home, (int)len, s) >= (int)buflen)
+        if ((dirname = malloc(buflen)) != NULL) {
+            if (snprintf(dirname, buflen, "%s/%.*s", home, (int)len, s) >= (int)buflen) {
+                free(dirname);
                 return (EINVAL);
+            }
+        }
     }
     if (dirname == NULL)
         return (ENOMEM);
@@ -398,8 +401,10 @@ dir_store_path(WT_FILE_SYSTEM *file_system, const char *dir, const char *name, c
     len = strlen(dir) + strlen(name) + 2;
     if ((p = malloc(len)) == NULL)
         return (dir_store_err(FS2DS(file_system), NULL, ENOMEM, "dir_store_path"));
-    if (snprintf(p, len, "%s/%s", dir, name) >= (int)len)
+    if (snprintf(p, len, "%s/%s", dir, name) >= (int)len) {
+        free(p);
         return (dir_store_err(FS2DS(file_system), NULL, EINVAL, "overflow sprintf"));
+    }
     *pathp = p;
     return (ret);
 }
