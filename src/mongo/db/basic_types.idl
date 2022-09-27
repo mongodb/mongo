@@ -101,12 +101,6 @@ types:
         cpp_type: "double"
         deserializer: "mongo::BSONElement::_numberDouble"
 
-    decimal:
-        bson_serialization_type: double
-        description: "A BSON 128-bit floating point decimal number"
-        cpp_type: "mongo::Decimal128"
-        deserializer: "mongo::BSONElement::_numberDecimal"
-
     bool:
         bson_serialization_type: bool
         description: "A BSON bool"
