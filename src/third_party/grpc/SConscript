@@ -90,7 +90,7 @@ grpc_env.Append(CPPPATH=[
     grpc_root.Dir('dist/third_party/address_sorting/include'),
 ])
 
-# This should match the default $PROTOC_CPP_PLUGIN bin name for everything to be seamless
+# This should match the default $PROTOC_GRPC_PLUGIN bin name for everything to be seamless
 # so if for some reason this name needs to change, make sure to update the default as well.
 protobuf_plugin_bin = grpc_env.Program(
     target='grpc_cpp_plugin',
@@ -853,15 +853,11 @@ grpcxx_env.AppendUnique(
     PROTOC_GEN_TYPES=['cpp'],
     PROTOC_PLUGINS={
         'grpc': {
-            'plugin': '$PROTOC_CPP_PLUGIN',
-            'out_dir': '$PROTOC_CPPGEN_DIR',
+            'plugin': '$PROTOC_GRPC_PLUGIN',
             'options': ['generate_mock_code=true'],
             'exts': ['.grpc.pb.cc', '.grpc.pb.h'],
         },
     },
-    PROTOC_MOCKS=[
-        'grpc'
-    ],
 )
 
 lib_node = grpcxx_env.Library(

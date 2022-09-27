@@ -39,6 +39,7 @@ def protoc_emitter(target, source, env):
         if type == 'cpp':
             new_targets += [f"{base_file_name}.pb.cc", f"{base_file_name}.pb.h"]
 
+
     plugins = env.get('PROTOC_PLUGINS', [])
     for name in plugins:
         for ext in plugins[name].get('exts', []):
@@ -66,14 +67,11 @@ protoc_scanner = SCons.Scanner.Scanner(function=protoc_scanner, skeys=[".proto"]
 def type_out_gen(source, target, env, for_signature):
     # the user set PROTOC_CPPGEN_DIR that means we add the flag
     # to turn on cpp generation
-    try:
-        result = env.subst('$PROTOC_GEN_TYPES', target=target, source=source)
-        if 'cpp' in result:
-            out_dir = os.path.dirname(str(target[0].abspath))
-            os.makedirs(out_dir, exist_ok=True)
-            return f"--cpp_out={out_dir}"
-    except:
-        traceback.print_exc()
+    result = env.subst('$PROTOC_GEN_TYPES', target=target, source=source)
+    if 'cpp' in result:
+        out_dir = os.path.dirname(str(target[0].abspath))
+        os.makedirs(out_dir, exist_ok=True)
+        return f"--cpp_out={out_dir}"
 
 def gen_types_str(source, target, env, for_signature):
     # This generates the types from the list of types we which are supported and
@@ -103,10 +101,9 @@ def gen_plugins(source, target, env, for_signature):
     gen_types_results = []
     plugins = env.get('PROTOC_PLUGINS', [])
     for name in plugins:
-        out_dir = plugins[name].get('out_dir')
         plugin = plugins[name].get('plugin')
         options = plugins[name].get('options')
-        if plugin and out_dir:
+        if plugin:
             cmd_line = f'--{name}_out='
             for opt in options:
                 cmd_line += f'{opt}:'

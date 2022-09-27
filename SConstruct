@@ -1336,7 +1336,7 @@ env_vars.Add(
 )
 
 env_vars.Add(
-    'PROTOC_CPP_PLUGIN',
+    'PROTOC_GRPC_PLUGIN',
     default="$DESTDIR/bin/grpc_cpp_plugin$PROGSUFFIX",
     help='Path to protobuf compiler grpc plugin.',
 )
