@@ -437,6 +437,14 @@ void logUpdateCachedClusterParameter(Client* client,
                                      const BSONObj& oldValue,
                                      const BSONObj& newValue);
 
+/**
+ * Logs details of log file being rotated out to the file that is being rotated
+ * in
+ */
+void logRotateLog(Client* client,
+                  const Status& logStatus,
+                  const std::vector<Status>& errors,
+                  const std::string& suffix);
 
 }  // namespace audit
 }  // namespace mongo

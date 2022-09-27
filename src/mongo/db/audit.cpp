@@ -273,6 +273,13 @@ void logUpdateCachedClusterParameter(Client* client,
     invariant(client);
 }
 
+void logRotateLog(Client* client,
+                  const Status& logStatus,
+                  const std::vector<Status>& errors,
+                  const std::string& suffix) {
+    invariant(client);
+}
+
 #endif
 
 }  // namespace audit
