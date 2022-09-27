@@ -1245,8 +1245,9 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
     {
         Lock::GlobalLock lk(opCtx, MODE_IS);
         DurableCatalog* catalog = DurableCatalog::get(opCtx);
-        std::vector<DurableCatalog::Entry> catalogEntries = catalog->getAllCatalogEntries(opCtx);
-        for (const DurableCatalog::Entry& e : catalogEntries) {
+        std::vector<DurableCatalog::EntryIdentifier> catalogEntries =
+            catalog->getAllCatalogEntries(opCtx);
+        for (const DurableCatalog::EntryIdentifier& e : catalogEntries) {
             // Populate the collection ident with its namespace and UUID.
             UUID uuid = catalog->getMetaData(opCtx, e.catalogId)->options.uuid.value();
             _wtBackup.identToNamespaceAndUUIDMap.emplace(e.ident, std::make_pair(e.nss, uuid));

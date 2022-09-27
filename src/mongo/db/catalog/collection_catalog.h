@@ -38,8 +38,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/service_context.h"
-// TODO SERVER-69372: remove include.
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/uuid.h"
@@ -210,14 +208,10 @@ public:
     /**
      * Returns the collection instance representative of 'entry' at the provided read timestamp.
      *
-     * TODO SERVER-69372:
-     * - Use NamespaceString instead of DurableCatalog::Entry.
-     * - Remove DurableCatalog dependency.
-     *
      * Returns nullptr when reading from a point-in-time where the collection did not exist.
      */
     std::shared_ptr<Collection> openCollection(OperationContext* opCtx,
-                                               const DurableCatalog::Entry& entry,
+                                               const NamespaceString& nss,
                                                Timestamp readTimestamp) const;
 
     /**

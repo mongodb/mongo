@@ -62,9 +62,9 @@ public:
 
     void init(OperationContext* opCtx);
 
-    std::vector<Entry> getAllCatalogEntries(OperationContext* opCtx) const;
+    std::vector<EntryIdentifier> getAllCatalogEntries(OperationContext* opCtx) const;
 
-    Entry getEntry(const RecordId& catalogId) const;
+    EntryIdentifier getEntry(const RecordId& catalogId) const;
 
     std::string getCollectionIdent(const RecordId& catalogId) const;
 
@@ -78,6 +78,9 @@ public:
     BSONObj getCatalogEntry(OperationContext* opCtx, const RecordId& catalogId) const {
         return _findEntry(opCtx, catalogId);
     }
+
+    boost::optional<CatalogEntry> getParsedCatalogEntry(OperationContext* opCtx,
+                                                        const RecordId& catalogId) const override;
 
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> getMetaData(
         OperationContext* opCtx, const RecordId& catalogId) const;
@@ -166,12 +169,12 @@ private:
     friend class StorageEngineTest;
 
     BSONObj _findEntry(OperationContext* opCtx, const RecordId& catalogId) const;
-    StatusWith<Entry> _addEntry(OperationContext* opCtx,
-                                NamespaceString nss,
-                                const CollectionOptions& options);
-    StatusWith<Entry> _importEntry(OperationContext* opCtx,
-                                   NamespaceString nss,
-                                   const BSONObj& metadata);
+    StatusWith<EntryIdentifier> _addEntry(OperationContext* opCtx,
+                                          NamespaceString nss,
+                                          const CollectionOptions& options);
+    StatusWith<EntryIdentifier> _importEntry(OperationContext* opCtx,
+                                             NamespaceString nss,
+                                             const BSONObj& metadata);
     Status _replaceEntry(OperationContext* opCtx,
                          const RecordId& catalogId,
                          const NamespaceString& toNss,
@@ -203,7 +206,7 @@ private:
     std::string _rand;
     unsigned long long _next;
 
-    std::map<RecordId, Entry> _catalogIdToEntryMap;
+    std::map<RecordId, EntryIdentifier> _catalogIdToEntryMap;
     mutable Mutex _catalogIdToEntryMapLock =
         MONGO_MAKE_LATCH("DurableCatalogImpl::_catalogIdToEntryMap");
 

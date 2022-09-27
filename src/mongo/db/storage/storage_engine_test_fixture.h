@@ -56,8 +56,8 @@ public:
             std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
     }
 
-    StatusWith<DurableCatalog::Entry> createCollection(OperationContext* opCtx,
-                                                       NamespaceString ns) {
+    StatusWith<DurableCatalog::EntryIdentifier> createCollection(OperationContext* opCtx,
+                                                                 NamespaceString ns) {
         AutoGetDb db(opCtx, ns.dbName(), LockMode::MODE_X);
         CollectionOptions options;
         options.uuid = UUID::gen();
@@ -129,7 +129,7 @@ public:
     }
 
     bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
-        std::vector<DurableCatalog::Entry> allCollections =
+        std::vector<DurableCatalog::EntryIdentifier> allCollections =
             _storageEngine->getCatalog()->getAllCatalogEntries(opCtx);
         return std::count_if(allCollections.begin(), allCollections.end(), [&](auto& entry) {
             return nss == entry.nss;

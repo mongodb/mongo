@@ -181,7 +181,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
     std::vector<std::string> identsKnownToStorageEngine = _engine->getAllIdents(opCtx);
     std::sort(identsKnownToStorageEngine.begin(), identsKnownToStorageEngine.end());
 
-    std::vector<DurableCatalog::Entry> catalogEntries = _catalog->getAllCatalogEntries(opCtx);
+    std::vector<DurableCatalog::EntryIdentifier> catalogEntries =
+        _catalog->getAllCatalogEntries(opCtx);
 
     // Perform a read on the catalog at the `oldestTimestamp` and record the record stores (via
     // their catalogId) that existed.
@@ -212,10 +213,11 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
         // will be dropped in reconcileCatalogAndIdents().
         for (const auto& ident : identsKnownToStorageEngine) {
             if (_catalog->isCollectionIdent(ident)) {
-                bool isOrphan = !std::any_of(
-                    catalogEntries.begin(),
-                    catalogEntries.end(),
-                    [this, &ident](DurableCatalog::Entry entry) { return entry.ident == ident; });
+                bool isOrphan = !std::any_of(catalogEntries.begin(),
+                                             catalogEntries.end(),
+                                             [this, &ident](DurableCatalog::EntryIdentifier entry) {
+                                                 return entry.ident == ident;
+                                             });
                 if (isOrphan) {
                     // If the catalog does not have information about this
                     // collection, we create an new entry for it.
@@ -275,7 +277,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
     const auto loadingFromUncleanShutdownOrRepair =
         lastShutdownState == LastShutdownState::kUnclean || _options.forRepair;
     BatchedCollectionCatalogWriter catalogBatchWriter{opCtx};
-    for (DurableCatalog::Entry entry : catalogEntries) {
+    for (DurableCatalog::EntryIdentifier entry : catalogEntries) {
         if (_options.forRestore) {
             // When restoring a subset of user collections from a backup, the collections not
             // restored are in the catalog but are unknown to the storage engine. The catalog
@@ -480,7 +482,7 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
 
 void StorageEngineImpl::_checkForIndexFiles(
     OperationContext* opCtx,
-    const DurableCatalog::Entry& entry,
+    const DurableCatalog::EntryIdentifier& entry,
     std::vector<std::string>& identsKnownToStorageEngine) const {
     std::vector<std::string> indexIdents = _catalog->getIndexIdents(opCtx, entry.catalogId);
     for (const std::string& indexIdent : indexIdents) {
@@ -665,9 +667,10 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     // engine. An omission here is fatal. A missing ident could mean a collection drop was rolled
     // back. Note that startup already attempts to open tables; this should only catch errors in
     // other contexts such as `recoverToStableTimestamp`.
-    std::vector<DurableCatalog::Entry> catalogEntries = _catalog->getAllCatalogEntries(opCtx);
+    std::vector<DurableCatalog::EntryIdentifier> catalogEntries =
+        _catalog->getAllCatalogEntries(opCtx);
     if (!_options.forRepair) {
-        for (const DurableCatalog::Entry& entry : catalogEntries) {
+        for (const DurableCatalog::EntryIdentifier& entry : catalogEntries) {
             if (engineIdents.find(entry.ident) == engineIdents.end()) {
                 return {ErrorCodes::UnrecoverableRollbackError,
                         str::stream() << "Expected collection does not exist. Collection: "
@@ -681,7 +684,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     //
     // Also, remove unfinished builds except those that were background index builds started on a
     // secondary.
-    for (const DurableCatalog::Entry& entry : catalogEntries) {
+    for (const DurableCatalog::EntryIdentifier& entry : catalogEntries) {
         std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metaData =
             _catalog->getMetaData(opCtx, entry.catalogId);
         NamespaceString nss(metaData->nss);

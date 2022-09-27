@@ -57,13 +57,21 @@ public:
     /**
      * `Entry` ties together the common identifiers of a single `_mdb_catalog` document.
      */
-    struct Entry {
-        Entry() {}
-        Entry(RecordId catalogId, std::string ident, NamespaceString nss)
+    struct EntryIdentifier {
+        EntryIdentifier() {}
+        EntryIdentifier(RecordId catalogId, std::string ident, NamespaceString nss)
             : catalogId(std::move(catalogId)), ident(std::move(ident)), nss(std::move(nss)) {}
         RecordId catalogId;
         std::string ident;
         NamespaceString nss;
+    };
+
+    /**
+     * Parsed catalog entry of a single `_mdb_catalog` document.
+     */
+    struct CatalogEntry {
+        std::string ident;
+        std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata;
     };
 
     virtual ~DurableCatalog() {}
@@ -85,9 +93,9 @@ public:
 
     virtual void init(OperationContext* opCtx) = 0;
 
-    virtual std::vector<Entry> getAllCatalogEntries(OperationContext* opCtx) const = 0;
+    virtual std::vector<EntryIdentifier> getAllCatalogEntries(OperationContext* opCtx) const = 0;
 
-    virtual Entry getEntry(const RecordId& catalogId) const = 0;
+    virtual EntryIdentifier getEntry(const RecordId& catalogId) const = 0;
 
     virtual std::string getIndexIdent(OperationContext* opCtx,
                                       const RecordId& id,
@@ -96,8 +104,20 @@ public:
     virtual std::vector<std::string> getIndexIdents(OperationContext* opCtx,
                                                     const RecordId& id) const = 0;
 
+    /**
+     * Get a raw catalog entry for catalogId as BSON.
+     */
     virtual BSONObj getCatalogEntry(OperationContext* opCtx, const RecordId& catalogId) const = 0;
 
+    /**
+     * Like 'getCatalogEntry' above but parses the catalog entry to common types.
+     */
+    virtual boost::optional<CatalogEntry> getParsedCatalogEntry(
+        OperationContext* opCtx, const RecordId& catalogId) const = 0;
+
+    /**
+     * Like 'getParsedCatalogEntry' above but only extracts the metadata component.
+     */
     virtual std::shared_ptr<BSONCollectionCatalogEntry::MetaData> getMetaData(
         OperationContext* opCtx, const RecordId& id) const = 0;
 
