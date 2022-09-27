@@ -102,8 +102,8 @@ public:
             6979802,
             1,
             "running sbe expression benchmark on expression {expression}, sbe representation {sbe}",
-            "expression"_attr = expression->serialize(true).toString(),
-            "sbe"_attr = sbe::DebugPrinter{true}.print(expr->debugPrint()));
+            "expression"_attr = expression->serialize(/*explain = */ true).toString(),
+            "sbe"_attr = sbe::DebugPrinter{}.print(expr->debugPrint()));
 
         for (auto keepRunning : benchmarkState) {
             for (const auto& document : bsonDocuments) {
