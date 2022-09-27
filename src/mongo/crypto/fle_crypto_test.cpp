@@ -2571,11 +2571,6 @@ void assertMinCoverResult(A lb,
     vals.elems(elems);
     auto spec = FLE2RangeFindSpec(elems[0], lbIncluded, elems[1], ubIncluded, elems[2], elems[3]);
     auto result = getMinCover(spec, sparsity);
-    if (expected.size() == 0 && result.size() != 0) {
-        for (auto& res : result) {
-            std::cout << "DAVISDEBUG " << res << std::endl;
-        }
-    }
     ASSERT_EQ(result.size(), expected.size());
     for (size_t i = 0; i < result.size(); i++) {
         ASSERT_EQ(result[i], expected[i]) << spec.toBSON();

@@ -46,6 +46,17 @@ void logTagsExceeded(const ExceptionFor<ErrorCodes::FLEMaxTagLimitExceeded>& ex)
         6672410, 2, "FLE Max tag limit hit during query rewrite", "__error__"_attr = ex.what());
 }
 
+std::unique_ptr<MatchExpression> makeTagDisjunction(BSONArray&& tagArray) {
+    auto tagElems = std::vector<BSONElement>();
+    tagArray.elems(tagElems);
+
+    auto newExpr = std::make_unique<InMatchExpression>(kSafeContent);
+    newExpr->setBackingBSON(std::move(tagArray));
+    uassertStatusOK(newExpr->setEqualities(std::move(tagElems)));
+
+    return newExpr;
+}
+
 BSONArray toBSONArray(std::vector<PrfBlock>&& vec) {
     auto bab = BSONArrayBuilder();
     for (auto& elt : vec) {
