@@ -5654,6 +5654,8 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
         LastVote lastVote{args.getTerm(), args.getCandidateIndex()};
         Status status = _externalState->storeLocalLastVoteDocument(opCtx, lastVote);
         if (!status.isOK()) {
+            // Note the topology coordinator has already advanced its last vote at this point,
+            // so this node will not be able to vote in this election; this is a "spoiled" vote.
             LOGV2_ERROR(21428,
                         "replSetRequestVotes failed to store LastVote document",
                         "error"_attr = status);

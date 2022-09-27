@@ -256,6 +256,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx) const final {
+        MONGO_UNREACHABLE;
+    }
+
     JournalListener* getReplicationJournalListener() final {
         MONGO_UNREACHABLE;
     }
