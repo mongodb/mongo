@@ -500,6 +500,37 @@ int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s, const std::string& uri) {
     return result.getValue();
 }
 
+int64_t WiredTigerUtil::getEphemeralIdentSize(WT_SESSION* s, const std::string& uri) {
+    // For ephemeral case, use cursor statistics
+    const auto statsUri = "statistics:" + uri;
+
+    // Helper function to retrieve stats and check for errors
+    auto getStats = [&](int key) -> int64_t {
+        auto result = getStatisticsValue(s, statsUri, "statistics=(fast)", key);
+        if (!result.isOK()) {
+            if (result.getStatus().code() == ErrorCodes::CursorNotFound)
+                return 0;  // ident gone, so return 0
+
+            uassertStatusOK(result.getStatus());
+        }
+        return result.getValue();
+    };
+
+    auto inserts = getStats(WT_STAT_DSRC_CURSOR_INSERT);
+    auto removes = getStats(WT_STAT_DSRC_CURSOR_REMOVE);
+    auto insertBytes = getStats(WT_STAT_DSRC_CURSOR_INSERT_BYTES);
+
+    if (inserts == 0 || removes >= inserts)
+        return 0;
+
+    // Rough approximation of index size as average entry size times number of entries.
+    // May be off if key sizes change significantly over the life time of the collection,
+    // but is the best we can do currrently with the statistics available.
+    auto bytesPerEntry = (insertBytes + inserts - 1) / inserts;  // round up
+    auto numEntries = inserts - removes;
+    return numEntries * bytesPerEntry;
+}
+
 int64_t WiredTigerUtil::getIdentReuseSize(WT_SESSION* s, const std::string& uri) {
     auto result = WiredTigerUtil::getStatisticsValue(
         s, "statistics:" + uri, "statistics=(fast)", WT_STAT_DSRC_BLOCK_REUSE_BYTES);

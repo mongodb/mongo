@@ -272,6 +272,8 @@ public:
                                                   const std::string& config,
                                                   int statisticsKey);
 
+    static int64_t getEphemeralIdentSize(WT_SESSION* s, const std::string& uri);
+
     static int64_t getIdentSize(WT_SESSION* s, const std::string& uri);
 
     /**

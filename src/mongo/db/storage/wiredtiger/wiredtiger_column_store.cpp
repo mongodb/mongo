@@ -426,17 +426,22 @@ bool WiredTigerColumnStore::isEmpty(OperationContext* opCtx) {
 }
 
 long long WiredTigerColumnStore::getSpaceUsedBytes(OperationContext* opCtx) const {
-    // TODO: SERVER-65980.
-    // For now we just return  this so that tests can successfully obtain collection-level stats on
-    // a collection with a columnstore index.
-    return 27017;
+    dassert(opCtx->lockState()->isReadLocked());
+    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+    WT_SESSION* s = ru->getSession()->getSession();
+
+    if (ru->getSessionCache()->isEphemeral()) {
+        return static_cast<long long>(WiredTigerUtil::getEphemeralIdentSize(s, _uri));
+    }
+    return static_cast<long long>(WiredTigerUtil::getIdentSize(s, _uri));
 }
 
 long long WiredTigerColumnStore::getFreeStorageBytes(OperationContext* opCtx) const {
-    // TODO: SERVER-65980.
-    // For now we just fake this so that tests can successfully obtain collection-level stats on a
-    // collection with a columnstore index.
-    return 27017;
+    dassert(opCtx->lockState()->isReadLocked());
+    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+    WiredTigerSession* session = ru->getSession();
+
+    return static_cast<long long>(WiredTigerUtil::getIdentReuseSize(session->getSession(), _uri));
 }
 
 Status WiredTigerColumnStore::compact(OperationContext* opCtx) {
