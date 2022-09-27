@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-using IndexCatalogTypeMap = StringDataMap<IndexCatalogType>;
+using IndexCatalogTypeMap = StringMap<IndexCatalogType>;
 
 class GlobalIndexesCache {
 public:
