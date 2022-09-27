@@ -28,6 +28,8 @@
 
 #include "format.h"
 
+static void apply_bounds(WT_CURSOR *, TABLE *);
+static void clear_bounds(WT_CURSOR *, TABLE *);
 static int col_insert(TINFO *);
 static void col_insert_resolve(TABLE *, void *);
 static int col_modify(TINFO *, bool);
@@ -612,8 +614,9 @@ table_op(TINFO *tinfo, bool intxn, iso_level_t iso_level, thread_op op)
     WT_DECL_RET;
     TABLE *table;
     u_int i, j;
-    bool evict_page, next, positioned;
+    bool bound_set, evict_page, next, positioned;
 
+    bound_set = false;
     table = tinfo->table;
 
     /* Acquire a cursor. */
@@ -714,12 +717,27 @@ table_op(TINFO *tinfo, bool intxn, iso_level_t iso_level, thread_op op)
         break;
     case READ:
         ++tinfo->search;
+
+        if (!positioned && GV(OPS_BOUND_CURSOR) && mmrand(NULL, 1, 2) == 1) {
+            bound_set = true;
+            /*
+             * FIXME-WT-9883: It is possible that the underlying cursor is still positioned even
+             * though the positioned variable is false. Reset the position through reset for now.
+             */
+            testutil_check(tinfo->cursor->reset(tinfo->cursor));
+            apply_bounds(tinfo->cursor, tinfo->table);
+        }
+
         ret = read_row(tinfo);
         if (ret == 0) {
             positioned = true;
-            SNAP_TRACK(tinfo, READ);
-        } else
+            if (!bound_set)
+                SNAP_TRACK(tinfo, READ);
+        } else {
+            clear_bounds(tinfo->cursor, tinfo->table);
             OP_FAILED(true);
+        }
+        clear_bounds(tinfo->cursor, tinfo->table);
         break;
     case REMOVE:
         ++tinfo->remove;
@@ -1271,6 +1289,84 @@ read_row_worker(TINFO *tinfo, TABLE *table, WT_CURSOR *cursor, uint64_t keyno, W
 }
 
 /*
+ * apply_bounds --
+ *     Apply lower and upper bounds on the cursor. The lower and upper bound is randomly generated.
+ */
+static void
+apply_bounds(WT_CURSOR *cursor, TABLE *table)
+{
+    WT_ITEM key;
+    uint32_t lower_keyno, max_rows, upper_keyno;
+
+    /* FIXME-WT-9851: Enable once FLCS is supported. */
+    if (table->type == FIX)
+        return;
+
+    /* Set up the default key buffer. */
+    key_gen_init(&key);
+    WT_ORDERED_READ(max_rows, table->rows_current);
+
+    /*
+     * Generate a random lower key and apply to the lower bound or upper bound depending on the
+     * reverse collator.
+     */
+    lower_keyno = mmrand(NULL, 1, max_rows);
+    /* Retrieve the key/value pair by key. */
+    switch (table->type) {
+    case FIX:
+    case VAR:
+        cursor->set_key(cursor, lower_keyno);
+        break;
+    case ROW:
+        key_gen(table, &key, lower_keyno);
+        cursor->set_key(cursor, &key);
+        break;
+    }
+    if (TV(BTREE_REVERSE))
+        testutil_check(cursor->bound(cursor, "action=set,bound=upper"));
+    else
+        testutil_check(cursor->bound(cursor, "action=set,bound=lower"));
+
+    /*
+     * Generate a random upper key and apply to the upper bound or lower bound depending on the
+     * reverse collator.
+     */
+    upper_keyno = mmrand(NULL, lower_keyno, max_rows);
+
+    /* Retrieve the key/value pair by key. */
+    switch (table->type) {
+    case FIX:
+    case VAR:
+        cursor->set_key(cursor, upper_keyno);
+        break;
+    case ROW:
+        key_gen(table, &key, upper_keyno);
+        cursor->set_key(cursor, &key);
+        break;
+    }
+    if (TV(BTREE_REVERSE))
+        testutil_check(cursor->bound(cursor, "action=set,bound=upper"));
+    else
+        testutil_check(cursor->bound(cursor, "action=set,bound=lower"));
+
+    key_gen_teardown(&key);
+}
+
+/*
+ * clear_bounds --
+ *     Clear both the lower and upper bounds on the cursor.
+ */
+static void
+clear_bounds(WT_CURSOR *cursor, TABLE *table)
+{
+    /* FIXME-WT-9851: Enable once FLCS is supported. */
+    if (table->type == FIX)
+        return;
+
+    cursor->bound(cursor, "action=clear");
+}
+
+/*
  * wts_read_scan --
  *     Read and verify a subset of the elements in a file.
  */
@@ -1314,6 +1410,12 @@ wts_read_scan(TABLE *table, void *arg)
         if (keyno > max_rows)
             keyno = max_rows;
 
+        if (GV(OPS_BOUND_CURSOR) && mmrand(NULL, 1, 10) == 1) {
+            /* Reset the position of the cursor, so that we can apply bounds on the cursor. */
+            testutil_check(cursor->reset(cursor));
+            apply_bounds(cursor, table);
+        }
+
         switch (ret = read_row_worker(NULL, table, cursor, keyno, &key, &value, &bitv, false)) {
         case 0:
         case WT_NOTFOUND:
@@ -1324,6 +1426,7 @@ wts_read_scan(TABLE *table, void *arg)
         default:
             testutil_die(ret, "%s: read row %" PRIu64, __func__, keyno);
         }
+        clear_bounds(cursor, table);
     }
 
     wt_wrap_close_session(session);
