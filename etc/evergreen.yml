@@ -1202,7 +1202,7 @@ buildvariants:
   display_name: "* macOS DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
-  - macos-1100
+  - macos-1014
   expansions: &macos-debug-expansions
     test_flags: --excludeWithAnyTags=incompatible_with_macos
     resmoke_jobs_max: 6
