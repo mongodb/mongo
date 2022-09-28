@@ -30,6 +30,18 @@ if grpc_env.ToolchainIs('msvc'):
         ],
     )
 
+if grpc_env['TARGET_ARCH'] == 's390x':
+    # this is from __warn_memset_zero_len on older platforms
+    grpc_env.Append(
+        CCFLAGS=[
+            '-Wno-error',
+        ],
+        LINKFLAGS=[
+            '-Wl,--no-fatal-warnings',
+        ],
+    )
+
+
 grpc_root = grpc_env.Dir(".").srcnode()
 
 upb_env = grpc_env.Clone()
@@ -894,6 +906,7 @@ grpc_unittest_env.CppUnitTest(
     ],
     SYSLIBDEPS=[
         'ssl',
-        'crypto'
-    ]
+        'crypto',
+    ],
 )
+
