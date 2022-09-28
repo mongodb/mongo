@@ -241,8 +241,8 @@ public:
             collection.getWritableCollection(opCtx)->getIndexCatalog()->dropAllIndexes(
                 opCtx, collection.getWritableCollection(opCtx), true, {});
 
-            swIndexesToRebuild =
-                indexer->init(opCtx, collection, all, MultiIndexBlock::kNoopOnInitFn);
+            swIndexesToRebuild = indexer->init(
+                opCtx, collection, all, MultiIndexBlock::kNoopOnInitFn, /*forRecovery=*/false);
             uassertStatusOK(swIndexesToRebuild.getStatus());
             wunit.commit();
         });

@@ -112,6 +112,8 @@ public:
 
     void setIsReady(bool newIsReady) final;
 
+    void setIsFrozen(bool newIsFrozen) final;
+
     void setDropped() final {
         _isDropped.store(true);
     }

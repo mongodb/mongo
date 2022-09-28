@@ -90,8 +90,11 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
     AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
     CollectionWriter coll(operationContext(), autoColl);
 
-    auto specs = unittest::assertGet(indexer->init(
-        operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(operationContext(),
+                                                   coll,
+                                                   std::vector<BSONObj>(),
+                                                   MultiIndexBlock::kNoopOnInitFn,
+                                                   /*forRecovery=*/false));
     ASSERT_EQUALS(0U, specs.size());
 
     ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll.get()));
@@ -113,8 +116,11 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
     AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
     CollectionWriter coll(operationContext(), autoColl);
 
-    auto specs = unittest::assertGet(indexer->init(
-        operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(operationContext(),
+                                                   coll,
+                                                   std::vector<BSONObj>(),
+                                                   MultiIndexBlock::kNoopOnInitFn,
+                                                   /*forRecovery=*/false));
     ASSERT_EQUALS(0U, specs.size());
 
     ASSERT_OK(
@@ -146,8 +152,11 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
     AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
     CollectionWriter coll(operationContext(), autoColl);
 
-    auto specs = unittest::assertGet(indexer->init(
-        operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(operationContext(),
+                                                   coll,
+                                                   std::vector<BSONObj>(),
+                                                   MultiIndexBlock::kNoopOnInitFn,
+                                                   /*forRecovery=*/false));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_OK(
         indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(),

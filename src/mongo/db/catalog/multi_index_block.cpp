@@ -197,7 +197,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
                                                        const BSONObj& spec,
                                                        OnInitFn onInit) {
     const auto indexes = std::vector<BSONObj>(1, spec);
-    return init(opCtx, collection, indexes, onInit, boost::none);
+    return init(opCtx, collection, indexes, onInit, /*forRecovery=*/false, boost::none);
 }
 
 StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
@@ -205,6 +205,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     CollectionWriter& collection,
     const std::vector<BSONObj>& indexSpecs,
     OnInitFn onInit,
+    bool forRecovery,
     const boost::optional<ResumeIndexInfo>& resumeInfo) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X),
               str::stream() << "Collection " << collection->ns() << " with UUID "
@@ -258,27 +259,31 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
         for (size_t i = 0; i < indexSpecs.size(); i++) {
             BSONObj info = indexSpecs[i];
-            StatusWith<BSONObj> statusWithInfo =
-                collection->getIndexCatalog()->prepareSpecForCreate(
-                    opCtx, collection.get(), info, resumeInfo);
-            Status status = statusWithInfo.getStatus();
-            if (!status.isOK()) {
-                // If we were given two identical indexes to build, we will run into an error trying
-                // to set up the same index a second time in this for-loop. This is the only way to
-                // encounter this error because callers filter out ready/in-progress indexes and
-                // start the build while holding a lock throughout.
-                if (status == ErrorCodes::IndexBuildAlreadyInProgress) {
-                    invariant(indexSpecs.size() > 1,
-                              str::stream()
-                                  << "Collection: " << collection->ns() << " (" << _collectionUUID
-                                  << "), Index spec: " << indexSpecs.front());
-                    return {
-                        ErrorCodes::OperationFailed,
-                        "Cannot build two identical indexes. Try again without duplicate indexes."};
+            if (!forRecovery) {
+                // We skip this step when initializing unfinished index builds during startup
+                // recovery as they are already in the index catalog.
+                StatusWith<BSONObj> statusWithInfo =
+                    collection->getIndexCatalog()->prepareSpecForCreate(
+                        opCtx, collection.get(), info, resumeInfo);
+                Status status = statusWithInfo.getStatus();
+                if (!status.isOK()) {
+                    // If we were given two identical indexes to build, we will run into an error
+                    // trying to set up the same index a second time in this for-loop. This is the
+                    // only way to encounter this error because callers filter out ready/in-progress
+                    // indexes and start the build while holding a lock throughout.
+                    if (status == ErrorCodes::IndexBuildAlreadyInProgress) {
+                        invariant(indexSpecs.size() > 1,
+                                  str::stream() << "Collection: " << collection->ns() << " ("
+                                                << _collectionUUID
+                                                << "), Index spec: " << indexSpecs.front());
+                        return {ErrorCodes::OperationFailed,
+                                "Cannot build two identical indexes. Try again without duplicate "
+                                "indexes."};
+                    }
+                    return status;
                 }
-                return status;
+                info = statusWithInfo.getValue();
             }
-            info = statusWithInfo.getValue();
             indexInfoObjs.push_back(info);
 
             boost::optional<TimeseriesOptions> options = collection->getTimeseriesOptions();
@@ -316,7 +321,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                                                     *stateInfo,
                                                     resumeInfo->getPhase());
             } else {
-                status = index.block->init(opCtx, collection.getWritableCollection(opCtx));
+                status =
+                    index.block->init(opCtx, collection.getWritableCollection(opCtx), forRecovery);
             }
             if (!status.isOK())
                 return status;
