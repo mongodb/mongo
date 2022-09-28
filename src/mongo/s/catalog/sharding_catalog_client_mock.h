@@ -145,6 +145,11 @@ public:
         const LogicalTime& newerThanThis,
         repl::ReadConcernLevel readConcernLevel) override;
 
+    std::vector<ShardId> getShardsThatOwnDataForCollAtClusterTime(
+        OperationContext* opCtx,
+        const NamespaceString& collName,
+        const Timestamp& clusterTime) override;
+
 private:
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,

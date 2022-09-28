@@ -166,6 +166,21 @@ public:
         const LogicalTime& newerThanThis,
         repl::ReadConcernLevel readConcernLevel) override;
 
+
+    /*
+        * Return all shards that used to own data for the collection at the given clusterTime.
+        * The result should be either:
+            1. The list of shards if the collection was sharded
+            2. A list 1 element containing only the primary shard if the collection was unsharded,
+        dropped or renamed.
+            3. An empty array if the collection and the database are not found
+        * In case at least one of the shard is no longer active, a SnapshotTooOld error is thrown.
+    */
+    std::vector<ShardId> getShardsThatOwnDataForCollAtClusterTime(
+        OperationContext* opCtx,
+        const NamespaceString& collName,
+        const Timestamp& clusterTime) override;
+
 private:
     /**
      * Updates a single document (if useMultiUpdate is false) or multiple documents (if

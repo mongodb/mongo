@@ -328,6 +328,14 @@ public:
                                          const WriteConcernOptions& writeConcern,
                                          boost::optional<BSONObj> hint = boost::none) = 0;
 
+    /**
+     * Returns the list of active shards that still contains the specified collection or that used
+     * to contain the specified collection at clusterTime >= input clusterTime based on
+     * placementHistory
+     */
+    virtual std::vector<ShardId> getShardsThatOwnDataForCollAtClusterTime(
+        OperationContext* opCtx, const NamespaceString& collName, const Timestamp& clusterTime) = 0;
+
 protected:
     ShardingCatalogClient() = default;
 

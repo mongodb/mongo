@@ -201,4 +201,9 @@ ShardingCatalogClientMock::_exhaustiveFindOnConfig(OperationContext* opCtx,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
+std::vector<ShardId> ShardingCatalogClientMock::getShardsThatOwnDataForCollAtClusterTime(
+    OperationContext* opCtx, const NamespaceString& collName, const Timestamp& clusterTime) {
+    uasserted(ErrorCodes::InternalError, "Method not implemented");
+}
+
 }  // namespace mongo
