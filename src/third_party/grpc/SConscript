@@ -30,18 +30,6 @@ if grpc_env.ToolchainIs('msvc'):
         ],
     )
 
-if grpc_env['TARGET_ARCH'] == 's390x':
-    # this is from __warn_memset_zero_len on older platforms
-    grpc_env.Append(
-        CCFLAGS=[
-            '-Wno-error',
-        ],
-        LINKFLAGS=[
-            '-Wl,--no-fatal-warnings',
-        ],
-    )
-
-
 grpc_root = grpc_env.Dir(".").srcnode()
 
 upb_env = grpc_env.Clone()
@@ -53,23 +41,22 @@ upb_env.Append(
     ],
 )
 
-upb_source = [
-    "dist/third_party/upb/upb/decode_fast.c",
-    "dist/third_party/upb/upb/decode.c",
-    "dist/third_party/upb/upb/def.c",
-    "dist/third_party/upb/upb/encode.c",
-    "dist/third_party/upb/upb/msg.c",
-    "dist/third_party/upb/upb/reflection.c",
-    "dist/third_party/upb/upb/table.c",
-    "dist/third_party/upb/upb/text_encode.c",
-    "dist/third_party/upb/upb/upb.c",
-    "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
-    "dist/src/core/ext/upbdefs-generated/google/protobuf/descriptor.upbdefs.c",
-]
-
 upb_env.Library(
     target='upb',
-    source=upb_source,
+    source=[
+        "dist/third_party/upb/upb/decode_fast.c",
+        "dist/third_party/upb/upb/decode.c",
+        "dist/third_party/upb/upb/def.c",
+        "dist/third_party/upb/upb/encode.c",
+        "dist/third_party/upb/upb/msg.c",
+        "dist/third_party/upb/upb/reflection.c",
+        "dist/third_party/upb/upb/table.c",
+        "dist/third_party/upb/upb/text_encode.c",
+        "dist/third_party/upb/upb/upb.c",
+        "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
+        "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
+        "dist/src/core/ext/upbdefs-generated/google/protobuf/descriptor.upbdefs.c",
+    ],
 )
 
 address_sorting_env = grpc_env.Clone()
@@ -79,15 +66,13 @@ address_sorting_env.Append(
     ],
 )
 
-address_sorting_source = [
-    "dist/third_party/address_sorting/address_sorting.c",
-    "dist/third_party/address_sorting/address_sorting_posix.c",
-    "dist/third_party/address_sorting/address_sorting_windows.c",
-]
-
 address_sorting_env.Library(
     target='address_sorting',
-    source=address_sorting_source,
+    source=[
+        "dist/third_party/address_sorting/address_sorting.c",
+        "dist/third_party/address_sorting/address_sorting_posix.c",
+        "dist/third_party/address_sorting/address_sorting_windows.c",
+    ],
 )
 
 grpc_env.Append(CPPPATH=[
@@ -130,7 +115,21 @@ grpc_env.Library(
     ],
 )
 
-grpc_env.Library(
+gpr_env = grpc_env.Clone()
+
+# older rhel7 platforms with older glibc give a warning `__warn_memset_zero_len` which
+# can not be selectively repressed, so we are disabling all warnings for this library.
+if grpc_env['TARGET_ARCH'] in ['x86_64', 's390x', 'ppc64le']:
+    grpc_env.Append(
+        CCFLAGS=[
+            '-Wno-error',
+        ],
+        LINKFLAGS=[
+            '-Wl,--no-fatal-warnings',
+        ],
+    )
+
+gpr_env.Library(
     target='gpr',
     source = [
         "dist/src/core/ext/upb-generated/google/api/annotations.upb.c",
