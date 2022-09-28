@@ -3057,7 +3057,12 @@ void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
-    updateSessionEntry(opCtx, updateRequest, _sessionId(), sessionTxnRecord.getTxnNum());
+    {
+        // Do not increase consumption metrics during updating session entry, as this
+        // will cause a tenant to be billed for reading or writing on session transactions table.
+        ResourceConsumption::PauseMetricsCollectorBlock pauseMetricsCollection(opCtx);
+        updateSessionEntry(opCtx, updateRequest, _sessionId(), sessionTxnRecord.getTxnNum());
+    }
     _registerUpdateCacheOnCommit(
         opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
 }
@@ -3074,7 +3079,12 @@ void TransactionParticipant::Participant::onRetryableWriteCloningCompleted(
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
-    updateSessionEntry(opCtx, updateRequest, _sessionId(), sessionTxnRecord.getTxnNum());
+    {
+        // Do not increase consumption metrics during updating session entry, as this
+        // will cause a tenant to be billed for reading or writing on session transactions table.
+        ResourceConsumption::PauseMetricsCollectorBlock pauseMetricsCollection(opCtx);
+        updateSessionEntry(opCtx, updateRequest, _sessionId(), sessionTxnRecord.getTxnNum());
+    }
     _registerUpdateCacheOnCommit(
         opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
 }
