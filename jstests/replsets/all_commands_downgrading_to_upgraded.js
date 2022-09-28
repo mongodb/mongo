@@ -659,7 +659,7 @@ const allCommands = {
         command: {getLog: "global"},
     },
     getMore: {
-        // TODO SERVER-67953: Uncomment/unskip the command and fix it so that it passes. Currently
+        // TODO SERVER-69753: Uncomment/unskip the command and fix it so that it passes. Currently
         // we need to be able to kill cursor ID in teardown in order for it to pass.
         skip: isNotImplementedYet,
         // setUp: function(conn) {
