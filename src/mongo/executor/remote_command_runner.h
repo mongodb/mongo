@@ -119,8 +119,8 @@ SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doRequest(
     return std::move(resFuture)
         .then([](detail::RemoteCommandInternalResponse r) {
             // TODO SERVER-67661: Make IDL reply types have string representation for logging
-            auto res =
-                CommandType::Reply::parse(IDLParserContext("RemoteCommandRunner"), r.response);
+            auto res = CommandType::Reply::parseSharingOwnership(
+                IDLParserContext("RemoteCommandRunner"), r.response);
 
             struct RemoteCommandRunnerResponse<typename CommandType::Reply> fullRes = {
                 res, r.targetUsed

@@ -28,6 +28,8 @@
  */
 
 #include "mongo/bson/oid.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_response.h"
@@ -142,6 +144,32 @@ TEST_F(RemoteCommandRunnerTestFixture, RemoteError) {
     // No write concern or write errors expected
     ASSERT_EQ(remoteError.getRemoteCommandWriteConcernError(), Status::OK());
     ASSERT_EQ(remoteError.getRemoteCommandFirstWriteError(), Status::OK());
+}
+
+TEST_F(RemoteCommandRunnerTestFixture, SuccessfulFind) {
+    std::unique_ptr<RemoteCommandHostTargeter> targeter =
+        std::make_unique<RemoteCommandLocalHostTargeter>();
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    NamespaceString nss(testDbName);
+
+    FindCommandRequest findCmd(nss);
+    auto resultFuture = doRequest(
+        findCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        // The BSON documents in this cursor response are created here.
+        // When the remote_command_runner parses the response, it participates
+        // in ownership of the underlying data, so it will participate in
+        // owning the data in the cursor response.
+        return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    CursorInitialReply res = std::move(resultFuture).get().response;
+
+    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], BSON("x" << 1));
 }
 
 /*

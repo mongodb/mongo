@@ -151,6 +151,7 @@ TEST_F(HedgedCommandRunnerTest, FindHedgeRequestTwoHosts) {
     ASSERT_EQ(counters.canceled, 1);
 
 
+    ASSERT_BSONOBJ_EQ(res.response.getCursor()->getFirstBatch()[0], BSON("x" << 1));
     ASSERT_EQ(res.response.getCursor()->getNs(), NamespaceString("testdb", "testcoll"));
 }
 
@@ -185,7 +186,7 @@ TEST_F(HedgedCommandRunnerTest, FindHedgeRequestThreeHosts) {
     ASSERT_EQ(counters.succeeded, 1);
     ASSERT_EQ(counters.canceled, 2);
 
-    // TODO SERVER-68767: ASSERT on actual BSONObj from getFirstBatch()
+    ASSERT_BSONOBJ_EQ(res.response.getCursor()->getFirstBatch()[0], BSON("x" << 1));
     ASSERT_EQ(res.response.getCursor()->getNs(), NamespaceString("testdb", "testcoll"));
 }
 
@@ -464,8 +465,9 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSkippableErrorNextSucceeds)
     ASSERT_EQ(counters.succeeded, 2);
     ASSERT_EQ(counters.canceled, 0);
 
-    ASSERT_EQ(resultFuture.get().response.getCursor()->getNs(),
-              NamespaceString("testdb", "testcoll"));
+    auto res = std::move(resultFuture).get().response;
+    ASSERT_EQ(res.getCursor()->getNs(), NamespaceString("testdb", "testcoll"));
+    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], BSON("x" << 1));
 }
 
 }  // namespace
