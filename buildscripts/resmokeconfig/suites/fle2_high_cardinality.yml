@@ -6,7 +6,7 @@ selector:
   exclude_with_any_tags:
   # Not compatible with tests the expect fle to always using $in in queries,
   # i.e. verify explain output
-  - requires_fle_in_always
+  - requires_fle2_in_always
 
 executor:
   archive:
