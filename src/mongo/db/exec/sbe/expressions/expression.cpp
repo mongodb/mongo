@@ -518,7 +518,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"tsSecond", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsSecond, false}},
     {"tsIncrement", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsIncrement, false}},
     {"typeMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::typeMatch, false}},
-};
+    {"dateTrunc",
+     BuiltinFn{[](size_t n) { return n == 5 || n == 6; }, vm::Builtin::dateTrunc, false}}};
 
 /**
  * The code generation function.

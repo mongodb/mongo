@@ -7552,9 +7552,7 @@ ExpressionDateTrunc::ExpressionDateTrunc(ExpressionContext* const expCtx,
       _unit{_children[1]},
       _binSize{_children[2]},
       _timeZone{_children[3]},
-      _startOfWeek{_children[4]} {
-    expCtx->sbeCompatible = false;
-}
+      _startOfWeek{_children[4]} {}
 
 boost::intrusive_ptr<Expression> ExpressionDateTrunc::parse(ExpressionContext* const expCtx,
                                                             BSONElement expr,

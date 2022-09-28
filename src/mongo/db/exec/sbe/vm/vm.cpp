@@ -2656,6 +2656,77 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateDiff(ArityTy
     return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateTrunc(ArityType arity) {
+    invariant(arity == 5 || arity == 6);  // 6th parameter is 'startOfWeek'.
+
+    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
+    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBValue);
+
+    // Get date.
+    auto [dateOwn, dateTag, dateValue] = getFromStack(1);
+    if (!coercibleToDate(dateTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto date = getDate(dateTag, dateValue);
+
+    // Get unit.
+    auto [unitOwn, unitTag, unitValue] = getFromStack(2);
+    if (!value::isString(unitTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto unitString = value::getStringView(unitTag, unitValue);
+    if (!isValidTimeUnit(unitString)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto unit = parseTimeUnit(unitString);
+
+    // Get binSize.
+    auto [binSizeOwn, binSizeTag, binSizeValue] = getFromStack(3);
+    if (!value::isNumber(binSizeTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto [binSizeLongOwn, binSizeLongTag, binSizeLongValue] =
+        genericNumConvert(binSizeTag, binSizeValue, value::TypeTags::NumberInt64);
+    if (binSizeLongTag == value::TypeTags::Nothing) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto binSize = value::bitcastTo<int64_t>(binSizeLongValue);
+    if (binSize <= 0) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    // Get timezone.
+    auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(4);
+    if (!isValidTimezone(timezoneTag, timezoneValue, timezoneDB)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
+
+    // Get startOfWeek, if 'startOfWeek' parameter was passed and time unit is the week.
+    DayOfWeek startOfWeek{kStartOfWeekDefault};
+    if (6 == arity) {
+        auto [startOfWeekOwn, startOfWeekTag, startOfWeekValue] = getFromStack(5);
+        if (!value::isString(startOfWeekTag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        if (TimeUnit::week == unit) {
+            auto startOfWeekString = value::getStringView(startOfWeekTag, startOfWeekValue);
+            if (!isValidDayOfWeek(startOfWeekString)) {
+                return {false, value::TypeTags::Nothing, 0};
+            }
+            startOfWeek = parseDayOfWeek(startOfWeekString);
+        }
+    }
+
+    auto truncatedDate = truncateDate(date, unit, binSize, timezone, startOfWeek);
+    return {false,
+            value::TypeTags::Date,
+            value::bitcastFrom<int64_t>(truncatedDate.toMillisSinceEpoch())};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateWeekYear(ArityType arity) {
     auto timeZoneDBTuple = getFromStack(0);
     auto yearTuple = getFromStack(1);
@@ -4634,6 +4705,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinTsIncrement(arity);
         case Builtin::typeMatch:
             return builtinTypeMatch(arity);
+        case Builtin::dateTrunc:
+            return builtinDateTrunc(arity);
     }
 
     MONGO_UNREACHABLE;

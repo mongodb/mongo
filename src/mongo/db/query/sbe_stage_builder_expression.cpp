@@ -1748,8 +1748,140 @@ public:
     void visit(const ExpressionDateToString* expr) final {
         unsupportedExpression("$dateFromString");
     }
-    void visit(const ExpressionDateTrunc*) final {
-        unsupportedExpression("$dateTrunc");
+    void visit(const ExpressionDateTrunc* expr) final {
+        auto frameId = _context->state.frameId();
+        sbe::EExpression::Vector arguments;
+        sbe::EExpression::Vector bindings;
+        sbe::EVariable dateRef(frameId, 0);
+        sbe::EVariable unitRef(frameId, 1);
+        sbe::EVariable binSizeRef(frameId, 2);
+        sbe::EVariable timezoneRef(frameId, 3);
+        sbe::EVariable startOfWeekRef(frameId, 4);
+
+        // An auxiliary boolean variable to hold a value of a common subexpression 'unit'=="week"
+        // (string).
+        sbe::EVariable unitIsWeekRef(frameId, 5);
+
+        auto children = expr->getChildren();
+        invariant(children.size() == 5);
+        _context->ensureArity(2 + (expr->isBinSizeSpecified() ? 1 : 0) +
+                              (expr->isTimezoneSpecified() ? 1 : 0) +
+                              (expr->isStartOfWeekSpecified() ? 1 : 0));
+
+        // Get child expressions.
+        auto startOfWeekExpression = expr->isStartOfWeekSpecified() ? _context->popExpr() : nullptr;
+        auto timezoneExpression =
+            expr->isTimezoneSpecified() ? _context->popExpr() : makeConstant("UTC"_sd);
+        auto binSizeExpression = expr->isBinSizeSpecified()
+            ? _context->popExpr()
+            : makeConstant(sbe::value::TypeTags::NumberInt64, 1);
+        auto unitExpression = _context->popExpr();
+        auto dateExpression = _context->popExpr();
+
+        auto timezoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+
+        // Set parameters for an invocation of built-in "dateTrunc" function.
+        arguments.push_back(makeVariable(timezoneDBSlot));
+        arguments.push_back(dateRef.clone());
+        arguments.push_back(unitRef.clone());
+        arguments.push_back(binSizeRef.clone());
+        arguments.push_back(timezoneRef.clone());
+        if (expr->isStartOfWeekSpecified()) {
+            // Parameter "startOfWeek" - if the time unit is the week, then pass value of parameter
+            // "startOfWeek" of "$dateTrunc" expression, otherwise pass a valid default value, since
+            // "dateTrunc" built-in function does not accept non-string type values for this
+            // parameter.
+            arguments.push_back(sbe::makeE<sbe::EIf>(
+                unitIsWeekRef.clone(), startOfWeekRef.clone(), makeConstant("sun"_sd)));
+        }
+
+        // Set bindings for the frame.
+        bindings.push_back(std::move(dateExpression));
+        bindings.push_back(std::move(unitExpression));
+        bindings.push_back(std::move(binSizeExpression));
+        bindings.push_back(std::move(timezoneExpression));
+        if (expr->isStartOfWeekSpecified()) {
+            bindings.push_back(std::move(startOfWeekExpression));
+            bindings.push_back(generateIsEqualToStringCheck(unitRef, "week"_sd));
+        }
+
+        // Create an expression to invoke built-in "dateTrunc" function.
+        auto dateTruncFunctionCall =
+            sbe::makeE<sbe::EFunction>("dateTrunc"_sd, std::move(arguments));
+
+        // Create expressions to check that each argument to "dateTrunc" function exists, is not
+        // null, and is of the correct type.
+        std::vector<CaseValuePair> inputValidationCases;
+
+        // Return null if any of the parameters is either null or missing.
+        inputValidationCases.push_back(generateReturnNullIfNullOrMissing(dateRef));
+        inputValidationCases.push_back(generateReturnNullIfNullOrMissing(unitRef));
+        inputValidationCases.push_back(generateReturnNullIfNullOrMissing(binSizeRef));
+        inputValidationCases.push_back(generateReturnNullIfNullOrMissing(timezoneRef));
+        if (expr->isStartOfWeekSpecified()) {
+            inputValidationCases.emplace_back(makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                                                           unitIsWeekRef.clone(),
+                                                           generateNullOrMissing(startOfWeekRef)),
+                                              makeConstant(sbe::value::TypeTags::Null, 0));
+        }
+
+        // "timezone" parameter validation.
+        inputValidationCases.emplace_back(
+            generateNonStringCheck(timezoneRef),
+            makeFail(5439100, "$dateTrunc parameter 'timezone' must be a string"));
+        inputValidationCases.emplace_back(
+            makeNot(makeFunction("isTimezone", makeVariable(timezoneDBSlot), timezoneRef.clone())),
+            makeFail(5439101, "$dateTrunc parameter 'timezone' must be a valid timezone"));
+
+        // "date" parameter validation.
+        inputValidationCases.emplace_back(generateFailIfNotCoercibleToDate(
+            dateRef, ErrorCodes::Error{5439102}, "$dateTrunc"_sd, "date"_sd));
+
+        // "unit" parameter validation.
+        inputValidationCases.emplace_back(
+            generateNonStringCheck(unitRef),
+            makeFail(5439103, "$dateTrunc parameter 'unit' must be a string"));
+        inputValidationCases.emplace_back(
+            makeNot(makeFunction("isTimeUnit", unitRef.clone())),
+            makeFail(5439104, "$dateTrunc parameter 'unit' must be a valid time unit"));
+
+        // "binSize" parameter validation.
+        if (expr->isBinSizeSpecified()) {
+            inputValidationCases.emplace_back(
+                makeNot(makeBinaryOp(
+                    sbe::EPrimBinary::logicAnd,
+                    makeBinaryOp(
+                        sbe::EPrimBinary::logicAnd,
+                        makeFunction("isNumber", binSizeRef.clone()),
+                        makeFunction("exists",
+                                     sbe::makeE<sbe::ENumericConvert>(
+                                         binSizeRef.clone(), sbe::value::TypeTags::NumberInt64))),
+                    generatePositiveCheck(binSizeRef))),
+                makeFail(5439105,
+                         "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
+                         "integer"));
+        }
+
+        // "startOfWeek" parameter validation.
+        if (expr->isStartOfWeekSpecified()) {
+            // If 'timeUnit' value is equal to "week" then validate "startOfWeek" parameter.
+            inputValidationCases.emplace_back(
+                makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                             unitIsWeekRef.clone(),
+                             generateNonStringCheck(startOfWeekRef)),
+                makeFail(5439106, "$dateTrunc parameter 'startOfWeek' must be a string"));
+            inputValidationCases.emplace_back(
+                makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                             unitIsWeekRef.clone(),
+                             makeNot(makeFunction("isDayOfWeek", startOfWeekRef.clone()))),
+                makeFail(5439107,
+                         "$dateTrunc parameter 'startOfWeek' must be a valid day of the week"));
+        }
+
+        auto dateTruncExpression = buildMultiBranchConditionalFromCaseValuePairs(
+            std::move(inputValidationCases), std::move(dateTruncFunctionCall));
+        _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
+            frameId, std::move(bindings), std::move(dateTruncExpression)));
     }
     void visit(const ExpressionDivide* expr) final {
         _context->ensureArity(2);

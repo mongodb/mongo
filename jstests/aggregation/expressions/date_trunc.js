@@ -249,9 +249,11 @@ const testCases = [
         expectedResults: [{date_trunc: null}],
     },
     {
-        // Missing 'timezone' value in the document, invalid other fields.
+        // Missing 'timezone' value in the document, invalid other fields. Result could be a null
+        // answer or an error code depending whether pipeline is optimized.
         pipeline: aggregationPipelineWithDateTrunc,
         inputDocuments: [{date: 1, unit: "century", binSize: "1"}],
+        expectedResults: [{date_trunc: null}],
         expectedErrorCode: [ErrorCodes.FailedToParse, 5439017],
     },
     {

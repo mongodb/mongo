@@ -615,6 +615,7 @@ enum class Builtin : uint8_t {
     tsSecond,
     tsIncrement,
     typeMatch,
+    dateTrunc,
 };
 
 /**
@@ -1168,6 +1169,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTsIncrement(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTypeMatch(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinDateTrunc(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 
