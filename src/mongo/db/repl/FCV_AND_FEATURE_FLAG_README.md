@@ -261,7 +261,7 @@ Additionally, any project or ticket that wants to introduce different behavior b
 the server is running ***must*** add a feature flag. In the past, the branching of the different
 behavior would be done by directly checking which FCV the server was running. However, we now must 
 ***not*** be using any references to FCV constants such as kVersion_6_0. Instead we should branch 
-the different behavior using feature flags (see #feature-flag-gating).
+the different behavior using feature flags (see [Feature Flag Gating](#feature-flag-gating)).
 ***This means that individual ticket that wants to introduce an FCV check will also need to create a 
 feature flag specific to that ticket.***
 
