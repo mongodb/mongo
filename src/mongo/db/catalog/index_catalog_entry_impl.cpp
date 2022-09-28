@@ -181,6 +181,10 @@ void IndexCatalogEntryImpl::setIsReady(bool newIsReady) {
     _isReady = newIsReady;
 }
 
+void IndexCatalogEntryImpl::setIsFrozen(bool newIsFrozen) {
+    _isFrozen = newIsFrozen;
+}
+
 void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
                                         const CollectionPtr& collection,
                                         const KeyStringSet& multikeyMetadataKeys,

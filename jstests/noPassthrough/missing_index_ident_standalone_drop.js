@@ -24,6 +24,12 @@ IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
 assert.commandWorked(standalone.getDB('test')[jsTestName()].dropIndex('a_1'));
 IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
 
+// Completing drop for index table immediately.
+checkLog.containsJson(standalone, 6361201, {
+    index: 'a_1',
+    namespace: coll.getFullName(),
+});
+
 MongoRunner.stopMongod(standalone);
 replTest.start(0, undefined, true /* restart */);
 IndexBuildTest.assertIndexes(replTest.getPrimary().getDB('test')[jsTestName()], 1, ['_id_']);

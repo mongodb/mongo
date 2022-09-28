@@ -97,10 +97,13 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
                     _opCtx.get(), collWriter.get(), secondaryIndexSpecs);
                 if (specs.size()) {
                     _secondaryIndexesBlock->ignoreUniqueConstraint();
-                    auto status =
-                        _secondaryIndexesBlock
-                            ->init(_opCtx.get(), collWriter, specs, MultiIndexBlock::kNoopOnInitFn)
-                            .getStatus();
+                    auto status = _secondaryIndexesBlock
+                                      ->init(_opCtx.get(),
+                                             collWriter,
+                                             specs,
+                                             MultiIndexBlock::kNoopOnInitFn,
+                                             /*forRecovery=*/false)
+                                      .getStatus();
                     if (!status.isOK()) {
                         return status;
                     }

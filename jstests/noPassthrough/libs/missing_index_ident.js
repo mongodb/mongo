@@ -76,8 +76,8 @@ const MissingIndexIdent = class {
         });
 
         // Since the index build was not yet completed at the recovery timestamp, its ident will
-        // be dropped.
-        checkLog.containsJson(conn, 6361201, {
+        // be reset.
+        checkLog.containsJson(conn, 6987700, {
             index: 'a_1',
             namespace: coll.getFullName(),
             ident: ident,
