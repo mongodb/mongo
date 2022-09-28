@@ -21,6 +21,9 @@ load("jstests/libs/change_stream_util.js");
 const adminDB = db.getSiblingDB("admin");
 const cst = new ChangeStreamTest(adminDB);
 
+// Make sure database does not exist. Otherwise burn-in may fail in passthrough.
+db.getSiblingDB(jsTestName()).dropDatabase();
+
 function runTest() {
     let cursor = cst.startWatchingAllChangesForCluster();
     const globalIndexUUID = UUID();
