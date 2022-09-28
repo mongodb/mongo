@@ -878,7 +878,7 @@ boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocumentLoca
     const Document& documentKey) {
     AutoGetCollectionForRead autoColl(expCtx->opCtx, nss);
     BSONObj document;
-    if (!Helpers::findById(expCtx->opCtx, nss.ns(), documentKey.toBson(), document)) {
+    if (!Helpers::findById(expCtx->opCtx, nss, documentKey.toBson(), document)) {
         return boost::none;
     }
     return Document(document).getOwned();

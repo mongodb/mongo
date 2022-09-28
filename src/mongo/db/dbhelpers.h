@@ -87,9 +87,8 @@ struct Helpers {
      *
      * Returns true if a matching document was found.
      */
-    // TODO SERVER-69541 pass in NamespaceString object instead
     static bool findById(OperationContext* opCtx,
-                         StringData ns,
+                         const NamespaceString& nss,
                          BSONObj query,
                          BSONObj& result,
                          bool* nsFound = nullptr,

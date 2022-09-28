@@ -773,7 +773,6 @@ Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
         updateList.splice(updateList.cbegin(), _reload);
     }
 
-    StringData ns = nss().ns().c_str();
     BSONArrayBuilder arrDel(builder->subarrayStart("deleted"));
     auto noopFn = [](BSONObj idDoc, BSONObj* fullDoc) {
         *fullDoc = idDoc;
@@ -784,8 +783,8 @@ Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
 
     if (deleteList.empty()) {
         BSONArrayBuilder arrUpd(builder->subarrayStart("reload"));
-        auto findByIdWrapper = [opCtx, ns](BSONObj idDoc, BSONObj* fullDoc) {
-            return Helpers::findById(opCtx, ns, idDoc, *fullDoc);
+        auto findByIdWrapper = [opCtx, this](BSONObj idDoc, BSONObj* fullDoc) {
+            return Helpers::findById(opCtx, this->nss(), idDoc, *fullDoc);
         };
         totalDocSize = xferMods(&arrUpd, &updateList, totalDocSize, findByIdWrapper);
         arrUpd.done();

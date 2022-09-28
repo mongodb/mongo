@@ -1628,11 +1628,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     invariant(op.getObject2());
                     auto&& documentId = *op.getObject2();
 
-                    // TODO SERVER-69541 pass in NamespaceString object instead
-                    auto documentFound = Helpers::findById(opCtx,
-                                                           collection->ns().toStringWithTenantId(),
-                                                           documentId,
-                                                           changeStreamPreImage);
+                    auto documentFound = Helpers::findById(
+                        opCtx, collection->ns(), documentId, changeStreamPreImage);
                     invariant(documentFound);
                 }
 

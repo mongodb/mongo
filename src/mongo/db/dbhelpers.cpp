@@ -138,13 +138,12 @@ RecordId Helpers::findOne(OperationContext* opCtx,
 }
 
 bool Helpers::findById(OperationContext* opCtx,
-                       StringData ns,
+                       const NamespaceString& nss,
                        BSONObj query,
                        BSONObj& result,
                        bool* nsFound,
                        bool* indexFound) {
     // TODO ForRead?
-    NamespaceString nss{ns};
     CollectionPtr collection =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     if (!collection) {

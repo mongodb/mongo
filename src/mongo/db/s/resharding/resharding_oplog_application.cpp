@@ -554,7 +554,7 @@ BSONObj ReshardingOplogApplicationRules::_queryStashCollById(OperationContext* o
             indexCatalog->haveIdIndex(opCtx));
 
     BSONObj result;
-    Helpers::findById(opCtx, _myStashNss.ns(), idQuery, result);
+    Helpers::findById(opCtx, _myStashNss, idQuery, result);
     return result;
 }
 }  // namespace mongo
