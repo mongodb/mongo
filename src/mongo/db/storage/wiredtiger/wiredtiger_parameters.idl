@@ -164,3 +164,11 @@ server_parameters:
       cpp_vartype: 'bool'
       cpp_varname: gWiredTigerSkipTableLoggingChecksOnStartup
       default: false
+
+    wiredTigerPrefixSearchForUniqueIndexes:
+      description: >-
+        Uses the prefix_search feature when checking for duplicate keys on unique indexes
+      set_at: [ startup, runtime ]
+      cpp_vartype: 'AtomicWord<bool>'
+      cpp_varname: gWiredTigerPrefixSearchForUniqueIndexes
+      default: true
