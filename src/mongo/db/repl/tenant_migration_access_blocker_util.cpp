@@ -64,12 +64,6 @@ namespace tenant_migration_access_blocker {
 
 namespace {
 using MtabType = TenantMigrationAccessBlocker::BlockerType;
-
-constexpr char kThreadNamePrefix[] = "TenantMigrationWorker-";
-constexpr char kPoolName[] = "TenantMigrationWorkerThreadPool";
-constexpr char kNetName[] = "TenantMigrationWorkerNetwork";
-
-const auto donorStateDocToDeleteDecoration = OperationContext::declareDecoration<BSONObj>();
 }  // namespace
 
 std::shared_ptr<TenantMigrationDonorAccessBlocker> getTenantMigrationDonorAccessBlocker(
@@ -176,7 +170,7 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
     // migration) is garbage collected.
     auto dbName = request.getDatabase();
     auto& blockerRegistry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
-    auto mtabPair = blockerRegistry.getTenantMigrationAccessBlockerForDbName(dbName);
+    auto mtabPair = blockerRegistry.getAccessBlockersForDbName(dbName);
 
     if (!mtabPair) {
         return Status::OK();
@@ -186,8 +180,8 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
     CancellationSource cancelTimeoutSource;
     // Source to cancel waiting on the 'canReadFutures'.
     CancellationSource cancelCanReadSource(opCtx->getCancellationToken());
-    const auto donorMtab = mtabPair->getAccessBlocker(MtabType::kDonor);
-    const auto recipientMtab = mtabPair->getAccessBlocker(MtabType::kRecipient);
+    const auto donorMtab = mtabPair->getDonorAccessBlocker();
+    const auto recipientMtab = mtabPair->getRecipientAccessBlocker();
     // A vector of futures where the donor access blocker's 'getCanReadFuture' will always precede
     // the recipient's.
     std::vector<ExecutorFuture<void>> futures;
@@ -324,7 +318,7 @@ bool hasActiveTenantMigration(OperationContext* opCtx, StringData dbName) {
     }
 
     return bool(TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .getTenantMigrationAccessBlockerForDbName(dbName));
+                    .getAccessBlockersForDbName(dbName));
 }
 
 void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
@@ -353,7 +347,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         if (protocol == MigrationProtocolEnum::kMultitenantMigrations) {
             registry.add(doc.getTenantId(), mtab);
         } else {
-            registry.addShardMergeDonorAccessBlocker(mtab);
+            registry.add(mtab);
         }
 
         switch (doc.getState()) {

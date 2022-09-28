@@ -47,7 +47,12 @@ public:
         DonorRecipientAccessBlockerPair(
             std::shared_ptr<TenantMigrationDonorAccessBlocker> donor,
             std::shared_ptr<TenantMigrationRecipientAccessBlocker> recipient)
-            : _donor(donor), _recipient(recipient) {}
+            : _donor(std::move(donor)), _recipient(std::move(recipient)) {}
+        DonorRecipientAccessBlockerPair(std::shared_ptr<TenantMigrationDonorAccessBlocker> donor)
+            : _donor(std::move(donor)) {}
+        DonorRecipientAccessBlockerPair(
+            std::shared_ptr<TenantMigrationRecipientAccessBlocker> recipient)
+            : _recipient(std::move(recipient)) {}
 
         std::shared_ptr<TenantMigrationAccessBlocker> getAccessBlocker(
             TenantMigrationAccessBlocker::BlockerType type) const {
@@ -57,14 +62,23 @@ public:
             return _recipient;
         }
 
+        std::shared_ptr<TenantMigrationDonorAccessBlocker> getDonorAccessBlocker() const {
+            return _donor;
+        }
+
+        std::shared_ptr<TenantMigrationRecipientAccessBlocker> getRecipientAccessBlocker() const {
+            return _recipient;
+        }
+
         void setAccessBlocker(std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
             invariant(mtab);
             if (mtab->getType() == TenantMigrationAccessBlocker::BlockerType::kDonor) {
                 invariant(!_donor);
-                _donor = mtab;
+                _donor = checked_pointer_cast<TenantMigrationDonorAccessBlocker>(std::move(mtab));
             } else {
                 invariant(!_recipient);
-                _recipient = mtab;
+                _recipient =
+                    checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(std::move(mtab));
             }
         }
 
@@ -73,7 +87,7 @@ public:
                 if (!_donor) {
                     return;
                 }
-                checked_pointer_cast<TenantMigrationDonorAccessBlocker>(_donor)->interrupt();
+                _donor->interrupt();
                 _donor.reset();
             } else {
                 if (!_recipient) {
@@ -84,35 +98,28 @@ public:
         }
 
     private:
-        std::shared_ptr<TenantMigrationAccessBlocker> _donor;
-        std::shared_ptr<TenantMigrationAccessBlocker> _recipient;
+        std::shared_ptr<TenantMigrationDonorAccessBlocker> _donor;
+        std::shared_ptr<TenantMigrationRecipientAccessBlocker> _recipient;
     };
     TenantMigrationAccessBlockerRegistry() = default;
 
     static const ServiceContext::Decoration<TenantMigrationAccessBlockerRegistry> get;
 
     /**
-     * Adds an entry for (tenantId, mtab). There must be no blocker of the same type (donor or
-     * recipient) for this tenantId already.
+     * Adds an entry for mtab with the provided tenantId as the key. There must not be
+     * a blocker of the same type (donor or recipient) for this tenantId already.
      */
     void add(StringData tenantId, std::shared_ptr<TenantMigrationAccessBlocker> mtab);
 
     /**
-     * Adds donor access blocker, throws ConflictingOperationInProgress if one exists. The blocker
-     * protocol must be MigrationProtocolEnum::kShardMerge.
+     * Adds an entry for mtab that will block all tenants.
      */
-    void addShardMergeDonorAccessBlocker(std::shared_ptr<TenantMigrationDonorAccessBlocker> mtab);
+    void add(std::shared_ptr<TenantMigrationAccessBlocker> mtab);
 
     /**
      * Removes the entry for (tenantId, mtab)
      */
     void remove(StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
-
-    /**
-     * Removes the donor access blocker, if any. Assumes migrationId refers to a migration with
-     * protocol MigrationProtocolEnum::kShardMerge.
-     */
-    void removeShardMergeDonorAccessBlocker(const UUID& migrationId);
 
     /**
      * Remove all access blockers of the provided type for a migration.
@@ -126,12 +133,10 @@ public:
     void removeAll(TenantMigrationAccessBlocker::BlockerType type);
 
     /**
-     * Iterates through each of the TenantMigrationAccessBlockers and
-     * returns the first 'DonorRecipientAccessBlockerPair' it finds whose tenantId is a prefix for
-     * dbName.
+     * Returns the first 'DonorRecipientAccessBlockerPair' it finds whose 'tenantId' is a prefix for
+     * 'dbName'.
      */
-    boost::optional<DonorRecipientAccessBlockerPair> getTenantMigrationAccessBlockerForDbName(
-        StringData dbName);
+    boost::optional<DonorRecipientAccessBlockerPair> getAccessBlockersForDbName(StringData dbName);
 
     /**
      * Iterates through each of the TenantMigrationAccessBlockers and
@@ -180,21 +185,18 @@ public:
     std::shared_ptr<executor::TaskExecutor> getAsyncBlockingOperationsExecutor();
 
 private:
-    boost::optional<DonorRecipientAccessBlockerPair> _getTenantMigrationAccessBlockersForDbName(
-        StringData dbName, WithLock);
-
-    bool _hasDonorAccessBlocker(WithLock, StringData dbName);
-
     void _remove(WithLock, StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
 
-    std::shared_ptr<TenantMigrationDonorAccessBlocker> _donorAccessBlocker;
+    std::shared_ptr<TenantMigrationDonorAccessBlocker> _getAllTenantDonorAccessBlocker(
+        WithLock) const;
 
-    using TenantMigrationAccessBlockersMap = StringMap<DonorRecipientAccessBlockerPair>;
+    std::shared_ptr<TenantMigrationDonorAccessBlocker> _getAllTenantDonorAccessBlocker(
+        WithLock, StringData dbName) const;
 
     std::shared_ptr<executor::TaskExecutor> _asyncBlockingOperationsExecutor;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerRegistry::_mutex");
-    TenantMigrationAccessBlockersMap _tenantMigrationAccessBlockers;
+    StringMap<DonorRecipientAccessBlockerPair> _tenantMigrationAccessBlockers;
 };
 
 }  // namespace mongo

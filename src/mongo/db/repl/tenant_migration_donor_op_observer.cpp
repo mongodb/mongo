@@ -76,15 +76,15 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
                 "Bad protocol",
                 donorStateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge);
 
-        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-            .addShardMergeDonorAccessBlocker(mtab);
+        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(mtab);
 
         if (opCtx->writesAreReplicated()) {
             // onRollback is not registered on secondaries since secondaries should not fail to
             // apply the write.
             opCtx->recoveryUnit()->onRollback([opCtx, donorStateDoc] {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .removeShardMergeDonorAccessBlocker(donorStateDoc.getId());
+                    .removeAccessBlockersForMigration(
+                        donorStateDoc.getId(), TenantMigrationAccessBlocker::BlockerType::kDonor);
             });
         }
     }
@@ -195,7 +195,9 @@ public:
                             "Bad protocol",
                             _donorStateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge);
                     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                        .removeShardMergeDonorAccessBlocker(_donorStateDoc.getId());
+                        .removeAccessBlockersForMigration(
+                            _donorStateDoc.getId(),
+                            TenantMigrationAccessBlocker::BlockerType::kDonor);
                 }
             }
             return;
