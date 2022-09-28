@@ -6,7 +6,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - rhel81-power8-small
+  - enterprise-rhel-71-ppc64le
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
