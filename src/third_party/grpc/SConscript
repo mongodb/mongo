@@ -54,7 +54,6 @@ upb_env.Library(
         "dist/third_party/upb/upb/text_encode.c",
         "dist/third_party/upb/upb/upb.c",
         "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
-        "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
         "dist/src/core/ext/upbdefs-generated/google/protobuf/descriptor.upbdefs.c",
     ],
 )
@@ -119,8 +118,8 @@ gpr_env = grpc_env.Clone()
 
 # older rhel7 platforms with older glibc give a warning `__warn_memset_zero_len` which
 # can not be selectively repressed, so we are disabling all warnings for this library.
-if grpc_env['TARGET_ARCH'] in ['x86_64', 's390x', 'ppc64le']:
-    grpc_env.Append(
+if gpr_env['TARGET_ARCH'] in ['x86_64', 's390x', 'ppc64le']:
+    gpr_env.Append(
         CCFLAGS=[
             '-Wno-error',
         ],

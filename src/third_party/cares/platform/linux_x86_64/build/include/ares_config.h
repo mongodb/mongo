@@ -276,7 +276,7 @@
 /* #undef HAVE_STRNICMP */
 
 /* Define to 1 if you have the <stropts.h> header file. */
-#define HAVE_STROPTS_H 1
+/* #undef HAVE_STROPTS_H */
 
 /* Define to 1 if you have struct addrinfo. */
 #define HAVE_STRUCT_ADDRINFO 1
@@ -341,7 +341,8 @@
 /* Define if __system_property_get exists. */
 /* #undef HAVE___SYSTEM_PROPERTY_GET */
 
-/* Define to the sub-directory where libtool stores uninstalled libraries. */
+/* Define to the sub-directory in which libtool stores uninstalled libraries.
+   */
 #define LT_OBJDIR ".libs/"
 
 /* Define to 1 if you need the malloc.h header file even with stdlib.h */
@@ -356,8 +357,11 @@
 /* Define to 1 if _THREAD_SAFE preprocessor symbol must be defined. */
 /* #undef NEED_THREAD_SAFE */
 
+/* Define to 1 if your C compiler doesn't accept -c and -o together. */
+/* #undef NO_MINUS_C_MINUS_O */
+
 /* cpu-machine-OS */
-#define OS "x86_64-pc-linux-gnu"
+#define OS "x86_64-unknown-linux-gnu"
 
 /* Name of package */
 #define PACKAGE "c-ares"
