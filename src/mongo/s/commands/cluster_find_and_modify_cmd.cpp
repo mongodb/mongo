@@ -326,6 +326,10 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kWrite;
+    }
+
     bool adminOnly() const override {
         return false;
     }

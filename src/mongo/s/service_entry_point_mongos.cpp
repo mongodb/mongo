@@ -45,6 +45,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
 #include "mongo/rpc/message.h"
@@ -164,9 +165,18 @@ Future<DbResponse> HandleRequest::handleRequest() {
 
 void HandleRequest::onSuccess(const DbResponse& dbResponse) {
     auto opCtx = rec->getOpCtx();
+    const auto currentOp = CurOp::get(opCtx);
+
     // Mark the op as complete, populate the response length, and log it if appropriate.
-    CurOp::get(opCtx)->completeAndLogOperation(
+    currentOp->completeAndLogOperation(
         opCtx, logv2::LogComponent::kCommand, dbResponse.response.size(), slowMsOverride);
+
+    // Update the source of stats shown in the db.serverStatus().opLatencies section.
+    Top::get(opCtx->getServiceContext())
+        .incrementGlobalLatencyStats(
+            opCtx,
+            durationCount<Microseconds>(currentOp->elapsedTimeExcludingPauses()),
+            currentOp->getReadWriteType());
 }
 
 Future<DbResponse> HandleRequest::run() {

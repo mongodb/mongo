@@ -89,6 +89,10 @@ public:
     bool allowedInTransactions() const final {
         return true;
     }
+
+    ReadWriteType getReadWriteType() const final {
+        return Command::ReadWriteType::kWrite;
+    }
 };
 
 MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ClusterWriteWithoutShardKeyCmd,

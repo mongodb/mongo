@@ -69,6 +69,10 @@ public:
         return false;
     }
 
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kRead;
+    }
+
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }

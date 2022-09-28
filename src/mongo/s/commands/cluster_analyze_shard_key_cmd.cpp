@@ -159,6 +159,10 @@ public:
         return true;
     }
 
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kWrite;
+    }
+
     std::string help() const override {
         return "Returns metrics for evaluating a shard key for a collection.";
     }

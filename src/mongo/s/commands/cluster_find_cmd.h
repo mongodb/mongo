@@ -83,6 +83,10 @@ public:
         return false;
     }
 
+    ReadWriteType getReadWriteType() const final {
+        return ReadWriteType::kRead;
+    }
+
     bool shouldAffectCommandCounter() const final {
         return false;
     }

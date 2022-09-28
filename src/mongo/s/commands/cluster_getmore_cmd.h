@@ -141,6 +141,10 @@ public:
         return false;
     }
 
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kRead;
+    }
+
     std::string help() const override {
         return "retrieve more documents for a cursor id";
     }

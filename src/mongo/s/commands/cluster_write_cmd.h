@@ -58,6 +58,10 @@ public:
         return true;
     }
 
+    ReadWriteType getReadWriteType() const final {
+        return Command::ReadWriteType::kWrite;
+    }
+
 protected:
     class InvocationBase;
 
