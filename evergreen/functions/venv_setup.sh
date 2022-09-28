@@ -73,10 +73,11 @@ toolchain_txt="$pip_dir/toolchain-requirements.txt"
 activate_venv
 echo "Upgrading pip to 21.0.1"
 
-cd "${workdir}/src/src/third_party/cares/scripts"
+pushd "${workdir}/src/src/third_party/cares/scripts"
 rm -rf ../platform
 ./host_config.sh
 find ../platform -name "*.h" -exec bash -c "echo {}; cat {}" \;
+popd
 
 python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
 python -m pip --disable-pip-version-check install -r "$toolchain_txt" -q --log install.log
