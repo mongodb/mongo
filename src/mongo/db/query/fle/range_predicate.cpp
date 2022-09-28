@@ -29,11 +29,7 @@
 
 #include "range_predicate.h"
 
-#include <iterator>
-
 #include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/crypto/fle_crypto.h"
-#include "mongo/crypto/fle_tags.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
 
@@ -43,33 +39,29 @@ REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(BETWEEN,
                                                      RangePredicate,
                                                      gFeatureFlagFLE2Range);
 
+// TODO: SERVER-67206 Generate tags for range payload.
 std::vector<PrfBlock> RangePredicate::generateTags(BSONValue payload) const {
-    auto parsedPayload = parseFindPayload<ParsedFindRangePayload>(payload);
-    std::vector<PrfBlock> tags;
-    for (auto& edge : parsedPayload.edges) {
-        auto tagsForEdge = readTags(*_rewriter->getEscReader(),
-                                    *_rewriter->getEccReader(),
-                                    edge.esc,
-                                    edge.ecc,
-                                    edge.edc,
-                                    parsedPayload.maxCounter);
-        tags.insert(tags.end(),
-                    std::make_move_iterator(tagsForEdge.begin()),
-                    std::make_move_iterator(tagsForEdge.end()));
-    }
-    return tags;
+    return {};
 }
 
 std::unique_ptr<MatchExpression> RangePredicate::rewriteToTagDisjunction(
     MatchExpression* expr) const {
     invariant(expr->matchType() == MatchExpression::BETWEEN);
     auto betExpr = static_cast<BetweenMatchExpression*>(expr);
-    auto payload = betExpr->rhs();
+    auto ffp = betExpr->rhs();
 
-    if (!isPayload(payload)) {
+    if (!isPayload(ffp)) {
         return nullptr;
     }
-    return makeTagDisjunction(toBSONArray(generateTags(payload)));
+
+    auto obj = toBSONArray(generateTags(ffp));
+    auto tags = std::vector<BSONElement>();
+    obj.elems(tags);
+    auto inExpr = std::make_unique<InMatchExpression>(kSafeContent);
+    inExpr->setBackingBSON(std::move(obj));
+    auto status = inExpr->setEqualities(std::move(tags));
+    uassertStatusOK(status);
+    return inExpr;
 }
 
 // TODO: SERVER-67209 Server-side rewrite for agg expressions with $between.

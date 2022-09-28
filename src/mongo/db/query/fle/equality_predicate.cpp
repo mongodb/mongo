@@ -29,7 +29,6 @@
 
 #include "equality_predicate.h"
 
-#include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tags.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -64,7 +63,16 @@ std::unique_ptr<MatchExpression> EqualityPredicate::rewriteToTagDisjunction(
             if (!isPayload(payload)) {
                 return nullptr;
             }
-            return makeTagDisjunction(toBSONArray(generateTags(payload)));
+            auto obj = toBSONArray(generateTags(payload));
+
+            auto tags = std::vector<BSONElement>();
+            obj.elems(tags);
+
+            auto inExpr = std::make_unique<InMatchExpression>(kSafeContent);
+            inExpr->setBackingBSON(std::move(obj));
+            auto status = inExpr->setEqualities(std::move(tags));
+            uassertStatusOK(status);
+            return inExpr;
         }
         case MatchExpression::MATCH_IN: {
             auto inExpr = static_cast<InMatchExpression*>(expr);
@@ -85,14 +93,22 @@ std::unique_ptr<MatchExpression> EqualityPredicate::rewriteToTagDisjunction(
             auto backingBSONBuilder = BSONArrayBuilder();
 
             for (auto& eq : inExpr->getEqualities()) {
-                auto obj = generateTags(eq);
+                auto obj = toBSONArray(generateTags(eq));
                 for (auto&& elt : obj) {
-                    backingBSONBuilder.appendBinData(elt.size(), BinDataGeneral, elt.data());
+                    backingBSONBuilder.append(elt);
                 }
             }
 
             auto backingBSON = backingBSONBuilder.arr();
-            return makeTagDisjunction(std::move(backingBSON));
+            auto allTags = std::vector<BSONElement>();
+            backingBSON.elems(allTags);
+
+            auto newExpr = std::make_unique<InMatchExpression>(kSafeContent);
+            newExpr->setBackingBSON(std::move(backingBSON));
+            auto status = newExpr->setEqualities(std::move(allTags));
+            uassertStatusOK(status);
+
+            return newExpr;
         }
         default:
             MONGO_UNREACHABLE_TASSERT(6911300);

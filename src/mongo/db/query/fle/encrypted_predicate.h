@@ -82,8 +82,6 @@ BSONArray toBSONArray(std::vector<PrfBlock>&& vec);
  */
 std::vector<Value> toValues(std::vector<PrfBlock>&& vec);
 
-std::unique_ptr<MatchExpression> makeTagDisjunction(BSONArray&& tagArray);
-
 void logTagsExceeded(const ExceptionFor<ErrorCodes::FLEMaxTagLimitExceeded>& ex);
 /**
  * Interface for implementing a server rewrite for an encrypted index. Each type of predicate
