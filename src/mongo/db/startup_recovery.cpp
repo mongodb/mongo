@@ -162,6 +162,10 @@ bool checkIdIndexExists(OperationContext* opCtx, const CollectionPtr& coll) {
 Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
     LOGV2(4805002, "Building missing _id index", logAttrs(*collection));
     MultiIndexBlock indexer;
+    // This method is called in startup recovery so we can safely build the id index in foreground
+    // mode. This prevents us from yielding a MODE_X lock (which is disallowed).
+    indexer.setIndexBuildMethod(IndexBuildMethod::kForeground);
+
     ScopeGuard abortOnExit([&] {
         CollectionWriter collWriter(collection);
         indexer.abortIndexBuild(opCtx, collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
