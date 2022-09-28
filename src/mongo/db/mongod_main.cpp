@@ -59,6 +59,7 @@
 #include "mongo/db/change_collection_expired_documents_remover.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_options_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/clientcursor.h"
@@ -349,8 +350,10 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         }
     }
 
-    // TODO SERVER-66717 create 'SetChangeStreamStateCoordinatorService' only in the serverless.
-    services.push_back(std::make_unique<SetChangeStreamStateCoordinatorService>(serviceContext));
+    if (change_stream_serverless_helpers::canInitializeServices()) {
+        services.push_back(
+            std::make_unique<SetChangeStreamStateCoordinatorService>(serviceContext));
+    }
 
     for (auto& service : services) {
         registry->registerService(std::move(service));
@@ -790,8 +793,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         repl::ReplicationCoordinator::modeNone;
     if (!isStandalone) {
         startChangeStreamExpiredPreImagesRemover(serviceContext);
-        // TODO SERVER-66717 Start 'startChangeCollectionExpiredDocumentsRemover' only in the
-        // serverless.
         startChangeCollectionExpiredDocumentsRemover(serviceContext);
     }
 
@@ -1576,8 +1577,9 @@ int mongod_main(int argc, char* argv[]) {
     ReadWriteConcernDefaults::create(service, readWriteConcernDefaultsCacheLookupMongoD);
     ChangeStreamOptionsManager::create(service);
 
-    // TODO SERVER-66717 Create 'ChangeStreamChangeCollectionManager' only in the serverless.
-    ChangeStreamChangeCollectionManager::create(service);
+    if (change_stream_serverless_helpers::canInitializeServices()) {
+        ChangeStreamChangeCollectionManager::create(service);
+    }
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {

@@ -31,6 +31,8 @@ const kNonTestOnlyClusterParameters = {
         insert: {expireAfterSeconds: 30},
         update: {expireAfterSeconds: 10},
         featureFlag: 'ServerlessChangeStreams',
+        setParameters: {'multitenancySupport': true},
+        serverless: true,
     },
 };
 
@@ -76,13 +78,42 @@ function considerParameter(paramName, conn) {
     // { featureFlag: 'name' } indicates that the CWSP should only be considered with the FF
     // enabled. { featureFlag: '!name' } indicates that the CWSP should only be considered with the
     // FF disabled.
-    const cp = kAllClusterParameters[paramName] || {};
-    if (cp.featureFlag) {
-        const considerWhenFFEnabled = cp.featureFlag[0] !== '!';
-        const ff = cp.featureFlag.substr(considerWhenFFEnabled ? 0 : 1);
-        return FeatureFlagUtil.isEnabled(conn, ff) === considerWhenFFEnabled;
+    function validateFeatureFlag(cp) {
+        if (cp.featureFlag) {
+            const considerWhenFFEnabled = cp.featureFlag[0] !== '!';
+            const ff = cp.featureFlag.substr(considerWhenFFEnabled ? 0 : 1);
+            return FeatureFlagUtil.isEnabled(conn, ff) === considerWhenFFEnabled;
+        }
+        return true;
     }
-    return true;
+
+    // A dictionary of 'setParameters' that should be validated while considering the current CWSP.
+    function validateSetParameter(cp) {
+        if (cp.setParameters) {
+            for ([param, value] of Object.entries(cp.setParameters)) {
+                const resp = conn.getDB("admin").runCommand({getParameter: 1, param: 1});
+                const hasParam = resp.hasOwnProperty(param) && resp[param] === value;
+                if (!hasParam) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // Check if the current CWSP should be run in the serverless.
+    function validateServerless(cp) {
+        if (cp.hasOwnProperty("serverless")) {
+            const resp =
+                assert.commandWorked(conn.getDB("admin").adminCommand({getCmdLineOpts: 1}));
+            return cp.serverless === resp.parsed && resp.parsed.replication &&
+                resp.parsed.replication.serverless;
+        }
+        return true;
+    }
+
+    const cp = kAllClusterParameters[paramName] || {};
+    return validateFeatureFlag(cp) && validateSetParameter(cp) && validateServerless(cp);
 }
 
 // Set the log level for get/setClusterParameter logging to appear.

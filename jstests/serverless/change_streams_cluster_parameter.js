@@ -46,6 +46,7 @@ function testWithAdminDB(conn) {
     // A positive value of 'expireAfterSeconds' should succeed.
     assert.commandWorked(adminDB.runCommand(
         {setClusterParameter: {changeStreams: {expireAfterSeconds: NumberLong(36)}}}));
+
     assertGetResponse(adminDB, {expireAfterSeconds: NumberLong(36)});
 
     // An empty parameter to 'changeStreams' cluster parameter should reset the 'expireAfterSeconds'
@@ -94,8 +95,16 @@ function testWithoutAdminDB(conn) {
         shards: 1,
         mongos: 1,
         other: {
-            mongosOptions: {setParameter: {featureFlagServerlessChangeStreams: true}},
-            shardOptions: {setParameter: {featureFlagServerlessChangeStreams: true}}
+            mongosOptions: {
+                setParameter: {
+                    internalChangeStreamUseTenantIdForTesting: true,
+                }
+            },
+            shardOptions: {
+                setParameter: {
+                    internalChangeStreamUseTenantIdForTesting: true,
+                }
+            }
         }
     });
     const adminDB = st.rs0.getPrimary().getDB("admin");
@@ -114,12 +123,14 @@ function testWithoutAdminDB(conn) {
     st.stop();
 }
 
-// Tests that 'changeStreams.expireAfterSeconds' is only available in serverless.
+// Tests that 'changeStreams.expireAfterSeconds' is only available in serverless. The
+// 'changeStreams.expireAfterSeconds' cluster wide parameter requires explicit setting of either
+// 'multitenancySupport' and 'serverless' or 'internalChangeStreamUseTenantIdForTesting' along with
+// the feature flag 'featureFlagServerlessChangeStreams' which has not been done in this scenario.
 {
     const rst = new ReplSetTest({nodes: 1});
-    rst.startSet({setParameter: {featureFlagServerlessChangeStreams: false}});
+    rst.startSet();
     rst.initiate();
-
     const primary = rst.getPrimary();
     const adminDB = primary.getDB("admin");
 

@@ -78,13 +78,6 @@ boost::optional<int64_t> getExpireAfterSeconds(const TenantId& tenantId) {
 }
 
 void removeExpiredDocuments(Client* client) {
-    // TODO SERVER-66717 Remove this logic from this method. Due to the delay in the feature flag
-    // activation it was placed here. The remover job should ultimately be initialized at the mongod
-    // startup when launched in serverless mode.
-    if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
-        return;
-    }
-
     hangBeforeRemovingExpiredChanges.pauseWhileSet();
 
     try {
@@ -211,12 +204,16 @@ private:
 }  // namespace
 
 void startChangeCollectionExpiredDocumentsRemover(ServiceContext* serviceContext) {
-    LOGV2(6663507, "Starting the ChangeCollectionExpiredChangeRemover");
-    ChangeCollectionExpiredDocumentsRemover::start(serviceContext);
+    if (change_stream_serverless_helpers::canInitializeServices()) {
+        LOGV2(6663507, "Starting the ChangeCollectionExpiredChangeRemover");
+        ChangeCollectionExpiredDocumentsRemover::start(serviceContext);
+    }
 }
 
 void shutdownChangeCollectionExpiredDocumentsRemover(ServiceContext* serviceContext) {
-    LOGV2(6663508, "Shutting down the ChangeCollectionExpiredChangeRemover");
-    ChangeCollectionExpiredDocumentsRemover::shutdown(serviceContext);
+    if (change_stream_serverless_helpers::canInitializeServices()) {
+        LOGV2(6663508, "Shutting down the ChangeCollectionExpiredChangeRemover");
+        ChangeCollectionExpiredDocumentsRemover::shutdown(serviceContext);
+    }
 }
 }  // namespace mongo
