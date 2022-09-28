@@ -251,6 +251,11 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     # Load a callback to check that all orphans are deleted before shutting down a ShardingTest.
     eval_sb.append("load('jstests/libs/override_methods/check_orphans_are_deleted.js');")
 
+    if config.FUZZ_MONGOD_CONFIGS is not None and config.FUZZ_MONGOD_CONFIGS is not False:
+        # Prevent commands from running with the config fuzzer.
+        eval_sb.append(
+            "load('jstests/libs/override_methods/config_fuzzer_incompatible_commands.js');")
+
     # Load this file to retry operations that fail due to in-progress background operations.
     eval_sb.append(
         "load('jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js');")

@@ -307,6 +307,7 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
         _config.MONGOD_SET_PARAMETERS, _config.WT_ENGINE_CONFIG, _config.WT_COLL_CONFIG, \
         _config.WT_INDEX_CONFIG = mongod_fuzzer_configs.fuzz_set_parameters(
             _config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS)
+        _config.EXCLUDE_WITH_ANY_TAGS.extend(["uses_compact"])
 
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
     mongos_set_parameters = config.pop("mongos_set_parameters")

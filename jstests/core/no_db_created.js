@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [requires_non_retryable_commands, uses_compact]
 
 // checks that operations do not create a database
 

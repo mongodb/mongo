@@ -12,6 +12,7 @@
 //   # Tenant migrations passthrough suites automatically retry operations on TenantMigrationAborted
 //   # errors.
 //   tenant_migration_incompatible,
+//   uses_compact
 // ]
 //
 
