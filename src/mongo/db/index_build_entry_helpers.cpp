@@ -270,7 +270,8 @@ Status removeIndexBuildEntry(OperationContext* opCtx,
 
             WriteUnitOfWork wuow(opCtx);
             OpDebug opDebug;
-            collection->deleteDocument(opCtx, kUninitializedStmtId, rid, &opDebug);
+            collection_internal::deleteDocument(
+                opCtx, collection, kUninitializedStmtId, rid, &opDebug);
             wuow.commit();
             return Status::OK();
         });

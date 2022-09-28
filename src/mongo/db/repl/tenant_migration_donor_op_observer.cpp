@@ -298,10 +298,9 @@ void TenantMigrationDonorOpObserver::onUpdate(OperationContext* opCtx,
 }
 
 void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
-                                                   NamespaceString const& nss,
-                                                   const UUID& uuid,
+                                                   const CollectionPtr& coll,
                                                    BSONObj const& doc) {
-    if (nss == NamespaceString::kTenantMigrationDonorsNamespace &&
+    if (coll->ns() == NamespaceString::kTenantMigrationDonorsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto donorStateDoc = tenant_migration_access_blocker::parseDonorStateDocument(doc);
         uassert(ErrorCodes::IllegalOperation,
@@ -321,11 +320,10 @@ void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
 }
 
 void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              const UUID& uuid,
+                                              const CollectionPtr& coll,
                                               StmtId stmtId,
                                               const OplogDeleteEntryArgs& args) {
-    if (nss == NamespaceString::kTenantMigrationDonorsNamespace &&
+    if (coll->ns() == NamespaceString::kTenantMigrationDonorsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto tmi = tenantMigrationInfo(opCtx);
         if (!tmi) {

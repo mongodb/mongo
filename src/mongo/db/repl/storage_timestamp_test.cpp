@@ -2796,7 +2796,8 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
     {
         RecordId badRecord = Helpers::findOne(_opCtx, collection.get(), BSON("_id" << 1));
         WriteUnitOfWork wuow(_opCtx);
-        collection->deleteDocument(_opCtx, kUninitializedStmtId, badRecord, nullptr);
+        collection_internal::deleteDocument(
+            _opCtx, *autoColl, kUninitializedStmtId, badRecord, nullptr);
         wuow.commit();
     }
 
@@ -3402,14 +3403,17 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyDelete) {
         auto record = cursor->next();
         invariant(record);
         WriteUnitOfWork wuow(_opCtx);
-        collection->deleteDocument(_opCtx,
-                                   objSnapshot,
-                                   1,
-                                   record->id,
-                                   nullptr,
-                                   false,
-                                   false,
-                                   Collection::StoreDeletedDoc::On);
+        collection_internal::deleteDocument(_opCtx,
+                                            *autoColl,
+                                            objSnapshot,
+                                            1,
+                                            record->id,
+                                            nullptr,
+                                            false,
+                                            false,
+                                            collection_internal::StoreDeletedDoc::On,
+                                            CheckRecordId::Off,
+                                            collection_internal::RetryableWrite::kYes);
         wuow.commit();
     }
 

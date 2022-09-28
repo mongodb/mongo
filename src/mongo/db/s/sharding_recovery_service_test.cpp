@@ -614,13 +614,8 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
     {
         WriteUnitOfWork wuow(opCtx());
         AutoGetDb db(opCtx(), dbName.dbName(), MODE_IS);
-        opObserver().aboutToDelete(
-            opCtx(), criticalSectionColl()->ns(), criticalSectionColl()->uuid(), doc.toBSON());
-        opObserver().onDelete(opCtx(),
-                              criticalSectionColl()->ns(),
-                              criticalSectionColl()->uuid(),
-                              kUninitializedStmtId,
-                              {});
+        opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON());
+        opObserver().onDelete(opCtx(), criticalSectionColl(), kUninitializedStmtId, {});
         wuow.commit();
     }
 
@@ -684,13 +679,8 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
     {
         WriteUnitOfWork wuow(opCtx());
         AutoGetCollection coll(opCtx(), collNss, MODE_IS);
-        opObserver().aboutToDelete(
-            opCtx(), criticalSectionColl()->ns(), criticalSectionColl()->uuid(), doc.toBSON());
-        opObserver().onDelete(opCtx(),
-                              criticalSectionColl()->ns(),
-                              criticalSectionColl()->uuid(),
-                              kUninitializedStmtId,
-                              {});
+        opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON());
+        opObserver().onDelete(opCtx(), criticalSectionColl(), kUninitializedStmtId, {});
         wuow.commit();
     }
 

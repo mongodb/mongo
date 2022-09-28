@@ -362,7 +362,8 @@ void ViewsForDatabase::remove(OperationContext* opCtx,
                 "view"_attr = ns,
                 "viewCatalog"_attr = systemViews->ns());
 
-    systemViews->deleteDocument(opCtx, kUninitializedStmtId, id, &CurOp::get(opCtx)->debug());
+    collection_internal::deleteDocument(
+        opCtx, systemViews, kUninitializedStmtId, id, &CurOp::get(opCtx)->debug());
 }
 
 void ViewsForDatabase::clear(OperationContext* opCtx) {

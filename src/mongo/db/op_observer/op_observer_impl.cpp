@@ -953,20 +953,19 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 }
 
 void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
-                                   NamespaceString const& nss,
-                                   const UUID& uuid,
+                                   const CollectionPtr& coll,
                                    BSONObj const& doc) {
-    repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(opCtx, nss, doc));
+    repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(opCtx, coll->ns(), doc));
 
-    ShardingWriteRouter shardingWriteRouter(opCtx, nss, Grid::get(opCtx)->catalogCache());
+    ShardingWriteRouter shardingWriteRouter(opCtx, coll->ns(), Grid::get(opCtx)->catalogCache());
 
     repl::DurableReplOperation op;
     op.setDestinedRecipient(shardingWriteRouter.getReshardingDestinedRecipient(doc));
     destinedRecipientDecoration(opCtx) = op.getDestinedRecipient();
 
-    shardObserveAboutToDelete(opCtx, nss, doc);
+    shardObserveAboutToDelete(opCtx, coll->ns(), doc);
 
-    if (nss.isTimeseriesBucketsCollection()) {
+    if (coll->ns().isTimeseriesBucketsCollection()) {
         if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
             auto& deletedBuckets = timeseries::DeletedBuckets::get(opCtx);
@@ -979,10 +978,11 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
 }
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const UUID& uuid,
+                              const CollectionPtr& coll,
                               StmtId stmtId,
                               const OplogDeleteEntryArgs& args) {
+    const auto& nss = coll->ns();
+    const auto uuid = coll->uuid();
     auto optDocKey = repl::documentKeyDecoration(opCtx);
     invariant(optDocKey, nss.ns());
     auto& documentKey = optDocKey.value();

@@ -136,30 +136,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void deleteDocument(OperationContext* opCtx,
-                        StmtId stmtId,
-                        const RecordId& loc,
-                        OpDebug* opDebug,
-                        bool fromMigrate,
-                        bool noWarn,
-                        Collection::StoreDeletedDoc storeDeletedDoc,
-                        CheckRecordId checkRecordId) const {
-        MONGO_UNREACHABLE;
-    }
-
-    void deleteDocument(
-        OperationContext* opCtx,
-        Snapshotted<BSONObj> doc,
-        StmtId stmtId,
-        const RecordId& loc,
-        OpDebug* opDebug,
-        bool fromMigrate = false,
-        bool noWarn = false,
-        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off,
-        CheckRecordId checkRecordId = CheckRecordId::Off) const {
-        MONGO_UNREACHABLE;
-    }
-
     bool updateWithDamagesSupported() const {
         MONGO_UNREACHABLE;
     }

@@ -82,14 +82,13 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
 }
 
 void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
-                                                     const NamespaceString& nss,
-                                                     const UUID& uuid,
+                                                     const CollectionPtr& coll,
                                                      const BSONObj& doc) {
     std::string docBeingDeleted;
 
-    if (isConfigNamespace(nss)) {
+    if (isConfigNamespace(coll->ns())) {
         // Store the tenantId associated with the doc to be deleted.
-        tenantIdToDelete(opCtx) = nss.dbName().tenantId();
+        tenantIdToDelete(opCtx) = coll->ns().dbName().tenantId();
         auto elem = doc[kIdField];
         if (elem.type() == String) {
             docBeingDeleted = elem.str();
@@ -111,8 +110,7 @@ void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
 }
 
 void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const UUID& uuid,
+                                                const CollectionPtr& coll,
                                                 StmtId stmtId,
                                                 const OplogDeleteEntryArgs& args) {
     const auto& docName = aboutToDeleteDoc(opCtx);

@@ -59,7 +59,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -171,25 +170,6 @@ bool isRetryableWrite(OperationContext* opCtx) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     return txnParticipant &&
         (!opCtx->inMultiDocumentTransaction() || txnParticipant.transactionIsOpen());
-}
-
-// TODO(SERVER-70043) remove after that ticket is fixed
-std::vector<OplogSlot> reserveOplogSlotsForRetryableFindAndModify(OperationContext* opCtx) {
-    invariant(isRetryableWrite(opCtx));
-
-    // For retryable findAndModify running in a multi-document transaction, we will reserve the
-    // oplog entries when the transaction prepares or commits without prepare.
-    if (opCtx->inMultiDocumentTransaction()) {
-        return {};
-    }
-
-    // We reserve oplog slots here, expecting the slot with the greatest timestmap (say TS) to be
-    // used as the oplog timestamp. Tenant migrations and resharding will forge no-op image oplog
-    // entries and set the timestamp for these synthetic entries to be TS - 1.
-    auto oplogInfo = LocalOplogInfo::get(opCtx);
-    auto slots = oplogInfo->getNextOpTimes(opCtx, 2);
-    uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(slots.back().getTimestamp()));
-    return slots;
 }
 
 bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
@@ -792,84 +772,6 @@ void CollectionImpl::setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapsh
 void CollectionImpl::setMinimumValidSnapshot(Timestamp newMinimumValidSnapshot) {
     if (!_minValidSnapshot || (newMinimumValidSnapshot > _minValidSnapshot.value())) {
         _minValidSnapshot = newMinimumValidSnapshot;
-    }
-}
-
-void CollectionImpl::deleteDocument(OperationContext* opCtx,
-                                    StmtId stmtId,
-                                    const RecordId& loc,
-                                    OpDebug* opDebug,
-                                    bool fromMigrate,
-                                    bool noWarn,
-                                    Collection::StoreDeletedDoc storeDeletedDoc,
-                                    CheckRecordId checkRecordId) const {
-    Snapshotted<BSONObj> doc = docFor(opCtx, loc);
-    deleteDocument(
-        opCtx, doc, stmtId, loc, opDebug, fromMigrate, noWarn, storeDeletedDoc, checkRecordId);
-}
-
-void CollectionImpl::deleteDocument(OperationContext* opCtx,
-                                    Snapshotted<BSONObj> doc,
-                                    StmtId stmtId,
-                                    const RecordId& loc,
-                                    OpDebug* opDebug,
-                                    bool fromMigrate,
-                                    bool noWarn,
-                                    Collection::StoreDeletedDoc storeDeletedDoc,
-                                    CheckRecordId checkRecordId) const {
-    if (isCapped() && opCtx->inMultiDocumentTransaction()) {
-        uasserted(ErrorCodes::IllegalOperation,
-                  "Cannot remove from a capped collection in a multi-document transaction");
-    }
-
-    if (needsCappedLock()) {
-        Lock::ResourceLock heldUntilEndOfWUOW{opCtx, ResourceId(RESOURCE_METADATA, _ns), MODE_X};
-    }
-
-    std::vector<OplogSlot> oplogSlots;
-    auto retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kNone;
-    if (storeDeletedDoc == Collection::StoreDeletedDoc::On && isRetryableWrite(opCtx)) {
-        retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
-        oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
-    }
-    OplogDeleteEntryArgs deleteArgs{nullptr /* deletedDoc */,
-                                    fromMigrate,
-                                    isChangeStreamPreAndPostImagesEnabled(),
-                                    retryableFindAndModifyLocation,
-                                    oplogSlots};
-
-    opCtx->getServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), uuid(), doc.value());
-
-    boost::optional<BSONObj> deletedDoc;
-    const bool isRecordingPreImageForRetryableWrite =
-        retryableFindAndModifyLocation != RetryableFindAndModifyLocation::kNone;
-
-    if (isRecordingPreImageForRetryableWrite || isChangeStreamPreAndPostImagesEnabled()) {
-        deletedDoc.emplace(doc.value().getOwned());
-    }
-    int64_t keysDeleted = 0;
-    _indexCatalog->unindexRecord(opCtx,
-                                 CollectionPtr(this, CollectionPtr::NoYieldTag{}),
-                                 doc.value(),
-                                 loc,
-                                 noWarn,
-                                 &keysDeleted,
-                                 checkRecordId);
-    _shared->_recordStore->deleteRecord(opCtx, loc);
-    if (deletedDoc) {
-        deleteArgs.deletedDoc = &(deletedDoc.value());
-    }
-
-    opCtx->getServiceContext()->getOpObserver()->onDelete(opCtx, ns(), uuid(), stmtId, deleteArgs);
-
-    if (opDebug) {
-        opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
-        // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
-        if (!opCtx->inMultiDocumentTransaction()) {
-            opCtx->recoveryUnit()->onRollback([opDebug, keysDeleted]() {
-                opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
-            });
-        }
     }
 }
 

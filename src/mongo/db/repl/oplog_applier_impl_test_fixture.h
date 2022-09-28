@@ -83,8 +83,7 @@ public:
      * This function is called whenever OplogApplierImpl deletes a document from a collection.
      */
     void onDelete(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const UUID& uuid,
+                  const CollectionPtr& coll,
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args) override;
 
@@ -149,11 +148,8 @@ public:
     std::function<void(OperationContext*, const NamespaceString&, const std::vector<BSONObj>&)>
         onInsertsFn;
 
-    std::function<void(OperationContext*,
-                       const NamespaceString&,
-                       boost::optional<UUID>,
-                       StmtId,
-                       const OplogDeleteEntryArgs&)>
+    std::function<void(
+        OperationContext*, const CollectionPtr&, StmtId, const OplogDeleteEntryArgs&)>
         onDeleteFn;
 
     std::function<void(OperationContext*, const OplogUpdateEntryArgs&)> onUpdateFn;

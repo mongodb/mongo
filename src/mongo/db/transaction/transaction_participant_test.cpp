@@ -4516,7 +4516,8 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
             }
 
             if (bson["startOpTime"]["ts"].timestamp() == ts) {
-                coll->deleteDocument(opCtx(), kUninitializedStmtId, record->id, nullptr);
+                collection_internal::deleteDocument(
+                    opCtx(), coll, kUninitializedStmtId, record->id, nullptr);
                 wuow.commit();
                 return;
             }

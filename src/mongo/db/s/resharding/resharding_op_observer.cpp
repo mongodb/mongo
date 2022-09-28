@@ -249,11 +249,10 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
 }
 
 void ReshardingOpObserver::onDelete(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const UUID& uuid,
+                                    const CollectionPtr& coll,
                                     StmtId stmtId,
                                     const OplogDeleteEntryArgs& args) {
-    if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {
+    if (coll->ns() == NamespaceString::kDonorReshardingOperationsNamespace) {
         _doPin(opCtx);
     }
 }

@@ -103,29 +103,28 @@ void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdat
 }
 
 void QueryAnalysisOpObserver::aboutToDelete(OperationContext* opCtx,
-                                            NamespaceString const& nss,
-                                            const UUID& uuid,
+                                            const CollectionPtr& coll,
                                             BSONObj const& doc) {
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis()) {
-        if (nss == NamespaceString::kConfigQueryAnalyzersNamespace || nss == MongosType::ConfigNS) {
+        if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace ||
+            coll->ns() == MongosType::ConfigNS) {
             docToDeleteDecoration(opCtx) = doc;
         }
     }
 }
 
 void QueryAnalysisOpObserver::onDelete(OperationContext* opCtx,
-                                       const NamespaceString& nss,
-                                       const UUID& uuid,
+                                       const CollectionPtr& coll,
                                        StmtId stmtId,
                                        const OplogDeleteEntryArgs& args) {
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis()) {
-        if (nss == NamespaceString::kConfigQueryAnalyzersNamespace) {
+        if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
             auto& doc = docToDeleteDecoration(opCtx);
             invariant(!doc.isEmpty());
             opCtx->recoveryUnit()->onCommit([opCtx, doc](boost::optional<Timestamp>) {
                 analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationDelete(doc);
             });
-        } else if (nss == MongosType::ConfigNS) {
+        } else if (coll->ns() == MongosType::ConfigNS) {
             auto& doc = docToDeleteDecoration(opCtx);
             invariant(!doc.isEmpty());
             opCtx->recoveryUnit()->onCommit([opCtx, doc](boost::optional<Timestamp>) {

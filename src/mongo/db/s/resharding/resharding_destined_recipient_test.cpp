@@ -283,7 +283,7 @@ protected:
 
         WriteUnitOfWork wuow(opCtx);
         OpDebug opDebug;
-        coll->deleteDocument(opCtx, kUninitializedStmtId, rid, &opDebug);
+        collection_internal::deleteDocument(opCtx, *coll, kUninitializedStmtId, rid, &opDebug);
         wuow.commit();
     }
 

@@ -118,11 +118,10 @@ void FreeMonOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntry
 }
 
 void FreeMonOpObserver::aboutToDelete(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      const UUID& uuid,
+                                      const CollectionPtr& coll,
                                       const BSONObj& doc) {
 
-    bool isFreeMonDoc = (nss == NamespaceString::kServerConfigurationNamespace) &&
+    bool isFreeMonDoc = (coll->ns() == NamespaceString::kServerConfigurationNamespace) &&
         (doc["_id"].str() == FreeMonStorage::kFreeMonDocIdKey);
 
     // Set a flag that indicates whether the document to be delete is the free monitoring state
@@ -131,11 +130,10 @@ void FreeMonOpObserver::aboutToDelete(OperationContext* opCtx,
 }
 
 void FreeMonOpObserver::onDelete(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const UUID& uuid,
+                                 const CollectionPtr& coll,
                                  StmtId stmtId,
                                  const OplogDeleteEntryArgs& args) {
-    if (nss != NamespaceString::kServerConfigurationNamespace) {
+    if (coll->ns() != NamespaceString::kServerConfigurationNamespace) {
         return;
     }
 

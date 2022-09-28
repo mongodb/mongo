@@ -114,13 +114,11 @@ public:
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) final {}
 
     void aboutToDelete(OperationContext* opCtx,
-                       const NamespaceString& nss,
-                       const UUID& uuid,
+                       const CollectionPtr& coll,
                        const BSONObj& doc) final;
 
     void onDelete(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const UUID& uuid,
+                  const CollectionPtr& coll,
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args) final;
 

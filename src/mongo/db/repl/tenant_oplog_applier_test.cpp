@@ -742,11 +742,10 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DatabaseMissing) {
     auto entry = makeOplogEntry(
         OpTypeEnum::kDelete, NamespaceString(_dbName.toStringWithTenantId(), "bar"), UUID::gen());
     bool onDeleteCalled = false;
-    _opObserver->onDeleteFn = [&](OperationContext* opCtx,
-                                  const NamespaceString&,
-                                  boost::optional<UUID>,
-                                  StmtId,
-                                  const OplogDeleteEntryArgs&) { onDeleteCalled = true; };
+    _opObserver->onDeleteFn =
+        [&](OperationContext* opCtx, const CollectionPtr&, StmtId, const OplogDeleteEntryArgs&) {
+            onDeleteCalled = true;
+        };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -773,11 +772,10 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_CollectionMissing) {
     auto entry = makeOplogEntry(
         OpTypeEnum::kDelete, NamespaceString(_dbName.toStringWithTenantId(), "bar"), UUID::gen());
     bool onDeleteCalled = false;
-    _opObserver->onDeleteFn = [&](OperationContext* opCtx,
-                                  const NamespaceString&,
-                                  boost::optional<UUID>,
-                                  StmtId,
-                                  const OplogDeleteEntryArgs&) { onDeleteCalled = true; };
+    _opObserver->onDeleteFn =
+        [&](OperationContext* opCtx, const CollectionPtr&, StmtId, const OplogDeleteEntryArgs&) {
+            onDeleteCalled = true;
+        };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -804,11 +802,10 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DocumentMissing) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto entry = makeOplogEntry(OpTypeEnum::kDelete, nss, uuid, BSON("_id" << 0));
     bool onDeleteCalled = false;
-    _opObserver->onDeleteFn = [&](OperationContext* opCtx,
-                                  const NamespaceString&,
-                                  boost::optional<UUID>,
-                                  StmtId,
-                                  const OplogDeleteEntryArgs&) { onDeleteCalled = true; };
+    _opObserver->onDeleteFn =
+        [&](OperationContext* opCtx, const CollectionPtr&, StmtId, const OplogDeleteEntryArgs&) {
+            onDeleteCalled = true;
+        };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -837,8 +834,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
     auto entry = makeOplogEntry(OpTypeEnum::kDelete, nss, uuid, BSON("_id" << 0));
     bool onDeleteCalled = false;
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const boost::optional<UUID>& observer_uuid,
+                                  const CollectionPtr& coll,
                                   StmtId,
                                   const OplogDeleteEntryArgs& args) {
         onDeleteCalled = true;
@@ -851,7 +847,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
         // passes "tid" to the NamespaceString constructor
         ASSERT_EQUALS(nss.dbName().db(), _dbName.toStringWithTenantId());
         ASSERT_EQUALS(nss.coll(), "bar");
-        ASSERT_EQUALS(uuid, observer_uuid);
+        ASSERT_EQUALS(uuid, coll->uuid());
     };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();

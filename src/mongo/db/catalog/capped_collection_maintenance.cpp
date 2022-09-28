@@ -83,7 +83,6 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         return;
 
     const auto& nss = collection->ns();
-    const auto& uuid = collection->uuid();
     auto& ccs = cappedCollectionState(*collection->getSharedDecorations());
 
     stdx::unique_lock<Latch> cappedFirstRecordMutex(ccs.cappedFirstRecordMutex, stdx::defer_lock);
@@ -157,7 +156,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         BSONObj doc = record->data.toBson();
         if (nss.isReplicated()) {
             OpObserver* opObserver = opCtx->getServiceContext()->getOpObserver();
-            opObserver->aboutToDelete(opCtx, nss, uuid, doc);
+            opObserver->aboutToDelete(opCtx, collection, doc);
 
             OplogDeleteEntryArgs args;
             // Explicitly setting values despite them being the defaults.
@@ -172,7 +171,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
             }
 
             // Reserves an optime for the deletion and sets the timestamp for future writes.
-            opObserver->onDelete(opCtx, nss, uuid, kUninitializedStmtId, args);
+            opObserver->onDelete(opCtx, collection, kUninitializedStmtId, args);
         }
 
         int64_t unusedKeysDeleted = 0;

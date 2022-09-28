@@ -36,6 +36,8 @@
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -80,8 +82,7 @@ bool compareSafeContentElem(const BSONObj& oldDoc, const BSONObj& newDoc) {
     return newDoc.getField(kSafeContent).binaryEqual(oldDoc.getField(kSafeContent));
 }
 
-std::vector<OplogSlot> reserveOplogSlotsForRetryableFindAndModify(OperationContext* opCtx,
-                                                                  const CollectionPtr& collection) {
+std::vector<OplogSlot> reserveOplogSlotsForRetryableFindAndModify(OperationContext* opCtx) {
     // For retryable findAndModify running in a multi-document transaction, we will reserve the
     // oplog entries when the transaction prepares or commits without prepare.
     if (opCtx->inMultiDocumentTransaction()) {
@@ -467,7 +468,7 @@ RecordId updateDocument(OperationContext* opCtx,
         // TS - 1: Tenant migrations and resharding will forge no-op image oplog entries and set
         //         the entry timestamps to TS - 1.
         // TS:     The timestamp given to the update oplog entry.
-        args->oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx, collection);
+        args->oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
     } else {
         // Retryable findAndModify commands should not reserve oplog slots before entering this
         // function since tenant migrations and resharding rely on always being able to set
@@ -543,7 +544,7 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
         // TS - 1: Tenant migrations and resharding will forge no-op image oplog entries and set
         //         the entry timestamps to TS - 1.
         // TS:     The timestamp given to the update oplog entry.
-        args->oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx, collection);
+        args->oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
     } else {
         // Retryable findAndModify commands should not reserve oplog slots before entering this
         // function since tenant migrations and resharding rely on always being able to set
@@ -584,6 +585,99 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
 
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
     return newDoc;
+}
+
+void deleteDocument(OperationContext* opCtx,
+                    const CollectionPtr& collection,
+                    StmtId stmtId,
+                    const RecordId& loc,
+                    OpDebug* opDebug,
+                    bool fromMigrate,
+                    bool noWarn,
+                    StoreDeletedDoc storeDeletedDoc,
+                    CheckRecordId checkRecordId,
+                    RetryableWrite retryableWrite) {
+    Snapshotted<BSONObj> doc = collection->docFor(opCtx, loc);
+    deleteDocument(opCtx,
+                   collection,
+                   doc,
+                   stmtId,
+                   loc,
+                   opDebug,
+                   fromMigrate,
+                   noWarn,
+                   storeDeletedDoc,
+                   checkRecordId);
+}
+
+void deleteDocument(OperationContext* opCtx,
+                    const CollectionPtr& collection,
+                    Snapshotted<BSONObj> doc,
+                    StmtId stmtId,
+                    const RecordId& loc,
+                    OpDebug* opDebug,
+                    bool fromMigrate,
+                    bool noWarn,
+                    StoreDeletedDoc storeDeletedDoc,
+                    CheckRecordId checkRecordId,
+                    RetryableWrite retryableWrite) {
+    const auto& nss = collection->ns();
+
+    if (collection->isCapped() && opCtx->inMultiDocumentTransaction()) {
+        uasserted(ErrorCodes::IllegalOperation,
+                  "Cannot remove from a capped collection in a multi-document transaction");
+    }
+
+    if (collection->needsCappedLock()) {
+        Lock::ResourceLock heldUntilEndOfWUOW{opCtx, ResourceId(RESOURCE_METADATA, nss), MODE_X};
+    }
+
+    std::vector<OplogSlot> oplogSlots;
+    auto retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kNone;
+    if (storeDeletedDoc == StoreDeletedDoc::On && retryableWrite == RetryableWrite::kYes) {
+        retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
+        oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
+    }
+    OplogDeleteEntryArgs deleteArgs{nullptr /* deletedDoc */,
+                                    fromMigrate,
+                                    collection->isChangeStreamPreAndPostImagesEnabled(),
+                                    retryableFindAndModifyLocation,
+                                    oplogSlots};
+
+    opCtx->getServiceContext()->getOpObserver()->aboutToDelete(opCtx, collection, doc.value());
+
+    boost::optional<BSONObj> deletedDoc;
+    const bool isRecordingPreImageForRetryableWrite =
+        retryableFindAndModifyLocation != RetryableFindAndModifyLocation::kNone;
+    const bool isTimeseriesCollection =
+        collection->getTimeseriesOptions() || nss.isTimeseriesBucketsCollection();
+
+    if (isRecordingPreImageForRetryableWrite ||
+        collection->isChangeStreamPreAndPostImagesEnabled() ||
+        (isTimeseriesCollection &&
+         feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+             serverGlobalParams.featureCompatibility))) {
+        deletedDoc.emplace(doc.value().getOwned());
+    }
+    int64_t keysDeleted = 0;
+    collection->getIndexCatalog()->unindexRecord(
+        opCtx, collection, doc.value(), loc, noWarn, &keysDeleted, checkRecordId);
+    collection->getRecordStore()->deleteRecord(opCtx, loc);
+    if (deletedDoc) {
+        deleteArgs.deletedDoc = &(deletedDoc.value());
+    }
+
+    opCtx->getServiceContext()->getOpObserver()->onDelete(opCtx, collection, stmtId, deleteArgs);
+
+    if (opDebug) {
+        opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+        // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
+        if (!opCtx->inMultiDocumentTransaction()) {
+            opCtx->recoveryUnit()->onRollback([opDebug, keysDeleted]() {
+                opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
+            });
+        }
+    }
 }
 
 }  // namespace collection_internal

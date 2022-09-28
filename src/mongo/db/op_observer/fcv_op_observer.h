@@ -70,8 +70,7 @@ public:
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) final;
 
     void onDelete(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const UUID& uuid,
+                  const CollectionPtr& coll,
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args) final;
 
@@ -122,8 +121,7 @@ public:
                            bool fromMigrate) final {}
 
     void aboutToDelete(OperationContext* opCtx,
-                       const NamespaceString& nss,
-                       const UUID& uuid,
+                       const CollectionPtr& coll,
                        const BSONObj& doc) final {}
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,

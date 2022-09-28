@@ -33,6 +33,8 @@
 #include "mongo/db/exec/delete_stage.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -232,9 +234,11 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         }
     }
 
+    auto retryableWrite = write_stage_common::isRetryableWrite(opCtx());
+
     // Ensure that the BSONObj underlying the WSM is owned because saveState() is
     // allowed to free the memory the BSONObj points to. The BSONObj will be needed
-    // later when it is passed to Collection::deleteDocument(). Note that the call to
+    // later when it is passed to collection_internal::deleteDocument(). Note that the call to
     // makeObjOwnedIfNeeded() will leave the WSM in the RID_AND_OBJ state in case we need to retry
     // deleting it.
     member->makeObjOwnedIfNeeded();
@@ -267,16 +271,20 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
                 collection()->ns().ns(),
                 [&] {
                     WriteUnitOfWork wunit(opCtx());
-                    collection()->deleteDocument(opCtx(),
-                                                 Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
-                                                 _params->stmtId,
-                                                 recordId,
-                                                 _params->opDebug,
-                                                 writeToOrphan || _params->fromMigrate,
-                                                 false,
-                                                 _params->returnDeleted
-                                                     ? Collection::StoreDeletedDoc::On
-                                                     : Collection::StoreDeletedDoc::Off);
+                    collection_internal::deleteDocument(
+                        opCtx(),
+                        collection(),
+                        Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
+                        _params->stmtId,
+                        recordId,
+                        _params->opDebug,
+                        writeToOrphan || _params->fromMigrate,
+                        false,
+                        _params->returnDeleted ? collection_internal::StoreDeletedDoc::On
+                                               : collection_internal::StoreDeletedDoc::Off,
+                        CheckRecordId::Off,
+                        retryableWrite ? collection_internal::RetryableWrite::kYes
+                                       : collection_internal::RetryableWrite::kNo);
                     wunit.commit();
                     return PlanStage::NEED_TIME;
                 },

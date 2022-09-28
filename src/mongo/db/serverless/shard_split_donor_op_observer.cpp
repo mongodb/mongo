@@ -357,10 +357,9 @@ void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
 }
 
 void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
-                                              NamespaceString const& nss,
-                                              const UUID& uuid,
+                                              const CollectionPtr& coll,
                                               BSONObj const& doc) {
-    if (nss != NamespaceString::kShardSplitDonorsNamespace ||
+    if (coll->ns() != NamespaceString::kShardSplitDonorsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
@@ -390,11 +389,10 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
 }
 
 void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         const UUID& uuid,
+                                         const CollectionPtr& coll,
                                          StmtId stmtId,
                                          const OplogDeleteEntryArgs& args) {
-    if (nss != NamespaceString::kShardSplitDonorsNamespace || !splitCleanupDetails(opCtx) ||
+    if (coll->ns() != NamespaceString::kShardSplitDonorsNamespace || !splitCleanupDetails(opCtx) ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }

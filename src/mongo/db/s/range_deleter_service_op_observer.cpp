@@ -115,20 +115,18 @@ void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
 }
 
 void RangeDeleterServiceOpObserver::aboutToDelete(OperationContext* opCtx,
-                                                  NamespaceString const& nss,
-                                                  const UUID& uuid,
+                                                  const CollectionPtr& coll,
                                                   BSONObj const& doc) {
-    if (nss == NamespaceString::kRangeDeletionNamespace) {
+    if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         deletedDocumentDecoration(opCtx) = doc;
     }
 }
 
 void RangeDeleterServiceOpObserver::onDelete(OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             const UUID& uuid,
+                                             const CollectionPtr& coll,
                                              StmtId stmtId,
                                              const OplogDeleteEntryArgs& args) {
-    if (nss == NamespaceString::kRangeDeletionNamespace) {
+    if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         const auto& deletedDoc = deletedDocumentDecoration(opCtx);
 
         auto deletionTask =

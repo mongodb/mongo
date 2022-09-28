@@ -467,17 +467,13 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteAbortedDocumentDoesNotRemoveBlockers
     auto bsonDoc = stateDocument.toBSON();
 
     WriteUnitOfWork wuow(_opCtx.get());
-    _observer->aboutToDelete(
-        _opCtx.get(), NamespaceString::kShardSplitDonorsNamespace, UUID::gen(), bsonDoc);
+    AutoGetCollection autoColl(_opCtx.get(), NamespaceString::kShardSplitDonorsNamespace, MODE_IX);
+    _observer->aboutToDelete(_opCtx.get(), *autoColl, bsonDoc);
 
     OplogDeleteEntryArgs deleteArgs;
     deleteArgs.deletedDoc = &bsonDoc;
 
-    _observer->onDelete(_opCtx.get(),
-                        NamespaceString::kShardSplitDonorsNamespace,
-                        UUID::gen(),
-                        0 /* stmtId */,
-                        deleteArgs);
+    _observer->onDelete(_opCtx.get(), *autoColl, 0 /* stmtId */, deleteArgs);
     wuow.commit();
 
     // Verify blockers have not been removed
@@ -509,17 +505,13 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteCommittedDocumentRemovesBlockers) {
     auto bsonDoc = stateDocument.toBSON();
 
     WriteUnitOfWork wuow(_opCtx.get());
-    _observer->aboutToDelete(
-        _opCtx.get(), NamespaceString::kShardSplitDonorsNamespace, UUID::gen(), bsonDoc);
+    AutoGetCollection autoColl(_opCtx.get(), NamespaceString::kShardSplitDonorsNamespace, MODE_IX);
+    _observer->aboutToDelete(_opCtx.get(), *autoColl, bsonDoc);
 
     OplogDeleteEntryArgs deleteArgs;
     deleteArgs.deletedDoc = &bsonDoc;
 
-    _observer->onDelete(_opCtx.get(),
-                        NamespaceString::kShardSplitDonorsNamespace,
-                        UUID::gen(),
-                        0 /* stmtId */,
-                        deleteArgs);
+    _observer->onDelete(_opCtx.get(), *autoColl, 0 /* stmtId */, deleteArgs);
     wuow.commit();
 
     // Verify blockers have been removed

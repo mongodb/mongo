@@ -195,9 +195,9 @@ public:
                                         const BSONObj& docKey) = 0;
 
     virtual void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) = 0;
+
     virtual void aboutToDelete(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const UUID& uuid,
+                               const CollectionPtr& coll,
                                const BSONObj& doc) = 0;
 
     /**
@@ -210,8 +210,7 @@ public:
      * opObserver must store the `deletedDoc` in addition to the documentKey.
      */
     virtual void onDelete(OperationContext* opCtx,
-                          const NamespaceString& nss,
-                          const UUID& uuid,
+                          const CollectionPtr& coll,
                           StmtId stmtId,
                           const OplogDeleteEntryArgs& args) = 0;
 

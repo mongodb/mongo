@@ -184,22 +184,20 @@ public:
     }
 
     void aboutToDelete(OperationContext* const opCtx,
-                       const NamespaceString& nss,
-                       const UUID& uuid,
+                       const CollectionPtr& coll,
                        const BSONObj& doc) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->aboutToDelete(opCtx, nss, uuid, doc);
+            o->aboutToDelete(opCtx, coll, doc);
     }
 
     void onDelete(OperationContext* const opCtx,
-                  const NamespaceString& nss,
-                  const UUID& uuid,
+                  const CollectionPtr& coll,
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onDelete(opCtx, nss, uuid, stmtId, args);
+            o->onDelete(opCtx, coll, stmtId, args);
     }
 
     void onInternalOpMessage(OperationContext* const opCtx,

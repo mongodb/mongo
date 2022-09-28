@@ -63,8 +63,7 @@ static const Milliseconds targetBatchTimeMS = Milliseconds(5);
 class ClockAdvancingOpObserver : public OpObserverNoop {
 public:
     void aboutToDelete(OperationContext* opCtx,
-                       const NamespaceString& nss,
-                       const UUID& uuid,
+                       const CollectionPtr& coll,
                        const BSONObj& doc) override {
 
         if (docDurationMap.find(doc) != docDurationMap.end()) {

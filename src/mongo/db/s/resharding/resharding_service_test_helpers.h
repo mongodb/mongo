@@ -176,11 +176,10 @@ public:
     }
 
     void onDelete(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const UUID& uuid,
+                  const CollectionPtr& coll,
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args) override {
-        if (nss != _stateDocumentNss) {
+        if (coll->ns() != _stateDocumentNss) {
             return;
         }
 

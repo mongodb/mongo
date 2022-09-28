@@ -155,31 +155,6 @@ public:
         return _shared->_recordStore->getCursor(opCtx, forward);
     }
 
-    void deleteDocument(
-        OperationContext* opCtx,
-        StmtId stmtId,
-        const RecordId& loc,
-        OpDebug* opDebug,
-        bool fromMigrate = false,
-        bool noWarn = false,
-        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off,
-        CheckRecordId checkRecordId = CheckRecordId::Off) const final {
-        unimplementedTasserted();
-    }
-
-    void deleteDocument(
-        OperationContext* opCtx,
-        Snapshotted<BSONObj> doc,
-        StmtId stmtId,
-        const RecordId& loc,
-        OpDebug* opDebug,
-        bool fromMigrate = false,
-        bool noWarn = false,
-        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off,
-        CheckRecordId checkRecordId = CheckRecordId::Off) const final {
-        unimplementedTasserted();
-    }
-
     bool updateWithDamagesSupported() const final {
         unimplementedTasserted();
         return false;

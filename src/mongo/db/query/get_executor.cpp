@@ -1643,9 +1643,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     }
 
     if (collection && collection->isCapped() && opCtx->inMultiDocumentTransaction()) {
-        // This check is duplicated from CollectionImpl::deleteDocument() for two reasons:
+        // This check is duplicated from collection_internal::deleteDocument() for two reasons:
         // - Performing a remove on an empty capped collection would not call
-        //   CollectionImpl::deleteDocument().
+        //   collection_internal::deleteDocument().
         // - We can avoid doing lookups on documents and erroring later when trying to delete them.
         return Status(
             ErrorCodes::IllegalOperation,

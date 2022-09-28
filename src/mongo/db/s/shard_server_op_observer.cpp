@@ -507,12 +507,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 }
 
 void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
-                                          NamespaceString const& nss,
-                                          const UUID& uuid,
+                                          const CollectionPtr& coll,
                                           BSONObj const& doc) {
 
-    if (nss == NamespaceString::kCollectionCriticalSectionsNamespace ||
-        nss == NamespaceString::kRangeDeletionNamespace) {
+    if (coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace ||
+        coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         documentIdDecoration(opCtx) = doc;
     } else {
         // Extract the _id field from the document. If it does not have an _id, use the
@@ -556,10 +555,10 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
 }
 
 void ShardServerOpObserver::onDelete(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const UUID& uuid,
+                                     const CollectionPtr& coll,
                                      StmtId stmtId,
                                      const OplogDeleteEntryArgs& args) {
+    const auto& nss = coll->ns();
     auto& documentId = documentIdDecoration(opCtx);
     invariant(!documentId.isEmpty());
 

@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/bson/json.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
@@ -216,7 +217,8 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
             }
             mongo::WriteUnitOfWork wuow(opCtx);
             for (const auto& recordId : recordIds) {
-                coll->deleteDocument(opCtx, kUninitializedStmtId, recordId, nullptr);
+                collection_internal::deleteDocument(
+                    opCtx, *coll, kUninitializedStmtId, recordId, nullptr);
             }
             wuow.commit();
             ASSERT_EQUALS(0UL, coll->numRecords(opCtx));

@@ -40,6 +40,10 @@ namespace collection_internal {
 
 using OnRecordInsertedFn = std::function<Status(const RecordId& loc)>;
 
+enum class StoreDeletedDoc { Off, On };
+
+enum class RetryableWrite { kYes, kNo };
+
 /**
  * Inserts a document into the record store for a bulk loader that manages the index building. The
  * bulk loader is notified with the RecordId of the document inserted into the RecordStore through
@@ -89,8 +93,7 @@ Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSON
  * Updates the document @ oldLocation with newDoc.
  *
  * If the document fits in the old space, it is put there; if not, it is moved.
- * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
- * success.
+ * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on success.
  * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
  * @return the post update location of the doc (may or may not be the same as oldLocation)
  */
@@ -105,8 +108,7 @@ RecordId updateDocument(OperationContext* opCtx,
 
 /**
  * Illegal to call if collection->updateWithDamagesSupported() returns false.
- * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
- * success.
+ * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on success.
  * Returns the contents of the updated document.
  */
 StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
@@ -118,6 +120,48 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
                                               bool indexesAffected,
                                               OpDebug* opDebug,
                                               CollectionUpdateArgs* args);
+
+/**
+ * Deletes the document with the given RecordId from the collection. For a description of the
+ * parameters, see the overloaded function below.
+ */
+void deleteDocument(OperationContext* opCtx,
+                    const CollectionPtr& collection,
+                    StmtId stmtId,
+                    const RecordId& loc,
+                    OpDebug* opDebug,
+                    bool fromMigrate = false,
+                    bool noWarn = false,
+                    StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off,
+                    CheckRecordId checkRecordId = CheckRecordId::Off,
+                    RetryableWrite retryableWrite = RetryableWrite::kNo);
+
+/**
+ * Deletes the document from the collection.
+ *
+ * @param doc: the document to be deleted.
+ * @param fromMigrate: indicates whether the delete was induced by a chunk migration, and so should
+ * be ignored by the user as an internal maintenance operation and not a real delete.
+ * @param loc: key to uniquely identify a record in a collection.
+ * @param opDebug: Optional argument. When not null, will be used to record operation statistics.
+ * @param noWarn: if unindexing the record causes an error, if noWarn is true the error will not be
+ * logged.
+ * @param storeDeletedDoc: whether to store the document deleted in the oplog.
+ * @param checkRecordId: whether to confirm the recordId matches the record we are removing when
+ * unindexing.
+ * @param retryableWrite: whether it's a retryable write, @see write_stage_common::isRetryableWrite
+ */
+void deleteDocument(OperationContext* opCtx,
+                    const CollectionPtr& collection,
+                    Snapshotted<BSONObj> doc,
+                    StmtId stmtId,
+                    const RecordId& loc,
+                    OpDebug* opDebug,
+                    bool fromMigrate = false,
+                    bool noWarn = false,
+                    StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off,
+                    CheckRecordId checkRecordId = CheckRecordId::Off,
+                    RetryableWrite retryableWrite = RetryableWrite::kNo);
 
 }  // namespace collection_internal
 }  // namespace mongo

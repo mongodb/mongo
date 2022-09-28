@@ -110,8 +110,6 @@ public:
 
 class Collection : public Decorable<Collection> {
 public:
-    enum class StoreDeletedDoc { Off, On };
-
     /**
      * Direction of collection scan plan executor returned by makePlanExecutor().
      */
@@ -313,44 +311,6 @@ public:
 
     virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                             bool forward = true) const = 0;
-
-    /**
-     * Deletes the document with the given RecordId from the collection. For a description of the
-     * parameters, see the overloaded function below.
-     */
-    virtual void deleteDocument(OperationContext* opCtx,
-                                StmtId stmtId,
-                                const RecordId& loc,
-                                OpDebug* opDebug,
-                                bool fromMigrate = false,
-                                bool noWarn = false,
-                                StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off,
-                                CheckRecordId checkRecordId = CheckRecordId::Off) const = 0;
-
-    /**
-     * Deletes the document from the collection.
-     *
-     * 'doc' the document to be deleted.
-     * 'fromMigrate' indicates whether the delete was induced by a chunk migration, and
-     * so should be ignored by the user as an internal maintenance operation and not a
-     * real delete.
-     * 'loc' key to uniquely identify a record in a collection.
-     * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
-     * 'noWarn' if unindexing the record causes an error, if noWarn is true the error
-     * will not be logged.
-     * 'storeDeletedDoc' whether to store the document deleted in the oplog.
-     * 'checkRecordId' whether to confirm the recordId matches the record we are removing when
-     * unindexing.
-     */
-    virtual void deleteDocument(OperationContext* opCtx,
-                                Snapshotted<BSONObj> doc,
-                                StmtId stmtId,
-                                const RecordId& loc,
-                                OpDebug* opDebug,
-                                bool fromMigrate = false,
-                                bool noWarn = false,
-                                StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off,
-                                CheckRecordId checkRecordId = CheckRecordId::Off) const = 0;
 
     virtual bool updateWithDamagesSupported() const = 0;
 

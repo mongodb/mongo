@@ -87,11 +87,11 @@ public:
 
     void doDelete(const NamespaceString& nss, BSONObj deletedDoc, bool includeDeletedDoc = true) {
         auto opCtx = cc().makeOperationContext();
-        auto uuid = UUID::gen();
-        observer.aboutToDelete(opCtx.get(), nss, uuid, deletedDoc);
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
+        observer.aboutToDelete(opCtx.get(), *autoColl, deletedDoc);
         OplogDeleteEntryArgs args;
         args.deletedDoc = includeDeletedDoc ? &deletedDoc : nullptr;
-        observer.onDelete(opCtx.get(), nss, uuid, 1 /* StmtId */, args);
+        observer.onDelete(opCtx.get(), *autoColl, 1 /* StmtId */, args);
     }
 
     void doDropDatabase(const DatabaseName& dbname) {

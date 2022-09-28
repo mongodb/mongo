@@ -50,8 +50,7 @@ PrimaryOnlyServiceOpObserver::~PrimaryOnlyServiceOpObserver() = default;
 
 
 void PrimaryOnlyServiceOpObserver::aboutToDelete(OperationContext* opCtx,
-                                                 NamespaceString const& nss,
-                                                 const UUID& uuid,
+                                                 const CollectionPtr& coll,
                                                  BSONObj const& doc) {
     // Extract the _id field from the document. If it does not have an _id, use the
     // document itself as the _id.
@@ -59,10 +58,10 @@ void PrimaryOnlyServiceOpObserver::aboutToDelete(OperationContext* opCtx,
 }
 
 void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
-                                            const NamespaceString& nss,
-                                            const UUID& uuid,
+                                            const CollectionPtr& coll,
                                             StmtId stmtId,
                                             const OplogDeleteEntryArgs& args) {
+    const auto& nss = coll->ns();
     auto& documentId = documentIdDecoration(opCtx);
     invariant(!documentId.isEmpty());
 
