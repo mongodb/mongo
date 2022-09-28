@@ -1399,6 +1399,16 @@ Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
             *keysInsertedOut += inserted;
         }
     } else {
+        // Ensure that our snapshot is compatible with the index's minimum visibile snapshot.
+        const auto minVisibleTimestamp = index->getMinimumVisibleSnapshot();
+        const auto readTimestamp =
+            opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(
+                opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
+        if (minVisibleTimestamp && !readTimestamp.isNull() &&
+            readTimestamp < *minVisibleTimestamp) {
+            throw WriteConflictException();
+        }
+
         int64_t numInserted = 0;
         status = index->accessMethod()->insertKeysAndUpdateMultikeyPaths(
             opCtx,
@@ -1582,6 +1592,14 @@ void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
     // for unindex operations, since initial sync can build an index over a collection with
     // duplicates. See SERVER-17487 for more details.
     options.dupsAllowed = options.dupsAllowed || !index->isReady(opCtx, collection);
+
+    // Ensure that our snapshot is compatible with the index's minimum visibile snapshot.
+    const auto minVisibleTimestamp = index->getMinimumVisibleSnapshot();
+    const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(
+        opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
+    if (minVisibleTimestamp && !readTimestamp.isNull() && readTimestamp < *minVisibleTimestamp) {
+        throw WriteConflictException();
+    }
 
     int64_t removed = 0;
     Status status = index->accessMethod()->removeKeys(opCtx, keys, loc, options, &removed);
