@@ -17,7 +17,8 @@
 //   # will override the 'getIndexes()' helper to hide the implicitly created index. This override
 //   # messes with the latency stats tracking and counts the operation as an aggregate instead of a
 //   # command. It's an implementation detail that leaks and invalidates the test.
-//   assumes_no_implicit_index_creation
+//   assumes_no_implicit_index_creation,
+//   uses_compact
 // ]
 //
 

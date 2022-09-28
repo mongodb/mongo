@@ -12,6 +12,7 @@
 //   no_selinux,
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
+//   uses_compact,
 // ]
 
 // This file tests that commands namespace parsing rejects embedded null bytes.
