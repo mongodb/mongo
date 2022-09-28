@@ -97,7 +97,7 @@ public:
 
         auto expr = evalExpr.extractExpr();
         auto compiledExpr = expr->compile(_planStageData.ctx);
-        sbe::vm::ByteCode _vm;
+        sbe::vm::ByteCode vm;
 
         LOGV2_DEBUG(
             6979802,
@@ -111,7 +111,10 @@ public:
                 _inputSlotAccessor->reset(false,
                                           sbe::value::TypeTags::bsonObject,
                                           sbe::value::bitcastFrom<const char*>(document.objdata()));
-                benchmark::DoNotOptimize(_vm.run(compiledExpr.get()));
+                auto [owned, tag, val] = vm.run(compiledExpr.get());
+                if (owned) {
+                    sbe::value::releaseValue(tag, val);
+                }
             }
             benchmark::ClobberMemory();
         }
