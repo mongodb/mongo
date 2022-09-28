@@ -40,9 +40,16 @@ template <class Node, class T>
 void calculateSubDiffHelper(const BSONElement& preVal,
                             const BSONElement& postVal,
                             T fieldIdentifier,
-                            Node* diffNode);
+                            Node* diffNode,
+                            bool ignoreSizeLimit);
 
-std::unique_ptr<diff_tree::ArrayNode> computeArrayDiff(const BSONObj& pre, const BSONObj& post) {
+/**
+ * Computes an array diff between the given 'pre' and 'post' images. If 'ignoreSizeLimit' is false,
+ * returns a nullptr if the size of the computed diff is larger than the 'post' image.
+ */
+std::unique_ptr<diff_tree::ArrayNode> computeArrayDiff(const BSONObj& pre,
+                                                       const BSONObj& post,
+                                                       bool ignoreSizeLimit) {
     auto diffNode = std::make_unique<diff_tree::ArrayNode>();
     auto preItr = BSONObjIterator(pre);
     auto postItr = BSONObjIterator(post);
@@ -50,7 +57,7 @@ std::unique_ptr<diff_tree::ArrayNode> computeArrayDiff(const BSONObj& pre, const
     size_t nFieldsInPostArray = 0;
     while (preItr.more() && postItr.more()) {
         // Bailout if the generated diff so far is larger than the 'post' object.
-        if (postObjSize < diffNode->getObjSize()) {
+        if (!ignoreSizeLimit && (postObjSize < diffNode->getObjSize())) {
             return nullptr;
         }
 
@@ -62,7 +69,8 @@ std::unique_ptr<diff_tree::ArrayNode> computeArrayDiff(const BSONObj& pre, const
             // array or object.
             if (preVal.type() == postVal.type() &&
                 (preVal.type() == BSONType::Object || preVal.type() == BSONType::Array)) {
-                calculateSubDiffHelper(preVal, postVal, nFieldsInPostArray, diffNode.get());
+                calculateSubDiffHelper(
+                    preVal, postVal, nFieldsInPostArray, diffNode.get(), ignoreSizeLimit);
             } else {
                 diffNode->addUpdate(nFieldsInPostArray, postVal);
             }
@@ -86,11 +94,19 @@ std::unique_ptr<diff_tree::ArrayNode> computeArrayDiff(const BSONObj& pre, const
     if (preItr.more()) {
         diffNode->setResize(nFieldsInPostArray);
     }
-    return (postObjSize > diffNode->getObjSize()) ? std::move(diffNode) : nullptr;
+    return (ignoreSizeLimit || (postObjSize > diffNode->getObjSize())) ? std::move(diffNode)
+                                                                       : nullptr;
 }
 
+/**
+ * Computes an object diff between the given 'pre' and 'post' images. If 'ignoreSizeLimit' is false,
+ * returns a nullptr if the size of the computed diff is larger than the 'post' image. The
+ * 'padding' represents the additional size that needs be added to the size of the diff, while
+ * comparing whether the diff is viable.
+ */
 std::unique_ptr<diff_tree::DocumentSubDiffNode> computeDocDiff(const BSONObj& pre,
                                                                const BSONObj& post,
+                                                               bool ignoreSizeLimit,
                                                                size_t padding = 0) {
     auto diffNode = std::make_unique<diff_tree::DocumentSubDiffNode>(padding);
     BSONObjIterator preItr(pre);
@@ -99,7 +115,7 @@ std::unique_ptr<diff_tree::DocumentSubDiffNode> computeDocDiff(const BSONObj& pr
     std::set<StringData> deletes;
     while (preItr.more() && postItr.more()) {
         // Bailout if the generated diff so far is larger than the 'post' object.
-        if (postObjSize < diffNode->getObjSize()) {
+        if (!ignoreSizeLimit && (postObjSize < diffNode->getObjSize())) {
             return nullptr;
         }
 
@@ -120,7 +136,7 @@ std::unique_ptr<diff_tree::DocumentSubDiffNode> computeDocDiff(const BSONObj& pr
                 // Both are either arrays or objects, recursively compute the diff of the respective
                 // array or object.
                 calculateSubDiffHelper(
-                    preVal, postVal, preVal.fieldNameStringData(), diffNode.get());
+                    preVal, postVal, preVal.fieldNameStringData(), diffNode.get(), ignoreSizeLimit);
             } else {
                 // Any other case, just replace with the 'postVal'.
                 diffNode->addUpdate((*preItr).fieldNameStringData(), postVal);
@@ -157,19 +173,21 @@ std::unique_ptr<diff_tree::DocumentSubDiffNode> computeDocDiff(const BSONObj& pr
     for (auto&& deleteField : deletes) {
         diffNode->addDelete(deleteField);
     }
-    return (postObjSize > diffNode->getObjSize()) ? std::move(diffNode) : nullptr;
+    return (ignoreSizeLimit || (postObjSize > diffNode->getObjSize())) ? std::move(diffNode)
+                                                                       : nullptr;
 }
 
 template <class Node, class T>
 void calculateSubDiffHelper(const BSONElement& preVal,
                             const BSONElement& postVal,
                             T fieldIdentifier,
-                            Node* diffNode) {
+                            Node* diffNode,
+                            bool ignoreSizeLimit) {
     auto subDiff = (preVal.type() == BSONType::Object)
         ? std::unique_ptr<diff_tree::InternalNode>(
-              computeDocDiff(preVal.embeddedObject(), postVal.embeddedObject()))
+              computeDocDiff(preVal.embeddedObject(), postVal.embeddedObject(), ignoreSizeLimit))
         : std::unique_ptr<diff_tree::InternalNode>(
-              computeArrayDiff(preVal.embeddedObject(), postVal.embeddedObject()));
+              computeArrayDiff(preVal.embeddedObject(), postVal.embeddedObject(), ignoreSizeLimit));
     if (!subDiff) {
         // We could not compute sub-diff because the potential sub-diff is bigger than the 'postVal'
         // itself. So we just log the modification as an update.
@@ -234,13 +252,95 @@ bool anyIndexesMightBeAffected(const DiffNode* node,
     }
     return false;
 }
+
+/**
+ * Appends the given element to the given BSONObjBuilder. If the element is an object, sets the
+ * value of the most inner field(s) to 'innerValue'. Otherwise, sets the value of the field to
+ * 'outerValue'.
+ */
+void appendFieldNested(stdx::variant<mutablebson::Element, BSONElement> elt,
+                       StringData outerValue,
+                       StringData innerValue,
+                       BSONObjBuilder* bob) {
+    stdx::visit(OverloadedVisitor{[&](const mutablebson::Element& element) {
+                                      auto fieldName = element.getFieldName();
+                                      if (element.getType() == BSONType::Object) {
+                                          auto elementObj = element.getValueObject();
+                                          if (!elementObj.isEmpty()) {
+                                              BSONObjBuilder subBob(bob->subobjStart(fieldName));
+                                              for (const auto& subElement : elementObj) {
+                                                  appendFieldNested(
+                                                      subElement, innerValue, innerValue, &subBob);
+                                              }
+                                              return;
+                                          }
+                                      }
+                                      bob->append(fieldName, outerValue);
+                                  },
+                                  [&](BSONElement element) {
+                                      auto fieldName = element.fieldNameStringData();
+                                      if (element.type() == BSONType::Object) {
+                                          auto elementObj = element.Obj();
+                                          if (!elementObj.isEmpty()) {
+                                              BSONObjBuilder subBob(bob->subobjStart(fieldName));
+                                              for (const auto& subElement : elementObj) {
+                                                  appendFieldNested(
+                                                      subElement, innerValue, innerValue, &subBob);
+                                              }
+                                              return;
+                                          }
+                                      }
+                                      bob->append(fieldName, outerValue);
+                                  }},
+                elt);
+}
+
+void serializeInlineDiff(diff_tree::DocumentSubDiffNode const* node, BSONObjBuilder* bob) {
+    for (auto&& [field, child] : node->getChildren()) {
+        StringWrapper wrapper(field);
+        auto fieldName = wrapper.getStr().toString();
+        switch (child->type()) {
+            case diff_tree::NodeType::kInsert: {
+                appendFieldNested(checked_cast<const diff_tree::InsertNode&>(*child).elt,
+                                  doc_diff::kInsertSectionFieldName, /* outerValue */
+                                  doc_diff::kInsertSectionFieldName, /* innerValue */
+                                  bob);
+                break;
+            }
+            case diff_tree::NodeType::kUpdate: {
+                appendFieldNested(checked_cast<const diff_tree::UpdateNode&>(*child).elt,
+                                  doc_diff::kUpdateSectionFieldName, /* outerValue */
+                                  doc_diff::kInsertSectionFieldName, /* innerValue */
+                                  bob);
+                break;
+            }
+            case diff_tree::NodeType::kDelete: {
+                bob->append(fieldName, doc_diff::kDeleteSectionFieldName);
+                break;
+            }
+            case diff_tree::NodeType::kDocumentSubDiff: {
+                BSONObjBuilder subBob(bob->subobjStart(fieldName));
+                serializeInlineDiff(
+                    checked_cast<const diff_tree::DocumentSubDiffNode*>(child.get()), &subBob);
+                break;
+            }
+            case diff_tree::NodeType::kArray: {
+                bob->append(fieldName, doc_diff::kUpdateSectionFieldName);
+                break;
+            }
+            case diff_tree::NodeType::kDocumentInsert: {
+                MONGO_UNREACHABLE;
+            }
+        }
+    }
+}
 }  // namespace
 
-boost::optional<DiffResult> computeDiff(const BSONObj& pre,
-                                        const BSONObj& post,
-                                        size_t padding,
-                                        const UpdateIndexData* indexData) {
-    if (auto diffNode = computeDocDiff(pre, post, padding)) {
+boost::optional<DiffResult> computeOplogDiff(const BSONObj& pre,
+                                             const BSONObj& post,
+                                             size_t padding,
+                                             const UpdateIndexData* indexData) {
+    if (auto diffNode = computeDocDiff(pre, post, false /* ignoreSizeLimit */, padding)) {
         auto diff = diffNode->serialize();
         if (diff.objsize() < post.objsize()) {
             FieldRef path;
@@ -251,4 +351,15 @@ boost::optional<DiffResult> computeDiff(const BSONObj& pre,
     }
     return {};
 }
+
+boost::optional<BSONObj> computeInlineDiff(const BSONObj& pre, const BSONObj& post) {
+    auto diffNode = computeDocDiff(pre, post, true /* ignoreSizeLimit */, 0);
+    BSONObjBuilder bob;
+    serializeInlineDiff(diffNode.get(), &bob);
+    if (bob.bb().len() >= BSONObjMaxUserSize) {
+        return boost::none;
+    }
+    return bob.obj();
+}
+
 }  // namespace mongo::doc_diff

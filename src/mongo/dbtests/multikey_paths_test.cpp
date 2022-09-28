@@ -297,7 +297,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
 
         auto oldDoc = collection->docFor(_opCtx.get(), record->id);
         auto newDoc = BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3));
-        auto diffResult = doc_diff::computeDiff(oldDoc.value(), newDoc, 0, nullptr);
+        auto diffResult = doc_diff::computeOplogDiff(oldDoc.value(), newDoc, 0, nullptr);
         auto damagesOutput = doc_diff::computeDamages(oldDoc.value(), diffResult->diff, false);
         {
             WriteUnitOfWork wuow(_opCtx.get());

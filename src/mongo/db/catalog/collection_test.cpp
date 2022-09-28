@@ -314,7 +314,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
     ASSERT_TRUE(!oldRecordId.isNull());
 
     auto newDoc = BSON("_id" << 1 << "a" << 5 << "b" << 32);
-    auto diff = doc_diff::computeDiff(oldDoc, newDoc, 0, nullptr);
+    auto diff = doc_diff::computeOplogDiff(oldDoc, newDoc, 0, nullptr);
     ASSERT(diff);
     auto damagesOutput = doc_diff::computeDamages(oldDoc, diff->diff, false);
     {
@@ -464,11 +464,11 @@ TEST_F(CollectionTest, CheckTimeseriesBucketDocsForMixedSchemaData) {
             R"({ "control" : { "min" : { "x" : { "y" : 1 } },
                                "max" : { "x" : { "y" : [ 1, 2 ] } } } })"),
         // Insert -> {x: 1}, {x: {y: 10}}, {x: true}
-        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1 }, 
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1 },
                                              "max" : { "x" : true } } })"),
         // Insert -> {x: {y: 1}}, {x: {y: 2}}, {x: {y: null}}
         ::mongo::fromjson(
-            R"({ "control" : { "min" : { "x" : { "y" : null } }, 
+            R"({ "control" : { "min" : { "x" : { "y" : null } },
                                "max" : { "x" : { "y" : 2 } } } })"),
         // Insert -> {x: {y: true}}, {x: {y: false}}, {x: {y: null}}
         ::mongo::fromjson(

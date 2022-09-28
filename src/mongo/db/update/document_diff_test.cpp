@@ -141,10 +141,11 @@ void runTest(TestOptions* options) {
         std::vector<BSONObj> diffs;
         diffs.reserve(options->documents.size() - 1);
         for (size_t i = 1; i < options->documents.size(); ++i) {
-            const auto diffOutput = computeDiff(preDoc,
-                                                options->documents[i],
-                                                update_oplog_entry::kSizeOfDeltaOplogEntryMetadata,
-                                                nullptr);
+            const auto diffOutput =
+                computeOplogDiff(preDoc,
+                                 options->documents[i],
+                                 update_oplog_entry::kSizeOfDeltaOplogEntryMetadata,
+                                 nullptr);
 
             ASSERT(diffOutput);
             diffs.push_back(diffOutput->diff);

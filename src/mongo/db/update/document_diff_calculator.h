@@ -42,16 +42,43 @@ struct DiffResult {
 };
 
 /**
- * Returns the delta between 'pre' and 'post' by recursively iterating the object. If the size
- * of the computed delta is larger than the 'post' object then the function returns
+ * Returns the oplog v2 diff between the given 'pre' and 'post' images. The diff has the following
+ * format:
+ * {
+ *    i: {<fieldName>: <value>, ...},                       // optional insert section.
+ *    u: {<fieldName>: <newValue>, ...},                    // optional update section.
+ *    d: {<fieldName>: false, ...},                         // optional delete section.
+ *    s<arrFieldName>: {a: true, l: <integer>, ...},        // array diff.
+ *    s<objFieldName>: {i: {...}, u: {...}, d: {...}, ...}, // object diff.
+ *    ...
+ * }
+ * If the size of the computed diff is larger than the 'post' image then the function returns
  * 'boost::none'. The 'paddingForDiff' represents the additional size that needs be added to the
  * size of the diff, while comparing whether the diff is viable. If any paths in 'indexData' are
  * affected by the generated diff, then the 'indexesAffected' field in the output will be set to
  * true, false otherwise.
  */
-boost::optional<DiffResult> computeDiff(const BSONObj& pre,
-                                        const BSONObj& post,
-                                        size_t paddingForDiff,
-                                        const UpdateIndexData* indexData);
+boost::optional<DiffResult> computeOplogDiff(const BSONObj& pre,
+                                             const BSONObj& post,
+                                             size_t paddingForDiff,
+                                             const UpdateIndexData* indexData);
+
+/**
+ * Returns the inline diff between the given 'pre' and 'post' images. The diff has the same schema
+ * as the document that the images correspond to. The value of each field is set to either 'i',
+ * 'u' or 'd' to indicate that the field was inserted, updated and deleted, respectively. The
+ * fields that did not change do not show up in the diff. For example:
+ * {
+ *    <fieldName>: 'i'|'u'|'d',
+ *    <arrFieldName>: 'i'|'u'|'d',
+ *    <objFieldName>: {
+ *       <fieldName>: 'i'|'u'|'d',
+ *       ...,
+ *    },
+ *    ...
+ * }
+ * Returns 'boost::none' if the diff exceeds the BSON size limit.
+ */
+boost::optional<BSONObj> computeInlineDiff(const BSONObj& pre, const BSONObj& post);
 
 };  // namespace mongo::doc_diff

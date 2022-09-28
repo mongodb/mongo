@@ -336,7 +336,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesScalar) {
         {
             WriteUnitOfWork uow(opCtx.get());
             // {i: {c: "12", d: 2}}
-            auto diffOutput = doc_diff::computeDiff(obj0, obj1, 0, nullptr);
+            auto diffOutput = doc_diff::computeOplogDiff(obj0, obj1, 0, nullptr);
             ASSERT(diffOutput);
             auto [_, damageSource, damages] =
                 doc_diff::computeDamages(obj0, diffOutput->diff, false);
@@ -358,7 +358,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesScalar) {
         {
             WriteUnitOfWork uow(opCtx.get());
             // {u: {c: "123", d: 3}, i: {a: 1, e: 1}}
-            auto diffOutput = doc_diff::computeDiff(obj1, obj2, 0, nullptr);
+            auto diffOutput = doc_diff::computeOplogDiff(obj1, obj2, 0, nullptr);
             ASSERT(diffOutput);
             auto [_, damageSource, damages] =
                 doc_diff::computeDamages(obj1, diffOutput->diff, false);
@@ -419,7 +419,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesNested) {
         {
             WriteUnitOfWork uow(opCtx.get());
             // {u: {c: "3"}, sb: {i: {q: 1}}, sd: {sp: {u: {x: {j: "1"}}}}}
-            auto diffOutput = doc_diff::computeDiff(obj0, obj1, 0, nullptr);
+            auto diffOutput = doc_diff::computeOplogDiff(obj0, obj1, 0, nullptr);
             ASSERT(diffOutput);
             auto [_, damageSource, damages] =
                 doc_diff::computeDamages(obj0, diffOutput->diff, true);
@@ -473,7 +473,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesArray) {
         {
             WriteUnitOfWork uow(opCtx.get());
             // {sfield2: {a: true, l: 6, 's3': {a: true, l: 4, 'u2': [4]}, 'u5': 6}}
-            auto diffOutput = doc_diff::computeDiff(obj0, obj1, 0, nullptr);
+            auto diffOutput = doc_diff::computeOplogDiff(obj0, obj1, 0, nullptr);
             ASSERT(diffOutput);
             auto [_, damageSource, damages] =
                 doc_diff::computeDamages(obj0, diffOutput->diff, true);
