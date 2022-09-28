@@ -43,6 +43,8 @@
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
+#include "mongo/db/catalog/virtual_collection_impl.h"
+#include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -771,6 +773,31 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                            bool createIdIndex,
                                            const BSONObj& idIndex,
                                            bool fromMigrate) const {
+    return _createCollection(
+        opCtx, nss, options, createIdIndex, idIndex, fromMigrate, /*vopts=*/boost::none);
+}
+
+Collection* DatabaseImpl::createVirtualCollection(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const CollectionOptions& opts,
+                                                  const VirtualCollectionOptions& vopts) const {
+    return _createCollection(opCtx,
+                             nss,
+                             opts,
+                             /*createIdIndex=*/false,
+                             /*idIndex=*/BSONObj(),
+                             /*fromMigrate=*/false,
+                             vopts);
+}
+
+Collection* DatabaseImpl::_createCollection(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionOptions& options,
+    bool createIdIndex,
+    const BSONObj& idIndex,
+    bool fromMigrate,
+    const boost::optional<VirtualCollectionOptions>& vopts) const {
     invariant(!options.isView());
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
@@ -833,13 +860,21 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
           "options"_attr = options);
 
     // Create Collection object
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
-        uassertStatusOK(storageEngine->getCatalog()->createCollection(
-            opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
-    auto& catalogId = catalogIdRecordStorePair.first;
-    std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
-        opCtx, nss, catalogId, optionsWithUUID, std::move(catalogIdRecordStorePair.second));
+    auto ownedCollection = [&]() -> std::shared_ptr<Collection> {
+        if (!vopts) {
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
+                uassertStatusOK(storageEngine->getCatalog()->createCollection(
+                    opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
+            auto& catalogId = catalogIdRecordStorePair.first;
+            return Collection::Factory::get(opCtx)->make(
+                opCtx, nss, catalogId, optionsWithUUID, std::move(catalogIdRecordStorePair.second));
+        } else {
+            // Virtual collection stays only in memory and its metadata need not persist on disk and
+            // therefore we bypass DurableCatalog.
+            return VirtualCollectionImpl::make(opCtx, nss, optionsWithUUID, *vopts);
+        }
+    }();
     auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
     ownedCollection->setCommitted(false);
@@ -899,25 +934,12 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     return collection;
 }
 
-Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  CollectionOptions collectionOptions,
-                                  bool createDefaultIndexes,
-                                  const BSONObj& idIndex,
-                                  bool fromMigrate) const {
-    LOGV2_DEBUG(20324,
-                1,
-                "create collection {namespace} {collectionOptions}",
-                "namespace"_attr = nss,
-                "collectionOptions"_attr = collectionOptions.toBSON());
-    if (!NamespaceString::validCollectionComponent(nss.ns()))
-        return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << nss);
-
-    // Validate the collation, if there is one.
+StatusWith<std::unique_ptr<CollatorInterface>> DatabaseImpl::_validateCollator(
+    OperationContext* opCtx, CollectionOptions& opts) const {
     std::unique_ptr<CollatorInterface> collator;
-    if (!collectionOptions.collation.isEmpty()) {
-        auto collatorWithStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                      ->makeFromBSON(collectionOptions.collation);
+    if (!opts.collation.isEmpty()) {
+        auto collatorWithStatus =
+            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(opts.collation);
 
         if (!collatorWithStatus.isOK()) {
             return collatorWithStatus.getStatus();
@@ -933,12 +955,35 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
         // we simply unset the "collation" from the collection options. This ensures that
         // collections created on versions which do not support the collation feature have the same
         // format for representing the simple collation as collections created on this version.
-        collectionOptions.collation = collator ? collator->getSpec().toBSON() : BSONObj();
+        opts.collation = collator ? collator->getSpec().toBSON() : BSONObj();
+    }
+
+    return {std::move(collator)};
+}
+
+Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  CollectionOptions collectionOptions,
+                                  bool createDefaultIndexes,
+                                  const BSONObj& idIndex,
+                                  bool fromMigrate) const {
+    LOGV2_DEBUG(20324,
+                1,
+                "create collection {namespace} {collectionOptions}",
+                "namespace"_attr = nss,
+                "collectionOptions"_attr = collectionOptions.toBSON());
+    if (!NamespaceString::validCollectionComponent(nss.ns()))
+        return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << nss);
+
+    // Validate the collation, if there is one.
+    auto swCollator = _validateCollator(opCtx, collectionOptions);
+    if (!swCollator.isOK()) {
+        return swCollator.getStatus();
     }
 
     if (!collectionOptions.validator.isEmpty()) {
         boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(opCtx, std::move(collator), nss));
+            new ExpressionContext(opCtx, std::move(swCollator.getValue()), nss));
 
         // If the feature compatibility version is not kLatest, and we are validating features as
         // primary, ban the use of new agg features introduced in kLatest to prevent them from being
@@ -1004,11 +1049,41 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
 
         uassertStatusOK(createView(opCtx, nss, collectionOptions));
     } else {
-        invariant(createCollection(
+        invariant(_createCollection(
                       opCtx, nss, collectionOptions, createDefaultIndexes, idIndex, fromMigrate),
                   str::stream() << "Collection creation failed after validating options: " << nss
                                 << ". Options: " << collectionOptions.toBSON());
     }
+
+    return Status::OK();
+}
+
+Status DatabaseImpl::userCreateVirtualNS(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         CollectionOptions opts,
+                                         const VirtualCollectionOptions& vopts) const {
+    LOGV2_DEBUG(6968505,
+                1,
+                "create collection {namespace} {collectionOptions}",
+                "namespace"_attr = nss,
+                "collectionOptions"_attr = opts.toBSON());
+    if (!NamespaceString::validCollectionComponent(nss.ns()))
+        return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << nss);
+
+    // Validate the collation, if there is one.
+    if (auto swCollator = _validateCollator(opCtx, opts); !swCollator.isOK()) {
+        return swCollator.getStatus();
+    }
+
+    invariant(_createCollection(opCtx,
+                                nss,
+                                opts,
+                                /*createDefaultIndexes=*/false,
+                                /*idIndex=*/BSONObj(),
+                                /*fromMigrate=*/false,
+                                vopts),
+              str::stream() << "Collection creation failed after validating options: " << nss
+                            << ". Options: " << opts.toBSON());
 
     return Status::OK();
 }

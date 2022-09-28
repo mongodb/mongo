@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/commands/create_gen.h"
 
 namespace mongo {
@@ -61,6 +62,13 @@ Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
                         const CollectionOptions& options,
                         const boost::optional<BSONObj>& idIndex);
+
+/**
+ * Creates a virtual collection as described by 'vopts'.
+ */
+Status createVirtualCollection(OperationContext* opCtx,
+                               const NamespaceString& ns,
+                               const VirtualCollectionOptions& vopts);
 
 /**
  * As above, but only used by replication to apply operations. This allows recreating collections

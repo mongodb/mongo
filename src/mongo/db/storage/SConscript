@@ -66,9 +66,7 @@ env.Library(
 
 env.Library(
     target='record_store_base',
-    source=[
-        'record_store.cpp',
-    ],
+    source=['record_store.cpp', 'external_record_store.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],

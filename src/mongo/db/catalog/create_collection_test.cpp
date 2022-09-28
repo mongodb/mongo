@@ -27,28 +27,32 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/virtual_collection_impl.h"
+#include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/stdx/utility.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
 
 class CreateCollectionTest : public ServiceContextMongoDTest {
-private:
+protected:
     void setUp() override;
     void tearDown() override;
 
-protected:
     void validateValidator(const std::string& validatorStr, int expectedError);
 
     // Use StorageInterface to access storage features below catalog interface.
@@ -75,6 +79,18 @@ void CreateCollectionTest::tearDown() {
     // Tear down mongod.
     ServiceContextMongoDTest::tearDown();
 }
+
+class CreateVirtualCollectionTest : public CreateCollectionTest {
+private:
+    void setUp() override {
+        CreateCollectionTest::setUp();
+        computeModeEnabled = true;
+    }
+    void tearDown() override {
+        computeModeEnabled = false;
+        CreateCollectionTest::tearDown();
+    }
+};
 
 /**
  * Creates an OperationContext.
@@ -123,6 +139,26 @@ CollectionOptions getCollectionOptions(OperationContext* opCtx, const NamespaceS
     ASSERT_TRUE(collection) << "Unable to get collections options for " << nss
                             << " because collection does not exist.";
     return collection->getCollectionOptions();
+}
+
+/**
+ * Returns a VirtualCollectionImpl if the underlying implementation object is a virtual collection.
+ */
+const VirtualCollectionImpl* getVirtualCollection(OperationContext* opCtx,
+                                                  const NamespaceString& nss) {
+    AutoGetCollectionForRead collection(opCtx, nss);
+    return dynamic_cast<const VirtualCollectionImpl*>(collection.getCollection().get());
+}
+
+/**
+ * Returns virtual collection options.
+ */
+VirtualCollectionOptions getVirtualCollectionOptions(OperationContext* opCtx,
+                                                     const NamespaceString& nss) {
+    auto vcollPtr = getVirtualCollection(opCtx, nss);
+    ASSERT_TRUE(vcollPtr) << "Collection must be a virtual collection";
+
+    return vcollPtr->getVirtualCollectionOptions();
 }
 
 /**
@@ -288,5 +324,109 @@ TEST_F(CreateCollectionTest, ValidationDisabledForTemporaryReshardingCollection)
     ASSERT_OK(status);
 }
 
+const auto kValidUrl1 =
+    ExternalDataSourceMetadata::kDefaultFileUrlPrefix.toString() + "named_pipe1";
+const auto kValidUrl2 =
+    ExternalDataSourceMetadata::kDefaultFileUrlPrefix.toString() + "named_pipe2";
+
+TEST_F(CreateVirtualCollectionTest, VirtualCollectionOptionsWithOneSource) {
+    NamespaceString vcollNss("myDb", "vcoll.name");
+    auto opCtx = makeOpCtx();
+
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
+    VirtualCollectionOptions reqVcollOpts;
+    reqVcollOpts.dataSources.emplace_back(kValidUrl1, StorageType::pipe, FileType::bson);
+    ASSERT_OK(createVirtualCollection(opCtx.get(), vcollNss, reqVcollOpts));
+    ASSERT_TRUE(getVirtualCollection(opCtx.get(), vcollNss));
+
+    ASSERT_EQ(stdx::to_underlying(getCollectionOptions(opCtx.get(), vcollNss).autoIndexId),
+              stdx::to_underlying(CollectionOptions::NO));
+
+    auto vcollOpts = getVirtualCollectionOptions(opCtx.get(), vcollNss);
+    ASSERT_EQ(vcollOpts.dataSources.size(), 1);
+    ASSERT_EQ(vcollOpts.dataSources[0].url, kValidUrl1);
+    ASSERT_EQ(stdx::to_underlying(vcollOpts.dataSources[0].storageType),
+              stdx::to_underlying(StorageType::pipe));
+    ASSERT_EQ(stdx::to_underlying(vcollOpts.dataSources[0].fileType),
+              stdx::to_underlying(FileType::bson));
+}
+
+TEST_F(CreateVirtualCollectionTest, VirtualCollectionOptionsWithMultiSource) {
+    NamespaceString vcollNss("myDb", "vcoll.name");
+    auto opCtx = makeOpCtx();
+
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
+    VirtualCollectionOptions reqVcollOpts;
+    reqVcollOpts.dataSources.emplace_back(kValidUrl1, StorageType::pipe, FileType::bson);
+    reqVcollOpts.dataSources.emplace_back(kValidUrl2, StorageType::pipe, FileType::bson);
+
+    ASSERT_OK(createVirtualCollection(opCtx.get(), vcollNss, reqVcollOpts));
+    ASSERT_TRUE(getVirtualCollection(opCtx.get(), vcollNss));
+
+    ASSERT_EQ(stdx::to_underlying(getCollectionOptions(opCtx.get(), vcollNss).autoIndexId),
+              stdx::to_underlying(CollectionOptions::NO));
+
+    auto vcollOpts = getVirtualCollectionOptions(opCtx.get(), vcollNss);
+    ASSERT_EQ(vcollOpts.dataSources.size(), 2);
+    for (int i = 0; i < 2; ++i) {
+        ASSERT_EQ(vcollOpts.dataSources[i].url, reqVcollOpts.dataSources[i].url);
+        ASSERT_EQ(stdx::to_underlying(vcollOpts.dataSources[i].storageType),
+                  stdx::to_underlying(StorageType::pipe));
+        ASSERT_EQ(stdx::to_underlying(vcollOpts.dataSources[i].fileType),
+                  stdx::to_underlying(FileType::bson));
+    }
+}
+
+TEST_F(CreateVirtualCollectionTest, InvalidVirtualCollectionOptions) {
+    using namespace fmt::literals;
+
+    NamespaceString vcollNss("myDb", "vcoll.name");
+    auto opCtx = makeOpCtx();
+
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
+
+    {
+        bool exceptionOccurred = false;
+        VirtualCollectionOptions reqVcollOpts;
+        constexpr auto kInvalidUrl = "file:///abc/named_pipe"_sd;
+        try {
+            reqVcollOpts.dataSources.emplace_back(kInvalidUrl, StorageType::pipe, FileType::bson);
+        } catch (const DBException&) {
+            exceptionOccurred = true;
+        }
+
+        ASSERT_TRUE(exceptionOccurred)
+            << "Invalid 'url': {} must fail but succeeded"_format(kInvalidUrl);
+    }
+
+    {
+        bool exceptionOccurred = false;
+        VirtualCollectionOptions reqVcollOpts;
+        constexpr auto kInvalidStorageType = StorageType(2);
+        try {
+            reqVcollOpts.dataSources.emplace_back(kValidUrl1, kInvalidStorageType, FileType::bson);
+        } catch (const DBException&) {
+            exceptionOccurred = true;
+        }
+
+        ASSERT_TRUE(exceptionOccurred)
+            << "Unknown 'storageType': {} must fail but succeeded"_format(
+                   stdx::to_underlying(kInvalidStorageType));
+    }
+
+    {
+        bool exceptionOccurred = false;
+        VirtualCollectionOptions reqVcollOpts;
+        constexpr auto kInvalidFileType = FileType(2);
+        try {
+            reqVcollOpts.dataSources.emplace_back(kValidUrl1, StorageType::pipe, kInvalidFileType);
+        } catch (const DBException&) {
+            exceptionOccurred = true;
+        }
+
+        ASSERT_TRUE(exceptionOccurred) << "Unknown 'fileType': {} must fail but succeeded"_format(
+            stdx::to_underlying(kInvalidFileType));
+    }
+}
 }  // namespace
 }  // namespace mongo

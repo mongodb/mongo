@@ -20,6 +20,17 @@ const configsvrOption = {
     setParameter: "enableComputeMode=true"
 };
 
+(function testStandaloneMongod() {
+    const conn = MongoRunner.runMongod();
+    const db = conn.getDB(jsTestName());
+
+    assert.commandFailedWithCode(db.createCollection("a", {virtual: {}}),
+                                 40415,
+                                 "ERROR from virtual collection creation in regular mode");
+
+    MongoRunner.stopMongod(conn);
+})();
+
 (function testComputeModeInStandaloneMongod() {
     const conn = MongoRunner.runMongod(mongodOption);
 
@@ -35,6 +46,10 @@ const configsvrOption = {
         }
     });
     assert(warningMsgFound, "ERROR from warning message match");
+
+    assert.commandFailedWithCode(db.createCollection("a", {virtual: {}}),
+                                 40415,
+                                 "ERROR from virtual collection creation in compute mode");
 
     MongoRunner.stopMongod(conn);
 })();

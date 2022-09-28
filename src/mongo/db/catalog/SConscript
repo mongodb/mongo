@@ -370,6 +370,7 @@ env.Library(
         'index_catalog_entry_impl.cpp',
         'index_catalog_impl.cpp',
         'index_consistency.cpp',
+        'virtual_collection_impl.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -676,6 +677,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/util/pcre_wrapper',
             'catalog_control',
             'catalog_helpers',
+            'catalog_impl',
             'catalog_test_fixture',
             'collection',
             'collection_catalog',

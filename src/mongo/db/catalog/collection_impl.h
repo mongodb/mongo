@@ -36,6 +36,13 @@ namespace mongo {
 
 class CollectionImpl final : public Collection {
 public:
+    // Uses the collator factory to convert the BSON representation of a collator to a
+    // CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be
+    // valid, since it gets validated on collection create.
+    static std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
+                                                             const NamespaceString& nss,
+                                                             BSONObj collationSpec);
+
     // TODO SERVER-56999: We should just need one API to create Collections
     explicit CollectionImpl(OperationContext* opCtx,
                             const NamespaceString& nss,

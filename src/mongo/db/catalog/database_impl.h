@@ -81,12 +81,22 @@ public:
                         const BSONObj& idIndex,
                         bool fromMigrate) const final;
 
+    Status userCreateVirtualNS(OperationContext* opCtx,
+                               const NamespaceString& fullns,
+                               CollectionOptions opts,
+                               const VirtualCollectionOptions& vopts) const final;
+
     Collection* createCollection(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const CollectionOptions& options = CollectionOptions(),
                                  bool createDefaultIndexes = true,
                                  const BSONObj& idIndex = BSONObj(),
                                  bool fromMigrate = false) const final;
+
+    Collection* createVirtualCollection(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        const CollectionOptions& opts,
+                                        const VirtualCollectionOptions& vopts) const final;
 
     Status createView(OperationContext* opCtx,
                       const NamespaceString& viewName,
@@ -105,6 +115,17 @@ public:
 
 private:
     friend class DatabaseHolderImpl;
+
+    StatusWith<std::unique_ptr<CollatorInterface>> _validateCollator(OperationContext* opCtx,
+                                                                     CollectionOptions& opts) const;
+    Collection* _createCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const CollectionOptions& opts = CollectionOptions(),
+        bool createDefaultIndexes = true,
+        const BSONObj& idIndex = BSONObj(),
+        bool fromMigrate = false,
+        const boost::optional<VirtualCollectionOptions>& vopts = boost::none) const;
 
     /**
      * Throws if there is a reason 'ns' cannot be created as a user collection. Namespace pattern

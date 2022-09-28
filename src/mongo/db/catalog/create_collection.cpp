@@ -36,9 +36,11 @@
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/unique_collection_name.h"
+#include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -52,6 +54,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -493,10 +496,12 @@ Status _createTimeseries(OperationContext* opCtx,
     return ret;
 }
 
-Status _createCollection(OperationContext* opCtx,
-                         const NamespaceString& nss,
-                         const CollectionOptions& collectionOptions,
-                         const boost::optional<BSONObj>& idIndex) {
+Status _createCollection(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionOptions& collectionOptions,
+    const boost::optional<BSONObj>& idIndex,
+    const boost::optional<VirtualCollectionOptions>& virtualCollectionOptions = boost::none) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
@@ -577,14 +582,15 @@ Status _createCollection(OperationContext* opCtx,
         // Even though 'collectionOptions' is passed by rvalue reference, it is not safe to move
         // because 'userCreateNS' may throw a WriteConflictException.
         if (idIndex == boost::none || collectionOptions.clusteredIndex) {
-            status = db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
+            status = virtualCollectionOptions
+                ? db->userCreateVirtualNS(opCtx, nss, collectionOptions, *virtualCollectionOptions)
+                : db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
         } else {
             bool createIdIndex = true;
             if (MONGO_unlikely(skipIdIndex.shouldFail())) {
                 createIdIndex = false;
             }
-            status = db->userCreateNS(
-                opCtx, nss, collectionOptions, /*createIdIndex=*/createIdIndex, *idIndex);
+            status = db->userCreateNS(opCtx, nss, collectionOptions, createIdIndex, *idIndex);
         }
         if (!status.isOK()) {
             return status;
@@ -883,6 +889,17 @@ Status createCollection(OperationContext* opCtx,
                 !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
         return _createCollection(opCtx, ns, options, idIndex);
     }
+}
+
+Status createVirtualCollection(OperationContext* opCtx,
+                               const NamespaceString& ns,
+                               const VirtualCollectionOptions& vopts) {
+    tassert(6968504,
+            "Virtual collection is available when the compute mode is enabled",
+            computeModeEnabled);
+    CollectionOptions options;
+    options.setNoIdIndex();
+    return _createCollection(opCtx, ns, options, boost::none, vopts);
 }
 
 }  // namespace mongo

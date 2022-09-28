@@ -79,36 +79,6 @@ MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
 
 MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
 
-// Uses the collator factory to convert the BSON representation of a collator to a
-// CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be
-// valid, since it gets validated on collection create.
-std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  BSONObj collationSpec) {
-    if (collationSpec.isEmpty()) {
-        return {nullptr};
-    }
-
-    auto collator =
-        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationSpec);
-
-    // If the collection's default collator has a version not currently supported by our ICU
-    // integration, shut down the server. Errors other than IncompatibleCollationVersion should not
-    // be possible, so these are an invariant rather than fassert.
-    if (collator == ErrorCodes::IncompatibleCollationVersion) {
-        LOGV2(20288,
-              "Collection {namespace} has a default collation which is incompatible with this "
-              "version: {collationSpec}"
-              "Collection has a default collation incompatible with this version",
-              logAttrs(nss),
-              "collationSpec"_attr = collationSpec);
-        fassertFailedNoTrace(40144);
-    }
-    invariant(collator.getStatus());
-
-    return std::move(collator.getValue());
-}
-
 Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
                                    const NamespaceString& nss,
                                    const UUID& uuid) {
@@ -272,6 +242,33 @@ bool isIndexCompatible(std::shared_ptr<IndexCatalogEntry> index, Timestamp readT
 }
 
 }  // namespace
+
+std::unique_ptr<CollatorInterface> CollectionImpl::parseCollation(OperationContext* opCtx,
+                                                                  const NamespaceString& nss,
+                                                                  BSONObj collationSpec) {
+    if (collationSpec.isEmpty()) {
+        return nullptr;
+    }
+
+    auto collator =
+        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationSpec);
+
+    // If the collection's default collator has a version not currently supported by our ICU
+    // integration, shut down the server. Errors other than IncompatibleCollationVersion should not
+    // be possible, so these are an invariant rather than fassert.
+    if (collator == ErrorCodes::IncompatibleCollationVersion) {
+        LOGV2(20288,
+              "Collection {namespace} has a default collation which is incompatible with this "
+              "version: {collationSpec}"
+              "Collection has a default collation incompatible with this version",
+              logAttrs(nss),
+              "collationSpec"_attr = collationSpec);
+        fassertFailedNoTrace(40144);
+    }
+    invariant(collator.getStatus());
+
+    return std::move(collator.getValue());
+}
 
 CollectionImpl::SharedState::SharedState(CollectionImpl* collection,
                                          std::unique_ptr<RecordStore> recordStore,
