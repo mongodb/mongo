@@ -357,17 +357,33 @@ void ColumnScanStage::readParentsIntoObj(StringData path,
 bool ColumnScanStage::checkFilter(CellView cell, size_t filterIndex, const PathValue& path) {
     auto splitCellView = SplitCellView::parse(cell);
 
-    SplitCellView::CursorWithArrayDepth<value::ColumnStoreEncoder> cellCursor{
-        splitCellView.firstValuePtr, splitCellView.arrInfo, &_encoder};
+    if (!splitCellView.hasDoubleNestedArrays) {
+        // When there are no doubly-nested arrays, we can read all of the values using a simple
+        // cursor.
+        SplitCellView::Cursor<value::ColumnStoreEncoder> cellCursor =
+            splitCellView.subcellValuesGenerator<value::ColumnStoreEncoder>(&_encoder);
 
-    while (cellCursor.hasNext()) {
-        auto [val, depth] = cellCursor.nextValue();
-        if (depth > 0)
-            continue;
+        while (cellCursor.hasNext()) {
+            const auto& val = cellCursor.nextValue();
 
-        _filterInputAccessors[filterIndex].reset(val->first, val->second);
-        if (_bytecode.runPredicate(_filterExprsCode[filterIndex].get())) {
-            return true;
+            _filterInputAccessors[filterIndex].reset(val->first, val->second);
+            if (_bytecode.runPredicate(_filterExprsCode[filterIndex].get())) {
+                return true;
+            }
+        }
+    } else {
+        SplitCellView::CursorWithArrayDepth<value::ColumnStoreEncoder> cellCursor{
+            splitCellView.firstValuePtr, splitCellView.arrInfo, &_encoder};
+
+        while (cellCursor.hasNext()) {
+            auto [val, depth] = cellCursor.nextValue();
+            if (depth > 0)
+                continue;
+
+            _filterInputAccessors[filterIndex].reset(val->first, val->second);
+            if (_bytecode.runPredicate(_filterExprsCode[filterIndex].get())) {
+                return true;
+            }
         }
     }
     return false;
