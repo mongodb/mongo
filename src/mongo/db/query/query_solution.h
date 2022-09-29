@@ -1528,9 +1528,8 @@ struct EqLookupNode : public QuerySolutionNode {
     }
 
     const ProvidedSortSet& providedSorts() const final {
-        // TODO SERVER-62815: The ProvidedSortSet will need to be computed here in order to allow
-        // sort optimization. The "joinField" field overwrites the field in the result outer
-        // document, this can affect the provided sort. For now, use conservative kEmptySet.
+        // Right now, we conservatively return kEmptySet. A future optimization could theoretically
+        // take the "joinField" into account when deciding whether this provides a sort or not.
         return kEmptySet;
     }
 
