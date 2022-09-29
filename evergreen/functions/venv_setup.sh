@@ -74,10 +74,9 @@ activate_venv
 echo "Upgrading pip to 21.0.1"
 
 python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
-python -m pip --disable-pip-version-check install -r "$toolchain_txt" -q --log install.log
-if [ $? != 0 ]; then
+if ! python -m pip --disable-pip-version-check install -r "$toolchain_txt" -q --log install.log; then
   echo "Pip install error"
-  cat install.log
+  cat install.log || true
   exit 1
 fi
 python -m pip freeze > pip-requirements.txt
