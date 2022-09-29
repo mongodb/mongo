@@ -1174,14 +1174,15 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
     std::vector<std::pair<ShardId, boost::optional<ReshardingOplogApplierProgress>>>
         progressDocList;
     for (const auto& donor : _donorShards) {
+        auto setOrAdd = [](auto& opt, auto add) { opt = opt.value_or(0) + add; };
         {
             AutoGetCollection oplogBufferColl(opCtx.get(),
                                               resharding::getLocalOplogBufferNamespace(
                                                   _metadata.getSourceUUID(), donor.getShardId()),
                                               MODE_IS);
             if (oplogBufferColl) {
-                optional_util::setOrAdd(externalMetrics.oplogEntriesFetched,
-                                        oplogBufferColl->numRecords(opCtx.get()));
+                setOrAdd(externalMetrics.oplogEntriesFetched,
+                         oplogBufferColl->numRecords(opCtx.get()));
             }
         }
 
@@ -1201,8 +1202,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
             if (!result.isEmpty()) {
                 progressDoc = ReshardingOplogApplierProgress::parse(
                     IDLParserContext("resharding-recipient-service-progress-doc"), result);
-                optional_util::setOrAdd(externalMetrics.oplogEntriesApplied,
-                                        progressDoc->getNumEntriesApplied());
+                setOrAdd(externalMetrics.oplogEntriesApplied, progressDoc->getNumEntriesApplied());
             }
         }
 

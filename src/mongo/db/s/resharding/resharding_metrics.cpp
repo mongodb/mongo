@@ -73,7 +73,7 @@ Date_t readStartTime(const CommonReshardingMetadata& metadata, ClockSource* fall
 
 void ReshardingMetrics::ExternallyTrackedRecipientFields::accumulateFrom(
     const ReshardingOplogApplierProgress& progressDoc) {
-    using optional_util::setOrAdd;
+    auto setOrAdd = [](auto& opt, auto add) { opt = opt.value_or(0) + add; };
     setOrAdd(insertsApplied, progressDoc.getInsertsApplied());
     setOrAdd(updatesApplied, progressDoc.getUpdatesApplied());
     setOrAdd(deletesApplied, progressDoc.getDeletesApplied());
