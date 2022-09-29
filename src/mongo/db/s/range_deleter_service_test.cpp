@@ -811,4 +811,44 @@ TEST_F(RangeDeleterServiceTest, PerformActualRangeDeletionWithKeyPattern) {
     ASSERT_EQUALS(dbclient.count(nss), 0);
 }
 
+TEST_F(RangeDeleterServiceTest, GetOverlappingRangeDeletionsWithNonContiguousTasks) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Register range deletion tasks [0, 10) - [10, 20) - [30, 40).
+    auto taskWithOngoingQueries0 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
+    auto completionFuture0 =
+        registerAndCreatePersistentTask(opCtx,
+                                        taskWithOngoingQueries0->getTask(),
+                                        taskWithOngoingQueries0->getOngoingQueriesFuture());
+    auto taskWithOngoingQueries10 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 10), BSON(kShardKey << 20));
+    auto completionFuture10 =
+        registerAndCreatePersistentTask(opCtx,
+                                        taskWithOngoingQueries10->getTask(),
+                                        taskWithOngoingQueries10->getOngoingQueriesFuture());
+    auto taskWithOngoingQueries30 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 30), BSON(kShardKey << 40));
+    auto completionFuture30 =
+        registerAndCreatePersistentTask(opCtx,
+                                        taskWithOngoingQueries30->getTask(),
+                                        taskWithOngoingQueries30->getOngoingQueriesFuture());
+
+    // Range overlapping with [10, 20) and [30, 40).
+    auto inputRange = ChunkRange(BSON(kShardKey << 25), BSON(kShardKey << 35));
+    auto futureReadyWhenTask30Ready =
+        rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!futureReadyWhenTask30Ready.isReady());
+
+    // Drain ongoing queries one task per time and check only expected futures get marked as ready.
+    taskWithOngoingQueries0->drainOngoingQueries();
+    ASSERT(!futureReadyWhenTask30Ready.isReady());
+
+    taskWithOngoingQueries10->drainOngoingQueries();
+    ASSERT(!futureReadyWhenTask30Ready.isReady());
+
+    taskWithOngoingQueries30->drainOngoingQueries();
+    ASSERT_OK(futureReadyWhenTask30Ready.getNoThrow(opCtx));
+}
+
 }  // namespace mongo

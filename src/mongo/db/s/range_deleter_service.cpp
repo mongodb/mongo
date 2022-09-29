@@ -548,18 +548,21 @@ SharedSemiFuture<void> RangeDeleterService::getOverlappingRangeDeletionsFuture(
     }
 
     std::vector<ExecutorFuture<void>> overlappingRangeDeletionsFutures;
+    auto addOverlappingRangeDeletionFuture = [&](std::shared_ptr<ChunkRange> range) {
+        auto future = static_cast<RangeDeletion*>(range.get())->getCompletionFuture();
+        // Scheduling wait on the current executor so that it gets invalidated on step-down
+        overlappingRangeDeletionsFutures.push_back(future.thenRunOn(_executor));
+    };
 
     auto& rangeDeletions = mapEntry->second;
     const auto rangeSharedPtr = std::make_shared<ChunkRange>(range);
     auto forwardIt = rangeDeletions.lower_bound(rangeSharedPtr);
-    if (forwardIt != rangeDeletions.begin()) {
-        forwardIt--;
+    if (forwardIt != rangeDeletions.begin() && (std::prev(forwardIt)->get()->overlapWith(range))) {
+        addOverlappingRangeDeletionFuture(*std::prev(forwardIt));
     }
 
     while (forwardIt != rangeDeletions.end() && forwardIt->get()->overlapWith(range)) {
-        auto future = static_cast<RangeDeletion*>(forwardIt->get())->getCompletionFuture();
-        // Scheduling wait on the current executor so that it gets invalidated on step-down
-        overlappingRangeDeletionsFutures.push_back(future.thenRunOn(_executor));
+        addOverlappingRangeDeletionFuture(*forwardIt);
         forwardIt++;
     }
 
