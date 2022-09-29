@@ -612,9 +612,24 @@ void removePersistentRangeDeletionTask(OperationContext* opCtx,
 }
 
 void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUID& collectionUuid) {
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    DBDirectClient dbClient(opCtx);
+
     auto query = BSON(RangeDeletionTask::kCollectionUuidFieldName << collectionUuid);
-    store.remove(opCtx, query);
+    auto commandResponse = dbClient.runCommand([&] {
+        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kRangeDeletionNamespace);
+
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(query);
+            entry.setMulti(true);
+            return entry;
+        }()});
+
+        return deleteOp.serialize({});
+    }());
+
+    const auto commandReply = commandResponse->getCommandReply();
+    uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
 }
 
 }  // namespace mongo

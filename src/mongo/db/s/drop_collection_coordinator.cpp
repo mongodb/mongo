@@ -104,6 +104,9 @@ DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opC
     const auto catalog = Grid::get(opCtx)->catalogCache();
     uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, nss));
     CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
+
+    // Ensures the remove of range deletions and the refresh of the catalog cache will be waited for
+    // majority at the end of the command
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
     return result;
