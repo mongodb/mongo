@@ -777,6 +777,16 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::_insertNewInst
 
                 return instance->run(std::move(scopedExecutor), std::move(token));
             })
+            // TODO SERVER-61717 remove this error handler once instance are automatically released
+            // at the end of run()
+            .onError<ErrorCodes::ConflictingServerlessOperation>([this, instanceID](Status status) {
+                LOGV2(6531507,
+                      "Removing instance due to ConflictingServerlessOperation error",
+                      "instanceID"_attr = instanceID);
+                releaseInstance(instanceID, Status::OK());
+
+                return status;
+            })
             .semi();
 
     auto [it, inserted] = _activeInstances.try_emplace(

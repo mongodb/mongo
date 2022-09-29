@@ -123,7 +123,6 @@ void checkForTokenInterrupt(const CancellationToken& token) {
     uassert(ErrorCodes::CallbackCanceled, "Donor service interrupted", !token.isCanceled());
 }
 
-
 template <class Promise>
 void setPromiseFromStatusIfNotReady(WithLock lk, Promise& promise, Status status) {
     if (promise.getFuture().isReady()) {
@@ -153,6 +152,17 @@ void setPromiseOkIfNotReady(WithLock lk, Promise& promise) {
     }
 
     promise.emplaceValue();
+}
+
+bool isNotDurableAndServerlessConflict(WithLock lk, SharedPromise<void>& promise) {
+    auto future = promise.getFuture();
+
+    if (!future.isReady() ||
+        future.getNoThrow().code() != ErrorCodes::ConflictingServerlessOperation) {
+        return false;
+    }
+
+    return true;
 }
 
 }  // namespace
@@ -515,7 +525,16 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
            })
-        .until([](StatusWith<repl::OpTime> swOpTime) { return swOpTime.getStatus().isOK(); })
+        .until([&](StatusWith<repl::OpTime> swOpTime) {
+            if (swOpTime.getStatus().code() == ErrorCodes::ConflictingServerlessOperation) {
+                LOGV2(6531508,
+                      "Tenant migration completed due to serverless lock error",
+                      "id"_attr = _migrationUuid,
+                      "status"_attr = swOpTime.getStatus());
+                uassertStatusOK(swOpTime);
+            }
+            return swOpTime.getStatus().isOK();
+        })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, token);
 }
@@ -950,6 +969,8 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                         ->incTotalMigrationDonationsCommitted();
                 }
             }
+
+            return Status::OK();
         })
         .then([this, self = shared_from_this(), executor, token, recipientTargeterRS] {
             return _waitForForgetMigrationThenMarkMigrationGarbageCollectable(
@@ -977,6 +998,13 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                   "tenantId"_attr = _tenantId,
                   "status"_attr = status,
                   "abortReason"_attr = _abortReason);
+
+            // If a ConflictingServerlessOperation was thrown during the initial insertion we do not
+            // have a state document. In that case return the error to PrimaryOnlyService so it
+            // frees the instance from its map.
+            if (isNotDurableAndServerlessConflict(lg, _initialDonorStateDurablePromise)) {
+                uassertStatusOK(_initialDonorStateDurablePromise.getFuture().getNoThrow());
+            }
         })
         .semi();
 }
@@ -1363,7 +1391,6 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
     checkForTokenInterrupt(token);
 
     {
-        stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
             // The migration was resumed on stepup and it was already aborted.
             return ExecutorFuture(**executor);
@@ -1420,6 +1447,21 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const CancellationToken& token) {
+    const bool skipWaitingForForget = [&]() {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (!isNotDurableAndServerlessConflict(lg, _initialDonorStateDurablePromise)) {
+            return false;
+        }
+        setPromiseErrorIfNotReady(lg,
+                                  _receiveDonorForgetMigrationPromise,
+                                  _initialDonorStateDurablePromise.getFuture().getNoThrow());
+        return true;
+    }();
+
+    if (skipWaitingForForget) {
+        return ExecutorFuture(**executor);
+    }
+
     LOGV2(6104909,
           "Waiting to receive 'donorForgetMigration' command.",
           "migrationId"_attr = _migrationUuid,
@@ -1445,6 +1487,16 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
     return std::move(_receiveDonorForgetMigrationPromise.getFuture())
         .thenRunOn(**executor)
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, token] {
+            {
+                // If the abortReason is ConflictingServerlessOperation, it means there are no
+                // document on the recipient. Do not send the forget command.
+                stdx::lock_guard<Latch> lg(_mutex);
+                if (_abortReason &&
+                    _abortReason->code() == ErrorCodes::ConflictingServerlessOperation) {
+                    return ExecutorFuture(**executor);
+                }
+            }
+
             LOGV2(6104910,
                   "Waiting for recipientForgetMigration response.",
                   "migrationId"_attr = _migrationUuid,
@@ -1487,6 +1539,12 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
 ExecutorFuture<void>
 TenantMigrationDonorService::Instance::_waitForGarbageCollectionDelayThenDeleteStateDoc(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
+    // If the state document was not inserted due to a conflicting serverless operation, do not
+    // try to delete it.
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (isNotDurableAndServerlessConflict(lg, _initialDonorStateDurablePromise)) {
+        return ExecutorFuture(**executor);
+    }
 
     LOGV2(8423362,
           "Waiting for garbage collection delay before deleting state document",
@@ -1494,7 +1552,6 @@ TenantMigrationDonorService::Instance::_waitForGarbageCollectionDelayThenDeleteS
           "tenantId"_attr = _tenantId,
           "expireAt"_attr = *_stateDoc.getExpireAt());
 
-    stdx::lock_guard<Latch> lg(_mutex);
     return (*executor)
         ->sleepUntil(*_stateDoc.getExpireAt(), token)
         .then([this, self = shared_from_this(), executor, token]() {

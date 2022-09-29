@@ -114,7 +114,7 @@ public:
     };
 
     std::string help() const {
-        return "Start an opereation to split a shard into its own slice.";
+        return "Start an operation to split a shard into its own slice.";
     }
 
     bool adminOnly() const override {

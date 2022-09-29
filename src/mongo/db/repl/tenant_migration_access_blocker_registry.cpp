@@ -88,7 +88,7 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
     if (it != _tenantMigrationAccessBlockers.end()) {
         auto existingMtab = it->second.getAccessBlocker(mtabType);
         if (existingMtab) {
-            tasserted(ErrorCodes::ConflictingOperationInProgress,
+            uasserted(ErrorCodes::ConflictingServerlessOperation,
                       str::stream() << "This node is already a "
                                     << (mtabType == MtabType::kDonor ? "donor" : "recipient")
                                     << " for tenantId \"" << tenantId << "\" with migrationId \""
@@ -121,7 +121,7 @@ void TenantMigrationAccessBlockerRegistry::add(std::shared_ptr<TenantMigrationAc
         std::find_if(_tenantMigrationAccessBlockers.begin(),
                      _tenantMigrationAccessBlockers.end(),
                      [](const auto& pair) { return pair.second.getDonorAccessBlocker().get(); });
-    tassert(6114105,
+    uassert(ErrorCodes::ConflictingServerlessOperation,
             str::stream()
                 << "Trying to add donor blocker for all tenants when this node already has a donor "
                    "blocker for \""

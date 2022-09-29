@@ -2968,7 +2968,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // Handle recipientForgetMigration.
             stdx::lock_guard lk(_mutex);
             if (_stateDoc.getExpireAt() ||
-                MONGO_unlikely(autoRecipientForgetMigration.shouldFail())) {
+                MONGO_unlikely(autoRecipientForgetMigration.shouldFail()) ||
+                status.code() == ErrorCodes::ConflictingServerlessOperation) {
                 // Skip waiting for the recipientForgetMigration command.
                 setPromiseOkifNotReady(lk, _receivedRecipientForgetMigrationPromise);
             }
@@ -3018,7 +3019,16 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // is safe even on shutDown/stepDown.
             stdx::lock_guard lk(_mutex);
             invariant(_dataSyncCompletionPromise.getFuture().isReady());
-            if (!status.isOK()) {
+
+            if (status.code() == ErrorCodes::ConflictingServerlessOperation) {
+                LOGV2(6531506,
+                      "Migration failed as another serverless operation was in progress",
+                      "migrationId"_attr = getMigrationUUID(),
+                      "tenantId"_attr = getTenantId(),
+                      "status"_attr = status);
+                setPromiseOkifNotReady(lk, _forgetMigrationDurablePromise);
+                return status;
+            } else if (!status.isOK()) {
                 // We should only hit here on a stepDown/shutDown, or a 'conflicting migration'
                 // error.
                 LOGV2(4881402,
@@ -3029,6 +3039,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 setPromiseErrorifNotReady(lk, _forgetMigrationDurablePromise, status);
             }
             _taskState.setState(TaskState::kDone);
+
+            return Status::OK();
         })
         .semi();
 }
