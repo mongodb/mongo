@@ -37,6 +37,7 @@
 #include "mongo/db/op_observer/oplog_writer_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/clock_source_mock.h"
@@ -67,6 +68,9 @@ protected:
         auto validator = std::make_unique<LogicalTimeValidator>(_keyManager);
         validator->init(getServiceContext());
         LogicalTimeValidator::set(getServiceContext(), std::move(validator));
+
+        // Ensure that this node is neither "config server" nor "shard server".
+        serverGlobalParams.clusterRole = ClusterRole::None;
     }
 
     void tearDown() override {
