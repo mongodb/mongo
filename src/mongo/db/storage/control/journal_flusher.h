@@ -75,8 +75,7 @@ public:
 
     /**
      * Runs data flushes every 'storageGlobalParams.journalCommitIntervalMs' millis (unless
-     * '_disablePeriodicFlushes' is set) or immediately if triggerJournalFlush() or
-     * waitForJournalFlush() is called.
+     * '_disablePeriodicFlushes' is set) or immediately if  waitForJournalFlush() is called.
      */
     void run();
 
@@ -97,11 +96,6 @@ public:
      * Signals the thread to resume from a pause.
      */
     void resume();
-
-    /**
-     * Signals an immediate journal flush and leaves.
-     */
-    void triggerJournalFlush();
 
     /**
      * Signals an immediate journal flush and waits for it to complete before returning.

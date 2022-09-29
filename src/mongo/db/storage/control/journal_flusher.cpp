@@ -233,14 +233,6 @@ void JournalFlusher::resume() {
     LOGV2(5142503, "Resumed journal flusher thread");
 }
 
-void JournalFlusher::triggerJournalFlush() {
-    stdx::lock_guard<Latch> lk(_stateMutex);
-    if (!_flushJournalNow) {
-        _flushJournalNow = true;
-        _flushJournalNowCV.notify_one();
-    }
-}
-
 void JournalFlusher::waitForJournalFlush() {
     while (true) {
         try {

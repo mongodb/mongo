@@ -117,10 +117,6 @@ void stopStorageControls(ServiceContext* serviceContext, const Status& reason, b
     }
 }
 
-void triggerJournalFlush(ServiceContext* serviceContext) {
-    JournalFlusher::get(serviceContext)->triggerJournalFlush();
-}
-
 void waitForJournalFlush(OperationContext* opCtx) {
     JournalFlusher::get(opCtx)->waitForJournalFlush();
 }
