@@ -160,9 +160,8 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {
             opts.tempDir = pExpCtx->tempDir;
         }
         const auto& valueCmp = pExpCtx->getValueComparator();
-        auto comparator = [valueCmp](const Sorter<Value, Document>::Data& lhs,
-                                     const Sorter<Value, Document>::Data& rhs) {
-            return valueCmp.compare(lhs.first, rhs.first);
+        auto comparator = [valueCmp](const Value& lhs, const Value& rhs) {
+            return valueCmp.compare(lhs, rhs);
         };
 
         _sorter.reset(Sorter<Value, Document>::make(opts, comparator));

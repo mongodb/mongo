@@ -494,6 +494,7 @@ public:
     Value getOwned() const {
         return *this;
     }
+    void makeOwned() {}
 
     Version getVersion() const {
         return _version;

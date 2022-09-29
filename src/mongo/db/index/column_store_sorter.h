@@ -86,6 +86,9 @@ public:
         Key getOwned() const {
             MONGO_UNREACHABLE;
         }
+        void makeOwned() {
+            MONGO_UNREACHABLE;
+        }
     };
 
     struct Value {
@@ -101,6 +104,9 @@ public:
         }
 
         Value getOwned() const {
+            MONGO_UNREACHABLE;
+        }
+        void makeOwned() {
             MONGO_UNREACHABLE;
         }
     };

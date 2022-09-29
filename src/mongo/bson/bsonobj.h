@@ -265,6 +265,12 @@ public:
     BSONObj copy() const;
 
     /**
+     * If the data buffer is not under the control of this BSONObj, allocate
+     * a separate copy and make this object a fully owned one.
+     */
+    void makeOwned();
+
+    /**
      * @return a new full (and owned) redacted copy of the object.
      */
     BSONObj redact(bool onlyEncryptedFields = false) const;

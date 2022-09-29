@@ -388,6 +388,7 @@ public:
     Value getOwned() const {
         return *this;
     }
+    void makeOwned() {}
 
     /// Members to support parsing/deserialization from IDL generated code.
     void serializeForIDL(StringData fieldName, BSONObjBuilder* builder) const;

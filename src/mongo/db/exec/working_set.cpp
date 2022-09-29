@@ -311,6 +311,10 @@ SortableWorkingSetMember SortableWorkingSetMember::getOwned() const {
     return ret;
 }
 
+void SortableWorkingSetMember::makeOwned() {
+    _holder->makeObjOwnedIfNeeded();
+}
+
 WorkingSetRegisteredIndexId WorkingSet::registerIndexAccessMethod(
     const IndexAccessMethod* indexAccess) {
     for (WorkingSetRegisteredIndexId i = 0; i < _registeredIndexes.size(); ++i) {

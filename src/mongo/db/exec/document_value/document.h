@@ -336,6 +336,13 @@ public:
     Document getOwned() &&;
 
     /**
+     * Needed to satisfy the Sorter interface. This method throws an assertion.
+     */
+    void makeOwned() {
+        MONGO_UNREACHABLE;
+    }
+
+    /**
      * Returns true if the underlying BSONObj is owned.
      */
     bool isOwned() const {

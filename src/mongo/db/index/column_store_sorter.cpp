@@ -35,13 +35,11 @@
 
 namespace mongo {
 struct ComparisonForPathAndRid {
-    int operator()(const std::pair<ColumnStoreSorter::Key, ColumnStoreSorter::Value>& left,
-                   const std::pair<ColumnStoreSorter::Key, ColumnStoreSorter::Value>& right) const {
-        auto stringComparison = left.first.path.compare(right.first.path);
-        return (stringComparison != 0) ? stringComparison
-                                       : ((left.first.rowId == right.first.rowId)
-                                              ? 0
-                                              : (left.first.rowId > right.first.rowId ? 1 : -1));
+    int operator()(const ColumnStoreSorter::Key& left, const ColumnStoreSorter::Key& right) const {
+        auto stringComparison = left.path.compare(right.path);
+        return (stringComparison != 0)
+            ? stringComparison
+            : ((left.rowId == right.rowId) ? 0 : (left.rowId > right.rowId ? 1 : -1));
     }
 };
 

@@ -199,6 +199,7 @@ public:
     NullValue getOwned() const {
         return {};
     }
+    void makeOwned() {}
 };
 
 /**
@@ -366,9 +367,8 @@ public:
                                           const Settings& settings = Settings());
 
     virtual void add(const Key&, const Value&) = 0;
-    virtual void emplace(Key&& k, Value&& v) {
-        add(k, v);
-    }
+    virtual void emplace(Key&& k, Value&& v) = 0;
+
     /**
      * Cannot add more data after calling done().
      */
@@ -544,14 +544,8 @@ public:
 
 private:
     using SpillIterator = SortIteratorInterface<Key, Value>;
-    struct PairComparator {
-        int operator()(const std::pair<Key, Value>& p1, const std::pair<Key, Value>& p2) const;
-        const Comparator& compare;
-    };
 
     void _spill();
-
-    const PairComparator _comparePairs;
 
     bool _checkInput;
 

@@ -158,9 +158,8 @@ MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPaths
 }  // namespace
 
 struct BtreeExternalSortComparison {
-    typedef std::pair<KeyString::Value, mongo::NullValue> Data;
-    int operator()(const Data& l, const Data& r) const {
-        return l.first.compare(r.first);
+    int operator()(const KeyString::Value& l, const KeyString::Value& r) const {
+        return l.compare(r);
     }
 };
 

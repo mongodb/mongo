@@ -289,6 +289,7 @@ public:
     }
 
     SortableWorkingSetMember getOwned() const;
+    void makeOwned();
 
 private:
     std::shared_ptr<WorkingSetMember> _holder;

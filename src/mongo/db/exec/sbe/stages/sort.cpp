@@ -130,13 +130,11 @@ void SortStage::makeSorter() {
         _specificStats.limit != std::numeric_limits<size_t>::max() ? _specificStats.limit : 0;
     opts.moveSortedDataIntoIterator = true;
 
-    auto comp = [&](const SorterData& lhs, const SorterData& rhs) {
-        auto size = lhs.first.size();
-        auto& left = lhs.first;
-        auto& right = rhs.first;
+    auto comp = [&](const value::MaterializedRow& lhs, const value::MaterializedRow& rhs) {
+        auto size = lhs.size();
         for (size_t idx = 0; idx < size; ++idx) {
-            auto [lhsTag, lhsVal] = left.getViewOfValue(idx);
-            auto [rhsTag, rhsVal] = right.getViewOfValue(idx);
+            auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
+            auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
             auto [tag, val] = value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
 
             auto result = value::bitcastTo<int32_t>(val);
@@ -185,15 +183,13 @@ void SortStage::open(bool reOpen) {
         size_t idx = 0;
         for (auto accessor : _inKeyAccessors) {
             auto [tag, val] = accessor->getViewOfValue();
-            auto [cTag, cVal] = copyValue(tag, val);
-            keys.reset(idx++, true, cTag, cVal);
+            keys.reset(idx++, false, tag, val);
         }
 
         idx = 0;
         for (auto accessor : _inValueAccessors) {
             auto [tag, val] = accessor->getViewOfValue();
-            auto [cTag, cVal] = copyValue(tag, val);
-            vals.reset(idx++, true, cTag, cVal);
+            vals.reset(idx++, false, tag, val);
         }
 
         _sorter->emplace(std::move(keys), std::move(vals));

@@ -121,8 +121,8 @@ inline std::string myErrnoWithDescription() {
     return sb.str();
 }
 
-template <typename Data, typename Comparator>
-void dassertCompIsSane(const Comparator& comp, const Data& lhs, const Data& rhs) {
+template <typename Key, typename Comparator>
+void dassertCompIsSane(const Comparator& comp, const Key& lhs, const Key& rhs) {
 #if defined(MONGO_CONFIG_DEBUG_BUILD) && !defined(_MSC_VER)
     // MSVC++ already does similar verification in debug mode in addition to using
     // algorithms that do more comparisons. Doing our own verification in addition makes
@@ -534,8 +534,8 @@ private:
         template <typename Ptr>
         bool operator()(const Ptr& lhs, const Ptr& rhs) const {
             // first compare data
-            dassertCompIsSane(_comp, lhs->current(), rhs->current());
-            int ret = _comp(lhs->current(), rhs->current());
+            dassertCompIsSane(_comp, lhs->current().first, rhs->current().first);
+            int ret = _comp(lhs->current().first, rhs->current().first);
             if (ret)
                 return ret > 0;
 
@@ -710,12 +710,16 @@ public:
         this->_stats.setSpilledRanges(this->_iters.size());
     }
 
-    void add(const Key& key, const Value& val) {
+    template <typename Generator>
+    void addImpl(const Key& key, const Value& val, Generator keyValProducer) {
         invariant(!_done);
 
-        _data.emplace_back(key.getOwned(), val.getOwned());
-
         auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
+
+        // Invoking keyValProducer could invalidate key and val if it uses move semantics,
+        // don't reference them anymore from this point on.
+        _data.emplace_back(keyValProducer());
+
         _memUsed += memUsage;
         this->_totalDataSizeSorted += memUsage;
 
@@ -723,17 +727,16 @@ public:
             spill();
     }
 
+    void add(const Key& key, const Value& val) override {
+        addImpl(key, val, [&]() -> Data { return {key.getOwned(), val.getOwned()}; });
+    }
+
     void emplace(Key&& key, Value&& val) override {
-        invariant(!_done);
-
-        auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
-        _memUsed += memUsage;
-        this->_totalDataSizeSorted += memUsage;
-
-        _data.emplace_back(std::move(key), std::move(val));
-
-        if (_memUsed > this->_opts.maxMemoryUsageBytes)
-            spill();
+        addImpl(key, val, [&]() -> Data {
+            key.makeOwned();
+            val.makeOwned();
+            return {std::move(key), std::move(val)};
+        });
     }
 
     Iterator* done() {
@@ -758,8 +761,8 @@ private:
     public:
         explicit STLComparator(const Comparator& comp) : _comp(comp) {}
         bool operator()(const Data& lhs, const Data& rhs) const {
-            dassertCompIsSane(_comp, lhs, rhs);
-            return _comp(lhs, rhs) < 0;
+            dassertCompIsSane(_comp, lhs.first, rhs.first);
+            return _comp(lhs.first, rhs.first) < 0;
         }
 
     private:
@@ -820,19 +823,32 @@ public:
         verify(opts.limit == 1);
     }
 
-    void add(const Key& key, const Value& val) {
-        Data contender(key, val);
-
+    template <typename Generator>
+    void addImpl(const Key& key, const Value& val, Generator keyValProducer) {
         this->_numSorted += 1;
         if (_haveData) {
-            dassertCompIsSane(_comp, _best, contender);
-            if (_comp(_best, contender) <= 0)
+            dassertCompIsSane(_comp, _best.first, key);
+            if (_comp(_best.first, key) <= 0)
                 return;  // not good enough
         } else {
             _haveData = true;
         }
 
-        _best = {contender.first.getOwned(), contender.second.getOwned()};
+        // Invoking keyValProducer could invalidate key and val if it uses move semantics,
+        // don't reference them anymore from this point on.
+        _best = keyValProducer();
+    }
+
+    void add(const Key& key, const Value& val) override {
+        addImpl(key, val, [&]() -> Data { return {key.getOwned(), val.getOwned()}; });
+    }
+
+    void emplace(Key&& key, Value&& val) override {
+        addImpl(key, val, [&]() -> Data {
+            key.makeOwned();
+            val.makeOwned();
+            return {std::move(key), std::move(val)};
+        });
     }
 
     Iterator* done() {
@@ -883,21 +899,24 @@ public:
         }
     }
 
-    void add(const Key& key, const Value& val) {
+    template <typename Generator>
+    void addImpl(const Key& key, const Value& val, Generator keyValProducer) {
         invariant(!_done);
 
         this->_numSorted += 1;
 
         STLComparator less(this->_comp);
-        Data contender(key, val);
 
         if (_data.size() < this->_opts.limit) {
-            if (_haveCutoff && !less(contender, _cutoff))
+            if (_haveCutoff && this->_comp(key, _cutoff.first) >= 0)
                 return;
 
-            _data.emplace_back(contender.first.getOwned(), contender.second.getOwned());
-
             auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
+
+            // Invoking keyValProducer could invalidate key and val if it uses move semantics,
+            // don't reference them anymore from this point on.
+            _data.emplace_back(keyValProducer());
+
             _memUsed += memUsage;
             this->_totalDataSizeSorted += memUsage;
 
@@ -912,7 +931,7 @@ public:
 
         invariant(_data.size() == this->_opts.limit);
 
-        if (!less(contender, _data.front()))
+        if (this->_comp(key, _data.front().first) >= 0)
             return;  // not good enough
 
         // Remove the old worst pair and insert the contender, adjusting _memUsed
@@ -925,11 +944,25 @@ public:
         _memUsed -= _data.front().second.memUsageForSorter();
 
         std::pop_heap(_data.begin(), _data.end(), less);
-        _data.back() = {contender.first.getOwned(), contender.second.getOwned()};
+        // Invoking keyValProducer could invalidate key and val if it uses move semantics,
+        // don't reference them anymore from this point on.
+        _data.back() = keyValProducer();
         std::push_heap(_data.begin(), _data.end(), less);
 
         if (_memUsed > this->_opts.maxMemoryUsageBytes)
             spill();
+    }
+
+    void add(const Key& key, const Value& val) override {
+        addImpl(key, val, [&]() -> Data { return {key.getOwned(), val.getOwned()}; });
+    }
+
+    void emplace(Key&& key, Value&& val) override {
+        addImpl(key, val, [&]() -> Data {
+            key.makeOwned();
+            val.makeOwned();
+            return {std::move(key), std::move(val)};
+        });
     }
 
     Iterator* done() {
@@ -954,8 +987,8 @@ private:
     public:
         explicit STLComparator(const Comparator& comp) : _comp(comp) {}
         bool operator()(const Data& lhs, const Data& rhs) const {
-            dassertCompIsSane(_comp, lhs, rhs);
-            return _comp(lhs, rhs) < 0;
+            dassertCompIsSane(_comp, lhs.first, rhs.first);
+            return _comp(lhs.first, rhs.first) < 0;
         }
 
     private:
@@ -1381,7 +1414,6 @@ BoundedSorter<Key, Value, Comparator, BoundMaker>::BoundedSorter(const SortOptio
     : BoundedSorterInterface<Key, Value>(opts),
       compare(comp),
       makeBound(makeBound),
-      _comparePairs{compare},
       _checkInput(checkInput),
       _opts(opts),
       _heap(Greater{&compare}),
@@ -1494,7 +1526,7 @@ std::pair<Key, Value> BoundedSorter<Key, Value, Comparator, BoundMaker>::next() 
     };
 
     if (!_heap.empty() && _spillIter) {
-        if (_comparePairs(_heap.top(), _spillIter->current()) <= 0) {
+        if (compare(_heap.top().first, _spillIter->current().first) <= 0) {
             pullFromHeap();
         } else {
             pullFromSpilled();
@@ -1548,23 +1580,17 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill() {
     }
     std::shared_ptr<SpillIterator> iteratorPtr(writer.done());
 
-    if (auto* mergeIter = static_cast<typename sorter::MergeIterator<Key, Value, PairComparator>*>(
+    if (auto* mergeIter = static_cast<typename sorter::MergeIterator<Key, Value, Comparator>*>(
             _spillIter.get())) {
         mergeIter->addSource(std::move(iteratorPtr));
     } else {
         std::vector<std::shared_ptr<SpillIterator>> iters{std::move(iteratorPtr)};
-        _spillIter.reset(SpillIterator::merge(iters, _opts, _comparePairs));
+        _spillIter.reset(SpillIterator::merge(iters, _opts, compare));
     }
 
     dassert(_spillIter->more());
 
     _memUsed = 0;
-}
-
-template <typename Key, typename Value, typename Comparator, typename BoundMaker>
-int BoundedSorter<Key, Value, Comparator, BoundMaker>::PairComparator::operator()(
-    const std::pair<Key, Value>& p1, const std::pair<Key, Value>& p2) const {
-    return compare(p1.first, p2.first);
 }
 
 //

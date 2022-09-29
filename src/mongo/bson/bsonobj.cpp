@@ -129,6 +129,12 @@ BSONObj BSONObj::copy() const {
     return BSONObj(std::move(storage));
 }
 
+void BSONObj::makeOwned() {
+    if (!isOwned()) {
+        *this = copy();
+    }
+}
+
 BSONObj BSONObj::getOwned() const {
     if (isOwned())
         return *this;

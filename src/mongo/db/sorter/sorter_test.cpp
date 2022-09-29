@@ -100,6 +100,7 @@ public:
     IntWrapper getOwned() const {
         return *this;
     }
+    void makeOwned() {}
 
     std::string toString() const {
         return std::to_string(_i);
@@ -117,10 +118,10 @@ enum Direction { ASC = 1, DESC = -1 };
 class IWComparator {
 public:
     IWComparator(Direction dir = ASC) : _dir(dir) {}
-    int operator()(const IWPair& lhs, const IWPair& rhs) const {
-        if (lhs.first == rhs.first)
+    int operator()(const IntWrapper& lhs, const IntWrapper& rhs) const {
+        if (lhs == rhs)
             return 0;
-        if (lhs.first < rhs.first)
+        if (lhs < rhs)
             return -1 * _dir;
         return 1 * _dir;
     }

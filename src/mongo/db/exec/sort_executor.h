@@ -55,9 +55,8 @@ public:
     class Comparator {
     public:
         Comparator(const SortPattern& sortPattern) : _sortKeyComparator(sortPattern) {}
-        int operator()(const typename DocumentSorter::Data& lhs,
-                       const typename DocumentSorter::Data& rhs) const {
-            return _sortKeyComparator(lhs.first, rhs.first);
+        int operator()(const Value& lhs, const Value& rhs) const {
+            return _sortKeyComparator(lhs, rhs);
         }
 
     private:
