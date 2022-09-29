@@ -170,14 +170,13 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
             .getPlanCache()
             ->remove(plan_cache_key_factory::make<PlanCacheKey>(*_query, collection()));
 
-        _bestPlanIdx = _backupPlanIdx;
-        _backupPlanIdx = kNoSuchPlan;
+        switchToBackupPlan();
         return _candidates[_bestPlanIdx].root->work(out);
     }
 
     if (hasBackupPlan() && PlanStage::ADVANCED == state) {
         LOGV2_DEBUG(20589, 5, "Best plan had a blocking stage, became unblocked");
-        _backupPlanIdx = kNoSuchPlan;
+        removeBackupPlan();
     }
 
     return state;
@@ -277,6 +276,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
                                      *_query,
                                      std::move(ranking),
                                      _candidates);
+    removeRejectedPlans();
 
     return Status::OK();
 }
@@ -352,6 +352,54 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
     return !doneWorking;
 }
 
+void MultiPlanStage::removeRejectedPlans() {
+    // Move the best plan and the backup plan to the front of 'children'.
+    if (_bestPlanIdx != 0) {
+        std::swap(_children[_bestPlanIdx], _children[0]);
+        std::swap(_candidates[_bestPlanIdx], _candidates[0]);
+        if (_backupPlanIdx == 0) {
+            _backupPlanIdx = _bestPlanIdx;
+        }
+        _bestPlanIdx = 0;
+    }
+    size_t startIndex = 1;
+    if (_backupPlanIdx != kNoSuchPlan) {
+        if (_bestPlanIdx != 1) {
+            std::swap(_children[_backupPlanIdx], _children[1]);
+            std::swap(_candidates[_backupPlanIdx], _candidates[1]);
+            _backupPlanIdx = 1;
+        }
+        startIndex = 2;
+    }
+
+    _rejected.reserve(_children.size() - startIndex);
+    for (size_t i = startIndex; i < _children.size(); ++i) {
+        rejectPlan(i);
+    }
+    _children.resize(startIndex);
+}
+
+void MultiPlanStage::switchToBackupPlan() {
+    std::swap(_children[_backupPlanIdx], _children[_bestPlanIdx]);
+    std::swap(_candidates[_backupPlanIdx], _candidates[_bestPlanIdx]);
+    removeBackupPlan();
+}
+
+void MultiPlanStage::rejectPlan(size_t planIdx) {
+    auto rejectedPlan = std::move(_children[planIdx]);
+    if (opCtx() != nullptr) {
+        rejectedPlan->saveState();
+        rejectedPlan->detachFromOperationContext();
+    }
+    _rejected.emplace_back(std::move(rejectedPlan));
+}
+
+void MultiPlanStage::removeBackupPlan() {
+    rejectPlan(_backupPlanIdx);
+    _children.resize(1);
+    _backupPlanIdx = kNoSuchPlan;
+}
+
 bool MultiPlanStage::hasBackupPlan() const {
     return kNoSuchPlan != _backupPlanIdx;
 }
@@ -384,6 +432,9 @@ unique_ptr<PlanStageStats> MultiPlanStage::getStats() {
         std::make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_PLAN);
     ret->specific = std::make_unique<MultiPlanStats>(_specificStats);
     for (auto&& child : _children) {
+        ret->children.emplace_back(child->getStats());
+    }
+    for (auto&& child : _rejected) {
         ret->children.emplace_back(child->getStats());
     }
     return ret;

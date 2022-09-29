@@ -31,7 +31,6 @@
 
 #include "mongo/db/query/sbe_multi_planner.h"
 
-#include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/collection_query_info.h"
