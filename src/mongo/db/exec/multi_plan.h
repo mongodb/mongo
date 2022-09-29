@@ -75,7 +75,6 @@ public:
 
     std::unique_ptr<PlanStageStats> getStats() final;
 
-
     const SpecificStats* getSpecificStats() const final;
 
     /**
@@ -161,6 +160,19 @@ private:
      */
     void tryYield(PlanYieldPolicy* yieldPolicy);
 
+    /**
+     * Deletes all children, except for best and backup plans.
+     *
+     * This is necessary to release any resources that rejected plans might have.
+     * For example, if multi-update can be done by scanning several indexes,
+     * it will be slowed down by rejected index scans because of index cursors
+     * that need to be reopeneed after every update.
+     */
+    void removeRejectedPlans();
+    void rejectPlan(size_t planIdx);
+    void switchToBackupPlan();
+    void removeBackupPlan();
+
     static const int kNoSuchPlan = -1;
 
     // Describes the cases in which we should write an entry for the winning plan to the plan cache.
@@ -175,6 +187,9 @@ private:
     // wraps this stage. Ownership of the PlanStages will be in PlanStage::_children which maps
     // one-to-one with _candidates.
     std::vector<plan_ranker::CandidatePlan> _candidates;
+
+    // Rejected plans in saved and detached state.
+    std::vector<std::unique_ptr<PlanStage>> _rejected;
 
     // index into _candidates, of the winner of the plan competition
     // uses -1 / kNoSuchPlan when best plan is not (yet) known
