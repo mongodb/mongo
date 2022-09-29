@@ -132,13 +132,22 @@ const tokenDB = tokenConn.getDB(kDbName);
             {findAndModify: kCollName, query: {a: 11}, update: {$set: {a: 1, b: 1}}}));
     }
 
-    // Drop the database and check that listCollections no longer returns the 3 collections.
+    // Drop the collection, and then the database. Check that listCollections no longer returns the
+    // 3 collections.
     {
+        assert.commandWorked(tokenDB.runCommand({drop: kCollName}));
+        const collsAfterDropColl = assert.commandWorked(
+            tokenDB.runCommand({listCollections: 1, nameOnly: true, filter: {name: kCollName}}));
+        assert.eq(0,
+                  collsAfterDropColl.cursor.firstBatch.length,
+                  tojson(collsAfterDropColl.cursor.firstBatch));
+
         assert.commandWorked(tokenDB.runCommand({dropDatabase: 1}));
-        const collsAfterDrop =
+        const collsAfterDropDb =
             assert.commandWorked(tokenDB.runCommand({listCollections: 1, nameOnly: true}));
-        assert.eq(
-            0, collsAfterDrop.cursor.firstBatch.length, tojson(collsAfterDrop.cursor.firstBatch));
+        assert.eq(0,
+                  collsAfterDropDb.cursor.firstBatch.length,
+                  tojson(collsAfterDropDb.cursor.firstBatch));
 
         // Reset the collection and document.
         assert.commandWorked(

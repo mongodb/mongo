@@ -187,23 +187,43 @@ const testColl = testDb.getCollection(kCollName);
         adminDb.runCommand(
             {renameCollection: toName, to: fromName, dropTarget: true, '$tenant': kOtherTenant}),
         ErrorCodes.NamespaceNotFound);
+
+    // Reset the collection to be used below
+    assert.commandWorked(adminDb.runCommand(
+        {renameCollection: toName, to: fromName, dropTarget: true, '$tenant': kTenant}));
 }
 
-// Test the dropDatabase command.
+// Test the dropCollection and dropDatabase commands.
 {
-    // Another tenant shouldn't be able to drop the database.
+    // Another tenant shouldn't be able to drop the collection or database.
+    assert.commandWorked(testDb.runCommand({drop: kCollName, '$tenant': kOtherTenant}));
+    const collsAfterDropCollectionByOtherTenant = assert.commandWorked(testDb.runCommand(
+        {listCollections: 1, nameOnly: true, filter: {name: kCollName}, '$tenant': kTenant}));
+    assert.eq(1,
+              collsAfterDropCollectionByOtherTenant.cursor.firstBatch.length,
+              tojson(collsAfterDropCollectionByOtherTenant.cursor.firstBatch));
+
     assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kOtherTenant}));
-    const collsAfterDropByOtherTenant = assert.commandWorked(
-        testDb.runCommand({listCollections: 1, nameOnly: true, '$tenant': kTenant}));
-    assert.eq(3,
-              collsAfterDropByOtherTenant.cursor.firstBatch.length,
-              tojson(collsAfterDropByOtherTenant.cursor.firstBatch));
+    const collsAfterDropDbByOtherTenant = assert.commandWorked(testDb.runCommand(
+        {listCollections: 1, nameOnly: true, filter: {name: kCollName}, '$tenant': kTenant}));
+    assert.eq(1,
+              collsAfterDropDbByOtherTenant.cursor.firstBatch.length,
+              tojson(collsAfterDropDbByOtherTenant.cursor.firstBatch));
+
+    // Now, drop the collection using the original tenantId.
+    assert.commandWorked(testDb.runCommand({drop: kCollName, '$tenant': kTenant}));
+    const collsAfterDropCollection = assert.commandWorked(testDb.runCommand(
+        {listCollections: 1, nameOnly: true, filter: {name: kCollName}, '$tenant': kTenant}));
+    assert.eq(0,
+              collsAfterDropCollection.cursor.firstBatch.length,
+              tojson(collsAfterDropCollection.cursor.firstBatch));
 
     // Now, drop the database using the original tenantId.
     assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kTenant}));
-    const collsAfterDrop = assert.commandWorked(
-        testDb.runCommand({listCollections: 1, nameOnly: true, '$tenant': kTenant}));
-    assert.eq(0, collsAfterDrop.cursor.firstBatch.length, tojson(collsAfterDrop.cursor.firstBatch));
+    const collsAfterDropDb = assert.commandWorked(testDb.runCommand(
+        {listCollections: 1, nameOnly: true, filter: {name: kCollName}, '$tenant': kTenant}));
+    assert.eq(
+        0, collsAfterDropDb.cursor.firstBatch.length, tojson(collsAfterDropDb.cursor.firstBatch));
 
     // Reset the collection so other test cases can still access this collection with kCollName
     // after this test.
