@@ -39,6 +39,14 @@ build_variant_large_distro_exceptions:
   - macos-debug-suggested
   - rhel70
   - rhel80
+  - rhel80-debug-asan
+  - rhel80-debug-asan-all-feature-flags
+  - rhel80-debug-asan-classic-engine
+  - rhel80-debug-aubsan-lite-required
+  - rhel80-debug-suggested
+  - rhel80-debug-ubsan
+  - rhel80-debug-ubsan-all-feature-flags
+  - rhel80-debug-ubsan-classic-engine
   - rhel-82-arm64
   - rhel90
   - suse12
@@ -46,11 +54,3 @@ build_variant_large_distro_exceptions:
   - ubi8
   - ubuntu1604-container
   - ubuntu1804-container
-  - ubuntu1604-debug
-  - ubuntu1804-debug-asan
-  - ubuntu1804-debug-asan-all-feature-flags
-  - ubuntu1804-debug-asan-classic-engine
-  - ubuntu1804-debug-aubsan-lite-required
-  - ubuntu1804-debug-ubsan
-  - ubuntu1804-debug-ubsan-all-feature-flags
-  - ubuntu1804-debug-ubsan-classic-engine
