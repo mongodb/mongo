@@ -326,10 +326,10 @@ variables:
   - enterprise-windows-inmem
   - enterprise-windows-required
   - enterprise-windows-wtdevelop
-  - ubuntu1804-debug-asan
-  - ubuntu1804-debug-ubsan
-  - ubuntu1804-debug-aubsan-lite-required
-  - ubuntu1804-debug-aubsan-lite_fuzzer
+  - rhel80-debug-asan
+  - rhel80-debug-ubsan
+  - rhel80-debug-aubsan-lite-required
+  - rhel80-debug-aubsan-lite_fuzzer
 
 
 # List of all variants that make mh artifacts.
