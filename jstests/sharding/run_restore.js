@@ -116,8 +116,20 @@ assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, logLevel: 
 assert.commandFailedWithCode(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}),
                              ErrorCodes.NamespaceNotFound);
 
-// Create the "local.system.collections_to_restore" collection and insert "test.a".
+let [_, uuidStr] = aCollUUID.toString().match(/"((?:\\.|[^"\\])*)"/);
+assert.commandWorked(conn.getDB("local").getCollection("system.collections_to_restore").insert({
+    ns: "test.a",
+    uuid: uuidStr
+}));
+
+// The "local.system.collections_to_restore" collection must have UUID as the correct type.
+assert.commandFailedWithCode(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}),
+                             ErrorCodes.BadValue);
+
+// Recreate the "local.system.collections_to_restore" collection and insert 'test.a'.
+assert(conn.getDB("local").getCollection("system.collections_to_restore").drop());
 assert.commandWorked(conn.getDB("local").createCollection("system.collections_to_restore"));
+
 assert.commandWorked(conn.getDB("local").getCollection("system.collections_to_restore").insert({
     ns: "test.a",
     uuid: aCollUUID

@@ -37,6 +37,8 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -71,8 +73,27 @@ ShouldRestoreDocument shouldRestoreDocument(OperationContext* opCtx,
     findRequest.setLimit(1);
 
     DBDirectClient client(opCtx);
-    return client.find(findRequest)->itcount() > 0 ? ShouldRestoreDocument::kYes
-                                                   : ShouldRestoreDocument::kNo;
+    auto resultCount = client.find(findRequest)->itcount();
+
+    // Log in cases where the schema is not adhered to.
+    if (resultCount == 0 && uuid) {
+        auto schemaCheckFindRequest =
+            FindCommandRequest(NamespaceString::kConfigsvrRestoreNamespace);
+        auto collectionsToRestore = client.find(schemaCheckFindRequest);
+        while (collectionsToRestore->more()) {
+            auto doc = collectionsToRestore->next();
+            try {
+                (void)UUID::parse(doc);
+            } catch (const AssertionException&) {
+                uasserted(ErrorCodes::BadValue,
+                          str::stream() << "The uuid field of '" << doc.toString() << "' in '"
+                                        << NamespaceString::kConfigsvrRestoreNamespace.toString()
+                                        << "' needs to be of type UUID");
+            }
+        }
+    }
+
+    return resultCount > 0 ? ShouldRestoreDocument::kYes : ShouldRestoreDocument::kNo;
 }
 
 std::set<std::string> getDatabasesToRestore(OperationContext* opCtx) {
@@ -164,12 +185,11 @@ public:
                     restoreColl);
         }
 
-        // Keeps track of database names for collections restored. Databases with no collections
-        // restored will have their entries removed in the config collections.
-        std::set<std::string> databasesRestored = getDatabasesToRestore(opCtx);
-
         for (const auto& collectionEntry : kCollectionEntries) {
             const NamespaceString& nss = collectionEntry.first;
+            boost::optional<std::string> nssFieldName = collectionEntry.second.first;
+            boost::optional<std::string> uuidFieldName = collectionEntry.second.second;
+
 
             LOGV2(6261300, "1st Phase - Restoring collection entries", logAttrs(nss));
             CollectionPtr coll =
@@ -185,9 +205,6 @@ public:
 
             while (cursor->more()) {
                 auto doc = cursor->next();
-
-                boost::optional<std::string> nssFieldName = collectionEntry.second.first;
-                boost::optional<std::string> uuidFieldName = collectionEntry.second.second;
 
                 boost::optional<NamespaceString> docNss = boost::none;
                 boost::optional<UUID> docUUID = boost::none;
@@ -210,6 +227,11 @@ public:
                     uassertStatusOK(swDocUUID);
 
                     docUUID = swDocUUID.getValue();
+                    LOGV2_DEBUG(6938701,
+                                1,
+                                "uuid found",
+                                "uuid"_attr = uuidFieldName,
+                                "docUUID"_attr = docUUID);
                 }
 
                 ShouldRestoreDocument shouldRestore = shouldRestoreDocument(opCtx, docNss, docUUID);
@@ -218,7 +240,9 @@ public:
                             1,
                             "Found document",
                             "doc"_attr = doc,
-                            "shouldRestore"_attr = shouldRestore);
+                            "shouldRestore"_attr = shouldRestore,
+                            "db"_attr = coll->ns().db().toString(),
+                            "docNss"_attr = docNss);
 
                 if (shouldRestore == ShouldRestoreDocument::kYes ||
                     shouldRestore == ShouldRestoreDocument::kMaybe) {
@@ -226,11 +250,21 @@ public:
                 }
 
                 // The collection for this document was not restored, delete it.
+                LOGV2_DEBUG(6938702,
+                            1,
+                            "Deleting collection that was not restored",
+                            "db"_attr = coll->ns().db().toString(),
+                            "uuid"_attr = coll->uuid(),
+                            "_id"_attr = doc.getField("_id"));
                 NamespaceStringOrUUID nssOrUUID(coll->ns().db().toString(), coll->uuid());
                 uassertStatusOK(repl::StorageInterface::get(opCtx)->deleteById(
                     opCtx, nssOrUUID, doc.getField("_id")));
             }
         }
+
+        // Keeps track of database names for collections restored. Databases with no collections
+        // restored will have their entries removed in the config collections.
+        std::set<std::string> databasesRestored = getDatabasesToRestore(opCtx);
 
         {
             const std::vector<NamespaceString> databasesEntries = {
@@ -267,7 +301,9 @@ public:
                                 1,
                                 "Found document",
                                 "doc"_attr = doc,
-                                "shouldRestore"_attr = shouldRestore);
+                                "shouldRestore"_attr = shouldRestore,
+                                "db"_attr = coll->ns().db().toString(),
+                                "dbNss"_attr = dbNss.toString());
 
                     if (shouldRestore) {
                         // This database had at least one collection restored.
@@ -275,6 +311,12 @@ public:
                     }
 
                     // No collection for this database was restored, delete it.
+                    LOGV2_DEBUG(6938703,
+                                1,
+                                "Deleting database that was not restored",
+                                "db"_attr = coll->ns().db().toString(),
+                                "uuid"_attr = coll->uuid(),
+                                "_id"_attr = doc.getField("_id"));
                     NamespaceStringOrUUID nssOrUUID(coll->ns().db().toString(), coll->uuid());
                     uassertStatusOK(repl::StorageInterface::get(opCtx)->deleteById(
                         opCtx, nssOrUUID, doc.getField("_id")));

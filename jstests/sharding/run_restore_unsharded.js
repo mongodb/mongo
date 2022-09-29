@@ -11,8 +11,8 @@
 
 load("jstests/libs/feature_flag_util.js");
 
-const s =
-    new ShardingTest({name: "runRestore", shards: 2, mongos: 1, config: 1, other: {chunkSize: 1}});
+const s = new ShardingTest(
+    {name: "runRestoreUnsharded", shards: 2, mongos: 1, config: 1, other: {chunkSize: 1}});
 
 let mongos = s.s0;
 let db = s.getDB("test");
