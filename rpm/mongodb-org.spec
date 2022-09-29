@@ -71,6 +71,13 @@ Conflicts: mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-un
 Obsoletes: mongo-10gen-server
 Provides: mongo-10gen-server
 
+%if 0%{?suse_version} >= 1210 || 0%{?rhel} >= 700 || 0%{?fedora} >= 15
+BuildRequires: systemd-rpm-macros
+%else
+BuildRequires: systemd
+%{?systemd_requires}
+%endif
+
 %description server
 MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
 
