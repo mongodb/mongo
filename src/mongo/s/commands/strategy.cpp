@@ -80,6 +80,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/s/load_balancer_support.h"
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -595,7 +596,7 @@ void ParseAndRunCommand::_parseCommand() {
 
     // TODO SERVER-28756: Change allowTransactionsOnConfigDatabase to true once we fix the bug
     // where the mongos custom write path incorrectly drops the client's txnNumber.
-    auto allowTransactionsOnConfigDatabase = false;
+    auto allowTransactionsOnConfigDatabase = !isMongos();
     validateSessionOptions(*_osi, command->getName(), nss, allowTransactionsOnConfigDatabase);
 
     _wc.emplace(uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body)));
