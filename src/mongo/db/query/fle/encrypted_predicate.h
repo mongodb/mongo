@@ -130,7 +130,8 @@ protected:
 
         // Check that the BinData's subtype is 6, and its sub-subtype is equal to this predicate's
         // encryptedBinDataType.
-        return dataLen >= 1 && data[0] == static_cast<uint8_t>(encryptedBinDataType());
+        return dataLen >= 1 &&
+            static_cast<uint8_t>(data[0]) == static_cast<uint8_t>(encryptedBinDataType());
     }
 
     /**
