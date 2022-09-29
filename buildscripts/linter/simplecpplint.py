@@ -60,6 +60,7 @@ _RE_ASSERT = re.compile(r'\bassert\s*\(')
 _RE_UNSTRUCTURED_LOG = re.compile(r'\blogd\s*\(')
 _RE_STD_OPTIONAL = re.compile(r'\bstd::optional\b')
 _RE_TRACING_SUPPORT = re.compile(r'\bTracerProvider::(get|initialize)\b')
+_RE_COLLECTION_SHARDING_RUNTIME = re.compile(r'\bCollectionShardingRuntime\b')
 
 _RE_GENERIC_FCV_COMMENT = re.compile(r'\(Generic FCV reference\):')
 GENERIC_FCV = [
@@ -153,6 +154,7 @@ class Linter:
             self._check_for_ctype(linenum)
             self._check_for_std_optional(linenum)
             self._check_for_tracing_support(linenum)
+            self._check_for_collection_sharding_runtime(linenum)
 
             # Relax the rule of commenting generic FCV references for files directly related to FCV
             # implementations.
@@ -288,6 +290,15 @@ class Linter:
             self._error(
                 linenum, 'mongodb/tracing', 'Illegal use of tracing support, '
                 'this is only for local development use and should not be committed.')
+
+    def _check_for_collection_sharding_runtime(self, linenum):
+        line = self.clean_lines[linenum]
+        if _RE_COLLECTION_SHARDING_RUNTIME.search(
+                line) and "/src/mongo/db/s/" not in self.file_name:
+            self._error(
+                linenum, 'mongodb/collection_sharding_runtime', 'Illegal use of '
+                'CollectionShardingRuntime outside of mongo/db/s/; use CollectionShardingState '
+                'instead; see src/mongo/db/s/collection_sharding_state.h for details.')
 
     def _license_error(self, linenum, msg, category='legal/license'):
         style_url = 'https://github.com/mongodb/mongo/wiki/Server-Code-Style'
