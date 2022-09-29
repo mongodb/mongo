@@ -101,12 +101,11 @@ public:
         auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(
             opCtx, cmd.getDbName().toStringWithTenantId());
         if (swDbInfo == ErrorCodes::NamespaceNotFound) {
-            uassert(CollectionUUIDMismatchInfo(cmd.getDbName().toString(),
-                                               *cmd.getCollectionUUID(),
-                                               nss.coll().toString(),
-                                               boost::none),
-                    "Database does not exist",
-                    !cmd.getCollectionUUID());
+            uassert(
+                CollectionUUIDMismatchInfo(
+                    cmd.getDbName(), *cmd.getCollectionUUID(), nss.coll().toString(), boost::none),
+                "Database does not exist",
+                !cmd.getCollectionUUID());
         }
         const auto dbInfo = uassertStatusOK(swDbInfo);
 

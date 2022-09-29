@@ -517,7 +517,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     for (size_t retries = 1; retries <= kMaxRetries; ++retries) {
         auto swCM = getCollectionRoutingInfoForTxnCmd(opCtx, query.nss());
         if (swCM == ErrorCodes::NamespaceNotFound) {
-            uassert(CollectionUUIDMismatchInfo(query.nss().db().toString(),
+            uassert(CollectionUUIDMismatchInfo(query.nss().dbName(),
                                                *findCommand.getCollectionUUID(),
                                                query.nss().coll().toString(),
                                                boost::none),

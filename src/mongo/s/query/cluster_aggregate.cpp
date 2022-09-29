@@ -329,7 +329,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
 
         if (!executionNsRoutingInfoStatus.isOK()) {
-            uassert(CollectionUUIDMismatchInfo(request.getDbName().toString(),
+            uassert(CollectionUUIDMismatchInfo(request.getDbName(),
                                                *request.getCollectionUUID(),
                                                request.getNamespace().coll().toString(),
                                                boost::none),

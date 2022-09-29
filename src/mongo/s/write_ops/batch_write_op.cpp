@@ -232,7 +232,7 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
     }
 
     if (*actualCollection) {
-        error->setStatus({CollectionUUIDMismatchInfo{info->db(),
+        error->setStatus({CollectionUUIDMismatchInfo{info->dbName(),
                                                      info->collectionUUID(),
                                                      info->expectedCollection(),
                                                      **actualCollection},

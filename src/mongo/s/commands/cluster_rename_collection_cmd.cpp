@@ -101,7 +101,7 @@ public:
             auto catalogCache = Grid::get(opCtx)->catalogCache();
             auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.db());
             if (swDbInfo == ErrorCodes::NamespaceNotFound) {
-                uassert(CollectionUUIDMismatchInfo(fromNss.db().toString(),
+                uassert(CollectionUUIDMismatchInfo(fromNss.dbName(),
                                                    *request().getCollectionUUID(),
                                                    fromNss.coll().toString(),
                                                    boost::none),

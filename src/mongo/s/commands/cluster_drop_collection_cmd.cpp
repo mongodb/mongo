@@ -119,7 +119,7 @@ public:
                 // Ensure our reply conforms to the IDL-defined reply structure.
                 return DropReply::parse(IDLParserContext{"drop"}, resultObj);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                uassert(CollectionUUIDMismatchInfo(request().getDbName().toString(),
+                uassert(CollectionUUIDMismatchInfo(request().getDbName(),
                                                    *request().getCollectionUUID(),
                                                    request().getNamespace().coll().toString(),
                                                    boost::none),

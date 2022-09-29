@@ -362,7 +362,7 @@ Status _dropCollection(OperationContext* opCtx,
             auto db = autoDb.getDb();
             if (!db) {
                 return expectedUUID
-                    ? Status{CollectionUUIDMismatchInfo(collectionName.db().toString(),
+                    ? Status{CollectionUUIDMismatchInfo(collectionName.dbName(),
                                                         *expectedUUID,
                                                         collectionName.coll().toString(),
                                                         boost::none),

@@ -44,7 +44,7 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
 
     auto actualNamespace = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid);
     uassert(
-        (CollectionUUIDMismatchInfo{ns.db().toString(),
+        (CollectionUUIDMismatchInfo{ns.dbName(),
                                     *uuid,
                                     ns.coll().toString(),
                                     actualNamespace && actualNamespace->db() == ns.db()

@@ -54,20 +54,20 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
     opCtx = alternativeOpCtx.get();
     AlternativeClientRegion acr{client};
 
-    auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, info->db());
+    auto swDbInfo =
+        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, info->dbName().toStringWithTenantId());
     if (!swDbInfo.isOK()) {
         return swDbInfo.getStatus();
     }
 
     ListCollections listCollections;
     // Empty tenant id is acceptable here as command's tenant id will not be serialized to BSON.
-    // TODO SERVER-68357: Use database name of CollectionUUIDMismatchInfo.
-    listCollections.setDbName(DatabaseName(boost::none, info->db()));
+    listCollections.setDbName(info->dbName());
     listCollections.setFilter(BSON("info.uuid" << info->collectionUUID()));
 
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
-                                             info->db(),
+                                             info->dbName().db(),
                                              swDbInfo.getValue(),
                                              listCollections.toBSON({}),
                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -83,7 +83,7 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
 
     if (auto actualCollectionElem = dotted_path_support::extractElementAtPath(
             response.swResponse.getValue().data, "cursor.firstBatch.0.name")) {
-        return {CollectionUUIDMismatchInfo{info->db(),
+        return {CollectionUUIDMismatchInfo{info->dbName(),
                                            info->collectionUUID(),
                                            info->expectedCollection(),
                                            actualCollectionElem.str()},
