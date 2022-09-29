@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/expression_bm_fixture.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -40,6 +41,29 @@ BSONArray rangeBSONArray(int count) {
     }
     return builder.arr();
 }
+
+template <typename Generator>
+std::vector<Document> randomPairs(int count, Generator generator) {
+    std::vector<Document> documents;
+    documents.reserve(count);
+
+    for (int i = 0; i < count; ++i) {
+        documents.emplace_back(BSON("lhs" << generator() << "rhs" << generator()));
+    }
+
+    return documents;
+}
+
+auto getDecimalGenerator(PseudoRandom& random) {
+    static constexpr int64_t kMax = 9'000'000'000'000'000;
+    static constexpr Decimal128 kHighDigits(1'000'000'000'000'000'000);
+    return [&]() {
+        return Decimal128(random.nextInt64(kMax))
+            .multiply(kHighDigits)
+            .add(Decimal128(random.nextInt64(kMax)));
+    };
+}
+
 }  // namespace
 
 void ExpressionBenchmarkFixture::benchmarkExpression(BSONObj expressionSpec,
@@ -358,6 +382,164 @@ void ExpressionBenchmarkFixture::benchmarkSetUnion(benchmark::State& state) {
                         std::vector<Document>(100, {{"lhs"_sd, lhs}, {"rhs"_sd, rhs}}));
 }
 
+void ExpressionBenchmarkFixture::benchmarkSubtractIntegers(benchmark::State& state) {
+    const int kCount = 1000;
+    const int kMax = 1'000'000'000;
+    auto generator = [this]() { return random.nextInt32(kMax); };
+    testBinaryOpExpression("$subtract", randomPairs(kCount, generator), state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkSubtractDoubles(benchmark::State& state) {
+    const int kCount = 1000;
+    const int kMax = 1'000'000'000;
+    auto generator = [this]() { return random.nextCanonicalDouble() * kMax; };
+    testBinaryOpExpression("$subtract", randomPairs(kCount, generator), state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkSubtractDecimals(benchmark::State& state) {
+    const int kCount = 1000;
+    testBinaryOpExpression("$subtract", randomPairs(kCount, getDecimalGenerator(random)), state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkSubtractDates(benchmark::State& state) {
+    const int kCount = 1000;
+    const int64_t kMin = -93724129050000;
+    const int64_t kMax = 32503676400000;
+    auto generator = [this]() {
+        int64_t timestamp = std::uniform_int_distribution<int64_t>(kMin, kMax)(random.urbg());
+        return Date_t::fromMillisSinceEpoch(timestamp);
+    };
+    testBinaryOpExpression("$subtract", randomPairs(kCount, generator), state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkSubtractNullAndMissing(benchmark::State& state) {
+    const int kCount = 1000;
+    std::vector<Document> documents;
+    for (int i = 0; i < kCount / 4; ++i) {
+        documents.emplace_back(BSON("empty" << true));
+        documents.emplace_back(BSON("lhs" << BSONNULL));
+        documents.emplace_back(BSON("rhs" << BSONNULL));
+        documents.emplace_back(BSON("lhs" << BSONNULL << "rhs" << BSONNULL));
+    }
+    testBinaryOpExpression("$subtract", documents, state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkAddIntegers(benchmark::State& state) {
+    const int kCount = 1000;
+    const int kMax = 1'000'000'000;
+    auto generator = [this]() { return random.nextInt32(kMax); };
+    testBinaryOpExpression("$add", randomPairs(kCount, generator), state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkAddDoubles(benchmark::State& state) {
+    const int kCount = 1000;
+    const int kMax = 1'000'000'000;
+    auto generator = [this]() { return random.nextCanonicalDouble() * kMax; };
+    testBinaryOpExpression("$add", randomPairs(kCount, generator), state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkAddDecimals(benchmark::State& state) {
+    const int kCount = 1000;
+    testBinaryOpExpression("$add", randomPairs(kCount, getDecimalGenerator(random)), state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkAddDates(benchmark::State& state) {
+    const int kCount = 1000;
+    const int kMaxInt = 1000000;
+    const int64_t kMinDate = -93724129050000;
+    const int64_t kMaxDate = 32503676400000;
+
+    std::vector<Document> documents;
+    documents.reserve(kCount);
+
+    auto nextDate = [this]() {
+        int64_t timestamp =
+            std::uniform_int_distribution<int64_t>(kMinDate, kMaxDate)(random.urbg());
+        return Date_t::fromMillisSinceEpoch(timestamp);
+    };
+
+    for (int i = 0; i < kCount; ++i) {
+        documents.emplace_back(BSON("lhs" << nextDate() << "rhs" << random.nextInt32(kMaxInt)));
+    }
+
+    testBinaryOpExpression("$add", documents, state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkAddNullAndMissing(benchmark::State& state) {
+    const int kCount = 1000;
+    std::vector<Document> documents;
+    for (int i = 0; i < kCount / 4; ++i) {
+        documents.emplace_back(BSON("empty" << true));
+        documents.emplace_back(BSON("lhs" << BSONNULL));
+        documents.emplace_back(BSON("rhs" << BSONNULL));
+        documents.emplace_back(BSON("lhs" << BSONNULL << "rhs" << BSONNULL));
+    }
+    testBinaryOpExpression("$add", documents, state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkAddArray(benchmark::State& state) {
+    const int kCount = 1000;
+    const int kMax = 1'000'000'000;
+    BSONArrayBuilder elements;
+    for (int i = 0; i < kCount; ++i) {
+        elements.append(random.nextInt32(kMax));
+    }
+    Document document{BSON("operands" << elements.done())};
+    BSONArrayBuilder operands;
+    for (int i = 0; i < kCount; ++i) {
+        operands.append("$operands." + std::to_string(i));
+    }
+    BSONObj expr = BSON("$add" << operands.arr());
+    benchmarkExpression(std::move(expr), state, {document});
+}
+
+void ExpressionBenchmarkFixture::benchmarkMultiplyIntegers(benchmark::State& state) {
+    const int kCount = 1000;
+    const int kMax = 1'000'000'000;
+    auto generator = [this]() { return random.nextInt32(kMax); };
+    testBinaryOpExpression("$add", randomPairs(kCount, generator), state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkMultiplyDoubles(benchmark::State& state) {
+    const int kCount = 1000;
+    const int kMax = 1'000'000'000;
+    auto generator = [this]() { return random.nextCanonicalDouble() * kMax; };
+    testBinaryOpExpression("$multiply", randomPairs(kCount, generator), state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkMultiplyDecimals(benchmark::State& state) {
+    const int kCount = 1000;
+    testBinaryOpExpression("$multiply", randomPairs(kCount, getDecimalGenerator(random)), state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkMultiplyNullAndMissing(benchmark::State& state) {
+    const int kCount = 1000;
+    std::vector<Document> documents;
+    for (int i = 0; i < kCount / 4; ++i) {
+        documents.emplace_back(BSON("empty" << true));
+        documents.emplace_back(BSON("lhs" << BSONNULL));
+        documents.emplace_back(BSON("rhs" << BSONNULL));
+        documents.emplace_back(BSON("lhs" << BSONNULL << "rhs" << BSONNULL));
+    }
+    testBinaryOpExpression("$multiply", documents, state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkMultiplyArray(benchmark::State& state) {
+    const int kCount = 1000;
+    const int kMax = 2;
+    BSONArrayBuilder elements;
+    for (int i = 0; i < kCount; ++i) {
+        elements.append(random.nextInt32(kMax) + 1);
+    }
+    Document document{BSON("operands" << elements.done())};
+    BSONArrayBuilder operands;
+    for (int i = 0; i < kCount; ++i) {
+        operands.append("$operands." + std::to_string(i));
+    }
+    BSONObj expr = BSON("$multiply" << operands.arr());
+    benchmarkExpression(std::move(expr), state, {document});
+}
+
 void ExpressionBenchmarkFixture::testDateDiffExpression(long long startDate,
                                                         long long endDate,
                                                         std::string unit,
@@ -434,6 +616,14 @@ void ExpressionBenchmarkFixture::testSetFieldExpression(std::string fieldname,
     benchmarkExpression(BSON("$setField" << objBuilder.obj()), state);
 }
 
+void ExpressionBenchmarkFixture::testBinaryOpExpression(const std::string& binaryOp,
+                                                        const std::vector<Document>& documents,
+                                                        benchmark::State& state) {
+    BSONObj expr = BSON(binaryOp << BSON_ARRAY("$lhs"
+                                               << "$rhs"));
+    benchmarkExpression(std::move(expr), state, documents);
+}
+
 BSONArray ExpressionBenchmarkFixture::randomBSONArray(int count, int max, int offset) {
     BSONArrayBuilder builder;
     for (int i = 0; i < count; i++) {
@@ -441,6 +631,5 @@ BSONArray ExpressionBenchmarkFixture::randomBSONArray(int count, int max, int of
     }
     return builder.arr();
 }
-
 
 }  // namespace mongo

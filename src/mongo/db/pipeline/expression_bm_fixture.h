@@ -91,6 +91,25 @@ public:
     void benchmarkSetEquals(benchmark::State& state);
     void benchmarkSetUnion(benchmark::State& state);
 
+    void benchmarkSubtractIntegers(benchmark::State& state);
+    void benchmarkSubtractDoubles(benchmark::State& state);
+    void benchmarkSubtractDecimals(benchmark::State& state);
+    void benchmarkSubtractDates(benchmark::State& state);
+    void benchmarkSubtractNullAndMissing(benchmark::State& state);
+
+    void benchmarkAddIntegers(benchmark::State& state);
+    void benchmarkAddDoubles(benchmark::State& state);
+    void benchmarkAddDecimals(benchmark::State& state);
+    void benchmarkAddDates(benchmark::State& state);
+    void benchmarkAddNullAndMissing(benchmark::State& state);
+    void benchmarkAddArray(benchmark::State& state);
+
+    void benchmarkMultiplyIntegers(benchmark::State& state);
+    void benchmarkMultiplyDoubles(benchmark::State& state);
+    void benchmarkMultiplyDecimals(benchmark::State& state);
+    void benchmarkMultiplyNullAndMissing(benchmark::State& state);
+    void benchmarkMultiplyArray(benchmark::State& state);
+
 private:
     void testDateDiffExpression(long long startDate,
                                 long long endDate,
@@ -112,6 +131,9 @@ private:
     void testSetFieldExpression(std::string fieldname,
                                 std::string oldFieldValue,
                                 std::string newFieldValue,
+                                benchmark::State& state);
+    void testBinaryOpExpression(const std::string& binaryOp,
+                                const std::vector<Document>& generator,
                                 benchmark::State& state);
 
     BSONArray randomBSONArray(int count, int max, int offset = 0);
@@ -246,6 +268,56 @@ private:
     }                                                                           \
     BENCHMARK_F(Fixture, SetUnion)(benchmark::State & state) {                  \
         benchmarkSetUnion(state);                                               \
+    }                                                                           \
+                                                                                \
+    BENCHMARK_F(Fixture, SubtractIntegers)(benchmark::State & state) {          \
+        benchmarkSubtractIntegers(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, SubtractDoubles)(benchmark::State & state) {           \
+        benchmarkSubtractDoubles(state);                                        \
+    }                                                                           \
+    BENCHMARK_F(Fixture, SubtractDecimals)(benchmark::State & state) {          \
+        benchmarkSubtractDecimals(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, SubtractDates)(benchmark::State & state) {             \
+        benchmarkSubtractDates(state);                                          \
+    }                                                                           \
+    BENCHMARK_F(Fixture, SubtractNullAndMissing)(benchmark::State & state) {    \
+        benchmarkSubtractNullAndMissing(state);                                 \
+    }                                                                           \
+                                                                                \
+    BENCHMARK_F(Fixture, AddIntegers)(benchmark::State & state) {               \
+        benchmarkAddIntegers(state);                                            \
+    }                                                                           \
+    BENCHMARK_F(Fixture, AddDoubles)(benchmark::State & state) {                \
+        benchmarkAddDoubles(state);                                             \
+    }                                                                           \
+    BENCHMARK_F(Fixture, AddDecimals)(benchmark::State & state) {               \
+        benchmarkAddDecimals(state);                                            \
+    }                                                                           \
+    BENCHMARK_F(Fixture, AddDates)(benchmark::State & state) {                  \
+        benchmarkAddDates(state);                                               \
+    }                                                                           \
+    BENCHMARK_F(Fixture, AddNullAndMissing)(benchmark::State & state) {         \
+        benchmarkAddNullAndMissing(state);                                      \
+    }                                                                           \
+    BENCHMARK_F(Fixture, AddArray)(benchmark::State & state) {                  \
+        benchmarkAddArray(state);                                               \
+    }                                                                           \
+                                                                                \
+    BENCHMARK_F(Fixture, MultiplyIntegers)(benchmark::State & state) {          \
+        benchmarkMultiplyIntegers(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MultiplyDoubles)(benchmark::State & state) {           \
+        benchmarkMultiplyDoubles(state);                                        \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MultiplyDecimals)(benchmark::State & state) {          \
+        benchmarkMultiplyDecimals(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MultiplyNullAndMissing)(benchmark::State & state) {    \
+        benchmarkMultiplyNullAndMissing(state);                                 \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MultiplyArray)(benchmark::State & state) {             \
+        benchmarkMultiplyArray(state);                                          \
     }
-
 }  // namespace mongo
