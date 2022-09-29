@@ -113,16 +113,20 @@ std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression>
 
     return makeIsMember(std::move(input), std::move(arr), std::move(collatorVar));
 }
-
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& var) {
-    return makeBinaryOp(sbe::EPrimBinary::logicOr,
-                        makeNot(makeFunction("exists", var.clone())),
+std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpression& expr) {
+    return makeFunction("fillEmpty",
                         makeFunction("typeMatch",
-                                     var.clone(),
+                                     expr.clone(),
                                      makeConstant(sbe::value::TypeTags::NumberInt64,
                                                   sbe::value::bitcastFrom<int64_t>(
                                                       getBSONTypeMask(BSONType::jstNULL) |
-                                                      getBSONTypeMask(BSONType::Undefined)))));
+                                                      getBSONTypeMask(BSONType::Undefined)))),
+                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                                   sbe::value::bitcastFrom<bool>(true)));
+}
+
+std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& var) {
+    return generateNullOrMissingExpr(var);
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frameId,
@@ -132,14 +136,7 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frame
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EExpression> arg) {
-    return makeBinaryOp(sbe::EPrimBinary::logicOr,
-                        makeNot(makeFunction("exists", arg->clone())),
-                        makeFunction("typeMatch",
-                                     arg->clone(),
-                                     makeConstant(sbe::value::TypeTags::NumberInt64,
-                                                  sbe::value::bitcastFrom<int64_t>(
-                                                      getBSONTypeMask(BSONType::jstNULL) |
-                                                      getBSONTypeMask(BSONType::Undefined)))));
+    return generateNullOrMissingExpr(*arg);
 }
 
 std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var) {

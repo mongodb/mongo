@@ -605,6 +605,22 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
         }
         vm::CodeFragment code;
 
+        // Optimize well known set of functions with constant arguments and generate their
+        // specialized variants.
+        if (_name == "typeMatch" && _nodes[1]->as<EConstant>()) {
+            auto [tag, val] = _nodes[1]->as<EConstant>()->getConstant();
+            if (tag == value::TypeTags::NumberInt64) {
+                auto mask = value::bitcastTo<int64_t>(val);
+                uassert(6996901,
+                        "Second argument to typeMatch() must be a 32-bit integer constant",
+                        mask >> 32 == 0 || mask >> 32 == -1);
+                code.append(_nodes[0]->compileDirect(ctx));
+                code.appendTypeMatch(mask);
+
+                return code;
+            }
+        }
+
         for (size_t idx = arity; idx-- > 0;) {
             code.append(_nodes[idx]->compileDirect(ctx));
         }

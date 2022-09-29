@@ -802,7 +802,7 @@ class SbeCodeFragmentPrinter(object):
                 offset = read_as_integer(cur_op, int_size)
                 cur_op += int_size
                 args = 'offset: ' + str(offset) + ', target: ' + hex(cur_op + offset)
-            elif op_name in ['pushConstVal', 'getFieldConst']:
+            elif op_name in ['pushConstVal', 'getFieldImm']:
                 tag = read_as_integer(cur_op, tag_size)
                 args = 'tag: ' + self.valuetags_lookup.get(tag, "unknown") + \
                     ', value: ' + hex(read_as_integer(cur_op + tag_size, value_size))
@@ -814,7 +814,7 @@ class SbeCodeFragmentPrinter(object):
                 args = 'convert to: ' + \
                     self.valuetags_lookup.get(read_as_integer(cur_op, tag_size), "unknown")
                 cur_op += tag_size
-            elif op_name in ['typeMatch']:
+            elif op_name in ['typeMatchImm']:
                 args = 'mask: ' + hex(read_as_integer(cur_op, uint32_size))
                 cur_op += uint32_size
             elif op_name in ['function', 'functionSmall']:
@@ -826,10 +826,10 @@ class SbeCodeFragmentPrinter(object):
                 args = 'builtin: ' + self.builtins_lookup.get(builtin_id, "unknown")
                 args += ' arity: ' + str(read_as_integer(cur_op + builtin_size, arity_size))
                 cur_op += (builtin_size + arity_size)
-            elif op_name in ['fillEmptyConst']:
+            elif op_name in ['fillEmptyImm']:
                 args = 'Instruction::Constants: ' + str(read_as_integer(cur_op, uint8_size))
                 cur_op += uint8_size
-            elif op_name in ['traverseFConst', 'traversePConst']:
+            elif op_name in ['traverseFImm', 'traversePImm']:
                 const_enum = read_as_integer(cur_op, uint8_size)
                 cur_op += uint8_size
                 args = \

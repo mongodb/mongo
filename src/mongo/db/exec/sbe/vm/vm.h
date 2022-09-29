@@ -274,16 +274,16 @@ struct Instruction {
         collCmp3w,
 
         fillEmpty,
-        fillEmptyConst,
+        fillEmptyImm,
         getField,
-        getFieldConst,
+        getFieldImm,
         getElement,
         collComparisonKey,
         getFieldOrElement,
         traverseP,  // traverse projection paths
-        traversePConst,
+        traversePImm,
         traverseF,  // traverse filter paths
-        traverseFConst,
+        traverseFImm,
         setField,
         getArraySize,  // number of elements
 
@@ -310,6 +310,7 @@ struct Instruction {
         isMinKey,
         isMaxKey,
         isTimestamp,
+        typeMatchImm,
 
         function,
         functionSmall,
@@ -422,12 +423,12 @@ struct Instruction {
                 return "collCmp3w";
             case fillEmpty:
                 return "fillEmpty";
-            case fillEmptyConst:
-                return "fillEmptyConst";
+            case fillEmptyImm:
+                return "fillEmptyImm";
             case getField:
                 return "getField";
-            case getFieldConst:
-                return "getFieldConst";
+            case getFieldImm:
+                return "getFieldImm";
             case getElement:
                 return "getElement";
             case collComparisonKey:
@@ -436,12 +437,12 @@ struct Instruction {
                 return "getFieldOrElement";
             case traverseP:
                 return "traverseP";
-            case traversePConst:
-                return "traversePConst";
+            case traversePImm:
+                return "traversePImm";
             case traverseF:
                 return "traverseF";
-            case traverseFConst:
-                return "traverseFConst";
+            case traverseFImm:
+                return "traverseFImm";
             case setField:
                 return "setField";
             case getArraySize:
@@ -488,6 +489,8 @@ struct Instruction {
                 return "isMaxKey";
             case isTimestamp:
                 return "isTimestamp";
+            case typeMatchImm:
+                return "typeMatchImm";
             case function:
                 return "function";
             case functionSmall:
@@ -783,6 +786,7 @@ public:
     void appendIsTimestamp() {
         appendSimpleInstruction(Instruction::isTimestamp);
     }
+    void appendTypeMatch(uint32_t mask);
     void appendFunction(Builtin f, ArityType arity);
     void appendJump(int jumpOffset);
     void appendJumpTrue(int jumpOffset);

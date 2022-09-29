@@ -469,29 +469,29 @@ TEST(SBEVM, CodeFragmentToStringArgs) {
         std::string toStringPattern{kAddrPattern};
 
         code.appendFillEmpty(vm::Instruction::Null);
-        toStringPattern += instrPattern("fillEmptyConst", "k: Null");
+        toStringPattern += instrPattern("fillEmptyImm", "k: Null");
         code.appendFillEmpty(vm::Instruction::False);
-        toStringPattern += instrPattern("fillEmptyConst", "k: False");
+        toStringPattern += instrPattern("fillEmptyImm", "k: False");
         code.appendFillEmpty(vm::Instruction::True);
-        toStringPattern += instrPattern("fillEmptyConst", "k: True");
+        toStringPattern += instrPattern("fillEmptyImm", "k: True");
 
         code.appendTraverseP(0xAA, vm::Instruction::Nothing);
         auto offsetP1 = 0xAA - code.instrs().size();
         toStringPattern +=
-            instrPattern("traversePConst", "k: Nothing, offset: " + std::to_string(offsetP1));
+            instrPattern("traversePImm", "k: Nothing, offset: " + std::to_string(offsetP1));
         code.appendTraverseP(0xAA, vm::Instruction::Int32One);
         auto offsetP2 = 0xAA - code.instrs().size();
         toStringPattern +=
-            instrPattern("traversePConst", "k: 1, offset: " + std::to_string(offsetP2));
+            instrPattern("traversePImm", "k: 1, offset: " + std::to_string(offsetP2));
         code.appendTraverseF(0xBB, vm::Instruction::True);
         auto offsetF = 0xBB - code.instrs().size();
         toStringPattern +=
-            instrPattern("traverseFConst", "k: True, offset: " + std::to_string(offsetF));
+            instrPattern("traverseFImm", "k: True, offset: " + std::to_string(offsetF));
 
         auto [tag, val] = value::makeNewString("Hello world!");
         value::ValueGuard guard{tag, val};
         code.appendGetField(tag, val);
-        toStringPattern += instrPattern("getFieldConst", "value: \"Hello world!\"");
+        toStringPattern += instrPattern("getFieldImm", "value: \"Hello world!\"");
 
         code.appendAdd();
         toStringPattern += instrPattern("add", "");

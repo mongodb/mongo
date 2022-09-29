@@ -108,16 +108,16 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -2,  // collCmp3w
 
     -1,  // fillEmpty
-    0,   // fillEmptyConst
+    0,   // fillEmptyImm
     -1,  // getField
-    0,   // getFieldConst
+    0,   // getFieldImm
     -1,  // getElement
     -1,  // collComparisonKey
     -1,  // getFieldOrElement
     -2,  // traverseP
-    0,   // traversePConst
+    0,   // traversePImm
     -2,  // traverseF
-    0,   // traverseFConst
+    0,   // traverseFImm
     -2,  // setField
     0,   // getArraySize
 
@@ -144,6 +144,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isMinKey
     0,  // isMaxKey
     0,  // isTimestamp
+    0,  // typeMatchImm
 
     0,  // function is special, the stack offset is encoded in the instruction itself
     0,  // functionSmall is special, the stack offset is encoded in the instruction itself
@@ -260,8 +261,8 @@ std::string CodeFragment::toString() const {
                 break;
             }
             // Instructions with other kinds of arguments.
-            case Instruction::traversePConst:
-            case Instruction::traverseFConst: {
+            case Instruction::traversePImm:
+            case Instruction::traverseFImm: {
                 auto k = readFromMemory<Instruction::Constants>(pcPointer);
                 pcPointer += sizeof(k);
                 auto offset = readFromMemory<int>(pcPointer);
@@ -269,13 +270,13 @@ std::string CodeFragment::toString() const {
                 ss << "k: " << Instruction::toStringConstants(k) << ", offset: " << offset;
                 break;
             }
-            case Instruction::fillEmptyConst: {
+            case Instruction::fillEmptyImm: {
                 auto k = readFromMemory<Instruction::Constants>(pcPointer);
                 pcPointer += sizeof(k);
                 ss << "k: " << Instruction::toStringConstants(k);
                 break;
             }
-            case Instruction::getFieldConst:
+            case Instruction::getFieldImm:
             case Instruction::pushConstVal: {
                 auto tag = readFromMemory<value::TypeTags>(pcPointer);
                 pcPointer += sizeof(tag);
@@ -301,6 +302,12 @@ std::string CodeFragment::toString() const {
                 auto tag = readFromMemory<value::TypeTags>(pcPointer);
                 pcPointer += sizeof(tag);
                 ss << "tag: " << tag;
+                break;
+            }
+            case Instruction::typeMatchImm: {
+                auto mask = readFromMemory<uint32_t>(pcPointer);
+                pcPointer += sizeof(mask);
+                ss << "mask: " << mask;
                 break;
             }
             case Instruction::function:
@@ -513,7 +520,7 @@ void CodeFragment::appendSimpleInstruction(Instruction::Tags tag) {
 
 void CodeFragment::appendFillEmpty(Instruction::Constants k) {
     Instruction i;
-    i.tag = Instruction::fillEmptyConst;
+    i.tag = Instruction::fillEmptyImm;
     adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(k));
@@ -530,7 +537,7 @@ void CodeFragment::appendGetField(value::TypeTags tag, value::Value val) {
     invariant(value::isString(tag));
 
     Instruction i;
-    i.tag = Instruction::getFieldConst;
+    i.tag = Instruction::getFieldImm;
     adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(tag) + sizeof(val));
@@ -630,7 +637,7 @@ void CodeFragment::appendIsRecordId() {
 
 void CodeFragment::appendTraverseP(int codePosition, Instruction::Constants k) {
     Instruction i;
-    i.tag = Instruction::traversePConst;
+    i.tag = Instruction::traversePImm;
     adjustStackSimple(i);
 
     auto size = sizeof(Instruction) + sizeof(codePosition) + sizeof(k);
@@ -645,7 +652,7 @@ void CodeFragment::appendTraverseP(int codePosition, Instruction::Constants k) {
 
 void CodeFragment::appendTraverseF(int codePosition, Instruction::Constants k) {
     Instruction i;
-    i.tag = Instruction::traverseFConst;
+    i.tag = Instruction::traverseFImm;
     adjustStackSimple(i);
 
     auto size = sizeof(Instruction) + sizeof(codePosition) + sizeof(k);
@@ -656,6 +663,18 @@ void CodeFragment::appendTraverseF(int codePosition, Instruction::Constants k) {
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, k);
     offset += writeToMemory(offset, codeOffset);
+}
+
+void CodeFragment::appendTypeMatch(uint32_t mask) {
+    Instruction i;
+    i.tag = Instruction::typeMatchImm;
+    adjustStackSimple(i);
+
+    auto size = sizeof(Instruction) + sizeof(mask);
+    auto offset = allocateSpace(size);
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, mask);
 }
 
 void CodeFragment::appendFunction(Builtin f, ArityType arity) {
@@ -5321,7 +5340,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     }
                     break;
                 }
-                case Instruction::fillEmptyConst: {
+                case Instruction::fillEmptyImm: {
                     auto k = readFromMemory<Instruction::Constants>(pcPointer);
                     pcPointer += sizeof(k);
 
@@ -5371,7 +5390,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     }
                     break;
                 }
-                case Instruction::getFieldConst: {
+                case Instruction::getFieldImm: {
                     auto tagField = readFromMemory<value::TypeTags>(pcPointer);
                     pcPointer += sizeof(tagField);
                     auto valField = readFromMemory<value::Value>(pcPointer);
@@ -5467,7 +5486,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     traverseP(code);
                     break;
                 }
-                case Instruction::traversePConst: {
+                case Instruction::traversePImm: {
                     auto k = readFromMemory<Instruction::Constants>(pcPointer);
                     pcPointer += sizeof(k);
 
@@ -5485,7 +5504,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     traverseF(code);
                     break;
                 }
-                case Instruction::traverseFConst: {
+                case Instruction::traverseFImm: {
                     auto k = readFromMemory<Instruction::Constants>(pcPointer);
                     pcPointer += sizeof(k);
 
@@ -5731,6 +5750,21 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 }
                 case Instruction::isTimestamp: {
                     runTagCheck(value::TypeTags::Timestamp);
+                    break;
+                }
+                case Instruction::typeMatchImm: {
+                    auto mask = readFromMemory<uint32_t>(pcPointer);
+                    pcPointer += sizeof(mask);
+
+                    auto [owned, tag, val] = getFromStack(0);
+                    if (tag != value::TypeTags::Nothing) {
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(getBSONTypeMask(tag) & mask));
+                    }
+                    if (owned) {
+                        value::releaseValue(tag, val);
+                    }
                     break;
                 }
                 case Instruction::function:
