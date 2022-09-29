@@ -1,0 +1,148 @@
+==== VARIATION: optimized partial index: the expression matches the pipeline ====
+-- INPUTS:
+pipeline: [{$match: {'a': 3, 'b': 2}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+				index1: 
+					collation spec: 
+						ABT path: 
+							PathGet [a]
+							PathTraverse [1]
+							PathIdentity []
+
+						collation op: Ascending
+					version: 2
+					ordering bits: 0
+					is multi-key: 1
+					distribution and paths: 
+						distribution type: Centralized
+						distribution paths: 
+					requirementsMap: 
+					    refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [2], Const [2]]}}}
+
+			non multi-key index paths: 
+			collection exists: 1
+			CE type: -1
+optimization phases: 
+	ConstEvalPost
+	ConstEvalPre
+	MemoExplorationPhase
+	MemoImplementationPhase
+	MemoSubstitutionPhase
+	PathFuse
+	PathLower
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+BinaryJoin [joinType: Inner, {rid_0}]
+|   |   Const [true]
+|   Filter []
+|   |   FunctionCall [traverseF]
+|   |   |   |   Const [false]
+|   |   |   LambdaAbstraction [valCmp_0]
+|   |   |   BinaryOp [Eq]
+|   |   |   |   Const [2]
+|   |   |   Variable [valCmp_0]
+|   |   Variable [evalTemp_4]
+|   LimitSkip []
+|   |   limitSkip:
+|   |       limit: 1
+|   |       skip: 0
+|   Seek [ridProjection: rid_0, {'<root>': scan_0, 'b': evalTemp_4}, collection]
+|   |   BindBlock:
+|   |       [evalTemp_4]
+|   |           Source []
+|   |       [scan_0]
+|   |           Source []
+|   RefBlock: 
+|       Variable [rid_0]
+IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {[Const [3], Const [3]]}]
+    BindBlock:
+        [rid_0]
+            Source []
+
+
+==== VARIATION: optimized partial index negative: the expression does not match the pipeline ====
+-- INPUTS:
+pipeline: [{$match: {'a': 3, 'b': 3}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+				index1: 
+					collation spec: 
+						ABT path: 
+							PathGet [a]
+							PathTraverse [1]
+							PathIdentity []
+
+						collation op: Ascending
+					version: 2
+					ordering bits: 0
+					is multi-key: 1
+					distribution and paths: 
+						distribution type: Centralized
+						distribution paths: 
+					requirementsMap: 
+					    refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [2], Const [2]]}}}
+
+			non multi-key index paths: 
+			collection exists: 1
+			CE type: -1
+optimization phases: 
+	ConstEvalPost
+	ConstEvalPre
+	MemoExplorationPhase
+	MemoImplementationPhase
+	MemoSubstitutionPhase
+	PathFuse
+	PathLower
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   FunctionCall [traverseF]
+|   |   |   Const [false]
+|   |   LambdaAbstraction [valCmp_1]
+|   |   BinaryOp [Eq]
+|   |   |   Const [3]
+|   |   Variable [valCmp_1]
+|   Variable [evalTemp_3]
+Filter []
+|   FunctionCall [traverseF]
+|   |   |   Const [false]
+|   |   LambdaAbstraction [valCmp_0]
+|   |   BinaryOp [Eq]
+|   |   |   Const [3]
+|   |   Variable [valCmp_0]
+|   Variable [evalTemp_2]
+PhysicalScan [{'<root>': scan_0, 'a': evalTemp_2, 'b': evalTemp_3}, collection]
+    BindBlock:
+        [evalTemp_2]
+            Source []
+        [evalTemp_3]
+            Source []
+        [scan_0]
+            Source []
+
+

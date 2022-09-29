@@ -156,4 +156,177 @@ ABT translatePipeline(const std::string& pipelineStr, std::string scanDefName) {
     return translatePipeline(metadata, pipelineStr, std::move(scanDefName), prefixId);
 }
 
+void serializeOptPhases(std::ostream& stream, opt::unordered_set<OptPhase> phaseSet) {
+    // The order of phases in the golden file must be the same every time the test is run.
+    std::set<std::string> orderedPhases;
+    for (const auto& phase : phaseSet) {
+        orderedPhases.insert(OptPhaseEnum::toString[static_cast<int>(phase)]);
+    }
+
+    stream << "optimization phases: " << std::endl;
+    for (const auto& phase : orderedPhases) {
+        stream << "\t" << phase << std::endl;
+    }
+}
+
+void explainPreserveIndentation(std::ostream& stream, std::string baseTabs, std::string explain) {
+    std::string currLine = "";
+    for (char ch : explain) {
+        if (ch == '\n') {
+            stream << baseTabs << currLine << std::endl;
+            currLine = "";
+        } else {
+            currLine += ch;
+        }
+    }
+    stream << std::endl;
+}
+
+void serializeDistributionAndPaths(std::ostream& stream,
+                                   DistributionAndPaths distributionAndPaths,
+                                   std::string baseTabs) {
+    stream << baseTabs << "distribution and paths: " << std::endl;
+    stream << baseTabs << "\tdistribution type: "
+           << DistributionTypeEnum::toString[static_cast<int>(distributionAndPaths._type)]
+           << std::endl;
+    stream << baseTabs << "\tdistribution paths: " << std::endl;
+    for (const ABT& abt : distributionAndPaths._paths) {
+        explainPreserveIndentation(stream, baseTabs + "\t\t", ExplainGenerator::explainV2(abt));
+    }
+}
+
+void serializeMetadata(std::ostream& stream, Metadata metadata) {
+    stream << "metadata: " << std::endl;
+
+    stream << "\tnumber of partitions: " << metadata._numberOfPartitions << std::endl;
+
+    // The ScanDefinitions are stored in an unordered map, and the order of the ScanDefinitions in
+    // the golden file must be the same every time the test is run.
+    std::map<std::string, ScanDefinition> orderedScanDefs;
+    for (auto element : metadata._scanDefs) {
+        orderedScanDefs.insert(element);
+    }
+
+    stream << "\tscan definitions: " << std::endl;
+    for (const auto& element : orderedScanDefs) {
+        stream << "\t\t" << element.first << ": " << std::endl;
+
+        ScanDefinition scanDef = element.second;
+
+        stream << "\t\t\toptions: " << std::endl;
+        for (const auto& optionElem : scanDef.getOptionsMap()) {
+            stream << "\t\t\t\t" << optionElem.first << ": " << optionElem.second << std::endl;
+        }
+
+        serializeDistributionAndPaths(stream, scanDef.getDistributionAndPaths(), "\t\t\t");
+
+        stream << "\t\t\tindexes: " << std::endl;
+        for (const auto& indexElem : scanDef.getIndexDefs()) {
+            stream << "\t\t\t\t" << indexElem.first << ": " << std::endl;
+
+            IndexDefinition indexDef = indexElem.second;
+
+            stream << "\t\t\t\t\tcollation spec: " << std::endl;
+            for (const auto& indexCollationEntry : indexDef.getCollationSpec()) {
+                stream << "\t\t\t\t\t\tABT path: " << std::endl;
+                explainPreserveIndentation(stream,
+                                           "\t\t\t\t\t\t\t",
+                                           ExplainGenerator::explainV2(indexCollationEntry._path));
+
+                stream << "\t\t\t\t\t\tcollation op: "
+                       << CollationOpEnum::toString[static_cast<int>(indexCollationEntry._op)]
+                       << std::endl;
+            }
+
+            stream << "\t\t\t\t\tversion: " << indexDef.getVersion() << std::endl;
+            stream << "\t\t\t\t\tordering bits: " << indexDef.getOrdering() << std::endl;
+            stream << "\t\t\t\t\tis multi-key: " << indexDef.isMultiKey() << std::endl;
+
+            serializeDistributionAndPaths(stream, indexDef.getDistributionAndPaths(), "\t\t\t\t\t");
+
+            std::string serializedReqMap =
+                ExplainGenerator::explainPartialSchemaReqMap(indexDef.getPartialReqMap());
+            explainPreserveIndentation(stream, "\t\t\t\t\t", serializedReqMap);
+        }
+
+        stream << "\t\t\tnon multi-key index paths: " << std::endl;
+        for (const auto& indexPath : scanDef.getNonMultiKeyPathSet()) {
+            explainPreserveIndentation(stream, "\t\t\t\t", ExplainGenerator::explainV2(indexPath));
+        }
+
+        stream << "\t\t\tcollection exists: " << scanDef.exists() << std::endl;
+        stream << "\t\t\tCE type: " << scanDef.getCE() << std::endl;
+    }
+}
+
+ABT translatetoABT(const std::string& pipelineStr,
+                   std::string scanDefName,
+                   Metadata metadata,
+                   const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss) {
+    PrefixId prefixId;
+    return translatePipeline(
+        metadata, pipelineStr, prefixId.getNextId("scan"), scanDefName, prefixId, involvedNss);
+}
+
+ABT optimizeABT(ABT abt,
+                opt::unordered_set<OptPhase> phaseSet,
+                Metadata metadata,
+                PathToIntervalFn pathToInterval,
+                bool phaseManagerDisableScan) {
+    PrefixId prefixId;
+
+    OptPhaseManager phaseManager(phaseSet,
+                                 prefixId,
+                                 false,
+                                 metadata,
+                                 std::make_unique<HeuristicCE>(),
+                                 std::make_unique<DefaultCosting>(),
+                                 pathToInterval,
+                                 DebugInfo::kDefaultForTests);
+    if (phaseManagerDisableScan) {
+        phaseManager.getHints()._disableScan = true;
+    }
+
+    ABT optimized = abt;
+    phaseManager.optimize(optimized);
+    return optimized;
+}
+
+void testABTTranslationAndOptimization(
+    unittest::GoldenTestContext& gctx,
+    const std::string& variationName,
+    const std::string& pipelineStr,
+    std::string scanDefName,
+    opt::unordered_set<OptPhase> phaseSet,
+    Metadata metadata,
+    PathToIntervalFn pathToInterval,
+    bool phaseManagerDisableScan,
+    const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss) {
+    auto& stream = gctx.outStream();
+    bool optimizePipeline = !phaseSet.empty();
+
+    stream << "==== VARIATION: " << variationName << " ====" << std::endl;
+    stream << "-- INPUTS:" << std::endl;
+    stream << "pipeline: " << pipelineStr << std::endl;
+
+    serializeMetadata(stream, metadata);
+    if (optimizePipeline) {
+        serializeOptPhases(stream, phaseSet);
+    }
+
+    stream << std::endl << "-- OUTPUT:" << std::endl;
+
+    ABT translated = translatetoABT(pipelineStr, scanDefName, metadata, involvedNss);
+
+    if (optimizePipeline) {
+        ABT optimized =
+            optimizeABT(translated, phaseSet, metadata, pathToInterval, phaseManagerDisableScan);
+        stream << ExplainGenerator::explainV2(optimized) << std::endl;
+    } else {
+        stream << ExplainGenerator::explainV2(translated) << std::endl;
+    }
+
+    stream << std::endl;
+}
+
 }  // namespace mongo::optimizer
