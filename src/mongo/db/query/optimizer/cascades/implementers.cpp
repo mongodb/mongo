@@ -1606,7 +1606,7 @@ private:
             setCollationForRIDIntersect(
                 collationLeftRightSplit, leftPhysPropsLocal, rightPhysPropsLocal);
 
-            optimizeChildren<BinaryJoinNode, PhysicalRewriteType::RIDIntersectNLJ>(
+            optimizeChildren<BinaryJoinNode, PhysicalRewriteType::IndexFetch>(
                 _queue,
                 kDefaultPriority,
                 std::move(physicalJoin),

@@ -1075,9 +1075,9 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
                                          LogicalRewriteType::FilterRIDIntersectReorder};
     PhysicalRewriteType physicalRules[] = {PhysicalRewriteType::Seek,
                                            PhysicalRewriteType::Seek,
-                                           PhysicalRewriteType::RIDIntersectNLJ,
+                                           PhysicalRewriteType::IndexFetch,
                                            PhysicalRewriteType::Evaluation,
-                                           PhysicalRewriteType::RIDIntersectNLJ,
+                                           PhysicalRewriteType::IndexFetch,
                                            PhysicalRewriteType::Root,
                                            PhysicalRewriteType::SargableToIndex,
                                            PhysicalRewriteType::SargableToIndex,
