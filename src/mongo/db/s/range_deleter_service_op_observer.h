@@ -222,7 +222,6 @@ private:
     std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
-        size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime,
         std::vector<repl::ReplOperation>* statements) override {
         return nullptr;

@@ -1145,8 +1145,8 @@ protected:
                             size_t numberOfPrePostImagesToWrite = 0) {
         auto txnOps = txnParticipant().retrieveCompletedTransactionOperations(opCtx());
         auto currentTime = Date_t::now();
-        auto applyOpsAssignment = opObserver().preTransactionPrepare(
-            opCtx(), reservedSlots, numberOfPrePostImagesToWrite, currentTime, txnOps);
+        auto applyOpsAssignment =
+            opObserver().preTransactionPrepare(opCtx(), reservedSlots, currentTime, txnOps);
         opCtx()->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
         opObserver().onTransactionPrepare(opCtx(),
                                           reservedSlots,

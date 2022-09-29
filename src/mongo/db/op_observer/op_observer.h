@@ -486,9 +486,6 @@ public:
      * The 'reservedSlots' is a list of oplog slots reserved for the oplog entries in a transaction.
      * The last reserved slot represents the prepareOpTime used for the prepare oplog entry.
      *
-     * The 'numberOfPrePostImagesToWrite' is the number of CRUD operations that have a pre-image
-     * to write as a noop oplog entry.
-     *
      * The 'wallClockTime' is the time to record as wall clock time on oplog entries resulting from
      * transaction preparation.
      *
@@ -498,7 +495,6 @@ public:
     virtual std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
-        size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime,
         std::vector<repl::ReplOperation>* statements) = 0;
 
