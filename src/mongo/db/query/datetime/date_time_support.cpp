@@ -577,11 +577,15 @@ long long TimeZone::isoYear(Date_t date) const {
 
 Seconds TimeZone::utcOffset(Date_t date) const {
     if (isTimeZoneIDZone()) {
-        auto* offset = timelib_get_time_zone_info(
-            durationCount<Seconds>(date.toDurationSinceEpoch()), _tzInfo.get());
-        auto timezoneOffsetFromUTC = Seconds(offset->offset);
-        timelib_time_offset_dtor(offset);
-        return timezoneOffsetFromUTC;
+        int32_t timezoneOffsetFromUTC = 0;
+        int result =
+            timelib_get_time_zone_offset_info(durationCount<Seconds>(date.toDurationSinceEpoch()),
+                                              _tzInfo.get(),
+                                              &timezoneOffsetFromUTC,
+                                              nullptr,
+                                              nullptr);
+        uassert(6828900, "Failed to obtain timezone offset", result);
+        return Seconds(timezoneOffsetFromUTC);
     } else {
         return _utcOffset;
     }
