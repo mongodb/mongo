@@ -690,11 +690,13 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         }
     }
 
-    // If the filter has no constraints after removing no-ops, then rewrite the filter with a
-    // predicate using the constant True.
     if (conversion->_reqMap.empty()) {
-        ctx.addNode(make<FilterNode>(Constant::boolean(true), filterNode.getChild()),
-                    true /*subtitute*/);
+        // If the filter has no constraints after removing no-ops, then replace with its child. We
+        // need to copy the child since we hold it by reference from the memo, and during
+        // subtitution the current group will be erased.
+
+        ABT newNode = filterNode.getChild();
+        ctx.addNode(newNode, true /*substitute*/);
         return;
     }
 

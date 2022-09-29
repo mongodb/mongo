@@ -1546,8 +1546,6 @@ TEST(LogicalRewriter, RemoveNoopFilter) {
         "|   |       ptest\n"
         "|   RefBlock: \n"
         "|       Variable [ptest]\n"
-        "Filter []\n"
-        "|   Const [true]\n"
         "Scan [test]\n"
         "    BindBlock:\n"
         "        [ptest]\n"

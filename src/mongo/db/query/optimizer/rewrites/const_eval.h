@@ -64,6 +64,8 @@ public:
     void transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs);
     void transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args);
     void transport(ABT& n, const If& op, ABT& cond, ABT& thenBranch, ABT& elseBranch);
+
+    void transport(ABT& n, const FilterNode& op, ABT& child, ABT& expr);
     void transport(ABT& n, const EvaluationNode& op, ABT& child, ABT& expr);
 
     void prepare(ABT&, const PathTraverse&);

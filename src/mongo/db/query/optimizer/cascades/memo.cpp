@@ -87,17 +87,6 @@ const ABTVector& OrderPreservingABTSet::getVector() const {
     return _vector;
 }
 
-PhysRewriteEntry::PhysRewriteEntry(const double priority,
-                                   PhysicalRewriteType rule,
-                                   ABT node,
-                                   std::vector<std::pair<ABT*, properties::PhysProps>> childProps,
-                                   NodeCEMap nodeCEMap)
-    : _priority(priority),
-      _rule(rule),
-      _node(std::move(node)),
-      _childProps(std::move(childProps)),
-      _nodeCEMap(std::move(nodeCEMap)) {}
-
 PhysOptimizationResult::PhysOptimizationResult()
     : PhysOptimizationResult(0, {}, CostType::kInfinity) {}
 
@@ -237,10 +226,14 @@ public:
         // noop
     }
 
-    GroupIdType transport(const ABT& /*n*/,
+    GroupIdType transport(const ABT& n,
                           const MemoLogicalDelegatorNode& node,
-                          const VariableEnvironment& /*env*/) {
-        return node.getGroupId();
+                          const VariableEnvironment& env) {
+        if (_targetGroupMap.count(n.ref()) == 0) {
+            return node.getGroupId();
+        }
+
+        return addNodes(n, node, n, env, {});
     }
 
     void prepare(const ABT& n, const FilterNode& node, const VariableEnvironment& /*env*/) {
@@ -628,9 +621,6 @@ std::pair<MemoLogicalNodeId, bool> Memo::addNode(GroupIdType groupId,
                                                  ABT n,
                                                  LogicalRewriteType rule) {
     uassert(6624052, "Attempting to insert a physical node", !n.is<ExclusivelyPhysicalNode>());
-    uassert(6624053,
-            "Attempting to insert a logical delegator node",
-            !n.is<MemoLogicalDelegatorNode>());
 
     Group& group = *_groups.at(groupId);
     OrderPreservingABTSet& nodes = group._logicalNodes;

@@ -124,7 +124,7 @@ public:
         const LogicalProps& childLogicalProps =
             _memo.getGroup(node.getGroupId())._logicalProperties;
         // Notice that unlike all physical nodes, this logical node takes it cardinality directly
-        // from the memo group logical property, igrnoring _cardinalityEstimate.
+        // from the memo group logical property, ignoring _cardinalityEstimate.
         CEType baseCE = getPropertyConst<CardinalityEstimate>(childLogicalProps).getEstimate();
 
         if (hasProperty<IndexingRequirement>(_physProps)) {

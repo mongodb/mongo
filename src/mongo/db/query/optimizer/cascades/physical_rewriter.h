@@ -71,7 +71,7 @@ public:
                                       CostType costLimit);
 
 private:
-    void costAndRetainBestNode(ABT node,
+    void costAndRetainBestNode(std::unique_ptr<ABT> node,
                                ChildPropsType childProps,
                                NodeCEMap nodeCEMap,
                                PhysicalRewriteType rule,

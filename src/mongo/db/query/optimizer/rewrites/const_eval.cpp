@@ -483,6 +483,18 @@ void ConstEval::transport(ABT&, const LambdaAbstraction&, ABT&) {
     --_inCostlyCtx;
 }
 
+void ConstEval::transport(ABT& n, const FilterNode& op, ABT& child, ABT& expr) {
+    if (expr == Constant::boolean(true)) {
+        // Remove trivially true filter.
+
+        // First, pull out the child and put in a blackhole.
+        auto result = std::exchange(child, make<Blackhole>());
+
+        // Replace the filter node itself with the extracted child.
+        swapAndUpdate(n, std::move(result));
+    }
+}
+
 void ConstEval::transport(ABT& n, const EvaluationNode& op, ABT& child, ABT& expr) {
     if (_noRefProj.erase(&op)) {
         // The evaluation node is unused so replace it with its own child.

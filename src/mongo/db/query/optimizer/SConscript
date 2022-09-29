@@ -42,7 +42,6 @@ env.Library(
         'utils/ce_math.cpp',
         "utils/interval_utils.cpp",
         "utils/memo_utils.cpp",
-        "utils/rewriter_utils.cpp",
         "utils/utils.cpp",
     ],
     LIBDEPS=[
@@ -72,6 +71,16 @@ env.CppUnitTest(
         "reference_tracker_test.cpp",
         "rewrites/path_optimizer_test.cpp",
         "interval_intersection_test.cpp",
+    ],
+    LIBDEPS=[
+        "optimizer",
+        "unit_test_utils",
+    ],
+)
+
+env.CppUnitTest(
+    target='optimizer_failure_test',
+    source=[
         "optimizer_failure_test.cpp",
     ],
     LIBDEPS=[

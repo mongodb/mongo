@@ -33,7 +33,6 @@
 #include "mongo/db/query/optimizer/cascades/implementers.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/utils/rewriter_utils.h"
 
 namespace mongo::optimizer::cascades {
 
@@ -139,21 +138,21 @@ static void printCandidateInfo(const ABT& node,
     }
 }
 
-void PhysicalRewriter::costAndRetainBestNode(ABT node,
+void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
                                              ChildPropsType childProps,
                                              NodeCEMap nodeCEMap,
                                              const PhysicalRewriteType rule,
                                              const GroupIdType groupId,
                                              PrefixId& prefixId,
                                              PhysOptimizationResult& bestResult) {
-    const CostAndCE nodeCostAndCE =
-        _costDerivation.deriveCost(_memo, bestResult._physProps, node.ref(), childProps, nodeCEMap);
+    const CostAndCE nodeCostAndCE = _costDerivation.deriveCost(
+        _memo, bestResult._physProps, node->ref(), childProps, nodeCEMap);
     const CostType nodeCost = nodeCostAndCE._cost;
     uassert(6624056, "Must get non-infinity cost for physical node.", !nodeCost.isInfinite());
 
     if (_memo.getDebugInfo().hasDebugLevel(3)) {
         std::cout << "Requesting optimization\n";
-        printCandidateInfo(node, groupId, nodeCost, childProps, bestResult);
+        printCandidateInfo(*node, groupId, nodeCost, childProps, bestResult);
     }
 
     const CostType childCostLimit =
@@ -166,14 +165,13 @@ void PhysicalRewriter::costAndRetainBestNode(ABT node,
         std::cout << (success ? (improvement ? "Improved" : "Did not improve")
                               : "Failed optimizing")
                   << "\n";
-        printCandidateInfo(node, groupId, nodeCost, childProps, bestResult);
+        printCandidateInfo(*node, groupId, nodeCost, childProps, bestResult);
     }
 
     tassert(6678300,
             "Retaining node with uninitialized rewrite rule",
             rule != cascades::PhysicalRewriteType::Uninitialized);
-    PhysNodeInfo candidateNodeInfo{
-        unwrapConstFilter(std::move(node)), cost, nodeCost, nodeCostAndCE._ce, rule};
+    PhysNodeInfo candidateNodeInfo{std::move(*node), cost, nodeCost, nodeCostAndCE._ce, rule};
     const bool keepRejectedPlans = _hints._keepRejectedPlans;
     if (improvement) {
         if (keepRejectedPlans && bestResult._nodeInfo) {
@@ -379,7 +377,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
             NodeCEMap nodeCEMap = std::move(rewrite._nodeCEMap);
             if (nodeCEMap.empty()) {
                 nodeCEMap.emplace(
-                    rewrite._node.cast<Node>(),
+                    rewrite._node->cast<Node>(),
                     getPropertyConst<CardinalityEstimate>(logicalProps).getEstimate());
             }
 

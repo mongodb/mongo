@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/optimizer/cascades/rewrite_queues.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
-#include "mongo/db/query/optimizer/utils/memo_utils.h"
 #include <mongo/db/query/optimizer/defs.h>
 
 namespace mongo::optimizer::cascades {
@@ -58,14 +57,39 @@ bool LogicalRewriteEntryComparator::operator()(
     return x->_nodeId._index < y->_nodeId._index;
 }
 
+PhysRewriteEntry::PhysRewriteEntry(const double priority,
+                                   PhysicalRewriteType rule,
+                                   std::unique_ptr<ABT> node,
+                                   std::vector<std::pair<ABT*, properties::PhysProps>> childProps,
+                                   NodeCEMap nodeCEMap)
+    : _priority(priority),
+      _rule(rule),
+      _node(std::move(node)),
+      _childProps(std::move(childProps)),
+      _nodeCEMap(std::move(nodeCEMap)) {}
+
 void optimizeChildrenNoAssert(PhysRewriteQueue& queue,
                               const double priority,
                               const PhysicalRewriteType rule,
-                              ABT node,
+                              std::unique_ptr<ABT> node,
                               ChildPropsType childProps,
                               NodeCEMap nodeCEMap) {
     queue.emplace(std::make_unique<PhysRewriteEntry>(
         priority, rule, std::move(node), std::move(childProps), std::move(nodeCEMap)));
+}
+
+void optimizeChildrenNoAssert(PhysRewriteQueue& queue,
+                              double priority,
+                              PhysicalRewriteType rule,
+                              ABT node,
+                              ChildPropsType childProps,
+                              NodeCEMap nodeCEMap) {
+    optimizeChildrenNoAssert(queue,
+                             priority,
+                             rule,
+                             std::make_unique<ABT>(std::move(node)),
+                             std::move(childProps),
+                             std::move(nodeCEMap));
 }
 
 }  // namespace mongo::optimizer::cascades

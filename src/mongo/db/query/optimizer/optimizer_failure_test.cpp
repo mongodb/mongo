@@ -29,13 +29,9 @@
 
 #include "mongo/db/query/optimizer/cascades/ce_hinted.h"
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
-#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
-#include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/syntax/syntax_fwd_declare.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/unittest/death_test.h"
@@ -261,7 +257,7 @@ DEATH_TEST_REGEX(Optimizer, OptGroupFailed, "Tripwire assertion.*6808706") {
     OptPhaseManager phaseManager(
         {OptPhase::MemoExplorationPhase, OptPhase::MemoImplementationPhase},
         prefixId,
-        true,
+        true /*requireRID*/,
         {{{"test", {{}, {}}}}},
         std::make_unique<HintedCE>(std::move(hints)),
         std::make_unique<DefaultCosting>(),
