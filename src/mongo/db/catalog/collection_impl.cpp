@@ -1050,44 +1050,43 @@ StatusWith<BSONObj> CollectionImpl::updateDocumentWithDamages(
     }
 
     RecordData oldRecordData(oldDoc.value().objdata(), oldDoc.value().objsize());
-    StatusWith<BSONObj> newDocStatus =
-        _shared->_recordStore->updateWithDamages(opCtx, loc, oldRecordData, damageSource, damages)
-            .transform(
-                [](RecordData&& recordData) { return recordData.releaseToBson().getOwned(); });
+    StatusWith<RecordData> recordData =
+        _shared->_recordStore->updateWithDamages(opCtx, loc, oldRecordData, damageSource, damages);
+    if (!recordData.isOK())
+        return recordData.getStatus();
+    BSONObj newDoc = std::move(recordData.getValue()).releaseToBson().getOwned();
 
-    if (newDocStatus.isOK()) {
-        args->updatedDoc = newDocStatus.getValue();
-        args->changeStreamPreAndPostImagesEnabledForCollection =
-            isChangeStreamPreAndPostImagesEnabled();
+    args->updatedDoc = newDoc;
+    args->changeStreamPreAndPostImagesEnabledForCollection =
+        isChangeStreamPreAndPostImagesEnabled();
 
-        if (indexesAffected) {
-            int64_t keysInserted = 0;
-            int64_t keysDeleted = 0;
+    if (indexesAffected) {
+        int64_t keysInserted = 0;
+        int64_t keysDeleted = 0;
 
-            uassertStatusOK(_indexCatalog->updateRecord(opCtx,
-                                                        {this, CollectionPtr::NoYieldTag{}},
-                                                        oldDoc.value(),
-                                                        args->updatedDoc,
-                                                        loc,
-                                                        &keysInserted,
-                                                        &keysDeleted));
+        uassertStatusOK(_indexCatalog->updateRecord(opCtx,
+                                                    {this, CollectionPtr::NoYieldTag{}},
+                                                    oldDoc.value(),
+                                                    args->updatedDoc,
+                                                    loc,
+                                                    &keysInserted,
+                                                    &keysDeleted));
 
-            if (opDebug) {
-                opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
-                opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
-                // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
-                if (!opCtx->inMultiDocumentTransaction()) {
-                    opCtx->recoveryUnit()->onRollback([opDebug, keysInserted, keysDeleted]() {
-                        opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
-                        opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
-                    });
-                }
+        if (opDebug) {
+            opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
+            opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+            // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
+            if (!opCtx->inMultiDocumentTransaction()) {
+                opCtx->recoveryUnit()->onRollback([opDebug, keysInserted, keysDeleted]() {
+                    opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
+                    opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
+                });
             }
         }
-
-        opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
     }
-    return newDocStatus;
+
+    opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
+    return newDoc;
 }
 
 bool CollectionImpl::isTemporary() const {
