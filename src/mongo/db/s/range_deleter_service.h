@@ -177,8 +177,8 @@ private:
 
     AtomicWord<State> _state{kDown};
 
-    // ONLY FOR TESTING: variable notified when the state changes to "up"
-    stdx::condition_variable _rangeDeleterServiceUpCondVar_FOR_TESTING;
+    // Future markes as ready when the state changes to "up"
+    SemiFuture<void> _stepUpCompletedFuture;
 
     /* Acquire mutex only if service is up (for "user" operation) */
     [[nodiscard]] stdx::unique_lock<Latch> _acquireMutexFailIfServiceNotUp() {
@@ -248,11 +248,7 @@ public:
 
     /* ONLY FOR TESTING: wait for the state to become "up" */
     void _waitForRangeDeleterServiceUp_FOR_TESTING() {
-        stdx::unique_lock<Latch> lg(_mutex_DO_NOT_USE_DIRECTLY);
-        if (_state.load() != kUp) {
-            _rangeDeleterServiceUpCondVar_FOR_TESTING.wait(lg,
-                                                           [&]() { return _state.load() == kUp; });
-        }
+        _stepUpCompletedFuture.get();
     }
 
     std::unique_ptr<ReadyRangeDeletionsProcessor> _readyRangeDeletionsProcessorPtr;

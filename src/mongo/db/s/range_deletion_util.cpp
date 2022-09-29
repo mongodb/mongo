@@ -319,7 +319,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                             const UUID& collectionUuid,
                             const BSONObj& keyPattern,
                             const ChunkRange& range) {
-    suspendRangeDeletion.pauseWhileSet();
+    suspendRangeDeletion.pauseWhileSet(opCtx);
 
     bool allDocsRemoved = false;
     // Delete all batches in this range unless a stepdown error occurs. Do not yield the
