@@ -52,6 +52,10 @@ public:
         _opCtx = makeOperationContext();
     }
 
+    void tearDown() override {
+        serverGlobalParams.clusterRole = ClusterRole::None;
+    }
+
     OperationContext* opCtx() const {
         return _opCtx.get();
     }
