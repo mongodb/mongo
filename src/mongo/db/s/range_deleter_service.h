@@ -175,7 +175,7 @@ private:
 
     enum State { kInitializing, kUp, kDown };
 
-    AtomicWord<State> _state{kDown};
+    State _state{kDown};
 
     // Future markes as ready when the state changes to "up"
     SemiFuture<void> _stepUpCompletedFuture;
@@ -183,8 +183,7 @@ private:
     /* Acquire mutex only if service is up (for "user" operation) */
     [[nodiscard]] stdx::unique_lock<Latch> _acquireMutexFailIfServiceNotUp() {
         stdx::unique_lock<Latch> lg(_mutex_DO_NOT_USE_DIRECTLY);
-        uassert(
-            ErrorCodes::NotYetInitialized, "Range deleter service not up", _state.load() == kUp);
+        uassert(ErrorCodes::NotYetInitialized, "Range deleter service not up", _state == kUp);
         return lg;
     }
 

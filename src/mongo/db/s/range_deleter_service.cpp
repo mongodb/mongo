@@ -248,9 +248,9 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
     }
 
     auto lock = _acquireMutexUnconditionally();
-    dassert(_state.load() == kDown, "Service expected to be down before stepping up");
+    dassert(_state == kDown, "Service expected to be down before stepping up");
 
-    _state.store(kInitializing);
+    _state = kInitializing;
 
     if (_executor) {
         // Join previously shutted down executor before reinstantiating it
@@ -279,7 +279,7 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
 
 void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx) {
     if (disableResumableRangeDeleter.load()) {
-        _state.store(kDown);
+        _state = kDown;
         return;
     }
 
@@ -358,8 +358,8 @@ void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx
                 auto lock = _acquireMutexUnconditionally();
                 // Since the recovery is only spawned on step-up but may complete later, it's not
                 // assumable that the node is still primary when the all resubmissions finish
-                if (_state.load() != kDown) {
-                    this->_state.store(kUp);
+                if (_state != kDown) {
+                    this->_state = kUp;
                 }
             })
             .semi();
@@ -390,7 +390,7 @@ void RangeDeleterService::_stopService(bool joinExecutor) {
     // Clear range deletion tasks map in order to notify potential waiters on completion futures
     _rangeDeletionTasks.clear();
 
-    _state.store(kDown);
+    _state = kDown;
 }
 
 void RangeDeleterService::onStepDown() {
@@ -477,9 +477,9 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
         .then([this, rdt = rdt]() {
             // Step 3: schedule the actual range deletion task
             auto lock = _acquireMutexUnconditionally();
-            invariant(_readyRangeDeletionsProcessorPtr || _state.load() == kDown,
+            invariant(_readyRangeDeletionsProcessorPtr || _state == kDown,
                       "The range deletions processor must be instantiated if the state != kDown");
-            if (_state.load() != kDown) {
+            if (_state != kDown) {
                 _readyRangeDeletionsProcessorPtr->emplaceRangeDeletion(rdt);
             }
         });
