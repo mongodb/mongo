@@ -458,6 +458,36 @@ save_backup_info(ACTIVE_FILES *active, uint64_t id)
 }
 
 /*
+ * copy_format_files --
+ *     Copies over format-specific files to the BACKUP.copy directory. These include CONFIG and any
+ *     CONFIG.keylen* files.
+ */
+static void
+copy_format_files(WT_SESSION *session)
+{
+    size_t file_len;
+    u_int i;
+    char *filename;
+
+    /* The CONFIG file should always exist, copy it over. */
+    testutil_copy_file(session, "CONFIG");
+
+    /* Copy over any CONFIG.keylen* files if they exist. */
+    if (ntables == 0)
+        testutil_copy_if_exists(session, "CONFIG.keylen");
+    else {
+        file_len = strlen("CONFIG.keylen.") + 10;
+        filename = dmalloc(file_len);
+
+        for (i = 1; i <= ntables; ++i) {
+            testutil_check(__wt_snprintf(filename, file_len, "CONFIG.keylen.%u", i));
+            testutil_copy_if_exists(session, filename);
+        }
+        free(filename);
+    }
+}
+
+/*
  * backup --
  *     Periodically do a backup and verify it.
  */
@@ -580,6 +610,12 @@ backup(void *arg)
         /* If we're taking a full backup, create the backup directories. */
         if (full || incremental == 0) {
             testutil_create_backup_directory(g.home);
+
+            /*
+             * Copy format-specific files into the backup directories so that test/format can be run
+             * on the BACKUP.copy database for verification.
+             */
+            copy_format_files(session);
         }
 
         /*

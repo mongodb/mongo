@@ -313,6 +313,20 @@ testutil_copy_file(WT_SESSION *session, const char *name)
 }
 
 /*
+ * testutil_copy_if_exists --
+ *     Copy a file into a directory if it exists.
+ */
+void
+testutil_copy_if_exists(WT_SESSION *session, const char *name)
+{
+    bool exist;
+
+    testutil_check(__wt_fs_exist((WT_SESSION_IMPL *)session, name, &exist));
+    if (exist)
+        testutil_copy_file(session, name);
+}
+
+/*
  * testutil_is_flag_set --
  *     Return if an environment variable flag is set.
  */
