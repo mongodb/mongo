@@ -49,7 +49,8 @@ class WiredTigerTimeStamp(object):
 @contextmanager
 def session_timestamped_transaction(session, timestamper):
     need_commit = False
-    if timestamper != None and not getattr(session, "_has_transaction", False):
+    if timestamper != None and \
+      not (hasattr(session, "_has_transaction") and session._has_transaction):
         session.begin_transaction()
         need_commit = True
     yield
@@ -66,10 +67,13 @@ def session_timestamped_transaction(session, timestamper):
 # are passed to the implementation object (via __getattr__),
 # except for the ones that we explicitly override here.
 class TimestampedCursor(wiredtiger.Cursor):
-    def __init__(self, cursor, timeStamper, testcase):
+    def __init__(self, session, cursor, timeStamper, testcase):
         self._cursor = cursor
         self._timeStamper = timeStamper
         self._testcase = testcase
+        self._session = session
+        if not hasattr(session, "_has_transaction"):
+            session._has_transaction = False
 
     def __getattr__(self, name):
         return getattr(self._cursor, name)
@@ -77,11 +81,7 @@ class TimestampedCursor(wiredtiger.Cursor):
     # A more convenient way to "wrap" an operation in a transaction
     @contextmanager
     def timestamped_transaction(self):
-        # Prefer the _session object if available, it returns a Python
-        # Session object that is 1-1 mapped to the WT_SESSION in the C API.
-        session = getattr(self._cursor, "_session", self._cursor.session)
-        timestamper = self._timeStamper
-        with session_timestamped_transaction(session, timestamper):
+        with session_timestamped_transaction(self._session, self._timeStamper):
             yield
 
     # Overrides Cursor.insert

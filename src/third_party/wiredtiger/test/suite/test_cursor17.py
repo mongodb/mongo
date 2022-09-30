@@ -60,7 +60,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
             self.ds = self.dataset(self, self.type + self.tablename, rownum, key_format=self.keyformat)
         self.ds.populate()
 
-    @wttest.skip_for_hook("tiered", "fails assertion 99")  # FIXME-WT-9809
+    @wttest.skip_for_hook("timestamp", "fails assertion 99")  # FIXME-WT-9809
     def test_globally_deleted_key(self):
         self.populate(100)
 

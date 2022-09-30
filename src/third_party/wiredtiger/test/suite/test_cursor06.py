@@ -62,7 +62,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
         cursor.set_key(self.ds.key(10))
         cursor.set_value(self.ds.value(10))
 
-    @wttest.skip_for_hook("tiered", "crashes on final connection close")  # FIXME-WT-9809
+    @wttest.skip_for_hook("timestamp", "crashes on final connection close")  # FIXME-WT-9809
     def test_reconfigure_overwrite(self):
         uri = self.type + self.name
         for open_config in (None, "overwrite=0", "overwrite=1"):

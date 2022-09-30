@@ -30,6 +30,7 @@ from __future__ import print_function
 import os, re, subprocess, sys
 from run import wt_builddir
 from wttest import WiredTigerTestCase
+import wttest
 
 # suite_subprocess.py
 #    Run a subprocess within the test suite
@@ -224,15 +225,18 @@ class suite_subprocess:
         return [ returncode, new_home_dir ]
 
     # Run the wt utility.
+
+    # FIXME-WT-9808:
+    # The tiered hook silently interjects tiered configuration and extensions,
+    # these are not yet dealt with when running the external 'wt' process.
+    @wttest.skip_for_hook("tiered", "runWt cannot add needed extensions")
     def runWt(self, args, infilename=None,
         outfilename=None, errfilename=None, closeconn=True,
         reopensession=True, failure=False):
 
-        # FIXME-WT-9808:
-        # The tiered hook silently interjects tiered configuration and extensions,
-        # these are not yet dealt with when running the external 'wt' process.
-        if 'tiered' in self.hook_names:
-            self.skipTest("runWt is not yet supported with tiering")
+        # FIXME-WT-9809:
+        if 'timestamp' in self.hook_names and args[0] == 'load':
+            self.skipTest("the load utility cannot be run when timestamps are already set")
 
         # Close the connection to guarantee everything is flushed, and that
         # we can open it from another process.

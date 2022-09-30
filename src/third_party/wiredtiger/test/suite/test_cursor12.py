@@ -339,7 +339,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         self.modify_confirm(ds, False)
 
     # Check that we can perform a large number of modifications to a record.
-    @wttest.skip_for_hook("tiered", "crashes on commit_transaction or connection close")  # FIXME-WT-9809
+    @wttest.skip_for_hook("timestamp", "crashes on commit_transaction or connection close")  # FIXME-WT-9809
     def test_modify_many(self):
         ds = SimpleDataSet(self,
             self.uri, 20, key_format=self.keyfmt, value_format=self.valuefmt)

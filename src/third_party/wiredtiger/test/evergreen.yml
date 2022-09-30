@@ -1918,6 +1918,26 @@ tasks:
         vars:
           unit_test_args: --hook tiered
 
+  - name: unit-test-hook-tiered-timestamp
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook tiered --hook timestamp
+
+  - name: unit-test-hook-timestamp
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook timestamp
+
   # Break out Python unit tests into multiple buckets/tasks.  We have a fixed number of buckets,
   # and we use the -b option of the test/suite/run.py script to split up the tests.
 
@@ -3975,6 +3995,8 @@ buildvariants:
     - name: unit-test-zstd
     - name: unit-test-random-seed
     - name: unit-test-hook-tiered
+    - name: unit-test-hook-tiered-timestamp
+    - name: unit-test-hook-timestamp
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf

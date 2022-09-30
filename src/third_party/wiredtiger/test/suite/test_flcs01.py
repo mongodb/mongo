@@ -105,7 +105,7 @@ class test_flcs01(wttest.WiredTigerTestCase):
         self.check_prev(cursor, k, 0)
         self.session.rollback_transaction()
 
-    @wttest.skip_for_hook("tiered", "crashes in evict function, during cursor reset")  # FIXME-WT-9809
+    @wttest.skip_for_hook("timestamp", "crashes in evict function, during cursor reset")  # FIXME-WT-9809
     def test_flcs(self):
         uri = "table:test_flcs01"
         nrows = 44

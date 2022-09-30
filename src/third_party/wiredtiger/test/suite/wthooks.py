@@ -143,7 +143,7 @@ def hooked_function(self, orig_func, hook_info_name, *args):
 class WiredTigerHookManager(object):
     def __init__(self, hooknames = []):
         self.hooks = []
-        self.platform_api = None
+        self.platform_apis = []
         names_seen = []
         for name in hooknames:
             # The hooks are indicated as "somename=arg" or simply "somename".
@@ -172,16 +172,8 @@ class WiredTigerHookManager(object):
         for hook in self.hooks:
             hook.setup_hooks()
             api = hook.get_platform_api()   # can return None
-            if api:
-                # We currently don't allow multiple platforms to create their own API,
-                # but this could be relaxed. Imagine that hooks implement subsets of the
-                # API. We could create an ordered list, and try each platform_api in turn.
-                if self.platform_api:
-                    raise Exception('Running multiple hooks, each with their own platform API, ' +
-                                    'is not implemented')
-                self.platform_api = api
-        if self.platform_api == None:
-            self.platform_api = DefaultPlatformAPI()
+            self.platform_apis.append(api)
+        self.platform_apis.append(DefaultPlatformAPI())
 
     def add_hook(self, clazz, method_name, hook_type, hook_func):
         if not hasattr(clazz, method_name):
@@ -244,7 +236,7 @@ class WiredTigerHookManager(object):
         return self.hook_names
 
     def get_platform_api(self):
-        return self.platform_api
+        return MultiPlatformAPI(self.platform_apis)
 
     # Returns a list of hook names that use something on the list
     def hooks_using(self, use_list):
@@ -297,39 +289,28 @@ class WiredTigerHookCreator(ABC):
     def uses(self, use_list):
         return False
 
-class WiredTigerHookPlatformAPI(ABC):
-    @abstractmethod
+class WiredTigerHookPlatformAPI(object):
     def setUp(self):
         """Called at the beginning of a test case"""
         pass
 
-    @abstractmethod
     def tearDown(self):
         """Called at the termination of a test case"""
         pass
 
-    @abstractmethod
     def tableExists(self, name):
         """Return boolean if local files exist for the table with the given base name"""
-        pass
+        raise NotImplementedError('tableExists method not implemented')
 
-    @abstractmethod
     def initialFileName(self, uri):
         """The first local backing file name created for this URI."""
-        pass
+        raise NotImplementedError('initialFileName method not implemented')
 
-    @abstractmethod
     def getTimestamp(self):
         """The timestamp generator for this test case."""
-        pass
+        raise NotImplementedError('getTimestamp method not implemented')
 
 class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
     def tableExists(self, name):
         tablename = name + ".wt"
         return os.path.exists(tablename)
@@ -345,3 +326,44 @@ class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
     # By default, there is no automatic timestamping by test infrastructure classes.
     def getTimestamp(self):
         return None
+
+class MultiPlatformAPI(WiredTigerHookPlatformAPI):
+    def __init__(self, platform_apis):
+        self.apis = platform_apis
+
+    def setUp(self):
+        """Called at the beginning of a test case"""
+        for api in self.apis:
+            api.setUp()
+
+    def tearDown(self):
+        """Called at the termination of a test case"""
+        for api in self.apis:
+            api.tearDown()
+
+    def tableExists(self, name):
+        """Return boolean if local files exist for the table with the given base name"""
+        for api in self.apis:
+            try:
+                return api.tableExists(name)
+            except NotImplementedError:
+                pass
+        raise Exception('tableExists: no implementation')  # should never happen
+
+    def initialFileName(self, uri):
+        """The first local backing file name created for this URI."""
+        for api in self.apis:
+            try:
+                return api.initialFileName(uri)
+            except NotImplementedError:
+                pass
+        raise Exception('initialFileName: no implementation')  # should never happen
+
+    def getTimestamp(self):
+        """The timestamp generator for this test case."""
+        for api in self.apis:
+            try:
+                return api.getTimestamp()
+            except NotImplementedError:
+                pass
+        raise Exception('getTimestamp: no implementation')  # should never happen

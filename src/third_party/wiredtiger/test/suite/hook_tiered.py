@@ -55,7 +55,7 @@
 #
 from __future__ import print_function
 
-import os, sys, unittest, wthooks, wttimestamp
+import os, sys, unittest, wthooks
 from wttest import WiredTigerTestCase
 
 # These are the hook functions that are run when particular APIs are called.
@@ -163,13 +163,6 @@ def connection_close_replace(orig_connection_close, connection_self, config):
     ret = orig_connection_close(connection_self, config)
     return ret
 
-# Called to replace Connection.open_session
-def connection_open_session_replace(orig_connection_open_session, connection_self, config):
-    ret_session = orig_connection_open_session(connection_self, config)
-    ret_session._connection = connection_self
-    ret_session._has_transaction = False
-    return ret_session
-
 # Called to replace Session.checkpoint.
 # We add a call to flush_tier after the checkpoint to make sure we are exercising tiered
 # functionality.
@@ -183,24 +176,6 @@ def session_checkpoint_replace(orig_session_checkpoint, session_self, config):
         WiredTigerTestCase.verbose(None, 3,
             '    Calling flush_tier() after checkpoint')
         return session_self.flush_tier(None)
-
-# Called to replace Session.begin_transaction
-def session_begin_transaction_replace(orig_session_begin_transaction, session_self, config):
-    ret = orig_session_begin_transaction(session_self, config)
-    session_self._has_transaction = True
-    return ret
-
-# Called to replace Session.commit_transaction
-def session_commit_transaction_replace(orig_session_commit_transaction, session_self, config):
-    ret = orig_session_commit_transaction(session_self, config)
-    session_self._has_transaction = False
-    return ret
-
-# Called to replace Session.rollback_transaction
-def session_rollback_transaction_replace(orig_session_rollback_transaction, session_self, config):
-    ret = orig_session_rollback_transaction(session_self, config)
-    session_self._has_transaction = False
-    return ret
 
 # Called to replace Session.compact
 def session_compact_replace(orig_session_compact, session_self, uri, config):
@@ -242,9 +217,7 @@ def session_open_cursor_replace(orig_session_open_cursor, session_self, uri, dup
     if uri != None and uri.startswith("backup:"):
         testcase = WiredTigerTestCase.currentTestCase()
         testcase.skipTest("backup on tiered tables not yet implemented")
-    ret_cursor = orig_session_open_cursor(session_self, uri, dupcursor, config)
-    ret_cursor._session = session_self
-    return ret_cursor
+    return orig_session_open_cursor(session_self, uri, dupcursor, config)
 
 # Called to replace Session.rename
 def session_rename_replace(orig_session_rename, session_self, uri, newuri, config):
@@ -289,14 +262,6 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
         # Override some platform APIs
         self.platform_api = TieredPlatformAPI()
 
-    # This hook plays with timestamps, indirectly by modifying the behavior of the *DataSet classes.
-    # Here we declare our use of timestamp code, so that tests that have their own notion of
-    # timestamps can be skipped when running with this hook.
-    def uses(self, use_list):
-        if "timestamp" in use_list:
-            return True
-        return False
-
     # Is this test one we should skip?
     def skip_test(self, test):
         # Skip any test that contains one of these strings as a substring
@@ -333,7 +298,6 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
                 # This group fail within Python for various, sometimes unknown, reasons.
                 "test_bug018.test_bug018",
                 "test_checkpoint.test_checkpoint",
-                "test_checkpoint_target.test_checkpoint_target",
                 "test_checkpoint_snapshot02.test_checkpoint_snapshot_with_txnid_and_timestamp",
                 "test_compat05.test_compat05",
                 "test_config05.test_too_many_sessions",
@@ -401,22 +365,6 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
         self.Connection['close'] = (wthooks.HOOK_REPLACE, lambda s, config=None:
           connection_close_replace(orig_connection_close, s, config))
 
-        orig_connection_open_session = self.Connection['open_session']
-        self.Connection['open_session'] = (wthooks.HOOK_REPLACE, lambda s, config=None:
-          connection_open_session_replace(orig_connection_open_session, s, config))
-
-        orig_session_begin_transaction = self.Session['begin_transaction']
-        self.Session['begin_transaction'] =  (wthooks.HOOK_REPLACE, lambda s, config=None:
-          session_begin_transaction_replace(orig_session_begin_transaction, s, config))
-
-        orig_session_commit_transaction = self.Session['commit_transaction']
-        self.Session['commit_transaction'] =  (wthooks.HOOK_REPLACE, lambda s, config=None:
-          session_commit_transaction_replace(orig_session_commit_transaction, s, config))
-
-        orig_session_rollback_transaction = self.Session['rollback_transaction']
-        self.Session['rollback_transaction'] =  (wthooks.HOOK_REPLACE, lambda s, config=None:
-          session_rollback_transaction_replace(orig_session_rollback_transaction, s, config))
-
         orig_session_compact = self.Session['compact']
         self.Session['compact'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config=None:
           session_compact_replace(orig_session_compact, s, uri, config))
@@ -445,12 +393,6 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
 
 # Override some platform APIs for this hook.
 class TieredPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
-    def setUp(self):
-        self._timestamp = wttimestamp.WiredTigerTimeStamp()
-
-    def tearDown(self):
-        pass
-
     def tableExists(self, name):
         for i in range(1, 9):
             tablename = name + "-000000000{}.wtobj".format(i)
@@ -463,10 +405,6 @@ class TieredPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
             return uri[6:] + '-0000000001.wtobj'
         else:
             return wthooks.DefaultPlatformAPI.initialFileName(uri)
-
-    # By default, there is no timestamping by the data set classes.
-    def getTimestamp(self):
-        return self._timestamp
 
 
 # Every hook file must have a top level initialize function,

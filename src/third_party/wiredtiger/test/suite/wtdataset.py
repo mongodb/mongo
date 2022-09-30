@@ -58,7 +58,7 @@ class BaseDataSet(object):
         if session == None:
             session = self.testcase.session
         c = session.open_cursor(uri, None, config)
-        return wttimestamp.TimestampedCursor(c, self.timestamp, self.testcase)
+        return wttimestamp.TimestampedCursor(session, c, self.timestamp, self.testcase)
 
     def truncate(self, uri, c1, c2, config, session=None):
         if session == None:
