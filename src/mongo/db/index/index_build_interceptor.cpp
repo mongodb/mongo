@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_build_interceptor_gen.h"
 #include "mongo/db/multi_key_path_tracker.h"
@@ -291,56 +292,25 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
                                           TrackDuplicates trackDups,
                                           int64_t* const keysInserted,
                                           int64_t* const keysDeleted) {
-    // Deserialize the encoded KeyString::Value.
-    int keyLen;
-    const char* binKey = operation["key"].binData(keyLen);
-    BufReader reader(binKey, keyLen);
-    auto accessMethod = _indexCatalogEntry->accessMethod()->asSortedData();
-    const KeyString::Value keyString = KeyString::Value::deserialize(
-        reader, accessMethod->getSortedDataInterface()->getKeyStringVersion());
-
-    const Op opType = operation.getStringField("op") == "i"_sd ? Op::kInsert : Op::kDelete;
-
-    const KeyStringSet keySet{keyString};
-    if (opType == Op::kInsert) {
-        int64_t numInserted;
-        auto status = accessMethod->insertKeysAndUpdateMultikeyPaths(
+    // Check field for "key" to determine if collection is sorted data or column store.
+    if (operation.hasField("key")) {
+        return _indexCatalogEntry->accessMethod()->applySortedDataSideWrite(
             opCtx,
             coll,
-            {keySet.begin(), keySet.end()},
-            {},
-            MultikeyPaths{},
+            operation,
             options,
             [=](const KeyString::Value& duplicateKey) {
                 return trackDups == TrackDuplicates::kTrack
                     ? recordDuplicateKey(opCtx, duplicateKey)
                     : Status::OK();
             },
-            &numInserted);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        *keysInserted += numInserted;
-        opCtx->recoveryUnit()->onRollback(
-            [keysInserted, numInserted] { *keysInserted -= numInserted; });
+            keysInserted,
+            keysDeleted);
     } else {
-        invariant(opType == Op::kDelete);
-        if (kDebugBuild)
-            invariant(operation.getStringField("op") == "d"_sd);
-
-        int64_t numDeleted;
-        Status s =
-            accessMethod->removeKeys(opCtx, {keySet.begin(), keySet.end()}, options, &numDeleted);
-        if (!s.isOK()) {
-            return s;
-        }
-
-        *keysDeleted += numDeleted;
-        opCtx->recoveryUnit()->onRollback(
-            [keysDeleted, numDeleted] { *keysDeleted -= numDeleted; });
+        _indexCatalogEntry->accessMethod()->applyColumnDataSideWrite(
+            opCtx, coll, operation, keysInserted, keysDeleted);
+        return Status::OK();
     }
-    return Status::OK();
 }
 
 void IndexBuildInterceptor::_yield(OperationContext* opCtx, const Yieldable* yieldable) {
@@ -422,6 +392,35 @@ boost::optional<MultikeyPaths> IndexBuildInterceptor::getMultikeyPaths() const {
     return _multikeyPaths;
 }
 
+Status IndexBuildInterceptor::_finishSideWrite(OperationContext* opCtx,
+                                               const std::vector<BSONObj>& toInsert) {
+    _sideWritesCounter->fetchAndAdd(toInsert.size());
+    // This insert may roll back, but not necessarily from inserting into this table. If other write
+    // operations outside this table and in the same transaction are rolled back, this counter also
+    // needs to be rolled back.
+    opCtx->recoveryUnit()->onRollback([sharedCounter = _sideWritesCounter, size = toInsert.size()] {
+        sharedCounter->fetchAndSubtract(size);
+    });
+
+    std::vector<Record> records;
+    for (auto& doc : toInsert) {
+        records.emplace_back(Record{RecordId(),  // The storage engine will assign its own RecordId
+                                                 // when we pass one that is null.
+                                    RecordData(doc.objdata(), doc.objsize())});
+    }
+
+    LOGV2_DEBUG(20691,
+                2,
+                "Recording side write keys on index",
+                "numRecords"_attr = records.size(),
+                "index"_attr = _indexCatalogEntry->descriptor()->indexName());
+
+    // By passing a vector of null timestamps, these inserts are not timestamped individually, but
+    // rather with the timestamp of the owning operation.
+    std::vector<Timestamp> timestamps(records.size());
+    return _sideWritesTable->rs()->insertRecords(opCtx, &records, timestamps);
+}
+
 Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                                         const KeyStringSet& keys,
                                         const KeyStringSet& multikeyMetadataKeys,
@@ -429,6 +428,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                                         Op op,
                                         int64_t* const numKeysOut) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(op != IndexBuildInterceptor::Op::kUpdate);
 
     // Maintain parity with IndexAccessMethods handling of key counting. Only include
     // `multikeyMetadataKeys` when inserting.
@@ -478,9 +478,9 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     }
 
     if (op == Op::kInsert) {
-        // Wildcard indexes write multikey path information, typically part of the catalog
-        // document, to the index itself. Multikey information is never deleted, so we only need
-        // to add this data on the insert path.
+        // Wildcard indexes write multikey path information, typically part of the catalog document,
+        // to the index itself. Multikey information is never deleted, so we only need to add this
+        // data on the insert path.
         for (const auto& keyString : multikeyMetadataKeys) {
             builder.reset();
             keyString.serialize(builder);
@@ -491,33 +491,41 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         }
     }
 
-    _sideWritesCounter->fetchAndAdd(toInsert.size());
-    // This insert may roll back, but not necessarily from inserting into this table. If other write
-    // operations outside this table and in the same transaction are rolled back, this counter also
-    // needs to be rolled back.
-    opCtx->recoveryUnit()->onRollback([sharedCounter = _sideWritesCounter, size = toInsert.size()] {
-        sharedCounter->fetchAndSubtract(size);
-    });
+    return _finishSideWrite(opCtx, std::move(toInsert));
+}
 
-    std::vector<Record> records;
-    for (auto& doc : toInsert) {
-        records.emplace_back(Record{RecordId(),  // The storage engine will assign its own RecordId
-                                                 // when we pass one that is null.
-                                    RecordData(doc.objdata(), doc.objsize())});
+Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
+                                        const PathCellSet& keys,
+                                        Op op,
+                                        int64_t* const numKeysOut) {
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
+    *numKeysOut = keys.size();
+
+    std::vector<BSONObj> toInsert;
+    toInsert.reserve(keys.size());
+    for (const auto& [path, cell, rid] : keys) {
+
+        BSONObjBuilder builder;
+        rid.serializeToken("rid", &builder);
+        builder.append("op", [op] {
+            switch (op) {
+                case Op::kInsert:
+                    return "i";
+                case Op::kDelete:
+                    return "d";
+                case Op::kUpdate:
+                    return "u";
+            }
+            MONGO_UNREACHABLE;
+        }());
+        builder.append("path", path);
+        builder.append("cell", cell);
+
+        toInsert.push_back(builder.obj());
     }
 
-    LOGV2_DEBUG(20691,
-                2,
-                "recording {records_size} side write keys on index "
-                "'{indexCatalogEntry_descriptor_indexName}'",
-                "records_size"_attr = records.size(),
-                "indexCatalogEntry_descriptor_indexName"_attr =
-                    _indexCatalogEntry->descriptor()->indexName());
-
-    // By passing a vector of null timestamps, these inserts are not timestamped individually, but
-    // rather with the timestamp of the owning operation.
-    std::vector<Timestamp> timestamps(records.size());
-    return _sideWritesTable->rs()->insertRecords(opCtx, &records, timestamps);
+    return _finishSideWrite(opCtx, std::move(toInsert));
 }
 
 Status IndexBuildInterceptor::retrySkippedRecords(OperationContext* opCtx,

@@ -175,7 +175,6 @@ void WiredTigerColumnStore::WriteCursor::insert(PathView path, RowId rid, CellVi
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
     metricsCollector.incrementOneIdxEntryWritten(c()->uri, keyItem.size);
 
-    // TODO: SERVER-65978, we may have to specially handle WT_DUPLICATE_KEY error here.
     if (ret) {
         uassertStatusOK(wtRCToStatus(ret, c()->session));
     }
@@ -219,7 +218,6 @@ void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellVi
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
     metricsCollector.incrementOneIdxEntryWritten(c()->uri, keyItem.size);
 
-    // TODO: SERVER-65978, may want to handle WT_NOTFOUND specially.
     if (ret != 0)
         return uassertStatusOK(wtRCToStatus(ret, c()->session));
 }

@@ -51,8 +51,6 @@ ResumableIndexBuildTest.runResumeInterruptedByShutdown(
     [{a: 77}, {a: 88}],
     [{a: 99}, {a: 100}]);
 
-// TODO (SERVER-65978): Add side writes to these test cases once they are supported by column store
-// index builds.
 if (columnstoreEnabled) {
     ResumableIndexBuildTest.runResumeInterruptedByShutdown(
         rst,
@@ -63,8 +61,15 @@ if (columnstoreEnabled) {
         {name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386},
         "collection scan",
         {a: 1},  // initial doc
-        [],
-        [{a: 4}, {a: 5}]);
+        (function(collection) {
+            assert.commandWorked(collection.insert([{a: [{b: 14}]}, {a: 15}]));
+            assert.commandWorked(collection.update({a: 1}, {a: 2}));
+            assert.commandWorked(collection.remove({"a.b": 14}));
+            assert.commandWorked(collection.insert({a: 1}));
+            assert.commandWorked(collection.remove({a: 2}));
+            assert.commandWorked(collection.update({a: 15}, {a: 2}));
+        }),
+        [{a: 16}, {a: 17}]);
 
     ResumableIndexBuildTest.runResumeInterruptedByShutdown(
         rst,
@@ -74,8 +79,15 @@ if (columnstoreEnabled) {
         "resumable_index_build4",  // index name
         {name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400},
         "bulk load",
-        {a: [11, 22, 33]},  // initial doc
-        [],
+        {a: [44, 55, 66]},  // initial doc
+        (function(collection) {
+            assert.commandWorked(collection.insert([{a: [{b: 77}]}, {a: 88}]));
+            assert.commandWorked(collection.update({a: [44, 55, 66]}, {a: [55, 66]}));
+            assert.commandWorked(collection.remove({"a.b": 77}));
+            assert.commandWorked(collection.insert({a: 99}));
+            assert.commandWorked(collection.remove({a: [55, 66]}));
+            assert.commandWorked(collection.update({a: 99}, {a: 1}));
+        }),
         [{a: 99}, {a: 100}]);
 }
 rst.stopSet();

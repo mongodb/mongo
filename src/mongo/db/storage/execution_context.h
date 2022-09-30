@@ -31,6 +31,7 @@
 
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/auto_clear_ptr.h"
 
@@ -61,11 +62,15 @@ public:
     AutoClearPtr<MultikeyPaths> multikeyPaths() {
         return makeAutoClearPtr(&_multikeyPaths);
     }
+    AutoClearPtr<PathCellSet> columnKeys() {
+        return makeAutoClearPtr(&_columnKeys);
+    }
 
 private:
     KeyStringSet _keys;
     KeyStringSet _multikeyMetadataKeys;
     MultikeyPaths _multikeyPaths;
+    PathCellSet _columnKeys;
 };
 
 }  // namespace mongo

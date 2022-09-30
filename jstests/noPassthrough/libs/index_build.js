@@ -358,8 +358,8 @@ const ResumableIndexBuildTest = class {
     }
 
     /**
-     * Runs createIndexFn in a parellel shell to create indexes, inserting the documents specified
-     * by sideWrites into the side writes table.
+     * Runs createIndexFn in a parellel shell to create indexes, modifying the collection with the
+     * side writes table.
      *
      * 'createIndexFn' should take three parameters: collection name, index specifications, and
      *   index names.
@@ -367,6 +367,10 @@ const ResumableIndexBuildTest = class {
      * 'indexNames' should follow the exact same format as 'indexSpecs'. For example, if indexSpecs
      *   is [[{a: 1}, {b: 1}], [{c: 1}]], a valid indexNames would look like
      *   [["index_1", "index_2"], ["index_3"]].
+     *
+     * 'sideWrites' can be an array specifying documents to be inserted into the side writes table,
+     * or a function that performs any series of operations (inserts, deletes, or updates) with the
+     * side writes table
      *
      * If {hangBeforeBuildingIndex: true}, returns with the hangBeforeBuildingIndex failpoint
      * enabled and the index builds hanging at this point.
@@ -411,7 +415,11 @@ const ResumableIndexBuildTest = class {
             });
         }
 
-        assert.commandWorked(coll.insert(sideWrites));
+        if (Array.isArray(sideWrites)) {
+            assert.commandWorked(coll.insert(sideWrites));
+        } else {
+            sideWrites(coll);
+        }
 
         // Before building the index, wait for the the last op to be committed so that establishing
         // the majority read cursor does not race with step down.

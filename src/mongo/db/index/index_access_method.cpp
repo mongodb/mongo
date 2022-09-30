@@ -620,6 +620,66 @@ void SortedDataIndexAccessMethod::setIdent(std::shared_ptr<Ident> newIdent) {
     this->_newInterface->setIdent(std::move(newIdent));
 }
 
+Status SortedDataIndexAccessMethod::applySortedDataSideWrite(OperationContext* opCtx,
+                                                             const CollectionPtr& coll,
+                                                             const BSONObj& operation,
+                                                             const InsertDeleteOptions& options,
+                                                             KeyHandlerFn&& onDuplicateKey,
+                                                             int64_t* const keysInserted,
+                                                             int64_t* const keysDeleted) {
+    auto opType = [&operation] {
+        switch (operation.getStringField("op")[0]) {
+            case 'i':
+                return IndexBuildInterceptor::Op::kInsert;
+            case 'd':
+                return IndexBuildInterceptor::Op::kDelete;
+            case 'u':
+                return IndexBuildInterceptor::Op::kUpdate;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }();
+
+    // Deserialize the encoded KeyString::Value.
+    int keyLen;
+    const char* binKey = operation["key"].binData(keyLen);
+    BufReader reader(binKey, keyLen);
+    const KeyString::Value keyString =
+        KeyString::Value::deserialize(reader, getSortedDataInterface()->getKeyStringVersion());
+
+    const KeyStringSet keySet{keyString};
+    if (opType == IndexBuildInterceptor::Op::kInsert) {
+        int64_t numInserted;
+        auto status = insertKeysAndUpdateMultikeyPaths(opCtx,
+                                                       coll,
+                                                       {keySet.begin(), keySet.end()},
+                                                       {},
+                                                       MultikeyPaths{},
+                                                       options,
+                                                       std::move(onDuplicateKey),
+                                                       &numInserted);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        *keysInserted += numInserted;
+        opCtx->recoveryUnit()->onRollback(
+            [keysInserted, numInserted] { *keysInserted -= numInserted; });
+    } else {
+        invariant(opType == IndexBuildInterceptor::Op::kDelete);
+        int64_t numDeleted;
+        Status s = removeKeys(opCtx, {keySet.begin(), keySet.end()}, options, &numDeleted);
+        if (!s.isOK()) {
+            return s;
+        }
+
+        *keysDeleted += numDeleted;
+        opCtx->recoveryUnit()->onRollback(
+            [keysDeleted, numDeleted] { *keysDeleted -= numDeleted; });
+    }
+    return Status::OK();
+}
+
 void IndexAccessMethod::BulkBuilder::countNewBuildInStats() {
     indexBulkBuilderSSS.count.addAndFetch(1);
 }
@@ -1206,7 +1266,6 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
 
     if (!status.isOK()) {
         LOGV2(20362,
-              "Couldn't unindex record {obj} from collection {namespace}: {error}",
               "Couldn't unindex record",
               "record"_attr = redact(obj),
               "namespace"_attr = ns,

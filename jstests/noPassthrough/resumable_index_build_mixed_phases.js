@@ -61,6 +61,15 @@ const runTests = function(failPoints, resumePhases, resumeChecks) {
             resumePhases,
             resumeChecks,
             "_wildcard");
+
+    if (columnstoreEnabled) {
+        runTest([{a: 1, b: 1}, {a: 2, b: 2}, {a: 3, b: 3}],
+                [[{"$**": "columnstore"}], [{b: 1}]],
+                failPoints,
+                resumePhases,
+                resumeChecks,
+                "_columnstore");
+    }
 };
 
 runTests(
@@ -105,59 +114,5 @@ runTests(
     ],
     ["bulk load", "drain writes"],
     [{skippedPhaseLogID: 20391}, {skippedPhaseLogID: 20392}]);
-
-// TODO (SERVER-65978): Add sidewrites to tests and combine columnTests with normal runTests once
-// side writes are implemented as the numbers for numScannedAfterResume will match
-if (columnstoreEnabled) {
-    const runColumnTests = function(failPoints, resumePhases, resumeChecks) {
-        const docs = [{a: 1, b: 1}, {a: 2, b: 2}, {a: 3, b: 3}];
-        const coll = rst.getPrimary().getDB(dbName).getCollection(
-            jsTestName() + "_" + resumePhases[0].replace(" ", "_") + "_" +
-            resumePhases[1].replace(" ", "_") + "_columnstore");
-        assert.commandWorked(coll.insert(docs));
-
-        ResumableIndexBuildTest.run(rst,
-                                    dbName,
-                                    coll.getName(),
-                                    [[{b: 1}], [{"$**": "columnstore"}]],
-                                    failPoints,
-                                    1,
-                                    resumePhases,
-                                    resumeChecks,
-                                    [],
-                                    [{a: 7, b: 7}, {a: 8, b: 8}, {a: 9, b: 9}]);
-    };
-
-    runColumnTests(
-        [
-            {name: "hangIndexBuildBeforeWaitingUntilMajorityOpTime", logIdWithBuildUUID: 4940901},
-            {
-                name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
-                logIdWithBuildUUID: 20386
-            }
-        ],
-        ["initialized", "collection scan"],
-        [{numScannedAfterResume: 3}, {numScannedAfterResume: 2}]);
-
-    runColumnTests(
-        [
-            {name: "hangIndexBuildBeforeWaitingUntilMajorityOpTime", logIdWithBuildUUID: 4940901},
-            {name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400}
-
-        ],
-        ["initialized", "bulk load"],
-        [{numScannedAfterResume: 3}, {skippedPhaseLogID: 20391}]);
-
-    runColumnTests(
-        [
-            {
-                name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
-                logIdWithBuildUUID: 20386
-            },
-            {name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400}
-        ],
-        ["collection scan", "bulk load"],
-        [{numScannedAfterResume: 2}, {skippedPhaseLogID: 20391}]);
-}
 rst.stopSet();
 })();

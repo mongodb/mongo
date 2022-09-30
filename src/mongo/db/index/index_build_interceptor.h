@@ -31,11 +31,13 @@
 
 #include <memory>
 
+#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/duplicate_key_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/skipped_record_tracker.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/platform/atomic_word.h"
@@ -53,7 +55,7 @@ public:
      */
     enum class DrainYieldPolicy { kNoYield, kYield };
 
-    enum class Op { kInsert, kDelete };
+    enum class Op { kInsert, kDelete, kUpdate };
 
     /**
      * Indicates whether to record duplicate keys that have been inserted into the index. When set
@@ -97,6 +99,18 @@ public:
                      const KeyStringSet& keys,
                      const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths,
+                     Op op,
+                     int64_t* numKeysOut);
+
+    /**
+     * Client writes that are concurrent with a column store index build will have their index
+     * updates written to a temporary table. After the index table scan is complete, these updates
+     * will be applied to the underlying index table.
+     *
+     * On success, `numKeysOut` if non-null will contain the number of keys added or removed.
+     */
+    Status sideWrite(OperationContext* opCtx,
+                     const PathCellSet& columnstoreKeys,
                      Op op,
                      int64_t* numKeysOut);
 
@@ -173,7 +187,6 @@ public:
 private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 
-
     Status _applyWrite(OperationContext* opCtx,
                        const CollectionPtr& coll,
                        const BSONObj& doc,
@@ -192,6 +205,8 @@ private:
     void _checkDrainPhaseFailPoint(OperationContext* opCtx,
                                    FailPoint* fp,
                                    long long iteration) const;
+
+    Status _finishSideWrite(OperationContext* opCtx, const std::vector<BSONObj>& toInsert);
 
     // The entry for the index that is being built.
     const IndexCatalogEntry* _indexCatalogEntry;
@@ -224,5 +239,4 @@ private:
         MONGO_MAKE_LATCH("IndexBuildInterceptor::_multikeyPathMutex");
     boost::optional<MultikeyPaths> _multikeyPaths;
 };
-
 }  // namespace mongo

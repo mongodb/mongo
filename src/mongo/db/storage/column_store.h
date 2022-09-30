@@ -786,4 +786,6 @@ struct SplitCellView {
         }
     }
 };
+
+using PathCellSet = std::vector<std::tuple<std::string, std::string, RecordId>>;
 }  // namespace mongo

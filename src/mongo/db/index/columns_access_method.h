@@ -75,6 +75,7 @@ public:
                 const InsertDeleteOptions& options,
                 int64_t* keysDeletedOut,
                 CheckRecordId checkRecordId) final;
+
     Status update(OperationContext* opCtx,
                   SharedBufferFragmentBuilder& pooledBufferBuilder,
                   const BSONObj& oldDoc,
@@ -84,6 +85,12 @@ public:
                   const InsertDeleteOptions& options,
                   int64_t* keysInsertedOut,
                   int64_t* keysDeletedOut) final;
+
+    void applyColumnDataSideWrite(OperationContext* opCtx,
+                                  const CollectionPtr& coll,
+                                  const BSONObj& operation,
+                                  int64_t* keysInserted,
+                                  int64_t* keysDeleted) final;
 
     Status initializeAsEmpty(OperationContext* opCtx) final;
 
@@ -117,6 +124,11 @@ public:
     class BulkBuilder;
 
 private:
+    void _visitCellsForIndexInsert(OperationContext* opCtx,
+                                   PooledFragmentBuilder& pooledFragmentBuilder,
+                                   const std::vector<BsonRecord>& bsonRecords,
+                                   function_ref<void(StringData, const BsonRecord&)> cb) const;
+
     const std::unique_ptr<ColumnStore> _store;
     IndexCatalogEntry* const _indexCatalogEntry;  // owned by IndexCatalog
     const IndexDescriptor* const _descriptor;

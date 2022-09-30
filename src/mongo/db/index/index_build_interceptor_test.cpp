@@ -30,6 +30,7 @@
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/index/index_build_interceptor.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace mongo {
 namespace {
@@ -118,5 +119,238 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
                            << "key" << serializedKeyString),
                       sideWrites[0]);
 }
+
+
+TEST_F(IndexBuilderInterceptorTest, SingleColumnInsertIsSavedToSideWritesTable) {
+    RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
+    auto interceptor = createIndexBuildInterceptor(
+        fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
+
+    PathCellSet columnKeys;
+    columnKeys.emplace_back(std::make_tuple("path", "cell", RecordId(1)));
+
+    WriteUnitOfWork wuow(operationContext());
+    int64_t numKeys = 0;
+    ASSERT_OK(interceptor->sideWrite(
+        operationContext(), columnKeys, IndexBuildInterceptor::Op::kInsert, &numKeys));
+    ASSERT_EQ(1, numKeys);
+    wuow.commit();
+
+    BSONObjBuilder builder;
+    RecordId(1).serializeToken("rid", &builder);
+    BSONObj obj = builder.obj();
+    BSONElement elem = obj["rid"];
+
+    auto sideWrites = getSideWritesTableContents(std::move(interceptor));
+    ASSERT_EQ(1, sideWrites.size());
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem << "op"
+                                 << "i"
+                                 << "path"
+                                 << "path"
+                                 << "cell"
+                                 << "cell"),
+                      sideWrites[0]);
+}
+
+TEST_F(IndexBuilderInterceptorTest, SingleColumnDeleteIsSavedToSideWritesTable) {
+    RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
+    auto interceptor = createIndexBuildInterceptor(
+        fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
+
+    PathCellSet columnKeys;
+    columnKeys.emplace_back(std::make_tuple("path", "", RecordId(1)));
+
+    WriteUnitOfWork wuow(operationContext());
+    int64_t numKeys = 0;
+    ASSERT_OK(interceptor->sideWrite(
+        operationContext(), columnKeys, IndexBuildInterceptor::Op::kDelete, &numKeys));
+    ASSERT_EQ(1, numKeys);
+    wuow.commit();
+
+    BSONObjBuilder builder;
+    RecordId(1).serializeToken("rid", &builder);
+    BSONObj obj = builder.obj();
+    BSONElement elem = obj["rid"];
+
+    auto sideWrites = getSideWritesTableContents(std::move(interceptor));
+    ASSERT_EQ(1, sideWrites.size());
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem << "op"
+                                 << "d"
+                                 << "path"
+                                 << "path"
+                                 << "cell"
+                                 << ""),
+                      sideWrites[0]);
+}
+
+TEST_F(IndexBuilderInterceptorTest, SingleColumnUpdateIsSavedToSideWritesTable) {
+    RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
+    auto interceptor = createIndexBuildInterceptor(
+        fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
+
+    // create path + cell + rid
+    PathCellSet columnKeys;
+    columnKeys.emplace_back(std::make_tuple("path", "cell", RecordId(1)));
+
+    WriteUnitOfWork wuow(operationContext());
+    int64_t numKeys = 0;
+    ASSERT_OK(interceptor->sideWrite(
+        operationContext(), columnKeys, IndexBuildInterceptor::Op::kUpdate, &numKeys));
+    ASSERT_EQ(1, numKeys);
+    wuow.commit();
+
+    BSONObjBuilder builder;
+    RecordId(1).serializeToken("rid", &builder);
+    BSONObj obj = builder.obj();
+    BSONElement elem = obj["rid"];
+
+    auto sideWrites = getSideWritesTableContents(std::move(interceptor));
+    ASSERT_EQ(1, sideWrites.size());
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem << "op"
+                                 << "u"
+                                 << "path"
+                                 << "path"
+                                 << "cell"
+                                 << "cell"),
+                      sideWrites[0]);
+}
+
+TEST_F(IndexBuilderInterceptorTest, MultipleColumnInsertsAreSavedToSideWritesTable) {
+    RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
+    auto interceptor = createIndexBuildInterceptor(
+        fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
+
+    PathCellSet columnKeys;
+    columnKeys.emplace_back(std::make_tuple("path", "cell", RecordId(1)));
+    columnKeys.emplace_back(std::make_tuple("path1", "cell1", RecordId(1)));
+    columnKeys.emplace_back(std::make_tuple("path2", "cell2", RecordId(2)));
+    columnKeys.emplace_back(std::make_tuple("path3", "cell3", RecordId(2)));
+
+    WriteUnitOfWork wuow(operationContext());
+    int64_t numKeys = 0;
+
+    ASSERT_OK(interceptor->sideWrite(
+        operationContext(), columnKeys, IndexBuildInterceptor::Op::kInsert, &numKeys));
+    ASSERT_EQ(4, numKeys);
+    wuow.commit();
+
+    BSONObjBuilder builder;
+    RecordId(1).serializeToken("rid", &builder);
+    BSONObj obj = builder.obj();
+    BSONElement elem1 = obj["rid"];
+
+    BSONObjBuilder builder2;
+    RecordId(2).serializeToken("rid", &builder2);
+    BSONObj obj2 = builder2.obj();
+    BSONElement elem2 = obj2["rid"];
+
+    auto sideWrites = getSideWritesTableContents(std::move(interceptor));
+    ASSERT_EQ(4, sideWrites.size());
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem1 << "op"
+                                 << "i"
+                                 << "path"
+                                 << "path"
+                                 << "cell"
+                                 << "cell"),
+                      sideWrites[0]);
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem1 << "op"
+                                 << "i"
+                                 << "path"
+                                 << "path1"
+                                 << "cell"
+                                 << "cell1"),
+                      sideWrites[1]);
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem2 << "op"
+                                 << "i"
+                                 << "path"
+                                 << "path2"
+                                 << "cell"
+                                 << "cell2"),
+                      sideWrites[2]);
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem2 << "op"
+                                 << "i"
+                                 << "path"
+                                 << "path3"
+                                 << "cell"
+                                 << "cell3"),
+                      sideWrites[3]);
+}
+
+TEST_F(IndexBuilderInterceptorTest, MultipleColumnSideWritesAreSavedToSideWritesTable) {
+    RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
+    auto interceptor = createIndexBuildInterceptor(
+        fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
+
+    WriteUnitOfWork wuow(operationContext());
+    int64_t numKeys = 0;
+
+    PathCellSet columnKeys;
+    columnKeys.emplace_back(std::make_tuple("path", "cell", RecordId(1)));
+    ASSERT_OK(interceptor->sideWrite(
+        operationContext(), columnKeys, IndexBuildInterceptor::Op::kInsert, &numKeys));
+    ASSERT_EQ(1, numKeys);
+
+    PathCellSet columnKeys2;
+    columnKeys2.emplace_back(std::make_tuple("path", "", RecordId(1)));
+    ASSERT_OK(interceptor->sideWrite(
+        operationContext(), columnKeys2, IndexBuildInterceptor::Op::kDelete, &numKeys));
+    ASSERT_EQ(1, numKeys);
+
+
+    PathCellSet columnKeys3;
+    columnKeys3.emplace_back(std::make_tuple("path1", "cell1", RecordId(2)));
+    ASSERT_OK(interceptor->sideWrite(
+        operationContext(), columnKeys3, IndexBuildInterceptor::Op::kUpdate, &numKeys));
+    ASSERT_EQ(1, numKeys);
+
+    PathCellSet columnKeys4;
+    columnKeys4.emplace_back(std::make_tuple("path2", "cell2", RecordId(2)));
+    ASSERT_OK(interceptor->sideWrite(
+        operationContext(), columnKeys4, IndexBuildInterceptor::Op::kInsert, &numKeys));
+    ASSERT_EQ(1, numKeys);
+    wuow.commit();
+
+    BSONObjBuilder builder;
+    RecordId(1).serializeToken("rid", &builder);
+    BSONObj obj = builder.obj();
+    BSONElement elem1 = obj["rid"];
+
+    BSONObjBuilder builder2;
+    RecordId(2).serializeToken("rid", &builder2);
+    BSONObj obj2 = builder2.obj();
+    BSONElement elem2 = obj2["rid"];
+
+    auto sideWrites = getSideWritesTableContents(std::move(interceptor));
+    ASSERT_EQ(4, sideWrites.size());
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem1 << "op"
+                                 << "i"
+                                 << "path"
+                                 << "path"
+                                 << "cell"
+                                 << "cell"),
+                      sideWrites[0]);
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem1 << "op"
+                                 << "d"
+                                 << "path"
+                                 << "path"
+                                 << "cell"
+                                 << ""),
+                      sideWrites[1]);
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem2 << "op"
+                                 << "u"
+                                 << "path"
+                                 << "path1"
+                                 << "cell"
+                                 << "cell1"),
+                      sideWrites[2]);
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem2 << "op"
+                                 << "i"
+                                 << "path"
+                                 << "path2"
+                                 << "cell"
+                                 << "cell2"),
+                      sideWrites[3]);
+}
+
 }  // namespace
 }  // namespace mongo
