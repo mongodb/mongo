@@ -1234,8 +1234,8 @@ std::shared_ptr<Ident> StorageEngineImpl::markIdentInUse(const std::string& iden
     return _dropPendingIdentReaper.markIdentInUse(ident);
 }
 
-void StorageEngineImpl::checkpoint() {
-    _engine->checkpoint();
+void StorageEngineImpl::checkpoint(OperationContext* opCtx) {
+    _engine->checkpoint(opCtx);
 }
 
 void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp) {

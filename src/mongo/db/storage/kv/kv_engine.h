@@ -261,7 +261,7 @@ public:
         return false;
     }
 
-    virtual void checkpoint() {}
+    virtual void checkpoint(OperationContext* opCtx) {}
 
     /**
      * Returns true if the KVEngine is ephemeral -- that is, it is NOT persistent and all data is

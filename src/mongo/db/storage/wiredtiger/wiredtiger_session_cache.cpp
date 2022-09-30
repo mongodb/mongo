@@ -35,6 +35,7 @@
 #include <memory>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/storage/journal_listener.h"
@@ -295,6 +296,8 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
             auto config = syncType == Fsync::kCheckpointStableTimestamp ? "use_timestamp=true"
                                                                         : "use_timestamp=false";
             {
+                Lock::ResourceLock checkpointLock{
+                    opCtx, ResourceId(RESOURCE_MUTEX, "checkpoint"), MODE_X};
                 _engine->clearIndividuallyCheckpointedIndexes();
                 invariantWTOK(s->checkpoint(s, config), s);
             }
@@ -349,6 +352,7 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
                       _waitUntilDurableSession);
         LOGV2_DEBUG(22419, 4, "flushed journal");
     } else {
+        Lock::ResourceLock checkpointLock{opCtx, ResourceId(RESOURCE_MUTEX, "checkpoint"), MODE_X};
         _engine->clearIndividuallyCheckpointedIndexes();
         invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, nullptr),
                       _waitUntilDurableSession);

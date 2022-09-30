@@ -478,8 +478,9 @@ public:
     /**
      * Called when the checkpoint thread instructs the storage engine to take a checkpoint. The
      * underlying storage engine must take a checkpoint at this point.
+     * Acquires a resource mutex before taking the checkpoint.
      */
-    virtual void checkpoint() = 0;
+    virtual void checkpoint(OperationContext* opCtx) = 0;
 
     /**
      * Recovers the storage engine state to the last stable timestamp. "Stable" in this case

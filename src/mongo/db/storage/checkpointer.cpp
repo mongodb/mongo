@@ -116,7 +116,7 @@ void Checkpointer::run() {
         const Date_t startTime = Date_t::now();
 
         // TODO SERVER-50861: Access the storage engine via the ServiceContext.
-        _kvEngine->checkpoint();
+        _kvEngine->checkpoint(opCtx.get());
 
         const auto secondsElapsed = durationCount<Seconds>(Date_t::now() - startTime);
         if (secondsElapsed >= 30) {

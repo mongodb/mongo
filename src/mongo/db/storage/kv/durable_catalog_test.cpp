@@ -235,7 +235,7 @@ protected:
         wuow.commit();
 
         auto engine = operationContext()->getServiceContext()->getStorageEngine()->getEngine();
-        engine->checkpoint();
+        engine->checkpoint(operationContext());
 
         storageMetadata =
             BSON(ident << unittest::assertGet(engine->getStorageMetadata(ident)) << idxIdent

@@ -100,7 +100,8 @@ class WiredTigerKVEngine final : public KVEngine {
 public:
     static StringData kTableUriPrefix;
 
-    WiredTigerKVEngine(const std::string& canonicalName,
+    WiredTigerKVEngine(OperationContext* opCtx,
+                       const std::string& canonicalName,
                        const std::string& path,
                        ClockSource* cs,
                        const std::string& extraOpenOptions,
@@ -125,7 +126,7 @@ public:
         return !isEphemeral();
     }
 
-    void checkpoint() override;
+    void checkpoint(OperationContext* opCtx) override;
 
     bool isEphemeral() const override {
         return _ephemeral;
@@ -206,7 +207,7 @@ public:
                             const IndexDescriptor* desc,
                             bool isForceUpdateMetadata) override;
 
-    Status alterMetadata(StringData uri, StringData config);
+    Status alterMetadata(OperationContext* opCtx, StringData uri, StringData config);
 
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
@@ -422,7 +423,7 @@ private:
         StorageEngine::DropIdentCallback callback;
     };
 
-    void _checkpoint(WT_SESSION* session);
+    void _checkpoint(OperationContext* opCtx, WT_SESSION* session);
 
     /**
      * Opens a connection on the WiredTiger database 'path' with the configuration 'wtOpenConfig'.
@@ -433,7 +434,7 @@ private:
      */
     void _openWiredTiger(const std::string& path, const std::string& wtOpenConfig);
 
-    Status _salvageIfNeeded(const char* uri);
+    Status _salvageIfNeeded(OperationContext* opCtx, const char* uri);
     void _ensureIdentPath(StringData ident);
 
     /**
@@ -443,7 +444,7 @@ private:
      * Returns DataModifiedByRepair if the rebuild was successful, and any other error on failure.
      * This will never return Status::OK().
      */
-    Status _rebuildIdent(WT_SESSION* session, const char* uri);
+    Status _rebuildIdent(OperationContext* opCtx, WT_SESSION* session, const char* uri);
 
     bool _hasUri(WT_SESSION* session, const std::string& uri) const;
 

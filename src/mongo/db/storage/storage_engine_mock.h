@@ -179,7 +179,7 @@ public:
     }
     void startTimestampMonitor() final {}
 
-    void checkpoint() final {}
+    void checkpoint(OperationContext* opCtx) final {}
 
     int64_t sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) final {
         return 0;

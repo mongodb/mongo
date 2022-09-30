@@ -324,7 +324,7 @@ public:
 
     void startTimestampMonitor() override;
 
-    void checkpoint() override;
+    void checkpoint(OperationContext* opCtx) override;
 
     StatusWith<ReconcileResult> reconcileCatalogAndIdents(
         OperationContext* opCtx, LastShutdownState lastShutdownState) override;

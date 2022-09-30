@@ -52,7 +52,8 @@ class WiredTigerRecoveryUnitHarnessHelper final : public RecoveryUnitHarnessHelp
 public:
     WiredTigerRecoveryUnitHarnessHelper()
         : _dbpath("wt_test"),
-          _engine(kWiredTigerEngineName,  // .canonicalName
+          _engine(Client::getCurrent()->makeOperationContext().get(),
+                  kWiredTigerEngineName,  // .canonicalName
                   _dbpath.path(),         // .path
                   &_cs,                   // .cs
                   "",                     // .extraOpenOptions

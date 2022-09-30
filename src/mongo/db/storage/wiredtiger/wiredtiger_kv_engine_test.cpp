@@ -63,7 +63,7 @@ namespace {
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper(ServiceContext* svcCtx, bool forRepair = false)
-        : _dbpath("wt-kv-harness"), _forRepair(forRepair), _engine(makeEngine()) {
+        : _svcCtx(svcCtx), _dbpath("wt-kv-harness"), _forRepair(forRepair), _engine(makeEngine()) {
         // Faitfhully simulate being in replica set mode for timestamping tests which requires
         // parity for journaling settings.
         repl::ReplSettings replSettings;
@@ -94,7 +94,9 @@ private:
         // Use a small journal for testing to account for the unlikely event that the underlying
         // filesystem does not support fast allocation of a file of zeros.
         std::string extraStrings = "log=(file_max=1m,prealloc=false)";
-        return std::make_unique<WiredTigerKVEngine>(kWiredTigerEngineName,
+        auto client = _svcCtx->makeClient("opCtx");
+        return std::make_unique<WiredTigerKVEngine>(client->makeOperationContext().get(),
+                                                    kWiredTigerEngineName,
                                                     _dbpath.path(),
                                                     _cs.get(),
                                                     extraStrings,
@@ -104,6 +106,7 @@ private:
                                                     _forRepair);
     }
 
+    ServiceContext* _svcCtx;
     const std::unique_ptr<ClockSource> _cs = std::make_unique<ClockSourceMock>();
     unittest::TempDir _dbpath;
     bool _forRepair;
@@ -545,6 +548,7 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
     // Perform each test in their own limited scope in order to establish different
     // severity levels.
     {
+        auto opCtxRaii = _makeOperationContext();
         // Set the WiredTiger Checkpoint LOGV2 component severity to the Log level.
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
             logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Log()};
@@ -554,7 +558,7 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
         // Perform a checkpoint. The goal here is create some activity in WiredTiger in order
         // to generate verbose messages (we don't really care about the checkpoint itself).
         startCapturingLogMessages();
-        _engine->checkpoint();
+        _engine->checkpoint(opCtxRaii.get());
         stopCapturingLogMessages();
         // In this initial case, we don't expect to capture any debug checkpoint messages. The
         // base severity for the checkpoint component should be at Log().
@@ -569,6 +573,7 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
         ASSERT_FALSE(foundWTCheckpointMessage);
     }
     {
+        auto opCtxRaii = _makeOperationContext();
         // Set the WiredTiger Checkpoint LOGV2 component severity to the Debug(2) level.
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
             logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Debug(2)};
@@ -578,7 +583,7 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
 
         // Perform another checkpoint.
         startCapturingLogMessages();
-        _engine->checkpoint();
+        _engine->checkpoint(opCtxRaii.get());
         stopCapturingLogMessages();
 
         // This time we expect to detect WiredTiger checkpoint Debug() messages.
