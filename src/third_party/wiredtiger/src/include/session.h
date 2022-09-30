@@ -304,4 +304,6 @@ struct __wt_session_impl {
 };
 
 /* Consider moving this to session_inline.h if it ever appears. */
-#define WT_READING_CHECKPOINT(s) ((s)->dhandle != NULL && WT_DHANDLE_IS_CHECKPOINT((s)->dhandle))
+#define WT_READING_CHECKPOINT(s)                                       \
+    ((s)->dhandle != NULL && F_ISSET((s)->dhandle, WT_DHANDLE_OPEN) && \
+      WT_DHANDLE_IS_CHECKPOINT((s)->dhandle))
