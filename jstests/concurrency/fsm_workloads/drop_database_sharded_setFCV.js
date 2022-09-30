@@ -33,6 +33,29 @@ var $config = extendWorkload($config, function($config, $super) {
         jsTestLog('setFCV state finished');
     };
 
+    // Inherithed methods get overridden to tolerate the interruption of
+    // internal transactions on the config server during the execution of setFCV
+    // TODO SERVER-70131: remove the overrides if internal transactions are no longer interrupted.
+    $config.states.enableSharding = function(db, collName) {
+        try {
+            $super.states.enableSharding.apply(this, arguments);
+        } catch (err) {
+            if (err.code !== ErrorCodes.Interrupted) {
+                throw err;
+            }
+        }
+    };
+
+    $config.states.shardCollection = function(db, collName) {
+        try {
+            $super.states.shardCollection.apply(this, arguments);
+        } catch (err) {
+            if (err.code !== ErrorCodes.Interrupted) {
+                throw err;
+            }
+        }
+    };
+
     $config.transitions = {
         init: {enableSharding: 0.3, dropDatabase: 0.3, shardCollection: 0.3, setFCV: 0.1},
         enableSharding: {enableSharding: 0.3, dropDatabase: 0.3, shardCollection: 0.3, setFCV: 0.1},
