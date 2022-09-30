@@ -156,6 +156,18 @@ double valueToDouble(value::TypeTags tag, value::Value val) {
             const double charToDbl = ch / std::pow(2, i * 8);
             result += charToDbl;
         }
+    } else if (tag == value::TypeTags::Date || tag == value::TypeTags::Timestamp) {
+        int64_t v = value::bitcastTo<int64_t>(val);
+        result = value::numericCast<double>(value::TypeTags::NumberInt64, v);
+
+    } else if (tag == value::TypeTags::ObjectId) {
+        auto objView =
+            ConstDataView(reinterpret_cast<const char*>(sbe::value::getObjectIdView(val)->data()));
+        // Take the first 8 bytes of the ObjectId.
+        // ToDo: consider using the entire ObjectId or other parts of it
+        // 	 auto v = objView.read<LittleEndian<uint64_t>>(sizeof(uint32_t));
+        auto v = objView.read<LittleEndian<uint64_t>>();
+        result = value::numericCast<double>(value::TypeTags::NumberInt64, v);
     } else {
         uassert(6844500, "Unexpected value type", false);
     }

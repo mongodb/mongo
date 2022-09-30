@@ -32,6 +32,7 @@
 #include <cstddef>
 #include <sys/types.h>
 
+#include "mongo/db/query/ce/histogram_estimation.h"
 #include "mongo/db/query/ce/scalar_histogram.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
@@ -71,14 +72,15 @@ const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
  * expecting.
  */
 
-#define _ASSERT_MATCH_CE(ce, predicate, expectedCE)                        \
-    if constexpr (kCETestLogOnly) {                                        \
-        if (std::abs(ce.getCE(predicate) - expectedCE) > kMaxCEError) {    \
-            std::cout << "ERROR: expected " << expectedCE << std::endl;    \
-        }                                                                  \
-        ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError);                        \
-    } else {                                                               \
-        ASSERT_APPROX_EQUAL(expectedCE, ce.getCE(predicate), kMaxCEError); \
+#define _ASSERT_MATCH_CE(ce, predicate, expectedCE)                                   \
+    if constexpr (kCETestLogOnly) {                                                   \
+        if (std::abs(ce.getCE(predicate) - expectedCE) > kMaxCEError) {               \
+            std::cout << "ERROR: cardinality " << ce.getCE(predicate) << " expected " \
+                      << expectedCE << std::endl;                                     \
+        }                                                                             \
+        ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError);                                   \
+    } else {                                                                          \
+        ASSERT_APPROX_EQUAL(expectedCE, ce.getCE(predicate), kMaxCEError);            \
     }
 #define _PREDICATE(field, predicate) (str::stream() << "{" << field << ": " << predicate "}")
 #define _ELEMMATCH_PREDICATE(field, predicate) \
@@ -158,6 +160,8 @@ struct BucketData {
 };
 
 ScalarHistogram createHistogram(const std::vector<BucketData>& data);
+
+double estimateIntValCard(const ScalarHistogram& hist, int v, EstimationType type);
 
 }  // namespace ce
 }  // namespace mongo

@@ -129,9 +129,8 @@ TEST_F(HistogramTest, MaxDiffTestInt) {
 
     ASSERT_LTE(hist.getBuckets().size(), nBuckets);
     const double estimatedCard = estimateCard(hist, 11, EstimationType::kLess);
-
     ASSERT_EQ(36, actualCard);
-    ASSERT_APPROX_EQUAL(39.73333, estimatedCard, kTolerance);
+    ASSERT_APPROX_EQUAL(43.7333, estimatedCard, kTolerance);
 }
 
 TEST_F(HistogramTest, MaxDiffTestString) {
@@ -159,7 +158,7 @@ TEST_F(HistogramTest, MaxDiffTestString) {
     const double estimatedCard = estimate(hist, tag, val, EstimationType::kLess).card;
 
     ASSERT_EQ(15, actualCard);
-    ASSERT_APPROX_EQUAL(10.9443, estimatedCard, kTolerance);
+    ASSERT_APPROX_EQUAL(15.9443, estimatedCard, kTolerance);
 }
 
 TEST_F(HistogramTest, MaxDiffTestMixedTypes) {

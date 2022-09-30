@@ -142,12 +142,6 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
 }
 
 ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
-    sbe::value::Array array;
-    for (const auto& item : data) {
-        const auto [tag, val] = stage_builder::makeValue(item._v);
-        array.push_back(tag, val);
-    }
-
     value::Array bounds;
     std::vector<Bucket> buckets;
 
@@ -155,10 +149,10 @@ ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
     double cumulativeNDV = 0.0;
 
     for (size_t i = 0; i < data.size(); i++) {
-        const auto [tag, val] = array.getAt(i);
+        const auto& item = data.at(i);
+        const auto [tag, val] = stage_builder::makeValue(item._v);
         bounds.push_back(tag, val);
 
-        const auto& item = data.at(i);
         cumulativeFreq += item._equalFreq + item._rangeFreq;
         cumulativeNDV += item._ndv + 1.0;
         buckets.emplace_back(
@@ -167,4 +161,11 @@ ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
 
     return {std::move(bounds), std::move(buckets)};
 }
+
+double estimateIntValCard(const ScalarHistogram& hist, const int v, const EstimationType type) {
+    const auto [tag, val] =
+        std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(v));
+    return estimate(hist, tag, val, type).card;
+};
+
 }  // namespace mongo::ce

@@ -335,11 +335,11 @@ TEST(CEHistogramTest, TestOneBoundIntRangeHistogram) {
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 10}}", 46.0);
     ASSERT_MATCH_CE(t, "{intRange: {$gte: 15}}", 28.5);
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 15}}", 23.5);
-    ASSERT_MATCH_CE(t, "{intRange: {$gte: 11}, intRange: {$lte: 20}}", 46.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$gte: 11}, intRange: {$lte: 20}}", 41.5);
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 11}, intRange: {$lte: 20}}", 41.5);
 
     // Test ranges that partially overlap with the entire histogram.
-    ASSERT_MATCH_CE(t, "{intRange: {$lt: 11}}", 4.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$lt: 11}}", 9.5);
     ASSERT_MATCH_CE(t, "{intRange: {$lt: 15}}", 22.5);
     ASSERT_MATCH_CE(t, "{intRange: {$lte: 15}}", 27.5);
     ASSERT_MATCH_CE(t, "{intRange: {$gte: 8}, intRange: {$lte: 15}}", 27.5);
@@ -386,7 +386,7 @@ TEST(CEHistogramTest, TestOneBoundIntRangeHistogram) {
     // node corresponding to the path "intRange", we have two keys and two ranges, both
     // corresponding to the same path. As a consequence, we combine the estimates for the intervals
     // using exponential backoff, which results in an overestimate.
-    ASSERT_MATCH_CE(t, "{intRange: {$gte: 11}, intRange: {$lt: 20}}", 46.04);
+    ASSERT_MATCH_CE(t, "{intRange: {$gte: 11}, intRange: {$lt: 20}}", 41.09);
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 11}, intRange: {$lt: 20}}", 41.09);
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 12}, intRange: {$lt: 15}}", 19.16);
     ASSERT_MATCH_CE(t, "{intRange: {$gte: 12}, intRange: {$lt: 15}}", 20.42);
@@ -399,7 +399,7 @@ TEST(CEHistogramTest, TestOneBoundIntRangeHistogram) {
     t.setIndexes(
         {{"intRangeIndex",
           makeIndexDefinition("intRange", CollationOp::Ascending, /* isMultiKey */ false)}});
-    ASSERT_MATCH_CE(t, "{intRange: {$gte: 11}, intRange: {$lt: 20}}", 45.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$gte: 11}, intRange: {$lt: 20}}", 40.5);
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 11}, intRange: {$lt: 20}}", 40.5);
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 12}, intRange: {$lt: 15}}", 8.5);
     ASSERT_MATCH_CE(t, "{intRange: {$gte: 12}, intRange: {$lt: 15}}", 13.5);
@@ -647,7 +647,7 @@ TEST(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
     ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$eq: 5}}, array: {$eq: 5}}", 35.0);
 
     // Test case with multiple predicates and ranges.
-    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$lt: 5}}", 67.88);
+    ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$lt: 5}}", 68.75);
     ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$gt: 5}}", 28.19);
 
     // Test multiple $elemMatches.

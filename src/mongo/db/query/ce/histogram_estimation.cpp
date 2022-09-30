@@ -95,14 +95,16 @@ EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
         }
     }
 
-    resultCard += bucket._rangeFreq * ratio;
+    const double bucketFreqRatio = bucket._rangeFreq * ratio;
+    resultCard += bucketFreqRatio;
     resultNDV += bucket._ndv * ratio;
 
     if (type == EstimationType::kLess) {
         // Subtract from the estimate the cardinality and ndv corresponding to the equality
-        // operation.
+        // operation, if they are larger than the ratio taken from this bucket.
+        const double innerEqFreqCorrection = (bucketFreqRatio < innerEqFreq) ? 0.0 : innerEqFreq;
         const double innerEqNdv = (bucket._ndv * ratio <= 1.0) ? 0.0 : 1.0;
-        resultCard -= innerEqFreq;
+        resultCard -= innerEqFreqCorrection;
         resultNDV -= innerEqNdv;
     }
     return {resultCard, resultNDV};

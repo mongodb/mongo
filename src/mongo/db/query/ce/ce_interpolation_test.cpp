@@ -38,11 +38,6 @@ namespace {
 
 using namespace sbe;
 
-double estimateIntValCard(const ScalarHistogram& hist, const int v, const EstimationType type) {
-    auto [tag, val] = std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(v));
-    return estimate(hist, tag, val, type).card;
-};
-
 TEST(EstimatorTest, ManualHistogram) {
     std::vector<BucketData> data{{0, 1.0, 1.0, 1.0},
                                  {10, 1.0, 10.0, 5.0},
@@ -481,7 +476,7 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
                                             highTag,
                                             highVal,
                                             true /* includeScalar */);
-    ASSERT_APPROX_EQUAL(90.9, expectedCard, 0.1);  // Actual: 94.
+    ASSERT_APPROX_EQUAL(92.9, expectedCard, 0.1);  // Actual: 94.
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 550}}}}].
     expectedCard = estimateCardRange(arrHist,

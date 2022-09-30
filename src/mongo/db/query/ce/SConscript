@@ -118,6 +118,16 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="ce_edge_cases_test",
+    source=[
+        "ce_edge_cases_test.cpp",
+    ],
+    LIBDEPS=[
+        'ce_test_utils',
+    ],
+)
+
+env.CppUnitTest(
     target='stats_cache_loader_test',
     source=[
         'stats_cache_loader_test.cpp',
