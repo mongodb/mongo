@@ -1,6 +1,7 @@
 /**
  * Tests that the server will startup normally when a collection has a missing id index.
  *
+ * @tags: [requires_persistence]
  */
 (function() {
 "use strict";
