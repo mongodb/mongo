@@ -203,7 +203,7 @@ void serializeMetadata(std::ostream& stream, Metadata metadata) {
     // The ScanDefinitions are stored in an unordered map, and the order of the ScanDefinitions in
     // the golden file must be the same every time the test is run.
     std::map<std::string, ScanDefinition> orderedScanDefs;
-    for (auto element : metadata._scanDefs) {
+    for (const auto& element : metadata._scanDefs) {
         orderedScanDefs.insert(element);
     }
 
