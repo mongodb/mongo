@@ -35,23 +35,32 @@ function dropDatabases(db, pattern) {
  * Helper for dropping roles or users that were created by a workload
  * during its execution.
  */
+function dropUtilRetry(elems, cb, message) {
+    const kNumRetries = 5;
+    const kRetryInterval = 5000;
+
+    assert.retry(function() {
+        elems = elems.filter((elem) => !cb(elem));
+        return elems.length === 0;
+    }, message, kNumRetries, kRetryInterval);
+}
 
 function dropRoles(db, pattern) {
     assert(pattern instanceof RegExp, 'expected pattern to be a regular expression');
+    const rolesToDrop = db.getRoles().map((ri) => ri.role).filter((r) => pattern.test(r));
 
-    db.getRoles().forEach(function(roleInfo) {
-        if (pattern.test(roleInfo.role)) {
-            assertAlways(db.dropRole(roleInfo.role));
-        }
-    });
+    dropUtilRetry(
+        rolesToDrop,
+        (role) => db.dropRole(role),
+        "Failed dropping roles: " + tojson(rolesToDrop) + " from database " + db.getName());
 }
 
 function dropUsers(db, pattern) {
     assert(pattern instanceof RegExp, 'expected pattern to be a regular expression');
+    const usersToDrop = db.getUsers().map((ui) => ui.user).filter((u) => pattern.test(u));
 
-    db.getUsers().forEach(function(userInfo) {
-        if (pattern.test(userInfo.user)) {
-            assertAlways(db.dropUser(userInfo.user));
-        }
-    });
+    dropUtilRetry(
+        usersToDrop,
+        (user) => db.dropUser(user),
+        "Failed dropping users: " + tojson(usersToDrop) + " from database " + db.getName());
 }
