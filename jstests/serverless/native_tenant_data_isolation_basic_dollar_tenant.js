@@ -5,9 +5,16 @@
 
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
 
-const mongod = MongoRunner.runMongod(
-    {auth: '', setParameter: {multitenancySupport: true, featureFlagMongoStore: true}});
-const adminDb = mongod.getDB('admin');
+// TODO SERVER-69726 Make this replica set have multiple nodes.
+const rst = new ReplSetTest({
+    nodes: 1,
+    nodeOptions: {auth: '', setParameter: {multitenancySupport: true, featureFlagMongoStore: true}}
+});
+rst.startSet({keyFile: 'jstests/libs/key1'});
+rst.initiate();
+
+const primary = rst.getPrimary();
+const adminDb = primary.getDB('admin');
 
 // Prepare a user for testing pass tenant via $tenant.
 // Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
@@ -18,7 +25,7 @@ const kTenant = ObjectId();
 const kOtherTenant = ObjectId();
 const kDbName = 'myDb';
 const kCollName = 'myColl';
-const testDb = mongod.getDB(kDbName);
+const testDb = primary.getDB(kDbName);
 const testColl = testDb.getCollection(kCollName);
 
 // In this jstest, the collection (defined by kCollName) and the document "{_id: 0, a: 1, b: 1}"
@@ -231,6 +238,35 @@ const testColl = testDb.getCollection(kCollName);
         {insert: kCollName, documents: [{_id: 0, a: 1, b: 1}], '$tenant': kTenant}));
 }
 
+// Test that transactions can be run successfully.
+{
+    const lsid = assert.commandWorked(testDb.runCommand({startSession: 1, $tenant: kTenant})).id;
+    assert.commandWorked(testDb.runCommand({
+        delete: kCollName,
+        deletes: [{q: {_id: 0, a: 1, b: 1}, limit: 1}],
+        startTransaction: true,
+        lsid: lsid,
+        txnNumber: NumberLong(0),
+        autocommit: false,
+        '$tenant': kTenant
+    }));
+    assert.commandWorked(testDb.adminCommand({
+        commitTransaction: 1,
+        lsid: lsid,
+        txnNumber: NumberLong(0),
+        autocommit: false,
+        $tenant: kTenant
+    }));
+
+    const findRes = assert.commandWorked(testDb.runCommand({find: kCollName, '$tenant': kTenant}));
+    assert.eq(0, findRes.cursor.firstBatch.length, tojson(findRes.cursor.firstBatch));
+
+    // Reset the collection so other test cases can still access this collection with kCollName
+    // after this test.
+    assert.commandWorked(testDb.runCommand(
+        {insert: kCollName, documents: [{_id: 0, a: 1, b: 1}], '$tenant': kTenant}));
+}
+
 // Test createIndexes, listIndexes and dropIndexes command.
 {
     var sortIndexesByName = function(indexes) {
@@ -280,5 +316,5 @@ const testColl = testDb.getCollection(kCollName);
     assert(arrayEq([{key: {"_id": 1}, name: "_id_"}], getIndexesKeyAndName(res.cursor.firstBatch)));
 }
 
-MongoRunner.stopMongod(mongod);
+rst.stopSet();
 })();

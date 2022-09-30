@@ -5,9 +5,16 @@
 
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
 
-const mongod = MongoRunner.runMongod(
-    {auth: '', setParameter: {multitenancySupport: true, featureFlagMongoStore: true}});
-const adminDb = mongod.getDB('admin');
+// TODO SERVER-69726 Make this replica set have multiple nodes.
+const rst = new ReplSetTest({
+    nodes: 1,
+    nodeOptions: {auth: '', setParameter: {multitenancySupport: true, featureFlagMongoStore: true}}
+});
+rst.startSet({keyFile: 'jstests/libs/key1'});
+rst.initiate();
+
+const primary = rst.getPrimary();
+const adminDb = primary.getDB('admin');
 
 // Prepare a user for testing pass tenant via $tenant.
 // Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
@@ -19,7 +26,7 @@ const kOtherTenant = ObjectId();
 const kDbName = 'test';
 const kCollName = 'myColl0';
 
-const tokenConn = new Mongo(mongod.host);
+const tokenConn = new Mongo(primary.host);
 const securityToken = _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant});
 const tokenDB = tokenConn.getDB(kDbName);
 
@@ -30,7 +37,7 @@ const tokenDB = tokenConn.getDB(kDbName);
 // Test commands using a security token for one tenant.
 {
     // Create a user for kTenant and then set the security token on the connection.
-    assert.commandWorked(mongod.getDB('$external').runCommand({
+    assert.commandWorked(primary.getDB('$external').runCommand({
         createUser: "userTenant1",
         '$tenant': kTenant,
         roles:
@@ -154,6 +161,23 @@ const tokenDB = tokenConn.getDB(kDbName);
             tokenDB.runCommand({insert: kCollName, documents: [{_id: 0, a: 1, b: 1}]}));
     }
 
+    // Test that transactions can be run successfully.
+    {
+        const session = tokenDB.getMongo().startSession();
+        const sessionDb = session.getDatabase(kDbName);
+        session.startTransaction();
+        assert.commandWorked(sessionDb.runCommand(
+            {delete: kCollName, deletes: [{q: {_id: 0, a: 1, b: 1}, limit: 1}]}));
+        session.commitTransaction_forTesting();
+
+        const findRes = assert.commandWorked(tokenDB.runCommand({find: kCollName}));
+        assert.eq(0, findRes.cursor.firstBatch.length, tojson(findRes.cursor.firstBatch));
+
+        // Reset the collection and document.
+        assert.commandWorked(
+            tokenDB.runCommand({insert: kCollName, documents: [{_id: 0, a: 1, b: 1}]}));
+    }
+
     // Test createIndexes, listIndexes and dropIndexes command.
     {
         var sortIndexesByName = function(indexes) {
@@ -200,7 +224,7 @@ const tokenDB = tokenConn.getDB(kDbName);
 {
     // Create a user for a different tenant, and set the security token on the connection.
     // We reuse the same connection, but swap the token out.
-    assert.commandWorked(mongod.getDB('$external').runCommand({
+    assert.commandWorked(primary.getDB('$external').runCommand({
         createUser: "userTenant2",
         '$tenant': kOtherTenant,
         roles:
@@ -260,7 +284,7 @@ const tokenDB = tokenConn.getDB(kDbName);
 // commands on the doc when passing the correct tenant, but not when passing a different
 // tenant.
 {
-    const privelegedConn = new Mongo(mongod.host);
+    const privelegedConn = new Mongo(primary.host);
     assert(privelegedConn.getDB('admin').auth('admin', 'pwd'));
     const privelegedDB = privelegedConn.getDB('test');
 
@@ -320,5 +344,5 @@ const tokenDB = tokenConn.getDB(kDbName);
     }
 }
 
-MongoRunner.stopMongod(mongod);
+rst.stopSet();
 })();
