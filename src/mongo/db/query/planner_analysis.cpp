@@ -585,7 +585,7 @@ bool canUseSimpleSort(const QuerySolutionNode& solnRoot,
         // record ids along through the sorting process is wasted work when these ids will never be
         // consumed later in the execution of the query. If the record ids are needed, however, then
         // we can't use the simple sort stage.
-        !(plannerParams.options & QueryPlannerParams::PRESERVE_RECORD_ID);
+        !cq.getForceGenerateRecordId();
 }
 
 boost::optional<const projection_ast::Projection*> attemptToGetProjectionFromQuerySolution(

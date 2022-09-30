@@ -541,7 +541,6 @@ private:
     PlanStageData _data;
 
     bool _buildHasStarted{false};
-    bool _shouldProduceRecordIdSlot{true};
 
     // Common parameters to SBE stage builder functions.
     StageBuilderState _state;

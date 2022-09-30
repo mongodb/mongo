@@ -269,7 +269,12 @@ protected:
     std::vector<std::unique_ptr<QuerySolution>> solns;
 
     bool relaxBoundsCheck = false;
+    // Value used for the sbeCompatible flag in the CanonicalQuery objects created by the
+    // test.
     bool markQueriesSbeCompatible = false;
+    // Value used for the forceGenerateRecordId flag in the CanonicalQuery objects created by the
+    // test.
+    bool forceRecordId = false;
 };
 
 }  // namespace mongo

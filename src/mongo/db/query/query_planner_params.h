@@ -125,15 +125,9 @@ struct QueryPlannerParams {
         // declaration of getExecutorDistinct() for more detail.
         STRICT_DISTINCT_ONLY = 1 << 8,
 
-        // Instruct the planner that the caller is expecting to consume the record ids associated
-        // with documents returned by the plan. Any generated query solution must not discard record
-        // ids. In some cases, record ids can be discarded as an optimization when they will not be
-        // consumed downstream.
-        PRESERVE_RECORD_ID = 1 << 9,
-
         // Set this on an oplog scan to uassert that the oplog has not already rolled over the
         // minimum 'ts' timestamp specified in the query.
-        ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG = 1 << 10,
+        ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG = 1 << 9,
 
         // Instruct the plan enumerator to enumerate contained $ors in a special order. $or
         // enumeration can generate an exponential number of plans, and is therefore limited at some
@@ -150,16 +144,16 @@ struct QueryPlannerParams {
         // order, we would get assignments [a_b, a_b], [a_c, a_c], [a_c, a_b], then [a_b, a_c]. This
         // is thought to be helpful in general, but particularly in cases where all children of the
         // $or use the same fields and have the same indexes available, as in this example.
-        ENUMERATE_OR_CHILDREN_LOCKSTEP = 1 << 11,
+        ENUMERATE_OR_CHILDREN_LOCKSTEP = 1 << 10,
 
         // Ensure that any plan generated returns data that is "owned." That is, all BSONObjs are
         // in an "owned" state and are not pointing to data that belongs to the storage engine.
-        RETURN_OWNED_DATA = 1 << 12,
+        RETURN_OWNED_DATA = 1 << 11,
 
         // When generating column scan queries, splits match expressions so that the filters can be
         // applied per-column. This is off by default, since the execution side doesn't support it
         // yet.
-        GENERATE_PER_COLUMN_FILTERS = 1 << 13,
+        GENERATE_PER_COLUMN_FILTERS = 1 << 12,
     };
 
     // See Options enum above.

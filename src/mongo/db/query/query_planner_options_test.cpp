@@ -859,7 +859,7 @@ TEST_F(QueryPlannerTest, DollarResumeAfterFieldPropagatedFromQueryRequestToStage
 }
 
 TEST_F(QueryPlannerTest, PreserveRecordIdOptionPrecludesSimpleSort) {
-    params.options |= QueryPlannerParams::PRESERVE_RECORD_ID;
+    forceRecordId = true;
 
     runQueryAsCommand(fromjson("{find: 'testns', sort: {a:1}}"));
 

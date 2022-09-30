@@ -49,15 +49,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     const CollectionPtr& collection,
     const boost::optional<BSONObj>& indexHint,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    std::unique_ptr<CanonicalQuery> = nullptr,
-    bool requireRID = false);
+    std::unique_ptr<CanonicalQuery> = nullptr);
 
 /**
  * Returns a PlanExecutor for the given CanonicalQuery.
  */
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOptimizer(
-    const CollectionPtr& collection,
-    std::unique_ptr<CanonicalQuery> query,
-    bool requireRID = false);
+    const CollectionPtr& collection, std::unique_ptr<CanonicalQuery> query);
 
 }  // namespace mongo

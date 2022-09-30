@@ -60,6 +60,10 @@ SbeStageBuilderTestFixture::buildPlanStage(
     auto statusWithCQ =
         CanonicalQuery::canonicalize(operationContext(), std::move(findCommand), false, expCtx);
     ASSERT_OK(statusWithCQ.getStatus());
+    if (hasRecordId) {
+        // Force the builder to generate the RecordId output even if it isn't needed by the plan.
+        statusWithCQ.getValue()->setForceGenerateRecordId(true);
+    }
 
     CollectionMock coll(_nss);
     CollectionPtr collPtr(&coll);

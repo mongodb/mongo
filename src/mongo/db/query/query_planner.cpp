@@ -463,9 +463,6 @@ string optionString(size_t options) {
             case QueryPlannerParams::STRICT_DISTINCT_ONLY:
                 ss << "STRICT_DISTINCT_ONLY ";
                 break;
-            case QueryPlannerParams::PRESERVE_RECORD_ID:
-                ss << "PRESERVE_RECORD_ID ";
-                break;
             case QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG:
                 ss << "ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG ";
                 break;

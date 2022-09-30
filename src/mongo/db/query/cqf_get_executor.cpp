@@ -484,9 +484,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     const CollectionPtr& collection,
     const boost::optional<BSONObj>& indexHint,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    const bool requireRID) {
-
+    std::unique_ptr<CanonicalQuery> canonicalQuery) {
     // Ensure that either pipeline or canonicalQuery is set.
     tassert(624070,
             "getSBEExecutorViaCascadesOptimizer expects exactly one of the following to be set: "
@@ -503,6 +501,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     auto curOp = CurOp::get(opCtx);
     curOp->debug().cqfUsed = true;
 
+    const bool requireRID = canonicalQuery ? canonicalQuery->getForceGenerateRecordId() : false;
     const bool collectionExists = collection != nullptr;
     const std::string uuidStr = collectionExists ? collection->uuid().toString() : "<missing_uuid>";
     const std::string collNameStr = nss.coll().toString();
@@ -624,8 +623,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOptimizer(
-    const CollectionPtr& collection, std::unique_ptr<CanonicalQuery> query, const bool requireRID) {
-
+    const CollectionPtr& collection, std::unique_ptr<CanonicalQuery> query) {
     boost::optional<BSONObj> indexHint = query->getFindCommandRequest().getHint().isEmpty()
         ? boost::none
         : boost::make_optional(query->getFindCommandRequest().getHint());
@@ -635,14 +633,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     auto expCtx = query->getExpCtx();
     auto nss = query->nss();
 
-    return getSBEExecutorViaCascadesOptimizer(opCtx,
-                                              expCtx,
-                                              nss,
-                                              collection,
-                                              indexHint,
-                                              nullptr /* pipeline */,
-                                              std::move(query),
-                                              requireRID);
+    return getSBEExecutorViaCascadesOptimizer(
+        opCtx, expCtx, nss, collection, indexHint, nullptr /* pipeline */, std::move(query));
 }
 
 }  // namespace mongo

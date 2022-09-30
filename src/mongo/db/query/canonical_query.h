@@ -245,6 +245,14 @@ public:
         _explain = explain;
     }
 
+    bool getForceGenerateRecordId() const {
+        return _forceGenerateRecordId;
+    }
+
+    void setForceGenerateRecordId(bool value) {
+        _forceGenerateRecordId = value;
+    }
+
     OperationContext* getOpCtx() const {
         tassert(6508300, "'CanonicalQuery' does not have an 'ExpressionContext'", _expCtx);
         return _expCtx->opCtx;
@@ -309,6 +317,11 @@ private:
 
     // True if this query can be executed by the SBE.
     bool _sbeCompatible = false;
+
+    // True if this query must produce a RecordId output in addition to the BSON objects that
+    // constitute the result set of the query. Any generated query solution must not discard record
+    // ids, even if the optimizer detects that they are not going to be consumed downstream.
+    bool _forceGenerateRecordId = false;
 
     // A map from assigned InputParamId's to parameterised MatchExpression's.
     std::vector<const MatchExpression*> _inputParamIdToExpressionMap;

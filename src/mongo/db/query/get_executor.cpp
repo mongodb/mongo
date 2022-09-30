@@ -1437,10 +1437,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         sbe::isQuerySbeCompatible(&mainColl, canonicalQuery.get(), plannerParams.options));
 
     if (isEligibleForBonsai(*canonicalQuery, opCtx, mainColl)) {
-        return getSBEExecutorViaCascadesOptimizer(mainColl,
-                                                  std::move(canonicalQuery),
-                                                  plannerParams.options &
-                                                      QueryPlannerParams::PRESERVE_RECORD_ID);
+        return getSBEExecutorViaCascadesOptimizer(mainColl, std::move(canonicalQuery));
     }
 
     // Use SBE if 'canonicalQuery' is SBE compatible.
@@ -1716,8 +1713,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     // The underlying query plan must preserve the record id, since it will be needed in order to
     // identify the record to update.
-    const size_t defaultPlannerOptions = QueryPlannerParams::PRESERVE_RECORD_ID;
+    cq->setForceGenerateRecordId(true);
 
+    const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     ClassicPrepareExecutionHelper helper{
         opCtx, collection, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
@@ -1907,8 +1905,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     // The underlying query plan must preserve the record id, since it will be needed in order to
     // identify the record to update.
-    const size_t defaultPlannerOptions = QueryPlannerParams::PRESERVE_RECORD_ID;
+    cq->setForceGenerateRecordId(true);
 
+    const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     ClassicPrepareExecutionHelper helper{
         opCtx, collection, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();

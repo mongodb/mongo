@@ -1063,9 +1063,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         _state.data->foreignHashJoinCollections.emplace(eqLookupNode->foreignCollection);
     }
 
-    // $lookup creates its own output documents.
-    _shouldProduceRecordIdSlot = false;
-
     auto localReqs = reqs.copy().set(kResult);
     auto [localStage, localOutputs] = build(eqLookupNode->children[0].get(), localReqs);
     SlotId localDocumentSlot = localOutputs.get(PlanStageSlots::kResult);

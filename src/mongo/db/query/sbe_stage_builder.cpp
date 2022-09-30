@@ -473,26 +473,6 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
         _data.shouldTrackResumeToken = csn->requestResumeToken;
         _data.shouldUseTailableScan = csn->tailable;
     }
-
-    for (const auto& node : getAllNodesByType(solution.root(), STAGE_VIRTUAL_SCAN)) {
-        auto vsn = static_cast<const VirtualScanNode*>(node);
-        if (!vsn->hasRecordId) {
-            _shouldProduceRecordIdSlot = false;
-            break;
-        }
-    }
-
-    const auto [lookupNode, lookupCount] = getFirstNodeByType(solution.root(), STAGE_EQ_LOOKUP);
-    if (lookupCount) {
-        // TODO: SERVER-63604 optimize _shouldProduceRecordIdSlot maintenance
-        _shouldProduceRecordIdSlot = false;
-    }
-
-    const auto [groupNode, groupCount] = getFirstNodeByType(solution.root(), STAGE_GROUP);
-    if (groupCount) {
-        // TODO: SERVER-63604 optimize _shouldProduceRecordIdSlot maintenance
-        _shouldProduceRecordIdSlot = false;
-    }
 }
 
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolutionNode* root) {
@@ -500,11 +480,15 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
     invariant(!_buildHasStarted);
     _buildHasStarted = true;
 
-    // We always produce a 'resultSlot' and conditionally produce a 'recordIdSlot' based on the
-    // 'shouldProduceRecordIdSlot'.
+    // We always produce a 'resultSlot'.
     PlanStageReqs reqs;
     reqs.set(kResult);
-    reqs.setIf(kRecordId, _shouldProduceRecordIdSlot);
+    // We force the root stage to produce a 'recordId' if the iteration can be
+    // resumed (via a resume token or a tailable cursor) or if the caller simply expects to be able
+    // to read it.
+    reqs.setIf(kRecordId,
+               (_data.shouldUseTailableScan || _data.shouldTrackResumeToken ||
+                _cq.getForceGenerateRecordId()));
 
     // Set the target namespace to '_mainNss'. This is necessary as some QuerySolutionNodes that
     // require a collection when stage building do not explicitly name which collection they are
@@ -514,11 +498,10 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
     // Build the SBE plan stage tree.
     auto [stage, outputs] = build(root, reqs);
 
-    // Assert that we produced a 'resultSlot' and that we prouced a 'recordIdSlot' if the
-    // 'shouldProduceRecordIdSlot' flag was set. Also assert that we produced an 'oplogTsSlot' if
-    // it's needed.
+    // Assert that we produced a 'resultSlot' and that we produced a 'recordIdSlot' only if it was
+    // needed.
     invariant(outputs.has(kResult));
-    invariant(!_shouldProduceRecordIdSlot || outputs.has(kRecordId));
+    invariant(reqs.has(kRecordId) == outputs.has(kRecordId));
 
     _data.outputs = std::move(outputs);
 
@@ -543,6 +526,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                       root->nodeId(),
                                       outputs.get(kReturnKey),
                                       sbe::makeE<sbe::EFunction>("newObj", sbe::makeEs()));
+    }
+    // Don't advertize the RecordId output if none of our ancestors are going to use it.
+    if (!reqs.has(kRecordId)) {
+        outputs.clear(kRecordId);
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -659,6 +646,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                     iamMap,
                                                     reqs.has(kIndexKeyPattern));
 
+    // Remove the RecordId from the output if we were not requested to produce it.
+    if (!reqs.has(PlanStageSlots::kRecordId) && outputs.has(kRecordId)) {
+        outputs.clear(kRecordId);
+    }
     if (reqs.has(PlanStageSlots::kReturnKey)) {
         sbe::EExpression::Vector mkObjArgs;
 
@@ -984,10 +975,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                              _slotIdGenerator);
 
     outputs.set(kResult, fetchResultSlot);
-    outputs.set(kRecordId, fetchRecordIdSlot);
+    // Propagate the RecordId output only if requested.
+    if (reqs.has(kRecordId)) {
+        outputs.set(kRecordId, fetchRecordIdSlot);
+    } else {
+        outputs.clear(kRecordId);
+    }
 
     if (fn->filter) {
-        forwardingReqs = reqs.copy().set(kResult).set(kRecordId);
+        forwardingReqs = reqs.copy().set(kResult);
 
         relevantSlots = sbe::makeSV();
         outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
@@ -1676,6 +1672,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     if (mergeSortNode->dedup) {
         stage = sbe::makeS<sbe::UniqueStage>(
             std::move(stage), sbe::makeSV(outputs.get(kRecordId)), root->nodeId());
+        // Stop propagating the RecordId output if none of our ancestors are going to use it.
+        if (!reqs.has(kRecordId)) {
+            outputs.clear(kRecordId);
+        }
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -1894,6 +1894,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     if (orn->dedup) {
         stage = sbe::makeS<sbe::UniqueStage>(
             std::move(stage), sbe::makeSV(outputs.get(kRecordId)), root->nodeId());
+        // Stop propagating the RecordId output if none of our ancestors are going to use it.
+        if (!reqs.has(kRecordId)) {
+            outputs.clear(kRecordId);
+        }
     }
 
     if (orn->filter) {
@@ -2086,6 +2090,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                        collatorSlot,
                                                        root->nodeId());
     }
+    // Stop propagating the RecordId output if none of our ancestors are going to use it.
+    if (!reqs.has(kRecordId)) {
+        outputs.clear(kRecordId);
+    }
 
     return {std::move(hashJoinStage), std::move(outputs)};
 }
@@ -2194,6 +2202,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                          innerProjectSlots,
                                                          sortDirs,
                                                          root->nodeId());
+    }
+    // Stop propagating the RecordId output if none of our ancestors are going to use it.
+    if (!reqs.has(kRecordId)) {
+        outputs.clear(kRecordId);
     }
 
     return {std::move(mergeJoinStage), std::move(outputs)};
@@ -2619,6 +2631,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     tassert(
         5851600, "should have one and only one child for GROUP", groupNode->children.size() == 1);
     tassert(5851601, "GROUP should have had group-by key expression", idExpr);
+    tassert(
+        6360401,
+        "GROUP cannot propagate a record id slot, but the record id was requested by the parent",
+        !reqs.has(kRecordId));
 
     const auto& childNode = groupNode->children[0].get();
     const auto& accStmts = groupNode->accumulators;
@@ -2634,7 +2650,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Builds the child and gets the child result slot.
     auto [childStage, childOutputs] = build(childNode, childReqs);
-    _shouldProduceRecordIdSlot = false;
 
     tassert(6075900,
             "Expected no optimized expressions but got: {}"_format(_state.preGeneratedExprs.size()),
