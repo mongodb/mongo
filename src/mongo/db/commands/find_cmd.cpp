@@ -327,6 +327,14 @@ public:
             const bool isExplain = false;
             auto qr =
                 parseCmdObjectToQueryRequest(opCtx, std::move(parsedNss), _request.body, isExplain);
+            const bool isTxn = opCtx->inMultiDocumentTransaction();
+
+            // Disallow speculative majority find operations in transactions.
+            uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                    "Speculative majority find operations are not allowed in transactions. Remove "
+                    "the majority read concern and allowSpeculativeMajorityRead flag.",
+                    !(isTxn && repl::ReadConcernArgs::get(opCtx).isSpeculativeMajority() &&
+                      qr->allowSpeculativeMajorityRead()));
 
             // Only allow speculative majority for internal commands that specify the correct flag.
             uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
@@ -338,11 +346,11 @@ public:
             const auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "It is illegal to open a tailable cursor in a transaction",
-                    !(opCtx->inMultiDocumentTransaction() && qr->isTailable()));
+                    !(isTxn && qr->isTailable()));
 
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     "The 'readOnce' option is not supported within a transaction.",
-                    !txnParticipant || !opCtx->inMultiDocumentTransaction() || !qr->isReadOnce());
+                    !txnParticipant || !isTxn || !qr->isReadOnce());
 
             if (qr->getReadAtClusterTime()) {
                 AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
@@ -358,8 +366,7 @@ public:
             uassert(
                 ErrorCodes::OperationNotSupportedInTransaction,
                 "The '$_internalReadAtClusterTime' option is not supported within a transaction.",
-                !txnParticipant || !opCtx->inMultiDocumentTransaction() ||
-                    !qr->getReadAtClusterTime());
+                !txnParticipant || !isTxn || !qr->getReadAtClusterTime());
 
             uassert(ErrorCodes::InvalidOptions,
                     "The '$_internalReadAtClusterTime' option is only supported when replication is"
