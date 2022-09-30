@@ -176,7 +176,7 @@ public:
                 const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
                     opCtx, ns().dbName(), DSSAcquisitionMode::kShared);
                 criticalSectionSignal =
-                    scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead);
+                    scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
             }
 
             if (criticalSectionSignal)
