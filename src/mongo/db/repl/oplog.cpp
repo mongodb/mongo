@@ -1863,19 +1863,21 @@ Status applyOperation_inlock(OperationContext* opCtx,
         case OpTypeEnum::kInsertGlobalIndexKey: {
             invariant(op.getUuid());
 
-            global_index::insertKey(opCtx,
-                                    *op.getUuid(),
-                                    op.getObject().getObjectField("ik"),
-                                    op.getObject().getObjectField("dk"));
+            global_index::insertKey(
+                opCtx,
+                *op.getUuid(),
+                op.getObject().getObjectField(global_index::kOplogEntryIndexKeyFieldName),
+                op.getObject().getObjectField(global_index::kOplogEntryDocKeyFieldName));
             break;
         }
         case OpTypeEnum::kDeleteGlobalIndexKey: {
             invariant(op.getUuid());
 
-            global_index::deleteKey(opCtx,
-                                    *op.getUuid(),
-                                    op.getObject().getObjectField("ik"),
-                                    op.getObject().getObjectField("dk"));
+            global_index::deleteKey(
+                opCtx,
+                *op.getUuid(),
+                op.getObject().getObjectField(global_index::kOplogEntryIndexKeyFieldName),
+                op.getObject().getObjectField(global_index::kOplogEntryDocKeyFieldName));
             break;
         }
         default: {

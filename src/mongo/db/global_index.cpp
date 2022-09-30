@@ -52,8 +52,6 @@ namespace mongo::global_index {
 
 namespace {  // Anonymous namespace for private functions.
 
-constexpr StringData kIndexKeyIndexName = "ik_1"_sd;
-
 // Build an index entry to insert.
 BSONObj buildIndexEntry(const BSONObj& key, const BSONObj& docKey) {
     // Generate the KeyString representation of the index key.
@@ -72,12 +70,14 @@ BSONObj buildIndexEntry(const BSONObj& key, const BSONObj& docKey) {
     // - 'tb': the index key's TypeBits. Only present if non-zero.
 
     BSONObjBuilder indexEntryBuilder;
-    indexEntryBuilder.append("_id", docKey);
+    indexEntryBuilder.append(kContainerIndexDocKeyFieldName, docKey);
     indexEntryBuilder.append(
-        "ik", BSONBinData(ks.getBuffer(), ks.getSize(), BinDataType::BinDataGeneral));
+        kContainerIndexKeyFieldName,
+        BSONBinData(ks.getBuffer(), ks.getSize(), BinDataType::BinDataGeneral));
     if (!indexTB.isAllZeros()) {
         indexEntryBuilder.append(
-            "tb", BSONBinData(indexTB.getBuffer(), indexTB.getSize(), BinDataType::BinDataGeneral));
+            kContainerIndexKeyTypeBitsFieldName,
+            BSONBinData(indexTB.getBuffer(), indexTB.getSize(), BinDataType::BinDataGeneral));
     }
     return indexEntryBuilder.obj();
 }
@@ -120,8 +120,9 @@ void createContainer(OperationContext* opCtx, const UUID& indexUUID) {
 
     // Create the container.
     return writeConflictRetry(opCtx, "createGlobalIndexContainer", nss.ns(), [&]() {
-        const auto indexKeySpec = BSON("v" << 2 << "name" << kIndexKeyIndexName << "key"
-                                           << BSON("ik" << 1) << "unique" << true);
+        const auto indexKeySpec =
+            BSON("v" << 2 << "name" << kContainerIndexKeyFieldName.toString() + "_1"
+                     << "key" << BSON(kContainerIndexKeyFieldName << 1) << "unique" << true);
 
         WriteUnitOfWork wuow(opCtx);
 
@@ -153,13 +154,15 @@ void createContainer(OperationContext* opCtx, const UUID& indexUUID) {
                     str::stream() << "Collection with UUID " << indexUUID
                                   << " already exists but it's not clustered.",
                     autoColl->getCollectionOptions().clusteredIndex);
-            tassert(
-                6789205,
-                str::stream() << "Collection with UUID " << indexUUID
-                              << " already exists but it's missing a unique index on "
-                                 "'ik'.",
-                autoColl->getIndexCatalog()->findIndexByKeyPatternAndOptions(
-                    opCtx, BSON("ik" << 1), indexKeySpec, IndexCatalog::InclusionPolicy::kReady));
+            tassert(6789205,
+                    str::stream() << "Collection with UUID " << indexUUID
+                                  << " already exists but it's missing a unique index on "
+                                  << kContainerIndexKeyFieldName << ".",
+                    autoColl->getIndexCatalog()->findIndexByKeyPatternAndOptions(
+                        opCtx,
+                        BSON(kContainerIndexKeyFieldName << 1),
+                        indexKeySpec,
+                        IndexCatalog::InclusionPolicy::kReady));
             tassert(6789206,
                     str::stream() << "Collection with namespace " << nss.ns()
                                   << " already exists but it has inconsistent UUID "
@@ -191,6 +194,8 @@ void dropContainer(OperationContext* opCtx, const UUID& indexUUID) {
             return;
         }
 
+        const auto numKeys = autoColl->numRecords(opCtx);
+
         WriteUnitOfWork wuow(opCtx);
         {
             repl::UnreplicatedWritesBlock unreplicatedWrites(opCtx);
@@ -198,7 +203,7 @@ void dropContainer(OperationContext* opCtx, const UUID& indexUUID) {
         }
 
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
-        opObserver->onDropGlobalIndex(opCtx, nss, indexUUID);
+        opObserver->onDropGlobalIndex(opCtx, nss, indexUUID, numKeys);
 
         wuow.commit();
         return;

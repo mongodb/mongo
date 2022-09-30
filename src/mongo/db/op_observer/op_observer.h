@@ -133,7 +133,8 @@ public:
 
     virtual void onDropGlobalIndex(OperationContext* opCtx,
                                    const NamespaceString& globalIndexNss,
-                                   const UUID& globalIndexUUID) = 0;
+                                   const UUID& globalIndexUUID,
+                                   long long numKeys) = 0;
 
     virtual void onCreateIndex(OperationContext* opCtx,
                                const NamespaceString& nss,

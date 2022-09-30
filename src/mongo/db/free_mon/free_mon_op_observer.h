@@ -56,7 +56,8 @@ public:
 
     void onDropGlobalIndex(OperationContext* opCtx,
                            const NamespaceString& globalIndexNss,
-                           const UUID& globalIndexUUID) final{};
+                           const UUID& globalIndexUUID,
+                           long long numKeys) final{};
 
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,

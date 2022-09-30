@@ -11,11 +11,7 @@
 "use strict";
 
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-
-function uuidToString(uuid) {
-    const [_, uuidString] = uuid.toString().match(/"((?:\\.|[^"\\])*)"/);
-    return uuidString;
-}
+load('jstests/libs/uuid_util.js');
 
 function verifyCollectionExists(node, globalIndexUUID, namespace) {
     const systemDB = node.getDB("system");
@@ -80,6 +76,11 @@ function verifyOplogEntry(node, globalIndexUUID, namespace, commandString, lsid,
     assert.eq(oplogEntry.op, "c");
     assert.eq(oplogEntry.ui, globalIndexUUID);
     assert.docEq(oplogEntry.o, commandStringNamespaceObj);
+    if (commandString === "dropGlobalIndex") {
+        assert.eq(0, oplogEntry.o2.numRecords);
+    } else {
+        assert.eq(undefined, oplogEntry.o2);
+    }
 
     // lsid and txnNumber are either both present (retryable writes) or absent.
     assert((lsid && txnNumber) || (!lsid && !txnNumber));
@@ -96,7 +97,7 @@ function verifyCommandIsRetryableWrite(node, command, oplogCommandString, setup)
     const lsid = session.getSessionId();
     const txnNumber = NumberLong(10);
     const indexUUID = UUID();
-    const globalIndexCollName = "globalIndexes." + uuidToString(indexUUID);
+    const globalIndexCollName = "globalIndexes." + extractUUIDFromObject(indexUUID);
 
     var commandObj = {};
     commandObj[command] = indexUUID;
@@ -147,7 +148,7 @@ function testCreateGlobalIndex(rst) {
     const primary = rst.getPrimary();
     const adminDB = primary.getDB("admin");
     const globalIndexUUID = UUID();
-    const globalIndexCollName = "globalIndexes." + uuidToString(globalIndexUUID);
+    const globalIndexCollName = "globalIndexes." + extractUUIDFromObject(globalIndexUUID);
     const oplogCommandString = "createGlobalIndex";
 
     verifyMultiDocumentTransactionDisallowed(primary, {_shardsvrCreateGlobalIndex: UUID()});
@@ -173,7 +174,7 @@ function testDropGlobalIndex(rst) {
     const primary = rst.getPrimary();
     const adminDB = primary.getDB("admin");
     const globalIndexUUID = UUID();
-    const globalIndexCollName = "globalIndexes." + uuidToString(globalIndexUUID);
+    const globalIndexCollName = "globalIndexes." + extractUUIDFromObject(globalIndexUUID);
     const oplogCommandString = "dropGlobalIndex";
 
     verifyMultiDocumentTransactionDisallowed(primary, {_shardsvrDropGlobalIndex: UUID()});

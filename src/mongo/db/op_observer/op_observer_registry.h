@@ -76,10 +76,11 @@ public:
 
     void onDropGlobalIndex(OperationContext* opCtx,
                            const NamespaceString& globalIndexNss,
-                           const UUID& globalIndexUUID) final {
+                           const UUID& globalIndexUUID,
+                           long long numKeys) final {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onDropGlobalIndex(opCtx, globalIndexNss, globalIndexUUID);
+            o->onDropGlobalIndex(opCtx, globalIndexNss, globalIndexUUID, numKeys);
     };
 
     void onCreateIndex(OperationContext* const opCtx,

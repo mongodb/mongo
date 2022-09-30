@@ -173,7 +173,8 @@ public:
 
     void onDropGlobalIndex(OperationContext* opCtx,
                            const NamespaceString& globalIndexNss,
-                           const UUID& globalIndexUUID) final{};
+                           const UUID& globalIndexUUID,
+                           long long numKeys) final{};
 
     // Index builds committing can be left unchecked since we kill any active index builds before
     // enabling write blocking. This means any index build which gets to the commit phase while

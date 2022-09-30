@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/oplog_entry.h"
 
+#include "mongo/db/global_index.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -135,7 +136,8 @@ ReplOperation makeGlobalIndexCrudOperation(const NamespaceString& indexNss,
     // required oplog entry field.
     op.setNss(indexNss.getCommandNS());
     op.setUuid(indexUuid);
-    op.setObject(BSON("ik" << key << "dk" << docKey));
+    op.setObject(BSON(global_index::kOplogEntryIndexKeyFieldName
+                      << key << global_index::kOplogEntryDocKeyFieldName << docKey));
     return op;
 }
 }  // namespace
