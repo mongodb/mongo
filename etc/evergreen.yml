@@ -1569,6 +1569,99 @@ buildvariants:
       --use-glibcxx-debug
       --dbg=on
       --allocator=system
+    exec_timeout_secs: 32400 # 9 hour timeout
+    timeout_secs: 18000 # 5 hour idle timeout
+  tasks:
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: test_api_version_compatibility
+  - name: .aggfuzzer !.feature_flag_guarded !.no_debug_mode
+  - name: .aggregation !.feature_flag_guarded !.no_debug_mode
+  - name: audit
+  - name: .auth !.no_debug_mode
+  - name: .causally_consistent !.sharding
+  - name: .change_streams !.no_debug_mode
+  - name: .change_stream_fuzzer
+  - name: .misc_js !.no_debug_mode
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.no_debug_mode
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.no_debug_mode
+    distros:
+    - rhel80-medium
+  - name: config_fuzzer_concurrency
+  - name: config_fuzzer_jsCore
+  - name: config_fuzzer_replica_sets_jscore_passthrough
+    distros:
+    - rhel80-large
+  - name: disk_wiredtiger
+  - name: .encrypt !.no_debug_mode
+  - name: idl_tests
+  - name: initial_sync_fuzzer_gen
+  - name: .integration
+    distros:
+    - rhel80-medium
+  - name: jsCore
+    distros:
+    - rhel80-xlarge
+  - name: .jscore .common !jsCore
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  # TODO(SERVER-69996) reenable after ticket is complete
+  # - name: .jstestfuzz !.flow_control
+  - name: libunwind_tests
+  - name: .multiversion_sanity_check
+  - name: mqlrun
+  - name: .multi_shard !.no_debug_mode
+  - name: multiversion_gen
+  - name: .query_fuzzer
+  - name: .read_write_concern .large
+    distros:
+    - rhel80-medium
+  - name: .read_write_concern !.large
+  # TODO(SERVER-69951) reenable after ticket is complete
+  # - name: .replica_sets !.encrypt !.auth
+  #   distros:
+  #   - rhel80-xlarge
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: .read_only
+  - name: .rollbackfuzzer
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.no_debug_mode
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: .stitch
+  - name: .crypt
+    distros:
+    - rhel80-xlarge
+  - name: crypt_build_debug_and_test
+    distros:
+    - rhel80-xlarge
+  - name: .updatefuzzer !.no_debug_mode
+  - name: secondary_reads_passthrough_gen
+  - name: server_discovery_and_monitoring_json_test_TG
+  # TODO(SERVER-70015) reenable after ticket is complete
+  # - name: .serverless
+  #   distros:
+  #   - rhel80-xlarge
+  - name: server_selection_json_test_TG
+    distros:
+    - rhel80-xlarge
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
