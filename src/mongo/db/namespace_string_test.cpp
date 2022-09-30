@@ -358,7 +358,7 @@ TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
 }
 
 TEST(NamespaceStringTest, ParseNSSWithTenantId) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";

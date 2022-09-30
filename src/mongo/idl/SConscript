@@ -114,6 +114,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'cluster_server_parameter',

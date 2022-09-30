@@ -73,7 +73,7 @@ BSONObj addMetadata(DBClientBase* client, BSONObj command) {
 }
 
 Message assembleCommandRequest(DBClientBase* client,
-                               StringData database,
+                               const DatabaseName& dbName,
                                BSONObj commandObj,
                                const ReadPreferenceSetting& readPref) {
     // Add the $readPreference field to the request.
@@ -84,7 +84,7 @@ Message assembleCommandRequest(DBClientBase* client,
     }
 
     commandObj = addMetadata(client, std::move(commandObj));
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody(database, commandObj);
+    auto opMsgRequest = OpMsgRequestBuilder::create(dbName, commandObj);
     return opMsgRequest.serialize();
 }
 }  // namespace
@@ -97,7 +97,7 @@ Message DBClientCursor::assembleInit() {
     // We haven't gotten a cursorId yet so we need to issue the initial find command.
     invariant(_findRequest);
     BSONObj findCmd = _findRequest->toBSON(BSONObj());
-    return assembleCommandRequest(_client, _ns.db(), std::move(findCmd), _readPref);
+    return assembleCommandRequest(_client, _ns.dbName(), std::move(findCmd), _readPref);
 }
 
 Message DBClientCursor::assembleGetMore() {
@@ -112,7 +112,7 @@ Message DBClientCursor::assembleGetMore() {
         getMoreRequest.setTerm(static_cast<std::int64_t>(*_term));
     }
     getMoreRequest.setLastKnownCommittedOpTime(_lastKnownCommittedOpTime);
-    auto msg = assembleCommandRequest(_client, _ns.db(), getMoreRequest.toBSON({}), _readPref);
+    auto msg = assembleCommandRequest(_client, _ns.dbName(), getMoreRequest.toBSON({}), _readPref);
 
     // Set the exhaust flag if needed.
     if (_isExhaust) {
@@ -215,13 +215,18 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
 
     const auto replyObj = commandDataReceived(reply);
     _cursorId = 0;  // Don't try to kill cursor if we get back an error.
+    // TODO SERVER-70067: pass in the tenant id to parseFromBSON.
     auto cr = uassertStatusOK(CursorResponse::parseFromBSON(replyObj));
     _cursorId = cr.getCursorId();
     uassert(50935,
             "Received a getMore response with a cursor id of 0 and the moreToCome flag set.",
             !(_connectionHasPendingReplies && _cursorId == 0));
 
-    _ns = cr.getNSS();  // find command can change the ns to use for getMores.
+    // TODO SERVER-70067: Get nss from the parsed cursor directly as it already has the tenant
+    // information.
+    _ns = NamespaceString(
+        _ns.tenantId(),  // always reuse the request's tenant in case no tenant in the response.
+        cr.getNSS().toString());  // find command can change the ns to use for getMores.
     // Store the resume token, if we got one.
     _postBatchResumeToken = cr.getPostBatchResumeToken();
     _batch.objs = cr.releaseBatch();
@@ -340,7 +345,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(nsOrUuid),
       _isInitialized(true),
-      _ns(nsOrUuid.nss() ? *nsOrUuid.nss() : NamespaceString(nsOrUuid.dbname())),
+      _ns(nsOrUuid.nss() ? *nsOrUuid.nss() : NamespaceString(nsOrUuid.dbName().value())),
       _cursorId(cursorId),
       _isExhaust(isExhaust),
       _operationTime(operationTime),
@@ -353,7 +358,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
     : _client(client),
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(findRequest.getNamespaceOrUUID()),
-      _ns(_nsOrUuid.nss() ? *_nsOrUuid.nss() : NamespaceString(_nsOrUuid.dbname())),
+      _ns(_nsOrUuid.nss() ? *_nsOrUuid.nss() : NamespaceString(_nsOrUuid.dbName().value())),
       _batchSize(findRequest.getBatchSize().value_or(0)),
       _findRequest(std::move(findRequest)),
       _readPref(readPref),

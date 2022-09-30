@@ -251,6 +251,65 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     throw;
 }
 
+OpMsgRequest OpMsgRequest::fromDBAndBody(StringData db, BSONObj body, const BSONObj& extraFields) {
+    return OpMsgRequestBuilder::create(db, std::move(body), extraFields);
+}
+
+boost::optional<TenantId> parseDollarTenant(const BSONObj body) {
+    auto tenant = body.getField("$tenant");
+    if (tenant) {
+        return TenantId::parseFromBSON(body.getField("$tenant"));
+    } else {
+        return boost::none;
+    }
+}
+
+void appendDollarTenant(BSONObjBuilder& builder,
+                        const TenantId& tenant,
+                        boost::optional<TenantId> originalTenant = boost::none) {
+    if (originalTenant) {
+        massert(8423373,
+                str::stream() << "Unable to set TenantId '" << tenant
+                              << "' on OpMsgRequest as it already has "
+                              << originalTenant->toString(),
+                tenant == originalTenant.value());
+    } else {
+        tenant.serializeToBSON("$tenant", &builder);
+    }
+}
+
+void OpMsgRequest::setDollarTenant(const TenantId& tenant) {
+    massert(8423372,
+            str::stream() << "Should not set dollar tenant " << tenant
+                          << " on the validated OpMsgRequest.",
+            !validatedTenancyScope);
+
+    auto dollarTenant = parseDollarTenant(body);
+    BSONObjBuilder bodyBuilder(std::move(body));
+    appendDollarTenant(bodyBuilder, tenant, dollarTenant);
+    body = bodyBuilder.obj();
+}
+
+OpMsgRequest OpMsgRequestBuilder::create(StringData db, BSONObj body, const BSONObj& extraFields) {
+    return create({boost::none, db}, std::move(body), extraFields);
+}
+
+OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,
+                                         BSONObj body,
+                                         const BSONObj& extraFields) {
+    auto dollarTenant = parseDollarTenant(body);
+    BSONObjBuilder bodyBuilder(std::move(body));
+    bodyBuilder.appendElements(extraFields);
+    bodyBuilder.append("$db", dbName.db());
+    if (dbName.tenantId()) {
+        appendDollarTenant(bodyBuilder, dbName.tenantId().value(), dollarTenant);
+    }
+
+    OpMsgRequest request;
+    request.body = bodyBuilder.obj();
+    return request;
+}
+
 namespace {
 void serializeHelper(const std::vector<OpMsg::DocumentSequence>& sequences,
                      const BSONObj& body,

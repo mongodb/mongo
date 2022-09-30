@@ -155,25 +155,41 @@ std::unique_ptr<DBClientCursor> DBDirectClient::find(FindCommandRequest findRequ
 
 write_ops::FindAndModifyCommandReply DBDirectClient::findAndModify(
     const write_ops::FindAndModifyCommandRequest& findAndModify) {
-    auto response = runCommand(findAndModify.serialize({}));
+    auto request = findAndModify.serialize({});
+    if (const auto& tenant = findAndModify.getDbName().tenantId()) {
+        request.setDollarTenant(tenant.value());
+    }
+    auto response = runCommand(std::move(request));
     return FindAndModifyOp::parseResponse(response->getCommandReply());
 }
 
 write_ops::InsertCommandReply DBDirectClient::insert(
     const write_ops::InsertCommandRequest& insert) {
-    auto response = runCommand(insert.serialize({}));
+    auto request = insert.serialize({});
+    if (const auto& tenant = insert.getDbName().tenantId()) {
+        request.setDollarTenant(tenant.value());
+    }
+    auto response = runCommand(request);
     return InsertOp::parseResponse(response->getCommandReply());
 }
 
 write_ops::UpdateCommandReply DBDirectClient::update(
     const write_ops::UpdateCommandRequest& update) {
-    auto response = runCommand(update.serialize({}));
+    auto request = update.serialize({});
+    if (const auto& tenant = update.getDbName().tenantId()) {
+        request.setDollarTenant(tenant.value());
+    }
+    auto response = runCommand(request);
     return UpdateOp::parseResponse(response->getCommandReply());
 }
 
 write_ops::DeleteCommandReply DBDirectClient::remove(
     const write_ops::DeleteCommandRequest& remove) {
-    auto response = runCommand(remove.serialize({}));
+    auto request = remove.serialize({});
+    if (const auto& tenant = remove.getDbName().tenantId()) {
+        request.setDollarTenant(tenant.value());
+    }
+    auto response = runCommand(request);
     return DeleteOp::parseResponse(response->getCommandReply());
 }
 
@@ -187,10 +203,10 @@ long long DBDirectClient::count(const NamespaceStringOrUUID nsOrUuid,
     DirectClientScope directClientScope(_opCtx);
     BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip, boost::none);
 
-    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
+    auto& dbName = (nsOrUuid.uuid() ? nsOrUuid.dbName().value() : (*nsOrUuid.nss()).dbName());
 
-    auto result = CommandHelpers::runCommandDirectly(
-        _opCtx, OpMsgRequest::fromDBAndBody(dbName, std::move(cmdObj)));
+    auto request = OpMsgRequestBuilder::create(dbName, cmdObj);
+    auto result = CommandHelpers::runCommandDirectly(_opCtx, request);
 
     uassertStatusOK(getStatusFromCommandResult(result));
     return static_cast<unsigned long long>(result["n"].numberLong());

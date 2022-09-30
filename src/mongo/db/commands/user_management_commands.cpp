@@ -222,35 +222,17 @@ Status checkOkayToGrantPrivilegesToRole(const RoleName& role, const PrivilegeVec
     return Status::OK();
 }
 
-// TODO (SERVER-67423) Convert DBClient to accept DatabaseName type.
-// Currently tenant is lost on the way from DBDirectClient to runCommand.
-// For now, just mangle the NamespaceName into (`tenant_db`, `coll`) format.
-NamespaceString patchTenantNSS(const NamespaceString& nss) {
-    if (auto tenant = nss.tenantId()) {
-        return NamespaceString(
-            boost::none, str::stream() << *tenant << '_' << nss.dbName().db(), nss.coll());
-    } else {
-        return nss;
-    }
-}
-
-// TODO (SERVER-67423) Convert DBClient to accept DatabaseName type.
 NamespaceString usersNSS(const boost::optional<TenantId>& tenant) {
     if (tenant) {
-        return NamespaceString(boost::none,
-                               str::stream() << *tenant << '_' << NamespaceString::kAdminDb,
-                               NamespaceString::kSystemUsers);
+        return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemUsers);
     } else {
         return AuthorizationManager::usersCollectionNamespace;
     }
 }
 
-// TODO (SERVER-67423) Convert DBClient to accept DatabaseName type.
 NamespaceString rolesNSS(const boost::optional<TenantId>& tenant) {
     if (tenant) {
-        return NamespaceString(boost::none,
-                               str::stream() << *tenant << '_' << NamespaceString::kAdminDb,
-                               NamespaceString::kSystemRoles);
+        return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemRoles);
     } else {
         return AuthorizationManager::rolesCollectionNamespace;
     }
@@ -267,8 +249,7 @@ Status insertAuthzDocument(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const BSONObj& document) try {
     DBDirectClient client(opCtx);
-    write_ops::checkWriteErrors(
-        client.insert(write_ops::InsertCommandRequest(patchTenantNSS(nss), {document})));
+    write_ops::checkWriteErrors(client.insert(write_ops::InsertCommandRequest(nss, {document})));
     return Status::OK();
 } catch (const DBException& e) {
     return e.toStatus();
@@ -288,7 +269,7 @@ StatusWith<std::int64_t> updateAuthzDocuments(OperationContext* opCtx,
                                               bool multi) try {
     DBDirectClient client(opCtx);
     auto result = client.update([&] {
-        write_ops::UpdateCommandRequest updateOp(patchTenantNSS(nss));
+        write_ops::UpdateCommandRequest updateOp(nss);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(query);
@@ -349,7 +330,7 @@ StatusWith<std::int64_t> removeAuthzDocuments(OperationContext* opCtx,
                                               const BSONObj& query) try {
     DBDirectClient client(opCtx);
     auto result = client.remove([&] {
-        write_ops::DeleteCommandRequest deleteOp(patchTenantNSS(nss));
+        write_ops::DeleteCommandRequest deleteOp(nss);
         deleteOp.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
             entry.setQ(query);
@@ -754,11 +735,7 @@ public:
             as->grantInternalAuthorization(_client.get());
         }
 
-        if (tenant) {
-            _dbName = str::stream() << *tenant << '_' << kAdminDB;
-        } else {
-            _dbName = kAdminDB.toString();
-        }
+        _dbName = DatabaseName(tenant, kAdminDB);
 
         AlternativeClientRegion clientRegion(_client);
         _sessionInfo.setStartTransaction(true);
@@ -819,20 +796,7 @@ public:
 
 private:
     static bool validNamespace(const NamespaceString& nss) {
-        if (nss.dbName().db() == kAdminDB) {
-            return true;
-        }
-        if (gMultitenancySupport && !nss.tenantId()) {
-            // TODO (SERVER-67423) Convert DBClient to accept DatabaseName type.
-            try {
-                auto parsed =
-                    NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(nss.ns());
-                return parsed.dbName().db() == kAdminDB;
-            } catch (const DBException&) {
-            }
-        }
-
-        return false;
+        return (nss.dbName().db() == kAdminDB);
     }
 
     StatusWith<std::uint32_t> doCrudOp(BSONObj op) try {
@@ -891,7 +855,7 @@ private:
 
         auto svcCtx = _client->getServiceContext();
         auto sep = svcCtx->getServiceEntryPoint();
-        auto opMsgRequest = OpMsgRequest::fromDBAndBody(_dbName, cmdBuilder->obj());
+        auto opMsgRequest = OpMsgRequestBuilder::create(_dbName, cmdBuilder->obj());
         auto requestMessage = opMsgRequest.serialize();
 
         // Switch to our local client and create a short-lived opCtx for this transaction op.
@@ -910,7 +874,7 @@ private:
 
     bool _isReplSet;
     ServiceContext::UniqueClient _client;
-    std::string _dbName;
+    DatabaseName _dbName;
     OperationSessionInfoFromClient _sessionInfo;
     TransactionState _state = TransactionState::kInit;
 };
@@ -2296,7 +2260,7 @@ Status queryAuthzDocument(OperationContext* opCtx,
                           const BSONObj& projection,
                           const std::function<void(const BSONObj&)>& resultProcessor) try {
     DBDirectClient client(opCtx);
-    FindCommandRequest findRequest{patchTenantNSS(nss)};
+    FindCommandRequest findRequest{nss};
     findRequest.setFilter(query);
     findRequest.setProjection(projection);
     client.find(std::move(findRequest), resultProcessor);

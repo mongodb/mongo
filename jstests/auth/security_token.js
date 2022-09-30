@@ -42,7 +42,6 @@ function makeTokenAndExpect(user, db) {
 
 function runTest(conn, enabled, rst = undefined) {
     const admin = conn.getDB('admin');
-    const tenantAdmin = conn.getDB(tenantID.str + '_admin');
 
     // Must be authenticated as a user with ActionType::useTenant in order to use $tenant
     assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
@@ -51,6 +50,7 @@ function runTest(conn, enabled, rst = undefined) {
     // Create a tenant-local user.
     const createUserCmd =
         {createUser: 'user1', "$tenant": tenantID, pwd: 'pwd', roles: ['readWriteAnyDatabase']};
+    const countUserCmd = {count: "system.users", query: {user: 'user1'}, "$tenant": tenantID};
     if (enabled) {
         assert.commandWorked(admin.runCommand(createUserCmd));
 
@@ -59,9 +59,8 @@ function runTest(conn, enabled, rst = undefined) {
         assert.eq(admin.system.users.count({user: 'user1'}),
                   0,
                   'user1 should not exist on global users collection');
-        assert.eq(tenantAdmin.system.users.count({user: 'user1'}),
-                  1,
-                  'user1 should exist on tenant users collection');
+        const usersCount = assert.commandWorked(admin.runCommand(countUserCmd));
+        assert.eq(usersCount.n, 1, 'user1 should exist on tenant users collection');
     } else {
         assert.commandFailed(admin.runCommand(createUserCmd));
     }

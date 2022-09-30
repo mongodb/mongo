@@ -187,6 +187,42 @@ TEST_F(DBClientCursorTest, DBClientCursorCallsMetaDataReaderOncePerBatch) {
     ASSERT_EQ(2, numMetaRead);
 }
 
+TEST_F(DBClientCursorTest, DBClientCursorGetMoreWithTenant) {
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const TenantId tenantId(OID::gen());
+    const NamespaceString nss(tenantId, "test", "coll");
+    FindCommandRequest findCmd{nss};
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
+    cursor.setBatchSize(2);
+
+    // Set up mock 'find' response.
+    const long long cursorId = 42;
+    Message findResponseMsg = mockFindResponse(nss, cursorId, {docObj(1), docObj(2)});
+    conn.setCallResponse(findResponseMsg);
+
+    // Trigger a find command.
+    ASSERT(cursor.init());
+
+    // First batch from the initial find command.
+    ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
+    ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+    // Set a terminal getMore response with cursorId 0.
+    auto getMoreResponseMsg = mockGetMoreResponse(nss, 0, {docObj(3), docObj(4)});
+    conn.setCallResponse(getMoreResponseMsg);
+
+    // Trigger a subsequent getMore command.
+    ASSERT_TRUE(cursor.more());
+
+    // Second batch from the getMore command.
+    ASSERT_BSONOBJ_EQ(docObj(3), cursor.next());
+    ASSERT_BSONOBJ_EQ(docObj(4), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+    ASSERT_TRUE(cursor.isDead());
+}
+
 TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
 
     // Set up the DBClientCursor and a mock client connection.

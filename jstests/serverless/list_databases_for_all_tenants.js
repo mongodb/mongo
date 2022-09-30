@@ -37,13 +37,12 @@ function verifyNameOnly(listDatabasesOut) {
 
 // creates 'num' databases on 'conn', each belonging to a different tenant
 function createMultitenantDatabases(conn, tokenConn, num) {
-    let kTenant;
     let tenantIds = [];
     let expectedDatabases = [];
 
     for (let i = 0; i < num; i++) {
         // Randomly generate a tenantId
-        kTenant = ObjectId();
+        let kTenant = ObjectId();
         tenantIds.push(kTenant.str);
 
         // Create a user for kTenant and then set the security token on the connection.
@@ -135,10 +134,18 @@ function runTestCheckCmdOptions(mongod, tenantIds) {
     assert.eq(2, cmdRes.databases.length);
     verifySizeSum(cmdRes);
 
-    // Now return only the admin database.
+    // Now return the system admin database and tenants' admin databases.
     cmdRes = assert.commandWorked(
         adminDB.runCommand({listDatabasesForAllTenants: 1, filter: {name: "admin"}}));
-    assert.eq(1, cmdRes.databases.length);
+    assert.eq(1 + tenantIds.length, cmdRes.databases.length, tojson(cmdRes.databases));
+    verifySizeSum(cmdRes);
+
+    // Now return only one tenant admin database.
+    cmdRes = assert.commandWorked(adminDB.runCommand({
+        listDatabasesForAllTenants: 1,
+        filter: {name: "admin", tenantId: ObjectId(tenantIds[2])}
+    }));
+    assert.eq(1, cmdRes.databases.length, tojson(cmdRes.databases));
     verifySizeSum(cmdRes);
 
     // Now return only the names.

@@ -221,20 +221,6 @@ bool NamespaceString::isLegalClientSystemNS(
     const ServerGlobalParams::FeatureCompatibility& currentFCV) const {
     auto dbname = dbName().db();
 
-    NamespaceString parsedNSS;
-    if (gMultitenancySupport && !tenantId()) {
-        // TODO (SERVER-67423) Remove support for mangled dbname in isLegalClientSystemNS check
-        // Transitional support for accepting tenantId as a mangled database name.
-        try {
-            parsedNSS = parseFromStringExpectTenantIdInMultitenancyMode(ns());
-            if (parsedNSS.tenantId()) {
-                dbname = parsedNSS.dbName().db();
-            }
-        } catch (const DBException&) {
-            // Swallow exception.
-        }
-    }
-
     if (dbname == kAdminDb) {
         if (coll() == "system.roles")
             return true;

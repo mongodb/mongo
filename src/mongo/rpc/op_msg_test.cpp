@@ -43,7 +43,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
@@ -816,7 +818,7 @@ protected:
 };
 
 TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromSecurityToken) {
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     const auto kTenantId = TenantId(OID::gen());
     const auto token = makeSecurityToken(UserName("user", "admin", kTenantId));
@@ -845,7 +847,7 @@ TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromSecurityToken) {
 }
 
 TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromDollarTenant) {
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
 
     const auto kTenantId = TenantId(OID::gen());
@@ -870,7 +872,7 @@ TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromDollarTenant) {
 }
 
 TEST_F(OpMsgWithAuth, ValidatedTenancyScopeShouldNotBeSerialized) {
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
 
     const auto kTenantId = TenantId(OID::gen());
@@ -934,6 +936,44 @@ TEST(OpMsgRequest, GetDatabaseThrowsMissing) {
     ASSERT_THROWS(msg.getDatabase(), AssertionException);
 }
 
+TEST(OpMsgRequestBuilder, WithTenantInDatabaseName) {
+    const TenantId tenantId(OID::gen());
+    auto const body = fromjson("{ping: 1}");
+    OpMsgRequest msg = OpMsgRequestBuilder::create({tenantId, "testDb"}, body);
+    ASSERT_EQ(msg.body.getField("$tenant").eoo(), false);
+    ASSERT_EQ(TenantId::parseFromBSON(msg.body.getField("$tenant")), tenantId);
+}
+
+TEST(OpMsgRequestBuilder, WithSameTenantInBody) {
+    const TenantId tenantId(OID::gen());
+    auto const body = BSON("ping" << 1 << "$tenant" << tenantId);
+    OpMsgRequest msg = OpMsgRequestBuilder::create({tenantId, "testDb"}, body);
+    ASSERT_EQ(msg.body.getField("$tenant").eoo(), false);
+    ASSERT_EQ(TenantId::parseFromBSON(msg.body.getField("$tenant")), tenantId);
+}
+
+TEST(OpMsgRequestBuilder, FailWithDiffTenantInBody) {
+    const TenantId tenantId(OID::gen());
+    const TenantId otherTenantId(OID::gen());
+
+    auto const body = BSON("ping" << 1 << "$tenant" << tenantId);
+    ASSERT_THROWS_CODE(
+        OpMsgRequestBuilder::create({otherTenantId, "testDb"}, body), DBException, 8423373);
+}
+
+TEST(OpMsgRequestBuilder, FromDatabaseNameAndBodyDoesNotCopy) {
+    const TenantId tenantId(OID::gen());
+    auto body = fromjson("{ping: 1}");
+    const void* const bodyPtr = body.objdata();
+    auto msg = OpMsgRequestBuilder::create({tenantId, "db"}, std::move(body));
+
+    auto const newBody = BSON("ping" << 1 << "$db"
+                                     << "db"
+                                     << "$tenant" << tenantId);
+    ASSERT_BSONOBJ_EQ(msg.body, newBody);
+    ASSERT_EQ(static_cast<const void*>(msg.body.objdata()), bodyPtr);
+}
+
 TEST(OpMsgRequest, FromDbAndBodyDoesNotCopy) {
     auto body = fromjson("{ping: 1}");
     const void* const bodyPtr = body.objdata();
@@ -941,6 +981,52 @@ TEST(OpMsgRequest, FromDbAndBodyDoesNotCopy) {
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1, $db: 'db'}"));
     ASSERT_EQ(static_cast<const void*>(msg.body.objdata()), bodyPtr);
+}
+
+TEST(OpMsgRequest, SetDollarTenantHasSameTenant) {
+    const TenantId tenantId(OID::gen());
+    // Set $tenant on a OpMsgRequest which already has the same $tenant.
+    OpMsgRequest request;
+    request.body = BSON("ping" << 1 << "$tenant" << tenantId << "$db"
+                               << "testDb");
+    request.setDollarTenant(tenantId);
+
+    auto dollarTenant = request.body.getField("$tenant");
+    ASSERT(!dollarTenant.eoo());
+    ASSERT_EQ(TenantId::parseFromBSON(dollarTenant), tenantId);
+}
+
+TEST(OpMsgRequest, SetDollarTenantHasNoTenant) {
+    const TenantId tenantId(OID::gen());
+    // Set $tenant on a OpMsgRequest which has no $tenant.
+    OpMsgRequest request;
+    request.body = BSON("ping" << 1 << "$db"
+                               << "testDb");
+    request.setDollarTenant(tenantId);
+
+    auto dollarTenant = request.body.getField("$tenant");
+    ASSERT(!dollarTenant.eoo());
+    ASSERT_EQ(TenantId::parseFromBSON(dollarTenant), tenantId);
+}
+
+TEST(OpMsgRequest, SetDollarTenantFailWithDiffTenant) {
+    const TenantId tenantId(OID::gen());
+    auto const body = BSON("ping" << 1 << "$tenant" << tenantId);
+    auto request = OpMsgRequest::fromDBAndBody("testDb", body);
+    ASSERT_THROWS_CODE(request.setDollarTenant(TenantId(OID::gen())), DBException, 8423373);
+}
+
+TEST_F(OpMsgWithAuth, SetDollarTenantFailWithVTS) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
+
+    const auto kTenantId = TenantId(OID::gen());
+    const auto body = BSON("ping" << 1 << "$tenant" << kTenantId);
+    auto msg = OpMsgBytes{kNoFlags, kBodySection, body}.parse(client.get());
+    OpMsgRequest request(std::move(msg));
+
+    ASSERT(request.validatedTenancyScope);
+    ASSERT_THROWS_CODE(request.setDollarTenant(TenantId(OID::gen())), DBException, 8423372);
 }
 
 TEST(OpMsgTest, ChecksumResizesMessage) {

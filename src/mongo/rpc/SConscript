@@ -123,6 +123,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/signed_logical_time',
         '$BUILD_DIR/mongo/db/write_block_bypass',
         'client_metadata',
+        'message',
         'metadata_impersonated_user',
     ],
     LIBDEPS_PRIVATE=[

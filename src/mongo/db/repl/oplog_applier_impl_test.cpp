@@ -723,7 +723,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentInclud
 
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 
-    // TODO SERVER-67423: use docExists to check that the doc actually got inserted
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncorrectTenantId) {
@@ -744,8 +744,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncorr
         _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nssTenant2, false),
         ExceptionFor<ErrorCodes::NamespaceNotFound>);
 
-    // TODO SERVER-67423: use docExists to check that the doc still exists on nssTenant1, and does
-    // not exist on nssTenant2
+    ASSERT_FALSE(docExists(_opCtx.get(), nssTenant1, doc));
+    ASSERT_FALSE(docExists(_opCtx.get(), nssTenant2, doc));
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncludesTenantId) {
@@ -769,11 +769,11 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentInclud
 
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 
-    // TODO SERVER-67423: use docExists to check that the doc actually got deleted
+    // Check that the doc actually got deleted.
+    ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
 }
 
-TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,  // see TODO SERVER-67423 below
-       applyOplogEntryOrGroupedInsertsDeleteDocumentIncorrectTenantId) {
+TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncorrectTenantId) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     const auto commonNss("test.t"_sd);
@@ -788,16 +788,10 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,  // see TODO SERVER-674
 
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nssTenant2, boost::none);
 
-    ASSERT_THROWS(
-        _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nssTenant2, false),
-        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nssTenant2, false);
 
-    // TODO SERVER-67423: use docExists to check that the doc still exists on nssTenant1, and does
-    // not exist on nssTenant2. Also, we are using OplogApplierImplTestEnableSteadyStateConstraints
-    // because according to OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon not enabling
-    // steady state constraints allows the delete to fail silently.  While updating SERVER-67423, we
-    // can instead use docExists to check the results of the deletion rather than rely on the
-    // exception
+    ASSERT_TRUE(docExists(_opCtx.get(), nssTenant1, doc));
+    ASSERT_FALSE(docExists(_opCtx.get(), nssTenant2, doc));
 }
 
 // Steady state constraints are required for secondaries in order to avoid turning an insert into an
@@ -848,7 +842,9 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentInclud
 
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 
-    // TODO SERVER-67423: use docExists to check that the doc exists in its new updated form
+    // Check that the doc exists in its new updated form.
+    BSONObj updatedDoc = BSON("_id" << 0 << "a" << 1);
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, updatedDoc));
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncorrectTenantId) {
@@ -875,8 +871,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncorr
         _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nssTenant2, true),
         ExceptionFor<ErrorCodes::NamespaceNotFound>);
 
-    // TODO SERVER-67423: use docExists to check that the original doc still exists on nssTenant1,
-    // and no doc exists on nssTenant2
+    ASSERT_TRUE(docExists(_opCtx.get(), nssTenant1, doc));
+    ASSERT_FALSE(docExists(_opCtx.get(), nssTenant2, doc));
 }
 
 class MultiOplogEntryOplogApplierImplTest : public OplogApplierImplTest {

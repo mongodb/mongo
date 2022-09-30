@@ -54,7 +54,7 @@ TEST(DatabaseNameTest, MultitenancySupportDisabled) {
 
 TEST(DatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
     // TODO SERVER-62114 remove this test case.
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     DatabaseName dbnWithoutTenant(boost::none, "a");
     ASSERT(!dbnWithoutTenant.tenantId());
@@ -74,13 +74,13 @@ TEST(DatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
 // TODO SERVER-65457 Re-enable these tests
 
 DEATH_TEST(DatabaseNameTest, TenantIDRequiredNoTenantIdAssigned, "invariant") {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     DatabaseName dbnWithoutTenant(boost::none, "a");
 }
 
 TEST(DatabaseNameTest, TenantIDRequiredBasic) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     // TODO SERVER-62114 Remove enabling this feature flag.
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 

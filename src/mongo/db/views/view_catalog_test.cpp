@@ -759,7 +759,7 @@ public:
 };
 
 TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeatureFlagOff) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     const NamespaceString viewName(db()->name(), "view");
     const NamespaceString viewOn(db()->name(), "coll");
 
@@ -771,7 +771,7 @@ TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeature
 }
 
 TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeatureFlagOn) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     const NamespaceString viewName(db()->name(), "view");
     const NamespaceString viewOn(db()->name(), "coll");
@@ -784,7 +784,7 @@ TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeature
 }
 
 TEST_F(ServerlessViewCatalogFixture, ModifyViewBelongingToTenantFeatureFlagOff) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     const NamespaceString viewName(db()->name(), "db1.view");
     const NamespaceString viewOn(db()->name(), "db2.coll");
 
@@ -799,7 +799,7 @@ TEST_F(ServerlessViewCatalogFixture, ModifyViewBelongingToTenantFeatureFlagOff) 
 }
 
 TEST_F(ServerlessViewCatalogFixture, ModifyViewBelongingToTenantFeatureFlagOn) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     const NamespaceString viewName(db()->name(), "db1.view");
     const NamespaceString viewOn(db()->name(), "db2.coll");
