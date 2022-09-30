@@ -2909,7 +2909,43 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionSubtract* expr) final {
-        unsupportedExpression(expr->getOpName());
+        invariant(expr->getChildren().size() == 2);
+        _context->ensureArity(2);
+
+        auto rhs = _context->popExpr();
+        auto lhs = _context->popExpr();
+
+        auto frameId = _context->state.frameId();
+        auto binds = sbe::makeEs(std::move(lhs), std::move(rhs));
+        sbe::EVariable lhsRef{frameId, 0};
+        sbe::EVariable rhsRef{frameId, 1};
+
+        auto checkNullArguments = makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                               generateNullOrMissing(lhsRef.clone()),
+                                               generateNullOrMissing(rhsRef.clone()));
+
+        auto checkArgumentTypes = makeNot(sbe::makeE<sbe::EIf>(
+            makeFunction("isNumber", lhsRef.clone()),
+            makeFunction("isNumber", rhsRef.clone()),
+            makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                         makeFunction("isDate", lhsRef.clone()),
+                         makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                      makeFunction("isNumber", rhsRef.clone()),
+                                      makeFunction("isDate", rhsRef.clone())))));
+
+        auto subtractOp = makeBinaryOp(sbe::EPrimBinary::sub, lhsRef.clone(), rhsRef.clone());
+        auto subtractExpr = buildMultiBranchConditional(
+            CaseValuePair{std::move(checkNullArguments),
+                          makeConstant(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{
+                std::move(checkArgumentTypes),
+                makeFail(5156200,
+                         "Only numbers and dates are allowed in an $subtract expression. To "
+                         "subtract a number from a date, the date must be the first argument.")},
+            std::move(subtractOp));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(subtractExpr)));
     }
     void visit(const ExpressionSwitch* expr) final {
         visitConditionalExpression(expr);

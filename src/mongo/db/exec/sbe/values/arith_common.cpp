@@ -236,7 +236,7 @@ FastTuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeTa
         } else {
             int64_t result;
             if (!Op::doOperation(
-                    bitcastTo<int64_t>(lhsValue), bitcastTo<int64_t>(lhsValue), result)) {
+                    bitcastTo<int64_t>(lhsValue), bitcastTo<int64_t>(rhsValue), result)) {
                 return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
             }
         }

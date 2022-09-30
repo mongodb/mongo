@@ -3258,9 +3258,7 @@ public:
     static StatusWith<Value> apply(Value lhs, Value rhs);
 
     explicit ExpressionSubtract(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx) {}
     ExpressionSubtract(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx, std::move(children)) {}
 
