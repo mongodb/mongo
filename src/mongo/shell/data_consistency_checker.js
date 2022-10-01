@@ -104,7 +104,7 @@ var {DataConsistencyChecker} = (function() {
         }
 
         hasNext() {
-            return this.cursor.hasNext();
+            return this.stashedDoc !== undefined || this.cursor.hasNext();
         }
 
         peekNext() {
