@@ -226,7 +226,7 @@ protected:
         _mockCatalogCacheLoader->setCollectionRefreshValues(
             env.tempNss, coll, createChunks(env.version.epoch(), "y"), boost::none);
 
-        forceDatabaseRefresh(opCtx, kNss.db());
+        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kNss.db(), boost::none));
         forceShardFilteringMetadataRefresh(opCtx, kNss);
 
         if (refreshTempNss)

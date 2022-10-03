@@ -121,10 +121,12 @@ std::shared_ptr<DatabaseShardingState> DatabaseShardingState::getSharedForLockFr
 }
 
 void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
-                                                             DSSLock&,
+                                                             DSSLock& dssLock,
                                                              const BSONObj& reason) {
     invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
     _critSec.enterCriticalSectionCatchUpPhase(reason);
+
+    cancelDbMetadataRefresh(dssLock);
 }
 
 void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx,
@@ -217,6 +219,29 @@ void DatabaseShardingState::clearMovePrimarySourceManager(OperationContext* opCt
     invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
     const auto dssLock = DSSLock::lockExclusive(opCtx, this);
     _sourceMgr = nullptr;
+}
+
+void DatabaseShardingState::setDbMetadataRefreshFuture(SharedSemiFuture<void> future,
+                                                       CancellationSource cancellationSource,
+                                                       const DSSLock&) {
+    invariant(!_dbMetadataRefresh);
+    _dbMetadataRefresh.emplace(std::move(future), std::move(cancellationSource));
+}
+
+boost::optional<SharedSemiFuture<void>> DatabaseShardingState::getDbMetadataRefreshFuture(
+    const DSSLock&) const {
+    return _dbMetadataRefresh ? boost::optional<SharedSemiFuture<void>>(_dbMetadataRefresh->future)
+                              : boost::none;
+}
+
+void DatabaseShardingState::resetDbMetadataRefreshFuture(const DSSLock&) {
+    _dbMetadataRefresh = boost::none;
+}
+
+void DatabaseShardingState::cancelDbMetadataRefresh(const DSSLock&) {
+    if (_dbMetadataRefresh) {
+        _dbMetadataRefresh->cancellationSource.cancel();
+    }
 }
 
 }  // namespace mongo

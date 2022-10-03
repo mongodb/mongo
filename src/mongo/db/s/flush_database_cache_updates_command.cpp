@@ -191,7 +191,7 @@ public:
                             "Forcing remote routing table refresh for {db}",
                             "Forcing remote routing table refresh",
                             "db"_attr = _dbName());
-                forceDatabaseRefresh(opCtx, _dbName());
+                uassertStatusOK(onDbVersionMismatchNoExcept(opCtx, _dbName(), boost::none));
             }
 
             CatalogCacheLoader::get(opCtx).waitForDatabaseFlush(opCtx, _dbName());

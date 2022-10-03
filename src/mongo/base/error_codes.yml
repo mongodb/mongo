@@ -450,6 +450,8 @@ error_codes:
 
     - {code: 360, name: ShardVersionRefreshCanceled, categories: [InternalOnly]}
 
+    - {code: 379, name: DatabaseMetadataRefreshCanceled, categories: [InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

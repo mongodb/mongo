@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
@@ -58,10 +59,178 @@ MONGO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
 
 namespace {
+
+/**
+ * If the critical section associate with the database is entered by another thread (e.g., a move
+ * primary or a drop database is in progress), it releases the acquired locks and waits for the
+ * latter to exit. In this case the function returns true, otherwise false.
+ */
+bool checkAndWaitIfCriticalSectionIsEntered(
+    OperationContext* opCtx,
+    DatabaseShardingState* dss,
+    boost::optional<Lock::DBLock>& dbLock,
+    boost::optional<DatabaseShardingState::DSSLock>& dssLock) {
+    invariant(dbLock);
+    invariant(dssLock);
+
+    if (auto critSect =
+            dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead, *dssLock)) {
+        LOGV2_DEBUG(6697201,
+                    2,
+                    "Waiting for exit from the critical section",
+                    "db"_attr = dss->getDbName(),
+                    "reason"_attr = dss->getCriticalSectionReason(*dssLock));
+
+        dbLock = boost::none;
+        dssLock = boost::none;
+
+        // If we are in a transaction, limit the time we can wait behind the critical section. This
+        // is needed in order to prevent distributed deadlocks in situations where a DDL operation
+        // needs to acquire the critical section on several shards. In that case, a shard running a
+        // transaction could be waiting for the critical section to be exited, while on another
+        // shard the transaction has already executed some statement and stashed locks which prevent
+        // the critical section from being acquired in that node. Limiting the wait behind the
+        // critical section will ensure that the transaction will eventually get aborted.
+        const auto deadLine = opCtx->inMultiDocumentTransaction()
+            ? opCtx->getServiceContext()->getFastClockSource()->now() +
+                Milliseconds(metadataRefreshInTransactionMaxWaitBehindCritSecMS.load())
+            : Date_t::max();
+        opCtx->runWithDeadline(
+            deadLine, ErrorCodes::ExceededTimeLimit, [&] { critSect->get(opCtx); });
+
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * If another thread is refreshing the database metadata, it releases the acquired locks and waits
+ * for that refresh to complete. In this case the function returns true, otherwise false.
+ */
+bool checkAndWaitIfAnotherRefreshIsRunning(
+    OperationContext* opCtx,
+    DatabaseShardingState* dss,
+    boost::optional<Lock::DBLock>& dbLock,
+    boost::optional<DatabaseShardingState::DSSLock>& dssLock) {
+    invariant(dbLock);
+    invariant(dssLock);
+
+    if (auto refreshVersionFuture = dss->getDbMetadataRefreshFuture(*dssLock)) {
+        LOGV2_DEBUG(6697202,
+                    2,
+                    "Waiting for completion of another database metadata refresh",
+                    "db"_attr = dss->getDbName());
+
+        dbLock = boost::none;
+        dssLock = boost::none;
+
+        try {
+            refreshVersionFuture->get(opCtx);
+        } catch (const ExceptionFor<ErrorCodes::DatabaseMetadataRefreshCanceled>&) {
+            // The refresh was canceled by another thread that entered the critical section.
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Unconditionally refreshes the database metadata from the config server.
+ *
+ * NOTE: Does network I/O and acquires the database lock in X mode.
+ */
+Status refreshDbMetadata(OperationContext* opCtx,
+                         const StringData& dbName,
+                         const CancellationToken& cancellationToken) {
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(!opCtx->getClient()->isInDirectClient());
+    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
+
+    auto resetRefreshFutureOnError = makeGuard([&] {
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+        Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+        auto* dss = DatabaseShardingState::get(opCtx, dbName);
+        const auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
+
+        dss->resetDbMetadataRefreshFuture(dssLock);
+    });
+
+    // Force a refresh of the cached database metadata from the config server.
+    const auto swDbMetadata =
+        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName);
+
+    Lock::DBLock dbLock(opCtx, dbName, MODE_X);
+    auto* dss = DatabaseShardingState::get(opCtx, dbName);
+    auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
+
+    if (!cancellationToken.isCanceled()) {
+        if (swDbMetadata.isOK()) {
+            // Set the refreshed database metadata.
+            dss->setDatabaseInfo(opCtx, swDbMetadata.getValue().getDatabaseType(), dssLock);
+        } else if (swDbMetadata == ErrorCodes::NamespaceNotFound) {
+            // The database has been dropped, so clear its metadata.
+            dss->clearDatabaseInfo(opCtx);
+        }
+    }
+
+    // Reset the future reference to allow any other thread to refresh the database metadata.
+    dss->resetDbMetadataRefreshFuture(dssLock);
+    resetRefreshFutureOnError.dismiss();
+
+    return swDbMetadata.getStatus();
+}
+
+SharedSemiFuture<void> asyncDbMetadataRefresh(OperationContext* opCtx,
+                                              const StringData& dbName,
+                                              const CancellationToken& cancellationToken) {
+    const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    return ExecutorFuture<void>(executor)
+        .then([=,
+               serviceCtx = opCtx->getServiceContext(),
+               forwardableOpMetadata = ForwardableOperationMetadata(opCtx),
+               dbNameStr = dbName.toString()] {
+            ThreadClient tc("DbMetadataRefreshThread", serviceCtx);
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillableByStepdown(lk);
+            }
+
+            const auto opCtxHolder =
+                CancelableOperationContext(tc->makeOperationContext(), cancellationToken, executor);
+            auto opCtx = opCtxHolder.get();
+
+            // Forward `users` and `roles` attributes from the original request.
+            forwardableOpMetadata.setOn(opCtx);
+
+            LOGV2_DEBUG(6697203, 2, "Started database metadata refresh", "db"_attr = dbNameStr);
+
+            return refreshDbMetadata(opCtx, dbNameStr, cancellationToken);
+        })
+        .onCompletion([=, dbNameStr = dbName.toString()](Status status) {
+            uassert(ErrorCodes::DatabaseMetadataRefreshCanceled,
+                    str::stream() << "Canceled metadata refresh for database " << dbNameStr,
+                    !cancellationToken.isCanceled());
+
+            if (status.isOK()) {
+                LOGV2(6697204, "Refreshed database metadata", "db"_attr = dbNameStr);
+            } else {
+                LOGV2_ERROR(6697205,
+                            "Failed database metadata refresh",
+                            "db"_attr = dbNameStr,
+                            "error"_attr = redact(status));
+            }
+        })
+        .semi()
+        .share();
+}
+
 void onDbVersionMismatch(OperationContext* opCtx,
                          const StringData dbName,
-                         const DatabaseVersion& clientDbVersion,
-                         const boost::optional<DatabaseVersion>& serverDbVersion) {
+                         const boost::optional<DatabaseVersion> receivedVersion) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
@@ -71,33 +240,97 @@ void onDbVersionMismatch(OperationContext* opCtx,
             "Can't check version of {} database"_format(dbName),
             dbName != NamespaceString::kAdminDb && dbName != NamespaceString::kConfigDb);
 
-    if (serverDbVersion) {
-        // Do not reorder these two statements! if the comparison is done through epochs, the
-        // construction order matters: we are pessimistically assuming that the client version
-        // is newer when they have different uuids
-        const ComparableDatabaseVersion comparableServerDbVersion =
-            ComparableDatabaseVersion::makeComparableDatabaseVersion(*serverDbVersion);
-        const ComparableDatabaseVersion comparableClientDbVersion =
-            ComparableDatabaseVersion::makeComparableDatabaseVersion(clientDbVersion);
+    LOGV2_DEBUG(6697200,
+                2,
+                "Handle database version mismatch",
+                "db"_attr = dbName,
+                "receivedVersion"_attr = receivedVersion);
 
-        if (comparableClientDbVersion < comparableServerDbVersion ||
-            (comparableClientDbVersion == comparableServerDbVersion &&
-             clientDbVersion.getTimestamp() == serverDbVersion->getTimestamp())) {
-            // The client was stale; do not trigger server-side refresh.
-            return;
+    while (true) {
+        boost::optional<SharedSemiFuture<void>> dbMetadataRefreshFuture;
+
+        // Set the database metadata refresh future after waiting for another thread to exit from
+        // the critical section or to complete an ongoing refresh.
+        {
+            auto dbLock = boost::make_optional(Lock::DBLock(opCtx, dbName, MODE_IS));
+            auto* dss = DatabaseShardingState::get(opCtx, dbName);
+
+            if (receivedVersion) {
+                auto dssLock =
+                    boost::make_optional(DatabaseShardingState::DSSLock::lockShared(opCtx, dss));
+
+                if (checkAndWaitIfCriticalSectionIsEntered(opCtx, dss, dbLock, dssLock) ||
+                    checkAndWaitIfAnotherRefreshIsRunning(opCtx, dss, dbLock, dssLock)) {
+                    // Waited for another thread to exit from the critical section or to complete an
+                    // ongoing refresh, so reacquire the locks.
+                    continue;
+                }
+
+                // From now until the end of this block [1] no thread is in the critical section or
+                // can enter it (would require to X-lock the database) and [2] no metadata refresh
+                // is in progress or can start (would require to exclusive lock the DSS).
+                // Therefore, the database version can be accessed safely.
+
+                const auto wantedVersion = dss->getDbVersion(opCtx, *dssLock);
+
+                // Do not reorder these two statements! If the comparison is done through epochs,
+                // the construction order matters: we are pessimistically assuming that the client
+                // version is newer when they have different UUIDs.
+                const ComparableDatabaseVersion comparableWantedDbVersion =
+                    ComparableDatabaseVersion::makeComparableDatabaseVersion(wantedVersion);
+                const ComparableDatabaseVersion comparableReceivedDbVersion =
+                    ComparableDatabaseVersion::makeComparableDatabaseVersion(receivedVersion);
+
+                if (comparableReceivedDbVersion < comparableWantedDbVersion ||
+                    (comparableReceivedDbVersion == comparableWantedDbVersion &&
+                     receivedVersion->getTimestamp() == wantedVersion->getTimestamp())) {
+                    // No need to refresh the database metadata as the wanted version is newer than
+                    // the one received.
+                    return;
+                }
+            }
+
+            if (MONGO_unlikely(skipDatabaseVersionMetadataRefresh.shouldFail())) {
+                return;
+            }
+
+            auto dssLock =
+                boost::make_optional(DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss));
+
+            if (checkAndWaitIfCriticalSectionIsEntered(opCtx, dss, dbLock, dssLock) ||
+                checkAndWaitIfAnotherRefreshIsRunning(opCtx, dss, dbLock, dssLock)) {
+                // Waited for another thread to exit from the critical section or to complete an
+                // ongoing refresh, so reacquire the locks.
+                continue;
+            }
+
+            // From now until the end of this block [1] no thread is in the critical section or can
+            // enter it (would require to X-lock the database) and [2] this is the only metadata
+            // refresh in progress (holding the exclusive lock on the DSS).
+            // Therefore, the future to refresh the database metadata can be set.
+
+            CancellationSource cancellationSource;
+            CancellationToken cancellationToken = cancellationSource.token();
+            dss->setDbMetadataRefreshFuture(
+                asyncDbMetadataRefresh(opCtx, dbName, cancellationToken),
+                std::move(cancellationSource),
+                *dssLock);
+            dbMetadataRefreshFuture = dss->getDbMetadataRefreshFuture(*dssLock);
         }
+
+        // No other metadata refresh for this database can run in parallel. If another thread enters
+        // the critical section, the ongoing refresh would be interrupted and subsequently
+        // re-queued.
+
+        try {
+            dbMetadataRefreshFuture->get(opCtx);
+        } catch (const ExceptionFor<ErrorCodes::DatabaseMetadataRefreshCanceled>&) {
+            // The refresh was canceled by another thread that entered the critical section.
+            continue;
+        }
+
+        break;
     }
-
-    // Ensure any ongoing movePrimary's have completed before trying to do the refresh. This wait is
-    // just an optimization so that mongos does not exhaust its maximum number of
-    // StaleDatabaseVersion retry attempts while the movePrimary is being committed.
-    OperationShardingState::get(opCtx).waitForMovePrimaryCriticalSectionSignal(opCtx);
-
-    if (MONGO_unlikely(skipDatabaseVersionMetadataRefresh.shouldFail())) {
-        return;
-    }
-
-    forceDatabaseRefresh(opCtx, dbName);
 }
 
 // Return true if joins a shard version update/recover/refresh (in that case, all locks are dropped)
@@ -571,10 +804,9 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
 Status onDbVersionMismatchNoExcept(
     OperationContext* opCtx,
     const StringData dbName,
-    const DatabaseVersion& clientDbVersion,
-    const boost::optional<DatabaseVersion>& serverDbVersion) noexcept {
+    const boost::optional<DatabaseVersion> clientDbVersion) noexcept {
     try {
-        onDbVersionMismatch(opCtx, dbName, clientDbVersion, serverDbVersion);
+        onDbVersionMismatch(opCtx, dbName, clientDbVersion);
         return Status::OK();
     } catch (const DBException& ex) {
         LOGV2(22065,
@@ -584,70 +816,6 @@ Status onDbVersionMismatchNoExcept(
               "error"_attr = redact(ex));
         return ex.toStatus();
     }
-}
-
-void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->getClient()->isInDirectClient());
-
-    auto const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->canAcceptShardedCommands());
-
-    const auto swRefreshedDbInfo =
-        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName);
-
-    if (swRefreshedDbInfo == ErrorCodes::NamespaceNotFound) {
-        // db has been dropped, set the db version to boost::none
-        Lock::DBLock dbLock(opCtx, dbName, MODE_X);
-        auto dss = DatabaseShardingState::get(opCtx, dbName);
-        dss->clearDatabaseInfo(opCtx);
-        return;
-    }
-
-    auto refreshedDbInfo = uassertStatusOK(std::move(swRefreshedDbInfo));
-    const auto refreshedDBVersion = refreshedDbInfo.databaseVersion();
-
-    // First, check under a shared lock if another thread already updated the cached version.
-    // This is a best-effort optimization to make as few threads as possible to convoy on the
-    // exclusive lock below.
-    {
-        // Take the DBLock directly rather than using AutoGetDb, to prevent a recursive call
-        // into checkDbVersion().
-        Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-        auto dss = DatabaseShardingState::get(opCtx, dbName);
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-
-        const auto cachedDbVersion = dss->getDbVersion(opCtx, dssLock);
-        if (cachedDbVersion) {
-            // Do not reorder these two statements! if the comparison is done through epochs, the
-            // construction order matters: we are pessimistically assuming that the refreshed
-            // version is newer when they have different uuids
-            const ComparableDatabaseVersion comparableCachedDbVersion =
-                ComparableDatabaseVersion::makeComparableDatabaseVersion(*cachedDbVersion);
-            const ComparableDatabaseVersion comparableRefreshedDbVersion =
-                ComparableDatabaseVersion::makeComparableDatabaseVersion(refreshedDBVersion);
-
-            if (comparableRefreshedDbVersion < comparableCachedDbVersion ||
-                (comparableRefreshedDbVersion == comparableCachedDbVersion &&
-                 cachedDbVersion->getTimestamp() == refreshedDBVersion.getTimestamp())) {
-                LOGV2_DEBUG(5369130,
-                            2,
-                            "Skipping updating cached database info from refreshed version "
-                            "because the one currently cached is more recent",
-                            "db"_attr = dbName,
-                            "refreshedDbVersion"_attr = refreshedDbInfo.databaseVersion(),
-                            "cachedDbVersion"_attr = cachedDbVersion.get());
-                return;
-            }
-        }
-    }
-
-    // The cached version is older than the refreshed version; update the cached version.
-    Lock::DBLock dbLock(opCtx, dbName, MODE_X);
-    auto dss = DatabaseShardingState::get(opCtx, dbName);
-    auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
-
-    dss->setDatabaseInfo(opCtx, refreshedDbInfo.getDatabaseType(), dssLock);
 }
 
 }  // namespace mongo

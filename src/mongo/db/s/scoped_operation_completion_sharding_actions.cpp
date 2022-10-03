@@ -87,10 +87,8 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
                   "Failed to handle stale version exception as part of the current operation",
                   "error"_attr = redact(handleMismatchStatus));
     } else if (auto staleInfo = status->extraInfo<StaleDbRoutingVersion>()) {
-        auto handleMismatchStatus = onDbVersionMismatchNoExcept(_opCtx,
-                                                                staleInfo->getDb(),
-                                                                staleInfo->getVersionReceived(),
-                                                                staleInfo->getVersionWanted());
+        auto handleMismatchStatus = onDbVersionMismatchNoExcept(
+            _opCtx, staleInfo->getDb(), staleInfo->getVersionReceived());
         if (!handleMismatchStatus.isOK())
             LOGV2(22054,
                   "Failed to handle database version exception as part of the current operation: "
