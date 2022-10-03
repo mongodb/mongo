@@ -57,6 +57,7 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: .stitch
   - name: .crypt
+  - name: test_packages
   - name: .publish_crypt
     distros:
     - rhel70-small
@@ -121,6 +122,7 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: .stitch
   - name: .crypt
+  - name: test_packages
   - name: .publish_crypt
     distros:
     - rhel70-small
@@ -184,6 +186,7 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: .stitch
   - name: .crypt
+  - name: test_packages
   - name: .publish_crypt
     distros:
     - rhel80-small

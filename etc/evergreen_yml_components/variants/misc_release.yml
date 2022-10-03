@@ -292,8 +292,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -425,8 +423,6 @@ buildvariants:
     distros:
     - amazon2-arm64-large
   - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -777,6 +773,9 @@ buildvariants:
   - name: jsCore
   - name: sharding_gen
   - name: replica_sets_gen
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
 
 - name: rhel80
   display_name: RHEL 8.0
@@ -1071,8 +1070,6 @@ buildvariants:
     - rhel82-arm64-large
   - name: .publish_crypt
   - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -1369,6 +1366,9 @@ buildvariants:
   - name: .publish
     distros:
     - suse15-small
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: suse15
@@ -1423,6 +1423,9 @@ buildvariants:
   - name: .publish
     distros:
     - suse15-small
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
   - name: generate_buildid_to_debug_symbols_mapping
 
 
@@ -1634,8 +1637,6 @@ buildvariants:
     distros:
     - ubuntu1804-test
   - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -1675,8 +1676,6 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -1789,6 +1788,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
+  - name: test_packages_complete
   - name: .publish
     distros:
     - ubuntu2004-small
@@ -1983,8 +1983,6 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: test_packages
-    distros:
-    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu2004-test
@@ -2022,8 +2020,7 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: test_packages
-    distros:
-    - ubuntu2004-package
+  - name: test_packages_complete
   - name: .publish
     distros:
     - ubuntu2004-test
