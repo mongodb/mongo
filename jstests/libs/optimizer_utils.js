@@ -53,7 +53,7 @@ function leftmostLeafStage(node) {
 /**
  * Get a very simplified version of a plan, which only includes nodeType and nesting structure.
  */
-function getPlanSkeleton(node) {
+function getPlanSkeleton(node, recursiveKeepKeys = [], addToKeepKeys = []) {
     const keepKeys = [
         'nodeType',
 
@@ -64,16 +64,23 @@ function getPlanSkeleton(node) {
         'children',
         'leftChild',
         'rightChild',
-    ];
+    ].concat(addToKeepKeys);
 
     if (Array.isArray(node)) {
         return node.map(n => getPlanSkeleton(n));
     } else if (node === null || typeof node !== 'object') {
         return node;
     } else {
-        return Object.fromEntries(Object.keys(node)
-                                      .filter(key => keepKeys.includes(key))
-                                      .map(key => [key, getPlanSkeleton(node[key])]));
+        return Object.fromEntries(
+            Object.keys(node)
+                .filter(key => (keepKeys.includes(key) || recursiveKeepKeys.includes(key)))
+                .map(key => {
+                    if (recursiveKeepKeys.includes(key)) {
+                        return [key, node[key]];
+                    } else {
+                        return [key, getPlanSkeleton(node[key], recursiveKeepKeys, addToKeepKeys)];
+                    }
+                }));
     }
 }
 

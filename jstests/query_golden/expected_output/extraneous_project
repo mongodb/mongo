@@ -1,0 +1,63 @@
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "username" : "/^user8/" } }, { "$project" : { "username" : 1 } }, { "$group" : { "_id" : 1, "count" : { "$sum" : 1 } } } ]
+[jsTest] ----
+
+
+nReturned: 0
+Plan skeleton: {
+	"queryPlanner" : {
+		"winningPlan" : {
+			"optimizerPlan" : {
+				"nodeType" : "Root",
+				"child" : {
+					"nodeType" : "Evaluation",
+					"child" : {
+						"nodeType" : "GroupBy",
+						"child" : {
+							"nodeType" : "Evaluation",
+							"child" : {
+								"nodeType" : "Filter",
+								"child" : {
+									"nodeType" : "PhysicalScan"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "username" : "/^user8/" } }, { "$group" : { "_id" : 1, "count" : { "$sum" : 1 } } } ]
+[jsTest] ----
+
+
+nReturned: 0
+Plan skeleton: {
+	"queryPlanner" : {
+		"winningPlan" : {
+			"optimizerPlan" : {
+				"nodeType" : "Root",
+				"child" : {
+					"nodeType" : "Evaluation",
+					"child" : {
+						"nodeType" : "GroupBy",
+						"child" : {
+							"nodeType" : "Evaluation",
+							"child" : {
+								"nodeType" : "Filter",
+								"child" : {
+									"nodeType" : "PhysicalScan"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
