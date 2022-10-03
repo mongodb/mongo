@@ -13,7 +13,7 @@ The following C++ unit tests exercise relevant parts of the codebase:
 - algebra_test (src/mongo/db/query/optimizer/algebra/)
 - db_pipeline_test (src/mongo/db/pipeline/)
 - - This test suite includes many unrelated test cases, but
-    'abt/pipeline_test.cpp' is the relevant one.
+    'abt/abt_translation_test.cpp' and 'abt/abt_optimization_test.cpp' are the relevant ones.
 - optimizer_test (src/mongo/db/query/optimizer/)
 - sbe_abt_test (src/mongo/db/exec/sbe/abt/)
 
@@ -34,6 +34,7 @@ exercising this codebase:
     [buildscripts/resmokeconfig/suites/cqf_disabled_pipeline_opt.yml](/buildscripts/resmokeconfig/suites/cqf_disabled_pipeline_opt.yml)
 - **cqf_parallel**: [buildscripts/resmokeconfig/suites/cqf_parallel.yml](/buildscripts/resmokeconfig/suites/cqf_parallel.yml)
 - **cqf_passthrough**: [buildscripts/resmokeconfig/suites/cqf_passthrough.yml](/buildscripts/resmokeconfig/suites/cqf_passthrough.yml)
+- **query_golden_cqf**: [buildscripts/resmokeconfig/suites/query_golden_cqf.yml](/buildscripts/resmokeconfig/suites/query_golden_cqf.yml)
 
 Desriptions of these suites can be found in
 [buildscripts/resmokeconfig/evg_task_doc/evg_task_doc.yml](/buildscripts/resmokeconfig/evg_task_doc/evg_task_doc.yml).
@@ -42,13 +43,13 @@ You may run these like so, adjusting the `-j` flag for the appropriate level of
 parallel execution for your machine.
 ```
 ./buildscripts/resmoke.py run -j4 \
- --suites=cqf,cqf_disabled_pipeline_opt,cqf_parallel,cqf_passthrough
+ --suites=cqf,cqf_disabled_pipeline_opt,cqf_parallel,cqf_passthrough,query_golden_cqf
 ```
 
 cqf_passthrough takes the longest to run by far, so this command may be more
 useful for a quicker signal:
 ```
-./buildscripts/resmoke.py run --suites=cqf,cqf_disabled_pipeline_opt,cqf_parallel -j4
+./buildscripts/resmoke.py run --suites=cqf,cqf_disabled_pipeline_opt,cqf_parallel,query_golden_cqf -j4
 ```
 
 ## Local Testing Recommendation
@@ -58,10 +59,10 @@ ninja <FLAGS> install-devcore build/install/bin/algebra_test \
 build/install/bin/db_pipeline_test build/install/bin/optimizer_test \
 build/install/bin/sbe_abt_test \
 && ./build/install/bin/algebra_test \
-&& ./build/install/bin/db_pipeline_test --fileNameFilter=pipeline_test.cpp \
+&& ./build/install/bin/db_pipeline_test --fileNameFilter=abt/.* \
 && ./build/install/bin/optimizer_test \
 && ./build/install/bin/sbe_abt_test \
-&& ./buildscripts/resmoke.py run --suites=cqf,cqf_parallel,cqf_disabled_pipeline_opt -j4
+&& ./buildscripts/resmoke.py run --suites=cqf,cqf_parallel,cqf_disabled_pipeline_opt,query_golden_cqf -j4
 ```
 **Note:** You may need to adjust the path to the unit test binary targets if your
 SCons install directory is something more like `build/opt/install/bin`.
