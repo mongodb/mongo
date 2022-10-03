@@ -1,0 +1,46 @@
+%YAML 1.2
+--- |
+  # Copyright 2015 gRPC authors.
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  #     http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+
+  <%include file="../../python_debian11.include"/>
+  <%include file="../../cxx_deps.include"/>
+
+  #========================
+  # Sanity test dependencies
+
+  RUN apt-get update && apt-get install -y ${"\\"}
+        autoconf ${"\\"}
+        automake ${"\\"}
+        libtool ${"\\"}
+        curl ${"\\"}
+        shellcheck
+  RUN python2 -m pip install simplejson mako virtualenv==16.7.9 lxml
+  RUN python3 -m pip install simplejson mako virtualenv==16.7.9 lxml six
+
+  # Upgrade Python's YAML library
+  RUN python2 -m pip install --upgrade --ignore-installed PyYAML==5.4.1 --user
+  RUN python3 -m pip install --upgrade --ignore-installed PyYAML==5.4.1 --user
+
+  # Install clang, clang-format, and clang-tidy
+  RUN apt-get update && apt-get install -y clang clang-format-11 clang-tidy-11 jq
+  ENV CLANG_FORMAT=clang-format-11
+  ENV CLANG_TIDY=clang-tidy-11
+
+
+  <%include file="../../bazel.include"/>
+  <%include file="../../buildifier.include"/>
+
+  # Define the default command.
+  CMD ["bash"]
