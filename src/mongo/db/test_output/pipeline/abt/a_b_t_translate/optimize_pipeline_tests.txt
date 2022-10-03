@@ -96,13 +96,18 @@ Root []
 |   |       scan_0
 |   RefBlock: 
 |       Variable [scan_0]
-Filter []
-|   EvalFilter []
-|   |   Variable [scan_0]
-|   PathGet [a]
-|   PathTraverse [1]
-|   PathCompare [EqMember]
-|   Const [[1, 2, 3]]
+Sargable [Complete]
+|   |   |   |   |   requirementsMap: 
+|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U {{[Const [3], Const [3]]}}}
+|   |   |   |   candidateIndexes: 
+|   |   |   |       candidateId: 1, index1, {}, {0}, {{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U {{[Const [3], Const [3]]}}}
+|   |   |   scanParams: 
+|   |   |       {'a': evalTemp_0}
+|   |   |           residualReqs: 
+|   |   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U {{[Const [3], Const [3]]}}}, entryIndex: 0
+|   |   BindBlock:
+|   RefBlock: 
+|       Variable [scan_0]
 Scan [collection]
     BindBlock:
         [scan_0]

@@ -42,6 +42,7 @@ unittest::GoldenTestConfig goldenTestConfigABTOptimization{"src/mongo/db/test_ou
 TEST(ABTTranslate, OptimizePipelineTests) {
     unittest::GoldenTestContext gctx(&goldenTestConfigABTOptimization);
 
+    // TODO SERVER-70028: the $or and $in explains below should be equal after 70028 is complete.
     testABTTranslationAndOptimization(
         gctx,
         "optimized $match with $or: pipeline is able to use a SargableNode with a disjunction of "
@@ -52,7 +53,6 @@ TEST(ABTTranslate, OptimizePipelineTests) {
         {{{"collection",
            ScanDefinition{{}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}});
 
-    // TODO SERVER-67819 Support indexing for eqMember op type
     testABTTranslationAndOptimization(
         gctx,
         "optimized $match with $in and a list of equalities becomes a comparison to an EqMember "

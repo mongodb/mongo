@@ -68,4 +68,9 @@ bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                                  const IntervalReqExpr::Node& sourceIntervals,
                                  bool reverseSource = false);
 
+/**
+ * Analyze the given interval, and convert it into a PathCompare EqMember if possible.
+ */
+boost::optional<ABT> coerceIntervalToPathCompareEqMember(const IntervalReqExpr::Node& interval);
+
 }  // namespace mongo::optimizer

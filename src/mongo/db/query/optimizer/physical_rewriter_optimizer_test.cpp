@@ -3876,6 +3876,7 @@ TEST(PhysRewriter, ArrayConstantIndex) {
     // Demonstrate we get index bounds to handle the array constant, while we also retain the
     // original filter. We have index bound with the array itself unioned with bound using the first
     // array element.
+    // TODO SERVER-70120: Reduce GroupBy Unique to just GroupBy.
     ASSERT_EXPLAIN_V2(
         "Root []\n"
         "|   |   projections: \n"
@@ -5289,6 +5290,143 @@ TEST(PhysRewriter, RootInterval) {
         "        [root]\n"
         "            Source []\n",
         optimized);
+}
+
+TEST(PhysRewriter, EqMemberSargable) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    const auto [tag, val] = sbe::value::makeNewArray();
+    sbe::value::Array* arr = sbe::value::getArrayView(val);
+    for (int i = 1; i < 4; i++) {
+        arr->push_back(sbe::value::TypeTags::NumberInt32, i);
+    }
+    ABT arrayConst = make<Constant>(tag, val);
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::EqMember, arrayConst),
+                                             PathTraverse::kSingleLevel)),
+            make<Variable>("root")),
+        std::move(scanNode));
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
+
+    {
+        PrefixId prefixId;
+        OptPhaseManager phaseManager(
+            {OptPhase::MemoSubstitutionPhase},
+            prefixId,
+            {{{"c1",
+               ScanDefinition{
+                   {},
+                   {{"index1",
+                     makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}}}}}},
+            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+        ABT optimized = rootNode;
+        phaseManager.optimize(optimized);
+
+        ASSERT_EXPLAIN_V2(
+            "Root []\n"
+            "|   |   projections: \n"
+            "|   |       root\n"
+            "|   RefBlock: \n"
+            "|       Variable [root]\n"
+            "Sargable [Complete]\n"
+            "|   |   |   |   |   requirementsMap: \n"
+            "|   |   |   |   |       refProjection: root, path: 'PathGet [a] PathIdentity []', "
+            "intervals: {{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U {{[Const [3], "
+            "Const "
+            "[3]]}}}\n"
+            "|   |   |   |   candidateIndexes: \n"
+            "|   |   |   |       candidateId: 1, index1, {}, {0}, {{{[Const [1], Const [1]]}} U "
+            "{{[Const [2], Const [2]]}} U {{[Const [3], Const [3]]}}}\n"
+            "|   |   |   scanParams: \n"
+            "|   |   |       {'a': evalTemp_0}\n"
+            "|   |   |           residualReqs: \n"
+            "|   |   |               refProjection: evalTemp_0, path: 'PathIdentity []', "
+            "intervals: "
+            "{{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U {{[Const [3], Const "
+            "[3]]}}}, "
+            "entryIndex: 0\n"
+            "|   |   BindBlock:\n"
+            "|   RefBlock: \n"
+            "|       Variable [root]\n"
+            "Scan [c1]\n"
+            "    BindBlock:\n"
+            "        [root]\n"
+            "            Source []\n",
+            optimized);
+    }
+
+    {
+        PrefixId prefixId;
+        OptPhaseManager phaseManager(
+            {OptPhase::MemoSubstitutionPhase,
+             OptPhase::MemoExplorationPhase,
+             OptPhase::MemoImplementationPhase},
+            prefixId,
+            {{{"c1",
+               ScanDefinition{{},
+                              {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}},
+            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+        ABT optimized = rootNode;
+        phaseManager.optimize(optimized);
+        ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+        // Test sargable filter is satisfied with an index scan.
+        // TODO SERVER-70120: Reduce GroupBy Unique to just GroupBy.
+        ASSERT_EXPLAIN_V2(
+            "Root []\n"
+            "|   |   projections: \n"
+            "|   |       root\n"
+            "|   RefBlock: \n"
+            "|       Variable [root]\n"
+            "BinaryJoin [joinType: Inner, {rid_0}]\n"
+            "|   |   Const [true]\n"
+            "|   LimitSkip []\n"
+            "|   |   limitSkip:\n"
+            "|   |       limit: 1\n"
+            "|   |       skip: 0\n"
+            "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
+            "|   |   BindBlock:\n"
+            "|   |       [root]\n"
+            "|   |           Source []\n"
+            "|   RefBlock: \n"
+            "|       Variable [rid_0]\n"
+            "Unique []\n"
+            "|   projections: \n"
+            "|       rid_0\n"
+            "GroupBy []\n"
+            "|   |   groupings: \n"
+            "|   |       RefBlock: \n"
+            "|   |           Variable [rid_0]\n"
+            "|   aggregations: \n"
+            "Union []\n"
+            "|   |   |   BindBlock:\n"
+            "|   |   |       [rid_0]\n"
+            "|   |   |           Source []\n"
+            "|   |   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
+            "{[Const [3], Const [3]]}]\n"
+            "|   |       BindBlock:\n"
+            "|   |           [rid_0]\n"
+            "|   |               Source []\n"
+            "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
+            "{[Const [2], Const [2]]}]\n"
+            "|       BindBlock:\n"
+            "|           [rid_0]\n"
+            "|               Source []\n"
+            "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+            "[1], Const [1]]}]\n"
+            "    BindBlock:\n"
+            "        [rid_0]\n"
+            "            Source []\n",
+            optimized);
+    }
 }
 
 TEST(PhysRewriter, IndexSubfieldCovered) {

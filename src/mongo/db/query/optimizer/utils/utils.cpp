@@ -29,11 +29,13 @@
 
 #include "mongo/db/query/optimizer/utils/utils.h"
 
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -524,9 +526,7 @@ public:
             return {};
         }
 
-        const auto [elTag, elVal] = arr->getAt(0);
-        const auto [elTagCopy, elValCopy] = sbe::value::copyValue(elTag, elVal);
-        ABT elementBound = make<Constant>(elTagCopy, elValCopy);
+        ABT elementBound = Constant::createFromCopy(arr->getAt(0).first, arr->getAt(0).second);
         // Create new interval which uses the first element of the array.
         const IntervalReqExpr::Node& newInterval =
             IntervalReqExpr::makeSingularDNF(IntervalRequirement{
@@ -655,6 +655,48 @@ public:
         return result;
     }
 
+    /**
+     * Convert to PathCompare EqMember to partial schema requirements if possible.
+     */
+    ResultType makeEqMemberInterval(const ABT& bound) {
+        const auto boundConst = bound.cast<Constant>();
+        if (boundConst == nullptr) {
+            return {};
+        }
+
+        const auto [boundTag, boundVal] = boundConst->get();
+        if (boundTag != sbe::value::TypeTags::Array) {
+            return {};
+        }
+        const auto boundArray = sbe::value::getArrayView(boundVal);
+
+        // Union the single intervals together. If we have PathCompare [EqMember] Const [[1, 2, 3]]
+        // we create [1, 1] U [2, 2] U [3, 3].
+        boost::optional<IntervalReqExpr::Node> unionedInterval;
+
+        for (size_t i = 0; i < boundArray->size(); i++) {
+            auto singleBoundLow =
+                Constant::createFromCopy(boundArray->getAt(i).first, boundArray->getAt(i).second);
+            auto singleBoundHigh = singleBoundLow;
+
+            auto singleInterval = IntervalReqExpr::makeSingularDNF(
+                IntervalRequirement{{true /*inclusive*/, std::move(singleBoundLow)},
+                                    {true /*inclusive*/, std::move(singleBoundHigh)}});
+
+            if (unionedInterval) {
+                // Union the singleInterval with the unionedInterval we want to update.
+                combineIntervalsDNF(false /*intersect*/, *unionedInterval, singleInterval);
+            } else {
+                unionedInterval = std::move(singleInterval);
+            }
+        }
+
+        return {{PartialSchemaRequirements{
+            {PartialSchemaKey{"" /*projectionName*/, make<PathIdentity>()},
+             PartialSchemaRequirement{
+                 "" /*boundProjectionName*/, std::move(*unionedInterval), false /*isPerfOnly*/}}}}};
+    }
+
     ResultType transport(const ABT& n, const PathCompare& pathCompare, ResultType inputResult) {
         if (!inputResult) {
             return {};
@@ -671,6 +713,9 @@ public:
 
         const Operations op = pathCompare.op();
         switch (op) {
+            case Operations::EqMember:
+                return makeEqMemberInterval(bound);
+
             case Operations::Eq:
                 lowBound = bound;
                 highBound = bound;
@@ -1442,12 +1487,13 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
     ABT path = make<PathIdentity>();
     if (pathToInterval) {
         // If we have a path converter, attempt to convert bounds back into a path element.
-        if (auto conversion = pathToInterval(make<PathArr>());
-            conversion && *conversion == req.getIntervals()) {
+        if (auto conversion = pathToInterval(make<PathArr>()); *conversion == req.getIntervals()) {
             path = make<PathArr>();
         } else if (auto conversion = pathToInterval(make<PathObj>());
-                   conversion && *conversion == req.getIntervals()) {
+                   *conversion == req.getIntervals()) {
             path = make<PathObj>();
+        } else if (auto conversion = coerceIntervalToPathCompareEqMember(req.getIntervals())) {
+            path = std::move(*conversion);
         }
     }
     if (path.is<PathIdentity>()) {

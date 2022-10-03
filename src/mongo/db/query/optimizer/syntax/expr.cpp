@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/platform/decimal128.h"
 
@@ -49,6 +50,11 @@ Constant::Constant(Constant&& other) noexcept {
 
     other._tag = TypeTags::Nothing;
     other._val = 0;
+}
+
+ABT Constant::createFromCopy(const sbe::value::TypeTags tag, const sbe::value::Value val) {
+    auto copy = sbe::value::copyValue(tag, val);
+    return make<Constant>(copy.first, copy.second);
 }
 
 ABT Constant::str(std::string str) {

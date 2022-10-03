@@ -49,6 +49,8 @@ class Constant final : public Operator<0>, public ExpressionSyntaxSort {
 public:
     Constant(sbe::value::TypeTags tag, sbe::value::Value val);
 
+    static ABT createFromCopy(sbe::value::TypeTags tag, sbe::value::Value val);
+
     static ABT str(std::string str);
 
     static ABT int32(int32_t valueInt32);
