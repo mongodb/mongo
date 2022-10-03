@@ -102,7 +102,7 @@ protected:
             wunit.commit();
             abortOnExit.dismiss();
         } catch (const DBException&) {
-            if (_opCtx->isKillPending())
+            if (!_opCtx->checkForInterruptNoAssert().isOK())
                 return true;
 
             throw;

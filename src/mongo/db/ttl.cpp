@@ -495,7 +495,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
                       "error"_attr = ex);
         return false;
     } catch (const DBException& ex) {
-        if (opCtx->isKillPending()) {
+        if (!opCtx->checkForInterruptNoAssert().isOK()) {
             // The exception is relevant to the entire TTL monitoring process, not just the specific
             // TTL index. Let the exception escape so it can be addressed at the higher monitoring
             // layer.

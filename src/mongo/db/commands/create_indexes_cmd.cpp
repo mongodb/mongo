@@ -606,7 +606,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
             throw;
         } catch (const DBException& ex) {
-            if (!opCtx->isKillPending()) {
+            if (opCtx->checkForInterruptNoAssert().isOK()) {
                 throw;
             }
 

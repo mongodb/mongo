@@ -2407,9 +2407,8 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // * Explicitly abort the index build with abortIndexBuildByBuildUUID() before performing an
     //   operation that causes the index build to throw an error.
     // TODO (SERVER-69264): Remove ErrorCodes::CannotCreateIndex.
-    // TODO (SERVER-69496): Remove ErrorCodes::InterruptedAtShutdown.
-    if (!opCtx->isKillPending() && status.code() != ErrorCodes::CannotCreateIndex &&
-        status.code() != ErrorCodes::InterruptedAtShutdown) {
+    if (opCtx->checkForInterruptNoAssert().isOK() &&
+        status.code() != ErrorCodes::CannotCreateIndex) {
         if (TestingProctor::instance().isEnabled()) {
             LOGV2_FATAL(
                 6967700, "Unexpected error code during index build cleanup", "error"_attr = status);

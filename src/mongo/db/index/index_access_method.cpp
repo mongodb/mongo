@@ -1075,7 +1075,7 @@ void SortedDataIndexAccessMethod::getKeys(OperationContext* opCtx,
             multikeyPaths->clear();
         }
 
-        if (opCtx->isKillPending()) {
+        if (!opCtx->checkForInterruptNoAssert().isOK()) {
             throw;
         }
 

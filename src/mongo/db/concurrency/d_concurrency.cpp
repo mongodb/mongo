@@ -165,10 +165,10 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
         unlockFCVLock.dismiss();
         unlockPBWM.dismiss();
     } catch (const DBException& ex) {
-        // If our opCtx was killed or we got a LockTimeout or MaxTimeMSExpired, either throw or
+        // If our opCtx is interrupted or we got a LockTimeout or MaxTimeMSExpired, either throw or
         // suppress the exception depending on the specified interrupt behavior. For any other
         // exception, always throw.
-        if ((!opCtx->isKillPending() && ex.code() != ErrorCodes::LockTimeout &&
+        if ((opCtx->checkForInterruptNoAssert().isOK() && ex.code() != ErrorCodes::LockTimeout &&
              ex.code() != ErrorCodes::MaxTimeMSExpired) ||
             _interruptBehavior == InterruptBehavior::kThrow) {
             throw;
