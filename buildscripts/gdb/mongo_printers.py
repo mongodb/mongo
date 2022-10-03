@@ -774,7 +774,11 @@ class SbeCodeFragmentPrinter(object):
         value_size = gdb.lookup_type('mongo::sbe::value::Value').sizeof
         uint8_size = gdb.lookup_type('uint8_t').sizeof
         uint32_size = gdb.lookup_type('uint32_t').sizeof
+        uint64_size = gdb.lookup_type('uint64_t').sizeof
         builtin_size = gdb.lookup_type('mongo::sbe::vm::Builtin').sizeof
+        time_unit_size = gdb.lookup_type('mongo::TimeUnit').sizeof
+        timezone_size = gdb.lookup_type('mongo::TimeZone').sizeof
+        day_of_week_size = gdb.lookup_type('mongo::DayOfWeek').sizeof
 
         cur_op = self.pdata
         end_op = self.pdata + self.size
@@ -838,6 +842,19 @@ class SbeCodeFragmentPrinter(object):
             elif op_name in ['applyClassicMatcher']:
                 args = 'MatchExpression* ' + hex(read_as_integer(cur_op, ptr_size))
                 cur_op += ptr_size
+            elif op_name in ['dateTruncImm']:
+                unit = read_as_integer(cur_op, time_unit_size)
+                cur_op += time_unit_size
+                args = 'unit: ' + str(unit)
+                bin_size = read_as_integer(cur_op, uint64_size)
+                cur_op += uint64_size
+                args += ', binSize: ' + str(bin_size)
+                timezone = read_as_integer(cur_op, timezone_size)
+                cur_op += timezone_size
+                args += ', timezone: ' + hex(timezone)
+                day_of_week = read_as_integer(cur_op, day_of_week_size)
+                cur_op += day_of_week_size
+                args += ', dayOfWeek: ' + str(day_of_week)
 
             yield hex(op_addr), '{} ({})'.format(op_name, args)
 

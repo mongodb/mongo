@@ -37,6 +37,8 @@
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/arith_common.h"
+#include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -518,8 +520,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"tsSecond", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsSecond, false}},
     {"tsIncrement", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsIncrement, false}},
     {"typeMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::typeMatch, false}},
-    {"dateTrunc",
-     BuiltinFn{[](size_t n) { return n == 5 || n == 6; }, vm::Builtin::dateTrunc, false}}};
+    {"dateTrunc", BuiltinFn{[](size_t n) { return n == 6; }, vm::Builtin::dateTrunc, false}}};
 
 /**
  * The code generation function.
@@ -619,6 +620,38 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
 
                 return code;
             }
+        } else if (_name == "dateTrunc" && _nodes[2]->as<EConstant>() &&
+                   _nodes[3]->as<EConstant>() && _nodes[4]->as<EConstant>() &&
+                   _nodes[5]->as<EConstant>()) {
+            // The validation for the arguments has been omitted here because the constants
+            // have already been validated in the stage builder.
+            auto [timezoneDBTag, timezoneDBVal] =
+                ctx.getRuntimeEnvAccessor(_nodes[0]->as<EVariable>()->getSlotId())
+                    ->getViewOfValue();
+            auto timezoneDB = value::getTimeZoneDBView(timezoneDBVal);
+
+            auto [unitTag, unitVal] = _nodes[2]->as<EConstant>()->getConstant();
+            auto unitString = value::getStringView(unitTag, unitVal);
+            auto unit = parseTimeUnit(unitString);
+
+            auto [binSizeTag, binSizeValue] = _nodes[3]->as<EConstant>()->getConstant();
+            auto [binSizeLongOwn, binSizeLongTag, binSizeLongValue] =
+                genericNumConvert(binSizeTag, binSizeValue, value::TypeTags::NumberInt64);
+            auto binSize = value::bitcastTo<int64_t>(binSizeLongValue);
+
+            auto [timezoneTag, timezoneVal] = _nodes[4]->as<EConstant>()->getConstant();
+            auto timezone = vm::getTimezone(timezoneTag, timezoneVal, timezoneDB);
+
+            DayOfWeek startOfWeek{kStartOfWeekDefault};
+            if (unit == TimeUnit::week) {
+                auto [startOfWeekTag, startOfWeekVal] = _nodes[5]->as<EConstant>()->getConstant();
+                auto startOfWeekString = value::getStringView(startOfWeekTag, startOfWeekVal);
+                startOfWeek = parseDayOfWeek(startOfWeekString);
+            }
+
+            code.append(_nodes[1]->compileDirect(ctx));
+            code.appendDateTrunc(unit, binSize, timezone, startOfWeek);
+            return code;
         }
 
         for (size_t idx = arity; idx-- > 0;) {

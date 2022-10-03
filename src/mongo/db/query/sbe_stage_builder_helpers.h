@@ -114,7 +114,7 @@ std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable&
  * Generates an EExpression that checks if the input expression is a positive number (i.e. > 0)
  * _assuming that_ it has already been verified to be numeric.
  */
-std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EVariable& var);
+std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EExpression& expr);
 
 /**
  * Generates an EExpression that checks if the input expression is a negative (i.e., < 0) number
@@ -132,7 +132,7 @@ std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& v
  * Generates an EExpression that checks if the input expression is not a string, _assuming that
  * it has already been verified to be neither null nor missing.
  */
-std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& var);
+std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EExpression& expr);
 
 /**
  * Generates an EExpression that checks whether the input expression is null, missing, or

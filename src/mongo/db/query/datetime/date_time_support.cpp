@@ -166,6 +166,12 @@ void TimeZoneDatabase::TimelibErrorContainerDeleter::operator()(
     timelib_error_container_dtor(errorContainer);
 }
 
+void TimeZoneDatabase::TimelibTZInfoDeleter::operator()(timelib_tzinfo* tzInfo) {
+    if (tzInfo) {
+        timelib_tzinfo_dtor(tzInfo);
+    }
+}
+
 void TimeZoneDatabase::loadTimeZoneInfo(
     std::unique_ptr<timelib_tzdb, TimeZoneDBDeleter> timeZoneDatabase) {
     invariant(timeZoneDatabase);
@@ -193,6 +199,8 @@ void TimeZoneDatabase::loadTimeZoneInfo(
             _timeZones[entry.id] = TimeZone{nullptr};
             timelib_tzinfo_dtor(tzInfo);
         } else {
+            _timeZoneInfos.emplace_back(
+                std::unique_ptr<_timelib_tzinfo, TimelibTZInfoDeleter>(tzInfo));
             _timeZones[entry.id] = TimeZone{tzInfo};
         }
     }
@@ -395,7 +403,7 @@ std::vector<std::string> TimeZoneDatabase::getTimeZoneStrings() const {
 
 void TimeZone::adjustTimeZone(timelib_time* timelibTime) const {
     if (isTimeZoneIDZone()) {
-        timelib_set_timezone(timelibTime, _tzInfo.get());
+        timelib_set_timezone(timelibTime, _tzInfo);
     } else if (isUtcOffsetZone()) {
         timelib_set_timezone_from_offset(timelibTime, durationCount<Seconds>(_utcOffset));
     }
@@ -488,14 +496,7 @@ TimeZone::Iso8601DateParts::Iso8601DateParts(const timelib_time& timelib_time, D
 }
 
 
-void TimeZone::TimelibTZInfoDeleter::operator()(timelib_tzinfo* tzInfo) {
-    if (tzInfo) {
-        timelib_tzinfo_dtor(tzInfo);
-    }
-}
-
-TimeZone::TimeZone(timelib_tzinfo* tzInfo)
-    : _tzInfo(tzInfo, TimelibTZInfoDeleter()), _utcOffset(0) {}
+TimeZone::TimeZone(timelib_tzinfo* tzInfo) : _tzInfo(tzInfo), _utcOffset(0) {}
 
 TimeZone::TimeZone(Seconds utcOffsetSeconds) : _tzInfo(nullptr), _utcOffset(utcOffsetSeconds) {}
 
@@ -580,7 +581,7 @@ Seconds TimeZone::utcOffset(Date_t date) const {
         int32_t timezoneOffsetFromUTC = 0;
         int result =
             timelib_get_time_zone_offset_info(durationCount<Seconds>(date.toDurationSinceEpoch()),
-                                              _tzInfo.get(),
+                                              _tzInfo,
                                               &timezoneOffsetFromUTC,
                                               nullptr,
                                               nullptr);

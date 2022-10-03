@@ -173,9 +173,9 @@ std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable&
                                                    sbe::value::bitcastFrom<int32_t>(0)));
 }
 
-std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EVariable& var) {
+std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EExpression& expr) {
     return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::greater,
-                        var.clone(),
+                        expr.clone(),
                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
                                                    sbe::value::bitcastFrom<int32_t>(0)));
 }
@@ -191,8 +191,8 @@ std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& v
     return makeNot(makeFunction("isObject", var.clone()));
 }
 
-std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& var) {
-    return makeNot(makeFunction("isString", var.clone()));
+std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EExpression& expr) {
+    return makeNot(makeFunction("isString", expr.clone()));
 }
 
 std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(

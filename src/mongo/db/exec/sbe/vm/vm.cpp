@@ -157,6 +157,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // fail
 
     0,  // applyClassicMatcher
+    0,  // dateTruncImm
 };
 
 void ByteCode::growAndResize() noexcept {
@@ -323,6 +324,21 @@ std::string CodeFragment::toString() const {
                     pcPointer += sizeof(SmallArityType);
                 }
                 ss << "f: " << static_cast<uint8_t>(f) << ", arity: " << arity;
+                break;
+            }
+            case Instruction::dateTruncImm: {
+                auto unit = readFromMemory<TimeUnit>(pcPointer);
+                pcPointer += sizeof(unit);
+                auto binSize = readFromMemory<int64_t>(pcPointer);
+                pcPointer += sizeof(binSize);
+                auto timezone = readFromMemory<TimeZone>(pcPointer);
+                pcPointer += sizeof(timezone);
+                auto startOfWeek = readFromMemory<DayOfWeek>(pcPointer);
+                pcPointer += sizeof(startOfWeek);
+                ss << "unit: " << static_cast<int32_t>(unit) << ", binSize: " << binSize
+                   << ", timezoneTzInfo: " << static_cast<void*>(timezone.getTzInfo())
+                   << ", timezoneUtcOffset: " << timezone.getUtcOffset()
+                   << ", startOfWeek: " << static_cast<int8_t>(startOfWeek);
                 break;
             }
             default:
@@ -675,6 +691,24 @@ void CodeFragment::appendTypeMatch(uint32_t mask) {
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, mask);
+}
+
+void CodeFragment::appendDateTrunc(TimeUnit unit,
+                                   int64_t binSize,
+                                   TimeZone timezone,
+                                   DayOfWeek startOfWeek) {
+    Instruction i;
+    i.tag = Instruction::dateTruncImm;
+    adjustStackSimple(i);
+
+    auto offset = allocateSpace(sizeof(Instruction) + sizeof(unit) + sizeof(binSize) +
+                                sizeof(timezone) + sizeof(startOfWeek));
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, unit);
+    offset += writeToMemory(offset, binSize);
+    offset += writeToMemory(offset, timezone);
+    offset += writeToMemory(offset, startOfWeek);
 }
 
 void CodeFragment::appendFunction(Builtin f, ArityType arity) {
@@ -2676,7 +2710,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateDiff(ArityTy
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateTrunc(ArityType arity) {
-    invariant(arity == 5 || arity == 6);  // 6th parameter is 'startOfWeek'.
+    invariant(arity == 6);
 
     auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
     if (timezoneDBTag != value::TypeTags::timeZoneDB) {
@@ -2686,10 +2720,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateTrunc(ArityT
 
     // Get date.
     auto [dateOwn, dateTag, dateValue] = getFromStack(1);
-    if (!coercibleToDate(dateTag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto date = getDate(dateTag, dateValue);
 
     // Get unit.
     auto [unitOwn, unitTag, unitValue] = getFromStack(2);
@@ -2726,19 +2756,32 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateTrunc(ArityT
 
     // Get startOfWeek, if 'startOfWeek' parameter was passed and time unit is the week.
     DayOfWeek startOfWeek{kStartOfWeekDefault};
-    if (6 == arity) {
+    if (TimeUnit::week == unit) {
         auto [startOfWeekOwn, startOfWeekTag, startOfWeekValue] = getFromStack(5);
         if (!value::isString(startOfWeekTag)) {
             return {false, value::TypeTags::Nothing, 0};
         }
-        if (TimeUnit::week == unit) {
-            auto startOfWeekString = value::getStringView(startOfWeekTag, startOfWeekValue);
-            if (!isValidDayOfWeek(startOfWeekString)) {
-                return {false, value::TypeTags::Nothing, 0};
-            }
-            startOfWeek = parseDayOfWeek(startOfWeekString);
+        auto startOfWeekString = value::getStringView(startOfWeekTag, startOfWeekValue);
+        if (!isValidDayOfWeek(startOfWeekString)) {
+            return {false, value::TypeTags::Nothing, 0};
         }
+        startOfWeek = parseDayOfWeek(startOfWeekString);
     }
+
+    return dateTrunc(dateTag, dateValue, unit, binSize, timezone, startOfWeek);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::dateTrunc(value::TypeTags dateTag,
+                                                                   value::Value dateValue,
+                                                                   TimeUnit unit,
+                                                                   int64_t binSize,
+                                                                   TimeZone timezone,
+                                                                   DayOfWeek startOfWeek) {
+    // Get date.
+    if (!coercibleToDate(dateTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto date = getDate(dateTag, dateValue);
 
     auto truncatedDate = truncateDate(date, unit, binSize, timezone, startOfWeek);
     return {false,
@@ -5836,6 +5879,28 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     pcPointer += sizeof(matcher);
 
                     runClassicMatcher(matcher);
+                    break;
+                }
+                case Instruction::dateTruncImm: {
+                    auto unit = readFromMemory<TimeUnit>(pcPointer);
+                    pcPointer += sizeof(unit);
+                    auto binSize = readFromMemory<int64_t>(pcPointer);
+                    pcPointer += sizeof(binSize);
+                    auto timezone = readFromMemory<TimeZone>(pcPointer);
+                    pcPointer += sizeof(timezone);
+                    auto startOfWeek = readFromMemory<DayOfWeek>(pcPointer);
+                    pcPointer += sizeof(startOfWeek);
+
+                    auto [dateOwned, dateTag, dateVal] = getFromStack(0);
+
+                    auto [owned, tag, val] =
+                        dateTrunc(dateTag, dateVal, unit, binSize, timezone, startOfWeek);
+
+                    topStack(owned, tag, val);
+
+                    if (dateOwned) {
+                        value::releaseValue(dateTag, dateVal);
+                    }
                     break;
                 }
                 default:

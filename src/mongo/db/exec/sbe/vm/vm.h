@@ -324,6 +324,8 @@ struct Instruction {
 
         applyClassicMatcher,  // Instruction which calls into the classic engine MatchExpression.
 
+        dateTruncImm,
+
         lastInstruction  // this is just a marker used to calculate number of instructions
     };
 
@@ -507,6 +509,8 @@ struct Instruction {
                 return "fail";
             case applyClassicMatcher:
                 return "applyClassicMatcher";
+            case dateTruncImm:
+                return "dateTruncImm";
             default:
                 return "unrecognized";
         }
@@ -758,6 +762,7 @@ public:
         appendSimpleInstruction(Instruction::setField);
     }
     void appendGetArraySize();
+    void appendDateTrunc(TimeUnit unit, int64_t binSize, TimeZone timezone, DayOfWeek startOfWeek);
 
     void appendSum();
     void appendMin();
@@ -925,9 +930,6 @@ private:
                                                              value::Value rhsVal,
                                                              value::TypeTags collTag,
                                                              value::Value collVal);
-    FastTuple<bool, value::TypeTags, value::Value> genericNumConvert(value::TypeTags lhsTag,
-                                                                     value::Value lhsValue,
-                                                                     value::TypeTags rhsTag);
 
     std::pair<value::TypeTags, value::Value> compare3way(
         value::TypeTags lhsTag,
@@ -1066,6 +1068,12 @@ private:
                                                                     value::Value timezoneValue);
     FastTuple<bool, value::TypeTags, value::Value> genericNewKeyString(
         ArityType arity, CollatorInterface* collator = nullptr);
+    FastTuple<bool, value::TypeTags, value::Value> dateTrunc(value::TypeTags dateTag,
+                                                             value::Value dateValue,
+                                                             TimeUnit unit,
+                                                             int64_t binSize,
+                                                             TimeZone timezone,
+                                                             DayOfWeek startOfWeek);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);

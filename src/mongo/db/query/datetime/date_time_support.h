@@ -344,8 +344,12 @@ public:
     static void validateFromStringFormat(StringData format);
     std::unique_ptr<_timelib_time, TimelibTimeDeleter> getTimelibTime(Date_t) const;
 
-    std::shared_ptr<_timelib_tzinfo> getTzInfo() const {
+    _timelib_tzinfo* getTzInfo() const {
         return _tzInfo;
+    }
+
+    Seconds getUtcOffset() const {
+        return _utcOffset;
     }
 
 private:
@@ -381,12 +385,8 @@ private:
         return Status::OK();
     }
 
-    struct TimelibTZInfoDeleter {
-        void operator()(_timelib_tzinfo* tzInfo);
-    };
-
     // null if this TimeZone represents the default UTC time zone, or a UTC-offset time zone
-    std::shared_ptr<_timelib_tzinfo> _tzInfo;
+    _timelib_tzinfo* _tzInfo;
 
     // represents the UTC offset in seconds if _tzInfo is null and it is not 0
     Seconds _utcOffset{0};
@@ -486,6 +486,10 @@ public:
     std::string toString() const;
 
 private:
+    struct TimelibTZInfoDeleter {
+        void operator()(_timelib_tzinfo* tzInfo);
+    };
+
     /**
      * Populates '_timeZones' with parsed time zone rules for each timezone specified by
      * 'timeZoneDatabase'.
@@ -504,6 +508,9 @@ private:
 
     // The timelib structure which provides timezone information.
     std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> _timeZoneDatabase;
+
+    // The list of pre-load _timelib_tzinfo objects.
+    std::vector<std::unique_ptr<_timelib_tzinfo, TimelibTZInfoDeleter>> _timeZoneInfos;
 };
 
 /**

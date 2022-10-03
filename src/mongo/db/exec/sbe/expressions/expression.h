@@ -448,6 +448,12 @@ public:
     size_t estimateSize() const final {
         return sizeof(*this);
     }
+    boost::optional<FrameId> getFrameId() const {
+        return _frameId;
+    }
+    value::SlotId getSlotId() const {
+        return _var;
+    }
 
 private:
     value::SlotId _var;

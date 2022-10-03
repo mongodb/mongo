@@ -116,18 +116,8 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
     value::OwnedValueAccessor startOfWeekAccessor;
     auto startOfWeekSlot = bindAccessor(&startOfWeekAccessor);
 
-    // Construct an invocation of "dateTrunc" function without 'startOfWeek' parameter.
+    // Construct an invocation of "dateTrunc" function.
     auto dateTruncExpression =
-        sbe::makeE<sbe::EFunction>("dateTrunc",
-                                   sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
-                                               makeE<EVariable>(dateSlot),
-                                               makeE<EVariable>(unitSlot),
-                                               makeE<EVariable>(binSizeSlot),
-                                               makeE<EVariable>(timezoneSlot)));
-    auto compiledDateTrunc = compileExpression(*dateTruncExpression);
-
-    // Construct an invocation of "dateTrunc" function with 'startOfWeek' parameter.
-    dateTruncExpression =
         sbe::makeE<sbe::EFunction>("dateTrunc",
                                    sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                makeE<EVariable>(dateSlot),
@@ -135,7 +125,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
                                                makeE<EVariable>(binSizeSlot),
                                                makeE<EVariable>(timezoneSlot),
                                                makeE<EVariable>(startOfWeekSlot)));
-    auto compiledDateTruncWithStartOfWeek = compileExpression(*dateTruncExpression);
+    auto compiledDateTrunc = compileExpression(*dateTruncExpression);
 
     // Setup timezone database.
     auto timezoneDatabase = std::make_unique<TimeZoneDatabase>();
@@ -148,12 +138,14 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
         std::pair<value::TypeTags, value::Value> date;
         std::pair<value::TypeTags, value::Value> unit;
         std::pair<value::TypeTags, value::Value> binSize;
+        std::pair<value::TypeTags, value::Value> startOfWeek;
         std::pair<value::TypeTags, value::Value> expectedValue;  // Output.
-        boost::optional<std::pair<value::TypeTags, value::Value>> startOfWeek;
     };
 
     const std::pair<value::TypeTags, value::Value> kNothing{value::TypeTags::Nothing, 0};
     const std::pair<value::TypeTags, value::Value> kDate{makeDateValue(2022, 9, 12, 12, 24, 36)};
+    const std::pair<value::TypeTags, value::Value> kDateOID{
+        makeDateValueOID(2022, 9, 12, 12, 24, 36)};
     const std::pair<value::TypeTags, value::Value> kHourTruncatedDate{
         makeDateValue(2022, 9, 12, 12, 0, 0)};
     std::vector<TestCase> testCases{
@@ -163,14 +155,16 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("hour"),
             makeLongValue(1),
+            value::makeNewString("sun"),
             kHourTruncatedDate,
         },
         {
             // Accepts OID values.
             value::makeNewString("GMT"),
-            kDate,
+            kDateOID,
             value::makeNewString("hour"),
             makeLongValue(1),
+            value::makeNewString("sun"),
             kHourTruncatedDate,
         },
         {
@@ -179,6 +173,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             convertTimestampToSbeValue(Timestamp{Hours{3}, 0}),
             value::makeNewString("hour"),
             makeLongValue(2),
+            value::makeNewString("sun"),
             makeDateValue(1970, 1, 1, 2, 0, 0),
         },
         {// 'timezone' is Nothing.
@@ -186,18 +181,21 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
          kDate,
          value::makeNewString("hour"),
          makeLongValue(1),
+         value::makeNewString("sun"),
          kNothing},
         {// 'timezone' is not a valid type.
          makeLongValue(0),
          kDate,
          value::makeNewString("hour"),
          makeLongValue(1),
+         value::makeNewString("sun"),
          kNothing},
         {// 'timezone' is not a recognized value.
          value::makeNewString("Arctic/North_Pole"),
          kDate,
          value::makeNewString("hour"),
          makeLongValue(1),
+         value::makeNewString("sun"),
          kNothing},
         {
             // 'date' is Nothing.
@@ -205,6 +203,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kNothing,
             value::makeNewString("hour"),
             makeLongValue(1),
+            value::makeNewString("sun"),
             kNothing,
         },
         {
@@ -213,6 +212,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             makeLongValue(0),
             value::makeNewString("hour"),
             makeLongValue(1),
+            value::makeNewString("sun"),
             kNothing,
         },
         {
@@ -221,6 +221,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             kNothing,
             makeLongValue(1),
+            value::makeNewString("sun"),
             kNothing,
         },
         {
@@ -229,6 +230,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             makeLongValue(0),
             makeLongValue(1),
+            value::makeNewString("sun"),
             kNothing,
         },
         {
@@ -237,6 +239,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("century"),
             makeLongValue(1),
+            value::makeNewString("sun"),
             kNothing,
         },
         {
@@ -245,6 +248,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("hour"),
             kNothing,
+            value::makeNewString("sun"),
             kNothing,
         },
         {
@@ -253,6 +257,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("hour"),
             kNothing,
+            value::makeNewString("sun"),
             kNothing,
         },
         {
@@ -261,6 +266,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("hour"),
             value::makeNewString("one"),
+            value::makeNewString("sun"),
             kNothing,
         },
         {
@@ -269,6 +275,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("hour"),
             makeDoubleValue(1.5),
+            value::makeNewString("sun"),
             kNothing,
         },
         {
@@ -277,6 +284,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("hour"),
             makeLongValue(0),
+            value::makeNewString("sun"),
             kNothing,
         },
         {
@@ -285,6 +293,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("hour"),
             makeLongValue(-1),
+            value::makeNewString("sun"),
             kNothing,
         },
         {
@@ -293,6 +302,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("hour"),
             makeIntValue(1),
+            value::makeNewString("sun"),
             kHourTruncatedDate,
         },
         {
@@ -301,6 +311,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("hour"),
             makeDoubleValue(1.0),
+            value::makeNewString("sun"),
             kHourTruncatedDate,
         },
         {
@@ -309,6 +320,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("hour"),
             makeDecimalValue("1"),
+            value::makeNewString("sun"),
             kHourTruncatedDate,
         },
         {// 'startOfWeek' is present and invalid type.
@@ -316,16 +328,16 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
          kDate,
          value::makeNewString("hour"),
          makeLongValue(1),
-         kNothing,
-         makeLongValue(0)},
+         makeLongValue(0),
+         kHourTruncatedDate},
         {
             // 'startOfWeek' is present, valid type but invalid value, unit is not week.
             value::makeNewString("UTC"),
             kDate,
             value::makeNewString("hour"),
             makeLongValue(1),
-            kHourTruncatedDate,
             value::makeNewString("holiday"),
+            kHourTruncatedDate,
         },
         {
             // 'startOfWeek' is Nothing, unit is week.
@@ -342,8 +354,8 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("week"),
             makeLongValue(1),
-            kNothing,
             makeLongValue(0),
+            kNothing,
         },
         {
             // 'startOfWeek' is invalid value, unit is week.
@@ -351,8 +363,8 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             kDate,
             value::makeNewString("week"),
             makeLongValue(1),
-            kNothing,
             value::makeNewString("holiday"),
+            kNothing,
         },
         {
             // 'startOfWeek' is valid value, unit is week.
@@ -360,16 +372,8 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
             makeDateValue(2022, 9, 12, 12, 24, 36),
             value::makeNewString("week"),
             makeLongValue(1),
-            makeDateValue(2022, 9, 10, 0, 0, 0),
             value::makeNewString("Saturday"),
-        },
-        {
-            // 'startOfWeek' is not specified (should default to Sunday), unit is week.
-            value::makeNewString("UTC"),
-            makeDateValue(2022, 9, 12, 12, 24, 36),
-            value::makeNewString("week"),
-            makeLongValue(1),
-            makeDateValue(2022, 9, 11, 0, 0, 0),
+            makeDateValue(2022, 9, 10, 0, 0, 0),
         },
     };
 
@@ -379,13 +383,10 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
         dateAccessor.reset(testCase.date.first, testCase.date.second);
         unitAccessor.reset(testCase.unit.first, testCase.unit.second);
         binSizeAccessor.reset(testCase.binSize.first, testCase.binSize.second);
-        if (testCase.startOfWeek) {
-            startOfWeekAccessor.reset(testCase.startOfWeek->first, testCase.startOfWeek->second);
-        }
+        startOfWeekAccessor.reset(testCase.startOfWeek.first, testCase.startOfWeek.second);
 
         // Execute the "dateTrunc" function.
-        auto result = runCompiledExpression(
-            (testCase.startOfWeek ? compiledDateTruncWithStartOfWeek : compiledDateTrunc).get());
+        auto result = runCompiledExpression(compiledDateTrunc.get());
         auto [resultTag, resultValue] = result;
         value::ValueGuard resultGuard(resultTag, resultValue);
 
