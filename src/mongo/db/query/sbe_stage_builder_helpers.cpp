@@ -568,6 +568,28 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
         return std::move(branches[0]);
     }
 
+    bool exprOnlyBranches = true;
+    for (const auto& [expr, stage] : branches) {
+        if (!stage.stageIsNull()) {
+            exprOnlyBranches = false;
+            break;
+        }
+    }
+
+    if (exprOnlyBranches) {
+        std::unique_ptr<sbe::EExpression> exprOnlyOp;
+        for (int32_t i = branches.size() - 1; i >= 0; i--) {
+            auto& [expr, _] = branches[i];
+            auto stateExpr = stateHelper.getBool(expr.extractExpr());
+            if (exprOnlyOp) {
+                exprOnlyOp = makeBinaryOp(logicOp, std::move(stateExpr), std::move(exprOnlyOp));
+            } else {
+                exprOnlyOp = std::move(stateExpr);
+            }
+        }
+        return {EvalExpr{std::move(exprOnlyOp)}, EvalStage{}};
+    }
+
     // Prepare to create limit-1/union with N branches (where N is the number of operands). Each
     // branch will be evaluated from left to right until one of the branches produces a value. The
     // first N-1 branches have a FilterStage to control whether they produce a value. If a branch's

@@ -8,7 +8,8 @@ const coll = db.big_predicate;
 coll.drop();
 
 let filter = {};
-for (let i = 0; i < 2500; ++i) {
+// TODO SERVER-70110: Revert number of branches to 2500.
+for (let i = 0; i < 25; ++i) {
     filter["field" + i] = i;
 }
 
