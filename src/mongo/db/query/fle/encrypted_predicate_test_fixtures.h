@@ -102,5 +102,6 @@ public:
 
 protected:
     MockServerRewrite _mock{};
+    ExpressionContextForTest _expCtx;
 };
 }  // namespace mongo::fle

@@ -286,20 +286,8 @@ std::unique_ptr<Expression> EqualityPredicate::rewriteToTagDisjunction(Expressio
         std::vector<boost::intrusive_ptr<Expression>> orListElems;
         auto payload = constChild->getValue();
         auto tags = toValues(generateTags(std::ref(payload)));
-        for (auto&& tagElt : tags) {
-            // ... and for each tag, construct expression {$in: [tag,
-            // "$__safeContent__"]}.
-            std::vector<boost::intrusive_ptr<Expression>> inVec{
-                ExpressionConstant::create(_rewriter->getExpressionContext(), tagElt),
-                ExpressionFieldPath::createPathFromString(
-                    _rewriter->getExpressionContext(),
-                    kSafeContent,
-                    _rewriter->getExpressionContext()->variablesParseState)};
-            orListElems.push_back(
-                make_intrusive<ExpressionIn>(_rewriter->getExpressionContext(), std::move(inVec)));
-        }
-        auto disjunction = std::make_unique<ExpressionOr>(_rewriter->getExpressionContext(),
-                                                          std::move(orListElems));
+        auto disjunction = makeTagDisjunction(_rewriter->getExpressionContext(), std::move(tags));
+
         if (eqExpr->getOp() == ExpressionCompare::NE) {
             std::vector<boost::intrusive_ptr<Expression>> notChild{disjunction.release()};
             return std::make_unique<ExpressionNot>(_rewriter->getExpressionContext(),
@@ -312,27 +300,19 @@ std::unique_ptr<Expression> EqualityPredicate::rewriteToTagDisjunction(Expressio
                 return nullptr;
             }
             auto& equalitiesList = inList->getChildren();
-            std::vector<boost::intrusive_ptr<Expression>> orListElems;
-            auto expCtx = _rewriter->getExpressionContext();
+            std::vector<Value> allTags;
             for (auto& equality : equalitiesList) {
                 // For each expression representing a FleFindPayload...
                 if (auto constChild = dynamic_cast<ExpressionConstant*>(equality.get())) {
                     // ... rewrite the payload to a list of tags...
                     auto payload = constChild->getValue();
                     auto tags = toValues(generateTags(std::ref(payload)));
-                    for (auto&& tagElt : tags) {
-                        // ... and for each tag, construct expression {$in: [tag,
-                        // "$__safeContent__"]}.
-                        std::vector<boost::intrusive_ptr<Expression>> inVec{
-                            ExpressionConstant::create(expCtx, tagElt),
-                            ExpressionFieldPath::createPathFromString(
-                                expCtx, kSafeContent, expCtx->variablesParseState)};
-                        orListElems.push_back(
-                            make_intrusive<ExpressionIn>(expCtx, std::move(inVec)));
-                    }
+                    allTags.insert(allTags.end(),
+                                   std::make_move_iterator(tags.begin()),
+                                   std::make_move_iterator(tags.end()));
                 }
             }
-            return std::make_unique<ExpressionOr>(expCtx, std::move(orListElems));
+            return makeTagDisjunction(_rewriter->getExpressionContext(), std::move(allTags));
         }
         return nullptr;
     }

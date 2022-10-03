@@ -72,5 +72,20 @@ std::vector<Value> toValues(std::vector<PrfBlock>&& vec) {
     }
     return output;
 }
+
+std::unique_ptr<Expression> makeTagDisjunction(ExpressionContext* expCtx,
+                                               std::vector<Value>&& tags) {
+    std::vector<boost::intrusive_ptr<Expression>> orListElems;
+    for (auto&& tagElt : tags) {
+        // ... and for each tag, construct expression {$in: [tag,
+        // "$__safeContent__"]}.
+        std::vector<boost::intrusive_ptr<Expression>> inVec{
+            ExpressionConstant::create(expCtx, tagElt),
+            ExpressionFieldPath::createPathFromString(
+                expCtx, kSafeContent, expCtx->variablesParseState)};
+        orListElems.push_back(make_intrusive<ExpressionIn>(expCtx, std::move(inVec)));
+    }
+    return std::make_unique<ExpressionOr>(expCtx, std::move(orListElems));
+}
 }  // namespace fle
 }  // namespace mongo

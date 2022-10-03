@@ -29,6 +29,9 @@
 
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 #include "mongo/db/query/fle/range_predicate.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -51,39 +54,52 @@ public:
     }
 
 
+    bool payloadValid = true;
+
 protected:
     bool isPayload(const BSONElement& elt) const override {
-        return true;
+        return payloadValid;
     }
 
     bool isPayload(const Value& v) const override {
-        return true;
+        return payloadValid;
     }
 
     std::vector<PrfBlock> generateTags(BSONValue payload) const {
         return stdx::visit(
-            OverloadedVisitor{
-                [&](BSONElement p) {
-                    auto parsedPayload = p.Obj().firstElement();
-                    auto fieldName = parsedPayload.fieldNameStringData();
+            OverloadedVisitor{[&](BSONElement p) {
+                                  auto parsedPayload = p.Obj().firstElement();
+                                  auto fieldName = parsedPayload.fieldNameStringData();
 
-                    std::vector<BSONElement> range;
-                    auto payloadAsArray = parsedPayload.Array();
-                    for (auto&& elt : payloadAsArray) {
-                        range.push_back(elt);
-                    }
+                                  std::vector<BSONElement> range;
+                                  auto payloadAsArray = parsedPayload.Array();
+                                  for (auto&& elt : payloadAsArray) {
+                                      range.push_back(elt);
+                                  }
 
-                    std::vector<PrfBlock> allTags;
-                    for (auto i = range[0].Number(); i <= range[1].Number(); i++) {
-                        ASSERT(_tags.find({fieldName, i}) != _tags.end());
-                        auto temp = _tags.find({fieldName, i})->second;
-                        for (auto tag : temp) {
-                            allTags.push_back(tag);
-                        }
-                    }
-                    return allTags;
-                },
-                [&](std::reference_wrapper<Value> v) { return std::vector<PrfBlock>{}; }},
+                                  std::vector<PrfBlock> allTags;
+                                  for (auto i = range[0].Number(); i <= range[1].Number(); i++) {
+                                      ASSERT(_tags.find({fieldName, i}) != _tags.end());
+                                      auto temp = _tags.find({fieldName, i})->second;
+                                      for (auto tag : temp) {
+                                          allTags.push_back(tag);
+                                      }
+                                  }
+                                  return allTags;
+                              },
+                              [&](std::reference_wrapper<Value> v) {
+                                  if (v.get().isArray()) {
+                                      auto arr = v.get().getArray();
+                                      std::vector<PrfBlock> allTags;
+                                      for (auto& val : arr) {
+                                          allTags.push_back(PrfBlock(
+                                              {static_cast<unsigned char>(val.coerceToInt())}));
+                                      }
+                                      return allTags;
+                                  } else {
+                                      return std::vector<PrfBlock>{};
+                                  }
+                              }},
             payload);
     }
 
@@ -99,7 +115,7 @@ protected:
     MockRangePredicate _predicate;
 };
 
-TEST_F(RangePredicateRewriteTest, BasicRangeRewrite) {
+TEST_F(RangePredicateRewriteTest, MatchRangeRewrite) {
     RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
 
     int start = 1;
@@ -124,6 +140,32 @@ TEST_F(RangePredicateRewriteTest, BasicRangeRewrite) {
     auto inputExpr = BetweenMatchExpression(encField, query[encField]["$between"], nullptr);
 
     assertRewriteToTags(_predicate, &inputExpr, toBSONArray(std::move(allTags)));
+}
+
+
+TEST_F(RangePredicateRewriteTest, AggRangeRewrite) {
+    auto input = fromjson(R"({$between: ["$age", {$literal: [1, 2, 3]}]})");
+    auto inputExpr =
+        ExpressionBetween::parseExpression(&_expCtx, input, _expCtx.variablesParseState);
+
+    auto expected = makeTagDisjunction(&_expCtx, toValues({{1}, {2}, {3}}));
+
+    auto actual = _predicate.rewrite(inputExpr.get());
+
+    ASSERT_BSONOBJ_EQ(actual->serialize(false).getDocument().toBson(),
+                      expected->serialize(false).getDocument().toBson());
+}
+
+TEST_F(RangePredicateRewriteTest, AggRangeRewriteNoOp) {
+    auto input = fromjson(R"({$between: ["$age", {$literal: [1, 2, 3]}]})");
+    auto inputExpr =
+        ExpressionBetween::parseExpression(&_expCtx, input, _expCtx.variablesParseState);
+
+    auto expected = inputExpr;
+
+    _predicate.payloadValid = false;
+    auto actual = _predicate.rewrite(inputExpr.get());
+    ASSERT(actual == nullptr);
 }
 
 };  // namespace

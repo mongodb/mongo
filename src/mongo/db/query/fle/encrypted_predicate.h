@@ -72,6 +72,9 @@ T parseFindPayload(BSONValue payload) {
                        payload);
 }
 
+std::unique_ptr<Expression> makeTagDisjunction(ExpressionContext* expCtx,
+                                               std::vector<Value>&& tags);
+
 /**
  * Convert a vector of PrfBlocks to a BSONArray for use in MatchExpression tag generation.
  */
