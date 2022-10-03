@@ -373,12 +373,6 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
     const ChunkRange& range,
     const UUID& migrationId,
     Seconds delayForActiveQueriesOnSecondariesToComplete) {
-
-    int maxToDelete = rangeDeleterBatchSize.load();
-    if (maxToDelete <= 0) {
-        maxToDelete = kRangeDeleterBatchSizeDefault;
-    }
-
     auto cleanupComplete =
         removeDocumentsInRange(_executor,
                                std::move(waitForActiveQueriesToComplete),
@@ -387,7 +381,6 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
                                _metadata.back()->metadata->getKeyPattern().getOwned(),
                                range,
                                migrationId,
-                               maxToDelete,
                                delayForActiveQueriesOnSecondariesToComplete);
 
     _rangesScheduledForDeletion.emplace_front(range, cleanupComplete);
@@ -400,6 +393,7 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
             stdx::lock_guard<Latch> lg(self->_managerLock);
             self->_rangesScheduledForDeletion.erase(it);
         });
+
     return cleanupComplete;
 }
 

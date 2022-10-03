@@ -60,7 +60,6 @@ SharedSemiFuture<void> removeDocumentsInRange(
     const BSONObj& keyPattern,
     const ChunkRange& range,
     const UUID& migrationId,
-    int numDocsToRemovePerBatch,
     Seconds delayForActiveQueriesOnSecondariesToComplete);
 
 /**

@@ -216,7 +216,6 @@ RangeDeletionTask insertRangeDeletionTask(OperationContext* opCtx,
 TEST_F(RangeDeleterTest,
        RemoveDocumentsInRangeRemovesAllDocumentsInRangeWhenAllDocumentsFitInSingleBatch) {
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
-    const int numDocsToRemovePerBatch = 10;
     auto queriesComplete = SemiFuture<void>::makeReady();
 
     setFilteringMetadataWithUUID(uuid());
@@ -232,7 +231,6 @@ TEST_F(RangeDeleterTest,
                                kShardKeyPattern,
                                range,
                                task.getId(),
-                               numDocsToRemovePerBatch,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -244,7 +242,6 @@ TEST_F(RangeDeleterTest,
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
     // More documents than the batch size.
     const auto numDocsToInsert = 3;
-    const auto numDocsToRemovePerBatch = 1;
     auto queriesComplete = SemiFuture<void>::makeReady();
 
     // Insert documents in range.
@@ -263,7 +260,6 @@ TEST_F(RangeDeleterTest,
                                kShardKeyPattern,
                                range,
                                task.getId(),
-                               numDocsToRemovePerBatch,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -272,7 +268,6 @@ TEST_F(RangeDeleterTest,
 
 TEST_F(RangeDeleterTest, RemoveDocumentsInRangeInsertsDocumentToNotifySecondariesOfRangeDeletion) {
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
-    const int numDocsToRemovePerBatch = 10;
     auto queriesComplete = SemiFuture<void>::makeReady();
 
     setFilteringMetadataWithUUID(uuid());
@@ -288,7 +283,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeInsertsDocumentToNotifySecondarie
                                kShardKeyPattern,
                                range,
                                task.getId(),
-                               numDocsToRemovePerBatch,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -304,7 +298,6 @@ TEST_F(
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
     // More documents than the batch size.
     const auto numDocsToInsert = 3;
-    const auto numDocsToRemovePerBatch = 1;
     auto queriesComplete = SemiFuture<void>::makeReady();
 
     // Insert documents in range.
@@ -323,7 +316,6 @@ TEST_F(
                                kShardKeyPattern,
                                range,
                                task.getId(),
-                               numDocsToRemovePerBatch,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -357,7 +349,6 @@ TEST_F(RangeDeleterTest,
                                kShardKeyPattern,
                                range,
                                task.getId(),
-                               1 /* numDocsToRemovePerBatch */,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -390,7 +381,6 @@ TEST_F(RangeDeleterTest,
                                kShardKeyPattern,
                                range,
                                task.getId(),
-                               1 /* numDocsToRemovePerBatch */,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -420,7 +410,6 @@ TEST_F(RangeDeleterTest,
                                kShardKeyPattern,
                                range,
                                task.getId(),
-                               10 /* numDocsToRemovePerBatch*/,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
 
@@ -443,7 +432,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeThrowsErrorWhenCollectionDoesNotE
                                kShardKeyPattern,
                                ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)),
                                task.getId(),
-                               10 /* numDocsToRemovePerBatch*/,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
 
@@ -487,7 +475,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeLeavesDocumentsWhenTaskDocumentDo
                                kShardKeyPattern,
                                range,
                                UUID::gen(),
-                               10 /*numDocsToRemovePerBatch*/,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -503,6 +490,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingS
 
     const auto numDocsToInsert = 3;
     const auto numDocsToRemovePerBatch = 10;
+    rangeDeleterBatchSize.store(numDocsToRemovePerBatch);
     const auto numBatches = ceil((double)numDocsToInsert / numDocsToRemovePerBatch);
     ASSERT_EQ(numBatches, 1);
     // We should wait twice: Once after deleting documents in the range, and once after deleting the
@@ -537,7 +525,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingS
                                kShardKeyPattern,
                                range,
                                t.getId(),
-                               numDocsToRemovePerBatch,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -552,6 +539,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationOnlyOnceAfterS
 
     const auto numDocsToInsert = 3;
     const auto numDocsToRemovePerBatch = 1;
+    rangeDeleterBatchSize.store(numDocsToRemovePerBatch);
     const auto numBatches = ceil((double)numDocsToInsert / numDocsToRemovePerBatch);
     ASSERT_GTE(numBatches, 1);
 
@@ -587,7 +575,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationOnlyOnceAfterS
                                kShardKeyPattern,
                                range,
                                t.getId(),
-                               numDocsToRemovePerBatch,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -601,7 +588,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotWaitForReplicationIfErrorD
         repl::ReplicationCoordinator::get(getServiceContext()));
 
     const auto numDocsToInsert = 3;
-    const auto numDocsToRemovePerBatch = 10;
 
     setFilteringMetadataWithUUID(uuid());
     DBDirectClient dbclient(_opCtx);
@@ -635,7 +621,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotWaitForReplicationIfErrorD
                                kShardKeyPattern,
                                range,
                                t.getId(),
-                               numDocsToRemovePerBatch,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     ASSERT_THROWS_CODE(cleanupComplete.get(), DBException, ErrorCodes::PrimarySteppedDown);
@@ -666,7 +651,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnWriteConflictException) 
                                kShardKeyPattern,
                                range,
                                t.getId(),
-                               10 /*numDocsToRemovePerBatch*/,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -698,7 +682,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnUnexpectedError) {
                                kShardKeyPattern,
                                range,
                                t.getId(),
-                               10 /*numDocsToRemovePerBatch*/,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -712,6 +695,8 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsDelayInBetweenBatches) {
     // More documents than the batch size.
     const auto numDocsToInsert = 3;
     const auto numDocsToRemovePerBatch = 1;
+    rangeDeleterBatchSize.store(numDocsToRemovePerBatch);
+
     auto queriesComplete = SemiFuture<void>::makeReady();
     // Insert documents in range.
     setFilteringMetadataWithUUID(uuid());
@@ -738,7 +723,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsDelayInBetweenBatches) {
                                kShardKeyPattern,
                                range,
                                task.getId(),
-                               numDocsToRemovePerBatch,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -753,7 +737,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsOrphanCleanupDelay) {
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
     // More documents than the batch size.
     const auto numDocsToInsert = 3;
-    const auto numDocsToRemovePerBatch = 1;
     const auto orphanCleanupDelay = Seconds(10);
     auto queriesComplete = SemiFuture<void>::makeReady();
 
@@ -772,7 +755,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsOrphanCleanupDelay) {
                                                   kShardKeyPattern,
                                                   range,
                                                   task.getId(),
-                                                  numDocsToRemovePerBatch,
                                                   orphanCleanupDelay);
 
     // A best-effort check that cleanup has not completed without advancing the clock.
@@ -811,7 +793,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRemovesRangeDeletionTaskOnSuccess
                                kShardKeyPattern,
                                range,
                                t.getId(),
-                               10 /*numDocsToRemovePerBatch*/,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -842,7 +823,6 @@ TEST_F(RangeDeleterTest,
                                kShardKeyPattern,
                                range,
                                t.getId(),
-                               10 /*numDocsToRemovePerBatch*/,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     ASSERT_THROWS_CODE(cleanupComplete.get(),
@@ -880,7 +860,6 @@ TEST_F(RangeDeleterTest,
                                kShardKeyPattern,
                                range,
                                t.getId(),
-                               10 /*numDocsToRemovePerBatch*/,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     ASSERT_THROWS_CODE(cleanupComplete.get(), DBException, ErrorCodes::PrimarySteppedDown);
@@ -912,7 +891,6 @@ DEATH_TEST_F(RangeDeleterTest, RemoveDocumentsInRangeCrashesIfInputFutureHasErro
                                kShardKeyPattern,
                                range,
                                t.getId(),
-                               10 /* numDocsToRemovePerBatch */,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
 
@@ -934,7 +912,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotCrashWhenShardKeyIndexDoes
                                BSON("x" << 1) /* shard key pattern */,
                                ChunkRange(BSON("x" << 0), BSON("x" << 10)),
                                UUID::gen(),
-                               10 /* numDocsToRemovePerBatch*/,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     // Range deleter will keep on retrying when it encounters non-stepdown errors. Make it run
