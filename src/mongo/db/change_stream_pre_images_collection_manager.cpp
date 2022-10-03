@@ -472,11 +472,12 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
                         "jobDuration"_attr = (Date_t::now() - startTime).toString());
         }
     } catch (const DBException& exception) {
-        if (opCtx && opCtx.get()->getKillStatus() != ErrorCodes::OK) {
+        Status interruptStatus = opCtx ? opCtx.get()->checkForInterruptNoAssert() : Status::OK();
+        if (!interruptStatus.isOK()) {
             LOGV2_DEBUG(5869105,
                         3,
-                        "Periodic expired pre-images removal job operation was killed",
-                        "errorCode"_attr = opCtx.get()->getKillStatus());
+                        "Periodic expired pre-images removal job operation was interrupted",
+                        "errorCode"_attr = interruptStatus);
         } else {
             LOGV2_ERROR(5869106,
                         "Periodic expired pre-images removal job failed",
