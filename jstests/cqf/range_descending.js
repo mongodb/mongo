@@ -11,9 +11,7 @@
 "use strict";
 
 load("jstests/libs/optimizer_utils.js");
-
 const coll = db.cqf_range_descending;
-
 /*
  * This is the most basic case: a single range predicate with a descending index.
  */
@@ -22,13 +20,10 @@ const coll = db.cqf_range_descending;
     assert.commandWorked(coll.insertOne({a: 1}));
     const indexKey = {a: -1};
     assert.commandWorked(coll.createIndex(indexKey));
-
     for (let i = 0; i < 100; ++i) {
         assert.commandWorked(coll.insert({}));
     }
-
     const query = {a: {$gte: 0, $lte: 2}};
-
     {
         const res = coll.find(query).hint(indexKey).toArray();
         assert.eq(res.length, 1);
@@ -38,36 +33,36 @@ const coll = db.cqf_range_descending;
         assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
     }
 }
-
 /*
- * Test a compound index, with a range on the leading field and a descending index on the secondary
- * field.
+ * Test a compound index, with a range on the leading field and a descending index on the
+ * secondary field.
  */
 {
     coll.drop();
+    var bulkOp = coll.initializeOrderedBulkOp();
     for (let i = 10; i <= 30; i += 10) {
         for (let j = 1; j <= 3; j++) {
-            assert.commandWorked(coll.insert({a: i, b: j}));
+            for (let k = 0; k < 10; k++) {
+                bulkOp.insert({a: i, b: j});
+            }
         }
     }
-    for (let i = 0; i < 100; ++i) {
-        assert.commandWorked(coll.insert({}));
+    for (let i = 0; i < 1000; ++i) {
+        bulkOp.insert({});
     }
+    assert.commandWorked(bulkOp.execute());
     const indexKey = {a: 1, b: -1};
     assert.commandWorked(coll.createIndex(indexKey));
-
     const query = {a: {$gte: 10, $lte: 20}, b: {$gt: 1}};
-
     {
         const res = coll.find(query).hint(indexKey).toArray();
-        assert.eq(res.length, 4);
+        assert.eq(res.length, 40);
     }
     {
         const res = coll.explain("executionStats").find(query).hint(indexKey).finish();
         assertValueOnPlanPath("IndexScan", res, "child.leftChild.child.nodeType");
     }
 }
-
 /*
  * Test a descending index with range predicates, ensuring that the index plan is chosen.
  */
@@ -79,9 +74,7 @@ const coll = db.cqf_range_descending;
     }
     const indexKey = {a: -1, b: -1};
     assert.commandWorked(coll.createIndex(indexKey));
-
     const query = [{a: 1}, {_id: 0, a: 1, b: 1}];
-
     {
         const res = coll.find(...query).hint(indexKey).toArray();
         assert.eq(res.length, 1);
