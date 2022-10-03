@@ -344,6 +344,14 @@ assert = (function() {
     assert.soon = function(func, msg, timeout, interval, {runHangAnalyzer = true} = {}) {
         _validateAssertionMessage(msg);
 
+        var msgPrefix = "assert.soon failed: " + func;
+
+        if (msg) {
+            if (typeof (msg) != "function") {
+                msgPrefix = "assert.soon failed, msg";
+            }
+        }
+
         var start = new Date();
 
         if (TestData && TestData.inEvergreen) {
@@ -353,14 +361,6 @@ assert = (function() {
         }
 
         interval = interval || 200;
-
-        var msgPrefix = "assert.soon (timeout " + timeout + "ms) failed: " + func;
-
-        if (msg) {
-            if (typeof (msg) != "function") {
-                msgPrefix = "assert.soon (timeout " + timeout + "ms) failed, msg";
-            }
-        }
 
         while (1) {
             if (typeof (func) == "string") {
