@@ -492,6 +492,8 @@ error_codes:
     - {code: 375, name: TransactionAPIMustRetryCommit, categories: [InternalOnly]}
     - {code: 377, name: FLEMaxTagLimitExceeded }
 
+    - {code: 379, name: DatabaseMetadataRefreshCanceled, categories: [InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
