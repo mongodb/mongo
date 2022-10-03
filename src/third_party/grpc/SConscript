@@ -890,8 +890,23 @@ lib_node = grpcxx_env.Library(
     ],
 )
 
-grpc_unittest_env = grpcxx_env.Clone()
+grpc_unittest_env = grpc_env.Clone()
 grpc_unittest_env.InjectThirdParty(libraries=['fmt', 'variant', 'boost', 'safeint'])
+
+# purposely changing the gen dir as an example and to excerise setting gen dirs
+grpc_unittest_env.AppendUnique(
+    PROTOC_GEN_TYPES=[['cpp', grpc_unittest_env.Dir('.')]],
+    PROTOC_PLUGINS={
+        'grpc': {
+            'plugin': '$PROTOC_GRPC_PLUGIN',
+            'options': ['generate_mock_code=true'],
+            'gen_out': grpc_unittest_env.Dir('.'),
+            'exts': ['.grpc.pb.cc', '.grpc.pb.h'],
+        },
+    },
+    CPPPATH=[grpc_unittest_env.Dir('.')]
+)
+
 grpc_unittest_env.Append(
     CPPPATH=[
         '#src',
@@ -904,7 +919,6 @@ grpc_unittest_env.CppUnitTest(
     source=[
         'grpc_source_test.cpp',
         'dist/examples/protos/helloworld.proto',
-        'dist/examples/protos/keyvaluestore.proto',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
