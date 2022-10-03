@@ -725,6 +725,13 @@ std::unique_ptr<Edges> getEdges(BSONElement element,
         case BSONType::NumberDouble:
             uassert(6775507, "min bound must be double", minBound.type() == BSONType::NumberDouble);
             uassert(6775508, "max bound must be double", maxBound.type() == BSONType::NumberDouble);
+            // TODO - SERVER-69667 remove
+            uassert(7006610,
+                    "unexpected min bound",
+                    minBound.numberDouble() == std::numeric_limits<double>::min());
+            uassert(7006611,
+                    "unexpected max bound",
+                    maxBound.numberDouble() == std::numeric_limits<double>::max());
             return getEdgesDouble(element.Double(), minBound.Double(), maxBound.Double(), sparsity);
 
         case BSONType::NumberDecimal:
@@ -732,6 +739,13 @@ std::unique_ptr<Edges> getEdges(BSONElement element,
                 6775509, "min bound must be decimal", minBound.type() == BSONType::NumberDecimal);
             uassert(
                 6775510, "max bound must be decimal", maxBound.type() == BSONType::NumberDecimal);
+            // TODO - SERVER-69667 remove
+            uassert(7006612,
+                    "unexpected min bound",
+                    minBound.numberDecimal() == Decimal128::kLargestNegative);
+            uassert(7006613,
+                    "unexpected max bound",
+                    maxBound.numberDecimal() == Decimal128::kLargestPositive);
             return getEdgesDecimal128(element.numberDecimal(),
                                       minBound.numberDecimal(),
                                       maxBound.numberDecimal(),

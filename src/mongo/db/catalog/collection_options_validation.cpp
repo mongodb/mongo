@@ -135,12 +135,23 @@ EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig conf
                     uassert(6775202,
                             "The field 'sparsity' is missing but required for range index",
                             query.getSparsity().has_value());
-                    uassert(6775203,
-                            "The field 'min' is missing but required for range index",
-                            query.getMin().has_value());
-                    uassert(6775204,
-                            "The field 'max' is missing but required for range index",
-                            query.getMax().has_value());
+                    if (type == BSONType::NumberDouble || type == BSONType::NumberDecimal) {
+                        uassert(
+                            7006601,
+                            "The field 'min' on floating point field is invalid for range index",
+                            !query.getMin().has_value());
+                        uassert(
+                            7006602,
+                            "The field 'max' on floating point field is invalid for range index",
+                            !query.getMax().has_value());
+                    } else {
+                        uassert(6775203,
+                                "The field 'min' is missing but required for range index",
+                                query.getMin().has_value());
+                        uassert(6775204,
+                                "The field 'max' is missing but required for range index",
+                                query.getMax().has_value());
+                    }
 
                     uassert(6775214,
                             "The field 'sparsity' must be between 1 and 4",
@@ -162,15 +173,9 @@ EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig conf
                             break;
                         }
                         case NumberDouble: {
-                            double min = query.getMin()->coerceToDouble();
-                            double max = query.getMax()->coerceToDouble();
-                            uassert(6775210, "Min must be less than max", min < max);
                             break;
                         }
                         case NumberDecimal: {
-                            Decimal128 min = query.getMin()->coerceToDecimal();
-                            Decimal128 max = query.getMax()->coerceToDecimal();
-                            uassert(6775211, "Min must be less than max", min < max);
                             break;
                         }
                         case Date: {
