@@ -1329,6 +1329,18 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    'PROTOC',
+    default="$DESTDIR/bin/protobuf_compiler$PROGSUFFIX",
+    help='Path to protobuf compiler.',
+)
+
+env_vars.Add(
+    'PROTOC_GRPC_PLUGIN',
+    default="$DESTDIR/bin/grpc_cpp_plugin$PROGSUFFIX",
+    help='Path to protobuf compiler grpc plugin.',
+)
+
+env_vars.Add(
     'SPLIT_DWARF',
     help='Set the boolean (auto, on/off true/false 1/0) to enable gsplit-dwarf (non-Windows).',
     converter=split_dwarf_converter, default="auto")
@@ -2008,6 +2020,7 @@ env['BUILDERS']['SharedArchive'] = SCons.Builder.Builder(
 # Teach builders how to build idl files
 for builder in ['SharedObject', 'StaticObject']:
     env['BUILDERS'][builder].add_src_builder("Idlc")
+    env['BUILDERS'][builder].add_src_builder("Protoc")
 
 if link_model.startswith("dynamic"):
 
@@ -5306,6 +5319,7 @@ if get_option('ninja') != 'disabled':
                 .format(env['ICECREAM_VERSION']))
 
     ninja_builder = Tool("ninja")
+
     env["NINJA_BUILDDIR"] = env.Dir("$NINJA_BUILDDIR")
     ninja_builder.generate(env)
 
@@ -5525,6 +5539,8 @@ if get_option('ninja') != 'disabled':
     env.NinjaRegisterFunctionHandler("test_list_builder_action", ninja_test_list_builder)
 
     env['NINJA_GENERATED_SOURCE_ALIAS_NAME'] = 'generated-sources'
+
+env.Tool('protobuf_compiler')
 
 if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
 
