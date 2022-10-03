@@ -21,7 +21,10 @@ variantSuffix = '-1.4.0'
 
 thirdPartyEnvironmentModifications = {
     'abseil-cpp': {'CPPPATH': ['#/src/third_party/abseil-cpp-master/abseil-cpp'], },
+    'cares': {'CPPPATH': ['#src/third_party/cares/dist/include', '#src/third_party/cares/platform/${TARGET_OS}_${TARGET_ARCH}/install/include'], },
     'fmt': {'CPPPATH': ['#src/third_party/fmt/dist/include'], },
+    'protobuf': {'CPPPATH': ['#src/third_party/protobuf/dist/src'], },
+    're2': {'CPPPATH': ['#src/third_party/re2/dist'], },
     's2': {'CPPPATH': ['#src/third_party/s2'], },
     'safeint': {
         'CPPPATH': ['#src/third_party/SafeInt'],
@@ -39,7 +42,8 @@ thirdPartyEnvironmentModifications = {
             "/include",
         ],
         'FORCEINCLUDES': ['js-config.h', ],
-    }
+    },
+    'zlib': {'CPPPATH': ['#/src/third_party/zlib'], },
 }
 
 
@@ -218,6 +222,7 @@ env.Alias('generated-sources', empty_source)
 empty_object = env.LibraryObject(
     target='third_party_shim',
     source=empty_source,
+    NINJA_GENSOURCE_INDEPENDENT=True
 )
 
 
@@ -287,7 +292,7 @@ if use_libunwind:
             'unwind/unwind',
         ])
 
-    unwindEnv.ShimLibrary(name="unwind", )
+    unwindEnv.ShimLibrary(name="unwind", NINJA_GENSOURCE_INDEPENDENT=True)
 
 fmtEnv = env.Clone()
 if use_system_version_of_library("fmt"):
@@ -353,9 +358,11 @@ abseilEnv = env.Clone()
 abseilEnv.InjectThirdParty(libraries=['abseil-cpp'])
 abseilEnv.SConscript(abseilDirectory + '/SConscript', exports={'env': abseilEnv})
 abseilEnv = abseilEnv.Clone(LIBDEPS_INTERFACE=[
-    abseilDirectory + '/absl_container',
+    abseilDirectory + '/absl_city',
     abseilDirectory + '/absl_hash',
-    abseilDirectory + '/absl_numeric',
+    abseilDirectory + '/absl_int128',
+    abseilDirectory + '/absl_raw_hash_set',
+    abseilDirectory + '/absl_wyhash',
 ])
 
 abseilEnv.ShimLibrary(name="abseil")
@@ -389,7 +396,7 @@ else:
         'zlib/zlib',
     ])
 
-zlibEnv.ShimLibrary(name="zlib", )
+zlibEnv.ShimLibrary(name="zlib", NINJA_GENSOURCE_INDEPENDENT=True)
 
 zstdEnv = env.Clone()
 if use_system_version_of_library("zstd"):
@@ -476,6 +483,7 @@ gperftoolsEnv.ShimLibrary(
         # allowed to have public dependencies.
         'lint-public-dep-allowed'
     ],
+    NINJA_GENSOURCE_INDEPENDENT=True,
 )
 
 stemmerEnv = env.Clone()
@@ -599,3 +607,14 @@ if get_option('ssl') == 'on':
         ])
 
     kmsEnv.ShimLibrary(name="kms_message", )
+
+env.SConscript(
+    dirs=[
+        'cares',
+        're2',
+        'protobuf',
+        'grpc',
+    ],
+    duplicate=False,
+    exports={'env': env}
+)
