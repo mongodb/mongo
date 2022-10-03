@@ -55,10 +55,10 @@ def temporary_filename(suffix=None):
 def get_gen_type_and_dir(env, gen_type):
     # Utility function for parsing out the gen type and desired gen dir
     if SCons.Util.is_String(gen_type):
-        gen_out_dir = "."
+        gen_out_dir = None
     elif SCons.Util.is_List(gen_type) and len(gen_type) == 1:
         gen_type = gen_type[0]
-        gen_out_dir = "."
+        gen_out_dir = None
     elif SCons.Util.is_List(gen_type) and len(gen_type) == 2:
         gen_out_dir = gen_type[1]
         gen_type = gen_type[0]
@@ -68,30 +68,46 @@ def get_gen_type_and_dir(env, gen_type):
 
 def protoc_emitter(target, source, env):
 
-    base_file_name = os.path.split(SCons.Util.splitext(str(target[0]))[0])[1]
-    new_targets = []
 
-    for gen_type in env.subst_list('$PROTOC_GEN_TYPES', target=target, source=source):
+    new_targets = []
+    gen_types = env.subst_list('$PROTOC_GEN_TYPES', target=target, source=source)
+    base_file_name = os.path.splitext(target[0].get_path())[0]
+    for gen_type in gen_types:
 
         # Check for valid requested gen type.
         gen_type, gen_out_dir = get_gen_type_and_dir(env, gen_type)
+
         if gen_type not in env['_PROTOC_SUPPORTED_GEN_TYPES']:
             raise ValueError(f"Requested protoc gen output of {gen_type}, but only {env['_PROTOC_SUPPORTED_GEN_TYPES']} are currenlty supported.")
 
+        if gen_out_dir:
+            base_file_name = os.path.join(env.Dir(gen_out_dir).get_path(), os.path.split(SCons.Util.splitext(target[0].get_path())[0])[1])
+
         # Create the targets by extensions list for this type in the desired gen dir.
         exts = env['_PROTOC_SUPPORTED_GEN_TYPES'][gen_type]
-        new_targets += [env.Dir(gen_out_dir).File(f"{base_file_name}{ext}") for ext in exts]
+        new_targets += [env.File(f"{base_file_name}{ext}") for ext in exts]
+
+    if gen_types:
+        # Setup the dependency file.
+        # This is little weird currently, because of the limitation of ninja and multiple
+        # outputs. The base file name can change for each gen type, so in this case we are
+        # taking the last one. This works if all gen outs are in the same dir and makes ninja
+        # happy, but if there are multiple gen_out dirs, then in a scons only build the deps
+        # is gened to the last in the list, which is awkward, but because this is only refernced
+        # as a target throughout the rest of tool, it works fine in scons build.
+        dep_file = env.File(f"{base_file_name}.protodeps")
+        new_targets += [dep_file]
 
     # Create targets for any listed plugins.
     plugins = env.get('PROTOC_PLUGINS', [])
     for name in plugins:
-        out_dir = plugins[name].get('gen_out', '.')
+        out_dir = plugins[name].get('gen_out')
         exts = plugins[name].get('exts', [])
-        new_targets += [env.Dir(out_dir).File(f"{base_file_name}{ext}") for ext in exts]
 
-    # Setup the dependency file.
-    dep_file = env.File(os.path.split(source[0].get_path())[1]+".protodeps")
-    new_targets += [dep_file]
+        if out_dir:
+            base_file_name = os.path.join(env.Dir(out_dir).get_path(), os.path.split(SCons.Util.splitext(target[0].get_path())[0])[1])
+
+        new_targets += [env.File(f"{base_file_name}{ext}") for ext in exts]
 
     env.Alias("generated-sources", new_targets)
 
@@ -299,9 +315,7 @@ def generate(env):
             def protobuf_provider(env, node, action, targets, sources, executor=None):
                 provided_rule, variables, tool_command = env.NinjaGetGenericShellCommand(node, action, targets, sources, executor)
 
-
                 t_dirs = [os.path.dirname(t.get_path()) for t in targets]
-                print(t_dirs)
                 if len(set(t_dirs)) > 1:
                     raise SCons.Errors.BuildError(node=node, errstr="Due to limitations with ninja tool and using phonies for multiple targets, protoc must generate all generated output for a single command to the same directory.")
                 for t in targets:
@@ -349,7 +363,7 @@ def generate(env):
     #     'grpc': {
     #         'plugin': '$PROTOC_GRPC_PLUGIN',
     #         'options': ['generate_mock_code=true'],
-    #         'gen_dir': "$BUILD_DIR/grpc_gen"
+    #         'gen_out': "$BUILD_DIR/grpc_gen"
     #         'exts': ['.grpc.pb.cc', '.grpc.pb.h'],
     #     },
     #     'my_plugin': {
