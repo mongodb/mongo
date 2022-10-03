@@ -29,7 +29,7 @@ let smallPartitionSize = 6;
 let largePartitionSize = 21;
 setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
                        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                       avgDocSize * smallPartitionSize + 50);
+                       avgDocSize * smallPartitionSize + 73);
 
 seedWithTickerData(coll, 10);
 
