@@ -868,14 +868,16 @@ buildvariants:
   - <<: *linux-wt-standalone
     name: linux-wt-standalone-classic-query-engine
     display_name: Standalone Linux inMemory (Classic Query Engine)
-    cron: "0 0 * * 4" # 00:00 on Thursday
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 2,3,4,5,7" # Run it every day except Saturday and Monday.
     expansions:
       mongodb_setup: microbenchmarks_standalone-classic-query-engine
 
   - <<: *linux-wt-standalone
     name: linux-wt-standalone-sbe
     display_name: Standalone Linux inMemory (SBE)
-    cron: "0 0 * * *" # Run it every day for now to get a stable baseline and then change it back to 00:00 on Thursday
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 2,3,4,5,7" # Run it every day except Saturday and Monday.
     expansions:
       mongodb_setup: microbenchmarks_standalone-sbe
 
