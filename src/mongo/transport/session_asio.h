@@ -59,17 +59,19 @@ extern FailPoint transportLayerASIOSessionPauseBeforeSetSocketOption;
 
 template <typename SuccessValue>
 auto futurize(const std::error_code& ec, SuccessValue&& successValue) {
-    using Result = Future<std::decay_t<SuccessValue>>;
+    using T = std::decay_t<SuccessValue>;
     if (MONGO_unlikely(ec)) {
-        return Result::makeReady(errorCodeToStatus(ec));
+        using namespace fmt::literals;
+        static StaticImmortal memo = "futurize<{}>"_format(demangleName(typeid(T)));
+        return Future<T>::makeReady(errorCodeToStatus(ec, *memo));
     }
-    return Result::makeReady(successValue);
+    return Future<T>::makeReady(std::forward<SuccessValue>(successValue));
 }
 
 inline Future<void> futurize(const std::error_code& ec) {
     using Result = Future<void>;
     if (MONGO_unlikely(ec)) {
-        return Result::makeReady(errorCodeToStatus(ec));
+        return Result::makeReady(errorCodeToStatus(ec, "futurize"));
     }
     return Result::makeReady();
 }

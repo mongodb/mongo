@@ -38,11 +38,23 @@
 namespace mongo::transport {
 
 Status errorCodeToStatus(const std::error_code& ec) {
+    return errorCodeToStatus(ec, {});
+}
+
+Status errorCodeToStatus(const std::error_code& ec, StringData context) {
     if (!ec)
         return Status::OK();
 
+    // Add additional context string to Status reason if included.
+    auto makeStatus = [&](ErrorCodes::Error code, StringData reason) {
+        Status result(code, reason);
+        if (context.rawData())
+            result.addContext(context);
+        return result;
+    };
+
     if (ec == asio::error::operation_aborted) {
-        return {ErrorCodes::CallbackCanceled, "Callback was canceled"};
+        return makeStatus(ErrorCodes::CallbackCanceled, "Callback was canceled");
     }
 
 #ifdef _WIN32
@@ -50,15 +62,15 @@ Status errorCodeToStatus(const std::error_code& ec) {
 #else
     if (ec == asio::error::try_again || ec == asio::error::would_block) {
 #endif
-        return {ErrorCodes::NetworkTimeout, "Socket operation timed out"};
+        return makeStatus(ErrorCodes::NetworkTimeout, "Socket operation timed out");
     } else if (ec == asio::error::eof) {
-        return {ErrorCodes::HostUnreachable, "Connection closed by peer"};
+        return makeStatus(ErrorCodes::HostUnreachable, "Connection closed by peer");
     } else if (ec == asio::error::connection_reset) {
-        return {ErrorCodes::HostUnreachable, "Connection reset by peer"};
+        return makeStatus(ErrorCodes::HostUnreachable, "Connection reset by peer");
     } else if (ec == asio::error::network_reset) {
-        return {ErrorCodes::HostUnreachable, "Connection reset by network"};
+        return makeStatus(ErrorCodes::HostUnreachable, "Connection reset by network");
     } else if (ec == asio::error::in_progress) {
-        return {ErrorCodes::ConnectionError, "Socket operation in progress"};
+        return makeStatus(ErrorCodes::ConnectionError, "Socket operation in progress");
     }
 
     // If the ec.category() is a mongoErrorCategory() then this error was propogated from
@@ -69,7 +81,7 @@ Status errorCodeToStatus(const std::error_code& ec) {
         // SocketException
         : ErrorCodes::SocketException;
     // Either way, include the error message.
-    return {errorCode, ec.message()};
+    return makeStatus(errorCode, ec.message());
 }
 
 template <typename T>

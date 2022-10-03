@@ -524,7 +524,7 @@ private:
         }
 
         if (ec) {
-            return _makeFuture(errorCodeToStatus(ec), peer);
+            return _makeFuture(errorCodeToStatus(ec, "resolve"), peer);
         } else {
             return _makeFuture(results, peer);
         }
@@ -716,7 +716,7 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
                         logv2::LogSeverity::Info(),
                         ec);
         if (tcpFastOpenIsConfigured) {
-            return errorCodeToStatus(ec);
+            return errorCodeToStatus(ec, "syncConnect tcpFastOpenIsConfigured");
         }
         ec = std::error_code();
     }
@@ -738,7 +738,7 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
 
     auto status = [&] {
         if (ec) {
-            return errorCodeToStatus(ec);
+            return errorCodeToStatus(ec, "syncConnect connect error");
         } else if (now >= expiration) {
             return Status(ErrorCodes::NetworkTimeout, "Timed out");
         } else {
@@ -763,7 +763,7 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
         return std::make_shared<ASIOSession>(
             this, std::move(sock), false, *endpoint, transientSSLContext);
     } catch (const asio::system_error& e) {
-        return errorCodeToStatus(e.code());
+        return errorCodeToStatus(e.code(), "syncConnect ASIOSession constructor");
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -922,7 +922,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
                                                          *connector->resolvedEndpoint,
                                                          transientSSLContext);
                 } catch (const asio::system_error& e) {
-                    iasserted(errorCodeToStatus(e.code()));
+                    iasserted(errorCodeToStatus(e.code(), "asyncConnect ASIOSession constructor"));
                 }
             }();
             connector->session->ensureAsync();
@@ -1245,7 +1245,7 @@ Status TransportLayerASIO::setup() {
                             logv2::LogSeverity::Info(),
                             ec);
             if (tcpFastOpenIsConfigured) {
-                return errorCodeToStatus(ec);
+                return errorCodeToStatus(ec, "setup tcpFastOpenIsConfigured");
             }
             ec = std::error_code();
         }
@@ -1257,12 +1257,12 @@ Status TransportLayerASIO::setup() {
 
         acceptor.non_blocking(true, ec);
         if (ec) {
-            return errorCodeToStatus(ec);
+            return errorCodeToStatus(ec, "setup non_blocking");
         }
 
         acceptor.bind(*addr, ec);
         if (ec) {
-            return errorCodeToStatus(ec);
+            return errorCodeToStatus(ec, "setup bind");
         }
 
 #ifndef _WIN32
