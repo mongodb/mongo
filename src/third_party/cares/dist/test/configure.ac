@@ -1,0 +1,22 @@
+AC_PREREQ(2.57)
+AC_INIT([c-ares-test],[-],[-])
+AC_CONFIG_SRCDIR([ares-test.cc])
+AC_CONFIG_MACRO_DIR([../m4])
+
+AM_INIT_AUTOMAKE([no-define])
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+
+dnl Checks for programs.
+AC_PROG_CXX
+AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
+LT_INIT
+AC_SUBST(LIBTOOL_DEPS)
+AX_PTHREAD
+AX_CODE_COVERAGE
+AX_CHECK_USER_NAMESPACE
+AX_CHECK_UTS_NAMESPACE
+
+AC_CHECK_HEADERS(netdb.h netinet/tcp.h)
+AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_FILES([Makefile])
+AC_OUTPUT

@@ -1,0 +1,48 @@
+Import('env')
+
+re2_env = env.Clone()
+
+re2_root = re2_env.Dir(".").srcnode()
+re2_env.Append(CPPPATH=[
+    re2_root.Dir("dist"),
+])
+
+if re2_env.ToolchainIs('gcc', 'clang'):
+    re2_env.Append(CCFLAGS=['-pthread'])
+if re2_env.ToolchainIs('msvc'):
+    re2_env.Append(
+        CPPDEFINES=[
+            'NOMINMAX',
+        ],
+        CCFLAGS=[
+            '/wd4996',  # The POSIX name for this item is deprecated
+        ],
+    )
+
+re2_env.Library(
+    target="re2",
+    source=[
+        "dist/re2/perl_groups.cc",
+        "dist/re2/unicode_casefold.cc",
+        "dist/re2/unicode_groups.cc",
+        "dist/re2/stringpiece.cc",
+        "dist/re2/tostring.cc",
+        "dist/re2/mimics_pcre.cc",
+        "dist/re2/simplify.cc",
+        "dist/re2/bitstate.cc",
+        "dist/re2/onepass.cc",
+        "dist/re2/prefilter.cc",
+        "dist/re2/parse.cc",
+        "dist/re2/re2.cc",
+        "dist/re2/filtered_re2.cc",
+        "dist/re2/nfa.cc",
+        "dist/re2/set.cc",
+        "dist/re2/prefilter_tree.cc",
+        "dist/re2/compile.cc",
+        "dist/re2/prog.cc",
+        "dist/re2/dfa.cc",
+        "dist/re2/regexp.cc",
+        "dist/util/rune.cc",
+        "dist/util/strutil.cc",
+    ],
+)

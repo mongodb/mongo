@@ -20,6 +20,12 @@ variantSuffix = '-1.4.0'
 
 thirdPartyEnvironmentModifications = {
     'abseil-cpp': {'CPPPATH': ['#/src/third_party/abseil-cpp-master/abseil-cpp'], },
+    'cares': {
+        'CPPPATH': [
+            '#src/third_party/cares/dist/include',
+            '#src/third_party/cares/platform/${TARGET_OS}_${TARGET_ARCH}/install/include'
+        ],
+    },
     'fmt': {'CPPPATH': ['#src/third_party/fmt/dist/include'], },
     's2': {'CPPPATH': ['#src/third_party/s2'], },
     'safeint': {
@@ -38,7 +44,7 @@ thirdPartyEnvironmentModifications = {
             "/include",
         ],
         'FORCEINCLUDES': ['js-config.h', ],
-    }
+    },
 }
 
 
@@ -218,6 +224,22 @@ if not use_system_version_of_library('libmongocrypt'):
         ],
     }
 
+if not use_system_version_of_library('protobuf'):
+    thirdPartyEnvironmentModifications['protobuf'] = {
+        'CPPPATH': ['#src/third_party/protobuf/dist/src'],
+    }
+
+if not use_system_version_of_library('grpc'):
+    thirdPartyEnvironmentModifications['re2'] = {
+        'CPPPATH': ['#src/third_party/re2/dist'],
+    }
+    thirdPartyEnvironmentModifications['cares'] = {
+        'CPPPATH': [
+            '#src/third_party/cares/dist/include',
+            '#src/third_party/cares/platform/${TARGET_OS}_${TARGET_ARCH}/install/include'
+        ],
+    }
+
 if use_system_libunwind:
     thirdPartyEnvironmentModifications['unwind'] = {
         'SYSLIBDEPS_PRIVATE': [env['LIBDEPS_UNWIND_SYSLIBDEP'], env['LIBDEPS_LZMA_SYSLIBDEP']],
@@ -257,10 +279,8 @@ empty_source = env.Textfile(
 )
 env.Alias('generated-sources', empty_source)
 
-empty_object = env.LibraryObject(
-    target='third_party_shim',
-    source=empty_source,
-)
+empty_object = env.LibraryObject(target='third_party_shim', source=empty_source,
+                                 NINJA_GENSOURCE_INDEPENDENT=True)
 
 
 def shim_library(env, name, **kwargs):
@@ -329,7 +349,7 @@ if use_libunwind:
             'unwind/unwind',
         ])
 
-    unwindEnv.ShimLibrary(name="unwind", )
+    unwindEnv.ShimLibrary(name="unwind", NINJA_GENSOURCE_INDEPENDENT=True)
 
 fmtEnv = env.Clone()
 if use_system_version_of_library("fmt"):
@@ -395,9 +415,11 @@ abseilEnv = env.Clone()
 abseilEnv.InjectThirdParty(libraries=['abseil-cpp'])
 abseilEnv.SConscript(abseilDirectory + '/SConscript', exports={'env': abseilEnv})
 abseilEnv = abseilEnv.Clone(LIBDEPS_INTERFACE=[
-    abseilDirectory + '/absl_container',
+    abseilDirectory + '/absl_city',
     abseilDirectory + '/absl_hash',
-    abseilDirectory + '/absl_numeric',
+    abseilDirectory + '/absl_int128',
+    abseilDirectory + '/absl_raw_hash_set',
+    abseilDirectory + '/absl_wyhash',
 ])
 
 abseilEnv.ShimLibrary(name="abseil")
@@ -431,7 +453,7 @@ else:
         'zlib/zlib',
     ])
 
-zlibEnv.ShimLibrary(name="zlib", )
+zlibEnv.ShimLibrary(name="zlib", NINJA_GENSOURCE_INDEPENDENT=True)
 
 zstdEnv = env.Clone()
 if use_system_version_of_library("zstd"):
@@ -518,6 +540,7 @@ gperftoolsEnv.ShimLibrary(
         # allowed to have public dependencies.
         'lint-public-dep-allowed'
     ],
+    NINJA_GENSOURCE_INDEPENDENT=True,
 )
 
 stemmerEnv = env.Clone()
@@ -655,3 +678,39 @@ else:
     ])
 
 mcEnv.ShimLibrary(name="libmongocrypt", )
+
+if env.TargetOSIs('linux'):
+
+    protobufEnv = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
+    if use_system_version_of_library("protobuf"):
+        protobufEnv = protobufEnv.Clone(
+            SYSLIBDEPS=[
+                env['LIBDEPS_PROTOBUF_SYSLIBDEP'],
+                env['LIBDEPS_PROTOC_SYSLIBDEP'],
+            ], )
+    else:
+        protobufEnv.SConscript(dirs=[
+            'protobuf',
+        ], duplicate=False, exports={'env': env})
+        protobufEnv = protobufEnv.Clone(LIBDEPS_INTERFACE=[
+            'protobuf/protoc',
+        ])
+    protobufEnv.ShimLibrary(name="protobuf", )
+
+    grpcEnv = env.Clone()
+    if use_system_version_of_library("grpc"):
+        grpcEnv = grpcEnv.Clone(SYSLIBDEPS=[
+            env['LIBDEPS_GRPC_SYSLIBDEP'],
+            env['LIBDEPS_GRPCXX_SYSLIBDEP'],
+            env['LIBDEPS_GRPCXX_REFLECTION_SYSLIBDEP'],
+        ])
+    else:
+        grpcEnv.SConscript(dirs=[
+            'cares',
+            're2',
+            'grpc',
+        ], duplicate=False, exports={'env': env})
+        grpcEnv = grpcEnv.Clone(LIBDEPS_INTERFACE=[
+            'grpc/grpc++_reflection',
+        ])
+    grpcEnv.ShimLibrary(name="grpc", )
