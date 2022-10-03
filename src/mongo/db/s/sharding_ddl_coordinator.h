@@ -188,7 +188,13 @@ protected:
                                const BSONObj& initialStateDoc)
         : ShardingDDLCoordinator(service, initialStateDoc),
           _coordinatorName(name),
-          _initialState(initialStateDoc.getOwned()),
+          /*
+           * Force a deserialisation + serialisation of the initialStateDoc to ensure that
+           * _initialState is a full deep copy of the received parameter.
+           */
+          _initialState(
+              StateDoc::parse(IDLParserContext("CoordinatorInitialState"), initialStateDoc)
+                  .toBSON()),
           _doc(StateDoc::parse(IDLParserContext("CoordinatorDocument"), _initialState)) {}
 
     ShardingDDLCoordinatorMetadata const& metadata() const override {
