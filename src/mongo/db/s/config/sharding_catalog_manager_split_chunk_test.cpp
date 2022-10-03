@@ -105,8 +105,8 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
                                                          splitPoints,
                                                          "shard0000",
                                                          false /* fromChunkSplitter*/));
-        auto collVersion = ChunkVersion::parse(versions["collectionVersion"]);
-        auto shardVersion = ChunkVersion::parse(versions["shardVersion"]);
+        auto collVersion = versions.collectionVersion;
+        auto shardVersion = versions.shardVersion;
 
         ASSERT_TRUE(origVersion.isOlderThan(shardVersion));
         ASSERT_EQ(collVersion, shardVersion);
@@ -181,15 +181,15 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
 
         setupCollection(nss, _keyPattern, {chunk});
 
-        ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                      ->commitChunkSplit(operationContext(),
-                                         nss,
-                                         collEpoch,
-                                         collTimestamp,
-                                         ChunkRange(chunkMin, chunkMax),
-                                         splitPoints,
-                                         "shard0000",
-                                         false /* fromChunkSplitter*/));
+        uassertStatusOK(ShardingCatalogManager::get(operationContext())
+                            ->commitChunkSplit(operationContext(),
+                                               nss,
+                                               collEpoch,
+                                               collTimestamp,
+                                               ChunkRange(chunkMin, chunkMax),
+                                               splitPoints,
+                                               "shard0000",
+                                               false /* fromChunkSplitter*/));
 
         // First chunkDoc should have range [chunkMin, chunkSplitPoint]
         auto chunkDocStatus =
@@ -278,15 +278,15 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
 
         setupCollection(nss, _keyPattern, {chunk, chunk2});
 
-        ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                      ->commitChunkSplit(operationContext(),
-                                         nss,
-                                         collEpoch,
-                                         collTimestamp,
-                                         ChunkRange(chunkMin, chunkMax),
-                                         splitPoints,
-                                         "shard0000",
-                                         false /* fromChunkSplitter*/));
+        uassertStatusOK(ShardingCatalogManager::get(operationContext())
+                            ->commitChunkSplit(operationContext(),
+                                               nss,
+                                               collEpoch,
+                                               collTimestamp,
+                                               ChunkRange(chunkMin, chunkMax),
+                                               splitPoints,
+                                               "shard0000",
+                                               false /* fromChunkSplitter*/));
 
         // First chunkDoc should have range [chunkMin, chunkSplitPoint]
         auto chunkDocStatus =
@@ -420,7 +420,7 @@ TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
                                                   splitPoints,
                                                   "shard0000",
                                                   false /* fromChunkSplitter*/);
-        ASSERT_EQ(ErrorCodes::StaleEpoch, splitStatus);
+        ASSERT_EQ(ErrorCodes::StaleEpoch, splitStatus.getStatus());
     };
 
     test(_nss2, Timestamp(42));

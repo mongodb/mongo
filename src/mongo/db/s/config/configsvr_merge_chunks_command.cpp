@@ -87,7 +87,7 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            const BSONObj shardAndCollVers = uassertStatusOK(
+            const auto shardAndCollVers = uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->commitChunksMerge(opCtx,
                                                                       ns(),
                                                                       request().getEpoch(),
@@ -96,8 +96,7 @@ public:
                                                                       request().getChunkRange(),
                                                                       request().getShard(),
                                                                       request().getValidAfter()));
-            return ConfigSvrMergeResponse{
-                ChunkVersion::parse(shardAndCollVers[ChunkVersion::kChunkVersionField])};
+            return ConfigSvrMergeResponse{shardAndCollVers.shardVersion};
         }
 
     private:

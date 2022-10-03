@@ -117,11 +117,11 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
                                                       _shardId,
                                                       validAfter));
 
-    auto collVersion = ChunkVersion::parse(versions["collectionVersion"]);
-    auto shardVersion = ChunkVersion::parse(versions["shardVersion"]);
+    auto collVersion = versions.collectionVersion;
+    auto shardVersion = versions.shardVersion;
 
-    ASSERT_TRUE(origVersion.isOlderThan(shardVersion));
-    ASSERT_EQ(collVersion, shardVersion);
+    ASSERT_TRUE(origVersion.isOlderThan(versions.shardVersion));
+    ASSERT_EQ(shardVersion, collVersion);
 
     // Check for increment on mergedChunk's minor version
     auto expectedShardVersion =
@@ -196,15 +196,15 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
 
     Timestamp validAfter{100, 0};
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunksMerge(operationContext(),
-                                      _nss1,
-                                      collEpoch,
-                                      collTimestamp,
-                                      collUuid,
-                                      rangeToBeMerged,
-                                      _shardId,
-                                      validAfter));
+    uassertStatusOK(ShardingCatalogManager::get(operationContext())
+                        ->commitChunksMerge(operationContext(),
+                                            _nss1,
+                                            collEpoch,
+                                            collTimestamp,
+                                            collUuid,
+                                            rangeToBeMerged,
+                                            _shardId,
+                                            validAfter));
 
     const auto query BSON(ChunkType::collectionUUID() << collUuid);
     auto findResponse = uassertStatusOK(
@@ -280,15 +280,15 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
 
     Timestamp validAfter{100, 0};
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunksMerge(operationContext(),
-                                      _nss1,
-                                      collEpoch,
-                                      collTimestamp,
-                                      collUuid,
-                                      rangeToBeMerged,
-                                      _shardId,
-                                      validAfter));
+    uassertStatusOK(ShardingCatalogManager::get(operationContext())
+                        ->commitChunksMerge(operationContext(),
+                                            _nss1,
+                                            collEpoch,
+                                            collTimestamp,
+                                            collUuid,
+                                            rangeToBeMerged,
+                                            _shardId,
+                                            validAfter));
 
     const auto query = BSON(ChunkType::collectionUUID() << collUuid);
     auto findResponse = uassertStatusOK(
@@ -362,15 +362,15 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     setupCollection(_nss1, _keyPattern, {chunk, chunk2, otherChunk});
 
     Timestamp validAfter{1};
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunksMerge(operationContext(),
-                                      _nss1,
-                                      collEpoch,
-                                      collTimestamp,
-                                      collUuid,
-                                      rangeToBeMerged,
-                                      shardId,
-                                      validAfter));
+    uassertStatusOK(ShardingCatalogManager::get(operationContext())
+                        ->commitChunksMerge(operationContext(),
+                                            _nss1,
+                                            collEpoch,
+                                            collTimestamp,
+                                            collUuid,
+                                            rangeToBeMerged,
+                                            shardId,
+                                            validAfter));
     const auto query = BSON(ChunkType::collectionUUID() << collUuid);
     auto findResponse = uassertStatusOK(
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
@@ -486,7 +486,7 @@ TEST_F(MergeChunkTest, NonMatchingUUIDsOfChunkAndRequestErrors) {
                                                rangeToBeMerged,
                                                _shardId,
                                                validAfter);
-    ASSERT_EQ(ErrorCodes::InvalidUUID, mergeStatus);
+    ASSERT_EQ(ErrorCodes::InvalidUUID, mergeStatus.getStatus());
 }
 
 TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
@@ -515,15 +515,15 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
 
     Timestamp validAfter{1};
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunksMerge(operationContext(),
-                                      _nss1,
-                                      collEpoch,
-                                      collTimestamp,
-                                      collUuid,
-                                      rangeToBeMerged,
-                                      _shardId,
-                                      validAfter));
+    uassertStatusOK(ShardingCatalogManager::get(operationContext())
+                        ->commitChunksMerge(operationContext(),
+                                            _nss1,
+                                            collEpoch,
+                                            collTimestamp,
+                                            collUuid,
+                                            rangeToBeMerged,
+                                            _shardId,
+                                            validAfter));
 
     // Verify that no change to config.chunks happened.
     const auto query = BSON(ChunkType::collectionUUID() << collUuid);
@@ -586,15 +586,15 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     ChunkRange rangeToBeMerged(chunk1.getMin(), chunk3.getMax());
     Timestamp validAfter{100, 0};
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunksMerge(operationContext(),
-                                      _nss1,
-                                      collEpoch,
-                                      collTimestamp,
-                                      collUuid,
-                                      rangeToBeMerged,
-                                      _shardId,
-                                      validAfter));
+    uassertStatusOK(ShardingCatalogManager::get(operationContext())
+                        ->commitChunksMerge(operationContext(),
+                                            _nss1,
+                                            collEpoch,
+                                            collTimestamp,
+                                            collUuid,
+                                            rangeToBeMerged,
+                                            _shardId,
+                                            validAfter));
 
     const auto query = BSON(ChunkType::collectionUUID() << collUuid);
     auto findResponse = uassertStatusOK(

@@ -91,6 +91,11 @@ public:
                            std::unique_ptr<executor::TaskExecutor> addShardExecutor);
     ~ShardingCatalogManager();
 
+    struct ShardAndCollectionVersion {
+        ChunkVersion shardVersion;
+        ChunkVersion collectionVersion;
+    };
+
     /**
      * Instantiates an instance of the sharding catalog manager and installs it on the specified
      * service context. This method is not thread-safe and must be called only once when the service
@@ -242,18 +247,20 @@ public:
      * Updates metadata in the config.chunks collection to show the given chunk as split into
      * smaller chunks at the specified split points.
      *
-     * Returns a BSON object with the newly produced chunk versions after the migration:
+     * Returns a ShardAndCollectionVersion object with the newly produced chunk versions after the
+     * migration:
      *   - shardVersion - The new shard version of the source shard
      *   - collectionVersion - The new collection version after the commit
      */
-    StatusWith<BSONObj> commitChunkSplit(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         const OID& requestEpoch,
-                                         const boost::optional<Timestamp>& requestTimestamp,
-                                         const ChunkRange& range,
-                                         const std::vector<BSONObj>& splitPoints,
-                                         const std::string& shardName,
-                                         bool fromChunkSplitter);
+    StatusWith<ShardAndCollectionVersion> commitChunkSplit(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const OID& requestEpoch,
+        const boost::optional<Timestamp>& requestTimestamp,
+        const ChunkRange& range,
+        const std::vector<BSONObj>& splitPoints,
+        const std::string& shardName,
+        bool fromChunkSplitter);
 
     /**
      * Updates metadata in the config.chunks collection so the chunks within the specified key range
@@ -261,36 +268,40 @@ public:
      * If 'validAfter' is not set, this means the commit request came from an older server version,
      * which is not history-aware.
      *
-     * Returns a BSON object with the newly produced chunk versions after the migration:
+     * Returns a ShardAndCollectionVersion object with the newly produced chunk versions after the
+     * migration:
      *   - shardVersion - The new shard version of the source shard
      *   - collectionVersion - The new collection version after the commit
      */
-    StatusWith<BSONObj> commitChunksMerge(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const boost::optional<OID>& epoch,
-                                          const boost::optional<Timestamp>& timestamp,
-                                          const UUID& requestCollectionUUID,
-                                          const ChunkRange& chunkRange,
-                                          const ShardId& shardId,
-                                          const boost::optional<Timestamp>& validAfter);
+    StatusWith<ShardAndCollectionVersion> commitChunksMerge(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<OID>& epoch,
+        const boost::optional<Timestamp>& timestamp,
+        const UUID& requestCollectionUUID,
+        const ChunkRange& chunkRange,
+        const ShardId& shardId,
+        const boost::optional<Timestamp>& validAfter);
 
     /**
      * Updates metadata in config.chunks collection to show the given chunk in its new shard.
      * If 'validAfter' is not set, this means the commit request came from an older server version,
      * which is not history-aware.
      *
-     * Returns a BSON object with the newly produced chunk versions after the migration:
+     * Returns a ShardAndCollectionVersion object with the newly produced chunk versions after the
+     * migration:
      *   - shardVersion - The new shard version of the source shard
      *   - collectionVersion - The new collection version after the commit
      */
-    StatusWith<BSONObj> commitChunkMigration(OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             const ChunkType& migratedChunk,
-                                             const OID& collectionEpoch,
-                                             const Timestamp& collectionTimestamp,
-                                             const ShardId& fromShard,
-                                             const ShardId& toShard,
-                                             const boost::optional<Timestamp>& validAfter);
+    StatusWith<ShardAndCollectionVersion> commitChunkMigration(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ChunkType& migratedChunk,
+        const OID& collectionEpoch,
+        const Timestamp& collectionTimestamp,
+        const ShardId& fromShard,
+        const ShardId& toShard,
+        const boost::optional<Timestamp>& validAfter);
 
     /**
      * Removes the jumbo flag from the specified chunk.

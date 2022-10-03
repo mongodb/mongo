@@ -73,8 +73,6 @@ MONGO_FAIL_POINT_DEFINE(skipExpiringOldChunkHistory);
 
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
-constexpr StringData kCollectionVersionField = "collectionVersion"_sd;
-
 /**
  * Append min, max and version information from chunk to the buffer for logChange purposes.
  */
@@ -609,15 +607,15 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
                                                                  sharedBlock->newChunks};
 }
 
-StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const OID& requestEpoch,
-    const boost::optional<Timestamp>& requestTimestamp,
-    const ChunkRange& range,
-    const std::vector<BSONObj>& splitPoints,
-    const std::string& shardName,
-    const bool fromChunkSplitter) {
+StatusWith<ShardingCatalogManager::ShardAndCollectionVersion>
+ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const OID& requestEpoch,
+                                         const boost::optional<Timestamp>& requestTimestamp,
+                                         const ChunkRange& range,
+                                         const std::vector<BSONObj>& splitPoints,
+                                         const std::string& shardName,
+                                         const bool fromChunkSplitter) {
 
     // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
     // under the exclusive _kChunkOpLock happen on the same term.
@@ -718,10 +716,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         }
     }
 
-    BSONObjBuilder response;
-    splitChunkResult.currentMaxVersion.serialize(kCollectionVersionField, &response);
-    splitChunkResult.currentMaxVersion.serialize(ChunkVersion::kChunkVersionField, &response);
-    return response.obj();
+    return ShardAndCollectionVersion{splitChunkResult.currentMaxVersion /*shardVersion*/,
+                                     splitChunkResult.currentMaxVersion /*collectionVersion*/};
 }
 
 void ShardingCatalogManager::_mergeChunksInTransaction(
@@ -829,15 +825,15 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
     txn.run(opCtx, updateChunksFn);
 }
 
-StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const boost::optional<OID>& epoch,
-    const boost::optional<Timestamp>& timestamp,
-    const UUID& requestCollectionUUID,
-    const ChunkRange& chunkRange,
-    const ShardId& shardId,
-    const boost::optional<Timestamp>& validAfter) {
+StatusWith<ShardingCatalogManager::ShardAndCollectionVersion>
+ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const boost::optional<OID>& epoch,
+                                          const boost::optional<Timestamp>& timestamp,
+                                          const UUID& requestCollectionUUID,
+                                          const ChunkRange& chunkRange,
+                                          const ShardId& shardId,
+                                          const boost::optional<Timestamp>& validAfter) {
     if (!validAfter) {
         return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
     }
@@ -907,15 +903,14 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
                           << " does not contain a sequence of chunks that exactly fills the range "
                           << chunkRange.toString(),
             chunk.getRange() == chunkRange);
-        BSONObjBuilder response;
-        collVersion.serialize(kCollectionVersionField, &response);
+
         const auto currentShardVersion = getShardVersion(opCtx, coll, shardId, collVersion);
-        currentShardVersion.serialize(ChunkVersion::kChunkVersionField, &response);
+
         // Makes sure that the last thing we read in getCollectionVersion and getShardVersion gets
         // majority written before to return from this command, otherwise next RoutingInfo cache
         // refresh from the shard may not see those newest information.
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        return response.obj();
+        return ShardAndCollectionVersion{currentShardVersion, collVersion};
     }
 
     // 3. Prepare the data for the merge
@@ -972,21 +967,18 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
 
-    BSONObjBuilder response;
-    mergeVersion.serialize(kCollectionVersionField, &response);
-    mergeVersion.serialize(ChunkVersion::kChunkVersionField, &response);
-    return response.obj();
+    return ShardAndCollectionVersion{mergeVersion /*shardVersion*/, mergeVersion /*collVersion*/};
 }
 
-StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ChunkType& migratedChunk,
-    const OID& collectionEpoch,
-    const Timestamp& collectionTimestamp,
-    const ShardId& fromShard,
-    const ShardId& toShard,
-    const boost::optional<Timestamp>& validAfter) {
+StatusWith<ShardingCatalogManager::ShardAndCollectionVersion>
+ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const ChunkType& migratedChunk,
+                                             const OID& collectionEpoch,
+                                             const Timestamp& collectionTimestamp,
+                                             const ShardId& fromShard,
+                                             const ShardId& toShard,
+                                             const boost::optional<Timestamp>& validAfter) {
 
     if (!validAfter) {
         return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
@@ -1100,16 +1092,13 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
 
     if (currentChunk.getShard() == toShard) {
         // The commit was already done successfully
-        BSONObjBuilder response;
-        currentCollectionVersion.serialize(kCollectionVersionField, &response);
         const auto currentShardVersion =
             getShardVersion(opCtx, coll, fromShard, currentCollectionVersion);
-        currentShardVersion.serialize(ChunkVersion::kChunkVersionField, &response);
         // Makes sure that the last thing we read in findChunkContainingRange, getShardVersion, and
         // getCollectionVersion gets majority written before to return from this command, otherwise
         // next RoutingInfo cache refresh from the shard may not see those newest information.
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        return response.obj();
+        return ShardAndCollectionVersion{currentShardVersion, currentCollectionVersion};
     }
 
     uassert(4914702,
@@ -1232,18 +1221,17 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     _commitChunkMigrationInTransaction(
         opCtx, nss, newMigratedChunk, newSplitChunks, newControlChunk);
 
-    BSONObjBuilder response;
+    ShardAndCollectionVersion response;
     if (!newControlChunk) {
         // We migrated the last chunk from the donor shard.
-        newMigratedChunk->getVersion().serialize(kCollectionVersionField, &response);
-        const ChunkVersion donorShardVersion(
+        response.collectionVersion = newMigratedChunk->getVersion();
+        response.shardVersion = ChunkVersion(
             {currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp()}, {0, 0});
-        donorShardVersion.serialize(ChunkVersion::kChunkVersionField, &response);
     } else {
-        newControlChunk->getVersion().serialize(kCollectionVersionField, &response);
-        newControlChunk->getVersion().serialize(ChunkVersion::kChunkVersionField, &response);
+        response.collectionVersion = newControlChunk->getVersion();
+        response.shardVersion = newControlChunk->getVersion();
     }
-    return response.obj();
+    return response;
 }
 
 StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(OperationContext* opCtx,

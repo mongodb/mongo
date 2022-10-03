@@ -65,6 +65,9 @@ using std::string;
  *   writeConcern: <BSONObj>
  * }
  */
+
+constexpr StringData kCollectionVersionField = "collectionVersion"_sd;
+
 class ConfigSvrSplitChunkCommand : public BasicCommand {
 public:
     ConfigSvrSplitChunkCommand() : BasicCommand("_configsvrCommitChunkSplit") {}
@@ -129,7 +132,9 @@ public:
                 parsedRequest.getSplitPoints(),
                 parsedRequest.getShardName(),
                 parsedRequest.isFromChunkSplitter()));
-        result.appendElements(shardAndCollVers);
+
+        shardAndCollVers.collectionVersion.serialize(kCollectionVersionField, &result);
+        shardAndCollVers.shardVersion.serialize(ChunkVersion::kChunkVersionField, &result);
 
         return true;
     }
