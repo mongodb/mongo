@@ -1292,6 +1292,7 @@ buildvariants:
       - name: schedule_variant_auto_tasks
       - name: linkbench
       - name: linkbench2
+      - name: snapshot_reads
 
   - name: linux-1-node-replSet-sbe
     display_name: Linux 1-Node ReplSet (SBE)
