@@ -375,41 +375,7 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
 bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
                                         BSONObjBuilder* output,
                                         double scale) const {
-    dassert(opCtx->lockState()->isReadLocked());
-    {
-        BSONObjBuilder metadata(output->subobjStart("metadata"));
-        Status status = WiredTigerUtil::getApplicationMetadata(opCtx, uri(), &metadata);
-        if (!status.isOK()) {
-            metadata.append("error", "unable to retrieve metadata");
-            metadata.append("code", static_cast<int>(status.code()));
-            metadata.append("reason", status.reason());
-        }
-    }
-    std::string type, sourceURI;
-    WiredTigerUtil::fetchTypeAndSourceURI(opCtx, _uri, &type, &sourceURI);
-    StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadataCreate(opCtx, sourceURI);
-    StringData creationStringName("creationString");
-    if (!metadataResult.isOK()) {
-        BSONObjBuilder creationString(output->subobjStart(creationStringName));
-        creationString.append("error", "unable to retrieve creation config");
-        creationString.append("code", static_cast<int>(metadataResult.getStatus().code()));
-        creationString.append("reason", metadataResult.getStatus().reason());
-    } else {
-        output->append(creationStringName, metadataResult.getValue());
-        // Type can be "lsm" or "file"
-        output->append("type", type);
-    }
-
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
-    WT_SESSION* s = session->getSession();
-    Status status =
-        WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri(), "statistics=(fast)", output);
-    if (!status.isOK()) {
-        output->append("error", "unable to retrieve statistics");
-        output->append("code", static_cast<int>(status.code()));
-        output->append("reason", status.reason());
-    }
-    return true;
+    return WiredTigerUtil::appendCustomStats(opCtx, output, scale, _uri);
 }
 
 Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const KeyString::Value& key) {

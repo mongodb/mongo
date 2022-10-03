@@ -446,14 +446,11 @@ Status WiredTigerColumnStore::compact(OperationContext* opCtx) {
     // TODO: SERVER-65980.
     uasserted(ErrorCodes::NotImplemented, "WiredTigerColumnStore::compact");
 }
+
 bool WiredTigerColumnStore::appendCustomStats(OperationContext* opCtx,
                                               BSONObjBuilder* output,
                                               double scale) const {
-    // TODO: SERVER-65980.
-    // For now we just skip this so that tests can successfully obtain collection-level stats on a
-    // collection with a columnstore index.
-    output->append("note"_sd, "columnstore stats are not yet implemented"_sd);
-    return true;
+    return WiredTigerUtil::appendCustomStats(opCtx, output, scale, _uri);
 }
 
 }  // namespace mongo
