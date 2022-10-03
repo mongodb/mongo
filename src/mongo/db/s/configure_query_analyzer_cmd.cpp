@@ -33,7 +33,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/list_collections_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/configure_query_analyzer_cmd_gen.h"
@@ -45,63 +48,6 @@
 namespace mongo {
 
 namespace {
-
-void validateCommandOptions(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            QueryAnalyzerModeEnum mode,
-                            boost::optional<double> sampleRate) {
-    uassert(ErrorCodes::InvalidOptions,
-            "Cannot specify 'sampleRate' when 'mode' is \"off\"",
-            mode != QueryAnalyzerModeEnum::kOff || !sampleRate);
-
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "'sampleRate' must be greater than 0",
-            !sampleRate || (*sampleRate > 0));
-
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        auto dbInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
-
-        ListCollections listCollections;
-        listCollections.setDbName(nss.db());
-        listCollections.setFilter(BSON("name" << nss.coll()));
-
-        auto cmdResponse = executeCommandAgainstDatabasePrimary(
-            opCtx,
-            nss.db(),
-            dbInfo,
-            CommandHelpers::filterCommandRequestForPassthrough(listCollections.toBSON({})),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            Shard::RetryPolicy::kIdempotent);
-        auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-        uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
-
-        auto firstBatch = remoteResponse.data.firstElement()["firstBatch"].Obj();
-        BSONObjIterator it(firstBatch);
-
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Cannot analyze queries for a non-existing collection",
-                it.more());
-
-        auto collection = it.next().Obj().getOwned();
-        uassert(ErrorCodes::CommandNotSupportedOnView,
-                "Cannot analyze queries for a view",
-                collection.getStringField("type") != "view");
-
-        uassert(6875000,
-                str::stream() << "Found multiple collections with the same name '" << nss << "'",
-                !it.more());
-    } else {
-        uassert(ErrorCodes::CommandNotSupportedOnView,
-                "Cannot analyze queries for a view",
-                !CollectionCatalog::get(opCtx)->lookupView(opCtx, nss));
-
-        AutoGetCollectionForReadCommand collection(opCtx, nss);
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Cannot analyze queries for a non-existing collection",
-                collection);
-    }
-}
 
 class ConfigureQueryAnalyzerCmd : public TypedCommand<ConfigureQueryAnalyzerCmd> {
 public:
@@ -120,15 +66,90 @@ public:
             const auto& nss = ns();
             const auto mode = request().getMode();
             const auto sampleRate = request().getSampleRate();
-            validateCommandOptions(opCtx, nss, mode, sampleRate);
+            uassert(ErrorCodes::InvalidOptions,
+                    "Cannot specify 'sampleRate' when 'mode' is \"off\"",
+                    mode != QueryAnalyzerModeEnum::kOff || !sampleRate);
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "'sampleRate' must be greater than 0",
+                    mode != QueryAnalyzerModeEnum::kFull || (sampleRate && *sampleRate > 0));
 
-            LOGV2(6875002,
-                  "Configuring query analysis",
-                  "nss"_attr = nss,
-                  "mode"_attr = mode,
-                  "sampleRate"_attr = sampleRate);
+            auto newConfig = request().getConfiguration();
 
-            return {};
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                auto dbInfo =
+                    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
+
+                ListCollections listCollections;
+                listCollections.setDbName(nss.db());
+                listCollections.setFilter(BSON("name" << nss.coll()));
+
+                auto cmdResponse = executeCommandAgainstDatabasePrimary(
+                    opCtx,
+                    nss.db(),
+                    dbInfo,
+                    CommandHelpers::filterCommandRequestForPassthrough(listCollections.toBSON({})),
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                    Shard::RetryPolicy::kIdempotent);
+                auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+
+                auto firstBatch = remoteResponse.data.firstElement()["firstBatch"].Obj();
+                BSONObjIterator it(firstBatch);
+
+                uassert(ErrorCodes::NamespaceNotFound,
+                        str::stream() << "Cannot analyze queries for a non-existing collection",
+                        it.more());
+
+                auto doc = it.next().Obj().getOwned();
+
+                uassert(ErrorCodes::CommandNotSupportedOnView,
+                        "Cannot analyze queries for a view",
+                        doc.getStringField("type") != "view");
+                uassert(6875000,
+                        str::stream()
+                            << "Found multiple collections with the same name '" << nss << "'",
+                        !it.more());
+
+                auto listCollRepItem = ListCollectionsReplyItem::parse(
+                    IDLParserContext("ListCollectionsReplyItem"), doc);
+                auto info = listCollRepItem.getInfo();
+                invariant(info);
+                auto uuid = info->getUuid();
+
+                QueryAnalyzerDocument qad;
+                qad.setNs(nss);
+                qad.setCollectionUuid(*uuid);
+                qad.setConfiguration(newConfig);
+                // TODO SERVER-69804: Implement start/stop timestamp in config.queryAnalyzers
+                // document.
+                LOGV2(6915001,
+                      "Persisting query analyzer configuration",
+                      "nss"_attr = nss,
+                      "collectionUuid"_attr = uuid,
+                      "mode"_attr = mode,
+                      "sampleRate"_attr = sampleRate);
+                PersistentTaskStore<QueryAnalyzerDocument> store{
+                    NamespaceString::kConfigQueryAnalyzersNamespace};
+                store.upsert(opCtx,
+                             BSON(QueryAnalyzerDocument::kCollectionUuidFieldName
+                                  << qad.getCollectionUuid()),
+                             qad.toBSON(),
+                             WriteConcerns::kMajorityWriteConcernNoTimeout);
+            } else {
+                uassert(ErrorCodes::CommandNotSupportedOnView,
+                        "Cannot analyze queries for a view",
+                        !CollectionCatalog::get(opCtx)->lookupView(opCtx, nss));
+
+                AutoGetCollectionForReadCommand collection(opCtx, nss);
+                uassert(ErrorCodes::NamespaceNotFound,
+                        str::stream() << "Cannot analyze queries for a non-existing collection",
+                        collection);
+            }
+
+            Response response;
+            // TODO SERVER-70019: Make configQueryAnalyzer return old configuration.
+            response.setNewConfiguration(newConfig);
+            return response;
         }
 
     private:

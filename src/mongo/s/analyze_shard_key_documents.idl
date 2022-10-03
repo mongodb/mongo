@@ -27,48 +27,23 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
-
-enums:
-  QueryAnalyzerMode:
-    description: "The query analysis mode for a collection."
-    type: string
-    values:
-      kFull: "full"
-      kOff: "off"
+    - "mongo/db/basic_types.idl"
+    - "mongo/s/configure_query_analyzer_cmd.idl"
 
 structs:
-  queryAnalyzerConfiguration:
-    description: "The query analyzer configuration for a collection."
-    strict: true
-    fields:
-      mode:
-        type: QueryAnalyzerMode
-        description: "The query analysis mode."
-      sampleRate:
-        type: double
-        description: "The maximum number of queries to sample per second, in total across the
-                      cluster (not per mongos or mongod)."
-        optional: true
-
-  configureQueryAnalyzerResponse:
-    description: "The response for the 'configureQueryAnalyzer' command."
-    strict: false
-    inline_chained_structs: true
-    chained_structs:
-      queryAnalyzerConfiguration: newConfiguration
-
-commands:
-  configureQueryAnalyzer:
-    description: "The command for setting the query analyzer configuration for a collection."
-    command_name: configureQueryAnalyzer
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    inline_chained_structs: true
-    chained_structs:
-      queryAnalyzerConfiguration: configuration
+    QueryAnalyzerDocument:
+        description: "Represents settings for query sampling for one collection."
+        fields:
+            _id:
+                type: uuid
+                description: "The UUID of the collection being sampled."
+                cpp_name: collectionUuid
+            ns:
+                type: namespacestring 
+                description: "The namespace of the collectiong being sampled."
+        inline_chained_structs: true
+        chained_structs:
+            queryAnalyzerConfiguration: configuration

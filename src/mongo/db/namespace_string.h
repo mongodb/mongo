@@ -267,6 +267,9 @@ public:
     // Namespace used for storing global index cloner state documents.
     static const NamespaceString kGlobalIndexClonerNamespace;
 
+    // Namespace used for storing query analyzer settings.
+    static const NamespaceString kConfigQueryAnalyzersNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

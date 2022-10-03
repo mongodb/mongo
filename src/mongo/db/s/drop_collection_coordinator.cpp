@@ -182,6 +182,8 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                             "namespace"_attr = nss(),
                             "sharded"_attr = collIsSharded);
 
+                sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(opCtx, nss(), boost::none);
+
                 if (collIsSharded) {
                     invariant(_doc.getCollInfo());
                     const auto& coll = _doc.getCollInfo().value();

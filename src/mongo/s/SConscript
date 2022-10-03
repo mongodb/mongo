@@ -136,6 +136,7 @@ env.Library(
     target='common_s',
     source=[
         'analyze_shard_key_cmd.idl',
+        'analyze_shard_key_documents.idl',
         'analyze_shard_key_feature_flag.idl',
         'analyze_shard_key_server_parameters.idl',
         'cannot_implicitly_create_collection_info.cpp',

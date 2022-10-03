@@ -130,6 +130,9 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
         opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern);
 
+    // Remove collection's query analyzer configuration document, if it exists.
+    sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(opCtx, nss, coll.getUuid());
+
     _updateSession(opCtx);
     sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, getCurrentSession());
 

@@ -192,6 +192,9 @@ const NamespaceString NamespaceString::kSetChangeStreamStateCoordinatorNamespace
 const NamespaceString NamespaceString::kGlobalIndexClonerNamespace(
     NamespaceString::kConfigDb, "localGlobalIndexOperations.cloner");
 
+const NamespaceString NamespaceString::kConfigQueryAnalyzersNamespace(NamespaceString::kConfigDb,
+                                                                      "queryAnalyzers");
+
 NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
     if (!gMultitenancySupport) {
         return NamespaceString(ns, boost::none);
