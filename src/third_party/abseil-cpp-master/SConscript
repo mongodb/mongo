@@ -1029,7 +1029,7 @@ env.Library(
 
 absl_strings_env = env.Clone()
 
-if 'undefined' in env.GetOption('sanitize').split(','):
+if env.GetOption('sanitize') and 'undefined' in env.GetOption('sanitize').split(','):
     # UBSAN causes the __muloti4 reference to be in the library. This is not defined in libgcc, so
     # we will just opt out of this check in this third party library. Related issues below:
     #
