@@ -1226,7 +1226,7 @@ buildvariants:
   - name: linux-standalone-classic-query-engine
     display_name: Linux Standalone (Classic Query Engine)
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 0 * * 2,3,4,5,7" # Run it every day except Saturday and Monday.
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *modules
     expansions:
       mongodb_setup: standalone-classic-query-engine
@@ -1261,7 +1261,7 @@ buildvariants:
   - name: linux-standalone-sbe
     display_name: Linux Standalone (SBE)
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 0 * * 2,3,4,5,7" # Run it every day except Saturday and Monday.
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *modules
     expansions:
       mongodb_setup: standalone-sbe
@@ -1278,7 +1278,7 @@ buildvariants:
   - name: linux-1-node-replSet-classic-query-engine
     display_name: Linux 1-Node ReplSet (Classic Query Engine)
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 0 * * 2,3,4,5,7" # Run it every day except Saturday and Monday.
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *modules
     expansions:
       mongodb_setup: single-replica-classic-query-engine
@@ -1300,7 +1300,7 @@ buildvariants:
   - name: linux-1-node-replSet-sbe
     display_name: Linux 1-Node ReplSet (SBE)
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 0 * * 2,3,4,5,7" # Run it every day except Saturday and Monday.
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *modules
     expansions:
       mongodb_setup: single-replica-sbe
