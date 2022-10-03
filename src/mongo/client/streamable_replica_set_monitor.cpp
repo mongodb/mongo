@@ -104,16 +104,6 @@ std::string readPrefToStringFull(const ReadPreferenceSetting& readPref) {
     return builder.obj().toString();
 }
 
-std::string hostListToString(boost::optional<std::vector<HostAndPort>> x) {
-    std::stringstream s;
-    if (x) {
-        for (const auto& h : *x) {
-            s << h.toString() << "; ";
-        }
-    }
-    return s.str();
-}
-
 double pingTimeMillis(const ServerDescriptionPtr& serverDescription) {
     const auto& serverRtt = serverDescription->getRtt();
     // Convert to micros so we don't lose information if under a ms
