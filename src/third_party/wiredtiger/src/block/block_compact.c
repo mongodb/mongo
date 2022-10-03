@@ -87,10 +87,9 @@ __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block, u_int *ms
     if (time_diff / WT_PROGRESS_MSG_PERIOD > *msg_countp) {
         ++*msg_countp;
         __wt_verbose_debug(session, WT_VERB_COMPACT_PROGRESS,
-          " compacting %s for %" PRIu64 " seconds; reviewed %" PRIu64 " pages, skipped %" PRIu64
-          " pages, rewritten %" PRIu64 " pages",
-          block->name, time_diff, block->compact_pages_reviewed, block->compact_pages_skipped,
-          block->compact_pages_rewritten);
+          " compacting %s for %" PRIu64 " seconds; reviewed %" PRIu64 " pages, rewritten %" PRIu64
+          " pages",
+          block->name, time_diff, block->compact_pages_reviewed, block->compact_pages_rewritten);
     }
 }
 /*
@@ -157,10 +156,8 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
     }
 
     __wt_verbose_debug(session, WT_VERB_COMPACT,
-      "%s: total reviewed %" PRIu64 " pages, total skipped %" PRIu64 " pages, total wrote %" PRIu64
-      " pages",
-      block->name, block->compact_pages_reviewed, block->compact_pages_skipped,
-      block->compact_pages_rewritten);
+      "%s: total reviewed %" PRIu64 " pages, total rewritten %" PRIu64 " pages", block->name,
+      block->compact_pages_reviewed, block->compact_pages_rewritten);
     __wt_verbose_debug(session, WT_VERB_COMPACT,
       "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first 80%% of the file",
       block->name, (uintmax_t)avail_eighty / WT_MEGABYTE, (uintmax_t)avail_eighty);
