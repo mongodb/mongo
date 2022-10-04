@@ -1,6 +1,6 @@
 /**
  * This is the test for $documents stage in aggregation pipeline on a sharded collection.
- * @tags: [ do_not_wrap_aggregations_in_facets ]
+ * @tags: [ do_not_wrap_aggregations_in_facets, requires_fcv_51 ]
  *
  */
 
