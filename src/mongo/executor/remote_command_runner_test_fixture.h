@@ -47,6 +47,43 @@
 #include "mongo/util/future.h"
 
 namespace mongo::executor::remote_command_runner {
+
+class RemoteCommandTestRetryPolicy : public RemoteCommandRetryPolicy {
+public:
+    bool recordAndEvaluateRetry(Status s) override final {
+        if (_numRetriesPerformed == _maxRetries) {
+            return false;
+        }
+        ++_numRetriesPerformed;
+        return true;
+    }
+
+    Milliseconds getNextRetryDelay() override final {
+        return _retryDelay;
+    }
+
+    void setRetryDelay(Milliseconds retryDelay) {
+        _retryDelay = retryDelay;
+    }
+
+    BSONObj toBSON() const override final {
+        return BSON("retryPolicyType"
+                    << "TestRetryPolicy");
+    }
+
+    void setMaxNumRetries(int maxRetries) {
+        _maxRetries = maxRetries;
+    }
+
+    int getNumRetriesPerformed() const {
+        return _numRetriesPerformed;
+    }
+
+private:
+    int _numRetriesPerformed, _maxRetries = 0;
+    Milliseconds _retryDelay = Milliseconds(100);
+};
+
 class RemoteCommandRunnerTestFixture : public LockerNoopServiceContextTest {
 public:
     void setUp() override {
@@ -101,6 +138,17 @@ public:
 
     NetworkInterfaceMock* getNetworkInterfaceMock() const {
         return _net.get();
+    }
+
+    void scheduleRequestAndAdvanceClockForRetry(
+        std::shared_ptr<RemoteCommandRetryPolicy> retryPolicy,
+        NetworkTestEnv::OnCommandFunction onCommandFunc) {
+        auto net = getNetworkInterfaceMock();
+        onCommand(onCommandFunc);
+        {
+            executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+            net->advanceTime(net->now() + retryPolicy->getNextRetryDelay());
+        }
     }
 
 protected:

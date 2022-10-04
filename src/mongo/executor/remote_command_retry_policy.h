@@ -43,9 +43,10 @@ namespace remote_command_runner {
 class RemoteCommandRetryPolicy {
 public:
     /**
-     * Given an error, returns true if the scheduler should retry the remote command.
+     * Records any necessary retry metadata and returns true if a command should be retried based on
+     * the policy conditions and input status.
      */
-    virtual bool shouldRetry(Status s) const = 0;
+    virtual bool recordAndEvaluateRetry(Status s) = 0;
 
     /**
      * Retry scheduler should wait this long in between retrying remote commands.
@@ -59,7 +60,7 @@ public:
 
 class RemoteCommandNoRetryPolicy : public RemoteCommandRetryPolicy {
 public:
-    bool shouldRetry(Status s) const override final {
+    bool recordAndEvaluateRetry(Status s) override final {
         return false;
     }
 

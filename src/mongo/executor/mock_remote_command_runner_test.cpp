@@ -68,15 +68,17 @@ public:
 
 
     SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> sendHelloCommandToHostAndPort(
-        HostAndPort target) {
+        HostAndPort target,
+        std::shared_ptr<RemoteCommandRetryPolicy> retryPolicy =
+            std::make_shared<RemoteCommandNoRetryPolicy>()) {
         HelloCommand hello;
         initializeCommand(hello);
-        auto opCtxHolder = makeOperationContext();
         return doRequest(hello,
-                         opCtxHolder.get(),
+                         _opCtx.get(),
                          std::make_unique<RemoteCommandFixedTargeter>(target),
                          getExecutorPtr(),
-                         _cancellationToken);
+                         _cancellationToken,
+                         retryPolicy);
     }
 
     SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> sendHelloCommandToLocalHost() {
@@ -85,6 +87,7 @@ public:
 
 private:
     MockType* _mock;
+    ServiceContext::UniqueOperationContext _opCtx = makeOperationContext();
 };
 
 using SyncMockRemoteCommandRunnerTestFixture =
@@ -192,6 +195,41 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, OnCommand) {
     ASSERT_BSONOBJ_EQ(responseFut.get().response.toBSON(), helloReply.toBSON());
 }
 
+TEST_F(SyncMockRemoteCommandRunnerTestFixture, SyncMockRemoteCommandRunnerWithRetryPolicy) {
+    const auto retryPolicy = std::make_shared<RemoteCommandTestRetryPolicy>();
+    const auto maxNumRetries = 1;
+    const auto retryDelay = Milliseconds(100);
+    retryPolicy->setMaxNumRetries(maxNumRetries);
+    retryPolicy->setRetryDelay(retryDelay);
+    auto responseFut =
+        sendHelloCommandToHostAndPort({"localhost", serverGlobalParams.port}, retryPolicy);
+
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    BSONObjBuilder result(helloReply.toBSON());
+    CommandHelpers::appendCommandStatusNoThrow(result, Status::OK());
+    auto expectedResultObj = result.obj();
+
+    HelloCommand hello;
+    initializeCommand(hello);
+
+    getMockRunner().onCommand([&](const RequestInfo& ri) {
+        ASSERT_BSONOBJ_EQ(hello.toBSON({}), ri._cmd);
+        return expectedResultObj;
+    });
+    auto net = getNetworkInterfaceMock();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        net->advanceTime(net->now() + retryPolicy->getNextRetryDelay());
+    }
+
+    getMockRunner().onCommand([&](const RequestInfo& ri) {
+        ASSERT_BSONOBJ_EQ(hello.toBSON({}), ri._cmd);
+        return expectedResultObj;
+    });
+    ASSERT_BSONOBJ_EQ(responseFut.get().response.toBSON(), helloReply.toBSON());
+    ASSERT_EQ(maxNumRetries, retryPolicy->getNumRetriesPerformed());
+}
+
 // A simple test showing that we can asynchronously register an expectation
 // that a request will eventually be scheduled with the mock before a request
 // actually arrives. Then, once the request is scheduled, we are asynchronously
@@ -220,6 +258,56 @@ TEST_F(AsyncMockRemoteCommandRunnerTestFixture, Expectation) {
     expectation.get();
     ASSERT_BSONOBJ_EQ(reply.response.toBSON(), helloReply.toBSON());
     ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), reply.targetUsed);
+}
+
+TEST_F(AsyncMockRemoteCommandRunnerTestFixture, AsyncMockRemoteCommandRunnerWithRetryPolicy) {
+    // We expect that some code will use the runner to send a hello
+    // to localhost on "testdb".
+    auto matcher = [](const AsyncMockRemoteCommandRunner::Request& req) {
+        bool isHello = req.cmdBSON.firstElementFieldName() == "hello"_sd;
+        bool isRightTarget = req.target == HostAndPort("localhost", serverGlobalParams.port);
+        return isHello && isRightTarget;
+    };
+
+    // Register our expectation and ensure it isn't yet met.
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    BSONObjBuilder firstResult(helloReply.toBSON());
+    CommandHelpers::appendCommandStatusNoThrow(firstResult, Status::OK());
+    BSONObjBuilder secondResult(helloReply.toBSON());
+    CommandHelpers::appendCommandStatusNoThrow(secondResult, Status::OK());
+
+    auto firstExpectation =
+        getMockRunner().expect(matcher, firstResult.obj(), "example expectation 1");
+    auto secondExpectation =
+        getMockRunner().expect(matcher, secondResult.obj(), "example expectation 2");
+    ASSERT_FALSE(firstExpectation.isReady());
+    ASSERT_FALSE(secondExpectation.isReady());
+
+    const auto retryPolicy = std::make_shared<RemoteCommandTestRetryPolicy>();
+    const auto maxNumRetries = 1;
+    const auto retryDelay = Milliseconds(100);
+    retryPolicy->setMaxNumRetries(maxNumRetries);
+    retryPolicy->setRetryDelay(retryDelay);
+    // Allow a request to be scheduled on the mock.
+    auto response =
+        sendHelloCommandToHostAndPort({"localhost", serverGlobalParams.port}, retryPolicy);
+
+    // Now, our first expectation should be met.
+    firstExpectation.get();
+
+    // Advance the network clock to simulate the delay between retries so the second expectation
+    // will be met.
+    auto net = getNetworkInterfaceMock();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        net->advanceTime(net->now() + retryPolicy->getNextRetryDelay());
+    }
+    auto reply = response.get();
+    // The second expectation should be met.
+    secondExpectation.get();
+    ASSERT_BSONOBJ_EQ(reply.response.toBSON(), helloReply.toBSON());
+    ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), reply.targetUsed);
+    ASSERT_EQ(maxNumRetries, retryPolicy->getNumRetriesPerformed());
 }
 
 // A more complicated test that registers several expectations, and then

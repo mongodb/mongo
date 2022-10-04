@@ -97,7 +97,7 @@ public:
     ExecutorFuture<detail::RemoteCommandInternalResponse> _doRequest(
         StringData dbName,
         BSONObj cmdBSON,
-        std::unique_ptr<RemoteCommandHostTargeter> targeter,
+        RemoteCommandHostTargeter* targeter,
         OperationContext* opCtx,
         std::shared_ptr<TaskExecutor> exec,
         CancellationToken token) final {
@@ -204,7 +204,7 @@ public:
     ExecutorFuture<detail::RemoteCommandInternalResponse> _doRequest(
         StringData dbName,
         BSONObj cmdBSON,
-        std::unique_ptr<RemoteCommandHostTargeter> targeter,
+        RemoteCommandHostTargeter* targeter,
         OperationContext* opCtx,
         std::shared_ptr<TaskExecutor> exec,
         CancellationToken token) final {

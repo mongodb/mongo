@@ -81,6 +81,86 @@ TEST_F(RemoteCommandRunnerTestFixture, SuccessfulHello) {
 }
 
 /*
+ * Tests that 'doRequest' will appropriately retry multiple times under the conditions defined by
+ * the retry policy.
+ */
+TEST_F(RemoteCommandRunnerTestFixture, RetryOnSuccessfulHelloAdditionalAttempts) {
+    std::unique_ptr<RemoteCommandHostTargeter> targeter =
+        std::make_unique<RemoteCommandLocalHostTargeter>();
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+    // Define a retry policy that simply decides to always retry a command three additional times.
+    std::shared_ptr<RemoteCommandTestRetryPolicy> testPolicy =
+        std::make_shared<RemoteCommandTestRetryPolicy>();
+    const auto maxNumRetries = 3;
+    const auto retryDelay = Milliseconds(100);
+    testPolicy->setMaxNumRetries(maxNumRetries);
+    testPolicy->setRetryDelay(retryDelay);
+
+    auto opCtxHolder = makeOperationContext();
+    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
+        doRequest(helloCmd,
+                  opCtxHolder.get(),
+                  std::move(targeter),
+                  getExecutorPtr(),
+                  _cancellationToken,
+                  testPolicy);
+
+    const auto onCommandFunc = [&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
+        return helloReply.toBSON();
+    };
+    // Schedule 1 request as the initial attempt, and then three following retries to satisfy the
+    // condition for the runner to stop retrying.
+    for (auto i = 0; i <= maxNumRetries; i++) {
+        scheduleRequestAndAdvanceClockForRetry(testPolicy, onCommandFunc);
+    }
+    RemoteCommandRunnerResponse res = resultFuture.get();
+
+    ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
+    ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), res.targetUsed);
+    ASSERT_EQ(maxNumRetries, testPolicy->getNumRetriesPerformed());
+}
+
+/*
+ * Tests that 'doRequest' will not retry when the retry policy indicates accordingly.
+ */
+TEST_F(RemoteCommandRunnerTestFixture, DoNotRetryOnErrorAccordingToPolicy) {
+    std::unique_ptr<RemoteCommandHostTargeter> targeter =
+        std::make_unique<RemoteCommandLocalHostTargeter>();
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+    std::shared_ptr<RemoteCommandTestRetryPolicy> testPolicy =
+        std::make_shared<RemoteCommandTestRetryPolicy>();
+    const auto zeroRetries = 0;
+    testPolicy->setMaxNumRetries(zeroRetries);
+
+    auto opCtxHolder = makeOperationContext();
+    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
+        doRequest(helloCmd,
+                  opCtxHolder.get(),
+                  std::move(targeter),
+                  getExecutorPtr(),
+                  _cancellationToken,
+                  testPolicy);
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
+        return Status(ErrorCodes::NetworkTimeout, "mock");
+    });
+
+    auto error = resultFuture.getNoThrow().getStatus();
+
+    // The error returned by our API should always be RemoteCommandExecutionError
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    ASSERT_EQ(zeroRetries, testPolicy->getNumRetriesPerformed());
+}
+
+/*
  * Mock error on local host side.
  */
 TEST_F(RemoteCommandRunnerTestFixture, LocalError) {
@@ -284,7 +364,7 @@ TEST_F(RemoteCommandRunnerTestFixture, HostAndPortTargeter) {
 TEST_F(RemoteCommandRunnerTestFixture, NoRetry) {
     RemoteCommandNoRetryPolicy p;
 
-    ASSERT_FALSE(p.shouldRetry(Status(ErrorCodes::BadValue, "mock")));
+    ASSERT_FALSE(p.recordAndEvaluateRetry(Status(ErrorCodes::BadValue, "mock")));
     ASSERT_EQUALS(p.getNextRetryDelay(), Milliseconds::zero());
 }
 

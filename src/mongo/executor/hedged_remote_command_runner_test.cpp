@@ -225,6 +225,52 @@ TEST_F(HedgedCommandRunnerTest, HelloHedgeRequest) {
     ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
 }
 
+TEST_F(HedgedCommandRunnerTest, HedgedRemoteCommandRunnerRetryPolicy) {
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+
+    // Define a retry policy that simply decides to always retry a command three additional times.
+    std::shared_ptr<RemoteCommandTestRetryPolicy> testPolicy =
+        std::make_shared<RemoteCommandTestRetryPolicy>();
+    const auto maxNumRetries = 3;
+    const auto retryDelay = Milliseconds(100);
+    testPolicy->setMaxNumRetries(maxNumRetries);
+    testPolicy->setRetryDelay(retryDelay);
+
+    ReadPreferenceSetting readPref;
+    std::shared_ptr<RemoteCommandTargeter> t = getTwoHostsTargeter();
+    std::unique_ptr<RemoteCommandHostTargeter> targeter =
+        std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
+
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = doHedgedRequest(helloCmd,
+                                        opCtxHolder.get(),
+                                        std::move(targeter),
+                                        getExecutorPtr(),
+                                        CancellationToken::uncancelable(),
+                                        testPolicy);
+
+    const auto onCommandFunc = [&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        return helloReply.toBSON();
+    };
+    // Schedule 1 request as the initial attempt, and then three following retries to satisfy the
+    // condition for the runner to stop retrying.
+    for (auto i = 0; i <= maxNumRetries; i++) {
+        scheduleRequestAndAdvanceClockForRetry(testPolicy, onCommandFunc);
+    }
+
+    auto counters = getNetworkInterfaceCounters();
+    ASSERT_EQ(counters.succeeded, 4);
+    ASSERT_EQ(counters.canceled, 0);
+
+    RemoteCommandRunnerResponse<HelloCommandReply> res = resultFuture.get();
+
+    ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
+    ASSERT_EQ(maxNumRetries, testPolicy->getNumRetriesPerformed());
+}
+
 /**
  * When the targeter returns no hosts, we get a HostNotFound error.
  */
@@ -306,17 +352,48 @@ TEST_F(HedgedCommandRunnerTest, BothCommandsFailWithSkippableError) {
                                         getExecutorPtr(),
                                         CancellationToken::uncancelable());
 
-    onCommand([&](const auto& request) {
-        ASSERT(request.cmdObj["find"]);
-        return createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock"));
-    });
+    auto network = getNetworkInterfaceMock();
+    auto now = network->now();
+    network->enterNetwork();
 
-    onCommand([&](const auto& request) {
-        ASSERT(request.cmdObj["find"]);
-        return createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock"));
-    });
+    NetworkInterfaceMock::NetworkOperationIterator noi1 = network->getNextReadyRequest();
+    NetworkInterfaceMock::NetworkOperationIterator noi2 = network->getNextReadyRequest();
 
-    auto counters = getNetworkInterfaceCounters();
+    auto firstRequest = (*noi1).getRequestOnAny();
+    auto secondRequest = (*noi2).getRequestOnAny();
+
+    if (firstRequest.target[0] == kTwoHosts[0]) {
+        network->scheduleResponse(
+            noi1,
+            now + Milliseconds(1000),
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
+    } else {
+        network->scheduleResponse(
+            noi1,
+            now,
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
+    }
+
+    if (secondRequest.target[0] == kTwoHosts[0]) {
+        network->scheduleResponse(
+            noi2,
+            now + Milliseconds(1000),
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
+    } else {
+        network->scheduleResponse(
+            noi2,
+            now,
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
+    }
+
+    auto remoteMaxTimeMSError = RemoteCommandResponse{
+        createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)};
+
+    network->runUntil(now + Milliseconds(1500));
+
+    auto counters = network->getCounters();
+    network->exitNetwork();
+
     ASSERT_EQ(counters.sent, 2);
     ASSERT_EQ(counters.canceled, 0);
 
@@ -437,7 +514,7 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSkippableErrorNextSucceeds)
 
     // if the first request is the authoritative one, send a delayed success response
     // otherwise send an ignorable error
-    if (firstRequest.target[0] == kThreeHosts[0]) {
+    if (firstRequest.target[0] == kTwoHosts[0]) {
         network->scheduleSuccessfulResponse(noi1, now + Milliseconds(1000), successResponse);
     } else {
         network->scheduleResponse(
@@ -448,7 +525,7 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSkippableErrorNextSucceeds)
 
     // if the second request is the authoritative one, send a delayed success response
     // otherwise send an ignorable error
-    if (secondRequest.target[0] == kThreeHosts[0]) {
+    if (secondRequest.target[0] == kTwoHosts[0]) {
         network->scheduleSuccessfulResponse(noi2, now + Milliseconds(1000), successResponse);
     } else {
         network->scheduleResponse(

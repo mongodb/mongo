@@ -48,13 +48,12 @@ public:
      *
      * Do not call directly - this is not part of the public API.
      */
-    ExecutorFuture<RemoteCommandInternalResponse> _doRequest(
-        StringData dbName,
-        BSONObj cmdBSON,
-        std::unique_ptr<RemoteCommandHostTargeter> targeter,
-        OperationContext* opCtx,
-        std::shared_ptr<TaskExecutor> exec,
-        CancellationToken token) final {
+    ExecutorFuture<RemoteCommandInternalResponse> _doRequest(StringData dbName,
+                                                             BSONObj cmdBSON,
+                                                             RemoteCommandHostTargeter* targeter,
+                                                             OperationContext* opCtx,
+                                                             std::shared_ptr<TaskExecutor> exec,
+                                                             CancellationToken token) final {
         return targeter->resolve(token)
             .thenRunOn(exec)
             .then([dbName, cmdBSON, opCtx, exec = std::move(exec), token](
