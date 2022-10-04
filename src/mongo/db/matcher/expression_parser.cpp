@@ -1337,6 +1337,46 @@ StatusWithMatchExpression parseElemMatch(StringData name,
             expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap())))};
 }
 
+StatusWithMatchExpression parseBetweenWithArray(
+    StringData name,
+    BSONElement e,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+    mongo::BSONElement first,
+    mongo::BSONElement second) {
+    auto theAnd = std::make_unique<AndMatchExpression>(
+        doc_validation_error::createAnnotation(expCtx, "$and", BSONObj()));
+    auto gte = parseComparison(
+        name,
+        std::make_unique<GTEMatchExpression>(
+            name,
+            first,
+            doc_validation_error::createAnnotation(
+                expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap()))),
+        e,
+        expCtx,
+        allowedFeatures);
+    if (!gte.isOK()) {
+        return gte;
+    }
+    addExpressionToRoot(expCtx, theAnd.get(), std::move(gte.getValue()));
+    auto lte = parseComparison(
+        name,
+        std::make_unique<LTEMatchExpression>(
+            name,
+            second,
+            doc_validation_error::createAnnotation(
+                expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap()))),
+        e,
+        expCtx,
+        allowedFeatures);
+    if (!lte.isOK()) {
+        return lte;
+    }
+    addExpressionToRoot(expCtx, theAnd.get(), std::move(lte.getValue()));
+    return theAnd;
+}
+
 StatusWithMatchExpression parseAll(StringData name,
                                    BSONElement e,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1743,13 +1783,34 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             return {Status(ErrorCodes::BadValue,
                            str::stream() << "near must be first in: " << context)};
 
-        case PathAcceptingKeyword::BETWEEN:
-            return std::make_unique<BetweenMatchExpression>(
-                name,
-                e,
-                doc_validation_error::createAnnotation(
-                    expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap())));
-
+        case PathAcceptingKeyword::BETWEEN: {
+            if (e.type() == BSONType::BinData) {
+                uassert(ErrorCodes::BadValue,
+                        "$between needs an encrypted binData",
+                        e.binDataType() == BinDataType::Encrypt);
+                return std::make_unique<BetweenMatchExpression>(
+                    name,
+                    e,
+                    doc_validation_error::createAnnotation(
+                        expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap())));
+            } else if (e.type() == BSONType::Array) {
+                auto betweenArray = e.embeddedObject();
+                auto iter = BSONObjIterator(betweenArray);
+                if (!iter.more()) {
+                    return Status(ErrorCodes::FailedToParse, "$between needs an array of size 2");
+                }
+                auto first = iter.next();
+                if (!iter.more()) {
+                    return Status(ErrorCodes::FailedToParse, "$between needs an array of size 2");
+                }
+                auto second = iter.next();
+                if (iter.more()) {
+                    return Status(ErrorCodes::FailedToParse, "$between needs an array of size 2");
+                }
+                return parseBetweenWithArray(name, e, expCtx, allowedFeatures, first, second);
+            }
+            return {Status(ErrorCodes::BadValue, "$between needs an array or binData ")};
+        }
         case PathAcceptingKeyword::INTERNAL_EXPR_EQ: {
             if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
                 return {Status(ErrorCodes::BadValue,
