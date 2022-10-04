@@ -41,7 +41,7 @@ public:
     RecoveryUnit* newRecoveryUnit() final {
         return nullptr;
     }
-    std::vector<DatabaseName> listDatabases() const final {
+    std::vector<DatabaseName> listDatabases(boost::optional<TenantId> tenantId) const final {
         return {};
     }
     bool supportsCappedCollections() const final {

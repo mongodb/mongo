@@ -23,9 +23,8 @@ assert(adminDb.auth('admin', 'pwd'));
 
 const kTenant = ObjectId();
 const kOtherTenant = ObjectId();
-const kDbName = 'test';
-const kCollName = 'myColl0';
-
+const kDbName = 'myDb';
+const kCollName = 'myColl';
 const tokenConn = new Mongo(primary.host);
 const securityToken = _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant});
 const tokenDB = tokenConn.getDB(kDbName);
@@ -137,6 +136,21 @@ const tokenDB = tokenConn.getDB(kDbName);
             tokenAdminDB.runCommand({renameCollection: toName, to: fromName, dropTarget: true}));
         assert.commandWorked(tokenDB.runCommand(
             {findAndModify: kCollName, query: {a: 11}, update: {$set: {a: 1, b: 1}}}));
+    }
+
+    // ListDatabases only returns databases associated with kTenant.
+    {
+        // Create databases for kTenant. A new database is implicitly created when a collection is
+        // created.
+        const kOtherDbName = 'otherDb';
+        assert.commandWorked(tokenConn.getDB(kOtherDbName).createCollection("collName"));
+        const tokenAdminDB = tokenConn.getDB('admin');
+        const dbs =
+            assert.commandWorked(tokenAdminDB.runCommand({listDatabases: 1, nameOnly: true}));
+        assert.eq(3, dbs.databases.length);
+        // TODO SERVER-70053: Change this check to check that we get tenantId prefixed db names.
+        const expectedDbs = ['admin', kDbName, kOtherDbName];
+        assert(arrayEq(expectedDbs, dbs.databases.map(db => db.name)));
     }
 
     // Drop the collection, and then the database. Check that listCollections no longer returns the
@@ -268,6 +282,13 @@ const tokenDB = tokenConn.getDB(kDbName);
         tokenDB2.runCommand({dropIndexes: kCollName, index: ["indexA", "indexB"]}),
         ErrorCodes.NamespaceNotFound);
 
+    // ListDatabases with securityToken of kOtherTenant cannot access databases created by kTenant.
+    const dbsWithDiffToken = assert.commandWorked(
+        tokenConn.getDB('admin').runCommand({listDatabases: 1, nameOnly: true}));
+    // Only the 'admin' db exists
+    assert.eq(1, dbsWithDiffToken.databases.length);
+    assert(arrayEq(['admin'], dbsWithDiffToken.databases.map(db => db.name)));
+
     // Attempt to drop the database, then check it was not dropped.
     assert.commandWorked(tokenDB2.runCommand({dropDatabase: 1}));
 
@@ -286,7 +307,7 @@ const tokenDB = tokenConn.getDB(kDbName);
 {
     const privelegedConn = new Mongo(primary.host);
     assert(privelegedConn.getDB('admin').auth('admin', 'pwd'));
-    const privelegedDB = privelegedConn.getDB('test');
+    const privelegedDB = privelegedConn.getDB(kDbName);
 
     // Find and modify the document using $tenant.
     {

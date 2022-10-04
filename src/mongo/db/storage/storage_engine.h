@@ -199,7 +199,8 @@ public:
     /**
      * List the databases stored in this storage engine.
      */
-    virtual std::vector<DatabaseName> listDatabases() const = 0;
+    virtual std::vector<DatabaseName> listDatabases(
+        boost::optional<TenantId> tenantId = boost::none) const = 0;
 
     /**
      * Returns whether the storage engine supports capped collections.

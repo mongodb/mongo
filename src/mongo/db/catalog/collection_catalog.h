@@ -473,12 +473,20 @@ public:
                                                              const DatabaseName& dbName) const;
 
     /**
-     * This functions gets all the database names. The result is sorted in alphabetical ascending
+     * This function gets all the database names. The result is sorted in alphabetical ascending
      * order.
      *
      * Unlike DatabaseHolder::getNames(), this does not return databases that are empty.
      */
     std::vector<DatabaseName> getAllDbNames() const;
+
+    /**
+     * This function gets all the database names associated with tenantId. The result is sorted in
+     * alphabetical ascending order.
+     *
+     * Unlike DatabaseHolder::getNames(), this does not return databases that are empty.
+     */
+    std::vector<DatabaseName> getAllDbNamesForTenant(boost::optional<TenantId> tenantId) const;
 
     /**
      * Sets 'newProfileSettings' as the profiling settings for the database 'dbName'.
@@ -608,6 +616,11 @@ private:
     boost::optional<const ViewsForDatabase&> _getViewsForDatabase(OperationContext* opCtx,
                                                                   const DatabaseName& dbName) const;
 
+    /**
+     * Returns all relevant dbNames using the firstDbName to construct an iterator pointing to the
+     * first desired dbName.
+     */
+    std::vector<DatabaseName> _getAllDbNamesHelper(DatabaseName firstDbName) const;
     /**
      * Sets all namespaces used by views for a database. Will uassert if there is a conflicting
      * collection name in the catalog.

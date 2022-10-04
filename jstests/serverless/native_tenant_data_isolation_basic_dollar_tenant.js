@@ -56,6 +56,40 @@ const testColl = testDb.getCollection(kCollName);
     assert.eq(0, collsWithDiffTenant.cursor.firstBatch.length);
 }
 
+// Test listDatabases command.
+{
+    // Create databases for kTenant. A new database is implicitly created when a collection is
+    // created.
+    const kOtherDbName = 'otherDb';
+    assert.commandWorked(
+        primary.getDB(kOtherDbName).createCollection(kCollName, {'$tenant': kTenant}));
+
+    const dbs = assert.commandWorked(
+        adminDb.runCommand({listDatabases: 1, nameOnly: true, '$tenant': kTenant}));
+    assert.eq(2, dbs.databases.length);
+    // TODO SERVER-70053: Change this check to check that we get tenantId prefixed db names.
+    // The 'admin' database is not expected because we do not create a tenant user in this test.
+    const expectedDbs = [kDbName, kOtherDbName];
+    assert(arrayEq(expectedDbs, dbs.databases.map(db => db.name)));
+
+    // These databases should not be accessed with a different tenant.
+    const dbsWithDiffTenant = assert.commandWorked(
+        adminDb.runCommand({listDatabases: 1, nameOnly: true, '$tenant': kOtherTenant}));
+    assert.eq(0, dbsWithDiffTenant.databases.length);
+
+    // If no tenantId is supplied, return all databases. We expect an empty vector when
+    // multitenancySupport and featureFlagRequireTenantId are enabled.
+    const allDbs = assert.commandWorked(adminDb.runCommand({listDatabases: 1, nameOnly: true}));
+    assert.eq(5, allDbs.databases.length);
+    expectedDbs.push("admin");
+    expectedDbs.push("config");
+    expectedDbs.push("local");
+    assert(arrayEq(expectedDbs, allDbs.databases.map(db => db.name)));
+
+    // TODO SERVER-69764: Check that we get an empty vector when multitenancySupport and
+    // featureFlagRequireTenantId are enabled, and tenantId is not supplied.
+}
+
 // Test insert, agg, find, getMore, and explain commands.
 {
     const kTenantDocs = [{w: 0}, {x: 1}, {y: 2}, {z: 3}];

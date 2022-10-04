@@ -73,7 +73,8 @@ public:
 
     virtual RecoveryUnit* newRecoveryUnit() override;
 
-    virtual std::vector<DatabaseName> listDatabases() const override;
+    virtual std::vector<DatabaseName> listDatabases(
+        boost::optional<TenantId> tenantId = boost::none) const override;
 
     virtual bool supportsCappedCollections() const override {
         return _supportsCappedCollections;

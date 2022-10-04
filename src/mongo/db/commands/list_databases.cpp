@@ -38,8 +38,10 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 
@@ -67,6 +69,9 @@ public:
     std::string help() const final {
         return "{ listDatabases:1, [filter: <filterObject>] [, nameOnly: true ] }\n"
                "list databases on this server";
+    }
+    bool allowedWithSecurityToken() const final {
+        return true;
     }
 
     class Invocation final : public InvocationBaseGen {
@@ -117,9 +122,17 @@ public:
                 Lock::GlobalLock lk(opCtx, MODE_IS);
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
-                dbNames = storageEngine->listDatabases();
+                auto tid = cmd.getDbName().tenantId();
+                if (gMultitenancySupport &&
+                    serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                    gFeatureFlagRequireTenantID.isEnabled(
+                        serverGlobalParams.featureCompatibility) &&
+                    !tid) {
+                    dbNames = {};
+                } else {
+                    dbNames = storageEngine->listDatabases(tid);
+                }
             }
-
             std::vector<ListDatabasesReplyItem> items;
             int64_t totalSize = list_databases::setReplyItems(opCtx,
                                                               dbNames,

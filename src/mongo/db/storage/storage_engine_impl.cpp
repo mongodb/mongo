@@ -884,8 +884,12 @@ RecoveryUnit* StorageEngineImpl::newRecoveryUnit() {
     return _engine->newRecoveryUnit();
 }
 
-std::vector<DatabaseName> StorageEngineImpl::listDatabases() const {
-    return CollectionCatalog::get(getGlobalServiceContext())->getAllDbNames();
+std::vector<DatabaseName> StorageEngineImpl::listDatabases(
+    boost::optional<TenantId> tenantId) const {
+    auto res = tenantId
+        ? CollectionCatalog::get(getGlobalServiceContext())->getAllDbNamesForTenant(tenantId)
+        : CollectionCatalog::get(getGlobalServiceContext())->getAllDbNames();
+    return res;
 }
 
 Status StorageEngineImpl::closeDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
