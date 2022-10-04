@@ -99,6 +99,12 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
+std::unique_ptr<CommonProcessInterface::WriteSizeEstimator>
+MongosProcessInterface::getWriteSizeEstimator(OperationContext* opCtx,
+                                              const NamespaceString& ns) const {
+    return std::make_unique<TargetPrimaryWriteSizeEstimator>();
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorSourceToPipeline(
     Pipeline* ownedPipeline, bool allowTargetingShards) {
     // On mongos we can't have local cursors.

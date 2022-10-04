@@ -98,5 +98,32 @@ const std::vector<BSONObj>& arrayFiltersOf(const T& opEntry) {
     return opEntry.getArrayFilters().get_value_or(emptyBSONArray);
 }
 
+/**
+ * Utility which estimates the size in bytes of an update statement with the given parameters, when
+ * serialized in the format used for the update command.
+ */
+int getUpdateSizeEstimate(const BSONObj& q,
+                          const write_ops::UpdateModification& u,
+                          const boost::optional<mongo::BSONObj>& c,
+                          bool includeUpsertSupplied,
+                          const boost::optional<mongo::BSONObj>& collation,
+                          const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
+                          const mongo::BSONObj& hint);
+
+/**
+ * If the response from a write command contains any write errors, it will throw the first one. All
+ * the remaining errors will be disregarded.
+ *
+ * Usages of this utility for anything other than single-document writes would be suspicious due to
+ * the fact that it will swallow the remaining ones.
+ */
+void checkWriteErrors(const WriteCommandReplyBase& reply);
+
+template <class T>
+T checkWriteErrors(T op) {
+    checkWriteErrors(op.getWriteCommandReplyBase());
+    return std::move(op);
+}
+
 }  // namespace write_ops
 }  // namespace mongo
