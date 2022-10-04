@@ -90,9 +90,13 @@ const pipeline = [mergeStage];
 // and updated.
 (function testMergeUnorderedBatchUpdate() {
     const maxBatchSize = 16 * 1024 * 1024;  // 16MB
-    const docSize = 1024 * 1024;            // 1MB
+
+    // Each document is just under 1MB in order to allow for some extra space for writes that need
+    // to be serialized over the wire in certain cluster configurations. Otherwise, the number of
+    // modified/unmodified documents would be off by one depending on how our cluster is configured.
+    const docSize = 1024 * 1023;  // 1MB
     const numDocs = 20;
-    const maxDocsInBatch = maxBatchSize / docSize;
+    const maxDocsInBatch = Math.floor(maxBatchSize / docSize);
 
     assert(source.drop());
     dropWithoutImplicitRecreate(target.getName());
