@@ -206,8 +206,8 @@ TEST(CEHeuristicTest, CEWithoutOptimizationTraverseSelectivityDoesNotAccumulate)
         "{'b0.b1.b3': {$gt: 10}}"
         "]}";
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    auto ce1 = ht.getCE(query);
-    auto ce2 = ht.getCE(queryWithLongPaths);
+    auto ce1 = ht.getMatchCE(query);
+    auto ce2 = ht.getMatchCE(queryWithLongPaths);
     ASSERT_APPROX_EQUAL(ce1, ce2, kMaxCEError);
 }
 
@@ -266,12 +266,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationOneLowBoundWithoutTraverse) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 2.1, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 4.9, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 7.0, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 33.0, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 3300.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 2.1, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 4.9, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 7.0, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 33.0, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 3300.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationOneHighBoundWithoutTraverse) {
@@ -288,12 +288,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationOneHighBoundWithoutTraverse) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 2.1, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 4.9, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 7.0, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 33.0, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 3300.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 2.1, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 4.9, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 7.0, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 33.0, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 3300.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationTwoLowBoundsWithoutTraverse) {
@@ -313,12 +313,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationTwoLowBoundsWithoutTraverse) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 2.1, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 4.9, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 7.0, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 33.0, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 3300.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 2.1, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 4.9, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 7.0, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 33.0, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 3300.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationTwoHighBoundsWithoutTraverse) {
@@ -338,12 +338,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationTwoHighBoundsWithoutTraverse) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 2.1, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 4.9, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 7.0, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 33.0, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 3300.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 2.1, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 4.9, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 7.0, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 33.0, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 3300.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationClosedRangeWithoutTraverse) {
@@ -363,12 +363,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationClosedRangeWithoutTraverse) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 1.5, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 3.5, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 5.0, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 20.0, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 2000.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 1.5, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 3.5, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 5.0, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 20.0, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 2000.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationIntervalWithDifferentTypes) {
@@ -389,12 +389,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationIntervalWithDifferentTypes) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 2.1, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 4.9, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 7.0, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 33.0, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 3300.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 2.1, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 4.9, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 7.0, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 33.0, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 3300.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationClosedRangeWithPathExpr) {
@@ -428,12 +428,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationClosedRangeWithPathExpr) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 1.5, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 3.5, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 5.0, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 20.0, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 2000.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 1.5, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 3.5, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 5.0, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 20.0, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 2000.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationClosedRangeWith1Variable) {
@@ -467,12 +467,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationClosedRangeWith1Variable) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 1.5, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 3.5, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 5.0, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 20.0, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 2000.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 1.5, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 3.5, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 5.0, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 20.0, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 2000.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationOpenRangeWith1Variable) {
@@ -506,12 +506,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationOpenRangeWith1Variable) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 2.1, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 4.9, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 7.0, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 33.0, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 3300.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 2.1, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 4.9, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 7.0, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 33.0, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 3300.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationConjunctionOfBoundsWithDifferentPaths) {
@@ -545,12 +545,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationConjunctionOfBoundsWithDifferentPaths
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 1.92, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 4.48, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 6.4, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 18.49, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 1849.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 1.92, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 4.48, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 6.4, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 18.49, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 1849.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationDisjunctionOnSamePathWithoutTraverse) {
@@ -574,12 +574,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationDisjunctionOnSamePathWithoutTraverse)
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 2.61962, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 5.69373, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 7.94868, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 39.7, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 3367.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 2.61962, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 5.69373, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 7.94868, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 39.7, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 3367.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationDisjunctionOnDifferentPathsWithoutTraverse) {
@@ -603,12 +603,12 @@ TEST(CEHeuristicTest, CEWithoutOptimizationDisjunctionOnDifferentPathsWithoutTra
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 2.61962, 3.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 5.69373, 7.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 7.94868, 10.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 39.7, 100.0);
-    ASSERT_MATCH_CE_CARD(ht, rootNode, 3367.0, 10000.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 2.61962, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 5.69373, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 7.94868, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 39.7, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 3367.0, 10000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationEquivalentConjunctions) {
@@ -750,7 +750,7 @@ TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathComplex) {
         "{$and: [{a0: {$gt:40}}, {a0: {$lt: 99}}, {a0: {$gt: 42}}, {a0: {$lt: 88}}, {a0: {$lt: "
         "81}}, {a0: {$lt: 77}}]}"
         "]}";
-    auto ce1 = ht.getCE(query1);
+    auto ce1 = ht.getMatchCE(query1);
     // The conjuncts are in inverse selectivity order.
     std::string query2 =
         "{$or: ["
@@ -762,7 +762,7 @@ TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathComplex) {
         "{$and: [{a0: {$gt: 9}}, {a0: {$lt: 12}}, {a0: {$gt: 42}}]},"
         "{$and: [{a0: {$gt: 9}}, {a0: {$lt: 12}}]}"
         "]}";
-    auto ce2 = ht.getCE(query2);
+    auto ce2 = ht.getMatchCE(query2);
     ASSERT_APPROX_EQUAL(ce1, ce2, kMaxCEError);
 }
 
@@ -806,7 +806,7 @@ TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_CNF2paths) {
 TEST(CEHeuristicTest, CEAfterMemoSubstitutionExplorationPhases) {
     std::string query = "{a : 13, b : 42}";
     HeuristicCETester ht(collName);
-    double ce = ht.getCE(query);
+    double ce = ht.getMatchCE(query);
     ASSERT_APPROX_EQUAL(10.0, ce, kMaxCEError);
 }
 

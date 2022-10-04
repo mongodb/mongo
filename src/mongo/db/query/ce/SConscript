@@ -128,6 +128,16 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="ce_dataflow_nodes_test",
+    source=[
+        "ce_dataflow_nodes_test.cpp",
+    ],
+    LIBDEPS=[
+        'ce_test_utils',
+    ],
+)
+
+env.CppUnitTest(
     target='stats_cache_loader_test',
     source=[
         'stats_cache_loader_test.cpp',

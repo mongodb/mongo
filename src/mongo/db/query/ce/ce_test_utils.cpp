@@ -48,15 +48,21 @@ using namespace cascades;
 CETester::CETester(std::string collName,
                    double collCard,
                    const optimizer::OptPhaseManager::PhaseSet& optPhases)
-    : _collName(std::move(collName)), _collCard(collCard), _optPhases(optPhases), _indexes() {}
+    : _optPhases(optPhases), _hints(), _metadata({}), _collName(collName) {
+    addCollection(collName, collCard);
+}
 
-optimizer::CEType CETester::getCE(const std::string& query) const {
+optimizer::CEType CETester::getMatchCE(const std::string& predicate) const {
+    return getCE("[{$match: " + predicate + "}]");
+}
+
+optimizer::CEType CETester::getCE(const std::string& pipeline) const {
     if constexpr (kCETestLogOnly) {
-        std::cout << "Query: " << query << "\n";
+        std::cout << "Query: " << pipeline << "\n";
     }
 
     // Construct ABT from pipeline and optimize.
-    ABT abt = translatePipeline("[{$match: " + query + "}]", _collName);
+    ABT abt = translatePipeline(pipeline, _collName);
 
     // Get cardinality estimate.
     return getCE(abt);
@@ -68,17 +74,15 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
     }
 
     // TODO SERVER-68914. We currently need to construct the Phase manager in place.
-    ScanDefinition sd({}, _indexes, {DistributionType::Centralized}, true, _collCard);
-    Metadata metadata({{_collName, sd}});
     OptPhaseManager phaseManager{_optPhases,
                                  _prefixId,
                                  false /*requireRID*/,
-                                 metadata,
+                                 _metadata,
                                  getCETransport(),
                                  std::make_unique<DefaultCosting>(),
                                  defaultConvertPathToInterval,
-                                 DebugInfo::kDefaultForTests};
-
+                                 DebugInfo::kDefaultForTests,
+                                 _hints};
     phaseManager.optimize(abt);
 
     const auto& memo = phaseManager.getMemo();
@@ -93,20 +97,23 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
     // us to estimate directly yet.
     if (_optPhases.empty()) {
         auto card = cht->deriveCE(memo, {}, abt.ref());
+
+        if constexpr (kCETestLogOnly) {
+            std::cout << "CE: " << card << std::endl;
+        }
+
         return card;
     }
 
     CEType outCard = kInvalidCardinality;
     for (size_t i = 0; i < memo.getGroupCount(); i++) {
+        // Note that we always verify CE for MemoLogicalDelegatorNodes when calling getCE().
         const auto& group = memo.getGroup(i);
 
         // If the 'optPhases' either ends with the MemoSubstitutionPhase or the
         // MemoImplementationPhase, we should have exactly one logical node per group. However, if
-        // we have indexes, we may have multiple logical nodes as a result of interval
-        // simplification. In this case, we still want to pick the first Sargable node.
-        if (_indexes.empty()) {
-            ASSERT_EQUALS(group._logicalNodes.size(), 1);
-        }
+        // we have indexes, or a $group, we may have multiple logical nodes. In this case, we still
+        // want to pick the first node.
         const auto& node = group._logicalNodes.at(0);
 
         // This gets the cardinality estimate actually produced during optimization.
@@ -124,6 +131,12 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
             // histogram estimation and only using the MemoSubstitutionPhase because the memo always
             // uses heuristic estimation in this case.
             ASSERT_APPROX_EQUAL(card, memoCE, kMaxCEError);
+        } else {
+            if (std::abs(memoCE - card) > kMaxCEError) {
+                std::cout << "ERROR: CE Group(" << i << ") " << card << " vs. " << memoCE
+                          << std::endl;
+                std::cout << ExplainGenerator::explainV2(node) << std::endl;
+            }
         }
 
         if (node.is<optimizer::RootNode>()) {
@@ -139,6 +152,29 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
     }
 
     return outCard;
+}
+
+ScanDefinition& CETester::getCollScanDefinition() {
+    auto it = _metadata._scanDefs.find(_collName);
+    invariant(it != _metadata._scanDefs.end());
+    return it->second;
+}
+
+void CETester::setCollCard(double card) {
+    auto& scanDef = getCollScanDefinition();
+    addCollection(_collName, card, scanDef.getIndexDefs());
+}
+
+void CETester::setIndexes(opt::unordered_map<std::string, IndexDefinition> indexes) {
+    auto& scanDef = getCollScanDefinition();
+    addCollection(_collName, scanDef.getCE(), indexes);
+}
+
+void CETester::addCollection(std::string collName,
+                             double numRecords,
+                             opt::unordered_map<std::string, IndexDefinition> indexes) {
+    _metadata._scanDefs.insert_or_assign(
+        collName, ScanDefinition({}, indexes, {DistributionType::Centralized}, true, numRecords));
 }
 
 ScalarHistogram createHistogram(const std::vector<BucketData>& data) {

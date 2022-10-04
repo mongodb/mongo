@@ -40,8 +40,16 @@ using namespace mongo::ce;
 
 // Invalid estimate - an arbitrary negative value used for initialization.
 constexpr SelectivityType kInvalidSel = -1.0;
+
 constexpr SelectivityType kDefaultFilterSel = 0.1;
 constexpr SelectivityType kDefaultTraverseSelectivity = 0.1;
+
+// Global and Local selectivity should multiply to the Complete selectivity.
+constexpr SelectivityType kDefaultCompleteGroupSel = 0.01;
+constexpr SelectivityType kDefaultLocalGroupSel = 0.02;
+constexpr SelectivityType kDefaultGlobalGroupSel = 0.5;
+
+constexpr CEType kDefaultAverageArraySize = 10.0;
 
 /**
  * Default selectivity of equalities. To avoid super small selectivities for small
@@ -463,13 +471,13 @@ public:
         // TODO: estimate number of groups.
         switch (node.getType()) {
             case GroupNodeType::Complete:
-                return 0.01 * childResult;
+                return kDefaultCompleteGroupSel * childResult;
 
             // Global and Local selectivity should multiply to Complete selectivity.
             case GroupNodeType::Global:
-                return 0.5 * childResult;
+                return kDefaultGlobalGroupSel * childResult;
             case GroupNodeType::Local:
-                return 0.02 * childResult;
+                return kDefaultLocalGroupSel * childResult;
 
             default:
                 MONGO_UNREACHABLE;
@@ -480,8 +488,7 @@ public:
                      CEType childResult,
                      CEType /*bindResult*/,
                      CEType /*refsResult*/) {
-        // Estimate unwind selectivity at 10.0
-        return 10.0 * childResult;
+        return kDefaultAverageArraySize * childResult;
     }
 
     CEType transport(const CollationNode& node, CEType childResult, CEType /*refsResult*/) {
@@ -491,10 +498,12 @@ public:
 
     CEType transport(const LimitSkipNode& node, CEType childResult) {
         const auto limit = node.getProperty().getLimit();
-        if (limit < childResult) {
+        const auto skip = node.getProperty().getSkip();
+        const auto cardAfterSkip = std::max(childResult - skip, 0.0);
+        if (limit < cardAfterSkip) {
             return limit;
         }
-        return childResult;
+        return cardAfterSkip;
     }
 
     CEType transport(const ExchangeNode& node, CEType childResult, CEType /*refsResult*/) {
