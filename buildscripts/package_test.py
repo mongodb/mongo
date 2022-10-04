@@ -209,7 +209,9 @@ for dl in iterate_over_downloads():
     oses.add(dl["target"])
     versions.add(dl["version"])
 
-parser = argparse.ArgumentParser(description='Package tester')
+parser = argparse.ArgumentParser(
+    description=
+    'Test packages on various hosts. This will spin up docker containers and test the installs.')
 
 parser.add_argument("--arch", type=str, help="Arch of host machine to use",
                     choices=["auto"] + list(arches), default="auto")
