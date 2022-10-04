@@ -470,8 +470,8 @@ using RoutingTableHistoryValueHandle = RoutingTableHistoryCache::ValueHandle;
  */
 struct ShardEndpoint {
     ShardEndpoint(const ShardId& shardName,
-                  boost::optional<ShardVersion> shardVersion,
-                  boost::optional<DatabaseVersion> dbVersion);
+                  boost::optional<ShardVersion> shardVersionParam,
+                  boost::optional<DatabaseVersion> dbVersionParam);
 
     ShardId shardName;
 
