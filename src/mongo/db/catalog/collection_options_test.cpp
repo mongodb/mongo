@@ -649,7 +649,15 @@ TEST(FLECollectionOptions, Range_AllowedTypes) {
     // TODO: SERVER-67760 remove feature flag
     RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2Range", true);
 
-    for (const auto& type : std::vector<std::string>{"int", "long"}) {
+    std::vector<std::string> typesAllowedIndexed({
+        "int",
+        "long",
+        "double",
+        "decimal",
+    });
+
+
+    for (const auto& type : typesAllowedIndexed) {
         ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
         encryptedFields: {
             "fields": [
@@ -665,21 +673,6 @@ TEST(FLECollectionOptions, Range_AllowedTypes) {
                       .getStatus());
     }
 
-    for (const auto& type : std::vector<std::string>{"double", "decimal"}) {
-        ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
-        encryptedFields: {
-            "fields": [
-                {
-                    "path": "firstName",
-                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
-                    "bsonType": ")" << type << R"(",
-                    "queries": {"queryType": "range", "sparsity" : 1}
-                }
-            ]
-        }
-    }})"))
-                      .getStatus());
-    }
     // Validate date works
     ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
         encryptedFields: {
@@ -828,30 +821,14 @@ TEST(FLECollectionOptions, Range_MinMax) {
     // TODO: SERVER-67760 remove feature flag
     RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2Range", true);
 
-    std::vector<std::pair<std::string, int>> typesWithMinMax{
+    std::vector<std::pair<std::string, int>> types{
         {"int", 6775208},
         {"long", 6775209},
+        {"double", 6775210},
+        {"decimal", 6775211},
     };
 
-    for (auto const& tc : typesWithMinMax) {
-        auto doc = BSON("encryptedFields"
-                        << BSON("fields" << BSON_ARRAY(BSON(
-                                    "path"
-                                    << "firstName"
-                                    << "keyId" << UUID::gen() << "bsonType" << tc.first << "queries"
-                                    << BSON("queryType"
-                                            << "range"
-                                            << "sparsity" << 1 << "min" << 2 << "max" << 1)))));
-
-        ASSERT_STATUS_CODE(tc.second, CollectionOptions::parse(doc));
-    }
-
-    std::vector<std::pair<std::string, int>> typesWithoutMinMax{
-        {"double", 7006601},
-        {"decimal", 7006601},
-    };
-
-    for (auto const& tc : typesWithoutMinMax) {
+    for (auto const& tc : types) {
         auto doc = BSON("encryptedFields"
                         << BSON("fields" << BSON_ARRAY(BSON(
                                     "path"
