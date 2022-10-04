@@ -129,7 +129,6 @@ inline HostAndPort endpointToHostAndPort(const asio::generic::stream_protocol::e
 }
 
 Status errorCodeToStatus(const std::error_code& ec);
-Status errorCodeToStatus(const std::error_code& ec, StringData context);
 
 /**
  * The ASIO implementation of poll (i.e. socket.wait()) cannot poll for a mask of events, and
@@ -164,7 +163,7 @@ size_t peekASIOStream(Stream& stream, const MutableBufferSequence& buffers) {
     // actually an error condition for our purposes, we ignore these two
     // errors.
     if (ec != asio::error::would_block && ec != asio::error::try_again) {
-        uassertStatusOK(errorCodeToStatus(ec, "peekASIOStream"));
+        uassertStatusOK(errorCodeToStatus(ec));
     }
 
     return bytesRead;
@@ -298,7 +297,7 @@ private:
         template <typename... As>
         void _onInvoke(std::error_code ec, As&&... args) {
             if (ec) {
-                promise.setError(errorCodeToStatus(ec, "onInvoke"));
+                promise.setError(errorCodeToStatus(ec));
                 return;
             }
             _onSuccess(std::forward<As>(args)...);
