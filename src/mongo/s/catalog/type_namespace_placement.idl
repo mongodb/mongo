@@ -46,6 +46,12 @@ structs:
                 type: namespacestring
                 description: "The namespace (database or full collection name)
                               referenced by this object."
+            uuid:
+                cpp_name: uuid
+                type: uuid
+                description: "When nss references a collection, this field stores the uuid assigned
+                              to such collection at the time of its creation."
+                optional: true
             timestamp:
                 type: timestamp
                 description: "The point in time at which this version of NamespacePlacementType 

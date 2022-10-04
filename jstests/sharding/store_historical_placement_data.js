@@ -34,6 +34,7 @@ const databaseDetails = databaseEntries[0];
 assert(timestampCmp(databaseDetails.version.timestamp, placementDetails.timestamp) == 0);
 assert.eq(1, placementDetails.shards.length);
 assert.eq(databaseDetails.primary, placementDetails.shards[0]);
+assert.eq(undefined, placementDetails.uuid);
 
 st.stop();
 }());

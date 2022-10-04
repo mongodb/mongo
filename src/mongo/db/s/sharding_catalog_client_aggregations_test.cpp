@@ -66,6 +66,8 @@ std::vector<BSONObj> generateConfigShardSampleData(int nShards) {
 
 std::vector<BSONObj> getPlacementDataSample() {
     std::vector<BSONObj> placementDataSample = {};
+    const auto coll1Uuid = UUID::gen();
+    const auto coll2Uuid = UUID::gen();
     // create database mock
     placementDataSample.push_back(BSON("_id' " << 1 << "nss"
                                                << "mock"
@@ -74,21 +76,24 @@ std::vector<BSONObj> getPlacementDataSample() {
     // shard collection mock.collection1
     placementDataSample.push_back(BSON("_id' " << 2 << "nss"
                                                << "mock.collection1"
-                                               << "timestamp" << Timestamp(2, 0) << "shards"
+                                               << "uuid" << coll1Uuid << "timestamp"
+                                               << Timestamp(2, 0) << "shards"
                                                << BSON_ARRAY("shard1"
                                                              << "shard2"
                                                              << "shard3")));
     // shard collection mock.collection2
     placementDataSample.push_back(BSON("_id' " << 3 << "nss"
                                                << "mock.collection2"
-                                               << "timestamp" << Timestamp(3, 0) << "shards"
+                                               << "uuid" << coll2Uuid << "timestamp"
+                                               << Timestamp(3, 0) << "shards"
                                                << BSON_ARRAY("shard1"
                                                              << "shard2"
                                                              << "shard3")));
     // drop collection2
     placementDataSample.push_back(BSON("_id' " << 4 << "nss"
                                                << "mock.collection2"
-                                               << "timestamp" << Timestamp(4, 0) << "shards"
+                                               << "uuid" << coll2Uuid << "timestamp"
+                                               << Timestamp(4, 0) << "shards"
                                                << BSONArrayBuilder().arr()));
     // move primary from shard1 to shard2
     placementDataSample.push_back(BSON("_id' " << 5 << "nss"
@@ -98,7 +103,8 @@ std::vector<BSONObj> getPlacementDataSample() {
     // move last chunk of collection 1 located in shard1 to shard4
     placementDataSample.push_back(BSON("_id' " << 6 << "nss"
                                                << "mock.collection1"
-                                               << "timestamp" << Timestamp(6, 0) << "shards"
+                                               << "uuid" << coll1Uuid << "timestamp"
+                                               << Timestamp(6, 0) << "shards"
                                                << BSON_ARRAY("shard2"
                                                              << "shard3"
                                                              << "shard4")));
