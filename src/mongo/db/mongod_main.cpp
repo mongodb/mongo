@@ -139,6 +139,7 @@
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
+#include "mongo/db/s/query_analysis_op_observer.h"
 #include "mongo/db/s/rename_collection_participant_service.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
@@ -1151,6 +1152,8 @@ void setUpObservers(ServiceContext* serviceContext) {
             std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
         opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
+        opObserverRegistry->addObserver(
+            std::make_unique<analyze_shard_key::QueryAnalysisOpObserver>());
     } else {
         opObserverRegistry->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
