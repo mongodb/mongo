@@ -265,6 +265,10 @@ the different behavior using feature flags (see [Feature Flag Gating](#feature-f
 ***This means that individual ticket that wants to introduce an FCV check will also need to create a 
 feature flag specific to that ticket.***
 
+The motivation for using feature flags rather than checking FCV constants directly is because
+checking FCV constants directly is more error prone and has caused issues in the release process
+when updating/removing outdated FCV constants. 
+
 ## Lifecycle of a feature flag
 * Adding the feature flag
     * Disabled by default. This minimizes disruption to the CI system and BB process.
