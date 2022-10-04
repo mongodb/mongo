@@ -90,3 +90,4 @@ Welcome to MongoDB!
   October 16, 2018, including patch fixes for prior versions, are published
   under the [Server Side Public License (SSPL) v1](LICENSE-Community.txt).
   See individual files for details.
+
