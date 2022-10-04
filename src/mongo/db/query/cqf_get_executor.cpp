@@ -286,6 +286,11 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
         OPTIMIZER_DEBUG_LOG(6264801, 5, "Optimized ABT", "explain"_attr = explain);
     }
 
+    OPTIMIZER_DEBUG_LOG(6264802,
+                        5,
+                        "Optimized and lowered physical ABT",
+                        "explain"_attr = ExplainGenerator::explainV2(abt));
+
     auto env = VariableEnvironment::build(abt);
     SlotVarMap slotMap;
     sbe::value::SlotIdGenerator ids;

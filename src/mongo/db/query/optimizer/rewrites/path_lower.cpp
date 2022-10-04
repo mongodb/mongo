@@ -399,6 +399,9 @@ void EvalFilterLowering::transport(ABT& n, const EvalFilter&, ABT& path, ABT& in
     n = make<LambdaApplication>(std::exchange(path, make<Blackhole>()),
                                 std::exchange(input, make<Blackhole>()));
 
+    // Wrap EvalFilter in fillEmpty to coerce it to a boolean.
+    n = make<FunctionCall>("fillEmpty", makeSeq(std::move(n), Constant::boolean(false)));
+
     _changed = true;
 }
 

@@ -73,6 +73,19 @@ public:
      */
     std::string getNextId(const std::string& key);
 
+    void enterElemMatch() {
+        _elemMatchCount++;
+    }
+
+    void exitElemMatch() {
+        tassert(6809501, "Attempting to exit out of elemMatch that was not entered", inElemMatch());
+        _elemMatchCount--;
+    }
+
+    bool inElemMatch() {
+        return _elemMatchCount > 0;
+    }
+
 private:
     const bool _assertExprSort;
     const bool _assertPathSort;
@@ -89,6 +102,9 @@ private:
     // Maintained as a stack so parent expressions can easily compose the ABTs representing their
     // child expressions.
     std::stack<ABT> _stack;
+
+    // Track whether the vistor is currently under an $elemMatch node.
+    int _elemMatchCount{0};
 };
 
 }  // namespace mongo::optimizer

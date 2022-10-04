@@ -282,9 +282,7 @@ public:
         unsupportedExpression(expr);
     }
 
-    void visit(const NotMatchExpression* expr) override {
-        unsupportedExpression(expr);
-    }
+    void visit(const NotMatchExpression* expr) override {}
 
     void visit(const RegexMatchExpression* expr) override {
         unsupportedExpression(expr);

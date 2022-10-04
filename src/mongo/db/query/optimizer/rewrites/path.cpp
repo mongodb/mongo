@@ -223,9 +223,10 @@ void PathFusion::transport(ABT& n, const PathComposeM& path, ABT& p1, ABT& p2) {
     if (auto p1Const = p1.cast<PathConstant>(); p1Const != nullptr) {
         switch (_kindCtx.back()) {
             case Kind::filter:
-                n = make<PathConstant>(make<EvalFilter>(p2, p1Const->getConstant()));
-                _changed = true;
-                return;
+                // PathComposeM in the EvalFilter context cannot be modeled as function composition
+                // the same way that it can in EvalPath because the output of the inner EvalFilter
+                // would be a stream of booleans rather than a stream of documents.
+                break;
 
             case Kind::project:
                 n = make<PathConstant>(make<EvalPath>(p2, p1Const->getConstant()));

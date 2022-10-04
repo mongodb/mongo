@@ -66,6 +66,24 @@
 
 namespace mongo::optimizer {
 
+class ABTMatchExpressionPreVisitor : public SelectiveMatchExpressionVisitorBase<true> {
+    using SelectiveMatchExpressionVisitorBase<true>::visit;
+
+public:
+    ABTMatchExpressionPreVisitor(ExpressionAlgebrizerContext& ctx) : _ctx(ctx) {}
+
+    void visit(const ElemMatchObjectMatchExpression* expr) override {
+        _ctx.enterElemMatch();
+    }
+
+    void visit(const ElemMatchValueMatchExpression* expr) override {
+        _ctx.enterElemMatch();
+    }
+
+private:
+    ExpressionAlgebrizerContext& _ctx;
+};
+
 class ABTMatchExpressionVisitor : public MatchExpressionConstVisitor {
 public:
     ABTMatchExpressionVisitor(ExpressionAlgebrizerContext& ctx, const bool allowAggExpressions)
@@ -101,10 +119,12 @@ public:
 
     void visit(const ElemMatchObjectMatchExpression* expr) override {
         generateElemMatch<false /*isValueElemMatch*/>(expr);
+        _ctx.exitElemMatch();
     }
 
     void visit(const ElemMatchValueMatchExpression* expr) override {
         generateElemMatch<true /*isValueElemMatch*/>(expr);
+        _ctx.exitElemMatch();
     }
 
     void visit(const EqualityMatchExpression* expr) override {
@@ -361,6 +381,27 @@ public:
 
     void visit(const NotMatchExpression* expr) override {
         ABT result = _ctx.pop();
+
+        // If this $not expression is a child of an $elemMatch, then we need to use a PathLambda to
+        // ensure that the value stream (variable) corresponding to the inner path element is passed
+        // into the inner EvalFilter.
+        //
+        // Examples:
+        // find({"a.b": {$not: {$eq: 1}}}): The input into the not expression are documents from the
+        // Scan. The EvalFilter expression will encapsulate the "a.b" path traversal.
+        //
+        // find({"a": {$elemMatch: {b: {$not: {$eq: 1}}}}}): The outer EvalFilter expression
+        // encapsulates the "a" path traversal. However, we need the input to the not expression to
+        // be the value of the "b" field, rather than those of "a". We use the PathLambda expression
+        // to achieve this.
+        if (_ctx.inElemMatch()) {
+            auto notProjName = _ctx.getNextId("not");
+            _ctx.push(make<PathLambda>(make<LambdaAbstraction>(
+                notProjName,
+                make<UnaryOp>(Operations::Not,
+                              make<EvalFilter>(std::move(result), make<Variable>(notProjName))))));
+            return;
+        }
         _ctx.push(make<PathConstant>(make<UnaryOp>(
             Operations::Not,
             make<EvalFilter>(std::move(result), make<Variable>(_ctx.getRootProjection())))));
@@ -631,8 +672,9 @@ ABT generateMatchExpression(const MatchExpression* expr,
                             const std::string& uniqueIdPrefix) {
     ExpressionAlgebrizerContext ctx(
         false /*assertExprSort*/, true /*assertPathSort*/, rootProjection, uniqueIdPrefix);
-    ABTMatchExpressionVisitor visitor(ctx, allowAggExpressions);
-    MatchExpressionWalker walker(nullptr /*preVisitor*/, nullptr /*inVisitor*/, &visitor);
+    ABTMatchExpressionPreVisitor preVisitor(ctx);
+    ABTMatchExpressionVisitor postVisitor(ctx, allowAggExpressions);
+    MatchExpressionWalker walker(&preVisitor, nullptr /*inVisitor*/, &postVisitor);
     tree_walker::walk<true, MatchExpression>(expr, &walker);
     return ctx.pop();
 }
