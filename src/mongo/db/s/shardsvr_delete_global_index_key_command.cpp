@@ -56,6 +56,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::CommandNotSupported,
+                    "Global indexes are not enabled.",
+                    gFeatureFlagGlobalIndexes.isEnabled(serverGlobalParams.featureCompatibility));
+
             uassert(6924200,
                     "_shardsvrDeleteGlobalIndexKey must run inside a multi-doc transaction.",
                     opCtx->inMultiDocumentTransaction());

@@ -83,6 +83,10 @@ public:
         }
 
         void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::CommandNotSupported,
+                    "Global indexes are not enabled.",
+                    gFeatureFlagGlobalIndexes.isEnabled(serverGlobalParams.featureCompatibility));
+
             const auto indexUUID = request().getCommandParameter();
             global_index::dropContainer(opCtx, indexUUID);
         }
