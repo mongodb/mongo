@@ -216,12 +216,20 @@ struct IndexSpec {
 };
 
 /**
+ * To be used for finding the index that can be used as a hint for the aggregate command for
+ * calculating the cardinality and frequency metrics.
+ *
  * Returns the IndexSpec for the index that has the given shard key as a prefix, ignoring the index
- * type (i.e. hashed or range). To be used for finding the index that can be used as a hint for the
- * aggregate command for calculating the cardinality and frequency metrics (the aggregation pipeline
- * works with both the original field values or by the hashes of the field values). The index must
- * have simple collation since that is the only supported collation for shard key string fields
- * comparisons.
+ * type (i.e. hashed or range) since the grouping inside the aggregation works with both the
+ * original field values and the hashes of the field values. The index must meet the following
+ * requirements:
+ * - It must have simple collation since that is the only supported collation for shard key string
+ *   fields comparisons.
+ * - It must not be sparse since such an index omits documents that have null/missing index
+ *   key fields.
+ * - It must not be partial since such an index omits documents do not match the specified
+ *   filter.
+ * - It must not be multi-key since a shard key field cannot be an array.
  */
 boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
                                                        const CollectionPtr& collection,
@@ -242,8 +250,8 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
         auto indexEntry = indexIterator->next();
         auto indexDesc = indexEntry->descriptor();
         auto indexKey = indexDesc->keyPattern();
-        if (indexDesc->collation().isEmpty() && !indexEntry->isMultikey(opCtx, collection) &&
-            shardKey.isFieldNamePrefixOf(indexKey)) {
+        if (indexDesc->collation().isEmpty() && !indexDesc->isSparse() && !indexDesc->isPartial() &&
+            !indexEntry->isMultikey(opCtx, collection) && shardKey.isFieldNamePrefixOf(indexKey)) {
             return IndexSpec{indexKey, indexDesc->unique()};
         }
     }

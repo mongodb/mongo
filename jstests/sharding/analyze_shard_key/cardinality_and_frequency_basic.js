@@ -11,7 +11,7 @@ load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 // Define base test cases. For each test case:
 // - 'shardKey' is the shard key being analyzed.
 // - 'indexKey' is the index that the collection has.
-// - 'indexCollation' is the collation for the index.
+// - 'indexOptions' is the additional options for the index.
 const shardKeyPrefixedIndexTestCases = [
     // Test non-compound shard keys with a shard key index.
     {shardKey: {a: 1}, indexKey: {a: 1}, expectMetrics: true},
@@ -31,7 +31,12 @@ const shardKeyPrefixedIndexTestCases = [
     {shardKey: {_id: 1}, indexKey: {_id: 1}, expectMetrics: true},
     {shardKey: {_id: 1, a: 1}, indexKey: {_id: 1, a: 1}, expectMetrics: true},
     // Test shard key indexes with simple collation.
-    {shardKey: {a: 1}, indexKey: {a: 1}, indexCollation: {locale: "simple"}, expectMetrics: true},
+    {
+        shardKey: {a: 1},
+        indexKey: {a: 1},
+        indexOptions: {collation: {locale: "simple"}},
+        expectMetrics: true
+    },
 ];
 
 const compatibleIndexTestCases = [
@@ -47,7 +52,7 @@ const compatibleIndexTestCases = [
     {
         shardKey: {a: 1},
         indexKey: {a: "hashed"},
-        indexCollation: {locale: "simple"},
+        indexOptions: {collation: {locale: "simple"}},
         expectMetrics: true
     },
 ];
@@ -61,7 +66,17 @@ const noIndexTestCases = [
     {
         shardKey: {a: 1},
         indexKey: {a: 1},
-        indexCollation: {locale: "fr"},  // non-simple collation.
+        indexOptions: {collation: {locale: "fr"}},  // non-simple collation.
+    },
+    {
+        shardKey: {a: 1},
+        indexKey: {a: 1},
+        indexOptions: {sparse: true},
+    },
+    {
+        shardKey: {a: 1},
+        indexKey: {a: 1},
+        indexOptions: {partialFilterExpression: {a: {$gte: 1}}},
     },
 ];
 
@@ -69,43 +84,48 @@ const noIndexTestCases = [
 const candidateKeyTestCases = [];
 const currentKeyTestCases = [];
 
-for (let testCase of shardKeyPrefixedIndexTestCases) {
-    if (!AnalyzeShardKeyUtil.isIdKeyPattern(testCase.indexKey)) {
-        const nonUniqueIndexTestCase =
-            Object.assign({isUniqueIndex: false, expectUnique: false}, testCase);
-        candidateKeyTestCases.push(nonUniqueIndexTestCase);
-        currentKeyTestCases.push(nonUniqueIndexTestCase);
+for (let testCaseBase of shardKeyPrefixedIndexTestCases) {
+    if (!AnalyzeShardKeyUtil.isIdKeyPattern(testCaseBase.indexKey)) {
+        const testCase = Object.extend({indexOptions: {}}, testCaseBase, true /* deep */);
+        testCase.indexOptions.unique = false;
+        testCase.expectUnique = false;
+        candidateKeyTestCases.push(testCase);
+        currentKeyTestCases.push(testCase);
     }
 
-    if (!AnalyzeShardKeyUtil.isHashedKeyPattern(testCase.indexKey)) {
+    if (!AnalyzeShardKeyUtil.isHashedKeyPattern(testCaseBase.indexKey)) {
         // Hashed indexes cannot have a uniqueness constraint.
-        const expectUnique =
-            Object.keys(testCase.shardKey).length == Object.keys(testCase.indexKey).length;
-        const uniqueIndexTestCase = Object.assign({isUniqueIndex: true, expectUnique}, testCase);
-        candidateKeyTestCases.push(uniqueIndexTestCase);
-        currentKeyTestCases.push(uniqueIndexTestCase);
+        const testCase = Object.extend({indexOptions: {}}, testCaseBase, true /* deep */);
+        testCase.indexOptions.unique = true;
+        testCase.expectUnique =
+            Object.keys(testCaseBase.shardKey).length == Object.keys(testCaseBase.indexKey).length;
+        candidateKeyTestCases.push(testCase);
+        currentKeyTestCases.push(testCase);
     }
 }
-for (let testCase of compatibleIndexTestCases) {
-    if (!AnalyzeShardKeyUtil.isIdKeyPattern(testCase.indexKey)) {
-        const nonUniqueIndexTestCase =
-            Object.assign({isUniqueIndex: false, expectUnique: false}, testCase);
-        candidateKeyTestCases.push(nonUniqueIndexTestCase);
+for (let testCaseBase of compatibleIndexTestCases) {
+    if (!AnalyzeShardKeyUtil.isIdKeyPattern(testCaseBase.indexKey)) {
+        const testCase = Object.extend({indexOptions: {}}, testCaseBase, true /* deep */);
+        testCase.indexOptions.unique = false;
+        testCase.expectUnique = false;
+        candidateKeyTestCases.push(testCase);
     }
 
-    if (!AnalyzeShardKeyUtil.isHashedKeyPattern(testCase.indexKey)) {
+    if (!AnalyzeShardKeyUtil.isHashedKeyPattern(testCaseBase.indexKey)) {
         // Hashed indexes cannot have a uniqueness constraint.
-        const expectUnique =
-            Object.keys(testCase.shardKey).length == Object.keys(testCase.indexKey).length;
-        const uniqueIndexTestCase = Object.assign({isUniqueIndex: true, expectUnique}, testCase);
-        candidateKeyTestCases.push(uniqueIndexTestCase);
+        const testCase = Object.extend({indexOptions: {}}, testCaseBase, true /* deep */);
+        testCase.indexOptions.unique = true;
+        testCase.expectUnique =
+            Object.keys(testCaseBase.shardKey).length == Object.keys(testCaseBase.indexKey).length;
+        candidateKeyTestCases.push(testCase);
     }
 }
-for (let testCase of noIndexTestCases) {
+for (let testCaseBase of noIndexTestCases) {
     // No metrics are expected for these test cases so there is no need to test with both non-unique
     // and unique index.
-    const nonUniqueIndexTestCase = Object.assign({isUniqueIndex: false}, testCase);
-    candidateKeyTestCases.push(nonUniqueIndexTestCase);
+    const testCase = Object.extend({indexOptions: {}}, testCaseBase, true /* deep */);
+    testCase.indexOptions.unique = false;
+    candidateKeyTestCases.push(testCase);
 }
 
 function assertNoMetrics(res) {
@@ -184,7 +204,7 @@ function makeDocument(fieldNames, val) {
  * supporting/compatible index or doesn't a supporting/compatible index.
  */
 function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKey, testCase) {
-    assert(!testCase.isUniqueIndex);
+    assert(!testCase.indexOptions.unique);
 
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
@@ -315,7 +335,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
  * supporting/compatible index.
  */
 function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey, testCase) {
-    assert(testCase.isUniqueIndex);
+    assert(testCase.indexOptions.unique);
     assert(testCase.expectMetrics);
 
     const ns = dbName + "." + collName;
@@ -418,15 +438,11 @@ function testAnalyzeCandidateShardKeysUnshardedCollection(conn, mongodConns) {
         jsTest.log(`Testing metrics for ${tojson({dbName, collName, testCase})}`);
 
         if (testCase.indexKey && !AnalyzeShardKeyUtil.isIdKeyPattern(testCase.indexKey)) {
-            const indexOptions = {unique: testCase.isUniqueIndex};
-            if (testCase.indexCollation) {
-                indexOptions.collation = testCase.indexCollation;
-            }
-            assert.commandWorked(coll.createIndex(testCase.indexKey, indexOptions));
+            assert.commandWorked(coll.createIndex(testCase.indexKey, testCase.indexOptions));
         }
         AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
 
-        if (testCase.isUniqueIndex) {
+        if (testCase.indexOptions.unique) {
             testAnalyzeShardKeyUniqueIndex(
                 conn, dbName, collName, null /* currentShardKey */, testCase);
         } else {
@@ -469,7 +485,7 @@ function testAnalyzeCandidateShardKeysShardedCollection(st, mongodConns) {
         }
 
         const testCase = Object.assign({}, testCaseBase);
-        if (currentShardKey && testCase.isUniqueIndex) {
+        if (currentShardKey && testCase.indexOptions.unique) {
             // It is illegal to create a unique index that doesn't have the shard key as a prefix.
             assert(testCase.indexKey);
             testCase.shardKey = Object.assign({}, currentShardKey, testCase.shardKey);
@@ -481,15 +497,11 @@ function testAnalyzeCandidateShardKeysShardedCollection(st, mongodConns) {
         jsTest.log(`Testing metrics for ${tojson({dbName, collName, currentShardKey, testCase})}`);
 
         if (testCase.indexKey && !AnalyzeShardKeyUtil.isIdKeyPattern(testCase.indexKey)) {
-            const indexOptions = {unique: testCase.isUniqueIndex};
-            if (testCase.indexCollation) {
-                indexOptions.collation = testCase.indexCollation;
-            }
-            assert.commandWorked(coll.createIndex(testCase.indexKey, indexOptions));
+            assert.commandWorked(coll.createIndex(testCase.indexKey, testCase.indexOptions));
         }
         AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
 
-        if (testCase.isUniqueIndex) {
+        if (testCase.indexOptions.unique) {
             testAnalyzeShardKeyUniqueIndex(st.s, dbName, collName, currentShardKey, testCase);
         } else {
             testAnalyzeShardKeyNoUniqueIndex(st.s, dbName, collName, currentShardKey, testCase);
@@ -529,11 +541,7 @@ function testAnalyzeCurrentShardKeys(st, mongodConns) {
         jsTest.log(`Testing metrics for ${tojson({dbName, collName, currentShardKey, testCase})}`);
 
         if (!AnalyzeShardKeyUtil.isIdKeyPattern(testCase.indexKey)) {
-            const indexOptions = {unique: testCase.isUniqueIndex};
-            if (testCase.indexCollation) {
-                indexOptions.collation = testCase.indexCollation;
-            }
-            assert.commandWorked(coll.createIndex(testCase.indexKey, indexOptions));
+            assert.commandWorked(coll.createIndex(testCase.indexKey, testCase.indexOptions));
         }
 
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentShardKey}));
@@ -549,7 +557,7 @@ function testAnalyzeCurrentShardKeys(st, mongodConns) {
 
         AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
 
-        if (testCase.isUniqueIndex) {
+        if (testCase.indexOptions.unique) {
             testAnalyzeShardKeyUniqueIndex(st.s, dbName, collName, currentShardKey, testCase);
         } else {
             testAnalyzeShardKeyNoUniqueIndex(st.s, dbName, collName, currentShardKey, testCase);
