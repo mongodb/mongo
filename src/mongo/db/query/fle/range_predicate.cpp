@@ -34,6 +34,7 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tags.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
@@ -78,7 +79,7 @@ std::unique_ptr<MatchExpression> RangePredicate::rewriteToTagDisjunction(
     return makeTagDisjunction(toBSONArray(generateTags(payload)));
 }
 
-std::unique_ptr<Expression> RangePredicate::rewriteToTagDisjunction(Expression* expr) const {
+std::pair<boost::intrusive_ptr<Expression>, Value> validateBetween(Expression* expr) {
     auto betweenExpr = dynamic_cast<ExpressionBetween*>(expr);
     tassert(6720901, "Range rewrite should only be called with $between operator.", betweenExpr);
     auto children = betweenExpr->getChildren();
@@ -89,7 +90,11 @@ std::unique_ptr<Expression> RangePredicate::rewriteToTagDisjunction(Expression* 
     auto secondArg = dynamic_cast<ExpressionConstant*>(children[1].get());
     uassert(6720904, "second argument should be a constant", secondArg);
     auto payload = secondArg->getValue();
+    return {children[0], payload};
+}
 
+std::unique_ptr<Expression> RangePredicate::rewriteToTagDisjunction(Expression* expr) const {
+    auto [_, payload] = validateBetween(expr);
     if (!isPayload(payload)) {
         return nullptr;
     }
@@ -98,16 +103,51 @@ std::unique_ptr<Expression> RangePredicate::rewriteToTagDisjunction(Expression* 
     return makeTagDisjunction(_rewriter->getExpressionContext(), std::move(tags));
 }
 
-// TODO: SERVER-67267 Rewrite $between to $_internalFleBetween when number of tags exceeds
-// limit.
-std::unique_ptr<MatchExpression> RangePredicate::rewriteToRuntimeComparison(
-    MatchExpression* expr) const {
-    return nullptr;
+std::unique_ptr<ExpressionInternalFLEBetween> RangePredicate::fleBetweenFromPayload(
+    StringData path, ParsedFindRangePayload payload) const {
+    auto* expCtx = _rewriter->getExpressionContext();
+    return fleBetweenFromPayload(ExpressionFieldPath::createPathFromString(
+                                     expCtx, path.toString(), expCtx->variablesParseState),
+                                 payload);
 }
 
-// TODO: SERVER-67267 Rewrite $between to $_internalFleBetween when number of tags exceeds
-// limit.
+std::unique_ptr<ExpressionInternalFLEBetween> RangePredicate::fleBetweenFromPayload(
+    boost::intrusive_ptr<Expression> fieldpath, ParsedFindRangePayload payload) const {
+    auto cm = payload.maxCounter;
+    ServerDataEncryptionLevel1Token serverToken = std::move(payload.serverToken);
+    std::vector<ConstDataRange> edcTokens;
+    std::transform(std::make_move_iterator(payload.edges.begin()),
+                   std::make_move_iterator(payload.edges.end()),
+                   std::back_inserter(edcTokens),
+                   [](FLEFindEdgeTokenSet&& edge) { return edge.edc.toCDR(); });
+
+    auto* expCtx = _rewriter->getExpressionContext();
+    return std::make_unique<ExpressionInternalFLEBetween>(
+        expCtx, fieldpath, serverToken.toCDR(), cm, std::move(edcTokens));
+}
+
+std::unique_ptr<MatchExpression> RangePredicate::rewriteToRuntimeComparison(
+    MatchExpression* expr) const {
+    auto between = static_cast<BetweenMatchExpression*>(expr);
+    auto ffp = between->rhs();
+
+    if (!isPayload(ffp)) {
+        return nullptr;
+    }
+    auto payload = parseFindPayload<ParsedFindRangePayload>(ffp);
+    auto internalFleBetween = fleBetweenFromPayload(expr->path(), payload);
+
+    return std::make_unique<ExprMatchExpression>(
+        boost::intrusive_ptr<ExpressionInternalFLEBetween>(internalFleBetween.release()),
+        _rewriter->getExpressionContext());
+}
+
 std::unique_ptr<Expression> RangePredicate::rewriteToRuntimeComparison(Expression* expr) const {
-    return nullptr;
+    auto [fieldpath, ffp] = validateBetween(expr);
+    if (!isPayload(ffp)) {
+        return nullptr;
+    }
+    auto payload = parseFindPayload<ParsedFindRangePayload>(ffp);
+    return fleBetweenFromPayload(fieldpath, payload);
 }
 }  // namespace mongo::fle

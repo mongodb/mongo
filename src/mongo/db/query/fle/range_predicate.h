@@ -54,5 +54,13 @@ private:
     EncryptedBinDataType encryptedBinDataType() const override {
         return EncryptedBinDataType::kFLE2FindRangePayload;
     }
+    /**
+     * Generate an expression for encrypted collscan for a range index.
+     */
+    std::unique_ptr<ExpressionInternalFLEBetween> fleBetweenFromPayload(
+        StringData path, ParsedFindRangePayload payload) const;
+
+    std::unique_ptr<ExpressionInternalFLEBetween> fleBetweenFromPayload(
+        boost::intrusive_ptr<Expression> fieldpath, ParsedFindRangePayload payload) const;
 };
 }  // namespace mongo::fle

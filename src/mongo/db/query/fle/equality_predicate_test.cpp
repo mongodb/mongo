@@ -151,48 +151,6 @@ TEST_F(EqualityPredicateRewriteTest, In_NotAllFFPs) {
         6329400);
 }
 
-template <typename T>
-std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, T t) {
-    BSONObj obj = t.toBSON();
-
-    std::vector<uint8_t> buf(obj.objsize() + 1);
-    buf[0] = static_cast<uint8_t>(dt);
-
-    std::copy(obj.objdata(), obj.objdata() + obj.objsize(), buf.data() + 1);
-
-    return buf;
-}
-
-template <typename T>
-void toEncryptedBinData(StringData field, EncryptedBinDataType dt, T t, BSONObjBuilder* builder) {
-    auto buf = toEncryptedVector(dt, t);
-
-    builder->appendBinData(field, buf.size(), BinDataType::Encrypt, buf.data());
-}
-
-constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
-constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
-static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId.toString()));
-static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId.toString()));
-
-std::vector<char> testValue = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19};
-std::vector<char> testValue2 = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29};
-
-const FLEIndexKey& getIndexKey() {
-    static std::string indexVec = hexblob::decode(
-        "7dbfebc619aa68a659f64b8e23ccd21644ac326cb74a26840c3d2420176c40ae088294d00ad6cae9684237b21b754cf503f085c25cd320bf035c3417416e1e6fe3d9219f79586582112740b2add88e1030d91926ae8afc13ee575cfb8bb965b7"_sd);
-    static FLEIndexKey indexKey(KeyMaterial(indexVec.begin(), indexVec.end()));
-    return indexKey;
-}
-
-const FLEUserKey& getUserKey() {
-    static std::string userVec = hexblob::decode(
-        "a7ddbc4c8be00d51f68d9d8e485f351c8edc8d2206b24d8e0e1816d005fbe520e489125047d647b0d8684bfbdbf09c304085ed086aba6c2b2b1677ccc91ced8847a733bf5e5682c84b3ee7969e4a5fe0e0c21e5e3ee190595a55f83147d8de2a"_sd);
-    static FLEUserKey userKey(KeyMaterial(userVec.begin(), userVec.end()));
-    return userKey;
-}
-
-
 BSONObj generateFFP(StringData path, int value) {
     auto indexKey = getIndexKey();
     FLEIndexKeyAndId indexKeyAndId(indexKey.data, indexKeyId);

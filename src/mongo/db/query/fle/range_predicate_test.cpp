@@ -28,6 +28,7 @@
  */
 
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -142,7 +143,6 @@ TEST_F(RangePredicateRewriteTest, MatchRangeRewrite) {
     assertRewriteToTags(_predicate, &inputExpr, toBSONArray(std::move(allTags)));
 }
 
-
 TEST_F(RangePredicateRewriteTest, AggRangeRewrite) {
     auto input = fromjson(R"({$between: ["$age", {$literal: [1, 2, 3]}]})");
     auto inputExpr =
@@ -166,6 +166,123 @@ TEST_F(RangePredicateRewriteTest, AggRangeRewriteNoOp) {
     _predicate.payloadValid = false;
     auto actual = _predicate.rewrite(inputExpr.get());
     ASSERT(actual == nullptr);
+}
+
+BSONObj generateFFP(StringData path, int lb, int ub, int min, int max) {
+    auto indexKey = getIndexKey();
+    FLEIndexKeyAndId indexKeyAndId(indexKey.data, indexKeyId);
+    auto userKey = getUserKey();
+    FLEUserKeyAndId userKeyAndId(userKey.data, indexKeyId);
+
+    auto edges = minCoverInt32(lb, true, ub, true, min, max, 1);
+    auto ffp = FLEClientCrypto::serializeFindRangePayload(indexKeyAndId, userKeyAndId, edges, 0);
+
+    BSONObjBuilder builder;
+    toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindRangePayload, ffp, &builder);
+    return builder.obj();
+}
+
+std::unique_ptr<MatchExpression> generateBetweenWithFFP(StringData path, int lb, int ub) {
+    auto ffp = generateFFP(path, lb, ub, 0, 255);
+    return std::make_unique<BetweenMatchExpression>(path, ffp.firstElement());
+}
+
+std::unique_ptr<Expression> generateBetweenWithFFP(ExpressionContext* expCtx,
+                                                   StringData path,
+                                                   int lb,
+                                                   int ub) {
+    auto ffp = Value(generateFFP(path, lb, ub, 0, 255).firstElement());
+    auto ffpExpr = make_intrusive<ExpressionConstant>(expCtx, ffp);
+    auto fieldpath = ExpressionFieldPath::createPathFromString(
+        expCtx, path.toString(), expCtx->variablesParseState);
+    std::vector<boost::intrusive_ptr<Expression>> children = {std::move(fieldpath),
+                                                              std::move(ffpExpr)};
+    return std::make_unique<ExpressionBetween>(expCtx, std::move(children));
+}
+
+TEST_F(RangePredicateRewriteTest, CollScanRewriteMatch) {
+    _mock.setForceEncryptedCollScanForTest();
+    auto input = generateBetweenWithFFP("age", 23, 35);
+    auto result = _predicate.rewrite(input.get());
+    ASSERT(result);
+    ASSERT_EQ(result->matchType(), MatchExpression::EXPRESSION);
+    auto* expr = static_cast<ExprMatchExpression*>(result.get());
+    auto aggExpr = expr->getExpression();
+    auto expected = fromjson(R"({
+        "$_internalFleBetween": {
+            "field": "$age",
+            "edc": [
+                {
+                    "$binary": {
+                        "base64": "CJb59SJCWcnn4u4uS1KHMphf8zK7M5+fUoFTzzUMqFVv",
+                        "subType": "6"
+                    }
+                },
+                {
+                    "$binary": {
+                        "base64": "CDE4/QorDvn6+GnmlPJtxQ5pZmwKOt/F48HmNrQuVJ1o",
+                        "subType": "6"
+                    }
+                },
+                {
+                    "$binary": {
+                        "base64": "CE0h7vfdciFBeqIk1N14ZXw/jzFT0bLfXcNyiPRsg4W4",
+                        "subType": "6"
+                    }
+                }
+                
+            ],
+            "counter": {$numberLong: "0"},
+            "server": {
+                "$binary": {
+                    "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                    "subType": "6"
+                }
+            }
+        }
+    })");
+    ASSERT_BSONOBJ_EQ(aggExpr->serialize(false).getDocument().toBson(), expected);
+}
+
+TEST_F(RangePredicateRewriteTest, CollScanRewriteAgg) {
+    _mock.setForceEncryptedCollScanForTest();
+    auto input = generateBetweenWithFFP(&_expCtx, "age", 23, 35);
+    auto result = _predicate.rewrite(input.get());
+    ASSERT(result);
+    auto expected = fromjson(R"({
+        "$_internalFleBetween": {
+            "field": "$age",
+            "edc": [
+                {
+                    "$binary": {
+                        "base64": "CJb59SJCWcnn4u4uS1KHMphf8zK7M5+fUoFTzzUMqFVv",
+                        "subType": "6"
+                    }
+                },
+                {
+                    "$binary": {
+                        "base64": "CDE4/QorDvn6+GnmlPJtxQ5pZmwKOt/F48HmNrQuVJ1o",
+                        "subType": "6"
+                    }
+                },
+                {
+                    "$binary": {
+                        "base64": "CE0h7vfdciFBeqIk1N14ZXw/jzFT0bLfXcNyiPRsg4W4",
+                        "subType": "6"
+                    }
+                }
+                
+            ],
+            "counter": {$numberLong: "0"},
+            "server": {
+                "$binary": {
+                    "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                    "subType": "6"
+                }
+            }
+        }
+    })");
+    ASSERT_BSONOBJ_EQ(result->serialize(false).getDocument().toBson(), expected);
 }
 
 };  // namespace
