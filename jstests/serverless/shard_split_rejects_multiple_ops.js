@@ -6,7 +6,7 @@
 
 load("jstests/libs/fail_point_util.js");         // for "configureFailPoint"
 load('jstests/libs/parallel_shell_helpers.js');  // for "startParallelShell"
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 (function() {
 "use strict";
@@ -17,7 +17,7 @@ const tenantIds = ["tenant1", "tenant2"];
 
 function commitShardSplitConcurrently() {
     const test =
-        new BasicServerlessTest({recipientTagName, recipientSetName, quickGarbageCollection: true});
+        new ShardSplitTest({recipientTagName, recipientSetName, quickGarbageCollection: true});
     test.addRecipientNodes();
 
     const donorPrimary = test.donor.getPrimary();

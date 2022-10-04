@@ -18,9 +18,9 @@
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
-const shardSplitTest = new BasicServerlessTest({
+const shardSplitTest = new ShardSplitTest({
     recipientTagName: "recipientNode",
     recipientSetName: "recipient",
     quickGarbageCollection: true
@@ -118,9 +118,9 @@ nonEmptyIndexThread.start();
 jsTestLog("Allowing migration to commit");
 afterBlockingFp.off();
 assert.soon(() => {
-    const state = BasicServerlessTest
-                      .getTenantMigrationAccessBlocker({node: donorPrimary, tenantId: kTenantId})
-                      .donor.state;
+    const state =
+        ShardSplitTest.getTenantMigrationAccessBlocker({node: donorPrimary, tenantId: kTenantId})
+            .donor.state;
     return state === TenantMigrationTest.DonorAccessState.kBlockWritesAndReads ||
         state === TenantMigrationTest.DonorAccessState.kReject;
 });

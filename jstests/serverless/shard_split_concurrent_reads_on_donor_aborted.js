@@ -21,7 +21,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/serverless/shard_split_concurrent_reads_on_donor_util.js");
 
 const kCollName = "testColl";
@@ -47,12 +47,12 @@ function testDoNotRejectReadsAfterMigrationAborted(testCase, dbName, collName) {
                 testCase.command(collName, donorDoc.commitOrAbortOpTime.ts),
                 null,
                 testCase.isTransaction);
-            BasicServerlessTest.checkShardSplitAccessBlocker(
+            ShardSplitTest.checkShardSplitAccessBlocker(
                 node, tenantId, {numTenantMigrationAbortedErrors: 0});
         } else {
             runCommandForConcurrentReadTest(
                 db, testCase.command(collName), null, testCase.isTransaction);
-            BasicServerlessTest.checkShardSplitAccessBlocker(
+            ShardSplitTest.checkShardSplitAccessBlocker(
                 node, tenantId, {numTenantMigrationAbortedErrors: 0});
         }
     });
@@ -60,7 +60,7 @@ function testDoNotRejectReadsAfterMigrationAborted(testCase, dbName, collName) {
 
 const testCases = shardSplitConcurrentReadTestCases;
 
-const test = new BasicServerlessTest({
+const test = new ShardSplitTest({
     recipientTagName: "recipientTag",
     recipientSetName: "recipientSet",
     quickGarbageCollection: true

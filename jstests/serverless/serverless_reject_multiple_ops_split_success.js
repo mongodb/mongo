@@ -9,8 +9,7 @@
 
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
-load("jstests/serverless/libs/serverless_reject_multiple_ops_utils.js");
+load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/libs/uuid_util.js");
 
 function canStartShardSplitWithAbortedMigration({protocol, runOnRecipient}) {
@@ -27,7 +26,7 @@ function canStartShardSplitWithAbortedMigration({protocol, runOnRecipient}) {
 
     const shardSplitRst = runOnRecipient ? test.getRecipientRst() : test.getDonorRst();
 
-    let recipientNodes = addRecipientNodes(shardSplitRst, recipientTagName);
+    let recipientNodes = addRecipientNodes({rst: test.getDonorRst(), recipientTagName});
 
     let fp = configureFailPoint(test.getDonorRst().getPrimary(),
                                 "abortTenantMigrationBeforeLeavingBlockingState");
@@ -41,12 +40,16 @@ function canStartShardSplitWithAbortedMigration({protocol, runOnRecipient}) {
     jsTestLog("Starting tenant migration");
     assert.commandWorked(test.startMigration(migrationOpts));
 
-    TenantMigrationTest.assertAborted(
-        waitForMergeToComplete(migrationOpts, tenantMigrationId, test));
+    TenantMigrationTest.assertAborted(test.waitForMigrationToComplete(migrationOpts));
     assert.commandWorked(test.forgetMigration(migrationOpts.migrationIdString));
 
-    const commitThread = commitSplitAsync(
-        shardSplitRst, tenantIds, recipientTagName, recipientSetName, splitMigrationId);
+    const commitThread = commitSplitAsync({
+        rst: shardSplitRst,
+        tenantIds,
+        recipientTagName,
+        recipientSetName,
+        migrationId: splitMigrationId
+    });
     assert.commandWorked(commitThread.returnData());
 
     recipientNodes.forEach(node => {

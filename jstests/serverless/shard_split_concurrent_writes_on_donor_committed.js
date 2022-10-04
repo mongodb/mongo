@@ -19,12 +19,12 @@ load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 TestData.skipCheckDBHashes = true;
 const recipientTagName = "recipientNode";
 const recipientSetName = "recipient";
-const tenantMigrationTest = new BasicServerlessTest({
+const tenantMigrationTest = new ShardSplitTest({
     recipientTagName,
     recipientSetName,
     quickGarbageCollection: true,
@@ -137,7 +137,7 @@ assert.commandWorked(
     operation.commit({retryOnRetryableErrors: false}, {enableDonorStartMigrationFsync: true}));
 
 runTestsAfterMigration();
-BasicServerlessTest.checkShardSplitAccessBlocker(donorPrimary, kTenantID, {
+ShardSplitTest.checkShardSplitAccessBlocker(donorPrimary, kTenantID, {
     numTenantMigrationCommittedErrors: countTenantMigrationCommittedErrors
 });
 

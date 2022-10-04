@@ -9,8 +9,7 @@
 
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
-load("jstests/serverless/libs/serverless_reject_multiple_ops_utils.js");
+load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/libs/uuid_util.js");
 
 function retryMigrationAfterSplitCompletes(protocol) {
@@ -29,12 +28,17 @@ function retryMigrationAfterSplitCompletes(protocol) {
 
     const splitRst = test.getDonorRst();
 
-    let splitRecipientNodes = addRecipientNodes(splitRst, recipientTagName);
+    let splitRecipientNodes = addRecipientNodes({rst: splitRst, recipientTagName});
 
     let fp = configureFailPoint(splitRst.getPrimary(), "pauseShardSplitBeforeBlockingState");
 
-    const commitThread =
-        commitSplitAsync(splitRst, tenantIds, recipientTagName, recipientSetName, splitMigrationId);
+    const commitThread = commitSplitAsync({
+        rst: splitRst,
+        tenantIds,
+        recipientTagName,
+        recipientSetName,
+        migrationId: splitMigrationId
+    });
     fp.wait();
 
     const firstMigrationOpts = {
@@ -72,8 +76,7 @@ function retryMigrationAfterSplitCompletes(protocol) {
     }
     jsTestLog("Starting tenant migration");
     assert.commandWorked(test.startMigration(secondMigrationOpts));
-    TenantMigrationTest.assertCommitted(
-        waitForMergeToComplete(secondMigrationOpts, secondTenantMigrationId, test));
+    TenantMigrationTest.assertCommitted(test.waitForMigrationToComplete(secondMigrationOpts));
     assert.commandWorked(test.forgetMigration(secondMigrationOpts.migrationIdString));
 
     waitForGarbageCollectionForSplit(splitRst.nodes, splitMigrationId, tenantIds);

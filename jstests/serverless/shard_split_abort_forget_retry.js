@@ -13,13 +13,12 @@
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');  // for "startParallelShell"
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 const recipientTagName = "recipientNode";
 const recipientSetName = "recipientSetName";
 TestData.skipCheckDBHashes = true;
-const test =
-    new BasicServerlessTest({recipientTagName, recipientSetName, quickGarbageCollection: true});
+const test = new ShardSplitTest({recipientTagName, recipientSetName, quickGarbageCollection: true});
 
 (() => {
     const tenantIds = ["tenant1", "tenant2"];

@@ -20,7 +20,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 const kGarbageCollectionParams = {
     // Set the delay before a donor state doc is garbage collected to be short to speed up the test.
@@ -44,7 +44,7 @@ function insertDocument(primaryHost, dbName, collName) {
     jsTestLog(
         "Testing blocked writes can see shard split outcome for a split that has been committed and garbage collected.");
 
-    const test = new BasicServerlessTest({
+    const test = new ShardSplitTest({
         recipientTagName: "recipientNode",
         recipientSetName: "recipient",
         nodeOptions: Object.assign({setParameter: kGarbageCollectionParams})
@@ -95,7 +95,7 @@ function insertDocument(primaryHost, dbName, collName) {
     jsTestLog(
         "Testing blocked writes can see shard split outcome for a split that has been aborted and garbage collected.");
 
-    const test = new BasicServerlessTest({
+    const test = new ShardSplitTest({
         recipientTagName: "recipientNode",
         recipientSetName: "recipient",
         nodeOptions: Object.assign({setParameter: kGarbageCollectionParams})

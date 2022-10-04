@@ -18,12 +18,12 @@
 (function() {
 "use strict";
 
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 
 const test =
-    new BasicServerlessTest({recipientSetName: "recipientSet", recipientTagName: "recipientTag"});
+    new ShardSplitTest({recipientSetName: "recipientSet", recipientTagName: "recipientTag"});
 test.addRecipientNodes();
 
 const kTenantId = "testTenantId";

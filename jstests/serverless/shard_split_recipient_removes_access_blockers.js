@@ -5,7 +5,7 @@
  */
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 (function() {
 "use strict";
@@ -13,7 +13,7 @@ load("jstests/serverless/libs/basic_serverless_test.js");
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
 
-const test = new BasicServerlessTest({
+const test = new ShardSplitTest({
     recipientTagName: "recipientNode",
     recipientSetName: "recipient",
     quickGarbageCollection: true
@@ -34,7 +34,7 @@ donorAfterBlockingFailpoint.wait();
 
 jsTestLog("Asserting recipient nodes have installed access blockers");
 assert.soon(() => test.recipientNodes.every(node => {
-    const accessBlockers = BasicServerlessTest.getTenantMigrationAccessBlocker({node});
+    const accessBlockers = ShardSplitTest.getTenantMigrationAccessBlocker({node});
     return tenantIds.every(tenantId => accessBlockers && accessBlockers.hasOwnProperty(tenantId) &&
                                !!accessBlockers[tenantId].donor);
 }));
@@ -45,7 +45,7 @@ assert.commandWorked(commitOp.returnData());
 
 jsTestLog("Asserting recipient nodes have removed access blockers");
 assert.soon(() => test.recipientNodes.every(node => {
-    return BasicServerlessTest.getTenantMigrationAccessBlocker({node}) == null;
+    return ShardSplitTest.getTenantMigrationAccessBlocker({node}) == null;
 }));
 
 test.stop();

@@ -29,7 +29,7 @@ function assertAsyncCommitted(splitThread) {
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 const kMaxBatchSize = 2;
 const kCollName = "testColl";
@@ -46,7 +46,7 @@ const kBatchTypes = {
 };
 
 function setup() {
-    const test = new BasicServerlessTest({
+    const test = new ShardSplitTest({
         recipientTagName: "recipientTag",
         recipientSetName: "recipientSet",
         quickGarbageCollection: true,

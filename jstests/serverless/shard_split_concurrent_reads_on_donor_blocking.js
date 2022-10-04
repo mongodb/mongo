@@ -21,7 +21,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/serverless/shard_split_concurrent_reads_on_donor_util.js");
 
 const kCollName = "testColl";
@@ -63,7 +63,7 @@ function testBlockReadsAfterMigrationEnteredBlocking(testCase, primary, dbName, 
 const testCases = shardSplitConcurrentReadTestCases;
 
 const tenantId = "tenantId";
-const test = new BasicServerlessTest({
+const test = new ShardSplitTest({
     recipientTagName: "recipientTag",
     recipientSetName: "recipientSet",
     quickGarbageCollection: true
@@ -93,13 +93,13 @@ for (const [testCaseName, testCase] of Object.entries(testCases)) {
 }
 
 // check on primary
-BasicServerlessTest.checkShardSplitAccessBlocker(
+ShardSplitTest.checkShardSplitAccessBlocker(
     donorPrimary, tenantId, {numBlockedReads: countBlockedReadsPrimary});
 
 // check on secondaries
 const secondaries = donorRst.getSecondaries();
 secondaries.forEach(node => {
-    BasicServerlessTest.checkShardSplitAccessBlocker(
+    ShardSplitTest.checkShardSplitAccessBlocker(
         node, tenantId, {numBlockedReads: countBlockedReadsSecondaries});
 });
 

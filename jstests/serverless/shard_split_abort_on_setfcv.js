@@ -8,11 +8,11 @@
 (function() {
 "use strict";
 load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
-const test = new BasicServerlessTest({
+const test = new ShardSplitTest({
     recipientTagName: "recipientNode",
     recipientSetName: "recipient",
     quickGarbageCollection: true

@@ -1007,6 +1007,10 @@ public:
         _recStateDoc = initialStateDocument();
         uassertStatusOK(serverless::insertStateDoc(opCtx, _recStateDoc));
 
+        ServerlessOperationLockRegistry::get(getServiceContext())
+            .acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit,
+                         _recStateDoc.getId());
+
         _pauseBeforeRecipientCleanupFp =
             std::make_unique<FailPointEnableBlock>("pauseShardSplitBeforeRecipientCleanup");
 
@@ -1042,10 +1046,6 @@ public:
         stateDocument.setBlockOpTime(repl::OpTime(Timestamp(1, 1), 1));
         stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
         stateDocument.setRecipientConnectionString(ConnectionString::forLocal());
-
-        ServerlessOperationLockRegistry::get(getServiceContext())
-            .acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit,
-                         stateDocument.getId());
 
         return stateDocument;
     }

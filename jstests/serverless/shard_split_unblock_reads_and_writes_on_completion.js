@@ -20,7 +20,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/libs/write_concern_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 function startReadThread(node, dbName, collName, afterClusterTime) {
     let readThread = new Thread((host, dbName, collName, afterClusterTime) => {
@@ -54,7 +54,7 @@ const kCollName = "testColl";
     jsTest.log(
         "Test that a lagged donor secondary correctly unblocks blocked reads after the split aborts");
 
-    const test = new BasicServerlessTest({
+    const test = new ShardSplitTest({
         recipientSetName: "recipientSet",
         recipientTagName: "recipientTag",
         quickGarbageCollection: true
@@ -62,7 +62,7 @@ const kCollName = "testColl";
     test.addRecipientNodes();
 
     const donorPrimary = test.donor.getPrimary();
-    const donorsColl = donorPrimary.getCollection(BasicServerlessTest.kConfigSplitDonorsNS);
+    const donorsColl = donorPrimary.getCollection(ShardSplitTest.kConfigSplitDonorsNS);
     const tenantId = kTenantIdPrefix + "LaggedSecondaryMigrationAborted";
     const dbName = tenantId + "_" + kDbName;
     assert.commandWorked(
@@ -82,7 +82,7 @@ const kCollName = "testColl";
     const donorDoc = donorsColl.findOne({_id: operation.migrationId});
     assert.neq(null, donorDoc);
     const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockOpTime.ts);
-    assert.soon(() => BasicServerlessTest.getNumBlockedReads(laggedSecondary, tenantId) == 1);
+    assert.soon(() => ShardSplitTest.getNumBlockedReads(laggedSecondary, tenantId) == 1);
 
     // Disable snapshotting on that secondary, and wait for the split to abort and be garbage
     // collected. That way the secondary is guaranteed to observe the write to set expireAt before
@@ -106,7 +106,7 @@ const kCollName = "testColl";
 (() => {
     jsTest.log(
         "Test that a lagged donor secondary correctly unblocks blocked reads after the split commits");
-    const test = new BasicServerlessTest({
+    const test = new ShardSplitTest({
         recipientSetName: "recipientSet",
         recipientTagName: "recipientTag",
         quickGarbageCollection: true
@@ -114,7 +114,7 @@ const kCollName = "testColl";
     test.addRecipientNodes();
 
     const donorPrimary = test.donor.getPrimary();
-    const donorsColl = donorPrimary.getCollection(BasicServerlessTest.kConfigSplitDonorsNS);
+    const donorsColl = donorPrimary.getCollection(ShardSplitTest.kConfigSplitDonorsNS);
     const tenantId = kTenantIdPrefix + "LaggedSecondaryMigrationCommitted";
     const dbName = tenantId + "_" + kDbName;
     assert.commandWorked(
@@ -133,7 +133,7 @@ const kCollName = "testColl";
     const donorDoc = donorsColl.findOne({_id: operation.migrationId});
     assert.neq(null, donorDoc);
     const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockOpTime.ts);
-    assert.soon(() => BasicServerlessTest.getNumBlockedReads(laggedSecondary, tenantId) == 1);
+    assert.soon(() => ShardSplitTest.getNumBlockedReads(laggedSecondary, tenantId) == 1);
 
     // Disable snapshotting on that secondary, and wait for the split to commit and be garbage
     // collected. That way the secondary is guaranteed to observe the write to set expireAt before
@@ -159,7 +159,7 @@ const kCollName = "testColl";
 (() => {
     jsTest.log(
         "Test that blocked writes and reads are interrupted when the donor's state doc collection is dropped");
-    const test = new BasicServerlessTest({
+    const test = new ShardSplitTest({
         recipientSetName: "recipientSet",
         recipientTagName: "recipientTag",
         quickGarbageCollection: true
@@ -167,7 +167,7 @@ const kCollName = "testColl";
     test.addRecipientNodes();
 
     const donorPrimary = test.donor.getPrimary();
-    const donorsColl = donorPrimary.getCollection(BasicServerlessTest.kConfigSplitDonorsNS);
+    const donorsColl = donorPrimary.getCollection(ShardSplitTest.kConfigSplitDonorsNS);
     const tenantId = kTenantIdPrefix + "DropStateDocCollection";
     const dbName = tenantId + "_" + kDbName;
     assert.commandWorked(
@@ -185,8 +185,8 @@ const kCollName = "testColl";
     assert.neq(null, donorDoc);
     const readThread = startReadThread(donorPrimary, dbName, kCollName, donorDoc.blockOpTime.ts);
     const writeThread = startWriteThread(donorPrimary, dbName, kCollName);
-    assert.soon(() => BasicServerlessTest.getNumBlockedReads(donorPrimary, tenantId) == 1);
-    assert.soon(() => BasicServerlessTest.getNumBlockedWrites(donorPrimary, tenantId) == 1);
+    assert.soon(() => ShardSplitTest.getNumBlockedReads(donorPrimary, tenantId) == 1);
+    assert.soon(() => ShardSplitTest.getNumBlockedWrites(donorPrimary, tenantId) == 1);
 
     // Cannot delete the donor state doc since it has not been marked as garbage collectable.
     assert.commandFailedWithCode(donorsColl.remove({}), ErrorCodes.IllegalOperation);

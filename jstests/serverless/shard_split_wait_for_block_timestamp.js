@@ -10,14 +10,14 @@ load("jstests/libs/fail_point_util.js");                         // for "configu
 load("jstests/libs/write_concern_util.js");                      // for "stopServerReplication"
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // for "setParameter"
 load('jstests/libs/parallel_shell_helpers.js');                  // for "startParallelShell"
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 (function() {
 "use strict";
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
-const test = new BasicServerlessTest({
+const test = new ShardSplitTest({
     recipientTagName: "recipientNode",
     recipientSetName: "recipient",
     quickGarbageCollection: true,

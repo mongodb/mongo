@@ -5,7 +5,7 @@
  */
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 function assertSplitConfigExists(donorPrimary) {
     jsTestLog("Asserting a split config has been applied");
@@ -32,7 +32,7 @@ function splitConfigRemovedAfterDecision(simulateErrorToAbortOperation) {
     // Skip db hash check because secondary is left with a different config.
     TestData.skipCheckDBHashes = true;
     const tenantIds = ["tenant1", "tenant2"];
-    const test = new BasicServerlessTest({
+    const test = new ShardSplitTest({
         recipientTagName: "recipientNode",
         recipientSetName: "recipient",
         quickGarbageCollection: true

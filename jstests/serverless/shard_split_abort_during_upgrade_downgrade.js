@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 // Shard split commands are gated by a feature flag, which will not be supported when we
 // downgrade versions. Eventually, we will run this test when we have two consecutive versions
@@ -19,7 +19,7 @@ if (MongoRunner.compareBinVersions(latestFCV, "6.3") < 0) {
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
-const test = new BasicServerlessTest({
+const test = new ShardSplitTest({
     recipientTagName: "recipientNode",
     recipientSetName: "recipient",
     quickGarbageCollection: true

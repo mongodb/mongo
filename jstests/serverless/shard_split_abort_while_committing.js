@@ -5,7 +5,7 @@
  */
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 const failpoints = ["pauseShardSplitAfterUpdatingToCommittedState"];
 
@@ -14,7 +14,7 @@ function testAbortAfterSplitIsAppliedStillsCommits(failpoint) {
 
     const tenantIds = ["tenant1", "tenant2"];
 
-    const test = new BasicServerlessTest({
+    const test = new ShardSplitTest({
         recipientTagName: "recipientNode",
         recipientSetName: "recipient",
         quickGarbageCollection: true

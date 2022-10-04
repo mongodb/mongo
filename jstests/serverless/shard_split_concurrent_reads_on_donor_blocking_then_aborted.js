@@ -23,7 +23,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/serverless/shard_split_concurrent_reads_on_donor_util.js");
 
 const kCollName = "testColl";
@@ -39,11 +39,11 @@ function getTenantId(dbName) {
  */
 function resumeMigrationAfterBlockingRead(host, tenantId, targetNumBlockedReads) {
     load("jstests/libs/fail_point_util.js");
-    load("jstests/serverless/libs/basic_serverless_test.js");
+    load("jstests/serverless/libs/shard_split_test.js");
     const primary = new Mongo(host);
 
-    assert.soon(() => BasicServerlessTest.getNumBlockedReads(primary, tenantId) ==
-                    targetNumBlockedReads);
+    assert.soon(() =>
+                    ShardSplitTest.getNumBlockedReads(primary, tenantId) == targetNumBlockedReads);
 
     assert.commandWorked(
         primary.adminCommand({configureFailPoint: "pauseShardSplitAfterBlocking", mode: "off"}));
@@ -60,7 +60,7 @@ function testUnblockBlockedReadsAfterMigrationAborted(testCase, dbName, collName
     }
 
     const tenantId = getTenantId(dbName);
-    const test = new BasicServerlessTest({
+    const test = new ShardSplitTest({
         recipientTagName: "recipientTag",
         recipientSetName: "recipientSet",
         quickGarbageCollection: true
@@ -108,7 +108,7 @@ function testUnblockBlockedReadsAfterMigrationAborted(testCase, dbName, collName
     }
 
     const shouldBlock = !testCase.isLinearizableRead;
-    BasicServerlessTest.checkShardSplitAccessBlocker(donorPrimary, tenantId, {
+    ShardSplitTest.checkShardSplitAccessBlocker(donorPrimary, tenantId, {
         numBlockedReads: shouldBlock ? 1 : 0,
         // Reads just get unblocked if the split aborts.
         numTenantMigrationAbortedErrors: 0

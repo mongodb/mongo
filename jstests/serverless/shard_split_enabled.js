@@ -8,10 +8,10 @@
 "use strict";
 
 load("jstests/replsets/libs/tenant_migration_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 const tenantIds = ["foo"];
-class ShardSplitEnabledTest extends BasicServerlessTest {
+class ShardSplitEnabledTest extends ShardSplitTest {
     makeCommitShardSplitCmd(uuid) {
         return {
             commitShardSplit: 1,

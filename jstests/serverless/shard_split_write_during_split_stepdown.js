@@ -6,14 +6,14 @@
  * @tags: [requires_fcv_52, featureFlagShardSplit]
  */
 
-load("jstests/serverless/libs/shard_split_write_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 (function() {
 "use strict";
 
 const recipientTagName = "recipientNode";
 const recipientSetName = "recipientSetName";
-const test = new BasicServerlessTest({
+const test = new ShardSplitTest({
     recipientTagName,
     recipientSetName,
     nodeOptions: {

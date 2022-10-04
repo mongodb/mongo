@@ -20,12 +20,12 @@ load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 TestData.skipCheckDBHashes = true;
 const recipientTagName = "recipientNode";
 const recipientSetName = "recipient";
-const tenantMigrationTest = new BasicServerlessTest({
+const tenantMigrationTest = new ShardSplitTest({
     recipientTagName,
     recipientSetName,
     quickGarbageCollection: true,
@@ -187,7 +187,7 @@ assert.eq(data.state, "committed");
 // run test after blocking is over and the migration committed.
 runTestsAfterMigrationCommitted();
 
-BasicServerlessTest.checkShardSplitAccessBlocker(
+ShardSplitTest.checkShardSplitAccessBlocker(
     donorPrimary, kTenantID, {numBlockedWrites: countBlockedWrites});
 
 tenantMigrationTest.stop();

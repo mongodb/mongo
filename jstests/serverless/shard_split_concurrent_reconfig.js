@@ -4,7 +4,7 @@
  * @tags: [requires_fcv_52, featureFlagShardSplit]
  */
 
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 (function() {
 "use strict";
@@ -12,8 +12,7 @@ load("jstests/serverless/libs/basic_serverless_test.js");
 const recipientTagName = "recipientNode";
 const recipientSetName = "recipientSetName";
 const tenantIds = ["tenant1", "tenant2"];
-const test =
-    new BasicServerlessTest({recipientTagName, recipientSetName, quickGarbageCollection: true});
+const test = new ShardSplitTest({recipientTagName, recipientSetName, quickGarbageCollection: true});
 
 test.addRecipientNodes();
 test.donor.awaitSecondaryNodes();

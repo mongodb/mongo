@@ -9,8 +9,7 @@
 
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
-load("jstests/serverless/libs/serverless_reject_multiple_ops_utils.js");
+load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/libs/uuid_util.js");
 
 function retrySplit({protocol, recipientTagName, recipientSetName, tenantIds, test, splitRst}) {
@@ -18,7 +17,7 @@ function retrySplit({protocol, recipientTagName, recipientSetName, tenantIds, te
     const firstSplitMigrationId = UUID();
     const secondSplitMigrationId = UUID();
 
-    let recipientNodes = addRecipientNodes(splitRst, recipientTagName);
+    let recipientNodes = addRecipientNodes({rst: splitRst, recipientTagName});
 
     let fp = configureFailPoint(test.getDonorRst().getPrimary(),
                                 "pauseTenantMigrationBeforeLeavingDataSyncState");
@@ -35,21 +34,30 @@ function retrySplit({protocol, recipientTagName, recipientSetName, tenantIds, te
 
     fp.wait();
 
-    const commitThread = commitSplitAsync(
-        splitRst, tenantIds, recipientTagName, recipientSetName, firstSplitMigrationId);
+    const commitThread = commitSplitAsync({
+        rst: splitRst,
+        tenantIds,
+        recipientTagName,
+        recipientSetName,
+        migrationId: firstSplitMigrationId
+    });
     assert.commandFailed(commitThread.returnData());
 
     fp.off();
 
-    TenantMigrationTest.assertCommitted(
-        waitForMergeToComplete(migrationOpts, tenantMigrationId, test));
+    TenantMigrationTest.assertCommitted(test.waitForMigrationToComplete(migrationOpts));
     assert.commandWorked(test.forgetMigration(migrationOpts.migrationIdString));
 
     // Potential race condition as we do not know how quickly the future continuation in
     // PrimaryOnlyService will remove the instance from its map.
     sleep(1000);
-    const secondCommitThread = commitSplitAsync(
-        splitRst, tenantIds, recipientTagName, recipientSetName, secondSplitMigrationId);
+    const secondCommitThread = commitSplitAsync({
+        rst: splitRst,
+        tenantIds,
+        recipientTagName,
+        recipientSetName,
+        migrationId: secondSplitMigrationId
+    });
     assert.commandWorked(secondCommitThread.returnData());
 
     splitRst.nodes = splitRst.nodes.filter(node => !recipientNodes.includes(node));

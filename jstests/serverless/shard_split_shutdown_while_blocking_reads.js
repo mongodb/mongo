@@ -20,11 +20,11 @@
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
 const test =
-    new BasicServerlessTest({recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
+    new ShardSplitTest({recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
 test.addRecipientNodes();
 
 const kTenantIds = ["testTenantId"];
@@ -58,7 +58,7 @@ let readThread = new Thread((host, dbName, collName, afterClusterTime) => {
 readThread.start();
 
 // Shut down the donor after the read starts blocking.
-assert.soon(() => BasicServerlessTest.getNumBlockedReads(donorPrimary, kTenantIds[0]) == 1);
+assert.soon(() => ShardSplitTest.getNumBlockedReads(donorPrimary, kTenantIds[0]) == 1);
 donorRst.stop(donorPrimary);
 readThread.join();
 

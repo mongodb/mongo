@@ -23,9 +23,9 @@
 load("jstests/libs/clustered_collections/clustered_collection_util.js");  // ClusteredCollectionUtil
 load("jstests/libs/parallelTester.js");                                   // Thread()
 load("jstests/libs/uuid_util.js");                                        // extractUUIDFromObject()
-load("jstests/serverless/libs/basic_serverless_test.js");                 // BasicServerlessTest
+load("jstests/serverless/libs/shard_split_test.js");                      // ShardSplitTest
 
-const test = new BasicServerlessTest({
+const test = new ShardSplitTest({
     recipientSetName: "recipientSet",
     recipientTagName: "recipientTag",
     quickGarbageCollection: true

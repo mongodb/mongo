@@ -19,12 +19,12 @@ load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 TestData.skipCheckDBHashes = true;
 const recipientTagName = "recipientNode";
 const recipientSetName = "recipient";
-const tenantMigrationTest = new BasicServerlessTest({
+const tenantMigrationTest = new ShardSplitTest({
     recipientTagName,
     recipientSetName,
     quickGarbageCollection: true,
@@ -61,14 +61,14 @@ function testDoNotRejectWritesAfterMigrationAborted(testCase, testOpts) {
     // committed the abort decision. Otherwise, the command below is expected to block and then get
     // rejected.
     assert.soon(() => {
-        const mtab = BasicServerlessTest.getTenantMigrationAccessBlocker(
-            {node: testOpts.primaryDB, tenantId});
+        const mtab =
+            ShardSplitTest.getTenantMigrationAccessBlocker({node: testOpts.primaryDB, tenantId});
         return mtab.donor.state === TenantMigrationTest.DonorAccessState.kAborted;
     });
 
     runCommandForConcurrentWritesTest(testOpts);
     testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
-    BasicServerlessTest.checkShardSplitAccessBlocker(
+    ShardSplitTest.checkShardSplitAccessBlocker(
         testOpts.primaryDB, tenantId, {numTenantMigrationAbortedErrors: 0});
 }
 

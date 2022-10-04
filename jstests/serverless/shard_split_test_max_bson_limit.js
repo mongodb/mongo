@@ -18,7 +18,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
@@ -41,7 +41,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
 jsTestLog("Testing that large write errors fit within the BSON size limit.");
 
-const test = new BasicServerlessTest({
+const test = new ShardSplitTest({
     recipientSetName: "recipientSet",
     recipientTagName: "recipientTagName",
     quickGarbageCollection: true

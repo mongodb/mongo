@@ -1,3 +1,4 @@
+load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
@@ -12,6 +13,77 @@ const runAbortShardSplitAsync = function(primaryHost, migrationIdString) {
     return primary.adminCommand({abortShardSplit: 1, migrationId: UUID(migrationIdString)});
 };
 
+/*
+ * Connects to a replica set and runs write operation, returning the results.
+ * @param {rstArgs} replicaSetArgs for the replica set to connect to.
+ * @param {tenantIds} perform a write operation for each tenantId.
+ */
+const doWriteOperations = function(rstArgs, tenantIds) {
+    load("jstests/replsets/rslib.js");
+
+    const donorRst = createRst(rstArgs, true);
+    const donorPrimary = donorRst.getPrimary();
+
+    const writeResults = [];
+
+    tenantIds.forEach(id => {
+        const kDbName = `${id}_testDb`;
+        const kCollName = "testColl";
+        const kNs = `${kDbName}.${kCollName}`;
+
+        const res = donorPrimary.getDB(kDbName)
+                        .getCollection(kNs)
+                        .insert([{_id: 0, x: 0}, {_id: 1, x: 1}, {_id: 2, x: 2}],
+                                {writeConcern: {w: "majority"}})
+                        .getRawResponse();
+        if (res.writeErrors.length > 0) {
+            writeResults.push(res.writeErrors[0].code);
+        } else {
+            // Push OK
+            writeResults.push(0);
+        }
+    });
+
+    return writeResults;
+};
+
+const addRecipientNodes = function({rst, numNodes, recipientTagName}) {
+    numNodes = numNodes || 3;  // default to three nodes
+    let recipientNodes = [];
+    const options = TenantMigrationUtil.makeX509OptionsForTest();
+    jsTestLog(`Adding ${numNodes} non-voting recipient nodes to donor`);
+    for (let i = 0; i < numNodes; ++i) {
+        recipientNodes.push(rst.add(options.donor));
+    }
+
+    const primary = rst.getPrimary();
+    const admin = primary.getDB('admin');
+    const config = rst.getReplSetConfigFromNode();
+    config.version++;
+
+    // ensure recipient nodes are added as non-voting members
+    recipientNodes.forEach(node => {
+        config.members.push({
+            host: node.host,
+            votes: 0,
+            priority: 0,
+            hidden: true,
+            tags: {[recipientTagName]: ObjectId().valueOf()}
+        });
+    });
+
+    // reindex all members from 0
+    config.members = config.members.map((member, idx) => {
+        member._id = idx;
+        return member;
+    });
+
+    assert.commandWorked(admin.runCommand({replSetReconfig: config}));
+    recipientNodes.forEach(node => rst.waitForState(node, ReplSetTest.State.SECONDARY));
+
+    return recipientNodes;
+};
+
 /**
  * Convert arguments passed through the Thread interface and calls runShardSplitCommand.
  */
@@ -23,7 +95,7 @@ const runCommitSplitThreadWrapper = function(rstArgs,
                                              retryOnRetryableErrors,
                                              enableDonorStartMigrationFsync) {
     load("jstests/replsets/rslib.js");
-    load("jstests/serverless/libs/basic_serverless_test.js");
+    load("jstests/serverless/libs/shard_split_test.js");
 
     const donorRst = createRst(rstArgs, true);
 
@@ -51,25 +123,23 @@ const waitForGarbageCollectionForSplit = function(donorNodes, migrationId, tenan
     jsTestLog("Wait for garbage collection");
     assert.soon(() => donorNodes.every(node => {
         const donorDocumentDeleted =
-            node.getCollection(BasicServerlessTest.kConfigSplitDonorsNS).count({
-                _id: migrationId
-            }) === 0;
+            node.getCollection(ShardSplitTest.kConfigSplitDonorsNS).count({_id: migrationId}) === 0;
         const allAccessBlockersRemoved = tenantIds.every(
-            id => BasicServerlessTest.getTenantMigrationAccessBlocker({node, id}) == null);
+            id => ShardSplitTest.getTenantMigrationAccessBlocker({node, id}) == null);
 
         const result = donorDocumentDeleted && allAccessBlockersRemoved;
         if (!result) {
             const status = [];
             if (!donorDocumentDeleted) {
                 status.push(`donor document to be deleted (docCount=${
-                    node.getCollection(BasicServerlessTest.kConfigSplitDonorsNS).count({
+                    node.getCollection(ShardSplitTest.kConfigSplitDonorsNS).count({
                         _id: migrationId
                     })})`);
             }
 
             if (!allAccessBlockersRemoved) {
                 const tenantsWithBlockers = tenantIds.filter(
-                    id => BasicServerlessTest.getTenantMigrationAccessBlocker({node, id}) != null);
+                    id => ShardSplitTest.getTenantMigrationAccessBlocker({node, id}) != null);
                 status.push(`access blockers to be removed (${tenantsWithBlockers})`);
             }
         }
@@ -78,6 +148,36 @@ const waitForGarbageCollectionForSplit = function(donorNodes, migrationId, tenan
                 "tenant access blockers weren't removed",
                 60 * 1000,
                 1 * 1000);
+};
+
+const commitSplitAsync = function({
+    rst,
+    tenantIds,
+    recipientTagName,
+    recipientSetName,
+    migrationId,
+    retryOnRetryableErrors,
+    enableDonorStartMigrationFsync
+} = {
+    retryOnRetryableErrors: false,
+    enableDonorStartMigrationFsync: false
+}) {
+    jsTestLog("Running commitAsync command");
+
+    const rstArgs = createRstArgs(rst);
+    const migrationIdString = extractUUIDFromObject(migrationId);
+
+    const thread = new Thread(runCommitSplitThreadWrapper,
+                              rstArgs,
+                              migrationIdString,
+                              tenantIds,
+                              recipientTagName,
+                              recipientSetName,
+                              retryOnRetryableErrors,
+                              enableDonorStartMigrationFsync);
+    thread.start();
+
+    return thread;
 };
 
 const runShardSplitCommand = function(
@@ -126,9 +226,9 @@ const runShardSplitCommand = function(
  * Utility class to run shard split operations.
  */
 class ShardSplitOperation {
-    constructor(basicServerlessTest, recipientSetName, recipientTagName, tenantIds, migrationId) {
-        this.basicServerlessTest = basicServerlessTest;
-        this.donorSet = basicServerlessTest.donor;
+    constructor(shardSplitTest, recipientSetName, recipientTagName, tenantIds, migrationId) {
+        this.shardSplitTest = shardSplitTest;
+        this.donorSet = shardSplitTest.donor;
         this.recipientTagName = recipientTagName;
         this.recipientSetName = recipientSetName;
         this.tenantIds = tenantIds;
@@ -162,20 +262,15 @@ class ShardSplitOperation {
         retryOnRetryableErrors: false,
         enableDonorStartMigrationFsync: false
     }) {
-        const donorRst = createRstArgs(this.donorSet);
-        const migrationIdString = extractUUIDFromObject(this.migrationId);
-
-        const thread = new Thread(runCommitSplitThreadWrapper,
-                                  donorRst,
-                                  migrationIdString,
-                                  this.tenantIds,
-                                  this.recipientTagName,
-                                  this.recipientSetName,
-                                  retryOnRetryableErrors,
-                                  enableDonorStartMigrationFsync);
-        thread.start();
-
-        return thread;
+        return commitSplitAsync({
+            rst: this.donorSet,
+            tenantIds: this.tenantIds,
+            recipientTagName: this.recipientTagName,
+            recipientSetName: this.recipientSetName,
+            migrationId: this.migrationId,
+            retryOnRetryableErrors,
+            enableDonorStartMigrationFsync
+        });
     }
 
     /**
@@ -184,9 +279,9 @@ class ShardSplitOperation {
     forget() {
         jsTestLog("Running forgetShardSplit command");
 
-        this.basicServerlessTest.removeRecipientNodesFromDonor();
+        this.shardSplitTest.removeRecipientNodesFromDonor();
         const donorRstArgs = createRstArgs(this.donorSet);
-        this.basicServerlessTest.removeRecipientsFromRstArgs(donorRstArgs);
+        this.shardSplitTest.removeRecipientsFromRstArgs(donorRstArgs);
         const donorSet = createRst(donorRstArgs, true);
 
         const cmdObj = {forgetShardSplit: 1, migrationId: this.migrationId};
@@ -199,7 +294,7 @@ class ShardSplitOperation {
     forgetAsync() {
         jsTestLog("Running forgetShardSplit command asynchronously");
 
-        const primary = this.basicServerlessTest.getDonorPrimary();
+        const primary = this.shardSplitTest.getDonorPrimary();
         const migrationIdString = extractUUIDFromObject(this.migrationId);
 
         const forgetMigrationThread =
@@ -216,7 +311,7 @@ class ShardSplitOperation {
      */
     abortAsync() {
         jsTestLog("Running abortShardSplit command asynchronously");
-        const primary = this.basicServerlessTest.getDonorPrimary();
+        const primary = this.shardSplitTest.getDonorPrimary();
         const migrationIdString = extractUUIDFromObject(this.migrationId);
 
         const abortShardSplitThread =
@@ -232,7 +327,7 @@ class ShardSplitOperation {
      */
     abort() {
         jsTestLog("Running abort command");
-        const primary = this.basicServerlessTest.getDonorPrimary();
+        const primary = this.shardSplitTest.getDonorPrimary();
         const admin = primary.getDB("admin");
 
         return admin.runCommand({abortShardSplit: 1, migrationId: this.migrationId});
@@ -243,7 +338,7 @@ class ShardSplitOperation {
  * Utility class to create a ReplicaSetTest that provides functionnality to run a shard split
  * operation.
  */
-class BasicServerlessTest {
+class ShardSplitTest {
     constructor({
         recipientTagName,
         recipientSetName,
@@ -314,42 +409,12 @@ class BasicServerlessTest {
      * @param {numNodes} indicates the number of recipient nodes to be added.
      */
     addRecipientNodes(numNodes) {
-        numNodes = numNodes || 3;  // default to three nodes
-
         if (this.recipientNodes.lengh > 0) {
             throw new Error("Recipient nodes may only be added once");
         }
 
-        jsTestLog(`Adding ${numNodes} non-voting recipient nodes to donor`);
-        const donor = this.donor;
-        for (let i = 0; i < numNodes; ++i) {
-            this.recipientNodes.push(donor.add());
-        }
-
-        const primary = donor.getPrimary();
-        const admin = primary.getDB('admin');
-        const config = donor.getReplSetConfigFromNode();
-        config.version++;
-
-        // ensure recipient nodes are added as non-voting members
-        this.recipientNodes.forEach(node => {
-            config.members.push({
-                host: node.host,
-                votes: 0,
-                priority: 0,
-                hidden: true,
-                tags: {[this.recipientTagName]: ObjectId().valueOf()}
-            });
-        });
-
-        // reindex all members from 0
-        config.members = config.members.map((member, idx) => {
-            member._id = idx;
-            return member;
-        });
-
-        assert.commandWorked(admin.runCommand({replSetReconfig: config}));
-        this.recipientNodes.forEach(node => donor.waitForState(node, ReplSetTest.State.SECONDARY));
+        this.recipientNodes =
+            addRecipientNodes({rst: this.donor, numNodes, recipientTagName: this.recipientTagName});
     }
 
     /*
@@ -388,8 +453,8 @@ class BasicServerlessTest {
     }
 
     /*
-     *  Wait for state document garbage collection by polling for when the document has been removed
-     * from the 'shardSplitDonors' namespace, and all access blockers have been removed.
+     *  Wait for state document garbage collection by polling for when the document has been
+     * removed from the 'shardSplitDonors' namespace, and all access blockers have been removed.
      * @param {migrationId} id that was used for the commitShardSplit command.
      * @param {tenantIds} tenant ids of the shard split.
      */
@@ -398,7 +463,7 @@ class BasicServerlessTest {
     }
 
     /**
-     * Remove recipient nodes from the donor.nodes of the BasicServerlessTest.
+     * Remove recipient nodes from the donor.nodes of ShardSplitTest.
      */
     removeRecipientNodesFromDonor() {
         jsTestLog("Removing recipient nodes from the donor.");
@@ -408,9 +473,9 @@ class BasicServerlessTest {
     }
 
     /**
-     * Remove the recipient nodes from the donor's config memberset and calls replSetReconfig on the
-     * updated local config. It does not need to be called after a successfull split as the service
-     * reconfig itself in that case.
+     * Remove the recipient nodes from the donor's config memberset and calls replSetReconfig on
+     * the updated local config. It does not need to be called after a successfull split as the
+     * service reconfig itself in that case.
      */
     reconfigDonorSetAfterSplit() {
         const primary = this.donor.getPrimary();
@@ -443,7 +508,7 @@ class BasicServerlessTest {
         const stateDoc = findSplitOperation(donorPrimary, migrationId);
         assert.soon(() => tenantIds.every(tenantId => {
             const donorMtab =
-                BasicServerlessTest.getTenantMigrationAccessBlocker({node: donorPrimary, tenantId})
+                ShardSplitTest.getTenantMigrationAccessBlocker({node: donorPrimary, tenantId})
                     .donor;
             const tenantAccessBlockersBlockRW = donorMtab.state == expectedState;
             const tenantAccessBlockersBlockTimestamp =
@@ -467,8 +532,8 @@ class BasicServerlessTest {
     }
 
     /**
-     * After calling the forgetShardSplit command, wait for the tenant access blockers to be removed
-     * then remove and stop the recipient nodes from the donor set.
+     * After calling the forgetShardSplit command, wait for the tenant access blockers to be
+     * removed then remove and stop the recipient nodes from the donor set.
      * @param {migrationId} migration id of the committed shard split operation.
      * @param {tenantIds}  tenant IDs that were used for the split operation.
      */
@@ -478,9 +543,9 @@ class BasicServerlessTest {
     }
 
     /**
-     * After calling the forgetShardSplit command, wait for the tenant access blockers to be removed
-     * then remove and stop the recipient nodes from the donor set and test and finally apply the
-     * new config once the split has been cleaned up.
+     * After calling the forgetShardSplit command, wait for the tenant access blockers to be
+     * removed then remove and stop the recipient nodes from the donor set and test and finally
+     * apply the new config once the split has been cleaned up.
      * @param {migrationId} migration id of the committed shard split operation.
      * @param {tenantIds}  tenant IDs that were used for the split operation.
      */
@@ -516,8 +581,7 @@ class BasicServerlessTest {
      * for the given tenant.
      */
     static getNumBlockedReads(donorNode, tenantId) {
-        const mtab =
-            BasicServerlessTest.getTenantMigrationAccessBlocker({node: donorNode, tenantId});
+        const mtab = ShardSplitTest.getTenantMigrationAccessBlocker({node: donorNode, tenantId});
         if (!mtab) {
             return 0;
         }
@@ -529,8 +593,7 @@ class BasicServerlessTest {
      * for the given tenant.
      */
     static getNumBlockedWrites(donorNode, tenantId) {
-        const mtab =
-            BasicServerlessTest.getTenantMigrationAccessBlocker({node: donorNode, tenantId});
+        const mtab = ShardSplitTest.getTenantMigrationAccessBlocker({node: donorNode, tenantId});
         if (!mtab) {
             return 0;
         }
@@ -538,8 +601,8 @@ class BasicServerlessTest {
     }
 
     /**
-     * Asserts that the TenantMigrationAccessBlocker for the given tenant on the given node has the
-     * expected statistics.
+     * Asserts that the TenantMigrationAccessBlocker for the given tenant on the given node has
+     * the expected statistics.
      */
     static checkShardSplitAccessBlocker(node, tenantId, {
         numBlockedWrites = 0,
@@ -547,7 +610,7 @@ class BasicServerlessTest {
         numTenantMigrationCommittedErrors = 0,
         numTenantMigrationAbortedErrors = 0
     }) {
-        const mtab = BasicServerlessTest.getTenantMigrationAccessBlocker({node, tenantId}).donor;
+        const mtab = ShardSplitTest.getTenantMigrationAccessBlocker({node, tenantId}).donor;
         if (!mtab) {
             assert.eq(0, numBlockedWrites);
             assert.eq(0, numTenantMigrationCommittedErrors);
@@ -565,7 +628,8 @@ class BasicServerlessTest {
     }
 
     /**
-     * Get the current donor primary by ignoring all the recipient nodes from the current donor set.
+     * Get the current donor primary by ignoring all the recipient nodes from the current donor
+     * set.
      */
     getDonorPrimary() {
         const donorRstArgs = createRstArgs(this.donor);
@@ -599,8 +663,8 @@ class BasicServerlessTest {
     }
 }
 
-BasicServerlessTest.kConfigSplitDonorsNS = "config.shardSplitDonors";
-BasicServerlessTest.DonorState = {
+ShardSplitTest.kConfigSplitDonorsNS = "config.shardSplitDonors";
+ShardSplitTest.DonorState = {
     kUninitialized: "uninitialized",
     kBlocking: "blocking",
     kCommitted: "committed",
@@ -608,12 +672,12 @@ BasicServerlessTest.DonorState = {
 };
 
 function findSplitOperation(primary, migrationId) {
-    const donorsCollection = primary.getCollection(BasicServerlessTest.kConfigSplitDonorsNS);
+    const donorsCollection = primary.getCollection(ShardSplitTest.kConfigSplitDonorsNS);
     return donorsCollection.findOne({"_id": migrationId});
 }
 
 function cleanupMigrationDocument(primary, migrationId) {
-    const donorsCollection = primary.getCollection(BasicServerlessTest.kConfigSplitDonorsNS);
+    const donorsCollection = primary.getCollection(ShardSplitTest.kConfigSplitDonorsNS);
     return donorsCollection.deleteOne({"_id": migrationId}, {w: "majority"});
 }
 

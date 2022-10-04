@@ -17,9 +17,9 @@
 "use strict";
 
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
-const test = new BasicServerlessTest({
+const test = new ShardSplitTest({
     recipientSetName: "recipientSet",
     recipientTagName: "recipientTag",
     quickGarbageCollection: true

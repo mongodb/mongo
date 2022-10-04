@@ -18,7 +18,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 const recipientTagName = "recipientNode";
 const recipientSetName = "recipient";
@@ -46,7 +46,7 @@ function testDroppingStateDocCollections(
     test.cleanupSuccesfulCommitted(migrationId, tenantIds);
 
     if (dropDonorsCollection) {
-        assert(donorPrimary.getCollection(BasicServerlessTest.kConfigSplitDonorsNS).drop());
+        assert(donorPrimary.getCollection(ShardSplitTest.kConfigSplitDonorsNS).drop());
         let donorDoc = findSplitOperation(donorPrimary, migrationId);
         assert.eq(donorDoc, null);
 
@@ -74,7 +74,7 @@ function testDroppingStateDocCollections(
 }
 
 jsTest.log("Test dropping donor and recipient state doc collections during a shard split.");
-const test = new BasicServerlessTest({
+const test = new ShardSplitTest({
     recipientTagName,
     recipientSetName,
     quickGarbageCollection: true,

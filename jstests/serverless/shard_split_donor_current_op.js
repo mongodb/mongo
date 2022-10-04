@@ -20,7 +20,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 
 const kTenantIds = ["testTenantId"];
 
@@ -37,8 +37,8 @@ function checkStandardFieldsOK(ops, {migrationId, reachedDecision, tenantIds}) {
 
 (() => {
     jsTestLog("Testing currentOp output for split before blocking state");
-    const test = new BasicServerlessTest(
-        {recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
+    const test =
+        new ShardSplitTest({recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
     test.addRecipientNodes();
 
     const operation = test.createSplitOperation(kTenantIds);
@@ -69,8 +69,8 @@ function checkStandardFieldsOK(ops, {migrationId, reachedDecision, tenantIds}) {
 
 (() => {
     jsTestLog("Testing currentOp output for split in blocking state");
-    const test = new BasicServerlessTest(
-        {recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
+    const test =
+        new ShardSplitTest({recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
     test.addRecipientNodes();
 
     const operation = test.createSplitOperation(kTenantIds);
@@ -102,8 +102,8 @@ function checkStandardFieldsOK(ops, {migrationId, reachedDecision, tenantIds}) {
 
 (() => {
     jsTestLog("Testing currentOp output for aborted split");
-    const test = new BasicServerlessTest(
-        {recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
+    const test =
+        new ShardSplitTest({recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
     test.addRecipientNodes();
 
     const operation = test.createSplitOperation(kTenantIds);
@@ -127,8 +127,8 @@ function checkStandardFieldsOK(ops, {migrationId, reachedDecision, tenantIds}) {
 // Check currentOp while in committed state before and after a split has completed.
 (() => {
     jsTestLog("Testing currentOp output for committed split");
-    const test = new BasicServerlessTest(
-        {recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
+    const test =
+        new ShardSplitTest({recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
     test.addRecipientNodes();
 
     const donorPrimary = test.donor.getPrimary();

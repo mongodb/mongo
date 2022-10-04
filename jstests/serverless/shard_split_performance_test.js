@@ -4,7 +4,7 @@
  * @tags: [requires_fcv_52, featureFlagShardSplit]
  */
 
-load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/replsets/rslib.js");
 
 function runOneMoveChunk() {
@@ -61,7 +61,7 @@ function runOneSplit() {
     const recipientTagName = "recipientNode";
     const recipientSetName = "recipientSetName";
     const test =
-        new BasicServerlessTest({recipientTagName, recipientSetName, quickGarbageCollection: true});
+        new ShardSplitTest({recipientTagName, recipientSetName, quickGarbageCollection: true});
 
     test.addRecipientNodes();
     test.donor.awaitSecondaryNodes();

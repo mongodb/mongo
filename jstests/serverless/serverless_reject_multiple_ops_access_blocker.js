@@ -9,8 +9,7 @@
 
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
-load("jstests/serverless/libs/serverless_reject_multiple_ops_utils.js");
+load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/libs/uuid_util.js");
 
 function cannotStartMigrationWhenThereIsAnExistingAccessBlocker(protocol) {
@@ -31,10 +30,15 @@ function cannotStartMigrationWhenThereIsAnExistingAccessBlocker(protocol) {
 
     const test = new TenantMigrationTest({quickGarbageCollection: true, sharedOptions});
 
-    let recipientNodes = addRecipientNodes(test.getDonorRst(), recipientTagName);
+    let recipientNodes = addRecipientNodes({rst: test.getDonorRst(), recipientTagName});
 
-    const commitThread = commitSplitAsync(
-        test.getDonorRst(), tenantIds, recipientTagName, recipientSetName, splitMigrationId);
+    const commitThread = commitSplitAsync({
+        rst: test.getDonorRst(),
+        tenantIds,
+        recipientTagName,
+        recipientSetName,
+        migrationId: splitMigrationId
+    });
     assert.commandWorked(commitThread.returnData());
 
     // Remove recipient nodes

@@ -9,8 +9,7 @@
 
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
-load("jstests/serverless/libs/basic_serverless_test.js");
-load("jstests/serverless/libs/serverless_reject_multiple_ops_utils.js");
+load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/libs/uuid_util.js");
 
 function cannotStartShardSplitWithMigrationInProgress(
@@ -35,14 +34,18 @@ function cannotStartShardSplitWithMigrationInProgress(
 
     fp.wait();
 
-    const commitThread = commitSplitAsync(
-        shardSplitRst, tenantIds, recipientTagName, recipientSetName, splitMigrationId);
+    const commitThread = commitSplitAsync({
+        rst: shardSplitRst,
+        tenantIds,
+        recipientTagName,
+        recipientSetName,
+        migrationId: splitMigrationId
+    });
     assert.commandFailed(commitThread.returnData());
 
     fp.off();
 
-    TenantMigrationTest.assertCommitted(
-        waitForMergeToComplete(migrationOpts, tenantMigrationId, test));
+    TenantMigrationTest.assertCommitted(test.waitForMigrationToComplete(migrationOpts));
     assert.commandWorked(test.forgetMigration(migrationOpts.migrationIdString));
 
     jsTestLog("cannotStartShardSplitWithMigrationInProgress test completed");
@@ -58,8 +61,8 @@ sharedOptions["setParameter"] = {
 const recipientTagName = "recipientTag";
 
 const test = new TenantMigrationTest({quickGarbageCollection: true, sharedOptions});
-addRecipientNodes(test.getDonorRst(), recipientTagName);
-addRecipientNodes(test.getRecipientRst(), recipientTagName);
+addRecipientNodes({rst: test.getDonorRst(), recipientTagName});
+addRecipientNodes({rst: test.getRecipientRst(), recipientTagName});
 
 cannotStartShardSplitWithMigrationInProgress({
     recipientTagName,
