@@ -462,7 +462,7 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
             opCtx,
             NamespaceString::kConfigsvrPlacementHistoryNamespace,
             BSON(NamespacePlacementType::kNssFieldName
-                 << 1 << NamespacePlacementType::kTimestampFieldName << 1),
+                 << 1 << NamespacePlacementType::kTimestampFieldName << -1),
             unique);
         if (!result.isOK()) {
             return result;
