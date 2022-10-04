@@ -1556,14 +1556,31 @@ functions:
       args:
       - "./src/evergreen/do_watchdog_setup.sh"
 
-  "run kitchen":
+  "run package test":
   - *f_expansions_write
   - command: subprocess.exec
     type: test
     params:
       binary: bash
+      add_expansions_to_env: true
       args:
-      - "./src/evergreen/kitchen_run.sh"
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/package_test.py"
+      - "--os=none"
+      - "--extra-test"
+      - "${packager_distro}"
+      - "https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"
+
+  "run complete package test":
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/package_test.py"
 
   "set up EC2 instance": &set_up_ec2_instance
 
@@ -6744,13 +6761,20 @@ tasks:
   - *kill_processes
   - *cleanup_environment
   - *set_up_venv
-  - func: "set up remote credentials"
-    vars:
-      private_key_file: ~/.ssh/kitchen.pem
-      private_key_remote: ${kitchen_private_key}
-      aws_key_remote: ${kitchen_aws_key}
-      aws_secret_remote: ${kitchen_aws_secret}
-  - func: "run kitchen"
+  - func: "run package test"
+
+- name: test_packages_complete
+  tags: []
+  depends_on:
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - *set_up_venv
+  - func: "run complete package test"
 
 - name: package
   tags: []
