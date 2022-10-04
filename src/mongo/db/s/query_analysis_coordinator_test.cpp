@@ -59,6 +59,14 @@ public:
         opObserverRegistry->addObserver(std::make_unique<QueryAnalysisOpObserver>());
     }
 
+    void advanceTime(Seconds secs) {
+        _mockClock->advance(secs);
+    }
+
+    Date_t now() {
+        return _mockClock->now();
+    }
+
     QueryAnalyzerDocument makeConfigQueryAnalyzersDocument(
         const NamespaceString& nss,
         const UUID& collUuid,
@@ -84,6 +92,56 @@ public:
         ASSERT_EQ(configuration.getSampleRate(), *analyzerDoc.getSampleRate());
     }
 
+    void assertContainsConfiguration(
+        std::vector<CollectionQueryAnalyzerConfiguration>& configurations,
+        const NamespaceString& nss,
+        const UUID& collUuid,
+        double sampleRate) {
+        for (const auto& configuration : configurations) {
+            if (configuration.getNs() == nss) {
+                ASSERT_EQ(configuration.getCollectionUuid(), collUuid);
+                ASSERT_EQ(configuration.getSampleRate(), sampleRate);
+                return;
+            }
+        }
+        FAIL("Cannot find the configuration for the specified collection");
+    }
+
+    MongosType makeConfigMongosDocument(std::string name) {
+        MongosType doc;
+        doc.setName(name);
+        doc.setPing(now());
+        doc.setUptime(0);
+        doc.setWaiting(true);
+        doc.setMongoVersion(VersionInfoInterface::instance().version().toString());
+        return doc;
+    }
+
+    void assertContainsSampler(const StringMap<QueryAnalysisCoordinator::Sampler>& samplers,
+                               MongosType mongosDoc) {
+        assertContainsSampler(samplers,
+                              mongosDoc.getName(),
+                              mongosDoc.getPing(),
+                              boost::none /*numQueriesPerSecond */);
+    }
+
+    void assertContainsSampler(const StringMap<QueryAnalysisCoordinator::Sampler>& samplers,
+                               StringData name,
+                               Date_t pingTime,
+                               boost::optional<double> numQueriesPerSecond) {
+        auto it = samplers.find(name);
+        ASSERT(it != samplers.end());
+        auto& sampler = it->second;
+        ASSERT_EQ(sampler.getName(), name);
+        ASSERT_EQ(sampler.getLastPingTime(), pingTime);
+        if (numQueriesPerSecond) {
+            ASSERT(sampler.getLastNumQueriesExecutedPerSecond());
+            ASSERT_EQ(sampler.getLastNumQueriesExecutedPerSecond(), numQueriesPerSecond);
+        } else {
+            ASSERT_FALSE(sampler.getLastNumQueriesExecutedPerSecond());
+        }
+    }
+
 protected:
     const NamespaceString nss0{"testDb", "testColl0"};
     const NamespaceString nss1{"testDb", "testColl1"};
@@ -93,8 +151,18 @@ protected:
     const UUID collUuid1 = UUID::gen();
     const UUID collUuid2 = UUID::gen();
 
+    const std::string mongosName0 = "FakeHost0:1234";
+    const std::string mongosName1 = "FakeHost1:1234";
+    const std::string mongosName2 = "FakeHost2:1234";
+
+    int inActiveThresholdSecs = 1000;
+
 private:
+    const std::shared_ptr<ClockSourceMock> _mockClock = std::make_shared<ClockSourceMock>();
+
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey", true};
+    RAIIServerParameterControllerForTest _inactiveThresholdController{
+        "queryAnalysisSamplerInActiveThresholdSecs", inActiveThresholdSecs};
 };
 
 TEST_F(QueryAnalysisCoordinatorTest, CreateConfigurationsOnInsert) {
@@ -318,6 +386,333 @@ TEST_F(QueryAnalysisCoordinatorTest, DoesNotClearConfigurationsOnStepUp) {
     configurations = coordinator->getConfigurationsForTest();
     ASSERT_EQ(configurations.size(), 1U);
     assertContainsConfiguration(configurations, analyzerDoc);
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, CreateActiveSamplersOnInsert) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    // There are no samplers initially.
+    auto samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    auto mongosDoc0 = makeConfigMongosDocument(mongosName0);
+    uassertStatusOK(
+        insertToConfigCollection(operationContext(), MongosType::ConfigNS, mongosDoc0.toBSON()));
+
+    advanceTime(Seconds(1));
+    auto mongosDoc1 = makeConfigMongosDocument(mongosName1);
+    uassertStatusOK(
+        insertToConfigCollection(operationContext(), MongosType::ConfigNS, mongosDoc1.toBSON()));
+
+    // The inserts should cause two samplers to get created.
+    samplers = coordinator->getSamplersForTest();
+    ASSERT_EQ(samplers.size(), 2U);
+    assertContainsSampler(samplers, mongosDoc0);
+    assertContainsSampler(samplers, mongosDoc1);
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, NotCreateInActiveSamplersOnInsert) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    // There are no samplers initially.
+    auto samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    auto mongosDoc = makeConfigMongosDocument(mongosName0);
+    advanceTime(Seconds(inActiveThresholdSecs + 1));
+    uassertStatusOK(
+        insertToConfigCollection(operationContext(), MongosType::ConfigNS, mongosDoc.toBSON()));
+
+    // The insert should not cause an inactive sampler to get created.
+    samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, UpdateSamplersOnUpdate) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    // There are no samplers initially.
+    auto samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    auto mongosDocPreUpdate = makeConfigMongosDocument(mongosName0);
+    uassertStatusOK(insertToConfigCollection(
+        operationContext(), MongosType::ConfigNS, mongosDocPreUpdate.toBSON()));
+
+    samplers = coordinator->getSamplersForTest();
+    ASSERT_EQ(samplers.size(), 1U);
+    assertContainsSampler(samplers, mongosDocPreUpdate);
+
+    advanceTime(Seconds(1));
+    auto mongosDocPostUpdate = makeConfigMongosDocument(mongosName0);
+    ASSERT_NE(mongosDocPostUpdate.getPing(), mongosDocPreUpdate.getPing());
+    uassertStatusOK(updateToConfigCollection(operationContext(),
+                                             MongosType::ConfigNS,
+                                             BSON(MongosType::name << mongosName0),
+                                             mongosDocPostUpdate.toBSON(),
+                                             false /* upsert */));
+
+    // The update should cause the sampler to have the new ping time.
+    samplers = coordinator->getSamplersForTest();
+    ASSERT_EQ(samplers.size(), 1U);
+    assertContainsSampler(samplers, mongosDocPostUpdate);
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, RemoveSamplersOnDelete) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    // There are no samplers initially.
+    auto samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    auto mongosDoc = makeConfigMongosDocument(mongosName0);
+    uassertStatusOK(
+        insertToConfigCollection(operationContext(), MongosType::ConfigNS, mongosDoc.toBSON()));
+
+    samplers = coordinator->getSamplersForTest();
+    ASSERT_EQ(samplers.size(), 1U);
+    assertContainsSampler(samplers, mongosDoc);
+
+    uassertStatusOK(deleteToConfigCollection(
+        operationContext(), MongosType::ConfigNS, mongosDoc.toBSON(), false /* multi */));
+
+    // The delete should cause the sampler to get removed.
+    samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, CreateSamplersOnStartup) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    // There are no samplers initially.
+    auto samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    // There are no samplers to create upon startup since there are no mongos documents.
+    coordinator->onStartup(operationContext());
+    samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    auto mongosDoc0 = makeConfigMongosDocument(mongosName0);
+    uassertStatusOK(
+        insertToConfigCollection(operationContext(), MongosType::ConfigNS, mongosDoc0.toBSON()));
+
+    advanceTime(Seconds(inActiveThresholdSecs + 1));
+    auto mongosDoc1 = makeConfigMongosDocument(mongosName1);
+    uassertStatusOK(
+        insertToConfigCollection(operationContext(), MongosType::ConfigNS, mongosDoc1.toBSON()));
+
+    advanceTime(Seconds(1));
+    auto mongosDoc2 = makeConfigMongosDocument(mongosName2);
+    uassertStatusOK(
+        insertToConfigCollection(operationContext(), MongosType::ConfigNS, mongosDoc2.toBSON()));
+
+    coordinator->clearSamplersForTest();
+    samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    // After startup, the samplers for mongos1 and mongos2 should get recreated. There should not be
+    // a sampler for mongos0 since it is inactive.
+    coordinator->onStartup(operationContext());
+    samplers = coordinator->getSamplersForTest();
+    ASSERT_EQ(samplers.size(), 2U);
+    assertContainsSampler(samplers, mongosDoc1);
+    assertContainsSampler(samplers, mongosDoc2);
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, CreateSamplerOnGetNewConfiguration) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    // There are no samplers initially.
+    auto samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    auto pingTime = now();
+    auto numQueriesExecutedPerSecond = 0.5;
+    coordinator->getNewConfigurationsForSampler(
+        operationContext(), mongosName0, numQueriesExecutedPerSecond);
+
+    // The refresh should cause the sampler to get created.
+    samplers = coordinator->getSamplersForTest();
+    ASSERT_EQ(samplers.size(), 1U);
+    assertContainsSampler(samplers, mongosName0, pingTime, numQueriesExecutedPerSecond);
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, ResetLastNumQueriesExecutedOnStepUp) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    // There are no samplers initially.
+    auto samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    auto pingTime = now();
+    auto numQueriesExecutedPerSecond = 0.5;
+    coordinator->getNewConfigurationsForSampler(
+        operationContext(), mongosName0, numQueriesExecutedPerSecond);
+
+    // The refresh should cause the sampler to get created.
+    samplers = coordinator->getSamplersForTest();
+    ASSERT_EQ(samplers.size(), 1U);
+    assertContainsSampler(samplers, mongosName0, pingTime, numQueriesExecutedPerSecond);
+
+    coordinator->onStepUpBegin(operationContext(), 1LL);
+
+    // After stepup, the sampler should have an unknown number of queries executed per second.
+    samplers = coordinator->getSamplersForTest();
+    assertContainsSampler(
+        samplers, mongosName0, pingTime, boost::none /* numQueriesExecutedPerSecond */);
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationOneSamplerBasic) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    auto analyzerDoc0 =
+        makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kFull, 0.5);
+    uassertStatusOK(insertToConfigCollection(operationContext(),
+                                             NamespaceString::kConfigQueryAnalyzersNamespace,
+                                             analyzerDoc0.toBSON()));
+
+    auto analyzerDoc1 =
+        makeConfigQueryAnalyzersDocument(nss1, collUuid1, QueryAnalyzerModeEnum::kFull, 5);
+    uassertStatusOK(insertToConfigCollection(operationContext(),
+                                             NamespaceString::kConfigQueryAnalyzersNamespace,
+                                             analyzerDoc1.toBSON()));
+
+    auto configurations =
+        coordinator->getNewConfigurationsForSampler(operationContext(), mongosName0, 1);
+    ASSERT_EQ(configurations.size(), 2U);
+    assertContainsConfiguration(configurations,
+                                analyzerDoc0.getNs(),
+                                analyzerDoc0.getCollectionUuid(),
+                                *analyzerDoc0.getSampleRate());
+    assertContainsConfiguration(configurations,
+                                analyzerDoc1.getNs(),
+                                analyzerDoc1.getCollectionUuid(),
+                                *analyzerDoc1.getSampleRate());
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationOneSamplerOneDisabledColl) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    auto analyzerDoc0 =
+        makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kOff);
+    uassertStatusOK(insertToConfigCollection(operationContext(),
+                                             NamespaceString::kConfigQueryAnalyzersNamespace,
+                                             analyzerDoc0.toBSON()));
+
+    auto analyzerDoc1 =
+        makeConfigQueryAnalyzersDocument(nss1, collUuid1, QueryAnalyzerModeEnum::kFull, 5);
+    uassertStatusOK(insertToConfigCollection(operationContext(),
+                                             NamespaceString::kConfigQueryAnalyzersNamespace,
+                                             analyzerDoc1.toBSON()));
+
+
+    auto configurations =
+        coordinator->getNewConfigurationsForSampler(operationContext(), mongosName0, 1);
+    ASSERT_EQ(configurations.size(), 1U);
+    assertContainsConfiguration(configurations,
+                                analyzerDoc1.getNs(),
+                                analyzerDoc1.getCollectionUuid(),
+                                *analyzerDoc1.getSampleRate());
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationMultipleSamplersBasic) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    // There are no samplers initially.
+    auto samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    auto mongosDoc0 = makeConfigMongosDocument(mongosName0);
+    uassertStatusOK(
+        insertToConfigCollection(operationContext(), MongosType::ConfigNS, mongosDoc0.toBSON()));
+    advanceTime(Seconds(1));
+    auto mongosDoc1 = makeConfigMongosDocument(mongosName1);
+    uassertStatusOK(
+        insertToConfigCollection(operationContext(), MongosType::ConfigNS, mongosDoc1.toBSON()));
+
+    // The inserts should cause two samplers to get created.
+    samplers = coordinator->getSamplersForTest();
+    ASSERT_EQ(samplers.size(), 2U);
+
+    auto analyzerDoc0 =
+        makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kFull, 1);
+    uassertStatusOK(insertToConfigCollection(operationContext(),
+                                             NamespaceString::kConfigQueryAnalyzersNamespace,
+                                             analyzerDoc0.toBSON()));
+
+    auto analyzerDoc1 =
+        makeConfigQueryAnalyzersDocument(nss1, collUuid1, QueryAnalyzerModeEnum::kFull, 15.5);
+    uassertStatusOK(insertToConfigCollection(operationContext(),
+                                             NamespaceString::kConfigQueryAnalyzersNamespace,
+                                             analyzerDoc1.toBSON()));
+
+    // Query distribution after: [1, unknown].
+    auto configurations0 =
+        coordinator->getNewConfigurationsForSampler(operationContext(), mongosName0, 1);
+    double expectedRatio0 = 0.5;
+    assertContainsConfiguration(configurations0,
+                                analyzerDoc0.getNs(),
+                                analyzerDoc0.getCollectionUuid(),
+                                expectedRatio0 * analyzerDoc0.getSampleRate().get());
+    assertContainsConfiguration(configurations0,
+                                analyzerDoc1.getNs(),
+                                analyzerDoc1.getCollectionUuid(),
+                                expectedRatio0 * analyzerDoc1.getSampleRate().get());
+
+    // Query distribution after: [1, 4.5].
+    auto configurations1 =
+        coordinator->getNewConfigurationsForSampler(operationContext(), mongosName1, 4.5);
+    double expectedRatio1 = 4.5 / 5.5;
+    ASSERT_EQ(configurations1.size(), 2U);
+    assertContainsConfiguration(configurations1,
+                                analyzerDoc0.getNs(),
+                                analyzerDoc0.getCollectionUuid(),
+                                expectedRatio1 * analyzerDoc0.getSampleRate().get());
+    assertContainsConfiguration(configurations1,
+                                analyzerDoc1.getNs(),
+                                analyzerDoc1.getCollectionUuid(),
+                                expectedRatio1 * analyzerDoc1.getSampleRate().get());
+
+    // Query distribution after: [1.5, 4.5].
+    configurations0 =
+        coordinator->getNewConfigurationsForSampler(operationContext(), mongosName0, 1.5);
+    expectedRatio0 = 1.5 / 6;
+    assertContainsConfiguration(configurations0,
+                                analyzerDoc0.getNs(),
+                                analyzerDoc0.getCollectionUuid(),
+                                expectedRatio0 * analyzerDoc0.getSampleRate().get());
+    assertContainsConfiguration(configurations0,
+                                analyzerDoc1.getNs(),
+                                analyzerDoc1.getCollectionUuid(),
+                                expectedRatio0 * analyzerDoc1.getSampleRate().get());
+
+    // Query distribution after: [1.5, 0].
+    configurations1 =
+        coordinator->getNewConfigurationsForSampler(operationContext(), mongosName1, 0);
+    expectedRatio1 = 0;
+    ASSERT_EQ(configurations1.size(), 2U);
+    assertContainsConfiguration(configurations1,
+                                analyzerDoc0.getNs(),
+                                analyzerDoc0.getCollectionUuid(),
+                                expectedRatio1 * analyzerDoc0.getSampleRate().get());
+    assertContainsConfiguration(configurations1,
+                                analyzerDoc1.getNs(),
+                                analyzerDoc1.getCollectionUuid(),
+                                expectedRatio1 * analyzerDoc1.getSampleRate().get());
+
+    // Query distribution after: [0, 0].
+    configurations0 =
+        coordinator->getNewConfigurationsForSampler(operationContext(), mongosName0, 0);
+    expectedRatio0 = 0.5;
+    assertContainsConfiguration(configurations0,
+                                analyzerDoc0.getNs(),
+                                analyzerDoc0.getCollectionUuid(),
+                                expectedRatio0 * analyzerDoc0.getSampleRate().get());
+    assertContainsConfiguration(configurations0,
+                                analyzerDoc1.getNs(),
+                                analyzerDoc1.getCollectionUuid(),
+                                expectedRatio0 * analyzerDoc1.getSampleRate().get());
 }
 
 }  // namespace

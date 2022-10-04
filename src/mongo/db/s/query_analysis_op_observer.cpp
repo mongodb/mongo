@@ -33,6 +33,7 @@
 #include "mongo/db/s/query_analysis_op_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
+#include "mongo/s/catalog/type_mongos.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -41,7 +42,7 @@ namespace analyze_shard_key {
 
 namespace {
 
-const auto docToDeleteDocration = OperationContext::declareDecoration<BSONObj>();
+const auto docToDeleteDecoration = OperationContext::declareDecoration<BSONObj>();
 
 bool isFeatureFlagEnabled() {
     return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
@@ -68,6 +69,14 @@ void QueryAnalysisOpObserver::onInserts(OperationContext* opCtx,
                     insertedDoc);
             });
         }
+    } else if (coll->ns() == MongosType::ConfigNS) {
+        for (auto it = begin; it != end; ++it) {
+            const auto& insertedDoc = it->doc;
+            opCtx->recoveryUnit()->onCommit([opCtx, insertedDoc](boost::optional<Timestamp>) {
+                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerInsert(
+                    insertedDoc);
+            });
+        }
     }
 }
 
@@ -82,6 +91,11 @@ void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdat
             analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationUpdate(
                 updatedDoc);
         });
+    } else if (args.nss == MongosType::ConfigNS) {
+        const auto& updatedDoc = args.updateArgs->updatedDoc;
+        opCtx->recoveryUnit()->onCommit([opCtx, updatedDoc](boost::optional<Timestamp>) {
+            analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerUpdate(updatedDoc);
+        });
     }
 }
 
@@ -93,8 +107,8 @@ void QueryAnalysisOpObserver::aboutToDelete(OperationContext* opCtx,
         return;
     }
 
-    if (nss == NamespaceString::kConfigQueryAnalyzersNamespace) {
-        docToDeleteDocration(opCtx) = doc;
+    if (nss == NamespaceString::kConfigQueryAnalyzersNamespace || nss == MongosType::ConfigNS) {
+        docToDeleteDecoration(opCtx) = doc;
     }
 }
 
@@ -108,10 +122,16 @@ void QueryAnalysisOpObserver::onDelete(OperationContext* opCtx,
     }
 
     if (nss == NamespaceString::kConfigQueryAnalyzersNamespace) {
-        auto& doc = docToDeleteDocration(opCtx);
+        auto& doc = docToDeleteDecoration(opCtx);
         invariant(!doc.isEmpty());
         opCtx->recoveryUnit()->onCommit([opCtx, doc](boost::optional<Timestamp>) {
             analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationDelete(doc);
+        });
+    } else if (nss == MongosType::ConfigNS) {
+        auto& doc = docToDeleteDecoration(opCtx);
+        invariant(!doc.isEmpty());
+        opCtx->recoveryUnit()->onCommit([opCtx, doc](boost::optional<Timestamp>) {
+            analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerDelete(doc);
         });
     }
 }

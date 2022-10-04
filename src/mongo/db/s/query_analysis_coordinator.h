@@ -47,6 +47,37 @@ namespace analyze_shard_key {
  */
 class QueryAnalysisCoordinator : public ReplicaSetAwareService<QueryAnalysisCoordinator> {
 public:
+    /**
+     * Stores the last ping time and the last exponential moving average number of queries executed
+     * per second for a sampler.
+     */
+    class Sampler {
+    public:
+        Sampler(std::string name, Date_t lastPingTime) : _name(name), _lastPingTime(lastPingTime){};
+
+        std::string getName() const {
+            return _name;
+        }
+
+        Date_t getLastPingTime() const {
+            return _lastPingTime;
+        }
+
+        boost::optional<double> getLastNumQueriesExecutedPerSecond() const {
+            return _lastNumQueriesExecutedPerSecond;
+        }
+
+        void setLastPingTime(Date_t pingTime);
+
+        void setLastNumQueriesExecutedPerSecond(double numQueries);
+        void resetLastNumQueriesExecutedPerSecond();
+
+    private:
+        std::string _name;
+        Date_t _lastPingTime;
+        boost::optional<double> _lastNumQueriesExecutedPerSecond;
+    };
+
     QueryAnalysisCoordinator() = default;
 
     /**
@@ -57,7 +88,7 @@ public:
 
     void onStartup(OperationContext* opCtx) override final;
 
-    void onStepUpBegin(OperationContext* opCtx, long long term) override final{};
+    void onStepUpBegin(OperationContext* opCtx, long long term) override final;
 
     /**
      * Creates, updates and deletes the configuration for the collection with the given
@@ -67,6 +98,21 @@ public:
     void onConfigurationUpdate(const BSONObj& doc);
     void onConfigurationDelete(const BSONObj& doc);
 
+    /**
+     * Creates, updates and deletes the sampler (i.e. mongos) with the given config.mongos document.
+     */
+    void onSamplerInsert(const BSONObj& doc);
+    void onSamplerUpdate(const BSONObj& doc);
+    void onSamplerDelete(const BSONObj& doc);
+
+    /**
+     * Given the average number of queries that a sampler executes, returns the new query analyzer
+     * configurations for the sampler.
+     */
+    std::vector<CollectionQueryAnalyzerConfiguration> getNewConfigurationsForSampler(
+        OperationContext* opCtx, StringData samplerName, double numQueriesExecutedPerSecond);
+
+
     std::map<UUID, CollectionQueryAnalyzerConfiguration> getConfigurationsForTest() const {
         stdx::lock_guard<Latch> lk(_mutex);
         return _configurations;
@@ -75,6 +121,16 @@ public:
     void clearConfigurationsForTest() {
         stdx::lock_guard<Latch> lk(_mutex);
         _configurations.clear();
+    }
+
+    StringMap<Sampler> getSamplersForTest() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return _samplers;
+    }
+
+    void clearSamplersForTest() {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _samplers.clear();
     }
 
 private:
@@ -91,8 +147,14 @@ private:
 
     void onBecomeArbiter() override final {}
 
+    /**
+     * Returns the minimum last ping time for a sampler to be considered as active.
+     */
+    Date_t _getMinLastPingTime();
+
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisCoordinator::_mutex");
     std::map<UUID, CollectionQueryAnalyzerConfiguration> _configurations;
+    StringMap<Sampler> _samplers;
 };
 
 }  // namespace analyze_shard_key

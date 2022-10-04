@@ -135,6 +135,7 @@ let testCases = {
     _recvChunkReleaseCritSec: {skip: "internal command"},
     _recvChunkStart: {skip: "internal command"},
     _recvChunkStatus: {skip: "internal command"},
+    _refreshQueryAnalyzerConfiguration: {skip: "internal command"},
     _shardsvrAbortReshardCollection: {skip: "internal command"},
     _shardsvrCleanupReshardCollection: {skip: "internal command"},
     _shardsvrCloneCatalogData: {skip: "internal command"},

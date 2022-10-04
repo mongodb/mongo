@@ -35,6 +35,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
+#include "mongo/s/analyze_shard_key_server_parameters_gen.h"
+#include "mongo/s/catalog/type_mongos.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -109,6 +111,56 @@ void QueryAnalysisCoordinator::onConfigurationDelete(const BSONObj& doc) {
     _configurations.erase(analyzerDoc.getCollectionUuid());
 }
 
+Date_t QueryAnalysisCoordinator::_getMinLastPingTime() {
+    auto serviceContext = getQueryAnalysisCoordinator.owner(this);
+    return serviceContext->getFastClockSource()->now() -
+        Seconds(gQueryAnalysisSamplerInActiveThresholdSecs.load());
+}
+
+void QueryAnalysisCoordinator::Sampler::setLastPingTime(Date_t pingTime) {
+    _lastPingTime = pingTime;
+}
+
+void QueryAnalysisCoordinator::Sampler::setLastNumQueriesExecutedPerSecond(double numQueries) {
+    _lastNumQueriesExecutedPerSecond = numQueries;
+}
+
+void QueryAnalysisCoordinator::Sampler::resetLastNumQueriesExecutedPerSecond() {
+    _lastNumQueriesExecutedPerSecond = boost::none;
+}
+
+void QueryAnalysisCoordinator::onSamplerInsert(const BSONObj& doc) {
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
+    if (mongosDoc.getPing() < _getMinLastPingTime()) {
+        return;
+    }
+    auto sampler = Sampler{mongosDoc.getName(), mongosDoc.getPing()};
+    _samplers.emplace(mongosDoc.getName(), std::move(sampler));
+}
+
+void QueryAnalysisCoordinator::onSamplerUpdate(const BSONObj& doc) {
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
+    auto it = _samplers.find(mongosDoc.getName());
+    if (it == _samplers.end()) {
+        auto sampler = Sampler{mongosDoc.getName(), mongosDoc.getPing()};
+        _samplers.emplace(mongosDoc.getName(), std::move(sampler));
+    } else {
+        it->second.setLastPingTime(mongosDoc.getPing());
+    }
+}
+
+void QueryAnalysisCoordinator::onSamplerDelete(const BSONObj& doc) {
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
+    auto erased = _samplers.erase(mongosDoc.getName());
+    invariant(erased);
+}
+
 void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_mutex);
 
@@ -131,6 +183,78 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
             invariant(inserted);
         }
     }
+
+    {
+        invariant(_samplers.empty());
+        auto minPingTime = _getMinLastPingTime();
+        FindCommandRequest findRequest{MongosType::ConfigNS};
+        findRequest.setFilter(BSON(MongosType::ping << BSON("$gte" << minPingTime)));
+        auto cursor = client.find(std::move(findRequest));
+        while (cursor->more()) {
+            auto mongosDoc = uassertStatusOK(MongosType::fromBSON(cursor->next()));
+            invariant(mongosDoc.getPing() >= minPingTime);
+            auto sampler = Sampler{mongosDoc.getName(), mongosDoc.getPing()};
+            _samplers.emplace(mongosDoc.getName(), std::move(sampler));
+        }
+    }
+}
+
+void QueryAnalysisCoordinator::onStepUpBegin(OperationContext* opCtx, long long term) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    for (auto& [_, sampler] : _samplers) {
+        sampler.resetLastNumQueriesExecutedPerSecond();
+    }
+}
+
+std::vector<CollectionQueryAnalyzerConfiguration>
+QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx,
+                                                         StringData samplerName,
+                                                         double numQueriesExecutedPerSecond) {
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    // Update the last ping time and last number of queries executed per second of this sampler.
+    auto it = _samplers.find(samplerName);
+    if (it == _samplers.end()) {
+        auto sampler = Sampler{samplerName.toString(),
+                               opCtx->getServiceContext()->getFastClockSource()->now()};
+        it = _samplers.emplace(samplerName, std::move(sampler)).first;
+    }
+    it->second.setLastNumQueriesExecutedPerSecond(numQueriesExecutedPerSecond);
+
+    // Calculate the sample rate ratio for this sampler.
+    int numActiveSamplers = 0;
+    int numWeights = 0;
+    double weight = numQueriesExecutedPerSecond;
+    double totalWeight = 0;
+
+    auto minPingTime = _getMinLastPingTime();
+    for (const auto& [name, sampler] : _samplers) {
+        if (sampler.getLastPingTime() > minPingTime) {
+            numActiveSamplers++;
+            if (auto weight = sampler.getLastNumQueriesExecutedPerSecond()) {
+                totalWeight += *weight;
+                numWeights++;
+            }
+        }
+    }
+    invariant(numActiveSamplers > 0);
+    // If the coordinator doesn't yet have a full view of the query distribution or no samplers
+    // have executed any queries, each sampler gets an equal ratio of the sample rates. Otherwise,
+    // the ratio is weighted based on the query distribution across samplers.
+    double sampleRateRatio = (numWeights < numActiveSamplers || totalWeight == 0)
+        ? (1.0 / numActiveSamplers)
+        : (weight / totalWeight);
+
+    // Populate the query analyzer configurations for all collections.
+    std::vector<CollectionQueryAnalyzerConfiguration> configurations;
+
+    for (const auto& [_, configuration] : _configurations) {
+        configurations.emplace_back(configuration.getNs(),
+                                    configuration.getCollectionUuid(),
+                                    sampleRateRatio * configuration.getSampleRate());
+    }
+
+    return configurations;
 }
 
 }  // namespace analyze_shard_key
