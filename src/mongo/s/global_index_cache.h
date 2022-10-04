@@ -32,6 +32,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/index_version.h"
+#include "mongo/util/read_through_cache.h"
 
 namespace mongo {
 
@@ -149,4 +150,8 @@ private:
     // than the ones created before.
     uint64_t _epochDisambiguatingSequenceNum{0};
 };
+
+using GlobalIndexesCacheBase =
+    ReadThroughCache<NamespaceString, GlobalIndexesCache, ComparableIndexVersion>;
+
 }  // namespace mongo

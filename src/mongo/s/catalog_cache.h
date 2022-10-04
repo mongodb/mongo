@@ -33,8 +33,10 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/global_index_cache.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -177,6 +179,32 @@ public:
                                                               bool allowLocks = false);
 
     /**
+     * Blocking method to get the global index information for a specific collection at a given
+     * cluster time.
+     *
+     * Returns a list of global indexes that may be empty is no global indexes exist. Throws if an
+     * error occurs while loading the metadata, returns a failed status.
+     *
+     * If the given atClusterTime is so far in the past that it is not possible to construct index
+     * info, returns a StaleClusterTime error.
+     */
+    GlobalIndexesCache getCollectionIndexInfoAt(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                Timestamp atClusterTime);
+
+    /**
+     * Same as the getCollectionIndexInfoAt call above, but returns the latest known index
+     * information for the specified namespace.
+     *
+     * While this method may fail under the same circumstances as getCollectionIndexInfoAt, it is
+     * guaranteed to never throw StaleClusterTime, because the latest index information should
+     * always be available.
+     */
+    virtual GlobalIndexesCache getCollectionIndexInfo(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      bool allowLocks = false);
+
+    /**
      * Same as getDatbase above, but in addition forces the database entry to be refreshed.
      */
     StatusWith<CachedDatabaseInfo> getDatabaseWithRefresh(OperationContext* opCtx,
@@ -188,6 +216,11 @@ public:
     StatusWith<ChunkManager> getCollectionRoutingInfoWithRefresh(OperationContext* opCtx,
                                                                  const NamespaceString& nss);
 
+    /**
+     * Same as getCollectionIndexInfo above, but in addition causes the namespace to be refreshed.
+     */
+    GlobalIndexesCache getCollectionIndexInfoWithRefresh(OperationContext* opCtx,
+                                                         const NamespaceString& nss);
 
     /**
      * Same as getCollectionRoutingInfo above, but throws NamespaceNotSharded error if the namespace
@@ -275,6 +308,8 @@ public:
      */
     void invalidateCollectionEntry_LINEARIZABLE(const NamespaceString& nss);
 
+    void invalidateIndexEntry_LINEARIZABLE(const NamespaceString& nss);
+
 private:
     class DatabaseCache : public DatabaseTypeCache {
     public:
@@ -337,10 +372,27 @@ private:
         void _updateRefreshesStats(bool isIncremental, bool add);
     };
 
+    class IndexCache : public GlobalIndexesCacheBase {
+    public:
+        IndexCache(ServiceContext* service, ThreadPoolInterface& threadPool);
+
+    private:
+        LookupResult _lookupIndexes(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    const ValueHandle& indexes,
+                                    const ComparableIndexVersion& previousIndexVersion);
+        Mutex _mutex = MONGO_MAKE_LATCH("IndexCache::_mutex");
+    };
+
     StatusWith<ChunkManager> _getCollectionRoutingInfoAt(OperationContext* opCtx,
                                                          const NamespaceString& nss,
                                                          boost::optional<Timestamp> atClusterTime,
                                                          bool allowLocks = false);
+
+    GlobalIndexesCache _getCollectionIndexInfoAt(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 boost::optional<Timestamp> atClusterTime,
+                                                 bool allowLocks = false);
 
     // Interface from which chunks will be retrieved
     CatalogCacheLoader& _cacheLoader;
@@ -351,6 +403,8 @@ private:
     DatabaseCache _databaseCache;
 
     CollectionCache _collectionCache;
+
+    IndexCache _indexCache;
 
     /**
      * Encapsulates runtime statistics across all databases and collections in this catalog cache

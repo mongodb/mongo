@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/s/catalog/type_collection_gen.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/index_version.h"
 
 namespace mongo {
 
@@ -111,6 +113,7 @@ public:
     using CollectionTypeBase::getUuid;
     using CollectionTypeBase::setDefragmentationPhase;
     using CollectionTypeBase::setDefragmentCollection;
+    using CollectionTypeBase::setIndexVersion;
     using CollectionTypeBase::setKeyPattern;
     using CollectionTypeBase::setNss;
     using CollectionTypeBase::setReshardingFields;
@@ -172,8 +175,15 @@ public:
             CollectionTypeBase::setAllowMigrations(false);
     }
 
-    Timestamp getIndexVersion() const {
-        return CollectionTypeBase::getIndexVersion().get_value_or(Timestamp(0, 0));
+    CollectionIndexes getIndexVersion() const {
+        return CollectionIndexes({getEpoch(), CollectionTypeBase::getTimestamp()},
+                                 CollectionTypeBase::getIndexVersion());
+    }
+
+    void setIndexVersion(CollectionIndexes indexVersion) {
+        setEpoch(indexVersion.epoch());
+        setTimestamp(indexVersion.getTimestamp());
+        CollectionTypeBase::setIndexVersion(indexVersion.indexVersion());
     }
 
     // TODO SERVER-61033: remove after permitMigrations have been merge with allowMigrations.

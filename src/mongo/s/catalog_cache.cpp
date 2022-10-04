@@ -33,6 +33,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"
@@ -54,12 +55,13 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(blockCollectionCacheLookup);
 
-// How many times to try refreshing the routing info if the set of chunks loaded from the config
-// server is found to be inconsistent.
-const int kMaxInconsistentRoutingInfoRefreshAttempts = 3;
+// How many times to try refreshing the routing info or the index info of a collection if the
+// information loaded from the config server is found to be inconsistent.
+const int kMaxInconsistentCollectionRefreshAttempts = 3;
 
 const int kDatabaseCacheSize = 10000;
 const int kCollectionCacheSize = 10000;
+const int kIndexCacheSize = 10000;
 
 const OperationContext::Decoration<bool> operationShouldBlockBehindCatalogCacheRefresh =
     OperationContext::declareDecoration<bool>();
@@ -234,7 +236,8 @@ CatalogCache::CatalogCache(ServiceContext* const service, CatalogCacheLoader& ca
           return options;
       }())),
       _databaseCache(service, *_executor, _cacheLoader),
-      _collectionCache(service, *_executor, _cacheLoader) {
+      _collectionCache(service, *_executor, _cacheLoader),
+      _indexCache(service, *_executor) {
     _executor->startup();
 }
 
@@ -366,7 +369,7 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
                                           "namespace"_attr = nss,
                                           "exception"_attr = redact(ex));
                 acquireTries++;
-                if (acquireTries == kMaxInconsistentRoutingInfoRefreshAttempts) {
+                if (acquireTries == kMaxInconsistentCollectionRefreshAttempts) {
                     return ex.toStatus();
                 }
             }
@@ -391,6 +394,92 @@ StatusWith<ChunkManager> CatalogCache::getCollectionRoutingInfoAt(OperationConte
     return _getCollectionRoutingInfoAt(opCtx, nss, atClusterTime, false);
 }
 
+GlobalIndexesCache CatalogCache::getCollectionIndexInfo(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
+                                                        bool allowLocks) {
+    return _getCollectionIndexInfoAt(opCtx, nss, boost::none, allowLocks);
+}
+
+GlobalIndexesCache CatalogCache::getCollectionIndexInfoAt(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          Timestamp atClusterTime) {
+    return _getCollectionIndexInfoAt(opCtx, nss, atClusterTime, false);
+}
+
+GlobalIndexesCache CatalogCache::_getCollectionIndexInfoAt(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           boost::optional<Timestamp> atClusterTime,
+                                                           bool allowLocks) {
+    if (!allowLocks) {
+        invariant(!opCtx->lockState() || !opCtx->lockState()->isLocked(),
+                  "Do not hold a lock while refreshing the catalog cache. Doing so would "
+                  "potentially hold "
+                  "the lock during a network call, and can lead to a deadlock as described in "
+                  "SERVER-37398.");
+    }
+
+    const auto swDbInfo = getDatabase(opCtx, nss.db(), allowLocks);
+    if (!swDbInfo.isOK()) {
+        if (swDbInfo == ErrorCodes::NamespaceNotFound) {
+            LOGV2_FOR_CATALOG_REFRESH(
+                6686300,
+                2,
+                "Invalidating cached index entry because its database has been dropped",
+                "namespace"_attr = nss);
+            invalidateIndexEntry_LINEARIZABLE(nss);
+        }
+        uasserted(swDbInfo.getStatus().code(),
+                  str::stream() << "Error getting database info for index refresh: "
+                                << swDbInfo.getStatus().reason());
+    }
+
+    const auto dbInfo = std::move(swDbInfo.getValue());
+
+    auto indexEntryFuture = _indexCache.acquireAsync(nss, CacheCausalConsistency::kLatestKnown);
+
+    if (allowLocks) {
+        // When allowLocks is true we may be holding a lock, so we don't
+        // want to block the current thread: if the future is ready let's
+        // use it, otherwise return an error
+        uassert(ShardCannotRefreshDueToLocksHeldInfo(nss),
+                "Index info refresh did not complete",
+                indexEntryFuture.isReady());
+        return *indexEntryFuture.get(opCtx);
+    }
+
+    // From this point we can guarantee that allowLocks is false
+    size_t acquireTries = 0;
+
+    operationBlockedBehindCatalogCacheRefresh(opCtx) = true;
+
+    while (true) {
+        try {
+            auto indexEntry = indexEntryFuture.get(opCtx);
+
+            return std::move(*indexEntry);
+        } catch (const DBException& ex) {
+            bool isCatalogCacheRetriableError = ex.isA<ErrorCategory::SnapshotError>() ||
+                ex.code() == ErrorCodes::ConflictingOperationInProgress ||
+                ex.code() == ErrorCodes::QueryPlanKilled;
+            if (!isCatalogCacheRetriableError) {
+                throw;
+            }
+
+            LOGV2_FOR_CATALOG_REFRESH(6686301,
+                                      0,
+                                      "Index refresh failed",
+                                      "namespace"_attr = nss,
+                                      "exception"_attr = redact(ex));
+            acquireTries++;
+            if (acquireTries == kMaxInconsistentCollectionRefreshAttempts) {
+                throw;
+            }
+        }
+
+        indexEntryFuture = _indexCache.acquireAsync(nss, CacheCausalConsistency::kLatestKnown);
+    }
+}
+
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationContext* opCtx,
                                                                     StringData dbName) {
     _databaseCache.advanceTimeInStore(
@@ -404,6 +493,14 @@ StatusWith<ChunkManager> CatalogCache::getCollectionRoutingInfoWithRefresh(
         nss, ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh());
     setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
     return getCollectionRoutingInfo(opCtx, nss);
+}
+
+GlobalIndexesCache CatalogCache::getCollectionIndexInfoWithRefresh(OperationContext* opCtx,
+                                                                   const NamespaceString& nss) {
+    _indexCache.advanceTimeInStore(
+        nss, ComparableIndexVersion::makeComparableIndexVersionForForcedRefresh());
+    setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
+    return getCollectionIndexInfo(opCtx, nss);
 }
 
 ChunkManager CatalogCache::getShardedCollectionRoutingInfo(OperationContext* opCtx,
@@ -462,9 +559,15 @@ void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
         ? ComparableChunkVersion::makeComparableChunkVersion(*wantedVersion)
         : ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh();
 
-    const bool timeAdvanced = _collectionCache.advanceTimeInStore(nss, newChunkVersion);
+    const bool routingInfoTimeAdvanced = _collectionCache.advanceTimeInStore(nss, newChunkVersion);
 
-    if (timeAdvanced && collectionEntry && collectionEntry->optRt) {
+    const auto newIndexVersion = wantedVersion
+        ? ComparableIndexVersion::makeComparableIndexVersion(*wantedVersion)
+        : ComparableIndexVersion::makeComparableIndexVersionForForcedRefresh();
+
+    _indexCache.advanceTimeInStore(nss, newIndexVersion);
+
+    if (routingInfoTimeAdvanced && collectionEntry && collectionEntry->optRt) {
         // Shards marked stale will be reset on the next refresh.
         // We can mark the shard stale only if the time advanced, otherwise no refresh would happen
         // and the shard will remain marked stale.
@@ -513,11 +616,13 @@ void CatalogCache::purgeDatabase(StringData dbName) {
     _databaseCache.invalidateKey(dbName);
     _collectionCache.invalidateKeyIf(
         [&](const NamespaceString& nss) { return nss.db() == dbName; });
+    _indexCache.invalidateKeyIf([&](const NamespaceString& nss) { return nss.db() == dbName; });
 }
 
 void CatalogCache::purgeAllDatabases() {
     _databaseCache.invalidateAll();
     _collectionCache.invalidateAll();
+    _indexCache.invalidateAll();
 }
 
 void CatalogCache::report(BSONObjBuilder* builder) const {
@@ -525,9 +630,11 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
 
     const size_t numDatabaseEntries = _databaseCache.getCacheInfo().size();
     const size_t numCollectionEntries = _collectionCache.getCacheInfo().size();
+    const size_t numIndexEntries = _indexCache.getCacheInfo().size();
 
     cacheStatsBuilder.append("numDatabaseEntries", static_cast<long long>(numDatabaseEntries));
     cacheStatsBuilder.append("numCollectionEntries", static_cast<long long>(numCollectionEntries));
+    cacheStatsBuilder.append("numIndexEntries", static_cast<long long>(numIndexEntries));
 
     _stats.report(&cacheStatsBuilder);
     _collectionCache.reportStats(&cacheStatsBuilder);
@@ -570,6 +677,10 @@ void CatalogCache::invalidateDatabaseEntry_LINEARIZABLE(const StringData& dbName
 
 void CatalogCache::invalidateCollectionEntry_LINEARIZABLE(const NamespaceString& nss) {
     _collectionCache.invalidateKey(nss);
+}
+
+void CatalogCache::invalidateIndexEntry_LINEARIZABLE(const NamespaceString& nss) {
+    _indexCache.invalidateKey(nss);
 }
 
 void CatalogCache::Stats::report(BSONObjBuilder* builder) const {
@@ -791,4 +902,67 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
     }
 }
 
+CatalogCache::IndexCache::IndexCache(ServiceContext* service, ThreadPoolInterface& threadPool)
+    : ReadThroughCache(_mutex,
+                       service,
+                       threadPool,
+                       [this](OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const ValueHandle& indexes,
+                              const ComparableIndexVersion& previousIndexVersion) {
+                           return _lookupIndexes(opCtx, nss, indexes, previousIndexVersion);
+                       },
+                       kIndexCacheSize) {}
+
+CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ValueHandle& indexes,
+    const ComparableIndexVersion& previousVersion) {
+    // This object will define the new time of the index info obtained by this refresh
+    auto newComparableVersion =
+        ComparableIndexVersion::makeComparableIndexVersion(CollectionIndexes::UNSHARDED());
+
+    try {
+        LOGV2_FOR_CATALOG_REFRESH(6686302,
+                                  1,
+                                  "Refreshing cached indexes",
+                                  "namespace"_attr = nss,
+                                  "timeInStore"_attr = previousVersion);
+
+        const auto readConcern = [&]() -> repl::ReadConcernArgs {
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                return {repl::ReadConcernLevel::kSnapshotReadConcern};
+            } else {
+                const auto vcTime = VectorClock::get(opCtx)->getTime();
+                return {vcTime.configTime(), repl::ReadConcernLevel::kSnapshotReadConcern};
+            }
+        }();
+        auto collAndIndexes = Grid::get(opCtx)->catalogClient()->getCollectionAndGlobalIndexes(
+            opCtx, nss, readConcern);
+        const auto& coll = collAndIndexes.first;
+        newComparableVersion.setCollectionIndexes(coll.getIndexVersion());
+        IndexCatalogTypeMap newIndexesMap;
+        for (const auto& index : collAndIndexes.second) {
+            newIndexesMap[index.getName()] = index;
+        }
+
+        LOGV2_FOR_CATALOG_REFRESH(6686303,
+                                  newComparableVersion != previousVersion ? 0 : 1,
+                                  "Refreshed cached indexes",
+                                  "namespace"_attr = nss,
+                                  "newVersion"_attr = newComparableVersion,
+                                  "timeInStore"_attr = previousVersion);
+        return LookupResult(
+            GlobalIndexesCache(coll.getIndexVersion().indexVersion(), std::move(newIndexesMap)),
+            std::move(newComparableVersion));
+    } catch (const DBException& ex) {
+        LOGV2_FOR_CATALOG_REFRESH(6686304,
+                                  0,
+                                  "Error refreshing cached indexes",
+                                  "namespace"_attr = nss,
+                                  "error"_attr = redact(ex));
+        throw;
+    }
+}
 }  // namespace mongo

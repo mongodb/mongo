@@ -128,7 +128,7 @@ protected:
         }
     }
 
-    void loadCollection(const ChunkVersion& version) {
+    CollectionType loadCollection(const ShardVersion& version) {
         const auto coll = makeCollectionType(version);
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(makeChunks(version));
@@ -136,6 +136,15 @@ protected:
         const auto swChunkManager =
             _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
         ASSERT_OK(swChunkManager.getStatus());
+        auto future = launchAsync([&] {
+            onCommand([&](const executor::RemoteCommandRequest& request) {
+                return makeCollectionAndIndexesAggregationResponse(coll, std::vector<BSONObj>());
+            });
+        });
+        const auto globalIndexesCache =
+            _catalogCache->getCollectionIndexInfo(operationContext(), coll.getNss());
+        future.default_timed_get();
+        return coll;
     }
 
     void loadUnshardedCollection(const NamespaceString& nss) {
@@ -157,13 +166,25 @@ protected:
         return {chunk};
     }
 
-    CollectionType makeCollectionType(const ChunkVersion& collVersion) {
-        return {kNss,
-                collVersion.epoch(),
-                collVersion.getTimestamp(),
-                Date_t::now(),
-                kUUID,
-                kShardKeyPattern.getKeyPattern()};
+    CollectionType makeCollectionType(const ShardVersion& collVersion) {
+        CollectionType coll{kNss,
+                            collVersion.epoch(),
+                            collVersion.getTimestamp(),
+                            Date_t::now(),
+                            kUUID,
+                            kShardKeyPattern.getKeyPattern()};
+        coll.setIndexVersion(collVersion);
+        return coll;
+    }
+
+    BSONObj makeCollectionAndIndexesAggregationResponse(const CollectionType& coll,
+                                                        const std::vector<BSONObj>& indexes) {
+        BSONObj obj = coll.toBSON();
+        BSONObjBuilder indexField;
+        indexField.append("indexes", indexes);
+        BSONObj newObj = obj.addField(indexField.obj().firstElement());
+        return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {newObj})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
     }
 
     const NamespaceString kNss{"catalgoCacheTestDB.foo"};
@@ -272,7 +293,9 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion = ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
+    const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion =
+        ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(gen, boost::none));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
@@ -283,11 +306,13 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
     ASSERT(status == ErrorCodes::InternalError);
 }
 
-TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
+TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterPlacementVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion = ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
-    const auto wantedCollVersion = ShardVersion(ChunkVersion(cachedCollVersion, {2, 0}),
-                                                CollectionIndexes(cachedCollVersion, boost::none));
+    const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion =
+        ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(gen, boost::none));
+    const auto wantedCollVersion =
+        ShardVersion(ChunkVersion(gen, {2, 0}), CollectionIndexes(gen, boost::none));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
@@ -300,8 +325,9 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
 
 TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
-    const auto epoch = OID::gen();
-    const auto version = ChunkVersion({epoch, Timestamp(42)}, {1, 0});
+    const auto gen = CollectionGeneration(OID::gen(), Timestamp(42));
+    const auto version =
+        ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(gen, boost::none));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
 
@@ -356,8 +382,9 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
 
 TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
-    const auto epoch = OID::gen();
-    const auto version = ChunkVersion({epoch, Timestamp(42)}, {1, 0});
+    const auto gen = CollectionGeneration(OID::gen(), Timestamp(42));
+    const auto version =
+        ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(gen, boost::none));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
 
@@ -373,5 +400,59 @@ TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
     ASSERT_EQUALS(swChunkManager.getStatus(), ErrorCodes::InvalidOptions);
 }
 
+
+TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterIndexVersion) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion =
+        ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(gen, boost::none));
+    const auto wantedCollVersion =
+        ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(gen, Timestamp(1, 0)));
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
+    CollectionType coll = loadCollection(cachedCollVersion);
+    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+        kNss, wantedCollVersion, kShards[0]);
+
+    auto future = launchAsync([&] {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            coll.setIndexVersion({{coll.getEpoch(), coll.getTimestamp()}, Timestamp(1, 0)});
+            return makeCollectionAndIndexesAggregationResponse(
+                coll,
+                {IndexCatalogType("x_1", BSON("x" << 1), BSONObj(), Timestamp(1, 0), coll.getUuid())
+                     .toBSON()});
+        });
+    });
+
+    const auto indexInfo = _catalogCache->getCollectionIndexInfo(operationContext(), kNss);
+    future.default_timed_get();
+}
+
+TEST_F(CatalogCacheTest, OnStaleShardVersionIndexVersionBumpNotNone) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion =
+        ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(gen, Timestamp(1, 0)));
+    const auto wantedCollVersion =
+        ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(gen, Timestamp(2, 0)));
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
+    CollectionType coll = loadCollection(cachedCollVersion);
+    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+        kNss, wantedCollVersion, kShards[0]);
+
+    auto future = launchAsync([&] {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            coll.setIndexVersion({{coll.getEpoch(), coll.getTimestamp()}, Timestamp(2, 0)});
+            return makeCollectionAndIndexesAggregationResponse(
+                coll,
+                {IndexCatalogType("x_1", BSON("x" << 1), BSONObj(), Timestamp(2, 0), coll.getUuid())
+                     .toBSON()});
+        });
+    });
+
+    const auto indexInfo = _catalogCache->getCollectionIndexInfo(operationContext(), kNss);
+    future.default_timed_get();
+}
 }  // namespace
 }  // namespace mongo
