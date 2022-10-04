@@ -436,7 +436,7 @@ function isOpenSSL3orGreater() {
         return false;
     }
 
-    return opensslVersionAsInt() > 0x3000000;
+    return opensslVersionAsInt() >= 0x3000000;
 }
 
 function opensslVersionAsInt() {
