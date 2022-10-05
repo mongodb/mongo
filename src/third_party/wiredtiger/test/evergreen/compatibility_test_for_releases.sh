@@ -76,7 +76,8 @@ build_branch()
     fi
 
     cd "$1"
-    git checkout --quiet "$1"
+    # Check out the required branch, tag or commit hash
+    git checkout --quiet "${gittags[$1]}"
 
     build_system=$(get_build_system $1)
     if [ "$build_system" == "cmake" ]; then
@@ -640,6 +641,21 @@ newer=false
 wt_standalone=false
 patch_version=false
 upgrade_to_latest=false
+
+# Map branch names to Github branches, tags, or commit hashes
+# First define the standard values for each build branch
+declare -A gittags
+gittags['develop']="develop"
+gittags['mongodb-6.0']="mongodb-6.0"
+gittags['mongodb-5.0']="mongodb-5.0"
+gittags['mongodb-4.4']="mongodb-4.4"
+gittags['mongodb-4.2']="mongodb-4.2"
+# Then, optionally, replace one or more tags with a particular branch or commit hash where required for testing
+# For example, this set of commit hashes will reproduce the bug in WT-9795
+#gittags['develop']="d031f0af518c9b5f15dc586de4ae55d6867f423b"
+#gittags['mongodb-6.0']="58159b1a09bc045ab956b40675212e01d91fa7c0"
+#gittags['mongodb-5.0']="ce1d1e58ba35166710552e3aaa1c426ddba513fd"
+#gittags['mongodb-4.4']="ec742d6807b943cd6f2baf1a55853d296eb5b5c6"
 
 # This array is used to configure the release branches we'd like to use for testing the importing
 # of files created in previous versions of WiredTiger. Go all the way back to mongodb-4.2 since
