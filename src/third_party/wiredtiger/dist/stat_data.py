@@ -872,6 +872,7 @@ conn_dsrc_stats = [
     ##########################################
     # Cursor operations
     ##########################################
+    CursorStat('cursor_bounds_comparisons', 'cursor bounds comparisons performed'),
     CursorStat('cursor_bounds_reset', 'cursor bounds cleared from reset'),
     CursorStat('cursor_bounds_next_early_exit', 'cursor bounds next early exit'),
     CursorStat('cursor_bounds_prev_early_exit', 'cursor bounds prev early exit'),

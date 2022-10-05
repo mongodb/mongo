@@ -564,6 +564,7 @@ struct __wt_connection_stats {
     int64_t cursor_cached_count;
     int64_t cursor_bound_error;
     int64_t cursor_bounds_reset;
+    int64_t cursor_bounds_comparisons;
     int64_t cursor_bounds_next_unpositioned;
     int64_t cursor_bounds_next_early_exit;
     int64_t cursor_bounds_prev_unpositioned;
@@ -1060,6 +1061,7 @@ struct __wt_dsrc_stats {
     int64_t cursor_create;
     int64_t cursor_bound_error;
     int64_t cursor_bounds_reset;
+    int64_t cursor_bounds_comparisons;
     int64_t cursor_bounds_next_unpositioned;
     int64_t cursor_bounds_next_early_exit;
     int64_t cursor_bounds_prev_unpositioned;
