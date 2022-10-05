@@ -76,8 +76,15 @@ build_branch()
     fi
 
     cd "$1"
+    # If the branch is in gittags, look up the required branch, tag or commit hash,
+    # Otherwise, use the branch itself for the checkout.
+    if [ "${gittags[$1]}" != "" ]; then
+        git_tag="${gittags[$1]}"
+    else
+        git_tag="$1"
+    fi
     # Check out the required branch, tag or commit hash
-    git checkout --quiet "${gittags[$1]}"
+    git checkout --quiet "${git_tag}"
 
     build_system=$(get_build_system $1)
     if [ "$build_system" == "cmake" ]; then
@@ -644,6 +651,8 @@ upgrade_to_latest=false
 
 # Map branch names to Github branches, tags, or commit hashes
 # First define the standard values for each build branch
+# Note: If a branch name is not stored in gittags,
+# then the branch name itself will be used for the checkout
 declare -A gittags
 gittags['develop']="develop"
 gittags['mongodb-6.0']="mongodb-6.0"
