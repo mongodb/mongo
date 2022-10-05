@@ -918,7 +918,7 @@ std::unique_ptr<NearStage::CoveredInterval> GeoNear2DSphereStage::nextInterval(
     invariant(cover.empty());
     S2CellUnion diffUnion;
     diffUnion.GetDifference(&coverUnion, &_scannedCells);
-    for (auto cellId : diffUnion.cell_ids()) {
+    for (const auto& cellId : diffUnion.cell_ids()) {
         if (region->MayIntersect(S2Cell(cellId))) {
             cover.push_back(cellId);
         }
