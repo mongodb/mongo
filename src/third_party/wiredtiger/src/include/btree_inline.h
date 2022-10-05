@@ -291,10 +291,10 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
          * If this is an application thread that is running in a txn, keep track of its dirty bytes
          * in the session statistic.
          */
-        if (!F_ISSET(session, WT_SESSION_INTERNAL) &&
-          F_ISSET(session->txn, WT_TXN_RUNNING | WT_TXN_HAS_ID))
-            WT_STAT_SESSION_INCRV(session, txn_bytes_dirty, size);
         if (!WT_PAGE_IS_INTERNAL(page) && !btree->lsm_primary) {
+            if (!F_ISSET(session, WT_SESSION_INTERNAL) &&
+              F_ISSET(session->txn, WT_TXN_RUNNING | WT_TXN_HAS_ID))
+                WT_STAT_SESSION_INCRV(session, txn_bytes_dirty, size);
             (void)__wt_atomic_add64(&cache->bytes_updates, size);
             (void)__wt_atomic_add64(&btree->bytes_updates, size);
             (void)__wt_atomic_addsize(&page->modify->bytes_updates, size);
