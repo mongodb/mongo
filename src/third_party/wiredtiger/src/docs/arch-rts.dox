@@ -1,113 +1,113 @@
-/*! @arch_page arch-rts Rollback to Stable
+/*! @arch_page arch-rts Rollback to Stable (RTS)
 
-Rollback to stable is an operation that retains only the modifications that
-are stable according to the stable timestamp and recovered checkpoint snapshot.
-The checkpoint transaction snapshot details are saved at the end of every
-checkpoint are recovered and used as a recovered checkpoint snapshot.
+RTS is an operation that retains only the modifications that are considered \a stable. A
+modification is considered \a unstable if it has a durable timestamp greater than the stable
+timestamp or its transaction id is not committed according to the recovery checkpoint snapshot.
+The recovery checkpoint snapshot corresponds to the checkpoint transaction snapshot details saved at
+the end of every checkpoint.
 
-@section rts-overview Overview of rollback to stable
+RTS works for all storage types except for LSM trees.
 
-Rollback to stable scans each and every table present in the database except
-@ref arch-metadata "Metadata" to remove the modifications from the table
-that are more than stable timestamp and recovered checkpoint snapshot.
+@section rts-overview Overview of RTS
 
-In the process of removing newer modifications from the table, all the in-memory
-updates are aborted and the on-disk version updates are replaced with an update
-from history store otherwise the data store version is removed.
+RTS scans tables in the database to remove any unstable modifications. A table is selected by RTS if
+it meets one of the following conditions:
 
-Rollback to stable is performed in three phases
-1. WiredTiger startup
-2. WiredTiger shutdown
-3. Application initiated
+1. It is modified.
+2. It has prepared updates.
+3. It has updates from transactions greater than the recovery checkpoint snapshot (this is
+applicable only during the restart phase).
+4. One of the checkpoint durable timestamps (start/stop) is greater than the stable timestamp.
 
-To improve the performance of rollback to stable operation, rollback to stable
-will perform only on particular tables that need rollback. Rollback to stable
-doesn't operate on logged tables as the updates on these are stable when the
-transaction gets committed.
+On the other hand, a table is skipped by RTS if it does not meet any of the previous criteria but
+does meet one of the following:
 
-@section rts-stable-update Stable update of rollback to stable
+1. It is empty.
+2. It has timestamped updates but there is no stable timestamp set.
+3. The associated files are missing.
+4. The associated files are corrupted.
+5. It is dedicated to @ref arch-metadata "metadata".
+6. It is a logged table. RTS is not necessary for tables with commit-level durability.
+7. It has no aggregated time window. It is worth noting that the tables with no aggregated time
+window are only created in versions older than MongoDB 4.4.
 
-According to rollback to stable, the stable version of update is an update that
-has durable timestamp of less than or equal to the stable timestamp and it's
-transaction id must be committed according to the checkpoint snapshot.
+For each selected table, its pages are read into the cache. The unstable in-memory updates and the
+unstable historical versions from the history store are removed. The unstable on-disk version is replaced by
+the latest stable in-memory update if any, otherwise by the latest stable version from the history
+store. If there is no stable in-memory updates and no stable version in the history store, the data
+store entry is completely removed. In the situation where the table has no timestamped updates, all
+the historical versions related to this table are removed from the history store as they are no
+longer required and the on-disk value is preserved.
 
-@section rts-preconditions Pre-conditions required for rollback to stable
+Finally, RTS is triggered on startup, shutdown or when the application is initiated. It is worth
+noting that RTS needs exclusive access to the database and no concurrent transaction is allowed.
 
-To perform rollback to stable, there shouldn't be any transaction activity happening
-in the WiredTiger.
+@section rts-abort-updates How RTS aborts unstable updates
 
-@section rts-table-check Checks performed on a table by rollback to stable
+For in-memory updates, RTS traverses all the updates defined in the update list and aborts every
+update until a stable is found. To remove any key from the table, RTS adds a globally visible
+tombstone to the key's update list and this key gets removed later during reconciliation.
 
-Rollback to stable consider a table to be processed for rollback based on the following
-conditions.
-1. Table is modified
-2. The checkpoint durable start/stop timestamp is greater than the rollback timestamp.
-3. There is no durable timestamp in any checkpoint.
-4. Has prepared updates
-5. Has updates from transactions greater than checkpoint snapshot (only in restart phase)
-
-There are some special conditions where the table is skipped for rollback to stable.
-1. Empty file
-2. Table has timestamp updates but there is no stable timestamp set.
-3. Files that don't exist
-4. Files that are corrupted.
-
-If the table has no timestamp updates, then the history store table is
-scanned to remove any historical versions related to this table as these
-older versions no longer required.
-
-Once all the tables are process for rollback to stable, at the end the history store
-is processed to remove any unstable updates more than the stable timestamp.
-
-@section rts-how How rollback to stable fixes the unstable updates
-
-Once a table is identified to perform rollback to stable, it reads the pages into
-the cache if they don't exist and process it to remove the unstable updates.
-
-There are two types of rollbacks that rollback to stable performs:
-1. Rolling back unstable fast truncate
-2. Rolling back unstable updates
-
-All internal pages are traversed to rollback unstable fast truncate operations and
-leaf pages are traversed to remove the unstable updates.
-
-Once the leaf page is identified to rollback the updates, it is performed in the
-following order.
-1. Check smallest insert lists on the page
-2. Traverse through all the on-disk keys
-    a. Check update list
-    b. Check insert list
-    c. Check the on-disk version if no stable update found in the update list.
-3. Traverse through the reconciled pages to abort any history store updates.
-
-@section rts-abort-update How rollback to stable aborts in-memory updates
-
-Traverse through all the updates in the update list and abort them until a stable
-update is found.
-
-@section rts-abort-on-disk-update How rollback to stable aborts on-disk update
-
-If the start time pair is not stable try to find a valid update from the history
-store that is stable to replace the on-disk version otherwise remove the on-disk
-key. In case if the stop time pair if exists and if its not stable, restore the
-on-disk update again into the update list.
-
-To remove any existing update, rollback to stable adds globally visible tombstone to
-the key update list and this key will get removed later during the reconciliation.
-
-Note: As of now, rollback to stable don't work on removing on-disk columnar updates.
-
-@section rts-hs-search Rollback to stable history store search
-
-Rollback to stable searches the history store to find a stable update to replace an
-unstable update in the data store. It searches the history store with the given data
-store key with a maximum timestamp and traverse back till a stable update found. If
-no valid update is found the data store key is removed.
+For on-disk values, if the start time point is not stable and the update list does not contain any
+stable update, RTS searches the history store to find a stable update to replace the unstable on-disk version
+with. If the history store does not contain any stable update, the on-disk key is removed. If the
+stop time point exists and it is not stable, the on-disk update is restored into the update list.
 
 @section rts-page-skip Skipping reading unnecessary pages into memory
 
-Rollback to stable doesn't load the pages that don't have any unstable updates to be
-removed to improve the performance of rollback to stable by verifying the time aggregated
-values with the stable timestamp or recovered checkpoint snapshot during the tree walk.
+RTS doesn't load pages that don't have unstable updates that need to be removed. This check is done
+by comparing the time aggregated values with the stable timestamp or the recovery checkpoint
+snapshot during the tree walk.
 
+@section rts-example-1 Example 1
+
+In the following scenario, there are 3 updates on the update list, an on-disk value, the history
+store is empty and the stable timestamp is 10:
+
+Update list: U3 (30) -> U2 (20) -> U1 (10)\n
+On-disk: U2 (20)\n
+History store: Empty\n
+Stable timestamp: 10\n\n
+
+RTS will mark all the unstable updates from the update list as aborted and the on-disk value will be
+replaced the most recent stable update after reconciliation:
+
+Update list: U3 (30) Aborted -> U2 (20) Aborted -> U1(10)\n
+On-disk: U1 (10)\n
+History store: Empty\n
+Stable timestamp: 10
+
+@section rts-example-2 Example 2
+
+Let's consider a scenario where the history store is not empty:
+
+Update list: U5(50) -> U4 (40)\n
+On-disk: U3 (30)\n
+History store: U2 (20) -> U1 (10)\n
+Stable timestamp: 20\n\n
+
+In this case, RTS will abort the unstable update from the update list again but will also move the
+latest stable update from the history store to the update list:
+
+Update list: U2 (20) -> U5 (50) Aborted -> U4 (40) Aborted\n
+On-disk: U2 (20)\n
+History store: U1 (10)\n
+Stable timestamp: 20
+
+@section rts-example-3 Example 3
+
+The last scenario covers the situation when the on-disk update is restored into the update list
+because the stop time point exists and it is not stable:
+
+Update list: Empty\n
+On-disk: U3 (30) with a stop timestamp (40)\n
+History store: U2 (20) -> U1 (10)\n
+Stable timestamp: 30\n\n
+
+After RTS, we end up with the following state:
+
+Update list: U3 (30)\n
+On-disk: U3 (30)\n
+History store: U2 (20) -> U1 (10)\n
+Stable timestamp: 30
 */
