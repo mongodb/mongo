@@ -421,7 +421,7 @@ bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& p
     auto depsTracker = DepsTracker{};
     expr.addDependencies(&depsTracker);
     // Match expressions that generate random numbers can't be safely split out and pushed down.
-    return !depsTracker.needRandomGenerator &&
+    return !depsTracker.needRandomGenerator && !depsTracker.needWholeDocument &&
         std::none_of(
             depsTracker.fields.begin(), depsTracker.fields.end(), [&pathSet](auto&& field) {
                 return pathSet.find(field) != pathSet.end() ||
