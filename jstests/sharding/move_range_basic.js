@@ -2,7 +2,7 @@
  * Basic tests for moveRange.
  *
  * @tags: [
- *    requires_fcv_61,
+ *    requires_fcv_60,
  * ]
  */
 'use strict';

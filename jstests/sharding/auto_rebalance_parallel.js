@@ -1,8 +1,7 @@
 /**
  * Tests that the cluster is balanced in parallel in one balancer round (standalone).
  * @tags: [
- *   # TODO SERVER-67813: Review "requires_fcv_61" tags when data size aware balancing lands in v6.0
- *   requires_fcv_61,
+ *   requires_fcv_60,
  * ]
  */
 

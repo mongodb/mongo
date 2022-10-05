@@ -4,7 +4,7 @@
  *
  * @tags: [
  *     featureFlagBalanceAccordingToDataSize,
- *     requires_fcv_61,
+ *     requires_fcv_60,
  * ]
  */
 
