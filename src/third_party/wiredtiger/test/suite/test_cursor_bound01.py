@@ -110,5 +110,11 @@ class test_cursor_bound01(bound_base):
         cursor.bound("action=clear,bound=lower")
         cursor.bound("action=clear,bound=upper")
 
+        # Check that largest key doesn't work with bounded cursors.
+        cursor.set_key(self.gen_key(1))
+        cursor.bound("bound=lower")
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: cursor.largest_key(),
+            '/Invalid argument/')
+
 if __name__ == '__main__':
     wttest.run()

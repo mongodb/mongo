@@ -1139,6 +1139,9 @@ __wt_cursor_largest_key(WT_CURSOR *cursor)
     key_only = F_ISSET(cursor, WT_CURSTD_KEY_ONLY);
     CURSOR_API_CALL(cursor, session, largest_key, CUR2BT(cbt));
 
+    if (WT_CURSOR_BOUNDS_SET(cursor))
+        WT_ERR_MSG(session, EINVAL, "cursor largest key is not compatible with bounded cursors");
+
     WT_ERR(__wt_scr_alloc(session, 0, &key));
 
     /* Reset the cursor to give up the cursor position. */
