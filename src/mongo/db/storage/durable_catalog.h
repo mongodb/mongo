@@ -95,6 +95,12 @@ public:
 
     virtual std::vector<EntryIdentifier> getAllCatalogEntries(OperationContext* opCtx) const = 0;
 
+    /**
+     * Scans the persisted catalog until an entry is found matching 'nss'.
+     */
+    virtual boost::optional<DurableCatalog::CatalogEntry> scanForCatalogEntryByNss(
+        OperationContext* opCtx, const NamespaceString& nss) const = 0;
+
     virtual EntryIdentifier getEntry(const RecordId& catalogId) const = 0;
 
     virtual std::string getIndexIdent(OperationContext* opCtx,

@@ -64,6 +64,9 @@ public:
 
     std::vector<EntryIdentifier> getAllCatalogEntries(OperationContext* opCtx) const;
 
+    boost::optional<DurableCatalog::CatalogEntry> scanForCatalogEntryByNss(
+        OperationContext* opCtx, const NamespaceString& nss) const;
+
     EntryIdentifier getEntry(const RecordId& catalogId) const;
 
     std::string getCollectionIdent(const RecordId& catalogId) const;
@@ -180,6 +183,9 @@ private:
                          const NamespaceString& toNss,
                          BSONCollectionCatalogEntry::MetaData& md);
     Status _removeEntry(OperationContext* opCtx, const RecordId& catalogId);
+
+    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> _parseMetaData(
+        const BSONElement& mdElement) const;
 
     /**
      * Generates a new unique identifier for a new "thing".
