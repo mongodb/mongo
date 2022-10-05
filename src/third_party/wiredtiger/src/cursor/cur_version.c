@@ -308,7 +308,13 @@ __curversion_next_int(WT_CURSOR *cursor)
         }
 
         /* Get the ondisk value. */
-        WT_ERR(__wt_value_return_buf(cbt, cbt->ref, &cbt->upd_value->buf, &cbt->upd_value->tw));
+        ret = __wt_value_return_buf(cbt, cbt->ref, &cbt->upd_value->buf, &cbt->upd_value->tw
+#ifdef HAVE_DIAGNOSTIC
+          ,
+          NULL
+#endif
+        );
+        WT_ERR(ret);
 
         if (!WT_TIME_WINDOW_HAS_STOP(&cbt->upd_value->tw)) {
             durable_stop_ts = version_cursor->upd_durable_stop_ts;
