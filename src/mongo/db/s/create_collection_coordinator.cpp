@@ -375,6 +375,10 @@ void CreateCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuild
 }
 
 const NamespaceString& CreateCollectionCoordinator::nss() const {
+    if (_timeseriesNssResolvedByCommandHandler()) {
+        return originalNss();
+    }
+
     // Rely on the resolved request parameters to retrieve the nss to be targeted by the
     // coordinator.
     stdx::lock_guard lk{_docMutex};
@@ -399,7 +403,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, anchor = shared_from_this()] {
-            if (_doc.getPhase() < Phase::kTranslateRequest) {
+            if (_doc.getPhase() < Phase::kCommit) {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -417,23 +421,6 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                             << "was already sharded by a past request");
                 }
             }
-        })
-        .then([this, anchor = shared_from_this()] {
-            if (_timeseriesNssResolvedByCommandHandler()) {
-                return;
-            }
-            _executePhase(Phase::kTranslateRequest, [this, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-                _logStartCreateCollection(opCtx);
-
-                // Enter the critical sections before patching the user request to
-                // avoid data races with concurrenct creation of unsharded
-                // collections referencing the same namespace(s).
-                _acquireCriticalSections(opCtx);
-                _doc.setTranslatedRequestParams(_translateRequestParameters(opCtx));
-            })();
         })
         .then(_executePhase(
             Phase::kCommit,
@@ -453,14 +440,59 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                         opCtx, getCurrentSession(), **executor);
+
+                    if (_timeseriesNssResolvedByCommandHandler() ||
+                        _doc.getTranslatedRequestParams()) {
+
+                        const auto shardKeyPattern = ShardKeyPattern(
+                            _timeseriesNssResolvedByCommandHandler()
+                                ? *_request.getShardKey()
+                                : _doc.getTranslatedRequestParams()->getKeyPattern());
+                        const auto collation = _timeseriesNssResolvedByCommandHandler()
+                            ? resolveCollationForUserQueries(opCtx, nss(), _request.getCollation())
+                            : _doc.getTranslatedRequestParams()->getCollation();
+
+                        // Check if the collection was already sharded by a past request
+                        if (auto createCollectionResponseOpt =
+                                sharding_ddl_util::checkIfCollectionAlreadySharded(
+                                    opCtx,
+                                    nss(),
+                                    shardKeyPattern.toBSON(),
+                                    collation,
+                                    _request.getUnique().value_or(false))) {
+
+                            // A previous request already created and committed the collection
+                            // but there was a stepdown after the commit.
+                            _releaseCriticalSections(opCtx);
+
+                            _result = createCollectionResponseOpt;
+                            return;
+                        }
+
+                        auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
+                        // If the collection can be found locally, then we clean up the
+                        // config.chunks collection.
+                        if (uuid) {
+                            LOGV2_DEBUG(5458704,
+                                        1,
+                                        "Removing partial changes from previous run",
+                                        "namespace"_attr = nss());
+
+                            _updateSession(opCtx);
+                            cleanupPartialChunksFromPreviousAttempt(
+                                opCtx, *uuid, getCurrentSession());
+
+                            _updateSession(opCtx);
+                            broadcastDropCollection(opCtx, nss(), **executor, getCurrentSession());
+                        }
+                    }
                 }
 
-                if (_timeseriesNssResolvedByCommandHandler()) {
-                    // execute the logic of the kTranslateRequest phase now.
-                    _logStartCreateCollection(opCtx);
-                    _acquireCriticalSections(opCtx);
-                    _doc.setTranslatedRequestParams(_translateRequestParameters(opCtx));
-                }
+                _logStartCreateCollection(opCtx);
+
+                _acquireCriticalSections(opCtx);
+
+                _doc.setTranslatedRequestParams(_translateRequestParameters(opCtx));
 
                 // Check if the collection was already sharded by a past request
                 if (auto createCollectionResponseOpt =
@@ -471,31 +503,16 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             _doc.getTranslatedRequestParams()->getCollation(),
                             _request.getUnique().value_or(false))) {
 
-                    // A previous request already created and committed the collection but there was
-                    // a stepdown after the commit.
+                    // A previous request already created and committed the collection
+                    // but there was a stepdown after the commit.
                     _releaseCriticalSections(opCtx);
 
                     _result = createCollectionResponseOpt;
                     return;
                 }
 
-                if (!_firstExecution) {
-                    auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
-                    // If the collection can be found locally, then we clean up the config.chunks
-                    // collection.
-                    if (uuid) {
-                        LOGV2_DEBUG(5458704,
-                                    1,
-                                    "Removing partial changes from previous run",
-                                    "namespace"_attr = nss());
-
-                        _updateSession(opCtx);
-                        cleanupPartialChunksFromPreviousAttempt(opCtx, *uuid, getCurrentSession());
-
-                        _updateSession(opCtx);
-                        broadcastDropCollection(opCtx, nss(), **executor, getCurrentSession());
-                    }
-                }
+                // Persist the coordinator document including the translated request params
+                _updateStateDocument(opCtx, CreateCollectionCoordinatorDocument(_doc));
 
                 ShardKeyPattern shardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
                 _createPolicy(opCtx, shardKeyPattern);

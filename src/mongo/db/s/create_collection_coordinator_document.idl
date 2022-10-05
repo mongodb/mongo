@@ -43,7 +43,6 @@ enums:
         type: string
         values:
             kUnset: "unset"
-            kTranslateRequest: "translateRequest"
             kCommit: "commit"
 
 structs:
