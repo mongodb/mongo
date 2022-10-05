@@ -35,6 +35,17 @@ imports:
 structs:
   clusterQueryWithoutShardKeyResponse: 
     description: "The response for the '_clusterQueryWithoutShardKeyFind' command."
+    fields:
+      targetDoc:
+        description: >-
+          "Contains _id or the constructed upsert document if upsert:true and no matches were 
+          found."
+        type: object
+        optional: true
+      shardId: 
+        description: "The shard id of the target shard."
+        type: shard_id
+        optional: true
   clusterWriteWithoutShardKeyResponse: 
     description: "The response for the '_clusterWriteWithoutShardKeyFind' command."
   
