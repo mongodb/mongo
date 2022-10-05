@@ -26,11 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/s/global_index_metrics.h"
+
+#include "mongo/db/s/global_index/global_index_metrics.h"
 #include "mongo/db/exec/document_value/document.h"
 
-
 namespace mongo {
+namespace global_index {
 namespace {
 
 inline GlobalIndexMetrics::State getDefaultState(GlobalIndexMetrics::Role role) {
@@ -234,4 +235,5 @@ boost::optional<Milliseconds> GlobalIndexMetrics::getRecipientHighEstimateRemain
     return boost::none;
 }
 
+}  // namespace global_index
 }  // namespace mongo

@@ -31,14 +31,14 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/global_index_cumulative_metrics.h"
-#include "mongo/db/s/global_index_metrics_field_name_provider.h"
+#include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
+#include "mongo/db/s/global_index/global_index_metrics_field_name_provider.h"
 #include "mongo/db/s/metrics_state_holder.h"
 #include "mongo/db/s/sharding_data_transform_instance_metrics.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-
+namespace global_index {
 
 class GlobalIndexMetrics : public ShardingDataTransformInstanceMetrics {
 public:
@@ -226,14 +226,17 @@ public:
             ShardingDataTransformCumulativeMetrics::getForGlobalIndexes(serviceContext));
         return result;
     }
+
     template <typename T>
     void onStateTransition(T before, boost::none_t after) {
         _stateHolder.onStateTransition(before, after);
     }
+
     template <typename T>
     void onStateTransition(boost::none_t before, T after) {
         _stateHolder.onStateTransition(before, after);
     }
+
     template <typename T>
     void onStateTransition(T before, T after) {
         _stateHolder.onStateTransition(before, after);
@@ -251,4 +254,5 @@ private:
     GlobalIndexMetricsFieldNameProvider* _globalIndexFieldNames;
 };
 
+}  // namespace global_index
 }  // namespace mongo

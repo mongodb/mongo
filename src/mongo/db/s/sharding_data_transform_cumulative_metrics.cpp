@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/db/s/global_index_cumulative_metrics.h"
+#include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 
 #include <cstdint>
@@ -46,7 +46,7 @@ constexpr auto kEstimateNotAvailable = -1;
 
 struct Metrics {
     ReshardingCumulativeMetrics _resharding;
-    GlobalIndexCumulativeMetrics _globalIndexes;
+    global_index::GlobalIndexCumulativeMetrics _globalIndexes;
 };
 using MetricsPtr = std::unique_ptr<Metrics>;
 const auto getMetrics = ServiceContext::declareDecoration<MetricsPtr>();

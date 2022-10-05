@@ -29,19 +29,21 @@
 
 #pragma once
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/s/sharding_data_transform_instance_metrics_field_name_provider.h"
-#include "mongo/util/duration.h"
+#include "mongo/db/s/sharding_data_transform_cumulative_metrics_field_name_provider.h"
 
 namespace mongo {
+namespace global_index {
 
-class GlobalIndexMetricsFieldNameProvider
-    : public ShardingDataTransformInstanceMetricsFieldNameProvider {
+class GlobalIndexCumulativeMetricsFieldNameProvider
+    : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
 public:
-    StringData getForDocumentsProcessed() const override;
-    StringData getForBytesWritten() const override;
-    StringData getForApproxDocumentsToProcess() const override;
-    StringData getForApproxBytesToScan() const override;
+    virtual StringData getForDocumentsProcessed() const override;
+    virtual StringData getForBytesWritten() const override;
+
+    // TODO: Replace this placeholder method with one method per global index role/state
+    // combination. See ReshardingCumulativeMetricsFieldNameProvider for an example implementation.
+    StringData getForCountInstancesInRoleNameStateNStateName() const;
 };
 
+}  // namespace global_index
 }  // namespace mongo

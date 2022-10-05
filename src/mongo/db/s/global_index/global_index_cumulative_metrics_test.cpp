@@ -27,21 +27,35 @@
  *    it in the license file.
  */
 
-#pragma once
 
-#include "mongo/db/s/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
+#include "mongo/db/s/sharding_data_transform_metrics_test_fixture.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
+namespace global_index {
+namespace {
 
-class GlobalIndexCumulativeMetricsFieldNameProvider
-    : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
-public:
-    virtual StringData getForDocumentsProcessed() const override;
-    virtual StringData getForBytesWritten() const override;
+constexpr auto kGlobalIndex = "globalIndex";
 
-    // TODO: Replace this placeholder method with one method per global index role/state
-    // combination. See ReshardingCumulativeMetricsFieldNameProvider for an example implementation.
-    StringData getForCountInstancesInRoleNameStateNStateName() const;
+class GlobalIndexCumulativeMetricsTest : public ShardingDataTransformMetricsTestFixture {
+protected:
+    void setUp() override {
+        ShardingDataTransformMetricsTestFixture::setUp();
+        _globalIndexCumulativeMetrics =
+            static_cast<GlobalIndexCumulativeMetrics*>(_cumulativeMetrics.get());
+        _fieldNames = std::make_unique<GlobalIndexCumulativeMetricsFieldNameProvider>();
+    }
+
+    virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics()
+        override {
+        return std::make_unique<GlobalIndexCumulativeMetrics>();
+    }
+    GlobalIndexCumulativeMetrics* _globalIndexCumulativeMetrics;
+    std::unique_ptr<GlobalIndexCumulativeMetricsFieldNameProvider> _fieldNames;
 };
 
+}  // namespace
+}  // namespace global_index
 }  // namespace mongo

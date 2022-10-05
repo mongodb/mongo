@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/db/s/cumulative_metrics_state_holder.h"
-#include "mongo/db/s/global_index_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/global_index/global_index_cumulative_metrics_field_name_provider.h"
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 
 namespace mongo {
+namespace global_index {
 
 class GlobalIndexCumulativeMetrics : public ShardingDataTransformCumulativeMetrics {
 public:
@@ -137,4 +138,6 @@ template <typename T>
 const AtomicWord<int64_t>* GlobalIndexCumulativeMetrics::getStateCounter(T state) const {
     return getStateListForRole<T>()->getStateCounter(state);
 }
+
+}  // namespace global_index
 }  // namespace mongo

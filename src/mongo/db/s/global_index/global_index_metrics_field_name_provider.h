@@ -27,29 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/global_index_metrics_field_name_provider.h"
+#pragma once
+
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/s/sharding_data_transform_instance_metrics_field_name_provider.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
-namespace {
-constexpr auto kBytesWritten = "bytesWritten";
-constexpr auto kKeysWrittenFromScan = "keysWrittenFromScan ";
-constexpr auto kApproxBytesToScan = "approxBytesToScan";
-constexpr auto kApproxDocumentsToScan = "approxDocumentsToScan";
-}  // namespace
+namespace global_index {
 
-StringData GlobalIndexMetricsFieldNameProvider::getForBytesWritten() const {
-    return kBytesWritten;
-}
+class GlobalIndexMetricsFieldNameProvider
+    : public ShardingDataTransformInstanceMetricsFieldNameProvider {
+public:
+    StringData getForDocumentsProcessed() const override;
+    StringData getForBytesWritten() const override;
+    StringData getForApproxDocumentsToProcess() const override;
+    StringData getForApproxBytesToScan() const override;
+};
 
-StringData GlobalIndexMetricsFieldNameProvider::getForDocumentsProcessed() const {
-    return kKeysWrittenFromScan;
-}
-
-StringData GlobalIndexMetricsFieldNameProvider::getForApproxDocumentsToProcess() const {
-    return kApproxDocumentsToScan;
-}
-
-StringData GlobalIndexMetricsFieldNameProvider::getForApproxBytesToScan() const {
-    return kApproxBytesToScan;
-}
+}  // namespace global_index
 }  // namespace mongo

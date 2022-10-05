@@ -27,17 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/global_index_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/global_index/global_index_cumulative_metrics_field_name_provider.h"
 
 namespace mongo {
+namespace global_index {
 
 namespace {
 using Provider = GlobalIndexCumulativeMetricsFieldNameProvider;
 constexpr auto kKeysWrittenFromScan = "keysWrittenFromScan";
 constexpr auto kBytesWrittenFromScan = "bytesWrittenFromScan";
-}  // namespace
 
-namespace {
 // TODO: Delete when at least one state name getter has been implemented.
 constexpr auto kPlaceholder = "placeholder";
 }  // namespace
@@ -54,4 +53,5 @@ StringData Provider::getForCountInstancesInRoleNameStateNStateName() const {
     return kPlaceholder;
 }
 
+}  // namespace global_index
 }  // namespace mongo

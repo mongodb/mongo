@@ -27,8 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/global_index_cumulative_metrics.h"
+#include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
+
 namespace mongo {
+namespace global_index {
 
 namespace {
 constexpr auto kGlobalIndex = "globalIndex";
@@ -142,5 +144,5 @@ StringData GlobalIndexCumulativeMetrics::fieldNameFor(
     MONGO_UNREACHABLE;
 }
 
-
+}  // namespace global_index
 }  // namespace mongo

@@ -27,32 +27,32 @@
  *    it in the license file.
  */
 
-
-#include "mongo/db/s/global_index_cumulative_metrics.h"
-#include "mongo/db/s/sharding_data_transform_metrics_test_fixture.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+#include "mongo/db/s/global_index/global_index_metrics_field_name_provider.h"
 
 namespace mongo {
+namespace global_index {
 namespace {
-
-constexpr auto kGlobalIndex = "globalIndex";
-
-class GlobalIndexCumulativeMetricsTest : public ShardingDataTransformMetricsTestFixture {
-protected:
-    void setUp() override {
-        ShardingDataTransformMetricsTestFixture::setUp();
-        _globalIndexCumulativeMetrics =
-            static_cast<GlobalIndexCumulativeMetrics*>(_cumulativeMetrics.get());
-        _fieldNames = std::make_unique<GlobalIndexCumulativeMetricsFieldNameProvider>();
-    }
-
-    virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics()
-        override {
-        return std::make_unique<GlobalIndexCumulativeMetrics>();
-    }
-    GlobalIndexCumulativeMetrics* _globalIndexCumulativeMetrics;
-    std::unique_ptr<GlobalIndexCumulativeMetricsFieldNameProvider> _fieldNames;
-};
+constexpr auto kBytesWritten = "bytesWritten";
+constexpr auto kKeysWrittenFromScan = "keysWrittenFromScan ";
+constexpr auto kApproxBytesToScan = "approxBytesToScan";
+constexpr auto kApproxDocumentsToScan = "approxDocumentsToScan";
 }  // namespace
+
+StringData GlobalIndexMetricsFieldNameProvider::getForBytesWritten() const {
+    return kBytesWritten;
+}
+
+StringData GlobalIndexMetricsFieldNameProvider::getForDocumentsProcessed() const {
+    return kKeysWrittenFromScan;
+}
+
+StringData GlobalIndexMetricsFieldNameProvider::getForApproxDocumentsToProcess() const {
+    return kApproxDocumentsToScan;
+}
+
+StringData GlobalIndexMetricsFieldNameProvider::getForApproxBytesToScan() const {
+    return kApproxBytesToScan;
+}
+
+}  // namespace global_index
 }  // namespace mongo
