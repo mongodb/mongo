@@ -3391,10 +3391,12 @@ struct __wt_event_handler {
 	 * progress message was generated. The handle may have been created by
 	 * the application or automatically by WiredTiger or may be NULL.
 	 * @param type A type indicator for what special event occurred.
+         * @param arg A generic argument that has a specific meaning
+         * depending on the event type.
 	 * (see ::WT_EVENT_TYPE for available options.)
 	 */
         int (*handle_general)(WT_EVENT_HANDLER *handler,
-            WT_CONNECTION *wt_conn, WT_SESSION *session, WT_EVENT_TYPE type);
+            WT_CONNECTION *wt_conn, WT_SESSION *session, WT_EVENT_TYPE type, void *arg);
 };
 
 /*!

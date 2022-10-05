@@ -81,12 +81,13 @@ subtest_error_handler(
  *     General event handler.
  */
 static int
-handle_general(
-  WT_EVENT_HANDLER *handler, WT_CONNECTION *conn, WT_SESSION *session, WT_EVENT_TYPE type)
+handle_general(WT_EVENT_HANDLER *handler, WT_CONNECTION *conn, WT_SESSION *session,
+  WT_EVENT_TYPE type, void *arg)
 {
     (void)(handler);
     (void)(conn);
     (void)(session);
+    (void)(arg);
     if (type != WT_EVENT_COMPACT_CHECK)
         return (0);
 

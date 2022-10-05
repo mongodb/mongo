@@ -1118,7 +1118,7 @@ err:
     if (conn->default_session->event_handler->handle_general != NULL &&
       F_ISSET(conn, WT_CONN_MINIMAL | WT_CONN_READY))
         WT_TRET(conn->default_session->event_handler->handle_general(
-          conn->default_session->event_handler, &conn->iface, NULL, WT_EVENT_CONN_CLOSE));
+          conn->default_session->event_handler, &conn->iface, NULL, WT_EVENT_CONN_CLOSE, NULL));
     F_CLR(conn, WT_CONN_MINIMAL | WT_CONN_READY);
 
     /*
@@ -1152,7 +1152,7 @@ err:
     F_SET(conn, WT_CONN_MINIMAL);
     if (conn->default_session->event_handler->handle_general != NULL)
         WT_TRET(conn->default_session->event_handler->handle_general(
-          conn->default_session->event_handler, wt_conn, NULL, WT_EVENT_CONN_READY));
+          conn->default_session->event_handler, wt_conn, NULL, WT_EVENT_CONN_READY, NULL));
 
     /* Wait for in-flight operations to complete. */
     WT_TRET(__wt_txn_activity_drain(session));
@@ -1186,7 +1186,7 @@ err:
     /* We know WT_CONN_MINIMAL is set a few lines above no need to check again. */
     if (conn->default_session->event_handler->handle_general != NULL)
         WT_TRET(conn->default_session->event_handler->handle_general(
-          conn->default_session->event_handler, wt_conn, NULL, WT_EVENT_CONN_CLOSE));
+          conn->default_session->event_handler, wt_conn, NULL, WT_EVENT_CONN_CLOSE, NULL));
     F_CLR(conn, WT_CONN_MINIMAL);
 
     /*
@@ -3042,8 +3042,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     F_SET(conn, WT_CONN_MINIMAL);
     if (event_handler != NULL && event_handler->handle_general != NULL)
-        WT_ERR(
-          event_handler->handle_general(event_handler, &conn->iface, NULL, WT_EVENT_CONN_READY));
+        WT_ERR(event_handler->handle_general(
+          event_handler, &conn->iface, NULL, WT_EVENT_CONN_READY, NULL));
 
     /* Start the worker threads and run recovery. */
     WT_ERR(__wt_connection_workers(session, cfg));
@@ -3095,7 +3095,7 @@ err:
         if (conn->default_session->event_handler->handle_general != NULL &&
           F_ISSET(conn, WT_CONN_MINIMAL | WT_CONN_READY))
             WT_TRET(conn->default_session->event_handler->handle_general(
-              conn->default_session->event_handler, &conn->iface, NULL, WT_EVENT_CONN_CLOSE));
+              conn->default_session->event_handler, &conn->iface, NULL, WT_EVENT_CONN_CLOSE, NULL));
         F_CLR(conn, WT_CONN_MINIMAL | WT_CONN_READY);
 
         /*

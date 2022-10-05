@@ -83,13 +83,14 @@ __handle_close_default(WT_EVENT_HANDLER *handler, WT_SESSION *wt_session, WT_CUR
  *     Default WT_EVENT_HANDLER->handle_general implementation: ignore.
  */
 static int
-__handle_general_default(
-  WT_EVENT_HANDLER *handler, WT_CONNECTION *wt_conn, WT_SESSION *wt_session, WT_EVENT_TYPE type)
+__handle_general_default(WT_EVENT_HANDLER *handler, WT_CONNECTION *wt_conn, WT_SESSION *wt_session,
+  WT_EVENT_TYPE type, void *arg)
 {
     WT_UNUSED(handler);
     WT_UNUSED(wt_conn);
     WT_UNUSED(wt_session);
     WT_UNUSED(type);
+    WT_UNUSED(arg);
 
     return (0);
 }
