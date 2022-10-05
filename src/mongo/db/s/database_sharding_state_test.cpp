@@ -166,7 +166,7 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefresh) {
         auto opCtx = operationContext();
 
         _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(newDb);
-        forceDatabaseRefresh(opCtx, kDbName);
+        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kDbName, boost::none));
 
         boost::optional<DatabaseVersion> activeDbVersion = [&] {
             AutoGetDb autoDb(opCtx, DatabaseName(boost::none, kDbName), MODE_IS);

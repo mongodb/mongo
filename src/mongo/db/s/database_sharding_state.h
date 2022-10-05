@@ -74,6 +74,13 @@ public:
                                                                             StringData dbName);
 
     /**
+     * Returns the name of the database related to the current sharding state.
+     */
+    std::string getDbName() const {
+        return _dbName;
+    }
+
+    /**
      * Methods to control the databases's critical section. Must be called with the database X lock
      * held.
      */
@@ -110,8 +117,42 @@ public:
      */
     void clearMovePrimarySourceManager(OperationContext* opCtx);
 
+    /**
+     * Sets the database metadata refresh future for other threads to wait on it.
+     */
+    void setDbMetadataRefreshFuture(SharedSemiFuture<void> future,
+                                    CancellationSource cancellationSource,
+                                    const DSSLock&);
+
+    /**
+     * If there is an ongoing database metadata refresh, returns the future to wait on it, otherwise
+     * `boost::none`.
+     */
+    boost::optional<SharedSemiFuture<void>> getDbMetadataRefreshFuture(const DSSLock&) const;
+
+    /**
+     * Resets the database metadata refresh future to `boost::none`.
+     */
+    void resetDbMetadataRefreshFuture(const DSSLock&);
+
+    /**
+     * Cancel any ongoing database metadata refresh.
+     */
+    void cancelDbMetadataRefresh(const DSSLock&);
+
 private:
     friend DSSLock;
+
+    struct DbMetadataRefresh {
+        DbMetadataRefresh(SharedSemiFuture<void> future, CancellationSource cancellationSource)
+            : future(std::move(future)), cancellationSource(std::move(cancellationSource)){};
+
+        // Tracks the ongoing database metadata refresh.
+        SharedSemiFuture<void> future;
+
+        // Cancellation source to cancel the ongoing database metadata refresh.
+        CancellationSource cancellationSource;
+    };
 
     // Object-wide ResourceMutex to protect changes to the DatabaseShardingState or objects held
     // within.
@@ -131,6 +172,10 @@ private:
     //
     // NOTE: The source manager is not owned by this class.
     MovePrimarySourceManager* _sourceMgr{nullptr};
+
+    // Tracks the ongoing database metadata refresh. Possibly keeps a future for other threads to
+    // wait on it, and a cancellation source to cancel the ongoing database metadata refresh.
+    boost::optional<DbMetadataRefresh> _dbMetadataRefresh;
 };
 
 }  // namespace mongo

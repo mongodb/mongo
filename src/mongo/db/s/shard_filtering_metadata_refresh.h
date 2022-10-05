@@ -90,6 +90,4 @@ Status onDbVersionMismatchNoExcept(OperationContext* opCtx,
                                    StringData dbName,
                                    boost::optional<DatabaseVersion> clientDbVersion) noexcept;
 
-void forceDatabaseRefresh(OperationContext* opCtx, StringData dbName);
-
 }  // namespace mongo
