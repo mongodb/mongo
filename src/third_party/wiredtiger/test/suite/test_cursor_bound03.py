@@ -54,8 +54,7 @@ class test_cursor_bound03(bound_base):
 
     value_formats = [
         ('string', dict(value_format='S')),
-        # FIX-ME-WT-9589: Fix bug complex colgroups not returning records within bounds.
-        # ('complex-string', dict(value_format='SS')),
+        ('complex-string', dict(value_format='SS')),
     ]
 
     config = [

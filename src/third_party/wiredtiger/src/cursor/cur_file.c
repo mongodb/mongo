@@ -275,7 +275,11 @@ __curfile_reset(WT_CURSOR *cursor)
 
     ret = __wt_btcur_reset(cbt);
 
-    /* If a user calls cursor reset also reset the bounds. */
+    /*
+     * The bounded cursor API clears bounds on external calls to cursor->reset. We determine this by
+     * guarding the call to cursor bound reset with the API_USER_ENTRY macro. Doing so prevents
+     * internal API calls from resetting cursor bounds unintentionally, e.g. cursor->remove.
+     */
     if (API_USER_ENTRY(session))
         __wt_cursor_bound_reset(cursor);
 

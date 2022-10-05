@@ -265,7 +265,7 @@ class bound_base(wttest.WiredTigerTestCase):
                 self.assertTrue(key <= self.check_key(upper_key))
             elif (upper_key):
                 self.assertTrue(key < self.check_key(upper_key))
-                
+   
         if (expected_count != None):
             self.assertEqual(expected_count, count)
         else:

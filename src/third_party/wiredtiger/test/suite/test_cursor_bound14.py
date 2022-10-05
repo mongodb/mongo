@@ -54,8 +54,7 @@ class test_cursor_bound14(bound_base):
 
     value_formats = [
         ('string', dict(value_format='S')),
-        # FIX-ME-WT-9589: Fix bug complex colgroups not returning records within bounds.
-        # ('complex-string', dict(value_format='SS')),
+        ('complex-string', dict(value_format='SS')),
     ]
 
     cursor_config = [
@@ -139,8 +138,10 @@ class test_cursor_bound14(bound_base):
             self.assertEqual(cursor.reserve(), 0)
         self.session.commit_transaction()
 
-        # Test bound API: test modifies on an existing key outside of bounds.
-        if (not self.use_colgroup):
+        # Test bound API: test modifies on an existing key outside of bounds. 
+        # Only test this with string format as cursor modify is not supported for 
+        # complex strings. 
+        if (not self.use_colgroup and self.value_format == 'S'):
             self.session.begin_transaction()
             cursor.set_key(self.gen_key(10))
             mods = [wiredtiger.Modify("2", 0, 1)]
