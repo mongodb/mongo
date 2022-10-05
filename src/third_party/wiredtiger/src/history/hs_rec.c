@@ -184,7 +184,7 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
     /*
      * Look ahead for any higher timestamps. If we find updates, we should remove them and reinsert
      * them at the current timestamp. If there were no keys equal to or less than our target key, we
-     * would have received WT_NOT_FOUND. In that case we need to search again with a higher
+     * would have received WT_NOTFOUND. In that case we need to search again with a higher
      * timestamp.
      */
     if (ret == 0) {
