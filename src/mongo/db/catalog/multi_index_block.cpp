@@ -97,18 +97,6 @@ size_t getEachIndexBuildMaxMemoryUsageBytes(size_t numIndexSpecs) {
     return result;
 }
 
-Status timeseriesMixedSchemaDataFailure(const Collection* collection) {
-    return Status(
-        ErrorCodes::CannotCreateIndex,
-        str::stream()
-            << "Index build on collection '" << collection->ns() << "' (" << collection->uuid()
-            << ") failed due to the detection of mixed-schema data in the "
-            << "time-series buckets collection. Starting as of v5.2, time-series "
-            << "measurement bucketing has been modified to ensure that newly created "
-            << "time-series buckets do not contain mixed-schema data. For details, "
-            << "see: https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/");
-}
-
 }  // namespace
 
 MultiIndexBlock::~MultiIndexBlock() {
@@ -709,15 +697,6 @@ Status MultiIndexBlock::_insert(OperationContext* opCtx,
 
             _timeseriesBucketContainsMixedSchemaData = true;
         }
-
-        // Only enforce the mixed-schema data constraint on the primary. Index builds may not fail
-        // on the secondaries. The primary will replicate an abortIndexBuild oplog entry.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        const bool replSetAndNotPrimary = !replCoord->canAcceptWritesFor(opCtx, collection->ns());
-
-        if (docHasMixedSchemaData && !replSetAndNotPrimary) {
-            return timeseriesMixedSchemaDataFailure(collection.get());
-        }
     }
 
     for (size_t i = 0; i < _indexes.size(); i++) {
@@ -929,17 +908,22 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     const bool replSetAndNotPrimary = !replCoord->canAcceptWritesFor(opCtx, collection->ns());
 
-    // During the collection scan phase, only the primary will enforce the mixed-schema data
-    // constraint. Secondaries will only keep track of and take no action if mixed-schema data is
-    // detected. If the primary steps down during the index build, a secondary node will takeover.
-    // This can happen after the collection scan phase, which is why we need this check here.
     if (_timeseriesBucketContainsMixedSchemaData && !replSetAndNotPrimary) {
         LOGV2_DEBUG(6057701,
                     1,
                     "Aborting index build commit due to the earlier detection of mixed-schema data",
                     logAttrs(collection->ns()),
                     logAttrs(collection->uuid()));
-        return timeseriesMixedSchemaDataFailure(collection);
+
+        return {
+            ErrorCodes::CannotCreateIndex,
+            str::stream()
+                << "Index build on collection '" << collection->ns() << "' (" << collection->uuid()
+                << ") failed due to the detection of mixed-schema data in the time-series buckets "
+                   "collection. Starting as of v5.2, time-series measurement bucketing has been "
+                   "modified to ensure that newly created time-series buckets do not contain "
+                   "mixed-schema data. For details, see: "
+                   "https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/"};
     }
 
     // Do not interfere with writing multikey information when committing index builds.
