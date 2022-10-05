@@ -232,10 +232,7 @@ public:
      * On return no transaction is active. It is a programming error to call this inside of a
      * WriteUnitOfWork, even if the AbandonSnapshotMode is 'kCommit'.
      */
-    void abandonSnapshot() {
-        doAbandonSnapshot();
-        assignNextSnapshotId();
-    }
+    void abandonSnapshot();
 
     void setAbandonSnapshotMode(AbandonSnapshotMode mode) {
         _abandonSnapshotMode = mode;
@@ -591,10 +588,25 @@ public:
     };
 
     /**
-     * The RecoveryUnit takes ownership of the change. The commitUnitOfWork() method calls the
-     * commit() method of each registered change in order of registration. The endUnitOfWork()
-     * method calls the rollback() method of each registered Change in reverse order of
-     * registration. Either will unregister and delete the changes.
+     * A SnapshotChange is an action that can be registered at anytime. When a WriteUnitOfWork
+     * begins, the openSnapshot() callback is called for any registered snapshot changes. Similarly,
+     * when the snapshot is abandoned, or the WriteUnitOfWork is committed or aborted, the
+     * closeSnapshot() callback is called.
+     *
+     * The same rules apply here that apply to the Change class.
+     */
+    class SnapshotChange {
+    public:
+        virtual ~SnapshotChange() {}
+
+        virtual void openSnapshot(OperationContext* opCtx) = 0;
+        virtual void closeSnapshot(OperationContext* opCtx) = 0;
+    };
+
+    /**
+     * The commitUnitOfWork() method calls the commit() method of each registered change in order of
+     * registration. The endUnitOfWork() method calls the rollback() method of each registered
+     * Change in reverse order of registration. Either will unregister and delete the changes.
      *
      * The registerChange() method may only be called when a WriteUnitOfWork is active, and
      * may not be called during commit or rollback.
@@ -687,6 +699,50 @@ public:
         };
 
         registerChange(std::make_unique<OnCommitChange>(std::move(callback)));
+    }
+
+    /**
+     * Registers a callback to be called when the snapshot is opened.
+     *
+     * Be careful about the lifetimes of all variables captured by the callback!
+     */
+    template <typename Callback>
+    void onOpenSnapshot(Callback cb) {
+        class OnOpenSnapshotChange final : public SnapshotChange {
+        public:
+            OnOpenSnapshotChange(Callback&& callback) : _callback(std::move(callback)) {}
+            void openSnapshot(OperationContext* opCtx) final {
+                _callback(opCtx);
+            }
+            void closeSnapshot(OperationContext* opCtx) final {}
+
+        private:
+            Callback _callback;
+        };
+
+        _registerSnapshotChange(std::make_unique<OnOpenSnapshotChange>(std::move(cb)));
+    }
+
+    /**
+     * Registers a callback to be called when the snapshot is closed.
+     *
+     * Be careful about the lifetimes of all variables captured by the callback!
+     */
+    template <typename Callback>
+    void onCloseSnapshot(Callback cb) {
+        class OnCloseSnapshotChange final : public SnapshotChange {
+        public:
+            OnCloseSnapshotChange(Callback&& callback) : _callback(std::move(callback)) {}
+            void openSnapshot(OperationContext* opCtx) final {}
+            void closeSnapshot(OperationContext* opCtx) final {
+                _callback(opCtx);
+            }
+
+        private:
+            Callback _callback;
+        };
+
+        _registerSnapshotChange(std::make_unique<OnCloseSnapshotChange>(std::move(cb)));
     }
 
     virtual void setOrderedCommit(bool orderedCommit) = 0;
@@ -789,10 +845,11 @@ protected:
 
     /**
      * Transitions to new state.
+     *
+     * Invokes openSnapshot() for all registered snapshot changes when transitioning to kActive or
+     * kActiveNotInUnitOfWork from an inactive state.
      */
-    void _setState(State newState) {
-        _state = newState;
-    }
+    void _setState(State newState);
 
     /**
      * Returns true if active.
@@ -825,6 +882,17 @@ protected:
      */
     void _executeRollbackHandlers();
 
+    /**
+     * Executes all registered open snapshot handlers. This does not clear any registered snapshot
+     * changes in order to keep the close snapshot handlers around until the snapshot is closed.
+     */
+    void _executeOpenSnapshotHandlers();
+
+    /**
+     * Executes all registered close snapshot handlers and clears all registered snapshot changes.
+     */
+    void _executeCloseSnapshotHandlers();
+
     bool _noEvictionAfterRollback = false;
 
     AbandonSnapshotMode _abandonSnapshotMode = AbandonSnapshotMode::kAbort;
@@ -840,10 +908,24 @@ private:
 
     virtual void validateInUnitOfWork() const;
 
+    /**
+     * The beginUnitOfWork() method calls  the openSnapshot() method. The abandonSnapshot(),
+     * commitUnitOfWork(), and abortUnitOfWork() methods call the closeSnapshot() method. All
+     * registered snapshot changes are called in the order of registration when a snapshot is opened
+     * and in reverse order when a snapshot is closed.
+     *
+     * This method may be called outside or inside of a WriteUnitOfWork.
+     */
+    void _registerSnapshotChange(std::unique_ptr<SnapshotChange> snapshotChange) {
+        _snapshotChanges.push_back(std::move(snapshotChange));
+    }
+
     std::vector<std::function<void(OperationContext*)>> _preCommitHooks;
 
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
+    typedef std::vector<std::unique_ptr<SnapshotChange>> SnapshotChanges;
+    SnapshotChanges _snapshotChanges;
     std::unique_ptr<Change> _changeForCatalogVisibility;
     State _state = State::kInactive;
     OperationContext* _opCtx = nullptr;

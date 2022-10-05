@@ -242,6 +242,11 @@ public:
                         });
                     break;
                 }
+                case UncommittedCatalogUpdates::Entry::Action::kOpenedCollection: {
+                    // No-op. Collections opened from earlier points in time remain local to the
+                    // operation.
+                    break;
+                }
             };
         }
 
@@ -686,6 +691,14 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
         return nullptr;
     }
 
+    // Check if the storage transaction already has this collection instantiated.
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+    auto lookupResult = uncommittedCatalogUpdates.lookupCollection(opCtx, nss);
+    if (lookupResult.found && !lookupResult.newColl) {
+        invariant(isCollectionCompatible(lookupResult.collection, readTimestamp));
+        return lookupResult.collection;
+    }
+
     auto catalogId = lookupCatalogIdByNSS(nss, readTimestamp);
     if (!catalogId) {
         return nullptr;
@@ -704,6 +717,7 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
     // timestamp.
     std::shared_ptr<Collection> latestColl = _lookupCollectionByUUID(*collectionOptions.uuid);
     if (isCollectionCompatible(latestColl, readTimestamp)) {
+        uncommittedCatalogUpdates.openCollection(opCtx, latestColl);
         return latestColl;
     }
 
@@ -718,6 +732,7 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
     }();
 
     if (isCollectionCompatible(dropPendingColl, readTimestamp)) {
+        uncommittedCatalogUpdates.openCollection(opCtx, dropPendingColl);
         return dropPendingColl;
     }
 
@@ -743,6 +758,8 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
                 6857100, 1, "Failed to instantiate collection", "reason"_attr = status.reason());
             return nullptr;
         }
+
+        uncommittedCatalogUpdates.openCollection(opCtx, collToReturn);
         return collToReturn;
     }
 
@@ -783,6 +800,8 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
             6857102, 1, "Failed to instantiate collection", "reason"_attr = status.reason());
         return nullptr;
     }
+
+    uncommittedCatalogUpdates.openCollection(opCtx, collToReturn);
     return collToReturn;
 }
 

@@ -234,6 +234,24 @@ void UncommittedCatalogUpdates::removeView(const NamespaceString& nss) {
     _entries.push_back({Entry::Action::kRemoveViewResource, nullptr, nss});
 }
 
+void UncommittedCatalogUpdates::openCollection(OperationContext* opCtx,
+                                               std::shared_ptr<Collection> coll) {
+    _entries.push_back({Entry::Action::kOpenedCollection, coll, coll->ns()});
+
+    // Removes the collection instance when either the snapshot is abandoned, or the current
+    // WriteUnitOfWork commits or aborts.
+    opCtx->recoveryUnit()->onCloseSnapshot([this, nss = coll->ns()](OperationContext* opCtx) {
+        auto it = std::find_if(_entries.begin(), _entries.end(), [&](auto&& entry) {
+            return entry.action == Entry::Action::kOpenedCollection && entry.nss == nss;
+        });
+
+        if (it == _entries.end()) {
+            return;
+        }
+        _entries.erase(it);
+    });
+}
+
 std::vector<UncommittedCatalogUpdates::Entry> UncommittedCatalogUpdates::releaseEntries() {
     std::vector<Entry> ret;
     std::swap(ret, _entries);

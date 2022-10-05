@@ -302,6 +302,8 @@ TEST(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
                                         harnessHelper.getOplogManager());
+    std::unique_ptr<OperationContext> opCtx{harnessHelper.newOperationContext()};
+    recoveryUnit.setOperationContext(opCtx.get());
     WiredTigerSession* session = recoveryUnit.getSession();
     auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
                                                      "statistics:table:no_such_table",
@@ -315,6 +317,8 @@ TEST(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(none)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
                                         harnessHelper.getOplogManager());
+    std::unique_ptr<OperationContext> opCtx{harnessHelper.newOperationContext()};
+    recoveryUnit.setOperationContext(opCtx.get());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
@@ -330,6 +334,8 @@ TEST(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
                                         harnessHelper.getOplogManager());
+    std::unique_ptr<OperationContext> opCtx{harnessHelper.newOperationContext()};
+    recoveryUnit.setOperationContext(opCtx.get());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
@@ -346,6 +352,8 @@ TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
                                         harnessHelper.getOplogManager());
+    std::unique_ptr<OperationContext> opCtx{harnessHelper.newOperationContext()};
+    recoveryUnit.setOperationContext(opCtx.get());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
@@ -373,6 +381,8 @@ TEST(WiredTigerUtilTest, ParseAPIMessages) {
     // Create a session.
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
                                         harnessHelper.getOplogManager());
+    std::unique_ptr<OperationContext> opCtx{harnessHelper.newOperationContext()};
+    recoveryUnit.setOperationContext(opCtx.get());
     WT_SESSION* wtSession = recoveryUnit.getSession()->getSession();
 
     // Perform simple WiredTiger operations while capturing the generated logs.

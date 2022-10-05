@@ -62,13 +62,14 @@ public:
             // Remove a view resource
             kRemoveViewResource,
             // Dropped index instance
-            kDroppedIndex
-
+            kDroppedIndex,
+            // Opened a collection instance from an earlier point-in-time
+            kOpenedCollection
         };
 
         boost::optional<UUID> uuid() const {
             if (action == Action::kCreatedCollection || action == Action::kWritableCollection ||
-                action == Action::kRenamedCollection)
+                action == Action::kRenamedCollection || action == Action::kOpenedCollection)
                 return collection->uuid();
             return externalUUID;
         }
@@ -112,8 +113,8 @@ public:
         bool found;
 
         // Storage for the actual collection.
-        // Set for actions kWritableCollection, kCreatedCollection, kRecreatedCollection (nullptr
-        // otherwise).
+        // Set for actions kWritableCollection, kCreatedCollection, kRecreatedCollection,
+        // kOpenedCollection (nullptr otherwise).
         std::shared_ptr<Collection> collection;
 
         // True if the collection was created during this transaction for the first time.
@@ -131,7 +132,8 @@ public:
                 entry.action == Entry::Action::kWritableCollection ||
                 entry.action == Entry::Action::kRenamedCollection ||
                 entry.action == Entry::Action::kDroppedCollection ||
-                entry.action == Entry::Action::kRecreatedCollection);
+                entry.action == Entry::Action::kRecreatedCollection ||
+                entry.action == Entry::Action::kOpenedCollection);
     }
 
     /**
@@ -204,6 +206,11 @@ public:
      * Removes the ResourceID associated with a view namespace.
      */
     void removeView(const NamespaceString& nss);
+
+    /**
+     * Manages the lifetime of the collection instance from an earlier point-in-time.
+     */
+    void openCollection(OperationContext* opCtx, std::shared_ptr<Collection> coll);
 
     /**
      * Releases all entries, needs to be done when WriteUnitOfWork commits or rolls back.

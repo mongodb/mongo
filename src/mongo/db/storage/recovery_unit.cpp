@@ -117,6 +117,11 @@ void RecoveryUnit::endReadOnlyUnitOfWork() {
     _readOnly = false;
 }
 
+void RecoveryUnit::abandonSnapshot() {
+    doAbandonSnapshot();
+    assignNextSnapshotId();
+}
+
 void RecoveryUnit::setOperationContext(OperationContext* opCtx) {
     _opCtx = opCtx;
 }
@@ -128,8 +133,8 @@ void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimes
             // Log at higher level because commits occur far more frequently than rollbacks.
             LOGV2_DEBUG(22244,
                         3,
-                        "CUSTOM COMMIT {demangleName_typeid_change}",
-                        "demangleName_typeid_change"_attr = redact(demangleName(typeid(*change))));
+                        "Custom commit",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
             change->commit(_opCtx, commitTimestamp);
         } catch (...) {
             std::terminate();
@@ -140,8 +145,8 @@ void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimes
             // Log at higher level because commits occur far more frequently than rollbacks.
             LOGV2_DEBUG(5255701,
                         2,
-                        "CUSTOM COMMIT {demangleName_typeid_change}",
-                        "demangleName_typeid_change"_attr =
+                        "Custom commit",
+                        "changeName"_attr =
                             redact(demangleName(typeid(*_changeForCatalogVisibility))));
             _changeForCatalogVisibility->commit(_opCtx, commitTimestamp);
         }
@@ -165,11 +170,10 @@ void RecoveryUnit::_executeRollbackHandlers() {
     invariant(_opCtx || (_changes.empty() && !_changeForCatalogVisibility));
     try {
         if (_changeForCatalogVisibility) {
-
             LOGV2_DEBUG(5255702,
                         2,
-                        "CUSTOM ROLLBACK {demangleName_typeid_change}",
-                        "demangleName_typeid_change"_attr =
+                        "Custom rollback",
+                        "changeName"_attr =
                             redact(demangleName(typeid(*_changeForCatalogVisibility))));
             _changeForCatalogVisibility->rollback(_opCtx);
         }
@@ -179,14 +183,64 @@ void RecoveryUnit::_executeRollbackHandlers() {
             Change* change = it->get();
             LOGV2_DEBUG(22245,
                         2,
-                        "CUSTOM ROLLBACK {demangleName_typeid_change}",
-                        "demangleName_typeid_change"_attr = redact(demangleName(typeid(*change))));
+                        "Custom rollback",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
             change->rollback(_opCtx);
         }
         _changeForCatalogVisibility.reset();
         _changes.clear();
     } catch (...) {
         std::terminate();
+    }
+}
+
+void RecoveryUnit::_executeOpenSnapshotHandlers() {
+    invariant(_opCtx);
+    try {
+        for (auto& snapshotChange : _snapshotChanges) {
+            LOGV2_DEBUG(6825600,
+                        2,
+                        "Custom openSnapshot",
+                        "changeName"_attr = redact(demangleName(typeid(*snapshotChange))));
+            snapshotChange->openSnapshot(_opCtx);
+        }
+    } catch (...) {
+        std::terminate();
+    }
+}
+
+void RecoveryUnit::_executeCloseSnapshotHandlers() {
+    invariant(_opCtx);
+    try {
+        for (SnapshotChanges::const_reverse_iterator it = _snapshotChanges.rbegin(),
+                                                     end = _snapshotChanges.rend();
+             it != end;
+             ++it) {
+            SnapshotChange* snapshotChange = it->get();
+            LOGV2_DEBUG(6825601,
+                        2,
+                        "Custom closeSnapshot",
+                        "changeName"_attr = redact(demangleName(typeid(*snapshotChange))));
+            snapshotChange->closeSnapshot(_opCtx);
+        }
+        _snapshotChanges.clear();
+    } catch (...) {
+        std::terminate();
+    }
+}
+
+void RecoveryUnit::_setState(State newState) {
+    const bool isAlreadyActive = _isActive();
+    _state = newState;
+
+    // When transitioning from an inactive to active state, execute the openSnapshot handlers.
+    if (!isAlreadyActive && _isActive()) {
+        _executeOpenSnapshotHandlers();
+    }
+
+    // When transitioning from an active to inactive state, execute the closeSnapshot handlers.
+    if (isAlreadyActive && !_isActive()) {
+        _executeCloseSnapshotHandlers();
     }
 }
 
