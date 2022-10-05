@@ -94,8 +94,6 @@ var $config = extendWorkload($config, function($config, $super) {
             const runningWithStepdowns =
                 TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
 
-            // TODO SERVER-46669: The moveChunk command can succeed without waiting for the range
-            // deletion to complete if the replica set shard primary steps down.
             if (waitForDelete && !runningWithStepdowns) {
                 msg = 'moveChunk succeeded but original shard still had documents.\n' + msgBase +
                     ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);

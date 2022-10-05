@@ -199,7 +199,6 @@ public:
                              ShardsvrMoveRange&& request,
                              WriteConcernOptions&& writeConcern) {
             if (request.getFromShard() == request.getToShard()) {
-                // TODO: SERVER-46669 handle wait for delete.
                 return;
             }
 
