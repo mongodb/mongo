@@ -24,7 +24,6 @@ class RunChangeStreamsInBackground(interface.Hook):
         self._fixture = fixture
         self._change_streams_thread = None
         self._test_run = None
-        random.seed(config.RANDOM_SEED)
         self._every_n_tests = random.randint(1, 10)
         self._full_suite_changes_num = 0
 
