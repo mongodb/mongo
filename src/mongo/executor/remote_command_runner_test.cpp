@@ -368,6 +368,44 @@ TEST_F(RemoteCommandRunnerTestFixture, NoRetry) {
     ASSERT_EQUALS(p.getNextRetryDelay(), Milliseconds::zero());
 }
 
+// TODO SERVER-69634: Remove this test.
+TEST_F(RemoteCommandRunnerTestFixture, ParseAndSeralizeNoop) {
+    std::unique_ptr<RemoteCommandHostTargeter> targeter =
+        std::make_unique<RemoteCommandLocalHostTargeter>();
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = doRequest(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
+        return Status(ErrorCodes::NetworkTimeout, "mock");
+    });
+
+    // Check that RemoteCommandExecutionErrorInfo::serialize() works safely (when converting a
+    // Status to string), instead of crashing the server.
+    try {
+        auto error = resultFuture.get();
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ex.toStatus(), ErrorCodes::RemoteCommandExecutionError);
+        ASSERT_FALSE(ex.toString().empty());
+    }
+
+    // Check that RemoteCommandExecutionErrorInfo::parse() safely creates a dummy ErrorExtraInfo
+    // (when a Status is constructed), instead of crashing the server.
+    const auto status = Status(ErrorCodes::RemoteCommandExecutionError, "", fromjson("{foo: 123}"));
+    ASSERT_EQ(status, ErrorCodes::RemoteCommandExecutionError);
+    ASSERT(status.extraInfo());
+    ASSERT(status.extraInfo<RemoteCommandExecutionErrorInfo>());
+    ASSERT_EQ(status.extraInfo<RemoteCommandExecutionErrorInfo>()->asLocal(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(
+        status.extraInfo<RemoteCommandExecutionErrorInfo>()->asLocal().toString(),
+        "RemoteCommandExectionError illegally parsed from bson");
+}
+
 }  // namespace
 }  // namespace remote_command_runner
 }  // namespace executor

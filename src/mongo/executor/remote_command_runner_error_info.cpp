@@ -39,12 +39,12 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(RemoteCommandExecutionErrorInfo);
 
 }  // namespace
 
+// NOTE: parse() and serialize() will be removed altogether as part of SERVER-69634.
 std::shared_ptr<const ErrorExtraInfo> RemoteCommandExecutionErrorInfo::parse(const BSONObj& obj) {
-    MONGO_UNREACHABLE;
+    return std::make_shared<RemoteCommandExecutionErrorInfo>(
+        Status(ErrorCodes::BadValue, "RemoteCommandExectionError illegally parsed from bson"));
 }
 
-void RemoteCommandExecutionErrorInfo::serialize(BSONObjBuilder* bob) const {
-    MONGO_UNREACHABLE;
-}
+void RemoteCommandExecutionErrorInfo::serialize(BSONObjBuilder* bob) const {}
 
 }  // namespace mongo
