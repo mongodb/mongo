@@ -100,6 +100,68 @@ int32_t getStmtIdForWriteAt(const WriteCommandBase& writeCommandBase, size_t wri
     return kFirstStmtId + writePos;
 }
 
+int getUpdateSizeEstimate(const BSONObj& q,
+                          const write_ops::UpdateModification& u,
+                          const boost::optional<mongo::BSONObj>& c,
+                          const bool includeUpsertSupplied,
+                          const boost::optional<mongo::BSONObj>& collation,
+                          const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
+                          const mongo::BSONObj& hint) {
+    using UpdateOpEntry = write_ops::UpdateOpEntry;
+
+    // This constant accounts for the null terminator in each field name and the BSONType byte for
+    // each element.
+    static const int kPerElementOverhead = 2;
+    static const int kBoolSize = 1;
+    int estSize = static_cast<int>(BSONObj::kMinBSONLength);
+
+    // Add the sizes of the 'multi' and 'upsert' fields.
+    estSize += UpdateOpEntry::kUpsertFieldName.size() + kBoolSize + kPerElementOverhead;
+    estSize += UpdateOpEntry::kMultiFieldName.size() + kBoolSize + kPerElementOverhead;
+
+    // Add the size of 'upsertSupplied' field if present.
+    if (includeUpsertSupplied) {
+        estSize += UpdateOpEntry::kUpsertSuppliedFieldName.size() + kBoolSize + kPerElementOverhead;
+    }
+
+    // Add the sizes of the 'q' and 'u' fields.
+    estSize += (UpdateOpEntry::kQFieldName.size() + q.objsize() + kPerElementOverhead +
+                UpdateOpEntry::kUFieldName.size() + u.objsize() + kPerElementOverhead);
+
+    // Add the size of the 'c' field, if present.
+    if (c) {
+        estSize += (UpdateOpEntry::kCFieldName.size() + c->objsize() + kPerElementOverhead);
+    }
+
+    // Add the size of the 'collation' field, if present.
+    if (collation) {
+        estSize += (UpdateOpEntry::kCollationFieldName.size() + collation->objsize() +
+                    kPerElementOverhead);
+    }
+
+    // Add the size of the 'arrayFilters' field, if present.
+    if (arrayFilters) {
+        estSize += ([&]() {
+            auto size = BSONObj::kMinBSONLength + UpdateOpEntry::kArrayFiltersFieldName.size() +
+                kPerElementOverhead;
+            for (auto&& filter : *arrayFilters) {
+                // For each filter, we not only need to account for the size of the filter itself,
+                // but also for the per array element overhead.
+                size += filter.objsize();
+                size += write_ops::kWriteCommandBSONArrayPerElementOverheadBytes;
+            }
+            return size;
+        })();
+    }
+
+    // Add the size of 'hint' field if present.
+    if (!hint.isEmpty()) {
+        estSize += UpdateOpEntry::kHintFieldName.size() + hint.objsize() + kPerElementOverhead;
+    }
+
+    return estSize;
+}
+
 }  // namespace write_ops
 
 write_ops::Insert InsertOp::parse(const OpMsgRequest& request) {

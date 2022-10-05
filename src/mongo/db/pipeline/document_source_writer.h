@@ -94,13 +94,14 @@ public:
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(stageName, expCtx),
           _outputNs(std::move(outputNs)),
-          _writeConcern(expCtx->opCtx->getWriteConcern()) {
+          _writeConcern(expCtx->opCtx->getWriteConcern()),
+          _writeSizeEstimator(
+              expCtx->mongoProcessInterface->getWriteSizeEstimator(expCtx->opCtx, outputNs)) {
         uassert(31476,
                 "Cluster must be fully upgraded to version 4.4 with featureCompatibilityVersion"
                 " 4.4 before attempting to run $out/$merge with a non-primary read preference",
                 pExpCtx->mongoProcessInterface->supportsReadPreferenceForWriteOp(pExpCtx));
     }
-
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
         deps->needWholeDocument = true;
         return DepsTracker::State::EXHAUSTIVE_ALL;
@@ -163,6 +164,9 @@ protected:
     // context. The getMore's will not have an attached writeConcern however we still want to
     // respect the writeConcern of the original command.
     WriteConcernOptions _writeConcern;
+
+    // An interface that is used to estimate the size of each write operation.
+    const std::unique_ptr<MongoProcessInterface::WriteSizeEstimator> _writeSizeEstimator;
 
 private:
     bool _initialized{false};

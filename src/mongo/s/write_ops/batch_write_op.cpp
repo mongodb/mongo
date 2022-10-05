@@ -65,7 +65,6 @@ struct WriteErrorDetailComp {
 // batches before serializing.
 //
 // TODO: Revisit when we revisit command limits in general
-const int kEstUpdateOverheadBytes = (BSONObjMaxInternalSize - BSONObjMaxUserSize) / 100;
 const int kEstDeleteOverheadBytes = (BSONObjMaxInternalSize - BSONObjMaxUserSize) / 100;
 
 /**
@@ -171,41 +170,17 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
         return item.getDocument().objsize();
     } else if (batchType == BatchedCommandRequest::BatchType_Update) {
         // Note: Be conservative here - it's okay if we send slightly too many batches.
-        auto estSize = static_cast<int>(BSONObj::kMinBSONLength);
-        static const auto boolSize = 1;
-
-        // Add the size of the 'collation' field, if present.
-        estSize += !item.getUpdate().getCollation() ? 0
-                                                    : (UpdateOpEntry::kCollationFieldName.size() +
-                                                       item.getUpdate().getCollation()->objsize());
-
-        // Add the size of the 'arrayFilters' field, if present.
-        estSize += !item.getUpdate().getArrayFilters() ? 0 : ([&item]() {
-            auto size = BSONObj::kMinBSONLength + UpdateOpEntry::kArrayFiltersFieldName.size();
-            for (auto&& filter : *item.getUpdate().getArrayFilters()) {
-                size += filter.objsize();
-            }
-            return size;
-        })();
-
-        // Add the sizes of the 'multi' and 'upsert' fields.
-        estSize += UpdateOpEntry::kUpsertFieldName.size() + boolSize;
-        estSize += UpdateOpEntry::kMultiFieldName.size() + boolSize;
-
-        // Add the sizes of the 'q' and 'u' fields.
-        estSize += (UpdateOpEntry::kQFieldName.size() + item.getUpdate().getQ().objsize() +
-                    UpdateOpEntry::kUFieldName.size() + item.getUpdate().getU().objsize());
-
-        // Add the size of the 'c' field if present.
-        if (auto constants = item.getUpdate().getC()) {
-            estSize += UpdateOpEntry::kCFieldName.size() + item.getUpdate().getC()->objsize();
-        }
-
-        // Finally, add the constant updateOp overhead size.
-        estSize += kEstUpdateOverheadBytes;
+        const auto& update = item.getUpdate();
+        auto estSize = write_ops::getUpdateSizeEstimate(update.getQ(),
+                                                        update.getU(),
+                                                        update.getC(),
+                                                        update.getUpsertSupplied().has_value(),
+                                                        update.getCollation(),
+                                                        update.getArrayFilters(),
+                                                        update.getHint());
 
         // When running a debug build, verify that estSize is at least the BSON serialization size.
-        dassert(estSize >= item.getUpdate().toBSON().objsize());
+        dassert(estSize >= update.toBSON().objsize());
         return estSize;
     } else if (batchType == BatchedCommandRequest::BatchType_Delete) {
         // Note: Be conservative here - it's okay if we send slightly too many batches.

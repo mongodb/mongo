@@ -53,6 +53,22 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    class StubWriteSizeEstimator final : public WriteSizeEstimator {
+    public:
+        int estimateInsertSizeBytes(const BSONObj& insert) const override {
+            MONGO_UNREACHABLE;
+        }
+
+        int estimateUpdateSizeBytes(const BatchObject& batchObject,
+                                    UpsertType type) const override {
+            MONGO_UNREACHABLE;
+        }
+    };
+    std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
+        OperationContext* opCtx, const NamespaceString& ns) const override {
+        return std::make_unique<StubWriteSizeEstimator>();
+    }
+
     bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
         return false;
     }
