@@ -67,7 +67,7 @@ public:
         CatalogTestFixture::setUp();
 
         _nss = NamespaceString("unittests.durable_catalog");
-        _collectionUUID = std::get<UUID>(createCollection(_nss, CollectionOptions()));
+        _collectionUUID = createCollection(_nss, CollectionOptions()).uuid;
     }
 
     NamespaceString ns() {
@@ -87,7 +87,12 @@ public:
         return CollectionWriter(operationContext(), *_collectionUUID);
     }
 
-    std::tuple<RecordId, UUID> createCollection(const NamespaceString& nss,
+    struct CollectionCatalogIdAndUUID {
+        RecordId catalogId;
+        UUID uuid;
+    };
+
+    CollectionCatalogIdAndUUID createCollection(const NamespaceString& nss,
                                                 CollectionOptions options) {
         Lock::DBLock dbLk(operationContext(), nss.dbName(), MODE_IX);
         Lock::CollectionLock collLk(operationContext(), nss, MODE_IX);
@@ -119,7 +124,7 @@ public:
 
         wuow.commit();
 
-        return {catalogId, *options.uuid};
+        return CollectionCatalogIdAndUUID{catalogId, *options.uuid};
     }
 
     IndexCatalogEntry* createIndex(BSONObj keyPattern,
@@ -673,7 +678,7 @@ TEST_F(DurableCatalogTest, IdentSuffixUsesRand) {
 
     const NamespaceString nss = NamespaceString("a.b");
 
-    auto uuid = std::get<UUID>(createCollection(nss, CollectionOptions()));
+    auto uuid = (createCollection(nss, CollectionOptions())).uuid;
     auto collection = CollectionCatalog::get(operationContext())
                           ->lookupCollectionByUUID(operationContext(), uuid);
     RecordId catalogId = collection->getCatalogId();
@@ -698,7 +703,7 @@ TEST_F(ImportCollectionTest, ImportCollectionRandConflict) {
     {
         // Check that a newly created collection doesn't use 'rand' as the suffix in the ident.
         const NamespaceString nss = NamespaceString("a.b");
-        auto catalogId = std::get<RecordId>(createCollection(nss, CollectionOptions()));
+        auto catalogId = (createCollection(nss, CollectionOptions())).catalogId;
 
         ASSERT(!StringData(getCatalog()->getEntry(catalogId).ident).endsWith(rand));
     }
@@ -760,9 +765,69 @@ TEST_F(DurableCatalogTest, CreateCollectionCatalogEntryHasCorrectTenantNamespace
               nss.tenantId());
     ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogId)->nss, nss);
 
+    auto catalogEntry = getCatalog()->scanForCatalogEntryByNss(operationContext(), nss);
+
     gMultitenancySupport = false;
 }
 
+
+TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
+    gMultitenancySupport = true;
+    ON_BLOCK_EXIT([&] { gMultitenancySupport = false; });
+
+    /**
+     * Create some collections for which to scan.
+     */
+
+    auto tenantId = TenantId(OID::gen());
+    const NamespaceString nssFirst = NamespaceString(tenantId, "test.first");
+    auto catalogIdAndUUIDFirst = createCollection(nssFirst, CollectionOptions());
+
+    const NamespaceString nssSecond = NamespaceString("system.buckets.ts");
+    CollectionOptions options;
+    options.timeseries = TimeseriesOptions(/*timeField=*/"t");
+    auto catalogIdAndUUIDSecond = createCollection(nssSecond, options);
+
+    const NamespaceString nssThird = NamespaceString("test.third");
+    auto catalogIdAndUUIDThird = createCollection(nssThird, CollectionOptions());
+
+    /**
+     * Fetch catalog entries by namespace by scanning the mdb catalog.
+     */
+
+    // Need a read lock for DurableCatalog::getMetaData() calls.
+    Lock::GlobalLock globalLock{operationContext(), MODE_IS};
+
+    auto catalogEntryThird = getCatalog()->scanForCatalogEntryByNss(operationContext(), nssThird);
+    ASSERT(catalogEntryThird != boost::none);
+    ASSERT_EQ(nssThird, catalogEntryThird->metadata->nss);
+    ASSERT_EQ(catalogIdAndUUIDThird.uuid, catalogEntryThird->metadata->options.uuid);
+    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogIdAndUUIDThird.catalogId)->nss,
+              nssThird);
+    ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDThird.catalogId).nss, nssThird);
+
+    auto catalogEntrySecond = getCatalog()->scanForCatalogEntryByNss(operationContext(), nssSecond);
+    ASSERT(catalogEntrySecond != boost::none);
+    ASSERT_EQ(nssSecond, catalogEntrySecond->metadata->nss);
+    ASSERT_EQ(catalogIdAndUUIDSecond.uuid, catalogEntrySecond->metadata->options.uuid);
+    ASSERT(catalogEntrySecond->metadata->options.timeseries);
+    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogIdAndUUIDSecond.catalogId)->nss,
+              nssSecond);
+    ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDSecond.catalogId).nss, nssSecond);
+
+    auto catalogEntryFirst = getCatalog()->scanForCatalogEntryByNss(operationContext(), nssFirst);
+    ASSERT(catalogEntryFirst != boost::none);
+    ASSERT_EQ(nssFirst, catalogEntryFirst->metadata->nss);
+    ASSERT_EQ(catalogIdAndUUIDFirst.uuid, catalogEntryFirst->metadata->options.uuid);
+    ASSERT_EQ(nssFirst.tenantId(), catalogEntryFirst->metadata->nss.tenantId());
+    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogIdAndUUIDFirst.catalogId)->nss,
+              nssFirst);
+    ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDFirst.catalogId).nss, nssFirst);
+
+    auto catalogEntryDoesNotExist =
+        getCatalog()->scanForCatalogEntryByNss(operationContext(), NamespaceString("foo", "bar"));
+    ASSERT(catalogEntryDoesNotExist == boost::none);
+}
 
 }  // namespace
 }  // namespace mongo
