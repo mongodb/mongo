@@ -5,8 +5,6 @@ selector:
   - jstests/aggregation/**/*.js
   - jstests/core/**/*.js
   exclude_files:
-  # TODO SERVER-68364
-  - jstests/core/index_decimal.js
   # TODO SERVER-67818
   - jstests/core/nan.js
   # TODO SERVER-67506
