@@ -1203,6 +1203,7 @@ TEST_F(TxnAPITest, UnyieldsAfterCancellation) {
     auto killerThread = stdx::thread([&txnApiStarted, &opCtxKilled, opCtx = opCtx()] {
         txnApiStarted.countDownAndWait();
         opCtx->markKilled();
+        opCtxKilled.countDownAndWait();
     });
 
     auto swResult = txnWithRetries().runNoThrow(
@@ -1230,11 +1231,7 @@ TEST_F(TxnAPITest, UnyieldsAfterCancellation) {
     ASSERT_EQ(resourceYielder()->timesYielded(), 1);
     ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
 
-    opCtxKilled.countDownAndWait();
     killerThread.join();
-
-    // Wait until the API callback has completed before letting the barriers go out of scope.
-    waitForAllEarlierTasksToComplete();
 }
 
 TEST_F(TxnAPITest, ClientSession_UsesNonRetryableInternalSession) {
