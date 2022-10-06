@@ -365,6 +365,10 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_clone(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& cancelToken,
     const CancelableOperationContextFactory& cancelableOpCtxFactory) {
+    if (_getState() > GlobalIndexClonerStateEnum::kCloning) {
+        return ExecutorFuture<void>(**executor);
+    }
+
     return AsyncTry([this, executor, cancelToken, cancelableOpCtxFactory] {
                auto cancelableOpCtx =
                    cancelableOpCtxFactory.makeOperationContext(Client::getCurrent());
