@@ -331,4 +331,7 @@ OperatorCounters operatorCountersMatchExpressions{"operatorCounters.match."};
 OperatorCounters operatorCountersGroupAccumulatorExpressions{"operatorCounters.groupAccumulators."};
 OperatorCounters operatorCountersWindowAccumulatorExpressions{
     "operatorCounters.windowAccumulators."};
+CounterMetric updateManyCount("query.updateManyCount");
+CounterMetric deleteManyCount("query.deleteManyCount");
+
 }  // namespace mongo
