@@ -1075,7 +1075,6 @@ public:
     }
 
     bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
-        // TODO: SERVER-67627 Implement runtime tag generation for $between.
         tasserted(6762800, "$between should be rewritten before execution.");
     }
 

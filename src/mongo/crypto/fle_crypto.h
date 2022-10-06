@@ -1464,31 +1464,10 @@ public:
      *
      * Returns a boolean indicator.
      */
-    template <typename T>
-    bool evaluate(
-        Value fieldValue,
-        EncryptedBinDataType indexedValueType,
-        std::function<StatusWith<T>(ConstDataRange, ConstDataRange)> decryptAndParse) const {
-
-        if (fieldValue.getType() != BinData) {
-            return false;
-        }
-
-        auto fieldValuePair = fromEncryptedBinData(fieldValue);
-
-        uassert(
-            6672400, "Invalid encrypted indexed field", fieldValuePair.first == indexedValueType);
-
-        // Value matches if
-        // 1. Decrypt field is successful
-        // 2. EDC_u Token is in GenTokens(EDC Token, ContentionFactor)
-        //
-        auto swIndexed = decryptAndParse(ConstDataRange(_serverToken), fieldValuePair.second);
-        uassertStatusOK(swIndexed);
-        auto indexed = swIndexed.getValue();
-
-        return _cachedEDCTokens.count(indexed.edc.data) == 1;
-    }
+    bool evaluate(Value fieldValue,
+                  EncryptedBinDataType indexedValueType,
+                  std::function<std::vector<EDCDerivedFromDataTokenAndContentionFactorToken>(
+                      ConstDataRange, ConstDataRange)> decryptAndParse) const;
 
     std::vector<PrfBlock> edcTokens() const {
         return _edcTokens;

@@ -3277,19 +3277,22 @@ ConstDataRange binDataToCDR(BSONElement element) {
 }
 
 bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType) {
-    auto queriesVariant = field.getQueries().get();
+    if (!field.getQueries()) {
+        return false;
+    }
 
-    bool hasQuery = stdx::visit(
-        OverloadedVisitor{
-            [&](QueryTypeConfig query) { return (query.getQueryType() == queryType); },
-            [&](std::vector<QueryTypeConfig> queries) {
-                return std::any_of(
-                    queries.cbegin(), queries.cend(), [&](const QueryTypeConfig& qtc) {
-                        return qtc.getQueryType() == queryType;
-                    });
-            }},
-        queriesVariant);
-    return hasQuery;
+    return stdx::visit(OverloadedVisitor{[&](QueryTypeConfig query) {
+                                             return (query.getQueryType() == queryType);
+                                         },
+                                         [&](std::vector<QueryTypeConfig> queries) {
+                                             return std::any_of(queries.cbegin(),
+                                                                queries.cend(),
+                                                                [&](const QueryTypeConfig& qtc) {
+                                                                    return qtc.getQueryType() ==
+                                                                        queryType;
+                                                                });
+                                         }},
+                       field.getQueries().get());
 }
 
 bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType) {
@@ -3585,6 +3588,32 @@ EncryptedPredicateEvaluator::EncryptedPredicateEvaluator(ConstDataRange serverTo
             _cachedEDCTokens.insert(std::move(token.data));
         }
     }
+}
+
+bool EncryptedPredicateEvaluator::evaluate(
+    Value fieldValue,
+    EncryptedBinDataType indexedValueType,
+    std::function<std::vector<EDCDerivedFromDataTokenAndContentionFactorToken>(
+        ConstDataRange, ConstDataRange)> decryptAndParse) const {
+
+    if (fieldValue.getType() != BinData) {
+        return false;
+    }
+
+    auto [subSubType, data] = fromEncryptedBinData(fieldValue);
+
+    uassert(6672400, "Invalid encrypted indexed field", subSubType == indexedValueType);
+
+    // Value matches if
+    // 1. Decrypt field is successful
+    // 2. EDC_u Token is in GenTokens(EDC Token, ContentionFactor)
+    //
+    auto tokens = decryptAndParse(ConstDataRange(_serverToken), data);
+
+    return std::any_of(
+        std::make_move_iterator(tokens.begin()),
+        std::make_move_iterator(tokens.end()),
+        [this](auto&& token) { return _cachedEDCTokens.count(std::move(token.data)) == 1; });
 }
 
 // Edges

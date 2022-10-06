@@ -3829,11 +3829,14 @@ Value ExpressionInternalFLEEqual::evaluate(const Document& root, Variables* vari
     if (fieldValue.nullish()) {
         return Value(BSONNULL);
     }
-    return Value(_evaluator.evaluate<FLE2IndexedEqualityEncryptedValue>(
+    return Value(_evaluator.evaluate(
         fieldValue,
         EncryptedBinDataType::kFLE2EqualityIndexedValue,
         [](auto token, auto serverValue) {
-            return EDCServerCollection::decryptAndParse(token, serverValue);
+            auto swIndexed = EDCServerCollection::decryptAndParse(token, serverValue);
+            uassertStatusOK(swIndexed);
+            auto indexed = swIndexed.getValue();
+            return std::vector<EDCDerivedFromDataTokenAndContentionFactorToken>{indexed.edc};
         }));
 }
 
@@ -3903,19 +3906,21 @@ Value ExpressionInternalFLEBetween::serialize(bool explain) const {
 }
 
 Value ExpressionInternalFLEBetween::evaluate(const Document& root, Variables* variables) const {
-    // TODO(SERVER-67627): Uncomment for runtime tag matching.
-    // auto fieldValue = _children[0]->evaluate(root, variables);
-    // if (fieldValue.nullish()) {
-    //     return Value(BSONNULL);
-    // }
-    // return Value(_evaluator.evaluate<FLE2IndexedRangeEncryptedValue>(
-    //     fieldValue,
-    //     EncryptedBinDataType::kFLE2RangeIndexedValue,
-    //     [](auto token, auto serverValue) {
-    //         return EDCServerCollection::decryptAndParseRange(token, serverValue);
-    //     }));
-    uasserted(ErrorCodes::InternalErrorNotSupported,
-              str::stream() << "$_internalFleBetween not supported.");
+    auto fieldValue = _children[0]->evaluate(root, variables);
+    if (fieldValue.nullish()) {
+        return Value(BSONNULL);
+    }
+    return Value(_evaluator.evaluate(
+        fieldValue, EncryptedBinDataType::kFLE2RangeIndexedValue, [](auto token, auto serverValue) {
+            auto indexed =
+                uassertStatusOK(EDCServerCollection::decryptAndParseRange(token, serverValue));
+            std::vector<EDCDerivedFromDataTokenAndContentionFactorToken> edcTokens;
+            edcTokens.reserve(indexed.tokens.size());
+            for (auto& edge : indexed.tokens) {
+                edcTokens.push_back(std::move(edge.edc));
+            }
+            return edcTokens;
+        }));
 }
 
 const char* ExpressionInternalFLEBetween::getOpName() const {

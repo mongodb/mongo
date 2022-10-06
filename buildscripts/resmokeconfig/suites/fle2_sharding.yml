@@ -3,7 +3,9 @@ selector:
   roots:
   - jstests/fle2/*.js
   - src/mongo/db/modules/*/jstests/fle2/**/*.js
-
+  exclude_with_any_tags:
+  # Don't run tests that require the encrypted collscan mode in this suite.
+  - requires_fle2_encrypted_collscan
 executor:
   archive:
     hooks:

@@ -4250,40 +4250,5 @@ TEST(ExpressionFLETest, ParseAndSerializeBetween) {
     ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
 }
 
-TEST(ExpressionFLETest, EvalBetween) {
-    auto expCtx = ExpressionContextForTest();
-    auto vps = expCtx.variablesParseState;
-
-    auto expr = fromjson(R"({$_internalFleBetween: {
-    field: {
-        "$binary": {
-            "base64":
-            "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
-                "subType": "6"
-        }
-    },
-    server: {
-        "$binary": {
-            "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
-            "subType": "6"
-        }
-    },
-    counter: {
-        "$numberLong": "3"
-    },
-    edc: [{
-        "$binary": {
-            "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
-            "subType": "6"
-        }
-    }]   } })");
-
-    auto exprFle = ExpressionInternalFLEBetween::parse(&expCtx, expr.firstElement(), vps);
-    // TODO(SERVER-67627): Remove assertion when runtime tag matching is implemented.
-    ASSERT_THROWS_CODE(exprFle->evaluate({}, &expCtx.variables),
-                       AssertionException,
-                       ErrorCodes::InternalErrorNotSupported);
-}
-
 }  // namespace ExpressionTests
 }  // namespace mongo
