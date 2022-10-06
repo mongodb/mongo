@@ -983,7 +983,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
                 hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
                     .pauseWhileSet();
                 uasserted(ErrorCodes::InternalError,
-                          "simulate an error response for forceShardFilteringMetadataRefresh");
+                          "simulate an error response for forceGetCurrentMetadata");
             }
 
             auto setFilteringMetadata = [&opCtx, &currentMetadata, &doc, &cancellationToken]() {

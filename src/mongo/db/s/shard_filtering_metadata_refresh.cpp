@@ -61,28 +61,29 @@ MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
 namespace {
 
 /**
- * If the critical section associate with the database is entered by another thread (e.g., a move
- * primary or a drop database is in progress), it releases the acquired locks and waits for the
- * latter to exit. In this case the function returns true, otherwise false.
+ * Blocking method, which will wait for any concurrent operations that could change the database
+ * version to complete (namely critical section and concurrent onDbVersionMismatch invocations).
+ *
+ * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
+ * will be dropped). If there were none, returns false and the locks continue to be held.
  */
-bool checkAndWaitIfCriticalSectionIsEntered(
-    OperationContext* opCtx,
-    DatabaseShardingState* dss,
-    boost::optional<Lock::DBLock>& dbLock,
-    boost::optional<DatabaseShardingState::DSSLock>& dssLock) {
-    invariant(dbLock);
-    invariant(dssLock);
+bool joinDbVersionOperation(OperationContext* opCtx,
+                            DatabaseShardingState* dss,
+                            boost::optional<Lock::DBLock>* dbLock,
+                            boost::optional<DatabaseShardingState::DSSLock>* dssLock) {
+    invariant(dbLock->has_value());
+    invariant(dssLock->has_value());
 
     if (auto critSect =
-            dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead, *dssLock)) {
+            dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead, **dssLock)) {
         LOGV2_DEBUG(6697201,
                     2,
                     "Waiting for exit from the critical section",
                     "db"_attr = dss->getDbName(),
-                    "reason"_attr = dss->getCriticalSectionReason(*dssLock));
+                    "reason"_attr = dss->getCriticalSectionReason(**dssLock));
 
-        dbLock = boost::none;
-        dssLock = boost::none;
+        dbLock->reset();
+        dssLock->reset();
 
         // If we are in a transaction, limit the time we can wait behind the critical section. This
         // is needed in order to prevent distributed deadlocks in situations where a DDL operation
@@ -101,29 +102,14 @@ bool checkAndWaitIfCriticalSectionIsEntered(
         return true;
     }
 
-    return false;
-}
-
-/**
- * If another thread is refreshing the database metadata, it releases the acquired locks and waits
- * for that refresh to complete. In this case the function returns true, otherwise false.
- */
-bool checkAndWaitIfAnotherRefreshIsRunning(
-    OperationContext* opCtx,
-    DatabaseShardingState* dss,
-    boost::optional<Lock::DBLock>& dbLock,
-    boost::optional<DatabaseShardingState::DSSLock>& dssLock) {
-    invariant(dbLock);
-    invariant(dssLock);
-
-    if (auto refreshVersionFuture = dss->getDbMetadataRefreshFuture(*dssLock)) {
+    if (auto refreshVersionFuture = dss->getDbMetadataRefreshFuture(**dssLock)) {
         LOGV2_DEBUG(6697202,
                     2,
                     "Waiting for completion of another database metadata refresh",
                     "db"_attr = dss->getDbName());
 
-        dbLock = boost::none;
-        dssLock = boost::none;
+        dbLock->reset();
+        dssLock->reset();
 
         try {
             refreshVersionFuture->get(opCtx);
@@ -152,7 +138,7 @@ Status refreshDbMetadata(OperationContext* opCtx,
     auto resetRefreshFutureOnError = makeGuard([&] {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
-        Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+        Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
         auto* dss = DatabaseShardingState::get(opCtx, dbName);
         const auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
 
@@ -184,9 +170,9 @@ Status refreshDbMetadata(OperationContext* opCtx,
     return swDbMetadata.getStatus();
 }
 
-SharedSemiFuture<void> asyncDbMetadataRefresh(OperationContext* opCtx,
-                                              const StringData& dbName,
-                                              const CancellationToken& cancellationToken) {
+SharedSemiFuture<void> recoverRefreshDbVersion(OperationContext* opCtx,
+                                               const StringData& dbName,
+                                               const CancellationToken& cancellationToken) {
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     return ExecutorFuture<void>(executor)
         .then([=,
@@ -230,7 +216,7 @@ SharedSemiFuture<void> asyncDbMetadataRefresh(OperationContext* opCtx,
 
 void onDbVersionMismatch(OperationContext* opCtx,
                          const StringData dbName,
-                         const boost::optional<DatabaseVersion> receivedVersion) {
+                         const boost::optional<DatabaseVersion> receivedDbVersion) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
@@ -244,23 +230,20 @@ void onDbVersionMismatch(OperationContext* opCtx,
                 2,
                 "Handle database version mismatch",
                 "db"_attr = dbName,
-                "receivedVersion"_attr = receivedVersion);
+                "receivedDbVersion"_attr = receivedDbVersion);
 
     while (true) {
         boost::optional<SharedSemiFuture<void>> dbMetadataRefreshFuture;
 
-        // Set the database metadata refresh future after waiting for another thread to exit from
-        // the critical section or to complete an ongoing refresh.
         {
             auto dbLock = boost::make_optional(Lock::DBLock(opCtx, dbName, MODE_IS));
             auto* dss = DatabaseShardingState::get(opCtx, dbName);
 
-            if (receivedVersion) {
+            if (receivedDbVersion) {
                 auto dssLock =
                     boost::make_optional(DatabaseShardingState::DSSLock::lockShared(opCtx, dss));
 
-                if (checkAndWaitIfCriticalSectionIsEntered(opCtx, dss, dbLock, dssLock) ||
-                    checkAndWaitIfAnotherRefreshIsRunning(opCtx, dss, dbLock, dssLock)) {
+                if (joinDbVersionOperation(opCtx, dss, &dbLock, &dssLock)) {
                     // Waited for another thread to exit from the critical section or to complete an
                     // ongoing refresh, so reacquire the locks.
                     continue;
@@ -271,19 +254,19 @@ void onDbVersionMismatch(OperationContext* opCtx,
                 // is in progress or can start (would require to exclusive lock the DSS).
                 // Therefore, the database version can be accessed safely.
 
-                const auto wantedVersion = dss->getDbVersion(opCtx, *dssLock);
+                const auto wantedDbVersion = dss->getDbVersion(opCtx, *dssLock);
 
                 // Do not reorder these two statements! If the comparison is done through epochs,
                 // the construction order matters: we are pessimistically assuming that the client
                 // version is newer when they have different UUIDs.
                 const ComparableDatabaseVersion comparableWantedDbVersion =
-                    ComparableDatabaseVersion::makeComparableDatabaseVersion(wantedVersion);
+                    ComparableDatabaseVersion::makeComparableDatabaseVersion(wantedDbVersion);
                 const ComparableDatabaseVersion comparableReceivedDbVersion =
-                    ComparableDatabaseVersion::makeComparableDatabaseVersion(receivedVersion);
+                    ComparableDatabaseVersion::makeComparableDatabaseVersion(receivedDbVersion);
 
                 if (comparableReceivedDbVersion < comparableWantedDbVersion ||
                     (comparableReceivedDbVersion == comparableWantedDbVersion &&
-                     receivedVersion->getTimestamp() == wantedVersion->getTimestamp())) {
+                     receivedDbVersion->getTimestamp() == wantedDbVersion->getTimestamp())) {
                     // No need to refresh the database metadata as the wanted version is newer than
                     // the one received.
                     return;
@@ -297,8 +280,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
             auto dssLock =
                 boost::make_optional(DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss));
 
-            if (checkAndWaitIfCriticalSectionIsEntered(opCtx, dss, dbLock, dssLock) ||
-                checkAndWaitIfAnotherRefreshIsRunning(opCtx, dss, dbLock, dssLock)) {
+            if (joinDbVersionOperation(opCtx, dss, &dbLock, &dssLock)) {
                 // Waited for another thread to exit from the critical section or to complete an
                 // ongoing refresh, so reacquire the locks.
                 continue;
@@ -312,7 +294,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
             CancellationSource cancellationSource;
             CancellationToken cancellationToken = cancellationSource.token();
             dss->setDbMetadataRefreshFuture(
-                asyncDbMetadataRefresh(opCtx, dbName, cancellationToken),
+                recoverRefreshDbVersion(opCtx, dbName, cancellationToken),
                 std::move(cancellationSource),
                 *dssLock);
             dbMetadataRefreshFuture = dss->getDbMetadataRefreshFuture(*dssLock);
@@ -333,40 +315,47 @@ void onDbVersionMismatch(OperationContext* opCtx,
     }
 }
 
-// Return true if joins a shard version update/recover/refresh (in that case, all locks are dropped)
+/**
+ * Blocking method, which will wait for any concurrent operations that could change the shard
+ * version to complete (namely critical section and concurrent onShardVersionMismatch invocations).
+ *
+ * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
+ * will be dropped). If there were none, returns false and the locks continue to be held.
+ */
 bool joinShardVersionOperation(OperationContext* opCtx,
                                CollectionShardingRuntime* csr,
                                boost::optional<Lock::DBLock>* dbLock,
                                boost::optional<Lock::CollectionLock>* collLock,
                                boost::optional<CollectionShardingRuntime::CSRLock>* csrLock,
                                Milliseconds criticalSectionMaxWait = Milliseconds::max()) {
+    invariant(dbLock->has_value());
     invariant(collLock->has_value());
     invariant(csrLock->has_value());
 
-    // If another thread is currently holding the critical section or the shard version future, it
-    // will be necessary to wait on one of the two variables to finish the update/recover/refresh.
-    auto inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
-    auto critSecSignal =
-        csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
-
-    if (inRecoverOrRefresh || critSecSignal) {
-        // Drop the locks and wait for an ongoing shard version's recovery/refresh/update
+    if (auto critSecSignal =
+            csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite)) {
         csrLock->reset();
         collLock->reset();
         dbLock->reset();
 
-        if (critSecSignal) {
-            const auto deadline = criticalSectionMaxWait == Milliseconds::max()
-                ? Date_t::max()
-                : opCtx->getServiceContext()->getFastClockSource()->now() + criticalSectionMaxWait;
-            opCtx->runWithDeadline(
-                deadline, ErrorCodes::ExceededTimeLimit, [&] { critSecSignal->get(opCtx); });
-        } else {
-            try {
-                inRecoverOrRefresh->get(opCtx);
-            } catch (const ExceptionFor<ErrorCodes::ShardVersionRefreshCanceled>&) {
-                // The ongoing refresh has finished, although it was interrupted.
-            }
+        const auto deadline = criticalSectionMaxWait == Milliseconds::max()
+            ? Date_t::max()
+            : opCtx->getServiceContext()->getFastClockSource()->now() + criticalSectionMaxWait;
+        opCtx->runWithDeadline(
+            deadline, ErrorCodes::ExceededTimeLimit, [&] { critSecSignal->get(opCtx); });
+
+        return true;
+    }
+
+    if (auto inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx)) {
+        csrLock->reset();
+        collLock->reset();
+        dbLock->reset();
+
+        try {
+            inRecoverOrRefresh->get(opCtx);
+        } catch (const ExceptionFor<ErrorCodes::ShardVersionRefreshCanceled>&) {
+            // The ongoing refresh has finished, although it was interrupted.
         }
 
         return true;
@@ -378,7 +367,7 @@ bool joinShardVersionOperation(OperationContext* opCtx,
 }  // namespace
 
 SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext,
-                                                  const NamespaceString nss,
+                                                  const NamespaceString& nss,
                                                   bool runRecover,
                                                   CancellationToken cancellationToken) {
     auto executor = Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor();
@@ -505,6 +494,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
     while (true) {
         boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
+
         {
             boost::optional<Lock::DBLock> dbLock;
             boost::optional<Lock::CollectionLock> collLock;
@@ -512,18 +502,17 @@ void onShardVersionMismatch(OperationContext* opCtx,
             collLock.emplace(opCtx, nss, MODE_IS);
 
             auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-            boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
-                CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
-            if (joinShardVersionOperation(
-                    opCtx, csr, &dbLock, &collLock, &csrLock, criticalSectionMaxWait)) {
-                continue;
-            }
+            if (shardVersionReceived) {
+                boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
+                    CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
-            auto metadata = csr->getCurrentMetadataIfKnown();
-            if (metadata) {
-                // Check if the current shard version is fresh enough
-                if (shardVersionReceived) {
+                if (joinShardVersionOperation(
+                        opCtx, csr, &dbLock, &collLock, &csrLock, criticalSectionMaxWait)) {
+                    continue;
+                }
+
+                if (auto metadata = csr->getCurrentMetadataIfKnown()) {
                     const auto currentShardVersion = metadata->getShardVersion();
                     // Don't need to remotely reload if we're in the same epoch and the requested
                     // version is smaller than the known one. This means that the remote side is
@@ -537,26 +526,27 @@ void onShardVersionMismatch(OperationContext* opCtx,
                 }
             }
 
-            csrLock.reset();
-            csrLock.emplace(CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr));
+            boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
+                CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
 
-            // If there is no ongoing shard version operation, initialize the RecoverRefreshThread
-            // thread and associate it to the CSR.
-            if (!joinShardVersionOperation(
+            if (joinShardVersionOperation(
                     opCtx, csr, &dbLock, &collLock, &csrLock, criticalSectionMaxWait)) {
-                // If the shard doesn't yet know its filtering metadata, recovery needs to be run
-                const bool runRecover = metadata ? false : true;
-                CancellationSource cancellationSource;
-                CancellationToken cancellationToken = cancellationSource.token();
-                csr->setShardVersionRecoverRefreshFuture(
-                    recoverRefreshShardVersion(
-                        opCtx->getServiceContext(), nss, runRecover, std::move(cancellationToken)),
-                    std::move(cancellationSource),
-                    *csrLock);
-                inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
-            } else {
                 continue;
             }
+
+            // If we reached here, there were no ongoing critical sections or recoverRefresh running
+            // and we are holding the exclusive CSR lock.
+
+            // If the shard doesn't yet know its filtering metadata, recovery needs to be run
+            const bool runRecover = csr->getCurrentMetadataIfKnown() ? false : true;
+            CancellationSource cancellationSource;
+            CancellationToken cancellationToken = cancellationSource.token();
+            csr->setShardVersionRecoverRefreshFuture(
+                recoverRefreshShardVersion(
+                    opCtx->getServiceContext(), nss, runRecover, std::move(cancellationToken)),
+                std::move(cancellationSource),
+                *csrLock);
+            inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
         }
 
         try {
