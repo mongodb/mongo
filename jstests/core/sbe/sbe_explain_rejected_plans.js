@@ -1,6 +1,6 @@
 /**
  * Tests that SBE reports correct rejected plans when calling explain().
- * @tags: [assumes_unsharded_collection]
+ * @tags: [assumes_unsharded_collection, requires_fcv_62]
  */
 (function() {
 "use strict";

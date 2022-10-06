@@ -13,6 +13,7 @@
 //   does_not_support_stepdowns,
 //   does_not_support_repeated_reads,
 //   inspects_whether_plan_cache_entry_is_active,
+//   requires_fcv_62,
 // ]
 
 (function() {
