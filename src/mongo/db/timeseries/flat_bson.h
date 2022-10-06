@@ -337,7 +337,7 @@ protected:
 /**
  * Buffer value for a Data of type kValue, storing a full BSONElement value.
  */
-struct BSONElementValue {
+struct BSONElementValueBuffer {
     BSONElement get() const;
     void set(const BSONElement&);
     BSONType type() const;
@@ -372,7 +372,7 @@ private:
 
 
 class MinMaxElement;
-typedef FlatBSONStore<MinMaxElement, BSONElementValue> MinMaxStore;
+typedef FlatBSONStore<MinMaxElement, BSONElementValueBuffer> MinMaxStore;
 
 /**
  * Element representing both the min and max values for a given field path across all measurements
@@ -407,8 +407,8 @@ private:
 /**
  * Manages Min and Max values for timeseries measurements within a bucket.
  */
-class MinMax : public FlatBSON<MinMax, MinMaxElement, BSONElementValue> {
-    friend class FlatBSON<MinMax, MinMaxElement, BSONElementValue>;
+class MinMax : public FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer> {
+    friend class FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer>;
 
 public:
     /**

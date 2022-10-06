@@ -687,11 +687,11 @@ void FlatBSON<Derived, Element, Value>::_setTypeArray(
     }
 }
 
-BSONElement BSONElementValue::get() const {
+BSONElement BSONElementValueBuffer::get() const {
     return BSONElement(_buffer.get(), 1, _size);
 }
 
-void BSONElementValue::set(const BSONElement& elem) {
+void BSONElementValueBuffer::set(const BSONElement& elem) {
     auto requiredSize = elem.size() - elem.fieldNameSize() + 1;
     if (_size < requiredSize) {
         _buffer = std::make_unique<char[]>(requiredSize);
@@ -703,7 +703,7 @@ void BSONElementValue::set(const BSONElement& elem) {
     _size = requiredSize;
 }
 
-BSONType BSONElementValue::type() const {
+BSONType BSONElementValueBuffer::type() const {
     return (BSONType)_buffer[0];
 }
 
@@ -961,8 +961,8 @@ Schema::UpdateStatus Schema::_maybeUpdateValue(
 }
 
 // Instantiations.
-template class FlatBSONStore<MinMaxElement, BSONElementValue>;
-template class FlatBSON<MinMax, MinMaxElement, BSONElementValue>;
+template class FlatBSONStore<MinMaxElement, BSONElementValueBuffer>;
+template class FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer>;
 
 template class FlatBSONStore<SchemaElement, BSONTypeValue>;
 template class FlatBSON<Schema, SchemaElement, BSONTypeValue>;

@@ -147,6 +147,7 @@ baseEnv.Library(
         'bson/bson_comparator_interface_base.cpp',
         'bson/bson_depth.cpp',
         'bson/bsonelement.cpp',
+        'bson/bsonelementvalue.cpp',
         'bson/bsonmisc.cpp',
         'bson/bsonobj.cpp',
         'bson/bsonobjbuilder.cpp',
