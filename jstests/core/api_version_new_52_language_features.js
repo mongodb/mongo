@@ -11,6 +11,19 @@
 "use strict";
 load("jstests/libs/api_version_helpers.js");  // For 'APIVersionHelpers'.
 
+function isFeatureFlagEnabled(featureFlag) {
+    const featureFlagParam = db.adminCommand({getParameter: 1, [featureFlag]: 1});
+    return featureFlagParam.hasOwnProperty(featureFlag) && featureFlagParam[featureFlag]["value"];
+}
+
+// Since parallel test suite ignores feature flags in some scenarios we need explicitly check if the
+// required flag is enabled.
+if (!isFeatureFlagEnabled('featureFlagExactTopNAccumulator')) {
+    jsTestLog(
+        "Skipping the test because required feature flag 'featureFlagExactTopNAccumulator' is disabled");
+    return;
+}
+
 const collName = "api_version_new_52_language_features";
 const viewName = collName + "_view";
 const coll = db[collName];
