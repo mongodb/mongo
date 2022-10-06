@@ -390,6 +390,11 @@ public:
     Date_t getLastUsed() const;
 
     /**
+     * Returns the number of times the connection was used by operations.
+     */
+    size_t getTimesUsed() const;
+
+    /**
      * Returns the status associated with the connection. If the status is not
      * OK, the connection will not be returned to the pool.
      */
@@ -432,6 +437,7 @@ protected:
 private:
     size_t _generation;
     Date_t _lastUsed;
+    size_t _timesUsed = 0;
     Status _status = ConnectionPool::kConnectionStateUnknown;
 };
 

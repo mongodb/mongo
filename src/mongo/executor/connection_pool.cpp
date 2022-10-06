@@ -97,6 +97,7 @@ void ConnectionPool::ConnectionInterface::indicateUsed() {
     // It is illegal to attempt to use a connection after calling indicateFailure().
     invariant(_status.isOK() || _status == ConnectionPool::kConnectionStateUnknown);
     _lastUsed = now();
+    _timesUsed++;
 }
 
 void ConnectionPool::ConnectionInterface::indicateSuccess() {
@@ -109,6 +110,10 @@ void ConnectionPool::ConnectionInterface::indicateFailure(Status status) {
 
 Date_t ConnectionPool::ConnectionInterface::getLastUsed() const {
     return _lastUsed;
+}
+
+size_t ConnectionPool::ConnectionInterface::getTimesUsed() const {
+    return _timesUsed;
 }
 
 const Status& ConnectionPool::ConnectionInterface::getStatus() const {
@@ -326,6 +331,16 @@ public:
     size_t neverUsedConnections() const;
 
     /**
+     * Returns the number of connections that were used only once before being destroyed.
+     */
+    size_t getOnceUsedConnections() const;
+
+    /**
+     * Returns the cumulative amount of time connections were in use by operations.
+     */
+    Milliseconds getTotalConnUsageTime() const;
+
+    /**
      * Returns the total number of connections currently open that belong to
      * this pool. This is the sum of refreshingConnections, availableConnections,
      * and inUseConnections.
@@ -409,9 +424,13 @@ private:
             ConnWrap(OwnedConnection conn, std::weak_ptr<SpecificPool> owner)
                 : conn{std::move(conn)}, owner{std::move(owner)} {}
             ~ConnWrap() {
-                if (conn->getLastUsed() == Date_t{})
+                if (conn->getTimesUsed() == 0) {
                     if (auto ownerSp = owner.lock())
-                        ++ownerSp->_neverUsed;
+                        ownerSp->_neverUsed.addAndFetch(1);
+                } else if (conn->getTimesUsed() == 1) {
+                    if (auto ownerSp = owner.lock())
+                        ownerSp->_usedOnce.addAndFetch(1);
+                }
             }
             const OwnedConnection conn;
             const std::weak_ptr<SpecificPool> owner;
@@ -487,7 +506,11 @@ private:
 
     size_t _refreshed = 0;
 
-    size_t _neverUsed = 0;
+    AtomicWord<size_t> _neverUsed{0};
+
+    AtomicWord<size_t> _usedOnce{0};
+
+    Milliseconds _totalConnUsageTime{0};
 
     ConnectionWaitTimeHistogram _connAcquisitionWaitTimeStats{};
 
@@ -658,7 +681,9 @@ void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
                                      pool->createdConnections(),
                                      pool->refreshingConnections(),
                                      pool->refreshedConnections(),
-                                     pool->neverUsedConnections()};
+                                     pool->neverUsedConnections(),
+                                     pool->getOnceUsedConnections(),
+                                     pool->getTotalConnUsageTime()};
 
         if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
             hostStats.acquisitionWaitTimes = pool->connectionWaitTimeStats();
@@ -719,7 +744,15 @@ size_t ConnectionPool::SpecificPool::createdConnections() const {
 }
 
 size_t ConnectionPool::SpecificPool::neverUsedConnections() const {
-    return _neverUsed;
+    return _neverUsed.load();
+}
+
+size_t ConnectionPool::SpecificPool::getOnceUsedConnections() const {
+    return _usedOnce.load();
+}
+
+Milliseconds ConnectionPool::SpecificPool::getTotalConnUsageTime() const {
+    return _totalConnUsageTime;
 }
 
 size_t ConnectionPool::SpecificPool::openConnections() const {
@@ -794,12 +827,15 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
 }
 
 auto ConnectionPool::SpecificPool::makeHandle(ConnectionInterface* connection) -> ConnectionHandle {
-    auto deleter = [this, anchor = shared_from_this()](ConnectionInterface* connection) {
-        stdx::lock_guard lk(_parent->_mutex);
-        returnConnection(connection);
-        _lastActiveTime = _parent->_factory->now();
-        updateState();
-    };
+    auto connUseStartedAt = _parent->_factory->now();
+    auto deleter =
+        [this, anchor = shared_from_this(), connUseStartedAt](ConnectionInterface* connection) {
+            stdx::lock_guard lk(_parent->_mutex);
+            _totalConnUsageTime += _parent->_factory->now() - connUseStartedAt;
+            returnConnection(connection);
+            _lastActiveTime = _parent->_factory->now();
+            updateState();
+        };
     return ConnectionHandle(connection, std::move(deleter));
 }
 

@@ -51,13 +51,17 @@ ConnectionStatsPer::ConnectionStatsPer(size_t nInUse,
                                        size_t nCreated,
                                        size_t nRefreshing,
                                        size_t nRefreshed,
-                                       size_t nWasNeverUsed)
+                                       size_t nWasNeverUsed,
+                                       size_t nWasUsedOnce,
+                                       Milliseconds nConnUsageTime)
     : inUse(nInUse),
       available(nAvailable),
       created(nCreated),
       refreshing(nRefreshing),
       refreshed(nRefreshed),
-      wasNeverUsed(nWasNeverUsed) {}
+      wasNeverUsed(nWasNeverUsed),
+      wasUsedOnce(nWasUsedOnce),
+      connUsageTime(nConnUsageTime) {}
 
 ConnectionStatsPer::ConnectionStatsPer() = default;
 
@@ -68,6 +72,8 @@ ConnectionStatsPer& ConnectionStatsPer::operator+=(const ConnectionStatsPer& oth
     refreshing += other.refreshing;
     refreshed += other.refreshed;
     wasNeverUsed += other.wasNeverUsed;
+    wasUsedOnce += other.wasUsedOnce;
+    connUsageTime += other.connUsageTime;
     acquisitionWaitTimes += other.acquisitionWaitTimes;
 
     return *this;
@@ -96,6 +102,8 @@ void ConnectionPoolStats::updateStatsForHost(std::string pool,
     totalRefreshing += newStats.refreshing;
     totalRefreshed += newStats.refreshed;
     totalWasNeverUsed += newStats.wasNeverUsed;
+    totalWasUsedOnce += newStats.wasUsedOnce;
+    totalConnUsageTime += newStats.connUsageTime;
     acquisitionWaitTimes += newStats.acquisitionWaitTimes;
 }
 
@@ -107,17 +115,28 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
     result.appendNumber("totalCreated", static_cast<long long>(totalCreated));
     result.appendNumber("totalRefreshing", static_cast<long long>(totalRefreshing));
     result.appendNumber("totalRefreshed", static_cast<long long>(totalRefreshed));
-    if (isCCHMEnabled)
+    if (isCCHMEnabled) {
         result.appendNumber("totalWasNeverUsed", static_cast<long long>(totalWasNeverUsed));
-
+        if (forFTDC) {
+            result.appendNumber("totalWasUsedOnce", static_cast<long long>(totalWasUsedOnce));
+            result.appendNumber("totalConnUsageTimeMillis",
+                                durationCount<Milliseconds>(totalConnUsageTime));
+        }
+    }
 
     if (forFTDC) {
-        BSONObjBuilder poolBuilder(result.subobjStart("connectionsInUsePerPool"));
+        BSONObjBuilder poolBuilder(result.subobjStart("pools"));
         for (const auto& [pool, stats] : statsByPool) {
             BSONObjBuilder poolInfo(poolBuilder.subobjStart(pool));
             poolInfo.appendNumber("poolInUse", static_cast<long long>(stats.inUse));
+            if (isCCHMEnabled) {
+                poolInfo.appendNumber("poolWasUsedOnce", static_cast<long long>(stats.wasUsedOnce));
+                poolInfo.appendNumber("poolConnUsageTimeMillis",
+                                      durationCount<Milliseconds>(stats.connUsageTime));
+            }
             for (const auto& [host, stats] : stats.statsByHost) {
-                poolInfo.appendNumber(host.toString(), static_cast<long long>(stats.inUse));
+                BSONObjBuilder hostInfo(poolInfo.subobjStart(host.toString()));
+                poolInfo.appendNumber("inUse", static_cast<long long>(stats.inUse));
             }
         }
 
