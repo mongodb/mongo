@@ -792,6 +792,11 @@ TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceCanStopMoreThanOnce
     }
 }
 
+TEST_F(TransportLayerASIOWithServiceContextTest, TransportStartAfterShutDown) {
+    tla().shutdown();
+    ASSERT_EQ(tla().start(), transport::TransportLayer::ShutdownStatus);
+}
+
 #ifdef MONGO_CONFIG_SSL
 #ifndef _WIN32
 // TODO SERVER-62035: enable the following on Windows.
