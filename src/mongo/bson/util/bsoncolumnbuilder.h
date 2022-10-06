@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/simple8b.h"
@@ -46,8 +47,8 @@ namespace mongo {
  */
 class BSONColumnBuilder {
 public:
-    BSONColumnBuilder(StringData fieldName, bool arrayCompression = false);
-    BSONColumnBuilder(StringData fieldName, BufBuilder&& builder, bool arrayCompression = false);
+    BSONColumnBuilder(bool arrayCompression = false);
+    BSONColumnBuilder(BufBuilder&& builder, bool arrayCompression = false);
 
     /**
      * Appends a BSONElement to this BSONColumnBuilder.
@@ -56,9 +57,25 @@ public:
      *
      * The field name will be ignored.
      *
+     * EOO is treated as 'skip'.
+     *
      * Throws InvalidBSONType if MinKey or MaxKey is appended.
      */
     BSONColumnBuilder& append(BSONElement elem);
+
+    /**
+     * Appends a BSONObj to this BSONColumnBuilder.
+     *
+     * Like appending a BSONElement of type Object.
+     */
+    BSONColumnBuilder& append(const BSONObj& obj);
+
+    /**
+     * Appends a BSONArray to this BSONColumnBuilder.
+     *
+     * Like appending a BSONElement of type Array.
+     */
+    BSONColumnBuilder& append(const BSONArray& arr);
 
     /**
      * Appends an index skip to this BSONColumnBuilder.
@@ -66,14 +83,17 @@ public:
     BSONColumnBuilder& skip();
 
     /**
-     * Returns the field name this BSONColumnBuilder was created with.
+     * Returns a BSON Column binary and leaves the BSONColumnBuilder in a state where it is allowed
+     * to continue append data to it. Less efficient than 'finalize'. Anchor is the point in the
+     * returned binary that will not change when more data is appended to the BSONColumnBuilder.
+     *
+     * The BSONColumnBuilder must remain in scope for the returned buffer to be valid. Any call to
+     * 'append' or 'skip' will invalidate the returned buffer.
      */
-    StringData fieldName() const {
-        return _fieldName;
-    }
+    BSONBinData intermediate(int* anchor = nullptr);
 
     /**
-     * Finalizes the BSON Column and returns the BinData binary.
+     * Finalizes the BSON Column and returns the BinData binary. Further data append is not allowed.
      *
      * The BSONColumnBuilder must remain in scope for the pointer to be valid.
      */
@@ -91,23 +111,44 @@ public:
     int numInterleavedStartWritten() const;
 
 private:
+    using ControlBlockWriteFn = std::function<void(const char*, size_t)>;
+
+    /**
+     * Deconstructed BSONElement without type and fieldname in the contigous buffer.
+     */
+    struct Element {
+        Element() : type(EOO), size(0) {}
+        Element(BSONElement elem)
+            : value(elem.value()), type(elem.type()), size(elem.valuesize()) {}
+        Element(const BSONObj& obj, BSONType t)
+            : value(obj.objdata()), type(t), size(obj.objsize()) {}
+        Element(BSONType t, BSONElementValue v, int s) : value(v), type(t), size(s) {}
+
+        // Performs binary memory compare
+        bool operator==(const Element& rhs) const;
+
+        BSONElementValue value;
+        BSONType type;
+        int size;
+    };
+
     /**
      * State for encoding scalar BSONElement as BSONColumn using delta or delta-of-delta
      * compression. When compressing Objects one Encoding state is used per sub-field within the
      * object to compress.
      */
     struct EncodingState {
-        EncodingState(BufBuilder* bufBuilder,
-                      std::function<void(const char*, size_t)> controlBlockWriter);
-        EncodingState(EncodingState&& other);
-        EncodingState& operator=(EncodingState&& rhs);
+        EncodingState();
 
-        void append(BSONElement elem);
+        // Initializes this encoding state. Must be called after construction and move.
+        void init(BufBuilder* buffer, ControlBlockWriteFn controlBlockWriter);
+
+        void append(Element elem);
         void skip();
         void flush();
 
-        BSONElement _previous() const;
-        void _storePrevious(BSONElement elem);
+        Element _previous() const;
+        void _storePrevious(Element elem);
         void _writeLiteralFromPrevious();
         void _initializeFromPrevious();
         ptrdiff_t _incrementSimple8bCount();
@@ -124,10 +165,26 @@ private:
 
         Simple8bWriteFn _createBufferWriter();
 
+        /**
+         * Copyable memory buffer
+         */
+        struct CloneableBuffer {
+            CloneableBuffer() = default;
+
+            CloneableBuffer(CloneableBuffer&&) = default;
+            CloneableBuffer(const CloneableBuffer&);
+
+            CloneableBuffer& operator=(CloneableBuffer&&) = default;
+            CloneableBuffer& operator=(const CloneableBuffer&);
+
+            std::unique_ptr<char[]> buffer;
+            int size = 0;
+            int capacity = 0;
+        };
+
         // Storage for the previously appended BSONElement
-        std::unique_ptr<char[]> _prev;
-        int _prevSize = 0;
-        int _prevCapacity = 0;
+        CloneableBuffer _prev;
+
         // This is only used for types that use delta of delta.
         int64_t _prevDelta = 0;
 
@@ -148,8 +205,67 @@ private:
         uint8_t _scaleIndex;
 
         BufBuilder* _bufBuilder;
-        std::function<void(const char*, size_t)> _controlBlockWriter;
+        ControlBlockWriteFn _controlBlockWriter;
     };
+
+    /**
+     * Internal mode this BSONColumnBuilder is in.
+     */
+    enum class Mode {
+        // Regular mode without interleaving. Appended elements are treated as scalars.
+        kRegular,
+        // Interleaved mode where the reference object is being determined. New sub fields are
+        // attempted to be merged in to the existing reference object candidate.
+        kSubObjDeterminingReference,
+        // Interleaved mode with a fixed reference object. Any incompatible sub fields in appended
+        // objects must exit interleaved mode.
+        kSubObjAppending
+    };
+
+    /**
+     * Internal state of the BSONColumnBuilder. Can be copied to restore a previous state after
+     * finalize.
+     */
+    struct InternalState {
+        Mode mode = Mode::kRegular;
+
+        // Encoding state for kRegular mode
+        EncodingState regular;
+
+        struct SubObjState {
+            SubObjState();
+            SubObjState(SubObjState&&);
+            SubObjState(const SubObjState&);
+
+            SubObjState& operator=(SubObjState&&);
+            SubObjState& operator=(const SubObjState&);
+
+            EncodingState state;
+            BufBuilder buffer;
+            std::deque<std::pair<ptrdiff_t, size_t>> controlBlocks;
+
+            ControlBlockWriteFn controlBlockWriter();
+        };
+
+        // Encoding states when in sub-object compression mode. There should be one encoding state
+        // per scalar field in '_referenceSubObj'.
+        std::deque<SubObjState> subobjStates;
+
+        // Reference object that is used to match object hierarchy to encoding states. Appending
+        // objects for sub-object compression need to check their hierarchy against this object.
+        BSONObj referenceSubObj;
+        BSONType referenceSubObjType;
+
+        // Buffered BSONObj when determining reference object. Will be compressed when this is
+        // complete and we transition into kSubObjAppending.
+        std::vector<BSONObj> bufferedObjElements;
+
+        // Helper to flatten Object to compress to match _subobjStates
+        std::vector<BSONElement> flattenedAppendedObj;
+    };
+
+    // Append helper for appending a BSONObj
+    BSONColumnBuilder& _appendObj(Element elem);
 
     // Append Object for sub-object compression when in mode kSubObjAppending
     bool _appendSubElements(const BSONObj& obj);
@@ -163,39 +279,17 @@ private:
     // Transition from kSubObjDeterminingReference or kSubObjAppending back into kRegular.
     void _flushSubObjMode();
 
-    // Encoding state for kRegular mode
-    EncodingState _state;
-
-    // Intermediate BufBuilder and offsets to written control blocks for sub-object compression
-    std::deque<std::pair<BufBuilder, std::deque<std::pair<ptrdiff_t, size_t>>>> _subobjBuffers;
-
-    // Encoding states when in sub-object compression mode. There should be one encoding state per
-    // scalar field in '_referenceSubObj'.
-    std::deque<EncodingState> _subobjStates;
-
-    // Reference object that is used to match object hierarchy to encoding states. Appending objects
-    // for sub-object compression need to check their hierarchy against this object.
-    BSONObj _referenceSubObj;
-    BSONType _referenceSubObjType;
-
-    // Buffered BSONObj when determining reference object. Will be compressed when this is complete
-    // and we transition into kSubObjAppending.
-    std::vector<BSONObj> _bufferedObjElements;
-
-    // Helper to flatten Object to compress to match _subobjStates
-    std::vector<BSONElement> _flattenedAppendedObj;
+    InternalState _is;
 
     // Buffer for the BSON Column binary
     BufBuilder _bufBuilder;
 
-    enum class Mode { kRegular, kSubObjDeterminingReference, kSubObjAppending };
-    Mode _mode = Mode::kRegular;
-
-    std::string _fieldName;
     int _numInterleavedStartWritten = 0;
 
     // Indicates if array compression should be used
     bool _arrayCompression = false;
+
+    bool _finalized = false;
 };
 
 }  // namespace mongo

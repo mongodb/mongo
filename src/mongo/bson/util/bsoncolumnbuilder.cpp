@@ -61,10 +61,9 @@ std::pair<int64_t, uint8_t> scaleAndEncodeDouble(double value, uint8_t minScaleI
 }
 
 // Checks if it is possible to do delta of ObjectIds
-bool objectIdDeltaPossible(BSONElement elem, BSONElement prev) {
-    return !memcmp(prev.OID().getInstanceUnique().bytes,
-                   elem.OID().getInstanceUnique().bytes,
-                   OID::kInstanceUniqueSize);
+bool objectIdDeltaPossible(const OID& elem, const OID& prev) {
+    return !memcmp(
+        prev.getInstanceUnique().bytes, elem.getInstanceUnique().bytes, OID::kInstanceUniqueSize);
 }
 
 // Traverses object and calls 'ElementFunc' on every scalar subfield encountered.
@@ -506,17 +505,13 @@ BSONObj mergeObjLegacy(const BSONObj& reference, const BSONObj& obj) {
 
 }  // namespace
 
-BSONColumnBuilder::BSONColumnBuilder(StringData fieldName, bool arrayCompression)
-    : BSONColumnBuilder(fieldName, BufBuilder(), arrayCompression) {}
+BSONColumnBuilder::BSONColumnBuilder(bool arrayCompression)
+    : BSONColumnBuilder(BufBuilder(), arrayCompression) {}
 
-BSONColumnBuilder::BSONColumnBuilder(StringData fieldName,
-                                     BufBuilder&& builder,
-                                     bool arrayCompression)
-    : _state(&_bufBuilder, nullptr),
-      _bufBuilder(std::move(builder)),
-      _fieldName(fieldName),
-      _arrayCompression(arrayCompression) {
+BSONColumnBuilder::BSONColumnBuilder(BufBuilder&& builder, bool arrayCompression)
+    : _bufBuilder(std::move(builder)), _arrayCompression(arrayCompression) {
     _bufBuilder.reset();
+    _is.regular.init(&_bufBuilder, nullptr);
 }
 
 BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
@@ -525,16 +520,35 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
             "MinKey or MaxKey is not valid for storage",
             type != MinKey && type != MaxKey);
 
+    if (elem.eoo()) {
+        return skip();
+    }
+
     if ((type != Object && (!_arrayCompression || type != Array)) || elem.Obj().isEmpty()) {
         // Flush previous sub-object compression when non-object is appended
-        if (_mode != Mode::kRegular) {
+        if (_is.mode != Mode::kRegular) {
             _flushSubObjMode();
         }
-        _state.append(elem);
+        _is.regular.append(elem);
         return *this;
     }
 
-    auto obj = elem.Obj();
+    return _appendObj(elem);
+}
+
+BSONColumnBuilder& BSONColumnBuilder::append(const BSONObj& obj) {
+    return _appendObj({obj, Object});
+}
+BSONColumnBuilder& BSONColumnBuilder::append(const BSONArray& arr) {
+    uassert(6825200,
+            "BSONColumnBuilder must be instantiated with array support to append arrays directly",
+            _arrayCompression);
+    return _appendObj({arr, Array});
+}
+
+BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
+    auto type = elem.type;
+    auto obj = elem.value.Obj();
     // First validate that we don't store MinKey or MaxKey anywhere in the Object. If this is the
     // case, throw exception before we modify any state.
     uint32_t numElements = 0;
@@ -550,9 +564,9 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         _traverseLegacy(obj, perElement);
     }
 
-    if (_mode == Mode::kRegular) {
+    if (_is.mode == Mode::kRegular) {
         if (numElements == 0) {
-            _state.append(elem);
+            _is.regular.append(elem);
         } else {
             _startDetermineSubObjReference(obj, type);
         }
@@ -561,13 +575,13 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
     }
 
     // Different types on root is not allowed
-    if (type != _referenceSubObjType) {
+    if (type != _is.referenceSubObjType) {
         _flushSubObjMode();
         _startDetermineSubObjReference(obj, type);
         return *this;
     }
 
-    if (_mode == Mode::kSubObjDeterminingReference) {
+    if (_is.mode == Mode::kSubObjDeterminingReference) {
         // We are in DeterminingReference mode, check if this current object is compatible and merge
         // in any new fields that are discovered.
         uint32_t numElementsReferenceObj = 0;
@@ -577,17 +591,17 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         };
         bool traverseResult = [&] {
             if (_arrayCompression) {
-                return traverseLockStep(_referenceSubObj, obj, perElementLockStep);
+                return traverseLockStep(_is.referenceSubObj, obj, perElementLockStep);
             } else {
-                return traverseLockStepLegacy(_referenceSubObj, obj, perElementLockStep);
+                return traverseLockStepLegacy(_is.referenceSubObj, obj, perElementLockStep);
             }
         }();
         if (!traverseResult) {
             BSONObj merged = [&] {
                 if (_arrayCompression) {
-                    return mergeObj(_referenceSubObj, obj);
+                    return mergeObj(_is.referenceSubObj, obj);
                 } else {
-                    return mergeObjLegacy(_referenceSubObj, obj);
+                    return mergeObjLegacy(_is.referenceSubObj, obj);
                 }
             }();
             if (merged.isEmptyPrototype()) {
@@ -597,22 +611,22 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
                 // If we only contain empty subobj (no value elements) then append in regular mode
                 // instead of re-starting subobj compression.
                 if (numElements == 0) {
-                    _state.append(elem);
+                    _is.regular.append(elem);
                     return *this;
                 }
 
-                _referenceSubObj = obj.getOwned();
-                _bufferedObjElements.push_back(_referenceSubObj);
-                _mode = Mode::kSubObjDeterminingReference;
+                _is.referenceSubObj = obj.getOwned();
+                _is.bufferedObjElements.push_back(_is.referenceSubObj);
+                _is.mode = Mode::kSubObjDeterminingReference;
                 return *this;
             }
-            _referenceSubObj = merged;
+            _is.referenceSubObj = merged;
         }
 
         // If we've buffered twice as many objects as we have sub-elements we will achieve good
         // compression so use the currently built reference.
-        if (numElementsReferenceObj * 2 >= _bufferedObjElements.size()) {
-            _bufferedObjElements.push_back(obj.getOwned());
+        if (numElementsReferenceObj * 2 >= _is.bufferedObjElements.size()) {
+            _is.bufferedObjElements.push_back(obj.getOwned());
             return *this;
         }
 
@@ -624,7 +638,7 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         // If we were not compatible restart subobj compression unless our object contain no value
         // fields (just empty subobjects)
         if (numElements == 0) {
-            _state.append(elem);
+            _is.regular.append(elem);
         } else {
             _startDetermineSubObjReference(obj, type);
         }
@@ -634,8 +648,8 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
 
 
 BSONColumnBuilder& BSONColumnBuilder::skip() {
-    if (_mode == Mode::kRegular) {
-        _state.skip();
+    if (_is.mode == Mode::kRegular) {
+        _is.regular.skip();
         return *this;
     }
 
@@ -643,9 +657,9 @@ BSONColumnBuilder& BSONColumnBuilder::skip() {
     // skipping in all substreams would not be encoded as skipped root object.
     bool emptyObj = [&] {
         if (_arrayCompression) {
-            return _hasEmptyObj(_referenceSubObj);
+            return _hasEmptyObj(_is.referenceSubObj);
         } else {
-            return _hasEmptyObjLegacy(_referenceSubObj);
+            return _hasEmptyObjLegacy(_is.referenceSubObj);
         }
     }();
     if (emptyObj) {
@@ -653,26 +667,50 @@ BSONColumnBuilder& BSONColumnBuilder::skip() {
         return skip();
     }
 
-    if (_mode == Mode::kSubObjDeterminingReference) {
-        _bufferedObjElements.push_back(BSONObj());
+    if (_is.mode == Mode::kSubObjDeterminingReference) {
+        _is.bufferedObjElements.push_back(BSONObj());
     } else {
-        for (auto&& state : _subobjStates) {
-            state.skip();
+        for (auto&& subobj : _is.subobjStates) {
+            subobj.state.skip();
         }
     }
 
     return *this;
 }
 
+BSONBinData BSONColumnBuilder::intermediate(int* anchor) {
+    // Save internal state before finalizing
+    InternalState stateCopy = _is;
+    int length = _bufBuilder.len();
+
+    // Finalize binary
+    auto binData = finalize();
+    _finalized = false;
+
+    // Restore previous state.
+    _is = std::move(stateCopy);
+    // Does not modify the buffer, just sets the point where future writes should occur.
+    _bufBuilder.setlen(length);
+
+    if (anchor) {
+        *anchor = length;
+    }
+
+    return binData;
+}
+
 BSONBinData BSONColumnBuilder::finalize() {
-    if (_mode == Mode::kRegular) {
-        _state.flush();
+    invariant(!_finalized);
+    if (_is.mode == Mode::kRegular) {
+        _is.regular.flush();
     } else {
         _flushSubObjMode();
     }
 
     // Write EOO at the end
     _bufBuilder.appendChar(EOO);
+
+    _finalized = true;
 
     return {_bufBuilder.buf(), _bufBuilder.len(), BinDataType::Column};
 }
@@ -685,57 +723,34 @@ int BSONColumnBuilder::numInterleavedStartWritten() const {
     return _numInterleavedStartWritten;
 }
 
-BSONColumnBuilder::EncodingState::EncodingState(
-    BufBuilder* bufBuilder, std::function<void(const char*, size_t)> controlBlockWriter)
-    : _simple8bBuilder64(_createBufferWriter()),
-      _simple8bBuilder128(_createBufferWriter()),
-      _controlByteOffset(kNoSimple8bControl),
-      _scaleIndex(Simple8bTypeUtil::kMemoryAsInteger),
-      _bufBuilder(bufBuilder),
-      _controlBlockWriter(controlBlockWriter) {
+bool BSONColumnBuilder::Element::operator==(const Element& rhs) const {
+    if (type != rhs.type || size != rhs.size)
+        return false;
+
+    return memcmp(value.value(), rhs.value.value(), size) == 0;
+}
+
+BSONColumnBuilder::EncodingState::EncodingState()
+    : _controlByteOffset(kNoSimple8bControl), _scaleIndex(Simple8bTypeUtil::kMemoryAsInteger) {
     // Store EOO type with empty field name as previous.
     _storePrevious(BSONElement());
 }
 
-BSONColumnBuilder::EncodingState::EncodingState(EncodingState&& other)
-    : _prev(std::move(other._prev)),
-      _prevSize(std::move(other._prevSize)),
-      _prevCapacity(std::move(other._prevCapacity)),
-      _prevDelta(std::move(other._prevDelta)),
-      _simple8bBuilder64(_createBufferWriter()),
-      _simple8bBuilder128(_createBufferWriter()),
-      _storeWith128(std::move(other._storeWith128)),
-      _controlByteOffset(std::move(other._controlByteOffset)),
-      _prevEncoded64(std::move(other._prevEncoded64)),
-      _prevEncoded128(std::move(other._prevEncoded128)),
-      _lastValueInPrevBlock(std::move(other._lastValueInPrevBlock)),
-      _scaleIndex(std::move(other._scaleIndex)),
-      _bufBuilder(std::move(other._bufBuilder)),
-      _controlBlockWriter(std::move(other._controlBlockWriter)) {}
-
-BSONColumnBuilder::EncodingState& BSONColumnBuilder::EncodingState::operator=(EncodingState&& rhs) {
-    _prev = std::move(rhs._prev);
-    _prevSize = std::move(rhs._prevSize);
-    _prevCapacity = std::move(rhs._prevCapacity);
-    _prevDelta = std::move(rhs._prevDelta);
-    _storeWith128 = std::move(rhs._storeWith128);
-    _controlByteOffset = std::move(rhs._controlByteOffset);
-    _prevEncoded64 = std::move(rhs._prevEncoded64);
-    _prevEncoded128 = std::move(rhs._prevEncoded128);
-    _lastValueInPrevBlock = std::move(rhs._lastValueInPrevBlock);
-    _scaleIndex = std::move(rhs._scaleIndex);
-    _bufBuilder = std::move(rhs._bufBuilder);
-    _controlBlockWriter = std::move(rhs._controlBlockWriter);
-    return *this;
+void BSONColumnBuilder::EncodingState::init(BufBuilder* buffer,
+                                            ControlBlockWriteFn controlBlockWriter) {
+    _bufBuilder = buffer;
+    _simple8bBuilder64.setWriteCallback(_createBufferWriter());
+    _simple8bBuilder128.setWriteCallback(_createBufferWriter());
+    _controlBlockWriter = std::move(controlBlockWriter);
 }
 
-void BSONColumnBuilder::EncodingState::append(BSONElement elem) {
-    auto type = elem.type();
+void BSONColumnBuilder::EncodingState::append(Element elem) {
+    auto type = elem.type;
     auto previous = _previous();
 
     // If we detect a type change (or this is first value). Flush all pending values in Simple-8b
     // and write uncompressed literal. Reset all default values.
-    if (previous.type() != elem.type()) {
+    if (previous.type != elem.type) {
         _storePrevious(elem);
         _simple8bBuilder128.flush();
         _simple8bBuilder64.flush();
@@ -744,7 +759,7 @@ void BSONColumnBuilder::EncodingState::append(BSONElement elem) {
     }
 
     // Store delta in Simple-8b if types match
-    bool compressed = !usesDeltaOfDelta(type) && elem.binaryEqualValues(previous);
+    bool compressed = !usesDeltaOfDelta(type) && elem == previous;
     if (compressed) {
         if (_storeWith128) {
             _simple8bBuilder128.append(0);
@@ -768,33 +783,33 @@ void BSONColumnBuilder::EncodingState::append(BSONElement elem) {
             switch (type) {
                 case String:
                 case Code:
-                    if (auto encoded = Simple8bTypeUtil::encodeString(elem.valueStringData())) {
+                    if (auto encoded = Simple8bTypeUtil::encodeString(elem.value.String())) {
                         appendEncoded(*encoded);
                     }
                     break;
                 case BinData: {
-                    int size;
-                    const char* binary = elem.binData(size);
+                    auto binData = elem.value.BinData();
+                    auto prevBinData = previous.value.BinData();
                     // We only do delta encoding of binary if the binary type and size are
                     // exactly the same. To support size difference we'd need to add a count to
                     // be able to reconstruct binaries starting with zero bytes. We don't want
                     // to waste bits for this.
-                    if (size != previous.valuestrsize() ||
-                        elem.binDataType() != previous.binDataType())
+                    if (binData.length != prevBinData.length || binData.type != prevBinData.type)
                         break;
 
-                    if (auto encoded = Simple8bTypeUtil::encodeBinary(binary, size)) {
+                    if (auto encoded = Simple8bTypeUtil::encodeBinary(
+                            static_cast<const char*>(binData.data), binData.length)) {
                         appendEncoded(*encoded);
                     }
                 } break;
                 case NumberDecimal:
-                    appendEncoded(Simple8bTypeUtil::encodeDecimal128(elem._numberDecimal()));
+                    appendEncoded(Simple8bTypeUtil::encodeDecimal128(elem.value.Decimal()));
                     break;
                 default:
                     MONGO_UNREACHABLE;
             };
         } else if (type == NumberDouble) {
-            compressed = _appendDouble(elem._numberDouble(), previous._numberDouble());
+            compressed = _appendDouble(elem.value.Double(), previous.value.Double());
         } else {
             // Variable to indicate that it was possible to encode this BSONElement as an integer
             // for storage inside Simple8b. If encoding is not possible the element is stored as
@@ -804,31 +819,33 @@ void BSONColumnBuilder::EncodingState::append(BSONElement elem) {
             int64_t value = 0;
             switch (type) {
                 case NumberInt:
-                    value = calcDelta(elem._numberInt(), previous._numberInt());
+                    value = calcDelta(elem.value.Int32(), previous.value.Int32());
                     break;
                 case NumberLong:
-                    value = calcDelta(elem._numberLong(), previous._numberLong());
+                    value = calcDelta(elem.value.Int64(), previous.value.Int64());
                     break;
                 case jstOID: {
-                    encodingPossible = objectIdDeltaPossible(elem, previous);
+                    auto oid = elem.value.ObjectID();
+                    auto prevOid = previous.value.ObjectID();
+                    encodingPossible = objectIdDeltaPossible(oid, prevOid);
                     if (!encodingPossible)
                         break;
 
-                    int64_t curEncoded = Simple8bTypeUtil::encodeObjectId(elem.OID());
+                    int64_t curEncoded = Simple8bTypeUtil::encodeObjectId(oid);
                     value = calcDelta(curEncoded, _prevEncoded64);
                     _prevEncoded64 = curEncoded;
                     break;
                 }
                 case bsonTimestamp: {
-                    value = calcDelta(elem.timestampValue(), previous.timestampValue());
+                    value = calcDelta(elem.value.TimestampValue(), previous.value.TimestampValue());
                     break;
                 }
                 case Date:
-                    value = calcDelta(elem.date().toMillisSinceEpoch(),
-                                      previous.date().toMillisSinceEpoch());
+                    value = calcDelta(elem.value.Date().toMillisSinceEpoch(),
+                                      previous.value.Date().toMillisSinceEpoch());
                     break;
                 case Bool:
-                    value = calcDelta(elem.boolean(), previous.boolean());
+                    value = calcDelta(elem.value.Boolean(), previous.value.Boolean());
                     break;
                 case Undefined:
                 case jstNULL:
@@ -873,7 +890,7 @@ void BSONColumnBuilder::EncodingState::skip() {
         _simple8bBuilder64.skip();
     }
     // Rescale previous known value if this skip caused Simple-8b blocks to be written
-    if (before != _bufBuilder->len() && _previous().type() == NumberDouble) {
+    if (before != _bufBuilder->len() && _previous().type == NumberDouble) {
         std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
     }
 }
@@ -1024,30 +1041,30 @@ bool BSONColumnBuilder::EncodingState::_appendDouble(double value, double previo
     return true;
 }
 
-BSONElement BSONColumnBuilder::EncodingState::_previous() const {
-    return {_prev.get(), 1, _prevSize};
+BSONColumnBuilder::Element BSONColumnBuilder::EncodingState::_previous() const {
+    // The first two bytes are type and field name null terminator
+    return {
+        BSONType(*_prev.buffer.get()), BSONElementValue(_prev.buffer.get() + 2), _prev.size - 2};
 }
 
 
-void BSONColumnBuilder::EncodingState::_storePrevious(BSONElement elem) {
-    auto valuesize = elem.valuesize();
-
+void BSONColumnBuilder::EncodingState::_storePrevious(Element elem) {
     // Add space for type byte and field name null terminator
-    auto size = valuesize + 2;
+    auto size = elem.size + 2;
 
     // Re-allocate buffer if not large enough
-    if (size > _prevCapacity) {
-        _prevCapacity = size;
-        _prev = std::make_unique<char[]>(_prevCapacity);
+    if (size > _prev.capacity) {
+        _prev.capacity = size;
+        _prev.buffer = std::make_unique<char[]>(_prev.capacity);
 
         // Store null terminator, this byte will never change
-        _prev[1] = '\0';
+        _prev.buffer[1] = '\0';
     }
 
     // Copy element into buffer for previous. Omit field name.
-    _prev[0] = elem.type();
-    memcpy(_prev.get() + 2, elem.value(), valuesize);
-    _prevSize = size;
+    _prev.buffer[0] = elem.type;
+    memcpy(_prev.buffer.get() + 2, elem.value.value(), elem.size);
+    _prev.size = size;
 }
 
 void BSONColumnBuilder::EncodingState::_writeLiteralFromPrevious() {
@@ -1057,9 +1074,9 @@ void BSONColumnBuilder::EncodingState::_writeLiteralFromPrevious() {
         _controlBlockWriter(_bufBuilder->buf() + _controlByteOffset,
                             _bufBuilder->len() - _controlByteOffset);
     }
-    _bufBuilder->appendBuf(_prev.get(), _prevSize);
+    _bufBuilder->appendBuf(_prev.buffer.get(), _prev.size);
     if (_controlBlockWriter) {
-        _controlBlockWriter(_bufBuilder->buf() + _bufBuilder->len() - _prevSize, _prevSize);
+        _controlBlockWriter(_bufBuilder->buf() + _bufBuilder->len() - _prev.size, _prev.size);
     }
 
 
@@ -1073,28 +1090,28 @@ void BSONColumnBuilder::EncodingState::_writeLiteralFromPrevious() {
 
 void BSONColumnBuilder::EncodingState::_initializeFromPrevious() {
     // Initialize previous encoded when needed
-    auto prevElem = _previous();
-    auto type = prevElem.type();
+    auto previous = _previous();
+    auto type = previous.type;
     _storeWith128 = uses128bit(type);
     switch (type) {
         case NumberDouble:
-            _lastValueInPrevBlock = prevElem._numberDouble();
+            _lastValueInPrevBlock = previous.value.Double();
             std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
             break;
         case String:
         case Code:
-            _prevEncoded128 = Simple8bTypeUtil::encodeString(prevElem.valueStringData());
+            _prevEncoded128 = Simple8bTypeUtil::encodeString(previous.value.String());
             break;
         case BinData: {
-            int size;
-            const char* binary = prevElem.binData(size);
-            _prevEncoded128 = Simple8bTypeUtil::encodeBinary(binary, size);
+            auto binData = previous.value.BinData();
+            _prevEncoded128 = Simple8bTypeUtil::encodeBinary(static_cast<const char*>(binData.data),
+                                                             binData.length);
         } break;
         case NumberDecimal:
-            _prevEncoded128 = Simple8bTypeUtil::encodeDecimal128(prevElem._numberDecimal());
+            _prevEncoded128 = Simple8bTypeUtil::encodeDecimal128(previous.value.Decimal());
             break;
         case jstOID:
-            _prevEncoded64 = Simple8bTypeUtil::encodeObjectId(prevElem.__oid());
+            _prevEncoded64 = Simple8bTypeUtil::encodeObjectId(previous.value.ObjectID());
             break;
         default:
             break;
@@ -1156,7 +1173,7 @@ Simple8bWriteFn BSONColumnBuilder::EncodingState::_createBufferWriter() {
         }
 
         auto previous = _previous();
-        if (previous.type() == NumberDouble) {
+        if (previous.type == NumberDouble) {
             // If we are double we need to remember the last value written in the block. There could
             // be multiple values pending still so we need to loop backwards and re-construct the
             // value before the first value in pending.
@@ -1177,19 +1194,98 @@ Simple8bWriteFn BSONColumnBuilder::EncodingState::_createBufferWriter() {
     };
 }
 
+BSONColumnBuilder::EncodingState::CloneableBuffer::CloneableBuffer(const CloneableBuffer& other) {
+    if (other.size <= 0) {
+        return;
+    }
+
+    buffer = std::make_unique<char[]>(other.size);
+    memcpy(buffer.get(), other.buffer.get(), other.size);
+    size = other.size;
+    capacity = other.size;
+}
+
+BSONColumnBuilder::EncodingState::CloneableBuffer&
+BSONColumnBuilder::EncodingState::CloneableBuffer::operator=(const CloneableBuffer& rhs) {
+    if (&rhs == this)
+        return *this;
+
+    if (rhs.size > capacity) {
+        buffer = std::make_unique<char[]>(rhs.size);
+        capacity = rhs.size;
+    }
+
+    if (rhs.size > 0) {
+        memcpy(buffer.get(), rhs.buffer.get(), rhs.size);
+    }
+
+    size = rhs.size;
+    return *this;
+}
+
+BSONColumnBuilder::InternalState::SubObjState::SubObjState() {
+    state.init(&buffer, controlBlockWriter());
+}
+
+BSONColumnBuilder::InternalState::SubObjState::SubObjState(const SubObjState& other)
+    : state(other.state), controlBlocks(other.controlBlocks) {
+    buffer.appendBuf(other.buffer.buf(), other.buffer.len());
+}
+
+BSONColumnBuilder::InternalState::SubObjState::SubObjState(SubObjState&& other)
+    : state(std::move(other.state)),
+      buffer(std::move(other.buffer)),
+      controlBlocks(std::move(other.controlBlocks)) {
+    state.init(&buffer, controlBlockWriter());
+}
+
+BSONColumnBuilder::InternalState::SubObjState& BSONColumnBuilder::InternalState::SubObjState::
+operator=(const SubObjState& rhs) {
+    if (&rhs == this)
+        return *this;
+
+    state = rhs.state;
+    controlBlocks = rhs.controlBlocks;
+    buffer.reset();
+    buffer.appendBuf(rhs.buffer.buf(), rhs.buffer.len());
+    return *this;
+}
+
+BSONColumnBuilder::InternalState::SubObjState& BSONColumnBuilder::InternalState::SubObjState::
+operator=(SubObjState&& rhs) {
+    if (&rhs == this)
+        return *this;
+
+    state = std::move(rhs.state);
+    buffer = std::move(rhs.buffer);
+    controlBlocks = std::move(rhs.controlBlocks);
+
+    state.init(&buffer, controlBlockWriter());
+    return *this;
+}
+
+BSONColumnBuilder::ControlBlockWriteFn
+BSONColumnBuilder::InternalState::SubObjState::controlBlockWriter() {
+    // We need to buffer all control blocks written by the EncodingStates
+    // so they can be added to the main buffer in the right order.
+    return [this](const char* controlBlock, size_t size) {
+        controlBlocks.emplace_back(controlBlock - buffer.buf(), size);
+    };
+}
+
 bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
     // Check if added object is compatible with selected reference object. Collect a flat vector of
     // all elements while we are doing this.
-    _flattenedAppendedObj.clear();
+    _is.flattenedAppendedObj.clear();
 
     auto perElement = [this](const BSONElement& ref, const BSONElement& elem) {
-        _flattenedAppendedObj.push_back(elem);
+        _is.flattenedAppendedObj.push_back(elem);
     };
     bool traverseResult = [&] {
         if (_arrayCompression) {
-            return traverseLockStep(_referenceSubObj, obj, perElement);
+            return traverseLockStep(_is.referenceSubObj, obj, perElement);
         } else {
-            return traverseLockStepLegacy(_referenceSubObj, obj, perElement);
+            return traverseLockStepLegacy(_is.referenceSubObj, obj, perElement);
         }
     }();
     if (!traverseResult) {
@@ -1199,19 +1295,19 @@ bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
 
     // We should have received one callback for every sub-element in reference object. This should
     // match number of encoding states setup previously.
-    invariant(_flattenedAppendedObj.size() == _subobjStates.size());
-    auto statesIt = _subobjStates.begin();
-    auto subElemIt = _flattenedAppendedObj.begin();
-    auto subElemEnd = _flattenedAppendedObj.end();
+    invariant(_is.flattenedAppendedObj.size() == _is.subobjStates.size());
+    auto statesIt = _is.subobjStates.begin();
+    auto subElemIt = _is.flattenedAppendedObj.begin();
+    auto subElemEnd = _is.flattenedAppendedObj.end();
 
     // Append elements to corresponding encoding state.
     for (; subElemIt != subElemEnd; ++subElemIt, ++statesIt) {
         const auto& subelem = *subElemIt;
-        auto& state = *statesIt;
+        auto& subobj = *statesIt;
         if (!subelem.eoo())
-            state.append(subelem);
+            subobj.state.append(subelem);
         else
-            state.skip();
+            subobj.state.skip();
     }
     return true;
 }
@@ -1219,20 +1315,20 @@ bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
 void BSONColumnBuilder::_startDetermineSubObjReference(const BSONObj& obj, BSONType type) {
     // Start sub-object compression. Enter DeterminingReference mode, we use this first Object
     // as the first reference
-    _state.flush();
-    _state = {&_bufBuilder, nullptr};
+    _is.regular.flush();
+    _is.regular = {};
 
-    _referenceSubObj = obj.getOwned();
-    _referenceSubObjType = type;
-    _bufferedObjElements.push_back(_referenceSubObj);
-    _mode = Mode::kSubObjDeterminingReference;
+    _is.referenceSubObj = obj.getOwned();
+    _is.referenceSubObjType = type;
+    _is.bufferedObjElements.push_back(_is.referenceSubObj);
+    _is.mode = Mode::kSubObjDeterminingReference;
 }
 
 void BSONColumnBuilder::_finishDetermineSubObjReference() {
     // Done determining reference sub-object. Write this control byte and object to stream.
     const char interleavedStartControlByte = [&] {
         if (_arrayCompression) {
-            return _referenceSubObjType == Object
+            return _is.referenceSubObjType == Object
                 ? bsoncolumn::kInterleavedStartControlByte
                 : bsoncolumn::kInterleavedStartArrayRootControlByte;
         } else {
@@ -1240,68 +1336,60 @@ void BSONColumnBuilder::_finishDetermineSubObjReference() {
         }
     }();
     _bufBuilder.appendChar(interleavedStartControlByte);
-    _bufBuilder.appendBuf(_referenceSubObj.objdata(), _referenceSubObj.objsize());
+    _bufBuilder.appendBuf(_is.referenceSubObj.objdata(), _is.referenceSubObj.objsize());
     ++_numInterleavedStartWritten;
 
     // Initialize all encoding states. We do this by traversing in lock-step between the reference
     // object and first buffered element. We can use the fact if sub-element exists in reference to
     // determine if we should start with a zero delta or skip.
     auto perElement = [this](const BSONElement& ref, const BSONElement& elem) {
-        _subobjBuffers.emplace_back();
-        auto* buffer = &_subobjBuffers.back().first;
-        auto* controlBlocks = &_subobjBuffers.back().second;
-
-        // We need to buffer all control blocks written by the EncodingStates
-        // so they can be added to the main buffer in the right order.
-        auto controlBlockWriter = [buffer, controlBlocks](const char* controlBlock, size_t size) {
-            controlBlocks->emplace_back(controlBlock - buffer->buf(), size);
-        };
-
         // Set a valid 'previous' into the encoding state to avoid a full
         // literal to be written when we append the first element. We want this
         // to be a zero delta as the reference object already contain this
         // literal.
-        _subobjStates.emplace_back(buffer, controlBlockWriter);
-        _subobjStates.back()._storePrevious(ref);
-        _subobjStates.back()._initializeFromPrevious();
+        _is.subobjStates.emplace_back();
+        auto& subobj = _is.subobjStates.back();
+        subobj.state._storePrevious(ref);
+        subobj.state._initializeFromPrevious();
         if (!elem.eoo()) {
-            _subobjStates.back().append(elem);
+            subobj.state.append(elem);
         } else {
-            _subobjStates.back().skip();
+            subobj.state.skip();
         }
     };
     bool res = [&] {
         if (_arrayCompression) {
-            return traverseLockStep(_referenceSubObj, _bufferedObjElements.front(), perElement);
+            return traverseLockStep(
+                _is.referenceSubObj, _is.bufferedObjElements.front(), perElement);
         } else {
             return traverseLockStepLegacy(
-                _referenceSubObj, _bufferedObjElements.front(), perElement);
+                _is.referenceSubObj, _is.bufferedObjElements.front(), perElement);
         }
     }();
 
     invariant(res);
-    _mode = Mode::kSubObjAppending;
+    _is.mode = Mode::kSubObjAppending;
 
     // Append remaining buffered objects.
-    auto it = _bufferedObjElements.begin() + 1;
-    auto end = _bufferedObjElements.end();
+    auto it = _is.bufferedObjElements.begin() + 1;
+    auto end = _is.bufferedObjElements.end();
     for (; it != end; ++it) {
         // The objects we append here should always be compatible with our reference object. If they
         // are not then there is a bug somewhere.
         invariant(_appendSubElements(*it));
     }
-    _bufferedObjElements.clear();
+    _is.bufferedObjElements.clear();
 }
 
 void BSONColumnBuilder::_flushSubObjMode() {
-    if (_mode == Mode::kSubObjDeterminingReference) {
+    if (_is.mode == Mode::kSubObjDeterminingReference) {
         _finishDetermineSubObjReference();
     }
 
     // Flush all EncodingStates, this will cause them to write out all their elements that is
     // captured by the controlBlockWriter.
-    for (auto&& state : _subobjStates) {
-        state.flush();
+    for (auto&& subobj : _is.subobjStates) {
+        subobj.state.flush();
     }
 
     // We now need to write all control blocks to the binary stream in the right order. This is done
@@ -1309,7 +1397,7 @@ void BSONColumnBuilder::_flushSubObjMode() {
     // next control byte. We can use a min-heap to see which encoding states have written the fewest
     // elements so far. In case of tie we use the smallest encoder/decoder index.
     std::vector<std::pair<uint32_t /* num elements written */, uint32_t /* encoder index */>> heap;
-    for (uint32_t i = 0; i < _subobjBuffers.size(); ++i) {
+    for (uint32_t i = 0; i < _is.subobjStates.size(); ++i) {
         heap.emplace_back(0, i);
     }
 
@@ -1322,14 +1410,14 @@ void BSONColumnBuilder::_flushSubObjMode() {
         // Take out encoding state with fewest elements written from heap
         std::pop_heap(heap.begin(), heap.end(), MinHeap());
         // And we take out control blocks in FIFO order from this encoding state
-        auto& slot = _subobjBuffers[heap.back().second];
-        const char* controlBlock = slot.first.buf() + slot.second.front().first;
-        size_t size = slot.second.front().second;
+        auto& slot = _is.subobjStates[heap.back().second];
+        const char* controlBlock = slot.buffer.buf() + slot.controlBlocks.front().first;
+        size_t size = slot.controlBlocks.front().second;
 
         // Write it to the buffer
         _bufBuilder.appendBuf(controlBlock, size);
-        slot.second.pop_front();
-        if (slot.second.empty()) {
+        slot.controlBlocks.pop_front();
+        if (slot.controlBlocks.empty()) {
             // No more control blocks for this encoding state so remove it from the heap
             heap.pop_back();
             continue;
@@ -1361,9 +1449,9 @@ void BSONColumnBuilder::_flushSubObjMode() {
     }
     // All control blocks written, write EOO to end the interleaving and cleanup.
     _bufBuilder.appendChar(EOO);
-    _subobjStates.clear();
-    _subobjBuffers.clear();
-    _mode = Mode::kRegular;
+    _is.subobjStates.clear();
+    _is.mode = Mode::kRegular;
+    _is.regular.init(&_bufBuilder, nullptr);
 }
 
 }  // namespace mongo

@@ -56,7 +56,7 @@ private:
 public:
     // Callback to handle writing of finalized Simple-8b blocks. Machine Endian byte order, the
     // value need to be converted to Little Endian before persisting.
-    Simple8bBuilder(Simple8bWriteFn writeFunc);
+    Simple8bBuilder(Simple8bWriteFn writeFunc = nullptr);
     ~Simple8bBuilder();
 
     /**

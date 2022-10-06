@@ -153,14 +153,11 @@ public:
                 int num = std::distance(col.begin(), col.end()) - 1;
                 ASSERT(num >= 0);
 
-                BSONColumnBuilder builder(fieldName);
+                BSONColumnBuilder builder;
                 auto it = col.begin();
                 for (int i = 0; i < num; ++i) {
                     auto elem = *it;
-                    if (!elem.eoo())
-                        builder.append(elem);
-                    else
-                        builder.skip();
+                    builder.append(elem);
                     ++it;
                 }
 

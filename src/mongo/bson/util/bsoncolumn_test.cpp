@@ -518,7 +518,7 @@ private:
 };
 
 TEST_F(BSONColumnTest, Empty) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     BufBuilder expected;
     appendEOO(expected);
@@ -529,7 +529,7 @@ TEST_F(BSONColumnTest, Empty) {
 }
 
 TEST_F(BSONColumnTest, BasicValue) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elem = createElementInt32(1);
     cb.append(elem);
@@ -547,7 +547,7 @@ TEST_F(BSONColumnTest, BasicValue) {
 }
 
 TEST_F(BSONColumnTest, BasicSkip) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elem = createElementInt32(1);
     cb.append(elem);
@@ -565,7 +565,7 @@ TEST_F(BSONColumnTest, BasicSkip) {
 }
 
 TEST_F(BSONColumnTest, OnlySkip) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     cb.skip();
 
@@ -580,7 +580,7 @@ TEST_F(BSONColumnTest, OnlySkip) {
 }
 
 TEST_F(BSONColumnTest, ValueAfterSkip) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elem = createElementInt32(1);
     cb.skip();
@@ -599,7 +599,7 @@ TEST_F(BSONColumnTest, ValueAfterSkip) {
 
 
 TEST_F(BSONColumnTest, LargeDeltaIsLiteral) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createElementInt64(1);
     cb.append(first);
@@ -618,7 +618,7 @@ TEST_F(BSONColumnTest, LargeDeltaIsLiteral) {
 }
 
 TEST_F(BSONColumnTest, LargeDeltaIsLiteralAfterSimple8b) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto zero = createElementInt64(0);
     cb.append(zero);
@@ -643,7 +643,7 @@ TEST_F(BSONColumnTest, LargeDeltaIsLiteralAfterSimple8b) {
 }
 
 TEST_F(BSONColumnTest, OverBlockCount) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     std::vector<BSONElement> elems;
     int64_t val = 0xFFFFFFFFFFFF;
@@ -676,7 +676,7 @@ TEST_F(BSONColumnTest, OverBlockCount) {
 }
 
 TEST_F(BSONColumnTest, TypeChangeAfterLiteral) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elemInt32 = createElementInt32(0);
     auto elemInt64 = createElementInt64(0);
@@ -695,7 +695,7 @@ TEST_F(BSONColumnTest, TypeChangeAfterLiteral) {
 }
 
 TEST_F(BSONColumnTest, TypeChangeAfterSimple8b) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elemInt32 = createElementInt32(0);
     auto elemInt64 = createElementInt64(0);
@@ -717,7 +717,7 @@ TEST_F(BSONColumnTest, TypeChangeAfterSimple8b) {
 }
 
 TEST_F(BSONColumnTest, Simple8bAfterTypeChange) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elemInt32 = createElementInt32(0);
     auto elemInt64 = createElementInt64(0);
@@ -739,7 +739,7 @@ TEST_F(BSONColumnTest, Simple8bAfterTypeChange) {
 }
 
 TEST_F(BSONColumnTest, BasicDouble) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto d1 = createElementDouble(1.0);
     auto d2 = createElementDouble(2.0);
@@ -758,7 +758,7 @@ TEST_F(BSONColumnTest, BasicDouble) {
 }
 
 TEST_F(BSONColumnTest, DoubleSameScale) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     std::vector<BSONElement> elems;
     elems.push_back(createElementDouble(1.0));
@@ -782,7 +782,7 @@ TEST_F(BSONColumnTest, DoubleSameScale) {
 }
 
 TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteral) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto d1 = createElementDouble(1.0);
     auto d2 = createElementDouble(1.1);
@@ -801,7 +801,7 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteral) {
 }
 
 TEST_F(BSONColumnTest, DoubleLiteralAndScaleAfterSkip) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto d1 = createElementDouble(1.0);
     auto d2 = createElementDouble(1.1);
@@ -823,7 +823,7 @@ TEST_F(BSONColumnTest, DoubleLiteralAndScaleAfterSkip) {
 }
 
 TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteralAfterSkip) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto d1 = createElementDouble(1);
     auto d2 = createElementDouble(1.1);
@@ -847,7 +847,7 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteralAfterSkip) {
 }
 
 TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaWithRescale) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     std::vector<BSONElement> elems;
     elems.push_back(createElementDouble(1.0));
@@ -872,7 +872,7 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaWithRescale) {
 }
 
 TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaNoRescale) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     std::vector<BSONElement> elems;
     elems.push_back(createElementDouble(1.1));
@@ -904,7 +904,7 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaNoRescale) {
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlock) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     std::vector<BSONElement> elems;
     elems.push_back(createElementDouble(1.12345671));
@@ -935,7 +935,7 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlock) {
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockContinueAppend) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     // The values below should result in two Simple8b blocks, one scaled with 10.0 and the second
     // scaled to 1.0. This tests that we can scale down doubles after writing a Simple8b block and
@@ -975,7 +975,7 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockContinueAppend) {
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkip) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     std::vector<BSONElement> elems;
     elems.push_back(createElementDouble(1.12345671));
@@ -985,11 +985,7 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkip) {
     elems.push_back(createElementDouble(3));
 
     for (const auto& elem : elems) {
-        if (!elem.eoo()) {
-            cb.append(elem);
-        } else {
-            cb.skip();
-        }
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -1011,7 +1007,7 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkip) {
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockThenScaleBackUp) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     std::vector<BSONElement> elems;
     elems.push_back(createElementDouble(1.12345671));
@@ -1037,7 +1033,7 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockThenScaleBackUp) {
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkipThenScaleBackUp) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     std::vector<BSONElement> elems;
     elems.push_back(createElementDouble(1.12345671));
@@ -1047,11 +1043,7 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkipThenScaleBackUp) {
     elems.push_back(createElementDouble(1.12345671));
 
     for (const auto& elem : elems) {
-        if (!elem.eoo()) {
-            cb.append(elem);
-        } else {
-            cb.skip();
-        }
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -1067,7 +1059,7 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkipThenScaleBackUp) {
 }
 
 TEST_F(BSONColumnTest, DoubleUnscalable) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     std::vector<BSONElement> elems;
     elems.push_back(createElementDouble(1.0));
@@ -1094,7 +1086,7 @@ TEST_F(BSONColumnTest, DoubleUnscalable) {
 }
 
 TEST_F(BSONColumnTest, DoubleMultiplePendingAfterWritingBlock) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     // This tests that we properly set '_lastValueInPrevBlock' after writing out a full Simple8b
     // block. In this test the last value in the first block will be '99.0' but the block will not
@@ -1130,7 +1122,7 @@ TEST_F(BSONColumnTest, DoubleMultiplePendingAfterWritingBlock) {
 }
 
 TEST_F(BSONColumnTest, DoubleSignalingNaN) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elem = createElementDouble(0.0);
     auto nan = createElementDouble(std::numeric_limits<double>::signaling_NaN());
@@ -1156,7 +1148,7 @@ TEST_F(BSONColumnTest, DoubleSignalingNaN) {
 }
 
 TEST_F(BSONColumnTest, DoubleQuietNaN) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elem = createElementDouble(0.0);
     auto nan = createElementDouble(std::numeric_limits<double>::quiet_NaN());
@@ -1180,7 +1172,7 @@ TEST_F(BSONColumnTest, DoubleQuietNaN) {
 }
 
 TEST_F(BSONColumnTest, DoubleInfinity) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elem = createElementDouble(0.0);
     auto inf = createElementDouble(std::numeric_limits<double>::infinity());
@@ -1204,7 +1196,7 @@ TEST_F(BSONColumnTest, DoubleInfinity) {
 }
 
 TEST_F(BSONColumnTest, DoubleDenorm) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elem = createElementDouble(0.0);
     auto denorm = createElementDouble(std::numeric_limits<double>::denorm_min());
@@ -1228,7 +1220,7 @@ TEST_F(BSONColumnTest, DoubleDenorm) {
 }
 
 TEST_F(BSONColumnTest, DoubleIntegerOverflow) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     // std::numeric_limits<int64_t>::min() - 0x1000 will cause an overflow if performed as signed,
     // make sure it is handled correctly
@@ -1252,7 +1244,7 @@ TEST_F(BSONColumnTest, DoubleIntegerOverflow) {
 }
 
 TEST_F(BSONColumnTest, DoubleZerosSignDifference) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     // 0.0 compares equal to -0.0 when compared as double. Make sure we can handle this case without
     // data loss.
@@ -1276,7 +1268,7 @@ TEST_F(BSONColumnTest, DoubleZerosSignDifference) {
 }
 
 TEST_F(BSONColumnTest, Decimal128Base) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elemDec128 = createElementDecimal128(Decimal128());
 
@@ -1292,7 +1284,7 @@ TEST_F(BSONColumnTest, Decimal128Base) {
 }
 
 TEST_F(BSONColumnTest, Decimal128Delta) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elemDec128 = createElementDecimal128(Decimal128(1));
 
@@ -1311,7 +1303,7 @@ TEST_F(BSONColumnTest, Decimal128Delta) {
 }
 
 TEST_F(BSONColumnTest, DecimalNonZeroDelta) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elemDec128Max = createElementDecimal128(Decimal128(100));
     auto elemDec128Zero = createElementDecimal128(Decimal128(1));
@@ -1330,7 +1322,7 @@ TEST_F(BSONColumnTest, DecimalNonZeroDelta) {
 }
 
 TEST_F(BSONColumnTest, DecimalMaxMin) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto elemDec128Max = createElementDecimal128(std::numeric_limits<Decimal128>::max());
     auto elemDec128Zero = createElementDecimal128(std::numeric_limits<Decimal128>::min());
@@ -1349,7 +1341,7 @@ TEST_F(BSONColumnTest, DecimalMaxMin) {
 }
 
 TEST_F(BSONColumnTest, DecimalMultiElement) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elemDec128Max = createElementDecimal128(std::numeric_limits<Decimal128>::max());
     auto elemDec128Zero = createElementDecimal128(std::numeric_limits<Decimal128>::min());
     auto elemDec128One = createElementDecimal128(Decimal128(1));
@@ -1377,7 +1369,7 @@ TEST_F(BSONColumnTest, DecimalMultiElement) {
 }
 
 TEST_F(BSONColumnTest, DecimalMultiElementSkips) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elemDec128Max = createElementDecimal128(std::numeric_limits<Decimal128>::max());
     auto elemDec128Zero = createElementDecimal128(std::numeric_limits<Decimal128>::min());
     auto elemDec128One = createElementDecimal128(Decimal128(1));
@@ -1415,7 +1407,7 @@ TEST_F(BSONColumnTest, DecimalMultiElementSkips) {
 }
 
 TEST_F(BSONColumnTest, BasicObjectId) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createObjectId(OID("112233445566778899AABBCC"));
     // Increment the lower byte for timestamp and counter.
@@ -1444,7 +1436,7 @@ TEST_F(BSONColumnTest, BasicObjectId) {
 }
 
 TEST_F(BSONColumnTest, ObjectIdDifferentProcessUnique) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createObjectId(OID("112233445566778899AABBCC"));
     auto second = createObjectId(OID("112233445566FF8899AABBCC"));
@@ -1463,7 +1455,7 @@ TEST_F(BSONColumnTest, ObjectIdDifferentProcessUnique) {
 }
 
 TEST_F(BSONColumnTest, ObjectIdAfterChangeBack) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createObjectId(OID("112233445566778899AABBCC"));
     // Increment the lower byte for timestamp and counter.
@@ -1495,7 +1487,7 @@ TEST_F(BSONColumnTest, ObjectIdAfterChangeBack) {
 }
 
 TEST_F(BSONColumnTest, Simple8bTimestamp) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createTimestamp(Timestamp(0));
     auto second = createTimestamp(Timestamp(1));
@@ -1518,7 +1510,7 @@ TEST_F(BSONColumnTest, Simple8bTimestamp) {
 }
 
 TEST_F(BSONColumnTest, Simple8bTimestampNegativeDeltaOfDelta) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createTimestamp(Timestamp(3));
     auto second = createTimestamp(Timestamp(5));
@@ -1542,7 +1534,7 @@ TEST_F(BSONColumnTest, Simple8bTimestampNegativeDeltaOfDelta) {
 }
 
 TEST_F(BSONColumnTest, Simple8bTimestampAfterChangeBack) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createTimestamp(Timestamp(0));
     auto second = createTimestamp(Timestamp(1));
@@ -1573,7 +1565,7 @@ TEST_F(BSONColumnTest, Simple8bTimestampAfterChangeBack) {
 }
 
 TEST_F(BSONColumnTest, LargeDeltaOfDeltaTimestamp) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createTimestamp(Timestamp(0));
     cb.append(first);
@@ -1592,7 +1584,7 @@ TEST_F(BSONColumnTest, LargeDeltaOfDeltaTimestamp) {
 }
 
 TEST_F(BSONColumnTest, LargeDeltaOfDeltaIsLiteralAfterSimple8bTimestamp) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto zero = createTimestamp(Timestamp(0));
     cb.append(zero);
@@ -1623,7 +1615,7 @@ TEST_F(BSONColumnTest, LargeDeltaOfDeltaIsLiteralAfterSimple8bTimestamp) {
 }
 
 TEST_F(BSONColumnTest, DateBasic) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createDate(Date_t::fromMillisSinceEpoch(1));
     auto second = createDate(Date_t::fromMillisSinceEpoch(2));
@@ -1645,7 +1637,7 @@ TEST_F(BSONColumnTest, DateBasic) {
 }
 
 TEST_F(BSONColumnTest, DateAfterChangeBack) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto date = createDate(Date_t::fromMillisSinceEpoch(1));
     auto elemInt32 = createElementInt32(0);
@@ -1668,7 +1660,7 @@ TEST_F(BSONColumnTest, DateAfterChangeBack) {
 }
 
 TEST_F(BSONColumnTest, DateLargeDelta) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createDate(Date_t::fromMillisSinceEpoch(1));
     cb.append(first);
@@ -1687,7 +1679,7 @@ TEST_F(BSONColumnTest, DateLargeDelta) {
 }
 
 TEST_F(BSONColumnTest, BoolBasic) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto trueBson = createBool(true);
     auto falseBson = createBool(false);
@@ -1711,7 +1703,7 @@ TEST_F(BSONColumnTest, BoolBasic) {
 }
 
 TEST_F(BSONColumnTest, BoolAfterChangeBack) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto trueBson = createBool(true);
     auto elemInt32 = createElementInt32(0);
@@ -1734,7 +1726,7 @@ TEST_F(BSONColumnTest, BoolAfterChangeBack) {
 }
 
 TEST_F(BSONColumnTest, UndefinedBasic) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createUndefined();
     cb.append(first);
@@ -1752,7 +1744,7 @@ TEST_F(BSONColumnTest, UndefinedBasic) {
 }
 
 TEST_F(BSONColumnTest, UndefinedAfterChangeBack) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto undefined = createUndefined();
     auto elemInt32 = createElementInt32(0);
@@ -1775,7 +1767,7 @@ TEST_F(BSONColumnTest, UndefinedAfterChangeBack) {
 }
 
 TEST_F(BSONColumnTest, NullBasic) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createNull();
     cb.append(first);
@@ -1793,7 +1785,7 @@ TEST_F(BSONColumnTest, NullBasic) {
 }
 
 TEST_F(BSONColumnTest, NullAfterChangeBack) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto null = createNull();
     auto elemInt32 = createElementInt32(0);
@@ -1816,7 +1808,7 @@ TEST_F(BSONColumnTest, NullAfterChangeBack) {
 }
 
 TEST_F(BSONColumnTest, RegexBasic) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createRegex();
     auto second = createRegex("regex");
@@ -1837,7 +1829,7 @@ TEST_F(BSONColumnTest, RegexBasic) {
 }
 
 TEST_F(BSONColumnTest, RegexAfterChangeBack) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto regex = createRegex();
     auto elemInt32 = createElementInt32(0);
@@ -1860,7 +1852,7 @@ TEST_F(BSONColumnTest, RegexAfterChangeBack) {
 }
 
 TEST_F(BSONColumnTest, DBRefBasic) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto oid = OID("112233445566778899AABBCC");
     auto first = createDBRef("ns", oid);
@@ -1882,7 +1874,7 @@ TEST_F(BSONColumnTest, DBRefBasic) {
 }
 
 TEST_F(BSONColumnTest, DBRefAfterChangeBack) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto oid = OID("112233445566778899AABBCC");
     auto dbRef = createDBRef("ns", oid);
@@ -1906,7 +1898,7 @@ TEST_F(BSONColumnTest, DBRefAfterChangeBack) {
 }
 
 TEST_F(BSONColumnTest, CodeWScopeBasic) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createCodeWScope("code", BSONObj());
     auto second = createCodeWScope("diffCode", BSONObj());
@@ -1927,7 +1919,7 @@ TEST_F(BSONColumnTest, CodeWScopeBasic) {
 }
 
 TEST_F(BSONColumnTest, CodeWScopeAfterChangeBack) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto codeWScope = createCodeWScope("code", BSONObj());
     auto elemInt32 = createElementInt32(0);
@@ -1950,7 +1942,7 @@ TEST_F(BSONColumnTest, CodeWScopeAfterChangeBack) {
 }
 
 TEST_F(BSONColumnTest, SymbolBasic) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto first = createSymbol("symbol");
     auto second = createSymbol("diffSymbol");
@@ -1971,7 +1963,7 @@ TEST_F(BSONColumnTest, SymbolBasic) {
 }
 
 TEST_F(BSONColumnTest, SymbolAfterChangeBack) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     auto symbol = createSymbol("symbol");
     auto elemInt32 = createElementInt32(0);
@@ -1994,7 +1986,7 @@ TEST_F(BSONColumnTest, SymbolAfterChangeBack) {
 }
 
 TEST_F(BSONColumnTest, BinDataBase) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     std::vector<uint8_t> input{'1', '2', '3', '4'};
     auto elemBinData = createElementBinData(BinDataGeneral, input);
 
@@ -2010,7 +2002,7 @@ TEST_F(BSONColumnTest, BinDataBase) {
 }
 
 TEST_F(BSONColumnTest, BinDataOdd) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     std::vector<uint8_t> input{'\n', '2', '\n', '4'};
     auto elemBinData = createElementBinData(BinDataGeneral, input);
 
@@ -2026,7 +2018,7 @@ TEST_F(BSONColumnTest, BinDataOdd) {
 }
 
 TEST_F(BSONColumnTest, BinDataDelta) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     std::vector<uint8_t> input{'1', '2', '3', '4'};
     auto elemBinData = createElementBinData(BinDataGeneral, input);
 
@@ -2045,7 +2037,7 @@ TEST_F(BSONColumnTest, BinDataDelta) {
 }
 
 TEST_F(BSONColumnTest, BinDataDeltaCountDifferenceShouldFail) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     std::vector<uint8_t> input{'1', '2', '3', '4'};
     auto elemBinData = createElementBinData(BinDataGeneral, input);
 
@@ -2066,7 +2058,7 @@ TEST_F(BSONColumnTest, BinDataDeltaCountDifferenceShouldFail) {
 }
 
 TEST_F(BSONColumnTest, BinDataDeltaTypeDifferenceShouldFail) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     std::vector<uint8_t> input{'1', '2', '3', '4'};
     auto elemBinData = createElementBinData(BinDataGeneral, input);
 
@@ -2086,7 +2078,7 @@ TEST_F(BSONColumnTest, BinDataDeltaTypeDifferenceShouldFail) {
 }
 
 TEST_F(BSONColumnTest, BinDataDeltaCheckSkips) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     std::vector<uint8_t> input{'1', '2', '3', '4'};
     auto elemBinData = createElementBinData(BinDataGeneral, input);
 
@@ -2114,7 +2106,7 @@ TEST_F(BSONColumnTest, BinDataDeltaCheckSkips) {
 }
 
 TEST_F(BSONColumnTest, BinDataLargerThan16) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     std::vector<uint8_t> input{
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '8'};
     auto elemBinData = createElementBinData(BinDataGeneral, input);
@@ -2137,7 +2129,7 @@ TEST_F(BSONColumnTest, BinDataLargerThan16) {
 }
 
 TEST_F(BSONColumnTest, BinDataEqualTo16) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     std::vector<uint8_t> input{
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7'};
     auto elemBinData = createElementBinData(BinDataGeneral, input);
@@ -2161,7 +2153,7 @@ TEST_F(BSONColumnTest, BinDataEqualTo16) {
 }
 
 TEST_F(BSONColumnTest, BinDataLargerThan16SameValue) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     std::vector<uint8_t> input{
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '8'};
     auto elemBinData = createElementBinData(BinDataGeneral, input);
@@ -2181,7 +2173,7 @@ TEST_F(BSONColumnTest, BinDataLargerThan16SameValue) {
 }
 
 TEST_F(BSONColumnTest, StringBase) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elem = createElementString("test");
     cb.append(elem);
 
@@ -2195,7 +2187,7 @@ TEST_F(BSONColumnTest, StringBase) {
 }
 
 TEST_F(BSONColumnTest, StringDeltaSame) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elemString = createElementString("test");
     cb.append(elemString);
     cb.append(elemString);
@@ -2212,7 +2204,7 @@ TEST_F(BSONColumnTest, StringDeltaSame) {
 }
 
 TEST_F(BSONColumnTest, StringDeltaDiff) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elemString = createElementString("mongo");
     cb.append(elemString);
     auto elemString2 = createElementString("tests");
@@ -2230,7 +2222,7 @@ TEST_F(BSONColumnTest, StringDeltaDiff) {
 }
 
 TEST_F(BSONColumnTest, StringDeltaLarge) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elemString = createElementString("mongoaaaaaaa");
     cb.append(elemString);
     // Need to make sure we have a significant overlap in delta so we can have a trailingZeroCount
@@ -2250,7 +2242,7 @@ TEST_F(BSONColumnTest, StringDeltaLarge) {
 }
 
 TEST_F(BSONColumnTest, StringAfterInvalid) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elem = createElementString("mongo");
     cb.append(elem);
 
@@ -2275,7 +2267,7 @@ TEST_F(BSONColumnTest, StringAfterInvalid) {
 }
 
 TEST_F(BSONColumnTest, StringEmptyAfterLarge) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto large = createElementString(std::string(32, 'a'));
     cb.append(large);
     auto empty = createElementString("");
@@ -2295,7 +2287,7 @@ TEST_F(BSONColumnTest, StringEmptyAfterLarge) {
 }
 
 TEST_F(BSONColumnTest, RepeatInvalidString) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elem = createElementString("mongo");
     cb.append(elem);
 
@@ -2316,7 +2308,7 @@ TEST_F(BSONColumnTest, RepeatInvalidString) {
 }
 
 TEST_F(BSONColumnTest, StringMultiType) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     // Add decimals first
     auto elemDec128Max = createElementDecimal128(std::numeric_limits<Decimal128>::max());
     auto elemDec128Zero = createElementDecimal128(std::numeric_limits<Decimal128>::min());
@@ -2362,7 +2354,7 @@ TEST_F(BSONColumnTest, StringMultiType) {
 }
 
 TEST_F(BSONColumnTest, CodeBase) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elem = createElementCode("test");
     cb.append(elem);
 
@@ -2376,7 +2368,7 @@ TEST_F(BSONColumnTest, CodeBase) {
 }
 
 TEST_F(BSONColumnTest, CodeDeltaSame) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elemCode = createElementCode("test");
     cb.append(elemCode);
     cb.append(elemCode);
@@ -2393,7 +2385,7 @@ TEST_F(BSONColumnTest, CodeDeltaSame) {
 }
 
 TEST_F(BSONColumnTest, CodeDeltaDiff) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elemCode = createElementCode("mongo");
     cb.append(elemCode);
     auto elemCode2 = createElementCode("tests");
@@ -2451,7 +2443,7 @@ TEST_F(BSONColumnTest, ObjectEqual) {
 }
 
 TEST_F(BSONColumnTest, ArrayUncompressed) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     std::vector<BSONElement> elems = {createElementArray(BSON_ARRAY(1 << 2)),
                                       createElementArray(BSON_ARRAY(1 << 2 << 3))};
 
@@ -2471,7 +2463,7 @@ TEST_F(BSONColumnTest, ArrayUncompressed) {
 }
 
 TEST_F(BSONColumnTest, ArrayEqual) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
     auto elemObj = createElementArray(BSON_ARRAY("a"
                                                  << "b"));
     std::vector<BSONElement> elems = {elemObj, elemObj};
@@ -2493,7 +2485,7 @@ TEST_F(BSONColumnTest, ArrayEqual) {
 
 TEST_F(BSONColumnTest, Interleaved) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
                                           createElementObj(BSON("x" << 1 << "y" << 3)),
@@ -2503,10 +2495,7 @@ TEST_F(BSONColumnTest, Interleaved) {
                                           createElementObj(BSON("x" << 1 << "y" << 3))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -2542,7 +2531,7 @@ TEST_F(BSONColumnTest, Interleaved) {
 }
 
 TEST_F(BSONColumnTest, InterleavedArray) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
     std::vector<BSONElement> elems = {createElementObj(BSON("x" << BSON_ARRAY(1 << 2))),
                                       createElementObj(BSON("x" << BSON_ARRAY(2 << 3)))};
 
@@ -2573,7 +2562,7 @@ TEST_F(BSONColumnTest, InterleavedArray) {
 }
 
 TEST_F(BSONColumnTest, InterleavedArrayRoot) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
     std::vector<BSONElement> elems = {createElementArray(BSON_ARRAY(1 << 2)),
                                       createElementArray(BSON_ARRAY(2 << 3))};
 
@@ -2602,7 +2591,7 @@ TEST_F(BSONColumnTest, InterleavedArrayRoot) {
 }
 
 TEST_F(BSONColumnTest, InterleavedArrayRootTypeChange) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
     std::vector<BSONElement> elems = {createElementArray(BSON_ARRAY(1 << 2)),
                                       createElementArrayAsObject(BSON_ARRAY(2 << 3))};
 
@@ -2634,7 +2623,7 @@ TEST_F(BSONColumnTest, InterleavedArrayRootTypeChange) {
 
 TEST_F(BSONColumnTest, InterleavedAfterNonInterleaved) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementInt32(1),
                                           createElementObj(BSON("x" << 1 << "y" << 2)),
@@ -2642,10 +2631,7 @@ TEST_F(BSONColumnTest, InterleavedAfterNonInterleaved) {
                                           createElementObj(BSON("x" << 2 << "y" << 4))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -2677,7 +2663,7 @@ TEST_F(BSONColumnTest, InterleavedAfterNonInterleaved) {
 
 TEST_F(BSONColumnTest, InterleavedLevels) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("root" << BSON("x" << 1) << "y" << 2)),
@@ -2685,10 +2671,7 @@ TEST_F(BSONColumnTest, InterleavedLevels) {
             createElementObj(BSON("root" << BSON("x" << 2) << "y" << 5))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -2721,7 +2704,7 @@ TEST_F(BSONColumnTest, InterleavedLevels) {
 
 TEST_F(BSONColumnTest, InterleavedDoubleDifferentScale) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1.0 << "y" << 2.0)),
                                           createElementObj(BSON("x" << 1.1 << "y" << 3.0)),
@@ -2730,10 +2713,7 @@ TEST_F(BSONColumnTest, InterleavedDoubleDifferentScale) {
                                           createElementObj(BSON("x" << 1.5 << "y" << 2.0))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -2768,7 +2748,7 @@ TEST_F(BSONColumnTest, InterleavedDoubleDifferentScale) {
 
 TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescale) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems;
         elems.push_back(createElementObj(BSON("x" << 1.1)));
@@ -2808,7 +2788,7 @@ TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescale) {
 
 TEST_F(BSONColumnTest, InterleavedScalarToObject) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 1)),
@@ -2817,10 +2797,7 @@ TEST_F(BSONColumnTest, InterleavedScalarToObject) {
             createElementObj(BSON("x" << BSON("y" << 2 << "z" << 3)))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -2896,7 +2873,7 @@ TEST_F(BSONColumnTest, DecodeInterleavedObjectAsScalar) {
 
 TEST_F(BSONColumnTest, InterleavedMix64And128Bit) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y"
                                                                     << "count0")),
@@ -2909,10 +2886,7 @@ TEST_F(BSONColumnTest, InterleavedMix64And128Bit) {
                                                                     << "count3"))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -2947,7 +2921,7 @@ TEST_F(BSONColumnTest, InterleavedMix64And128Bit) {
 
 TEST_F(BSONColumnTest, InterleavedWithEmptySubObj) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj())),
@@ -2955,10 +2929,7 @@ TEST_F(BSONColumnTest, InterleavedWithEmptySubObj) {
             createElementObj(BSON("x" << 3 << "y" << BSONObjBuilder().obj()))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -2983,7 +2954,7 @@ TEST_F(BSONColumnTest, InterleavedWithEmptySubObj) {
 
 TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj())),
@@ -2991,10 +2962,7 @@ TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
             createElementObj(BSON("x" << 3))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3024,17 +2992,14 @@ TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
 
 TEST_F(BSONColumnTest, InterleavedAddEmptySubObj) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 3)),
             createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj()))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3060,17 +3025,14 @@ TEST_F(BSONColumnTest, InterleavedAddEmptySubObj) {
 }
 
 TEST_F(BSONColumnTest, InterleavedAddEmptySubArray) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 3)),
         createElementObj(BSON("x" << 1 << "y" << BSONArrayBuilder().arr()))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -3093,7 +3055,7 @@ TEST_F(BSONColumnTest, InterleavedAddEmptySubArray) {
 
 TEST_F(BSONColumnTest, InterleavedSchemaChange) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
                                           createElementObj(BSON("x" << 1 << "y" << 3)),
@@ -3101,10 +3063,7 @@ TEST_F(BSONColumnTest, InterleavedSchemaChange) {
                                           createElementObj(BSON("x" << 1 << "y" << 4.0))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3139,17 +3098,14 @@ TEST_F(BSONColumnTest, InterleavedSchemaChange) {
 
 TEST_F(BSONColumnTest, InterleavedObjectSchemaChange) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << BSON("z" << 2))),
                                           createElementObj(BSON("x" << 1 << "y" << BSON("z" << 3))),
                                           createElementObj(BSON("x" << 1 << "y" << 3))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3186,17 +3142,14 @@ TEST_F(BSONColumnTest, InterleavedObjectSchemaChange) {
 
 TEST_F(BSONColumnTest, InterleavedObjectNameChange) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 1 << "y" << BSON("z" << 2))),
             createElementObj(BSON("x" << 1 << "y2" << BSON("z" << 3)))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3226,7 +3179,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNameChange) {
 
 TEST_F(BSONColumnTest, InterleavedObjectEmptyObjChange) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 1 << "y" << BSON("z" << 2))),
@@ -3234,10 +3187,7 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyObjChange) {
             createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj()))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3271,7 +3221,7 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyObjChange) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectEmptyArrayChange) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "y" << BSON("z" << 2))),
@@ -3279,10 +3229,7 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyArrayChange) {
         createElementObj(BSON("x" << 1 << "y" << BSONArrayBuilder().arr()))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -3313,7 +3260,7 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyArrayChange) {
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjMiddle) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 1 << "z" << 2)),
@@ -3321,10 +3268,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjMiddle) {
             createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj() << "z" << 4))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3360,7 +3304,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjMiddle) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayMiddle) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "z" << 2)),
@@ -3368,10 +3312,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayMiddle) {
         createElementObj(BSON("x" << 1 << "y" << BSONArrayBuilder().arr() << "z" << 4))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -3404,7 +3345,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayMiddle) {
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObj) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 1 << "z" << 2)),
@@ -3413,10 +3354,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObj) {
                 BSON("x" << 1 << "y" << BSON("y1" << BSONObjBuilder().obj()) << "z" << 4))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3452,7 +3390,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObj) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderObj) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "z" << 2)),
@@ -3461,10 +3399,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderObj) {
             BSON("x" << 1 << "y" << BSON("y1" << BSONArrayBuilder().arr()) << "z" << 4))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -3497,7 +3432,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderObj) {
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjEnd) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 1 << "y" << 2)),
@@ -3505,10 +3440,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjEnd) {
             createElementObj(BSON("x" << 1 << "y" << 4 << "z" << BSONObjBuilder().obj()))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3544,7 +3476,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjEnd) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayEnd) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "y" << 2)),
@@ -3552,10 +3484,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayEnd) {
         createElementObj(BSON("x" << 1 << "y" << 4 << "z" << BSONArrayBuilder().arr()))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -3588,7 +3517,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayEnd) {
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObjEnd) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 1 << "y" << 2)),
@@ -3597,10 +3526,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObjEnd) {
                 BSON("x" << 1 << "y" << 4 << "z" << BSON("z1" << BSONObjBuilder().obj())))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3636,7 +3562,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObjEnd) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderObjEnd) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "y" << 2)),
@@ -3645,10 +3571,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderObjEnd) {
             BSON("x" << 1 << "y" << 4 << "z" << BSON("z1" << BSONArrayBuilder().arr())))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -3680,7 +3603,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderObjEnd) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderArrayEnd) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "y" << 2)),
@@ -3689,10 +3612,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderArrayEnd) {
             BSON("x" << 1 << "y" << 4 << "z" << BSON_ARRAY(BSONArrayBuilder().arr())))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -3725,7 +3645,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderArrayEnd) {
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjMiddle) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj() << "z" << 2)),
@@ -3733,10 +3653,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjMiddle) {
             createElementObj(BSON("x" << 1 << "z" << 4))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3772,7 +3689,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjMiddle) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayMiddle) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "y" << BSONArrayBuilder().arr() << "z" << 2)),
@@ -3780,10 +3697,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayMiddle) {
         createElementObj(BSON("x" << 1 << "z" << 4))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -3815,7 +3729,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayMiddle) {
 }
 
 TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyObjMiddle) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementArray(BSON_ARRAY(1 << BSONObjBuilder().obj() << 2)),
@@ -3823,10 +3737,7 @@ TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyObjMiddle) {
         createElementArray(BSON_ARRAY(1 << 4))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -3859,7 +3770,7 @@ TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyObjMiddle) {
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObj) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(
@@ -3869,10 +3780,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObj) {
             createElementObj(BSON("x" << 1 << "z" << 4))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -3908,7 +3816,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObj) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObj) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(
@@ -3918,10 +3826,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObj) {
         createElementObj(BSON("x" << 1 << "z" << 4))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -3953,7 +3858,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObj) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderArray) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "y" << BSON_ARRAY(BSONArrayBuilder().arr()) << "z" << 2)),
@@ -3961,10 +3866,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderArray) {
         createElementObj(BSON("x" << 1 << "z" << 4))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -3997,7 +3899,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderArray) {
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjEnd) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("x" << 1 << "y" << 2 << "z" << BSONObjBuilder().obj())),
@@ -4005,10 +3907,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjEnd) {
             createElementObj(BSON("x" << 1 << "y" << 4))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -4044,7 +3943,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjEnd) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayEnd) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "y" << 2 << "z" << BSONArrayBuilder().arr())),
@@ -4052,10 +3951,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayEnd) {
         createElementObj(BSON("x" << 1 << "y" << 4))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -4087,7 +3983,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayEnd) {
 }
 
 TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyArrayEnd) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementArray(BSON_ARRAY(1 << 2 << BSONArrayBuilder().arr())),
@@ -4095,10 +3991,7 @@ TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyArrayEnd) {
         createElementArray(BSON_ARRAY(1 << 4))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -4131,7 +4024,7 @@ TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyArrayEnd) {
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObjEnd) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(
@@ -4141,10 +4034,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObjEnd) {
             createElementObj(BSON("x" << 1 << "y" << 4))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -4180,7 +4070,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObjEnd) {
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObjEnd) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(
@@ -4190,10 +4080,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObjEnd) {
         createElementObj(BSON("x" << 1 << "y" << 4))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -4225,7 +4112,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObjEnd) {
 }
 
 TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyObjUnderObjEnd) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementArray(BSON_ARRAY(1 << 2 << BSON("z1" << BSONObjBuilder().obj()))),
@@ -4233,10 +4120,7 @@ TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyObjUnderObjEnd) {
         createElementArray(BSON_ARRAY(1 << 4))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -4269,7 +4153,7 @@ TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyObjUnderObjEnd) {
 
 TEST_F(BSONColumnTest, ReenterInterleaved) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
                                           createElementObj(BSON("x" << 1 << "y" << 3)),
@@ -4278,10 +4162,7 @@ TEST_F(BSONColumnTest, ReenterInterleaved) {
                                           createElementObj(BSON("x" << 5 << "y" << 3 << "z" << 3))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -4327,7 +4208,7 @@ TEST_F(BSONColumnTest, ReenterInterleaved) {
 }
 
 TEST_F(BSONColumnTest, ReenterInterleavedArrayRootToObj) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {createElementArray(BSON_ARRAY(1 << 2)),
                                       createElementArray(BSON_ARRAY(1 << 3)),
@@ -4336,10 +4217,7 @@ TEST_F(BSONColumnTest, ReenterInterleavedArrayRootToObj) {
                                       createElementObj(BSON("x" << 5 << "y" << 3 << "z" << 3))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -4382,7 +4260,7 @@ TEST_F(BSONColumnTest, ReenterInterleavedArrayRootToObj) {
 
 TEST_F(BSONColumnTest, InterleavedAlternatingMergeRight) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
                                           createElementObj(BSON("y" << 2)),
@@ -4392,10 +4270,7 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeRight) {
                                           createElementObj(BSON("z" << 4))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -4444,17 +4319,14 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeRight) {
 
 TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRight) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementObj(BSON("z" << 1)),
                                           createElementObj(BSON("y" << 2 << "z" << 2)),
                                           createElementObj(BSON("x" << 3 << "z" << 3))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -4485,7 +4357,7 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRight) {
 }
 
 TEST_F(BSONColumnTest, InterleavedMergeWithUnrelatedArray) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(BSON("a" << BSON_ARRAY(1 << 2) << "z" << 1)),
@@ -4493,10 +4365,7 @@ TEST_F(BSONColumnTest, InterleavedMergeWithUnrelatedArray) {
         createElementObj(BSON("a" << BSON_ARRAY(1 << 2) << "x" << 3 << "z" << 3))};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -4534,7 +4403,7 @@ TEST_F(BSONColumnTest, InterleavedMergeWithUnrelatedArray) {
 
 TEST_F(BSONColumnTest, InterleavedMergeWithScalarObjectMismatch) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         // Test that we can successfully build reference object when there are unrelated fields with
         // object and scalar mismatch.
@@ -4543,10 +4412,7 @@ TEST_F(BSONColumnTest, InterleavedMergeWithScalarObjectMismatch) {
             createElementObj(BSON("y" << 1 << "z" << BSON("x" << 2)))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -4574,7 +4440,7 @@ TEST_F(BSONColumnTest, InterleavedMergeWithScalarObjectMismatch) {
 }
 
 TEST_F(BSONColumnTest, InterleavedArrayAppend) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementArray(BSONArrayBuilder().arr()),
@@ -4585,10 +4451,7 @@ TEST_F(BSONColumnTest, InterleavedArrayAppend) {
     };
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -4626,17 +4489,14 @@ TEST_F(BSONColumnTest, InterleavedArrayAppend) {
 
 TEST_F(BSONColumnTest, InterleavedIncompatibleMerge) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
                                           createElementObj(BSON("x" << 2 << "y" << 2)),
                                           createElementObj(BSON("y" << 3 << "x" << 3))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -4670,17 +4530,14 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleMerge) {
 
 TEST_F(BSONColumnTest, InterleavedIncompatibleMergeMiddle) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(BSON("a" << 1 << "x" << 2 << "y" << 2 << "b" << 2)),
             createElementObj(BSON("a" << 1 << "y" << 3 << "x" << 3 << "b" << 2))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -4720,7 +4577,7 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleMergeMiddle) {
 
 TEST_F(BSONColumnTest, InterleavedIncompatibleAfterDeterminedReference) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
                                           createElementObj(BSON("x" << 2)),
@@ -4731,10 +4588,7 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleAfterDeterminedReference) {
                                           createElementObj(BSON("x" << 0 << "y" << 0))};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -4769,7 +4623,7 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleAfterDeterminedReference) {
 
 TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubObj) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {
             createElementObj(
@@ -4777,10 +4631,7 @@ TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubObj) {
             BSONElement()};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -4805,7 +4656,7 @@ TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubObj) {
 }
 
 TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubArray) {
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
 
     std::vector<BSONElement> elems = {
         createElementObj(
@@ -4813,10 +4664,7 @@ TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubArray) {
         BSONElement()};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -4837,16 +4685,13 @@ TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubArray) {
 }
 
 TEST_F(BSONColumnTest, ObjectEmpty) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     std::vector<BSONElement> elems = {createElementObj(BSONObjBuilder().obj()),
                                       createElementObj(BSONObjBuilder().obj())};
 
     for (auto elem : elems) {
-        if (!elem.eoo())
-            cb.append(elem);
-        else
-            cb.skip();
+        cb.append(elem);
     }
 
     BufBuilder expected;
@@ -4862,16 +4707,13 @@ TEST_F(BSONColumnTest, ObjectEmpty) {
 
 TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
                                           createElementObj(BSONObjBuilder().obj())};
 
         for (auto elem : elems) {
-            if (!elem.eoo())
-                cb.append(elem);
-            else
-                cb.skip();
+            cb.append(elem);
         }
 
         BufBuilder expected;
@@ -4892,7 +4734,7 @@ TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
 }
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     std::vector<BSONElement> elems;
     elems.push_back(createElementObj(BSON("a" << BSONObjBuilder().obj())));
@@ -4914,7 +4756,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromDetermine) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         // Append elements so we are in kSubObjDeterminingReference state when element with 'b'
         // field is appended. Make sure this does not re-start subobj compression as it only contain
@@ -4947,7 +4789,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromDeterm
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromAppending) {
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
 
         // Append enough elements so we are in kSubObjAppending state when element with 'b' field is
         // appended. Make sure this does not re-start subobj compression as it only contain empty
@@ -4991,7 +4833,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromAppend
 }
 
 TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
-    BSONColumnBuilder cb("test"_sd);
+    BSONColumnBuilder cb;
 
     int64_t value = 1;
 
@@ -5010,7 +4852,7 @@ TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
                                       createElementInt64(value++)};
 
     // Add 120 additional elements that all get a delta of 1, because the last block ended with the
-    // same value they can be encoded with RLE.
+    // / same value they can be encoded with RLE.
     for (int i = 0; i < 120; ++i) {
         elems.push_back(createElementInt64(value++));
     }
@@ -5191,7 +5033,7 @@ TEST_F(BSONColumnTest, InvalidInterleavedCount) {
     // This test sets up an interleaved reference object with two fields but only provides one
     // interleaved substream.
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
         BufBuilder expected;
         appendInterleavedStartFunc(expected, BSON("a" << 1 << "b" << 1));
         appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -5206,7 +5048,7 @@ TEST_F(BSONColumnTest, InvalidInterleavedCount) {
     test(false, appendInterleavedStartLegacy);
     test(true, appendInterleavedStart);
 
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
     BufBuilder expected;
     appendInterleavedStartArrayRoot(expected, BSON_ARRAY(1 << 1));
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -5221,7 +5063,7 @@ TEST_F(BSONColumnTest, InvalidInterleavedCount) {
 TEST_F(BSONColumnTest, InvalidInterleavedWhenAlreadyInterleaved) {
     // This tests that we handle the interleaved start byte when already in interleaved mode.
     auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb("test"_sd, arrayCompression);
+        BSONColumnBuilder cb(arrayCompression);
         BufBuilder expected;
         appendInterleavedStartFunc(expected, BSON("a" << 1 << "b" << 1));
         appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -5237,7 +5079,7 @@ TEST_F(BSONColumnTest, InvalidInterleavedWhenAlreadyInterleaved) {
     test(false, appendInterleavedStartLegacy);
     test(true, appendInterleavedStart);
 
-    BSONColumnBuilder cb("test"_sd, true);
+    BSONColumnBuilder cb(true);
     BufBuilder expected;
     appendInterleavedStart(expected, BSON("a" << 1 << "b" << 1));
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -5292,7 +5134,7 @@ TEST_F(BSONColumnTest, InvalidDelta) {
 }
 
 TEST_F(BSONColumnTest, AppendMinKey) {
-    BSONColumnBuilder cb("test");
+    BSONColumnBuilder cb;
     ASSERT_THROWS_CODE(cb.append(createElementMinKey()), DBException, ErrorCodes::InvalidBSONType);
 
     BufBuilder expected;
@@ -5302,7 +5144,7 @@ TEST_F(BSONColumnTest, AppendMinKey) {
 }
 
 TEST_F(BSONColumnTest, AppendMaxKey) {
-    BSONColumnBuilder cb("test");
+    BSONColumnBuilder cb;
     ASSERT_THROWS_CODE(cb.append(createElementMaxKey()), DBException, ErrorCodes::InvalidBSONType);
 
     BufBuilder expected;
@@ -5312,7 +5154,7 @@ TEST_F(BSONColumnTest, AppendMaxKey) {
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObj) {
-    BSONColumnBuilder cb("test");
+    BSONColumnBuilder cb;
 
     BSONObjBuilder obj;
     {
@@ -5330,7 +5172,7 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObj) {
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStart) {
-    BSONColumnBuilder cb("test");
+    BSONColumnBuilder cb;
 
     BSONObjBuilder obj;
     {
@@ -5344,7 +5186,7 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStart) {
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStartInAppendMode) {
-    BSONColumnBuilder cb("test");
+    BSONColumnBuilder cb;
 
     BSONObjBuilder obj;
     {
@@ -5364,7 +5206,7 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStartInAppendMode) {
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterMerge) {
-    BSONColumnBuilder cb("test");
+    BSONColumnBuilder cb;
 
     BSONObjBuilder obj;
     {
@@ -5379,6 +5221,103 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterMerge) {
     ASSERT_THROWS_CODE(
         cb.append(createElementObj(obj.obj())), DBException, ErrorCodes::InvalidBSONType);
 }
+
+TEST_F(BSONColumnTest, AppendObjDirectly) {
+    BSONColumnBuilder cb;
+    BSONColumnBuilder cb2;
+
+    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
+                                      createElementObj(BSON("x" << 2))};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+        cb2.append(elem.Obj());
+    }
+
+    auto binData = cb.finalize();
+    auto binData2 = cb2.finalize();
+    ASSERT_EQ(binData.length, binData2.length);
+    ASSERT_EQ(memcmp(binData.data, binData2.data, binData.length), 0);
+}
+
+TEST_F(BSONColumnTest, AppendArrayDirectly) {
+    BSONColumnBuilder cb(true);
+    BSONColumnBuilder cb2(true);
+
+    std::vector<BSONElement> elems = {createElementArray(BSON_ARRAY(1 << 2 << 3)),
+                                      createElementArray(BSON_ARRAY(2 << 4 << 6))};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+        cb2.append(BSONArray(elem.Obj()));
+    }
+
+    auto binData = cb.finalize();
+    auto binData2 = cb2.finalize();
+    ASSERT_EQ(binData.length, binData2.length);
+    ASSERT_EQ(memcmp(binData.data, binData2.data, binData.length), 0);
+}
+
+TEST_F(BSONColumnTest, Intermediate) {
+    // Verify that the intermediate function works as expected
+    BSONColumnBuilder cb;
+    BSONColumnBuilder cb2;
+
+    // Various elements
+    std::vector<BSONElement> elems = {
+        createElementInt32(1),
+        createElementInt32(1),
+        createElementInt32(5),
+        createElementDouble(5),
+        createElementInt32(2),
+        createElementObj(BSON("x" << 1 << "y" << 2)),
+        createElementObj(BSON("x" << 4)),
+        createElementObj(BSON("x" << 4 << "y" << 1)),
+        createElementInt32(2),
+        createElementObj(BSON("x" << 1 << "y" << 1)),
+        createElementObj(BSON("x" << 1)),
+        createElementObj(BSON("x" << 1)),
+    };
+
+    std::vector<BufBuilder> anchors;
+
+    int prevAnchor = 0;
+    {
+        BSONBinData binData = cb.intermediate(&prevAnchor);
+        ASSERT_EQ(binData.length, 1);
+        ASSERT_EQ(*static_cast<const char*>(binData.data), '\0');
+        ASSERT_EQ(prevAnchor, 0);
+    }
+
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+        cb2.append(elem);
+
+        int anchor = 0;
+        BSONBinData binData = cb.intermediate(&anchor);
+        anchors.emplace_back();
+        anchors.back().appendBuf(binData.data, anchor);
+        // Anchor is always less than the final buffer because of the EOO at the end
+        ASSERT_LT(anchor, binData.length);
+        // Anchor should increase or stay the same when appending
+        ASSERT_GTE(anchor, prevAnchor);
+        prevAnchor = anchor;
+    }
+    ASSERT_GT(prevAnchor, 0);
+
+    // Verify that the binaries are exactly the same even if intermediate is called
+    auto binData = cb.finalize();
+    auto binData2 = cb2.finalize();
+    ASSERT_EQ(binData.length, binData2.length);
+    ASSERT_EQ(memcmp(binData.data, binData2.data, binData.length), 0);
+
+    // Validate that no data changed before the returned anchor
+    for (auto&& anchor : anchors) {
+        ASSERT_EQ(memcmp(binData.data, anchor.buf(), anchor.len()), 0);
+    }
+}
+
 
 // The large literal emits this on Visual Studio: Fatal error C1091: compiler limit: string exceeds
 // 65535 bytes in length
@@ -5395,14 +5334,10 @@ TEST_F(BSONColumnTest, FTDCRoundTrip) {
         builder.appendBinData("data"_sd, compressed.size(), BinDataType::Column, compressed.data());
         BSONElement compressedFTDCElement = builder.done().firstElement();
 
-        BSONColumnBuilder columnBuilder("", arrayCompression);
+        BSONColumnBuilder columnBuilder(arrayCompression);
         BSONColumn column(compressedFTDCElement);
         for (auto&& decompressed : column) {
-            if (!decompressed.eoo()) {
-                columnBuilder.append(decompressed);
-            } else {
-                columnBuilder.skip();
-            }
+            columnBuilder.append(decompressed);
         }
 
         auto binData = columnBuilder.finalize();

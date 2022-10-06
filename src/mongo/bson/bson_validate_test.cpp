@@ -741,7 +741,7 @@ TEST(BSONValidateExtended, DuplicateFieldNames) {
 }
 
 TEST(BSONValidateExtended, BSONColumn) {
-    BSONColumnBuilder cb("example"_sd);
+    BSONColumnBuilder cb;
     cb.append(BSON("a"
                    << "deadbeef")
                   .getField("a"));

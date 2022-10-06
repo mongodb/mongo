@@ -282,7 +282,6 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
         // Add compressed time field first
         {
             BSONColumnBuilder timeColumn(
-                timeFieldName,
                 std::move(columnBuffer),
                 feature_flags::gTimeseriesBucketCompressionWithArrays.isEnabled(
                     serverGlobalParams.featureCompatibility));
@@ -319,7 +318,6 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
         // Then add compressed data fields.
         for (size_t i = 0; i < columns.size(); ++i) {
             BSONColumnBuilder column(
-                columns[i].first,
                 std::move(columnBuffer),
                 feature_flags::gTimeseriesBucketCompressionWithArrays.isEnabled(
                     serverGlobalParams.featureCompatibility));
@@ -331,13 +329,13 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
                 }
             }
             BSONBinData dataBinary = column.finalize();
-            if (!validate(dataBinary, column.fieldName(), [i](const auto& measurement) {
+            if (!validate(dataBinary, columns[i].first, [i](const auto& measurement) {
                     return measurement.dataFields[i];
                 })) {
                 result.decompressionFailed = true;
                 return result;
             }
-            dataBuilder.append(column.fieldName(), dataBinary);
+            dataBuilder.append(columns[i].first, dataBinary);
             // We only record when the interleaved mode has to re-start. i.e. when more than one
             // interleaved start control byte was written in the binary
             if (int interleavedStarts = column.numInterleavedStartWritten();
