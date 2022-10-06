@@ -114,7 +114,7 @@ public:
 
     // Prefix for global index container collections. These collections belong to the system
     // database.
-    static constexpr StringData kGlobalIndexCollectionPrefix = "globalIndexes."_sd;
+    static constexpr StringData kGlobalIndexCollectionPrefix = "globalIndex."_sd;
 
     // Namespace for storing configuration data, which needs to be replicated if the server is
     // running as a replica set. Documents in this collection should represent some configuration

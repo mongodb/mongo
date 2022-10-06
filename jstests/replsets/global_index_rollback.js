@@ -17,7 +17,7 @@ load('jstests/replsets/libs/rollback_test.js');
 load('jstests/libs/uuid_util.js');
 
 function uuidToCollName(uuid) {
-    return "globalIndexes." + extractUUIDFromObject(uuid);
+    return "globalIndex." + extractUUIDFromObject(uuid);
 }
 
 const rollbackTest = new RollbackTest(jsTestName());

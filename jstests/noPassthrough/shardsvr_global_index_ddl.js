@@ -62,7 +62,7 @@ function verifyOplogEntry(node, globalIndexUUID, namespace, commandString, lsid,
     // 	"ns" : "system.$cmd",
     // 	"ui" : UUID("abe869a0-932f-418c-9baa-2f826fbf23e9"),
     // 	"o" : {
-    // 		"createGlobalIndex" : "globalIndexes.abe869a0-932f-418c-9baa-2f826fbf23e9"
+    // 		"createGlobalIndex" : "globalIndex.abe869a0-932f-418c-9baa-2f826fbf23e9"
     // 	},
     // 	"ts" : Timestamp(1659625616, 4),
     // 	"t" : NumberLong(1),
@@ -97,7 +97,7 @@ function verifyCommandIsRetryableWrite(node, command, oplogCommandString, setup)
     const lsid = session.getSessionId();
     const txnNumber = NumberLong(10);
     const indexUUID = UUID();
-    const globalIndexCollName = "globalIndexes." + extractUUIDFromObject(indexUUID);
+    const globalIndexCollName = "globalIndex." + extractUUIDFromObject(indexUUID);
 
     var commandObj = {};
     commandObj[command] = indexUUID;
@@ -148,7 +148,7 @@ function testCreateGlobalIndex(rst) {
     const primary = rst.getPrimary();
     const adminDB = primary.getDB("admin");
     const globalIndexUUID = UUID();
-    const globalIndexCollName = "globalIndexes." + extractUUIDFromObject(globalIndexUUID);
+    const globalIndexCollName = "globalIndex." + extractUUIDFromObject(globalIndexUUID);
     const oplogCommandString = "createGlobalIndex";
 
     verifyMultiDocumentTransactionDisallowed(primary, {_shardsvrCreateGlobalIndex: UUID()});
@@ -174,7 +174,7 @@ function testDropGlobalIndex(rst) {
     const primary = rst.getPrimary();
     const adminDB = primary.getDB("admin");
     const globalIndexUUID = UUID();
-    const globalIndexCollName = "globalIndexes." + extractUUIDFromObject(globalIndexUUID);
+    const globalIndexCollName = "globalIndex." + extractUUIDFromObject(globalIndexUUID);
     const oplogCommandString = "dropGlobalIndex";
 
     verifyMultiDocumentTransactionDisallowed(primary, {_shardsvrDropGlobalIndex: UUID()});

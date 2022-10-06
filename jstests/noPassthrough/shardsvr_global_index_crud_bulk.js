@@ -16,7 +16,7 @@ load('jstests/libs/uuid_util.js');
 
 function entriesInContainer(primary, uuid) {
     return primary.getDB("system")
-        .getCollection("globalIndexes." + extractUUIDFromObject(uuid))
+        .getCollection("globalIndex." + extractUUIDFromObject(uuid))
         .find()
         .itcount();
 }
@@ -446,7 +446,7 @@ assert.commandFailedWithCode(adminDB.runCommand({_shardsvrWriteGlobalIndexKeys: 
     // triggering DuplicateKey error on inserting the same index key.
     assert.eq(1,
               primary.getDB("system")
-                  .getCollection("globalIndexes." + extractUUIDFromObject(globalIndexUUID))
+                  .getCollection("globalIndex." + extractUUIDFromObject(globalIndexUUID))
                   .find({_id: {sk0: "first", _id: "first"}})
                   .itcount());
     session.startTransaction();
@@ -459,7 +459,7 @@ assert.commandFailedWithCode(adminDB.runCommand({_shardsvrWriteGlobalIndexKeys: 
     session.abortTransaction();
     assert.eq(1,
               primary.getDB("system")
-                  .getCollection("globalIndexes." + extractUUIDFromObject(otherGlobalIndexUUID))
+                  .getCollection("globalIndex." + extractUUIDFromObject(otherGlobalIndexUUID))
                   .find({_id: {sk0: "secondOnSecondContainer", _id: "secondOnSecondContainer"}})
                   .itcount());
     session.startTransaction();
@@ -503,12 +503,12 @@ assert.commandFailedWithCode(adminDB.runCommand({_shardsvrWriteGlobalIndexKeys: 
     // triggering DuplicateKey error on inserting the same index key.
     assert.eq(1,
               primary.getDB("system")
-                  .getCollection("globalIndexes." + extractUUIDFromObject(globalIndexUUID))
+                  .getCollection("globalIndex." + extractUUIDFromObject(globalIndexUUID))
                   .find({_id: {sk0: "globalIndexKey", _id: "globalIndexKey"}})
                   .itcount());
     assert.eq(1,
               primary.getDB("system")
-                  .getCollection("globalIndexes." + extractUUIDFromObject(globalIndexUUID))
+                  .getCollection("globalIndex." + extractUUIDFromObject(globalIndexUUID))
                   .find({_id: {sk0: "globalIndexKey2", _id: "globalIndexKey"}})
                   .itcount());
     session.startTransaction();
