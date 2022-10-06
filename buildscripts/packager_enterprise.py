@@ -44,7 +44,7 @@ import packager  # pylint: disable=wrong-import-position
 ARCH_CHOICES = ["x86_64", "ppc64le", "s390x", "arm64", "aarch64"]
 
 # Made up names for the flavors of distribution we package for.
-DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2"]
+DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2", "amazon2022"]
 
 
 class EnterpriseSpec(packager.Spec):
@@ -144,6 +144,8 @@ class EnterpriseDistro(packager.Distro):
                 return ["rhel82"]
             if self.dname == 'amazon2':
                 return ["amazon2"]
+            if self.dname == 'amazon2022':
+                return ["amazon2022"]
             return []
 
         if re.search("(redhat|fedora|centos)", self.dname):

@@ -288,6 +288,7 @@ variables:
 - mongocryptd_variants: &mongocryptd_variants
   - enterprise-amazon2
   - enterprise-amazon2-arm64
+  - enterprise-amazon2022-arm64
   - enterprise-debian10-64
   - enterprise-debian11-64
   - enterprise-linux-64-amazon-ami
@@ -336,6 +337,7 @@ variables:
   - enterprise-rhel-82-arm64
   - enterprise-rhel-90-64-bit
   - enterprise-amazon2-arm64
+  - enterprise-amazon2022-arm64
   - enterprise-ubuntu1804-64
   - enterprise-ubuntu2004-64
   - enterprise-ubuntu2204-64
@@ -347,8 +349,10 @@ variables:
   - amazon
   - enterprise-linux-64-amazon-ami
   - amazon2
+  - amazon2022-arm64
   - enterprise-amazon2
   - enterprise-amazon2-arm64
+  - enterprise-amazon2022-arm64
   - debian10
   - debian11
   - enterprise-debian10-64

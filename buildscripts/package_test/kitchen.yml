@@ -43,6 +43,13 @@ platforms:
       instance_type: c6g.medium
     transport:
       username: ec2-user
+  - name: amazon2022-arm64
+    driver:
+      image_id: ami-00bca6c8c9d0e6f92
+      instance_type: c6g.medium
+      user_data: rhel-user-data.sh
+    transport:
+      username: ec2-user
   - name: debian71-x86-64
     driver:
       image_id: ami-4b124a22

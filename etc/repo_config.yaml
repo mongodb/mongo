@@ -128,6 +128,13 @@ repos:
     repos:
       - yum/amazon/2/mongodb-org
 
+  - name: amazon2022
+    type: rpm
+    edition: org
+    bucket: repo.mongodb.org
+    repos:
+      - yum/amazon/2022/mongodb-org
+
   - name: suse11
     type: rpm
     edition: org
@@ -368,6 +375,13 @@ repos:
     bucket: repo.mongodb.com
     repos:
       - yum/amazon/2/mongodb-enterprise
+
+  - name: amazon2022
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - yum/amazon/2022/mongodb-enterprise
 
   - name: suse11
     type: rpm
