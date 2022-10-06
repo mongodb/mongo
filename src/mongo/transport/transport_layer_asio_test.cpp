@@ -39,6 +39,7 @@
 #include <fmt/format.h>
 
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
@@ -267,13 +268,29 @@ private:
     synchronized_value<std::vector<std::unique_ptr<SessionThread>>> _sessions;
 };
 
+std::unique_ptr<transport::TransportLayerASIO> makeTLA(ServiceEntryPoint* sep) {
+    auto options = [] {
+        ServerGlobalParams params;
+        params.noUnixSocket = true;
+        transport::TransportLayerASIO::Options opts(&params);
+        // TODO SERVER-30212 should clean this up and assign a port from the supplied port range
+        // provided by resmoke.
+        opts.port = 0;
+        return opts;
+    }();
+    auto tla = std::make_unique<transport::TransportLayerASIO>(options, sep);
+    ASSERT_OK(tla->setup());
+    ASSERT_OK(tla->start());
+    return tla;
+}
+
 /**
  * Properly setting up and tearing down the MockSEP and TransportLayerASIO is
  * tricky. Most tests can delegate the details to this TestFixture.
  */
 class TestFixture {
 public:
-    TestFixture() : _tla{_makeTLA()} {}
+    TestFixture() : _tla{makeTLA(&_sep)} {}
 
     ~TestFixture() {
         _sep.endAllSessions({});
@@ -289,22 +306,6 @@ public:
     }
 
 private:
-    std::unique_ptr<transport::TransportLayerASIO> _makeTLA() {
-        auto options = [] {
-            ServerGlobalParams params;
-            params.noUnixSocket = true;
-            transport::TransportLayerASIO::Options opts(&params);
-            // TODO SERVER-30212 should clean this up and assign a port from the supplied port range
-            // provided by resmoke.
-            opts.port = 0;
-            return opts;
-        }();
-        auto tla = std::make_unique<transport::TransportLayerASIO>(options, &_sep);
-        ASSERT_OK(tla->setup());
-        ASSERT_OK(tla->start());
-        return tla;
-    }
-
     std::unique_ptr<transport::TransportLayerASIO> _tla;
     MockSEP _sep;
 };
@@ -558,6 +559,30 @@ TEST(TransportLayerASIO, ConfirmSocketSetOptionOnResetConnections) {
     LOGV2(6101610,
           "ASIO set_option response on peer-reset connection",
           "msg"_attr = "{}"_format(thrown ? thrown->message() : ""));
+}
+
+class TransportLayerASIOWithServiceContextTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        auto sep = std::make_unique<MockSEP>();
+        auto tl = makeTLA(sep.get());
+        getServiceContext()->setServiceEntryPoint(std::move(sep));
+        getServiceContext()->setTransportLayer(std::move(tl));
+    }
+
+    void tearDown() override {
+        getServiceContext()->getTransportLayer()->shutdown();
+    }
+
+    transport::TransportLayerASIO& tla() {
+        auto tl = getServiceContext()->getTransportLayer();
+        return *dynamic_cast<transport::TransportLayerASIO*>(tl);
+    }
+};
+
+TEST_F(TransportLayerASIOWithServiceContextTest, TransportStartAfterShutDown) {
+    tla().shutdown();
+    ASSERT_EQ(tla().start(), transport::TransportLayer::ShutdownStatus);
 }
 
 }  // namespace
