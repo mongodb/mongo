@@ -36,6 +36,8 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/global_index.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/stats/counters.h"
@@ -58,35 +60,22 @@ CachedCollectionProperties::getCollectionProperties(OperationContext* opCtx,
         return it->second;
     }
 
-    auto collProperties = getCollectionPropertiesImpl(opCtx, NamespaceString(ns.key()));
+    CollectionProperties collProperties;
+    if (auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+            opCtx, NamespaceString(ns.key()))) {
+        collProperties.isCapped = collection->isCapped();
+        collProperties.isClustered = collection->isClustered();
+        collProperties.collator = collection->getDefaultCollator();
+    }
     _cache[ns] = collProperties;
     return collProperties;
 }
 
-CachedCollectionProperties::CollectionProperties
-CachedCollectionProperties::getCollectionPropertiesImpl(OperationContext* opCtx,
-                                                        const NamespaceString& nss) {
-    CollectionProperties collProperties;
-
-    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-
-    if (!collection) {
-        return collProperties;
-    }
-
-    collProperties.isCapped = collection->isCapped();
-    collProperties.isClustered = collection->isClustered();
-    collProperties.collator = collection->getDefaultCollator();
-    return collProperties;
-}
-
-void OplogApplierUtils::processCrudOp(OperationContext* opCtx,
-                                      OplogEntry* op,
-                                      uint32_t* hash,
-                                      StringMapHashedKey* hashedNs,
-                                      CachedCollectionProperties* collPropertiesCache) {
-    auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, *hashedNs);
-
+void OplogApplierUtils::processCrudOp(
+    OperationContext* opCtx,
+    OplogEntry* op,
+    uint32_t* hash,
+    const CachedCollectionProperties::CollectionProperties& collProperties) {
     // Include the _id of the document in the hash so we get parallelism even if all writes are to a
     // single collection.
     //
@@ -94,7 +83,14 @@ void OplogApplierUtils::processCrudOp(OperationContext* opCtx,
     // insertion order. One exception are clustered capped collections with a monotonically
     // increasing cluster key, which guarantee preservation of the insertion order.
     if (!collProperties.isCapped || collProperties.isClustered) {
-        BSONElement id = op->getIdElement();
+        BSONElement id = [&]() {
+            if (op->isGlobalIndexCrudOpType()) {
+                // The document key indentifies the base collection's document, and is used to
+                // serialise index key writes referring to the same document.
+                return op->getObject().getField(global_index::kOplogEntryDocKeyFieldName);
+            }
+            return op->getIdElement();
+        }();
         BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore,
                                             collProperties.collator);
         const size_t idHash = elementHasher.hash(id);
@@ -114,15 +110,21 @@ uint32_t OplogApplierUtils::addToWriterVector(
     std::vector<std::vector<const OplogEntry*>>* writerVectors,
     CachedCollectionProperties* collPropertiesCache,
     boost::optional<uint32_t> forceWriterId) {
-    auto hashedNs = StringMapHasher().hashed_key(op->getNss().ns());
+
+    NamespaceString nss = op->isGlobalIndexCrudOpType()
+        ? NamespaceString::makeGlobalIndexNSS(op->getUuid().value())
+        : op->getNss();
 
     // Reduce the hash from 64bit down to 32bit, just to allow combinations with murmur3 later
     // on. Bit depth not important, we end up just doing integer modulo with this in the end.
     // The hash function should provide entropy in the lower bits as it's used in hash tables.
-    uint32_t hash = static_cast<uint32_t>(hashedNs.hash());
+    auto hashedNs = StringMapHasher().hashed_key(nss.ns());
+    auto hash = static_cast<uint32_t>(hashedNs.hash());
 
-    if (op->isCrudOpType())
-        processCrudOp(opCtx, op, &hash, &hashedNs, collPropertiesCache);
+    if (op->isCrudOpType()) {
+        auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, hashedNs);
+        processCrudOp(opCtx, op, &hash, collProperties);
+    }
 
     const uint32_t numWriters = writerVectors->size();
     auto writerId = (forceWriterId ? *forceWriterId : hash) % numWriters;

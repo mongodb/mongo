@@ -549,6 +549,12 @@ public:
     bool isCrudOpType() const;
 
     /**
+     * Returns true if the oplog entry is for a global index CRUD operation.
+     */
+    static bool isGlobalIndexCrudOpType(OpTypeEnum opType);
+    bool isGlobalIndexCrudOpType() const;
+
+    /**
      * Returns true if the oplog entry is for an Update or Delete operation.
      */
     bool isUpdateOrDelete() const;
@@ -756,6 +762,7 @@ public:
     mongo::Date_t getWallClockTimeForPreImage() const;
 
     bool isCrudOpType() const;
+    bool isGlobalIndexCrudOpType() const;
     bool isUpdateOrDelete() const;
     bool isIndexCommandType() const;
     bool shouldPrepare() const;

@@ -57,6 +57,7 @@
 #include "mongo/db/repl/idempotency_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -4193,6 +4194,183 @@ TEST_F(IdempotencyTestTxns, CommitPreparedTransactionIgnoresNamespaceNotFoundErr
     // operation has no effect.
     ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
 }
+
+class GlobalIndexTest : public OplogApplierImplTest {
+protected:
+    using WriterVectors = std::vector<std::vector<const OplogEntry*>>;
+
+    void setUp() override {
+        OplogApplierImplTest::setUp();
+        writerPool = makeReplWriterPool();
+        applier = std::make_unique<TrackOpsAppliedApplier>(
+            nullptr,  // executor
+            nullptr,  // oplogBuffer
+            &observer,
+            ReplicationCoordinator::get(_opCtx.get()),
+            getConsistencyMarkers(),
+            getStorageInterface(),
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+            writerPool.get());
+    }
+
+    struct GlobalIndexCrudOp {
+        enum class Type { Insert, Delete };
+
+        UUID uuid;
+        Type type;
+        BSONObj key;
+        BSONObj docKey;
+    };
+
+    auto makeApplyOpsForGlobalIndexCrudBatch(const std::vector<GlobalIndexCrudOp>& batch) {
+        BSONArrayBuilder arrBuilder;
+        NamespaceString nss("system"_sd);
+        for (const auto& op : batch) {
+            if (op.type == GlobalIndexCrudOp::Type::Insert) {
+                arrBuilder << MutableOplogEntry::makeInsertGlobalIndexKeyOperation(
+                                  nss, op.uuid, op.key, op.docKey)
+                                  .toBSON();
+            } else {
+                arrBuilder << MutableOplogEntry::makeDeleteGlobalIndexKeyOperation(
+                                  nss, op.uuid, op.key, op.docKey)
+                                  .toBSON();
+            }
+        }
+        return BSON("applyOps" << arrBuilder.arr());
+    }
+
+    std::vector<OplogEntry> makeGlobalIndexCrudApplyOpsOplogBatch(
+        const std::vector<GlobalIndexCrudOp>& batch) {
+        const auto sessionId = makeLogicalSessionIdForTest();
+        OperationSessionInfo sessionInfo;
+        sessionInfo.setSessionId(sessionId);
+        sessionInfo.setTxnNumber(3);
+        const NamespaceString& nss{"admin", "$cmd"};
+        repl::OpTime opTime(Timestamp(1, 0), 1);
+
+        return {makeOplogEntry(opTime,                                      // optime
+                               OpTypeEnum::kCommand,                        // op type
+                               nss,                                         // namespace
+                               makeApplyOpsForGlobalIndexCrudBatch(batch),  // o
+                               boost::none,                                 // o2
+                               sessionInfo,                                 // session info
+                               Date_t::now(),                               // wall clock time
+                               {},
+                               boost::none,
+                               repl::OpTime())};
+    }
+
+    void filterConfigTransactionsEntryFromWriterVectors(WriterVectors& writerVectors) {
+        for (auto& vector : writerVectors) {
+            for (auto it = vector.begin(); it != vector.end(); ++it) {
+                if ((*it)->getNss() == NamespaceString::kSessionTransactionsTableNamespace) {
+                    vector.erase(it);
+                    return;
+                }
+            }
+        }
+    }
+
+    std::unique_ptr<TrackOpsAppliedApplier> applier;
+    std::unique_ptr<ThreadPool> writerPool;
+    NoopOplogApplierObserver observer;
+};
+
+TEST_F(GlobalIndexTest, SameUUIDSameDocKeyToSameWriter) {
+    // Regardless of the UUID, if the docKey is the same, the writer should be the same.
+    const UUID uuid1 = UUID::gen();
+
+    auto key1 = BSON("a" << 1);
+    auto key2 = BSON("a" << 20);
+
+    auto sameDocKey = BSON("sk" << 1 << "_id" << 1);
+
+    auto ops = makeGlobalIndexCrudApplyOpsOplogBatch(
+        {{uuid1, GlobalIndexCrudOp::Type::Insert, key1, sameDocKey},
+         {uuid1, GlobalIndexCrudOp::Type::Insert, key2, sameDocKey}});
+
+    WriterVectors writerVectors(writerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+    filterConfigTransactionsEntryFromWriterVectors(writerVectors);
+
+    bool found = false;
+    // We expect the two operations to be in the same writer vector. Only one of the writers should
+    // contain operations.
+    for (auto& vector : writerVectors) {
+        if (found) {
+            ASSERT(vector.size() == 0);
+        } else {
+            // An oplog entry
+            found = (vector.size() == 2);
+            ASSERT(vector.size() == 0 || found);
+        }
+    }
+    ASSERT(found);
+}
+
+TEST_F(GlobalIndexTest, LargeBatchSameUUIDDifferentDocKeyAssignsAtLeastOneOpToEachWriter) {
+    // Scale the test by the number of writer threads, so it does not start failing if maxThreads
+    // changes.
+    const int kNumEntries = writerPool->getStats().options.maxThreads * 1000;
+    const UUID uuid1 = UUID::gen();
+    std::vector<GlobalIndexCrudOp> opBatch;
+    opBatch.reserve(kNumEntries);
+
+    for (int i = 0; i < kNumEntries / 2; i++) {
+        auto key = BSON("a" << i);
+        auto docKey = BSON("sk" << 1 << "_id" << i);
+        opBatch.emplace_back(
+            GlobalIndexCrudOp{uuid1, GlobalIndexCrudOp::Type::Insert, key, docKey});
+        opBatch.emplace_back(
+            GlobalIndexCrudOp{uuid1, GlobalIndexCrudOp::Type::Delete, key, docKey});
+    }
+
+    auto ops = makeGlobalIndexCrudApplyOpsOplogBatch(opBatch);
+
+    WriterVectors writerVectors(writerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    size_t count = 0;
+    for (auto& vector : writerVectors) {
+        // Verify each writer has been assigned some operations.
+        ASSERT_GT(vector.size(), 0);
+        count += vector.size();
+    }
+    ASSERT_EQ(count, kNumEntries + 1);  // CRUD ops + 1 config.transactions entry.
+}
+
+TEST_F(GlobalIndexTest, LargeBatchDifferentUUIDAssignsAtLeastOneOpToEachWriter) {
+    // Scale the test by the number of writer threads, so it does not start failing if maxThreads
+    // changes.
+    const int kNumEntries = writerPool->getStats().options.maxThreads * 1000;
+    std::vector<GlobalIndexCrudOp> opBatch;
+    opBatch.reserve(kNumEntries);
+
+    auto key = BSON("a" << 1);
+    auto docKey = BSON("sk" << 1 << "_id" << 1);
+    for (int i = 0; i < kNumEntries / 2; i++) {
+        const auto uuid = UUID::gen();
+        opBatch.emplace_back(GlobalIndexCrudOp{uuid, GlobalIndexCrudOp::Type::Insert, key, docKey});
+        opBatch.emplace_back(GlobalIndexCrudOp{uuid, GlobalIndexCrudOp::Type::Delete, key, docKey});
+    }
+
+    auto ops = makeGlobalIndexCrudApplyOpsOplogBatch(opBatch);
+
+    WriterVectors writerVectors(writerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    size_t count = 0;
+    for (auto& vector : writerVectors) {
+        // Verify each writer has been assigned some operations.
+        ASSERT_GT(vector.size(), 0);
+        count += vector.size();
+    }
+    ASSERT_EQ(count, kNumEntries + 1);  // CRUD ops + 1 config.transactions entry.
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

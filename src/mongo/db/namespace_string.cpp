@@ -333,9 +333,8 @@ NamespaceString NamespaceString::makeChangeCollectionNSS(
 }
 
 NamespaceString NamespaceString::makeGlobalIndexNSS(const UUID& id) {
-    return NamespaceString(
-        kSystemDb,
-        fmt::format("{}{}", NamespaceString::kGlobalIndexCollectionPrefix, id.toString()));
+    return NamespaceString(kSystemDb,
+                           NamespaceString::kGlobalIndexCollectionPrefix + id.toString());
 }
 
 NamespaceString NamespaceString::makePreImageCollectionNSS(

@@ -438,6 +438,15 @@ bool DurableOplogEntry::isCrudOpType() const {
     return isCrudOpType(getOpType());
 }
 
+bool DurableOplogEntry::isGlobalIndexCrudOpType(OpTypeEnum opType) {
+    return opType == OpTypeEnum::kInsertGlobalIndexKey ||
+        opType == OpTypeEnum::kDeleteGlobalIndexKey;
+}
+
+bool DurableOplogEntry::isGlobalIndexCrudOpType() const {
+    return isGlobalIndexCrudOpType(getOpType());
+}
+
 bool DurableOplogEntry::isUpdateOrDelete() const {
     auto opType = getOpType();
     switch (opType) {
@@ -781,6 +790,10 @@ mongo::Date_t OplogEntry::getWallClockTimeForPreImage() const {
 
 bool OplogEntry::isCrudOpType() const {
     return _entry.isCrudOpType();
+}
+
+bool OplogEntry::isGlobalIndexCrudOpType() const {
+    return _entry.isGlobalIndexCrudOpType();
 }
 
 bool OplogEntry::isUpdateOrDelete() const {

@@ -53,9 +53,6 @@ public:
                                                  const StringMapHashedKey& ns);
 
 private:
-    CollectionProperties getCollectionPropertiesImpl(OperationContext* opCtx,
-                                                     const NamespaceString& nss);
-
     StringMap<CollectionProperties> _cache;
 };
 
@@ -77,11 +74,11 @@ public:
     /**
      * Updates a CRUD op's hash and isForCappedCollection field if necessary.
      */
-    static void processCrudOp(OperationContext* opCtx,
-                              OplogEntry* op,
-                              uint32_t* hash,
-                              StringMapHashedKey* hashedNs,
-                              CachedCollectionProperties* collPropertiesCache);
+    static void processCrudOp(
+        OperationContext* opCtx,
+        OplogEntry* op,
+        uint32_t* hash,
+        const CachedCollectionProperties::CollectionProperties& collProperties);
 
 
     /**
