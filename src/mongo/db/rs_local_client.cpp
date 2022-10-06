@@ -103,6 +103,9 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
     boost::optional<ScopeGuard<std::function<void()>>> readSourceGuard;
 
     if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
+        invariant(!opCtx->lockState()->isLocked());
+        invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
         // Resets to the original read source at the end of this operation.
         auto originalReadSource = opCtx->recoveryUnit()->getTimestampReadSource();
         boost::optional<Timestamp> originalReadTimestamp;
