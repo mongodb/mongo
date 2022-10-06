@@ -89,14 +89,14 @@ function runRollbackAfterMigrationCommitted(tenantId) {
     // Stepping up one of the secondaries should cause the original primary to rollback.
     jsTestLog("Stepping up one of the secondaries.");
     const newRecipientPrimary = secondaries[0];
-    assert.commandWorked(newRecipientPrimary.adminCommand({replSetStepUp: 1}));
+    recipientRst.stepUp(newRecipientPrimary, {awaitReplicationBeforeStepUp: false});
 
     jsTestLog("Restarting server replication.");
     restartServerReplication(secondaries);
     recipientRst.awaitReplication();
 
     jsTestLog("Stepping up the original primary back to primary.");
-    assert.commandWorked(originalPrimary.adminCommand({replSetStepUp: 1}));
+    recipientRst.stepUp(originalPrimary, {awaitReplicationBeforeStepUp: false});
 
     jsTestLog("Perform a read against the original primary on the tenant collection.");
     assert.eq(numDocs, originalPrimary.getDB(dbName)[collName].find().itcount());
@@ -188,7 +188,7 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
 
     // Stepping up one of the secondaries should cause the original primary to rollback.
     jsTestLog("Stepping up one of the secondaries.");
-    assert.commandWorked(newPrimary.adminCommand({replSetStepUp: 1}));
+    recipientRst.stepUp(newPrimary, {awaitReplicationBeforeStepUp: false});
 
     assert.commandFailedWithCode(recipientForgetMigrationThread.returnData(),
                                  ErrorCodes.InterruptedDueToReplStateChange);
@@ -203,13 +203,13 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
     jsTestLog("Stepping up the original primary back to primary.");
     const fpOriginalPrimaryBeforeStarting =
         configureFailPoint(originalPrimary, "pauseBeforeRunTenantMigrationRecipientInstance");
-    assert.commandWorked(originalPrimary.adminCommand({replSetStepUp: 1}));
+    fpOriginalPrimary.off();
+    recipientRst.stepUp(originalPrimary, {awaitReplicationBeforeStepUp: false});
 
     jsTestLog("Perform another read against the original primary on the tenant collection.");
     assert.eq(1, originalPrimary.getDB(dbName)[collName].find().itcount());
 
     fpOriginalPrimaryBeforeStarting.off();
-    fpOriginalPrimary.off();
     fpNewPrimary.off();
 
     tenantMigrationTest.stop();
