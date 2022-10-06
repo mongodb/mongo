@@ -211,27 +211,37 @@ void dropContainer(OperationContext* opCtx, const UUID& indexUUID) {
 }
 
 void insertKey(OperationContext* opCtx,
+               const CollectionPtr& container,
+               const BSONObj& key,
+               const BSONObj& docKey) {
+    const auto indexEntry = buildIndexEntry(key, docKey);
+    invariant(!opCtx->writesAreReplicated());
+
+    uassertStatusOK(collection_internal::insertDocument(
+        opCtx, container, InsertStatement(indexEntry), nullptr));
+}
+
+void insertKey(OperationContext* opCtx,
                const UUID& indexUUID,
                const BSONObj& key,
                const BSONObj& docKey) {
     const auto ns = NamespaceString::makeGlobalIndexNSS(indexUUID);
     const auto indexEntry = buildIndexEntry(key, docKey);
-    // Insert the index entry.
 
+    // Insert the index entry.
     writeConflictRetry(opCtx, "insertGlobalIndexKey", ns.toString(), [&] {
         WriteUnitOfWork wuow(opCtx);
-        AutoGetCollection container(opCtx, ns, MODE_IX);
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        auto& container = autoColl.getCollection();
+
+        uassert(6789402,
+                str::stream() << "Global index container with UUID " << indexUUID
+                              << " does not exist.",
+                container);
 
         {
             repl::UnreplicatedWritesBlock unreplicatedWrites(opCtx);
-
-            uassert(6789402,
-                    str::stream() << "Global index container with UUID " << indexUUID
-                                  << " does not exist.",
-                    container);
-
-            uassertStatusOK(collection_internal::insertDocument(
-                opCtx, *container, InsertStatement(indexEntry), nullptr));
+            insertKey(opCtx, container, key, docKey);
         }
 
         opCtx->getServiceContext()->getOpObserver()->onInsertGlobalIndexKey(
@@ -239,6 +249,46 @@ void insertKey(OperationContext* opCtx,
 
         wuow.commit();
     });
+}
+
+void deleteKey(OperationContext* opCtx,
+               const CollectionPtr& container,
+               const BSONObj& key,
+               const BSONObj& docKey) {
+    const auto indexEntry = buildIndexEntry(key, docKey);
+    invariant(!opCtx->writesAreReplicated());
+
+    // Params for single delete (isMulti=false).
+    auto deleteStageParams = std::make_unique<DeleteStageParams>();
+    deleteStageParams->returnDeleted = true;
+
+    auto docKeyRecordId = docKeyToRecordIdBound(docKey);
+
+    // Global index container is a clustered collection, where the _id is the docKey, which
+    // is why we delete using a collection scan.
+    auto planExecutor = InternalPlanner::deleteWithCollectionScan(
+        opCtx,
+        &container,
+        std::move(deleteStageParams),
+        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+        InternalPlanner::FORWARD,
+        docKeyRecordId,
+        docKeyRecordId,
+        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords);
+
+    // For now _id is unique, so we assume only one entry can be returned.
+    BSONObj deletedObj;
+    planExecutor->getNext(&deletedObj, nullptr);
+
+    // Return error if no document has been found (deletedObj is empty) or if the associated
+    // "key" does not match the key provided as parameter.
+    uassert(ErrorCodes::KeyNotFound,
+            str::stream() << "Global index container with UUID " << container->uuid()
+                          << " does not contain specified entry. key:" << key
+                          << ", docKey:" << docKey,
+            deletedObj.woCompare(buildIndexEntry(key, docKey)) == 0);
+
+    fassert(6924202, planExecutor->isEOF());
 }
 
 void deleteKey(OperationContext* opCtx,
@@ -252,46 +302,15 @@ void deleteKey(OperationContext* opCtx,
         WriteUnitOfWork wuow(opCtx);
 
         AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-        auto& collection = autoColl.getCollection();
+        auto& container = autoColl.getCollection();
         uassert(6924201,
                 str::stream() << "Global index container with UUID " << indexUUID
                               << " does not exist.",
-                collection);
+                container);
 
         {
             repl::UnreplicatedWritesBlock unreplicatedWrites(opCtx);
-
-            // Params for single delete (isMulti=false).
-            auto deleteStageParams = std::make_unique<DeleteStageParams>();
-            deleteStageParams->returnDeleted = true;
-
-            auto docKeyRecordId = docKeyToRecordIdBound(docKey);
-
-            // Global index container is a clustered collection, where the _id is the docKey, which
-            // is why we delete using a collection scan.
-            auto planExecutor = InternalPlanner::deleteWithCollectionScan(
-                opCtx,
-                &collection,
-                std::move(deleteStageParams),
-                PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                InternalPlanner::FORWARD,
-                docKeyRecordId,
-                docKeyRecordId,
-                CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords);
-
-            // For now _id is unique, so we asume only one entry can be returned.
-            BSONObj deletedObj;
-            planExecutor->getNext(&deletedObj, nullptr);
-
-            // Return error if no document has been found (deletedObj is empty) or if the associated
-            // "key" does not match the key provided as parameter.
-            uassert(ErrorCodes::KeyNotFound,
-                    str::stream() << "Global index container with UUID " << indexUUID
-                                  << " does not contain specified entry. key:" << key
-                                  << ", docKey:" << docKey,
-                    deletedObj.woCompare(buildIndexEntry(key, docKey)) == 0);
-
-            fassert(6924202, planExecutor->isEOF());
+            deleteKey(opCtx, container, key, docKey);
         }
 
         opCtx->getServiceContext()->getOpObserver()->onDeleteGlobalIndexKey(

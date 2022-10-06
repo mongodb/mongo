@@ -70,6 +70,14 @@ void insertKey(OperationContext* opCtx,
                const UUID& indexUUID,
                const BSONObj& key,
                const BSONObj& docKey);
+/**
+ * Variant of the above where the lock for the global index container is already granted. Unlike
+ * the above, this variant requires the call to be wrapped inside a writeConflictRetry.
+ */
+void insertKey(OperationContext* opCtx,
+               const CollectionPtr& container,
+               const BSONObj& key,
+               const BSONObj& docKey);
 
 /**
  * Deletes a key from the global index container identified by UUID. Replicates as an 'xd' command.
@@ -78,6 +86,15 @@ void insertKey(OperationContext* opCtx,
  */
 void deleteKey(OperationContext* opCtx,
                const UUID& indexUUID,
+               const BSONObj& key,
+               const BSONObj& docKey);
+
+/**
+ * Variant of the above where the lock for the global index container is already granted. Unlike
+ * the above, this variant requires the call to be wrapped inside a writeConflictRetry.
+ */
+void deleteKey(OperationContext* opCtx,
+               const CollectionPtr& container,
                const BSONObj& key,
                const BSONObj& docKey);
 
