@@ -298,8 +298,8 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
             {
                 Lock::ResourceLock checkpointLock{
                     opCtx, ResourceId(RESOURCE_MUTEX, "checkpoint"), MODE_X};
-                _engine->clearIndividuallyCheckpointedIndexes();
                 invariantWTOK(s->checkpoint(s, config), s);
+                _engine->clearIndividuallyCheckpointedIndexes();
             }
 
             if (token) {
@@ -353,10 +353,10 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
         LOGV2_DEBUG(22419, 4, "flushed journal");
     } else {
         Lock::ResourceLock checkpointLock{opCtx, ResourceId(RESOURCE_MUTEX, "checkpoint"), MODE_X};
-        _engine->clearIndividuallyCheckpointedIndexes();
         invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, nullptr),
                       _waitUntilDurableSession);
         LOGV2_DEBUG(22420, 4, "created checkpoint");
+        _engine->clearIndividuallyCheckpointedIndexes();
     }
 
     if (token) {

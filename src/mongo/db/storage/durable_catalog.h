@@ -238,6 +238,10 @@ public:
 
     virtual int getTotalIndexCount(OperationContext* opCtx, const RecordId& catalogId) const = 0;
 
+    virtual void getReadyIndexes(OperationContext* opCtx,
+                                 RecordId catalogId,
+                                 StringSet* names) const = 0;
+
     virtual bool isIndexPresent(OperationContext* opCtx,
                                 const RecordId& catalogId,
                                 StringData indexName) const = 0;

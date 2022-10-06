@@ -36,6 +36,7 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/util/fail_point.h"
@@ -50,7 +51,9 @@ namespace {
 const NamespaceString kNss = NamespaceString("fooDB.fooColl");
 
 class ValidateStateTest : public CatalogTestFixture {
-public:
+protected:
+    ValidateStateTest(Options options = {}) : CatalogTestFixture(std::move(options)) {}
+
     /**
      * Create collection 'nss'. It will possess a default _id index.
      */
@@ -63,6 +66,12 @@ public:
 
 private:
     void setUp() override;
+};
+
+// Background validation opens checkpoint cursors which requires reading from the disk.
+class ValidateStateDiskTest : public ValidateStateTest {
+protected:
+    ValidateStateDiskTest() : ValidateStateTest(Options{}.ephemeral(false)) {}
 };
 
 void ValidateStateTest::createCollection(OperationContext* opCtx, const NamespaceString& nss) {
@@ -170,7 +179,8 @@ TEST_F(ValidateStateTest, NonExistentCollectionShouldThrowNamespaceNotFoundError
         ErrorCodes::NamespaceNotFound);
 }
 
-TEST_F(ValidateStateTest, UncheckpointedCollectionShouldBeAbleToInitializeCursors) {
+// Validate with {background:true} should fail to find an uncheckpoint'ed collection.
+TEST_F(ValidateStateDiskTest, UncheckpointedCollectionShouldThrowCursorNotFoundError) {
     auto opCtx = operationContext();
 
     // Disable periodic checkpoint'ing thread so we can control when checkpoints occur.
@@ -179,16 +189,16 @@ TEST_F(ValidateStateTest, UncheckpointedCollectionShouldBeAbleToInitializeCursor
     // Checkpoint of all of the data.
     opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx, /*stableCheckpoint*/ false);
 
+    // Create the collection, which will not be in the checkpoint, and check that a CursorNotFound
+    // error is thrown when attempting to open cursors.
     createCollectionAndPopulateIt(opCtx, kNss);
     CollectionValidation::ValidateState validateState(
         opCtx,
         kNss,
         CollectionValidation::ValidateMode::kBackground,
         CollectionValidation::RepairMode::kNone);
-    // Assert that cursors are able to created on the new collection.
-    validateState.initializeCursors(opCtx);
-    // There should only be a first record id if cursors were initialized successfully.
-    ASSERT(!validateState.getFirstRecordId().isNull());
+    ASSERT_THROWS_CODE(
+        validateState.initializeCursors(opCtx), AssertionException, ErrorCodes::CursorNotFound);
 }
 
 // Basic test with {background:false} to open cursors against all collection indexes.
@@ -234,8 +244,8 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
     ASSERT_EQ(validateState.getIndexes().size(), 5);
 }
 
-// Open cursors against all indexes with {background:true}.
-TEST_F(ValidateStateTest, OpenCursorsOnAllIndexesWithBackground) {
+// Open cursors against checkpoint'ed indexes with {background:true}.
+TEST_F(ValidateStateDiskTest, OpenCursorsOnCheckpointedIndexes) {
     auto opCtx = operationContext();
     createCollectionAndPopulateIt(opCtx, kNss);
 
@@ -259,14 +269,57 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexesWithBackground) {
         CollectionValidation::RepairMode::kNone);
     validateState.initializeCursors(opCtx);
 
-    // We should be able to open a cursor on each index.
-    // (Note the _id index was create with collection creation, so we have 5 indexes.)
-    ASSERT_EQ(validateState.getIndexes().size(), 5);
+    // Make sure the uncheckpoint'ed indexes are not found.
+    // (Note the _id index was create with collection creation, so we have 3 indexes.)
+    ASSERT_EQ(validateState.getIndexes().size(), 3);
+}
+
+// Only open cursors against indexes that are consistent with the rest of the checkpoint'ed data.
+TEST_F(ValidateStateDiskTest, OpenCursorsOnConsistentlyCheckpointedIndexes) {
+    auto opCtx = operationContext();
+    createCollectionAndPopulateIt(opCtx, kNss);
+
+    // Disable periodic checkpoint'ing thread so we can control when checkpoints occur.
+    FailPointEnableBlock failPoint("pauseCheckpointThread");
+
+    // Create several indexes.
+    createIndex(opCtx, kNss, BSON("a" << 1));
+    createIndex(opCtx, kNss, BSON("b" << 1));
+    createIndex(opCtx, kNss, BSON("c" << 1));
+    createIndex(opCtx, kNss, BSON("d" << 1));
+
+    // Checkpoint the indexes.
+    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx, /*stableCheckpoint*/ false);
+
+    {
+        // Artificially set two indexes as inconsistent with the checkpoint.
+        AutoGetCollection autoColl(opCtx, kNss, MODE_IS);
+        auto indexIdentA =
+            opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
+                opCtx, autoColl.getCollection()->getCatalogId(), "a_1");
+        auto indexIdentB =
+            opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
+                opCtx, autoColl.getCollection()->getCatalogId(), "b_1");
+        opCtx->getServiceContext()->getStorageEngine()->addIndividuallyCheckpointedIndex(
+            indexIdentA);
+        opCtx->getServiceContext()->getStorageEngine()->addIndividuallyCheckpointedIndex(
+            indexIdentB);
+    }
+
+    // The two inconsistent indexes should not be found.
+    // (Note the _id index was create with collection creation, so we have 3 indexes.)
+    CollectionValidation::ValidateState validateState(
+        opCtx,
+        kNss,
+        CollectionValidation::ValidateMode::kBackground,
+        CollectionValidation::RepairMode::kNone);
+    validateState.initializeCursors(opCtx);
+    ASSERT_EQ(validateState.getIndexes().size(), 3);
 }
 
 // Indexes in the checkpoint that were dropped in the present should not have cursors opened against
 // them.
-TEST_F(ValidateStateTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatWereLaterDropped) {
+TEST_F(ValidateStateDiskTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatWereLaterDropped) {
     auto opCtx = operationContext();
     createCollectionAndPopulateIt(opCtx, kNss);
 

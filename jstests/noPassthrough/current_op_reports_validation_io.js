@@ -1,6 +1,8 @@
 /**
  * Verifies that the 'dataThroughputLastSecond' and 'dataThroughputAverage' fields appear in the
  * currentOp output while running validation.
+ *
+ * @tags: [requires_fsync, requires_wiredtiger, requires_persistence]
  */
 (function() {
 const dbName = "test";
@@ -29,6 +31,9 @@ assert.commandWorked(db.adminCommand(
 // validation statistics once we hit this fail point.
 assert.commandWorked(
     db.adminCommand({configureFailPoint: "pauseCollectionValidationWithLock", mode: "alwaysOn"}));
+
+// Forces a checkpoint to make the background validation see the data.
+assert.commandWorked(db.adminCommand({fsync: 1}));
 
 TestData.dbName = dbName;
 TestData.collName = collName;
