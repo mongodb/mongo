@@ -115,6 +115,8 @@ public:
             catalogId,
             getCatalog()->getMetaData(operationContext(), catalogId),
             std::move(coll.second));
+
+        Lock::GlobalWrite lk(operationContext());
         CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(operationContext(),
                                        options.uuid.value(),

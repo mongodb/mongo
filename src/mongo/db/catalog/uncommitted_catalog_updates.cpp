@@ -117,7 +117,7 @@ void UncommittedCatalogUpdates::_createCollection(OperationContext* opCtx,
 
             // This will throw when registering a namespace which is already in use.
             CollectionCatalog::write(opCtx, [&, coll = createdColl](CollectionCatalog& catalog) {
-                catalog.registerCollection(opCtx, uuid, coll, /*ts=*/boost::none);
+                catalog.registerCollectionTwoPhase(opCtx, uuid, coll, /*ts=*/boost::none);
             });
 
             opCtx->recoveryUnit()->onRollback([opCtx, uuid]() {
@@ -250,6 +250,10 @@ void UncommittedCatalogUpdates::openCollection(OperationContext* opCtx,
         }
         _entries.erase(it);
     });
+}
+
+const std::vector<UncommittedCatalogUpdates::Entry>& UncommittedCatalogUpdates::entries() const {
+    return _entries;
 }
 
 std::vector<UncommittedCatalogUpdates::Entry> UncommittedCatalogUpdates::releaseEntries() {

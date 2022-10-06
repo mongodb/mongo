@@ -149,12 +149,15 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
     shardRegistry()->reload(operationContext());
 
     auto uuid = UUID::gen();
-    CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(operationContext(),
-                                   uuid,
-                                   std::make_shared<CollectionMock>(kNamespace),
-                                   /*ts=*/boost::none);
-    });
+    {
+        Lock::GlobalWrite lk(operationContext());
+        CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(operationContext(),
+                                       uuid,
+                                       std::make_shared<CollectionMock>(kNamespace),
+                                       /*ts=*/boost::none);
+        });
+    }
 
     auto future = launchAsync([&] {
         ThreadClient tc("Test", getServiceContext());

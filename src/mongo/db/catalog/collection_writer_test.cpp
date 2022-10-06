@@ -55,6 +55,7 @@ public:
 protected:
     void setUp() override {
         CatalogTestFixture::setUp();
+        Lock::GlobalWrite lk(operationContext());
 
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(kNss);
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
@@ -250,6 +251,7 @@ public:
 
     void setUp() override {
         CatalogTestFixture::setUp();
+        Lock::GlobalWrite lk(operationContext());
 
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
             for (size_t i = 0; i < NumCollections; ++i) {

@@ -137,6 +137,19 @@ public:
     }
 
     /**
+     * Determine if an entry uses two-phase commit to write into the CollectionCatalog.
+     * kCreatedCollection is also committed using two-phase commit but using a separate system and
+     * is excluded from this list. kDroppedIndex is covered by kWritableCollection as a writable
+     * collection must be used to drop an index.
+     */
+    static bool isTwoPhaseCommitEntry(const Entry& entry) {
+        return (entry.action == Entry::Action::kWritableCollection ||
+                entry.action == Entry::Action::kRenamedCollection ||
+                entry.action == Entry::Action::kDroppedCollection ||
+                entry.action == Entry::Action::kRecreatedCollection);
+    }
+
+    /**
      * Lookup of Collection by UUID describing whether this namespace is managed, a managed
      * Collection pointer (may be returned as nullptr, which indicates a drop), and if it was
      * created in this transaction.
@@ -211,6 +224,11 @@ public:
      * Manages the lifetime of the collection instance from an earlier point-in-time.
      */
     void openCollection(OperationContext* opCtx, std::shared_ptr<Collection> coll);
+
+    /**
+     * Returns all entries without releasing them.
+     */
+    const std::vector<Entry>& entries() const;
 
     /**
      * Releases all entries, needs to be done when WriteUnitOfWork commits or rolls back.

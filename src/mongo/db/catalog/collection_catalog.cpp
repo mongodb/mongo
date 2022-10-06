@@ -123,19 +123,54 @@ public:
         catalog._catalog[collection->uuid()] = collection;
         auto dbIdPair = std::make_pair(collection->ns().dbName(), collection->uuid());
         catalog._orderedCollections[dbIdPair] = collection;
+
+        catalog._pendingCommitNamespaces.erase(collection->ns());
+        catalog._pendingCommitUUIDs.erase(collection->uuid());
     }
 
-    PublishCatalogUpdates(OperationContext* opCtx,
-                          UncommittedCatalogUpdates& uncommittedCatalogUpdates)
+    PublishCatalogUpdates(UncommittedCatalogUpdates& uncommittedCatalogUpdates)
         : _uncommittedCatalogUpdates(uncommittedCatalogUpdates) {}
 
     static void ensureRegisteredWithRecoveryUnit(
-        OperationContext* opCtx, UncommittedCatalogUpdates& UncommittedCatalogUpdates) {
+        OperationContext* opCtx, UncommittedCatalogUpdates& uncommittedCatalogUpdates) {
         if (opCtx->recoveryUnit()->hasRegisteredChangeForCatalogVisibility())
             return;
 
+        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+            opCtx->recoveryUnit()->registerPreCommitHook(
+                [](OperationContext* opCtx) { PublishCatalogUpdates::preCommit(opCtx); });
+        }
+
         opCtx->recoveryUnit()->registerChangeForCatalogVisibility(
-            std::make_unique<PublishCatalogUpdates>(opCtx, UncommittedCatalogUpdates));
+            std::make_unique<PublishCatalogUpdates>(uncommittedCatalogUpdates));
+    }
+
+    static void preCommit(OperationContext* opCtx) {
+        const auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+        const auto& entries = uncommittedCatalogUpdates.entries();
+
+        if (std::none_of(
+                entries.begin(), entries.end(), UncommittedCatalogUpdates::isTwoPhaseCommitEntry)) {
+            // Nothing to do, avoid calling CollectionCatalog::write.
+            return;
+        }
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            for (auto&& entry : entries) {
+                if (!UncommittedCatalogUpdates::isTwoPhaseCommitEntry(entry)) {
+                    continue;
+                }
+
+                // Mark the namespace as pending commit even if we don't have a collection instance.
+                std::shared_ptr<Collection>& collection =
+                    catalog._pendingCommitNamespaces[entry.nss];
+
+                if (!entry.collection)
+                    continue;
+
+                collection = entry.collection;
+                catalog._pendingCommitUUIDs[collection->uuid()] = collection;
+            }
+        });
     }
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) override {
@@ -161,6 +196,7 @@ public:
                         // We just need to do modifications on 'from' here. 'to' is taken care
                         // of by a separate kWritableCollection entry.
                         catalog._collections.erase(from);
+                        catalog._pendingCommitNamespaces.erase(from);
 
                         auto& resourceCatalog = ResourceCatalog::get(opCtx->getServiceContext());
                         resourceCatalog.remove({RESOURCE_COLLECTION, from}, from);
@@ -184,7 +220,12 @@ public:
                                          collection = entry.collection,
                                          uuid = *entry.externalUUID,
                                          commitTime](CollectionCatalog& catalog) {
-                        catalog.registerCollection(opCtx, uuid, std::move(collection), commitTime);
+                        // Override existing Collection on this namespace
+                        catalog._registerCollection(opCtx,
+                                                    uuid,
+                                                    std::move(collection),
+                                                    /*twoPhase=*/false,
+                                                    /*ts=*/commitTime);
                     });
                     // Fallthrough to the createCollection case to finish committing the collection.
                     [[fallthrough]];
@@ -206,6 +247,9 @@ public:
                             coll->setMinimumValidSnapshot(commitTime.value());
                         }
                         catalog._pushCatalogIdForNSS(coll->ns(), coll->getCatalogId(), commitTime);
+
+                        catalog._pendingCommitNamespaces.erase(coll->ns());
+                        catalog._pendingCommitUUIDs.erase(coll->uuid());
                         coll->setCommitted(true);
                     });
                     break;
@@ -261,7 +305,31 @@ public:
     }
 
     void rollback(OperationContext* opCtx) override {
-        _uncommittedCatalogUpdates.releaseEntries();
+        auto entries = _uncommittedCatalogUpdates.releaseEntries();
+        if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV())
+            return;
+
+        if (std::none_of(
+                entries.begin(), entries.end(), UncommittedCatalogUpdates::isTwoPhaseCommitEntry)) {
+            // Nothing to do, avoid calling CollectionCatalog::write.
+            return;
+        }
+
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            for (auto&& entry : entries) {
+                if (!UncommittedCatalogUpdates::isTwoPhaseCommitEntry(entry)) {
+                    continue;
+                }
+
+                catalog._pendingCommitNamespaces.erase(entry.nss);
+
+                // Entry without collection, nothing more to do
+                if (!entry.collection)
+                    continue;
+
+                catalog._pendingCommitUUIDs.erase(entry.collection->uuid());
+            }
+        });
     }
 
 private:
@@ -1370,6 +1438,22 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
                                            const UUID& uuid,
                                            std::shared_ptr<Collection> coll,
                                            boost::optional<Timestamp> commitTime) {
+    invariant(opCtx->lockState()->isW());
+    _registerCollection(opCtx, uuid, std::move(coll), /*twoPhase=*/false, commitTime);
+}
+
+void CollectionCatalog::registerCollectionTwoPhase(OperationContext* opCtx,
+                                                   const UUID& uuid,
+                                                   std::shared_ptr<Collection> coll,
+                                                   boost::optional<Timestamp> commitTime) {
+    _registerCollection(opCtx, uuid, std::move(coll), /*twoPhase=*/true, commitTime);
+}
+
+void CollectionCatalog::_registerCollection(OperationContext* opCtx,
+                                            const UUID& uuid,
+                                            std::shared_ptr<Collection> coll,
+                                            bool twoPhase,
+                                            boost::optional<Timestamp> commitTime) {
     auto nss = coll->ns();
     _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kAll);
 
@@ -1389,6 +1473,13 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
     _catalog[uuid] = coll;
     _collections[nss] = coll;
     _orderedCollections[dbIdPair] = coll;
+    if (twoPhase) {
+        _pendingCommitNamespaces[nss] = coll;
+        _pendingCommitUUIDs[uuid] = coll;
+    } else {
+        _pendingCommitNamespaces.erase(nss);
+        _pendingCommitUUIDs.erase(uuid);
+    }
 
     if (commitTime && !commitTime->isNull()) {
         coll->setMinimumValidSnapshot(commitTime.value());

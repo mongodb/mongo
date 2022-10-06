@@ -75,6 +75,8 @@ public:
             catalogId,
             _storageEngine->getCatalog()->getMetaData(opCtx, catalogId),
             std::move(rs));
+
+        Lock::GlobalWrite lk(opCtx);
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
                 opCtx, options.uuid.get(), std::move(coll), /*ts=*/boost::none);

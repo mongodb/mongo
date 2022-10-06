@@ -72,6 +72,7 @@ public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         opCtx = makeOperationContext();
+        globalLock.emplace(opCtx.get());
 
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(colUUID, nss);
         col = CollectionPtr(collection.get(), CollectionPtr::NoYieldTag{});
@@ -84,10 +85,15 @@ public:
                       CollectionCatalog::kNumCollectionReferencesStored + 1);
     }
 
+    void tearDown() {
+        globalLock.reset();
+    }
+
 protected:
     std::shared_ptr<CollectionCatalog> sharedCatalog = std::make_shared<CollectionCatalog>();
     CollectionCatalog& catalog = *sharedCatalog;
     ServiceContext::UniqueOperationContext opCtx;
+    boost::optional<Lock::GlobalWrite> globalLock;
     NamespaceString nss;
     CollectionPtr col;
     UUID colUUID;
@@ -100,6 +106,7 @@ public:
     void setUp() {
         ServiceContextMongoDTest::setUp();
         opCtx = makeOperationContext();
+        globalLock.emplace(opCtx.get());
 
         for (int counter = 0; counter < 5; ++counter) {
             NamespaceString fooNss("foo", "coll" + std::to_string(counter));
@@ -126,6 +133,7 @@ public:
                     opCtx.get(), kv.first, /*isDropPending=*/false, boost::none);
             }
         }
+        globalLock.reset();
     }
 
     std::map<UUID, CollectionPtr>::iterator collsIterator(std::string dbName) {
@@ -166,6 +174,7 @@ public:
 protected:
     CollectionCatalog catalog;
     ServiceContext::UniqueOperationContext opCtx;
+    boost::optional<Lock::GlobalWrite> globalLock;
     std::map<std::string, std::map<UUID, CollectionPtr>> dbMap;
 };
 
@@ -174,6 +183,7 @@ public:
     void setUp() {
         ServiceContextMongoDTest::setUp();
         opCtx = makeOperationContext();
+        globalLock.emplace(opCtx.get());
 
         for (int i = 0; i < 5; i++) {
             NamespaceString nss("resourceDb", "coll" + std::to_string(i));
@@ -222,11 +232,13 @@ public:
             numEntries++;
         }
         ASSERT_EQ(0, numEntries);
+        globalLock.reset();
     }
 
 protected:
     ServiceContext::UniqueOperationContext opCtx;
     CollectionCatalog catalog;
+    boost::optional<Lock::GlobalWrite> globalLock;
 };
 
 TEST_F(CollectionCatalogResourceTest, RemoveAllResources) {
@@ -468,7 +480,11 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS)
     catalog.deregisterCollection(opCtx.get(), colUUID, /*isDropPending=*/false, boost::none);
     ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), colUUID) == nullptr);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), nss);
-    catalog.registerCollection(opCtx.get(), colUUID, std::move(newCollShared), boost::none);
+    {
+        Lock::GlobalWrite lk(opCtx.get());
+        catalog.registerCollection(opCtx.get(), colUUID, std::move(newCollShared), boost::none);
+    }
+
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), colUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), newNss);
 

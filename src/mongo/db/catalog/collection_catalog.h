@@ -278,12 +278,25 @@ public:
     void onCloseDatabase(OperationContext* opCtx, DatabaseName dbName);
 
     /**
-     * Register the collection with `uuid`.
+     * Register the collection with `uuid` at a given commitTime.
+     *
+     * The global lock must be held in exclusive mode.
      */
     void registerCollection(OperationContext* opCtx,
                             const UUID& uuid,
                             std::shared_ptr<Collection> collection,
                             boost::optional<Timestamp> commitTime);
+
+    /**
+     * Like 'registerCollection' above but allows the Collection to be registered using just a
+     * MODE_IX lock on the namespace. The collection will be added to the catalog using a two-phase
+     * commit where it is marked as 'pending commit' internally. The user must call
+     * 'onCreateCollection' which sets up the necessary state for finishing the two-phase commit.
+     */
+    void registerCollectionTwoPhase(OperationContext* opCtx,
+                                    const UUID& uuid,
+                                    std::shared_ptr<Collection> collection,
+                                    boost::optional<Timestamp> commitTime);
 
     /**
      * Deregister the collection.
@@ -607,6 +620,18 @@ private:
     friend class CollectionCatalog::iterator;
     class PublishCatalogUpdates;
 
+    /**
+     * Register the collection with `uuid`.
+     *
+     * If 'twoPhase' is true, this call must be followed by 'onCreateCollection' which continues the
+     * two-phase commit process.
+     */
+    void _registerCollection(OperationContext* opCtx,
+                             const UUID& uuid,
+                             std::shared_ptr<Collection> collection,
+                             bool twoPhase,
+                             boost::optional<Timestamp> commitTime);
+
     std::shared_ptr<Collection> _lookupCollectionByUUID(UUID uuid) const;
 
     /**
@@ -710,6 +735,12 @@ private:
     OrderedCollectionMap _orderedCollections;  // Ordered by <dbName, collUUID> pair
     NamespaceCollectionMap _collections;
     UncommittedViewsSet _uncommittedViews;
+
+    // Namespaces and UUIDs in pending commit. The opened storage snapshot must be consulted to
+    // confirm visibility. The instance may be used if the namespace/uuid are otherwise unoccupied
+    // in the CollectionCatalog.
+    absl::flat_hash_map<NamespaceString, std::shared_ptr<Collection>> _pendingCommitNamespaces;
+    absl::flat_hash_map<UUID, std::shared_ptr<Collection>, UUID::Hash> _pendingCommitUUIDs;
 
     // CatalogId mappings for all known namespaces for the CollectionCatalog. The vector is sorted
     // on timestamp.
