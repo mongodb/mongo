@@ -129,6 +129,10 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
         float elapsedTimeSec = static_cast<float>(currentMillis - _startMillis) / 1000;
         float mbProcessed = static_cast<float>(_bytesProcessed + dataSize) / 1024 / 1024;
 
+        // Serialize concurrent access to CurOp dataThroughputLastSecond and dataThroughputAverage
+        // metrics.
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+
         // Update how much data we've seen in the last second for CurOp.
         CurOp::get(opCtx)->debug().dataThroughputLastSecond = mbProcessed / elapsedTimeSec;
 
