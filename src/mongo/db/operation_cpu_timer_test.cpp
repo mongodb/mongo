@@ -61,11 +61,16 @@ public:
         _opCtx = getGlobalServiceContext()->makeOperationContext(Client::getCurrent());
     }
 
-    void busyWait(Microseconds delay) const {
-        auto start = stdx::chrono::steady_clock::now();
-        auto end = start + stdx::chrono::microseconds{durationCount<Microseconds>(delay)};
-        while (stdx::chrono::steady_clock::now() <= end) {
+    void busyWait(Nanoseconds delay) const {
+        AtomicWord<bool> mayJoin{false};
+        stdx::thread blocker([&] {
+            sleepFor(delay);
+            mayJoin.store(true);
+        });
+        while (!mayJoin.load()) {
+            // Busy wait for the blocker thread.
         }
+        blocker.join();
     }
 
 private:
@@ -92,10 +97,10 @@ TEST_F(OperationCPUTimerTest, TestReset) {
     auto timer = getTimer();
 
     timer->start();
-    busyWait(Microseconds(1));  // Introducing some delay for the timer to measure.
+    busyWait(Milliseconds(1));  // Introducing some delay for the timer to measure.
     timer->stop();
     auto elapsedAfterStop = timer->getElapsed();
-    ASSERT_GTE(elapsedAfterStop, Microseconds(1));
+    ASSERT_GTE(elapsedAfterStop, Milliseconds(1));
 
     timer->start();
     auto elapsedAfterReset = timer->getElapsed();
