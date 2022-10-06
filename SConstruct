@@ -5299,7 +5299,8 @@ if (get_option('ninja') != "disabled" and ('ICECC' not in env or not env['ICECC'
 
 if get_option('ninja') != 'disabled':
 
-    env.AppendUnique(CCFLAGS=["-fdiagnostics-color"])
+    if env.ToolchainIs('gcc', 'clang'):
+        env.AppendUnique(CCFLAGS=["-fdiagnostics-color"])
     if 'ICECREAM_VERSION' in env and not env.get('CCACHE', None):
         if env['ICECREAM_VERSION'] < parse_version("1.2"):
             env.FatalError(
