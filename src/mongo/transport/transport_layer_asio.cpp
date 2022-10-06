@@ -1219,9 +1219,10 @@ void TransportLayerASIO::_runListener() noexcept {
 
 Status TransportLayerASIO::start() {
     stdx::unique_lock lk(_mutex);
-
-    // Make sure we haven't shutdown already
-    invariant(!_isShutdown);
+    if (_isShutdown) {
+        LOGV2(6986801, "Cannot start an already shutdown TransportLayer");
+        return ShutdownStatus;
+    }
 
     if (_listenerOptions.isIngress()) {
         _listener.thread = stdx::thread([this] { _runListener(); });
@@ -1240,7 +1241,6 @@ void TransportLayerASIO::shutdown() {
         // We were already stopped
         return;
     }
-
     lk.unlock();
     _timerService->stop();
     lk.lock();
