@@ -31,6 +31,8 @@ for (let i = 0; i < cRecords; ++i) {
 assert.commandWorked(bulk.execute({w: kNumNodes, wtimeout: 5000}));
 
 let secondary = replTest.getSecondary();
+// Wait for the insertion to be visible on 'secondary'.
+replTest.awaitLastOpCommitted(null, [secondary]);
 const readColl = secondary.getDB("test").foo;
 
 /**
