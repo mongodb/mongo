@@ -59,8 +59,6 @@ const clearCollection = function() {
         expectedStats.numBucketsClosedDueToTimeBackward = 0;
         expectedStats.numBucketsClosedDueToMemoryThreshold = 0;
         if (isTimeseriesScalabilityImprovementsEnabled) {
-            expectedStats.numBucketsArchivedDueToTimeForward = 0;
-            expectedStats.numBucketsArchivedDueToTimeBackward = 0;
             expectedStats.numBucketsArchivedDueToMemoryThreshold = 0;
             expectedStats.numBucketsReopened = 0;
             expectedStats.numBucketsKeptOpenDueToLargeMeasurements = 0;
@@ -166,13 +164,9 @@ assert.commandWorked(coll.insert(
 expectedStats.bucketCount++;
 expectedStats.numBucketInserts++;
 expectedStats.numCommits++;
-if (isTimeseriesScalabilityImprovementsEnabled) {
-    expectedStats.numBucketsArchivedDueToTimeBackward++;
-} else {
-    expectedStats.numBucketsClosedDueToTimeBackward++;
-}
+expectedStats.numBucketsClosedDueToTimeBackward++;
 expectedStats.numMeasurementsCommitted++;
-if (isTimeseriesBucketCompressionEnabled && !isTimeseriesScalabilityImprovementsEnabled) {
+if (isTimeseriesBucketCompressionEnabled) {
     expectedStats.numCompressedBuckets++;
 }
 checkCollStats();
@@ -253,11 +247,7 @@ assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += numDocs;
 expectedStats.numBucketInserts += numDocs;
 expectedStats.numBucketsOpenedDueToMetadata++;
-if (isTimeseriesScalabilityImprovementsEnabled) {
-    expectedStats.numBucketsArchivedDueToTimeForward++;
-} else {
-    expectedStats.numBucketsClosedDueToTimeForward++;
-}
+expectedStats.numBucketsClosedDueToTimeForward++;
 expectedStats.numCommits += numDocs;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =

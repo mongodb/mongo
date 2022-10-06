@@ -74,10 +74,8 @@ protected:
         AtomicWord<long long> numBucketsClosedDueToTimeForward;
         AtomicWord<long long> numBucketsClosedDueToTimeBackward;
         AtomicWord<long long> numBucketsClosedDueToMemoryThreshold;
-        AtomicWord<long long> numBucketsArchivedDueToTimeForward;
-        AtomicWord<long long> numBucketsArchivedDueToTimeBackward;
+        AtomicWord<long long> numBucketsClosedDueToReopening;
         AtomicWord<long long> numBucketsArchivedDueToMemoryThreshold;
-        AtomicWord<long long> numBucketsArchivedDueToReopening;
         AtomicWord<long long> numCommits;
         AtomicWord<long long> numWaits;
         AtomicWord<long long> numMeasurementsCommitted;
@@ -102,10 +100,8 @@ protected:
         void incNumBucketsClosedDueToTimeForward(long long increment = 1);
         void incNumBucketsClosedDueToTimeBackward(long long increment = 1);
         void incNumBucketsClosedDueToMemoryThreshold(long long increment = 1);
-        void incNumBucketsArchivedDueToTimeForward(long long increment = 1);
-        void incNumBucketsArchivedDueToTimeBackward(long long increment = 1);
+        void incNumBucketsClosedDueToReopening(long long increment = 1);
         void incNumBucketsArchivedDueToMemoryThreshold(long long increment = 1);
-        void incNumBucketsArchivedDueToReopening(long long increment = 1);
         void incNumCommits(long long increment = 1);
         void incNumWaits(long long increment = 1);
         void incNumMeasurementsCommitted(long long increment = 1);
@@ -522,7 +518,11 @@ protected:
     /**
      * Mode enum to determine the rollover type decision for a given bucket.
      */
-    enum class RolloverAction { kNone, kArchive, kClose };
+    enum class RolloverAction {
+        kNone,       // Keep bucket open
+        kSoftClose,  // Close bucket so it remains eligible for reopening
+        kHardClose,  // Permanently close bucket
+    };
 
     /**
      * Bundle of information that 'insert' needs to pass down to helper methods that may create a

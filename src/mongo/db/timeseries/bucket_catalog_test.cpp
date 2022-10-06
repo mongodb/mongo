@@ -39,16 +39,15 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
 constexpr StringData kNumSchemaChanges = "numBucketsClosedDueToSchemaChange"_sd;
 constexpr StringData kNumBucketsReopened = "numBucketsReopened"_sd;
-constexpr StringData kNumArchivedDueToTimeForward = "numBucketsArchivedDueToTimeForward"_sd;
-constexpr StringData kNumArchivedDueToTimeBackward = "numBucketsArchivedDueToTimeBackward"_sd;
 constexpr StringData kNumArchivedDueToMemoryThreshold = "numBucketsArchivedDueToMemoryThreshold"_sd;
-constexpr StringData kNumArchivedDueToReopening = "numBucketsArchivedDueToReopening"_sd;
+constexpr StringData kNumClosedDueToReopening = "numBucketsClosedDueToReopening"_sd;
 constexpr StringData kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"_sd;
 constexpr StringData kNumClosedDueToTimeBackward = "numBucketsClosedDueToTimeBackward"_sd;
 constexpr StringData kNumClosedDueToMemoryThreshold = "numBucketsClosedDueToMemoryThreshold"_sd;
@@ -1307,90 +1306,6 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     _bucketCatalog->finish(batch, {});
 }
 
-TEST_F(BucketCatalogTest, ArchiveIfTimeForward) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
-                                                     true};
-    auto baseTimestamp = Date_t::now();
-
-    // Insert an initial document to make sure we have an open bucket.
-    auto result1 =
-        _bucketCatalog->insert(_opCtx,
-                               _ns1,
-                               _getCollator(_ns1),
-                               _getTimeseriesOptions(_ns1),
-                               BSON(_timeField << baseTimestamp),
-                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
-    ASSERT_OK(result1.getStatus());
-    auto batch1 = result1.getValue().batch;
-    ASSERT(batch1->claimCommitRights());
-    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
-    _bucketCatalog->finish(batch1, {});
-
-    // Make sure we start out with nothing closed or archived.
-    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumArchivedDueToTimeForward));
-    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToTimeForward));
-
-    // Now insert another that's too far forward to fit in the same bucket
-    auto result2 =
-        _bucketCatalog->insert(_opCtx,
-                               _ns1,
-                               _getCollator(_ns1),
-                               _getTimeseriesOptions(_ns1),
-                               BSON(_timeField << (baseTimestamp + Seconds{7200})),
-                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
-    ASSERT_OK(result2.getStatus());
-    auto batch2 = result2.getValue().batch;
-    ASSERT(batch2->claimCommitRights());
-    ASSERT_OK(_bucketCatalog->prepareCommit(batch2));
-    _bucketCatalog->finish(batch2, {});
-
-    // Make sure it was archived, not closed.
-    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToTimeForward));
-    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToTimeForward));
-}
-
-TEST_F(BucketCatalogTest, ArchiveIfTimeBackward) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
-                                                     true};
-    auto baseTimestamp = Date_t::now();
-
-    // Insert an initial document to make sure we have an open bucket.
-    auto result1 =
-        _bucketCatalog->insert(_opCtx,
-                               _ns1,
-                               _getCollator(_ns1),
-                               _getTimeseriesOptions(_ns1),
-                               BSON(_timeField << baseTimestamp),
-                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
-    ASSERT_OK(result1.getStatus());
-    auto batch1 = result1.getValue().batch;
-    ASSERT(batch1->claimCommitRights());
-    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
-    _bucketCatalog->finish(batch1, {});
-
-    // Make sure we start out with nothing closed or archived.
-    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumArchivedDueToTimeBackward));
-    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToTimeBackward));
-
-    // Now insert another that's too far Backward to fit in the same bucket
-    auto result2 =
-        _bucketCatalog->insert(_opCtx,
-                               _ns1,
-                               _getCollator(_ns1),
-                               _getTimeseriesOptions(_ns1),
-                               BSON(_timeField << (baseTimestamp - Seconds{7200})),
-                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
-    ASSERT_OK(result2.getStatus());
-    auto batch2 = result2.getValue().batch;
-    ASSERT(batch2->claimCommitRights());
-    ASSERT_OK(_bucketCatalog->prepareCommit(batch2));
-    _bucketCatalog->finish(batch2, {});
-
-    // Make sure it was archived, not closed.
-    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToTimeBackward));
-    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToTimeBackward));
-}
-
 TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
     RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
                                                      true};
@@ -1459,8 +1374,19 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
 }
 
 TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
+    RAIIServerParameterControllerForTest flagController{
+        "featureFlagTimeseriesScalabilityImprovements", true};
+    RAIIServerParameterControllerForTest memoryController{
+        "timeseriesIdleBucketExpiryMemoryUsageThreshold",
+        200};  // An absurdly low limit that only allows us one open bucket at a time.
+    setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
+                       BSON("mode"
+                            << "alwaysOn"));
+    ScopeGuard guard{[] {
+        setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
+                           BSON("mode"
+                                << "off"));
+    }};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
     // Try to insert with no open bucket. Should hint to re-open.
@@ -1519,15 +1445,18 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT(!result.getValue().batch);
     ASSERT_TRUE(stdx::holds_alternative<BSONObj>(result.getValue().candidate));
 
-    // Now let's insert something so we archive the existing bucket.
+    // Now let's insert something with a different meta, so we open a new bucket, see we're past the
+    // memory limit, and archive the existing bucket.
     result = _bucketCatalog->insert(
         _opCtx,
         _ns1,
         _getCollator(_ns1),
         _getTimeseriesOptions(_ns1),
-        ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}})"),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}, "meta": "foo"})"),
         BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
     ASSERT_OK(result.getStatus());
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToMemoryThreshold));
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToMemoryThreshold));
     batch = result.getValue().batch;
     ASSERT_NE(batch->bucket().id, bucketId);
     ASSERT(batch);
@@ -1598,8 +1527,8 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
                                                     true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
-    // Insert a document so we have a base bucket and we can test that we archive it when we reopen
-    // a conflicting bucket.
+    // Insert a document so we have a base bucket and we can test that we soft close it when we
+    // reopen a conflicting bucket.
     auto result = _bucketCatalog->insert(
         _opCtx,
         _ns1,
@@ -1643,10 +1572,14 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     ASSERT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT_EQ(batch->measurements().size(), 1);
     _bucketCatalog->finish(batch, {});
-    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToReopening));
+    // Verify the old bucket was soft-closed
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumClosedDueToReopening));
     ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
+    ASSERT_FALSE(result.getValue().closedBuckets.empty());
+    ASSERT_TRUE(result.getValue().closedBuckets[0].eligibleForReopening);
 
-    // Verify the old bucket was archived and we'll get it back as a candidate.
+    // Verify that if we try another insert for the soft-closed bucket, we get a query-based
+    // reopening candidate.
     result = _bucketCatalog->tryInsert(
         _opCtx,
         _ns1,
@@ -1655,10 +1588,9 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
         ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:35:40.000Z"}})"),
         BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
     ASSERT_OK(result.getStatus());
-    ASSERT(result.getValue().closedBuckets.empty());
+    ASSERT_TRUE(result.getValue().closedBuckets.empty());
     ASSERT(!result.getValue().batch);
-    ASSERT_TRUE(stdx::holds_alternative<OID>(result.getValue().candidate));
-    ASSERT_EQ(stdx::get<OID>(result.getValue().candidate), oldBucketId);
+    ASSERT_TRUE(stdx::holds_alternative<BSONObj>(result.getValue().candidate));
 }
 
 TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
