@@ -3876,7 +3876,6 @@ TEST(PhysRewriter, ArrayConstantIndex) {
     // Demonstrate we get index bounds to handle the array constant, while we also retain the
     // original filter. We have index bound with the array itself unioned with bound using the first
     // array element.
-    // TODO SERVER-70120: Reduce GroupBy Unique to just GroupBy.
     ASSERT_EXPLAIN_V2(
         "Root []\n"
         "|   |   projections: \n"
@@ -3905,9 +3904,6 @@ TEST(PhysRewriter, ArrayConstantIndex) {
         "|   |           Source []\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
         "GroupBy []\n"
         "|   |   groupings: \n"
         "|   |       RefBlock: \n"
@@ -5379,7 +5375,6 @@ TEST(PhysRewriter, EqMemberSargable) {
         ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
         // Test sargable filter is satisfied with an index scan.
-        // TODO SERVER-70120: Reduce GroupBy Unique to just GroupBy.
         ASSERT_EXPLAIN_V2(
             "Root []\n"
             "|   |   projections: \n"
@@ -5398,9 +5393,6 @@ TEST(PhysRewriter, EqMemberSargable) {
             "|   |           Source []\n"
             "|   RefBlock: \n"
             "|       Variable [rid_0]\n"
-            "Unique []\n"
-            "|   projections: \n"
-            "|       rid_0\n"
             "GroupBy []\n"
             "|   |   groupings: \n"
             "|   |       RefBlock: \n"

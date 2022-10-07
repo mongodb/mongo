@@ -43,7 +43,7 @@ assert.commandWorked(bulk.execute());
     const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: [2]}}}]);
     assert.eq(20, res.executionStats.nReturned);
 
-    const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child.child");
+    const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child");
     assertValueOnPath("Union", indexUnionNode, "nodeType");
     assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
     assertValueOnPath([2], indexUnionNode, "children.0.interval.0.lowBound.bound.value");
@@ -59,7 +59,7 @@ assert.commandWorked(t.createIndex({b: 1, a: 1}));
     assert.eq(20, res.executionStats.nReturned);
 
     // Verify we still get index scan even if the field appears as second index field.
-    const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child.child");
+    const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child");
     assertValueOnPath("Union", indexUnionNode, "nodeType");
     assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
     assertValueOnPath([2], indexUnionNode, "children.0.interval.1.lowBound.bound.value");

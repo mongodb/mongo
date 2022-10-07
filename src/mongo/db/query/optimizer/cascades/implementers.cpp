@@ -559,9 +559,20 @@ public:
 
                 // TODO: consider pre-computing as part of the candidateIndexes structure.
                 const auto singularInterval = CompoundIntervalReqExpr::getSingularDNF(intervals);
-                const bool needsUniqueStage =
-                    (!singularInterval || !areCompoundIntervalsEqualities(*singularInterval)) &&
-                    indexDef.isMultiKey() && requirements.getDedupRID();
+
+                // TODO SERVER-70298: Allow merge join of RIDs on interval level index intersection,
+                // in which case we may need to worry about deduping.
+                /* The following logic determines whether we need a unique stage to deduplicate the
+                RIDs returned by the query. If the caller doesn't need unique RIDs then you don't
+                need to provide them. if the index is non-multikey there are no duplicates. If there
+                is more than one interval in the BoolExpr, then the helper method that is called
+                currently creates Groupby+Union which will already deduplicate. Finally, if there
+                is only one interval, but it's a point interval, then the index won't have
+                duplicates.
+                 */
+                const bool needsUniqueStage = singularInterval &&
+                    !areCompoundIntervalsEqualities(*singularInterval) && indexDef.isMultiKey() &&
+                    requirements.getDedupRID();
 
                 indexProjectionMap._ridProjection =
                     (needsRID || needsUniqueStage) ? ridProjName : "";
