@@ -91,8 +91,8 @@ public:
 
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(ErrorCodes::IllegalOperation,
-                "will not run compact on an active replica set primary as this is a slow blocking "
-                "operation. use force:true to force",
+                "will not run compact on an active replica set primary as this will slow down "
+                "other running operations. use force:true to force",
                 !replCoord->getMemberState().primary() || cmdObj["force"].trueValue());
 
         // Items in system.* cannot be moved as there might be pointers to them.
