@@ -3,6 +3,7 @@
  * @tags: [requires_replication, uses_transactions]
  */
 (function() {
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/wait_for_command.js");
 const rst = ReplSetTest({nodes: 1});
 rst.startSet();
@@ -26,8 +27,8 @@ const dropDB = rst.getPrimary().getDB("drop");
 (function assertDatabaseDropCanBeInterrupted() {
     assert.commandWorked(dropDB.bar.insert({}));
 
-    assert.commandWorked(rst.getPrimary().adminCommand(
-        {configureFailPoint: "dropDatabaseHangAfterAllCollectionsDrop", mode: "alwaysOn"}));
+    const failPoint =
+        configureFailPoint(rst.getPrimary(), "dropDatabaseHangAfterAllCollectionsDrop");
 
     // This will get blocked by the failpoint when collection drop phase finishes.
     let dropDatabaseShell = startParallelShell(() => {
@@ -36,9 +37,7 @@ const dropDB = rst.getPrimary().getDB("drop");
             ErrorCodes.MaxTimeMSExpired);
     }, rst.getPrimary().port);
 
-    checkLog.contains(
-        dropDB.getMongo(),
-        "dropDatabase - fail point dropDatabaseHangAfterAllCollectionsDrop enabled. Blocking until fail point is disabled");
+    failPoint.wait();
 
     let sleepCommand = startParallelShell(() => {
         // Make dropDatabase timeout.
@@ -52,8 +51,7 @@ const dropDB = rst.getPrimary().getDB("drop");
 
     // dropDatabase now gets unblocked by the failpoint but will immediately
     // get blocked by acquiring the database lock for dropping the database.
-    assert.commandWorked(rst.getPrimary().adminCommand(
-        {configureFailPoint: "dropDatabaseHangAfterAllCollectionsDrop", mode: "off"}));
+    failPoint.off();
 
     dropDatabaseShell();
 

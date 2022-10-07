@@ -11,6 +11,7 @@
 "use strict";
 
 load('jstests/noPassthrough/libs/index_build.js');
+load("jstests/libs/fail_point_util.js");
 
 const rst = new ReplSetTest({
     nodes: [
@@ -26,8 +27,7 @@ const primary = rst.getPrimary();
 const testDB = primary.getDB('test');
 const coll = testDB.getCollection('test');
 
-assert.commandWorked(testDB.adminCommand(
-    {configureFailPoint: 'dropDatabaseHangAfterWaitingForIndexBuilds', mode: 'alwaysOn'}));
+const failPoint = configureFailPoint(testDB, 'dropDatabaseHangAfterWaitingForIndexBuilds');
 
 assert.commandWorked(coll.insert({a: 1}));
 
@@ -45,7 +45,7 @@ let awaitDropDatabase = startParallelShell(() => {
                                  ErrorCodes.InterruptedDueToReplStateChange);
 }, primary.port);
 
-checkLog.containsJson(primary, 4612300);
+failPoint.wait();
 
 assert.commandWorked(testDB.adminCommand({clearLog: "global"}));
 let awaitStepDown = startParallelShell(() => {
@@ -55,8 +55,7 @@ let awaitStepDown = startParallelShell(() => {
 IndexBuildTest.resumeIndexBuilds(primary);
 
 checkLog.containsJson(primary, 21344);
-assert.commandWorked(testDB.adminCommand(
-    {configureFailPoint: 'dropDatabaseHangAfterWaitingForIndexBuilds', mode: 'off'}));
+failPoint.off();
 
 awaitIndexBuild();
 awaitDropDatabase();

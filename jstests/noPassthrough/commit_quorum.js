@@ -7,6 +7,7 @@
  */
 (function() {
 load("jstests/noPassthrough/libs/index_build.js");
+load('jstests/libs/fail_point_util.js');
 
 const replSet = new ReplSetTest({
     nodes: [
@@ -58,10 +59,8 @@ assert.eq(1, res.commitQuorum);
 replSet.awaitReplication();
 
 let awaitShell;
+const failPoint = configureFailPoint(testDB, "hangAfterIndexBuildFirstDrain");
 try {
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: "hangAfterIndexBuildFirstDrain", mode: "alwaysOn"}));
-
     // Starts parallel shell to run the command that will hang.
     awaitShell = startParallelShell(function() {
         // Use the index builds coordinator for a two-phase index build.
@@ -72,8 +71,7 @@ try {
         }));
     }, testDB.getMongo().port);
 
-    checkLog.containsWithCount(
-        replSet.getPrimary(), "Index build: waiting for index build to complete", 5);
+    failPoint.wait();
 
     // Test setting various commit quorums on the index build in our two node replica set.
     assert.commandFailed(testDB.runCommand(
@@ -96,8 +94,7 @@ try {
         commitQuorum: "majority"
     }));
 } finally {
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "hangAfterIndexBuildFirstDrain", mode: "off"}));
+    failPoint.off();
 }
 
 // Wait for the parallel shell to complete.

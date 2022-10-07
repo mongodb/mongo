@@ -6,6 +6,7 @@
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
+load("jstests/libs/fail_point_util.js");
 
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);
@@ -47,8 +48,7 @@ IndexBuildTest.waitForIndexBuildToScanCollection(testDB, secondCollName, "b_1");
 
 jsTest.log("Dropping database " + dbName + " with in-progress index builds on its collections.");
 
-assert.commandWorked(testDB.adminCommand(
-    {configureFailPoint: 'dropDatabaseHangAfterWaitingForIndexBuilds', mode: 'alwaysOn'}));
+const failPoint = configureFailPoint(testDB, 'dropDatabaseHangAfterWaitingForIndexBuilds');
 
 const awaitDropDatabase = startParallelShell(() => {
     const testDB = db.getSiblingDB(TestData.dbName);
@@ -60,9 +60,7 @@ try {
         "About to abort all index builders running for collections in the given database");
     IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
 
-    checkLog.contains(
-        testDB.getMongo(),
-        "dropDatabase - fail point dropDatabaseHangAfterWaitingForIndexBuilds enabled");
+    failPoint.wait();
 
     // Cannot create a collection on the database while it is drop pending.
     assert.commandFailedWithCode(testDB.createCollection("third"), ErrorCodes.DatabaseDropPending);
@@ -79,8 +77,7 @@ try {
     }
 } finally {
     IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
-    testDB.adminCommand(
-        {configureFailPoint: 'dropDatabaseHangAfterWaitingForIndexBuilds', mode: 'off'});
+    failPoint.off();
 }
 
 awaitFirstIndexBuild();

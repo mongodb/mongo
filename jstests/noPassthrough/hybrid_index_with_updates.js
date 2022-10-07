@@ -6,17 +6,10 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
+
 let conn = MongoRunner.runMongod();
 let testDB = conn.getDB('test');
-
-let turnFailPointOn = function(failPointName, data) {
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: failPointName, mode: "alwaysOn", data: data || {}}));
-};
-
-let turnFailPointOff = function(failPointName) {
-    assert.commandWorked(testDB.adminCommand({configureFailPoint: failPointName, mode: "off"}));
-};
 
 let totalDocs = 0;
 let crudOpsForPhase = function(coll, phase) {
@@ -53,7 +46,8 @@ crudOpsForPhase(testDB.hybrid, 0);
 assert.eq(totalDocs, testDB.hybrid.count());
 
 // Hang the build after the first document.
-turnFailPointOn("hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", {fieldsToMatch: {i: 1}});
+const collScanFailPoint = configureFailPoint(
+    testDB, "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", {fieldsToMatch: {i: 1}});
 
 // Start the background build.
 let bgBuild = startParallelShell(function() {
@@ -73,49 +67,50 @@ crudOpsForPhase(testDB.hybrid, 1);
 assert.eq(totalDocs, testDB.hybrid.count());
 
 // Enable pause after bulk dump into index.
-turnFailPointOn("hangAfterIndexBuildDumpsInsertsFromBulk");
+const insertDumpFailPoint = configureFailPoint(testDB, "hangAfterIndexBuildDumpsInsertsFromBulk");
 
 // Wait for the bulk insert to complete.
-turnFailPointOff("hangIndexBuildDuringCollectionScanPhaseBeforeInsertion");
-checkLog.contains(conn, "Hanging after dumping inserts from bulk builder");
+collScanFailPoint.off();
+insertDumpFailPoint.wait();
 
 // Phase 2: First drain
 // Do some updates, inserts and deletes after the bulk builder has finished.
 
 // Hang after yielding
-turnFailPointOn("hangDuringIndexBuildDrainYield", {namespace: testDB.hybrid.getFullName()});
+const yieldFailPoint = configureFailPoint(
+    testDB, "hangDuringIndexBuildDrainYield", {namespace: testDB.hybrid.getFullName()});
 
 // Enable pause after first drain.
-turnFailPointOn("hangAfterIndexBuildFirstDrain");
+const firstDrainFailPoint = configureFailPoint(testDB, "hangAfterIndexBuildFirstDrain");
 
 crudOpsForPhase(testDB.hybrid, 2);
 assert.eq(totalDocs, testDB.hybrid.count());
 
 // Allow first drain to start.
-turnFailPointOff("hangAfterIndexBuildDumpsInsertsFromBulk");
+insertDumpFailPoint.off();
 
 // Ensure the operation yields during the drain, then attempt some operations.
-checkLog.contains(conn, "Hanging index build during drain yield");
+yieldFailPoint.wait();
 assert.commandWorked(testDB.hybrid.insert({i: "during yield"}));
 assert.commandWorked(testDB.hybrid.remove({i: "during yield"}));
-turnFailPointOff("hangDuringIndexBuildDrainYield");
+yieldFailPoint.off();
 
 // Wait for first drain to finish.
-checkLog.contains(conn, "Hanging after index build first drain");
+firstDrainFailPoint.wait();
 
 // Phase 3: Second drain
 // Enable pause after second drain.
-turnFailPointOn("hangAfterIndexBuildSecondDrain");
+const secondDrainFailPoint = configureFailPoint(testDB, "hangAfterIndexBuildSecondDrain");
 
 // Add inserts that must be consumed in the second drain.
 crudOpsForPhase(testDB.hybrid, 3);
 assert.eq(totalDocs, testDB.hybrid.count());
 
 // Allow second drain to start.
-turnFailPointOff("hangAfterIndexBuildFirstDrain");
+firstDrainFailPoint.off();
 
 // Wait for second drain to finish.
-checkLog.contains(conn, "Hanging after index build second drain");
+secondDrainFailPoint.wait();
 
 // Phase 4: Final drain and commit.
 // Add inserts that must be consumed in the final drain.
@@ -123,7 +118,7 @@ crudOpsForPhase(testDB.hybrid, 4);
 assert.eq(totalDocs, testDB.hybrid.count());
 
 // Allow final drain to start.
-turnFailPointOff("hangAfterIndexBuildSecondDrain");
+secondDrainFailPoint.off();
 
 // Wait for build to complete.
 bgBuild();

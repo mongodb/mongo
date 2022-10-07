@@ -7,6 +7,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
+
 const rst = new ReplSetTest({
     nodes: [
         {},
@@ -31,18 +33,14 @@ assert.commandWorked(coll.insert({_id: 'a'}));
 
 const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(testDB.getName());
-assert.commandWorked(secondaryDB.adminCommand({
-    configureFailPoint: 'hangAfterCollectionInserts',
-    mode: 'alwaysOn',
-    data: {
-        collectionNS: coll.getFullName(),
-        first_id: 'b',
-    },
-}));
+const failPoint = configureFailPoint(secondaryDB, 'hangAfterCollectionInserts', {
+    collectionNS: coll.getFullName(),
+    first_id: 'b',
+});
 
 try {
     assert.commandWorked(coll.insert({_id: 'b'}));
-    checkLog.containsJson(secondary, 20289);
+    failPoint.wait();
 
     jsTestLog('Running currentOp() with slow operation logging.');
     // Lower slowms to make currentOp() log slow operation while the secondary is procesing the
@@ -57,8 +55,7 @@ try {
         secondaryAdminDB.setProfilingLevel(profileResult.was, {slowms: profileResult.slowms}));
     jsTestLog('Completed currentOp() with slow operation logging.');
 } finally {
-    assert.commandWorked(
-        secondaryDB.adminCommand({configureFailPoint: 'hangAfterCollectionInserts', mode: 'off'}));
+    failPoint.off();
 }
 
 rst.stopSet();

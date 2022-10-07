@@ -5,6 +5,8 @@
  * @tags: [requires_fsync, requires_wiredtiger, requires_persistence]
  */
 (function() {
+load('jstests/libs/fail_point_util.js');
+
 const dbName = "test";
 const collName = "currentOpValidation";
 
@@ -24,13 +26,11 @@ for (let i = 0; i < 5; i++) {
 assert.commandWorked(db.adminCommand({setParameter: 1, maxValidateMBperSec: 1}));
 
 // Simulate each record being 512KB.
-assert.commandWorked(db.adminCommand(
-    {configureFailPoint: "fixedCursorDataSizeOf512KBForDataThrottle", mode: "alwaysOn"}));
+const cursorDataSizeFailPoint = configureFailPoint(db, "fixedCursorDataSizeOf512KBForDataThrottle");
 
 // This fail point comes after we've traversed the record store, so currentOp should have some
 // validation statistics once we hit this fail point.
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "pauseCollectionValidationWithLock", mode: "alwaysOn"}));
+const pauseFailPoint = configureFailPoint(db, "pauseCollectionValidationWithLock");
 
 // Forces a checkpoint to make the background validation see the data.
 assert.commandWorked(db.adminCommand({fsync: 1}));
@@ -44,7 +44,7 @@ const awaitValidation = startParallelShell(() => {
         }));
 }, conn.port);
 
-checkLog.containsJson(conn, 20304);
+pauseFailPoint.wait();
 
 const curOpFilter = {
     'command.validate': collName
@@ -61,10 +61,8 @@ assert(curOp[0].hasOwnProperty("dataThroughputLastSecond") &&
        curOp[0].hasOwnProperty("dataThroughputAverage"));
 
 // Finish up validating the collection.
-assert.commandWorked(db.adminCommand(
-    {configureFailPoint: "fixedCursorDataSizeOf512KBForDataThrottle", mode: "off"}));
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "pauseCollectionValidationWithLock", mode: "off"}));
+cursorDataSizeFailPoint.off();
+pauseFailPoint.off();
 
 // Setting this to 0 turns off the throttle.
 assert.commandWorked(db.adminCommand({setParameter: 1, maxValidateMBperSec: 0}));
