@@ -101,7 +101,7 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
                     lambda: self.session.drop(self.uri, None), msg)
             elif op == 'flush_tier':
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                    lambda: self.session.flush_tier(None), msg)
+                    lambda: self.session.checkpoint('flush_tier=(enabled)'), msg)
             elif op == 'log_flush':
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.log_flush(None), msg)

@@ -1985,6 +1985,25 @@ struct __wt_session {
 	 * Checkpoints cannot be dropped if open in a cursor.  While a hot backup is in progress\,
 	 * checkpoints created prior to the start of the backup cannot be dropped., a list of
 	 * strings; default empty.}
+	 * @config{flush_tier = (, configure flushing objects to tiered storage after checkpoint., a
+	 * set of related configuration options defined as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if true\, perform one iteration of object
+	 * switching and flushing objects to tiered storage., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;force, if false (the default)\, flush_tier of any
+	 * individual object may be skipped if the underlying object has not been modified since the
+	 * previous flush_tier.  If true\, this option forces the flush_tier., a boolean flag;
+	 * default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;sync, wait for all objects to be
+	 * flushed to the shared storage to the level specified.  When false\, do not wait for any
+	 * objects to be written to the tiered storage system but return immediately after
+	 * generating the objects and work units for an internal thread.  When true\, the caller
+	 * waits until all work queued for this call to be completely processed before returning., a
+	 * boolean flag; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;timeout, amount of time\,
+	 * in seconds\, to wait for flushing of objects to complete.  WiredTiger returns EBUSY if
+	 * the timeout is reached.  A value of zero disables the timeout., an integer; default \c
+	 * 0.}
+	 * @config{ ),,}
 	 * @config{force, if false (the default)\, checkpoints may be skipped if the underlying
 	 * object has not been modified.  If true\, this option forces the checkpoint., a boolean
 	 * flag; default \c false.}
@@ -2218,9 +2237,6 @@ struct __wt_connection {
 	 * internal algorithms to change skew to force history store eviction to happen more
 	 * aggressively.  This includes but is not limited to not skewing newest\, not favoring leaf
 	 * pages\, and modifying the eviction score mechanism., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;flush_checkpoint, if true\, call a system wide checkpoint
-	 * immediately after a flush_tier completes to force objects out to disk so that a
-	 * flush_tier can work single-threaded., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log removal to retain at least this
 	 * number of log files.  (Warning: this option can remove log files required for recovery if
 	 * no checkpoints have yet been done and the number of log files exceeds the configured
@@ -2947,32 +2963,30 @@ struct __wt_connection {
  * force history store eviction to happen more aggressively.  This includes but is not limited to
  * not skewing newest\, not favoring leaf pages\, and modifying the eviction score mechanism., a
  * boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;flush_checkpoint, if true\, call
- * a system wide checkpoint immediately after a flush_tier completes to force objects out to disk so
- * that a flush_tier can work single-threaded., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log removal to retain at least this number
- * of log files.  (Warning: this option can remove log files required for recovery if no checkpoints
- * have yet been done and the number of log files exceeds the configured value.  As WiredTiger
- * cannot detect the difference between a system that has not yet checkpointed and one that will
- * never checkpoint\, it might discard log files before any checkpoint is done.) Ignored if set to
- * 0., an integer between \c 0 and \c 1024; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log
+ * removal to retain at least this number of log files.  (Warning: this option can remove log files
+ * required for recovery if no checkpoints have yet been done and the number of log files exceeds
+ * the configured value.  As WiredTiger cannot detect the difference between a system that has not
+ * yet checkpointed and one that will never checkpoint\, it might discard log files before any
+ * checkpoint is done.) Ignored if set to 0., an integer between \c 0 and \c 1024; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\, reallocation of memory will only provide
+ * the exact amount requested.  This will help with spotting memory allocation issues more easily.,
+ * a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a
+ * WT_ROLLBACK error from a transaction operation about every Nth operation to simulate a
+ * collision., an integer between \c 0 and \c 10M; default \c 0.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * realloc_exact, if true\, reallocation of memory will only provide the exact amount requested.
- * This will help with spotting memory allocation issues more easily., a boolean flag; default \c
+ * slow_checkpoint, if true\, slow down checkpoint creation by slowing down internal page
+ * processing., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if
+ * true\, write transaction related information to the log for all operations\, even operations for
+ * tables with logging turned off.  This additional logging information is intended for debugging
+ * and is informational only\, that is\, it is ignored during recovery., a boolean flag; default \c
  * false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a
- * transaction operation about every Nth operation to simulate a collision., an integer between \c 0
- * and \c 10M; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if true\, slow down
- * checkpoint creation by slowing down internal page processing., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write transaction related information to
- * the log for all operations\, even operations for tables with logging turned off.  This additional
- * logging information is intended for debugging and is informational only\, that is\, it is ignored
- * during recovery., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * update_restore_evict, if true\, control all dirty page evictions through forcing update restore
- * eviction., a boolean flag; default \c false.}
- * @config{ ),,}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\, control all dirty page
+ * evictions through forcing update restore eviction., a boolean flag; default \c false.}
+ * @config{
+ * ),,}
  * @config{direct_io, Use \c O_DIRECT on POSIX systems\, and \c FILE_FLAG_NO_BUFFERING on Windows to
  * access files.  Options are given as a list\, such as <code>"direct_io=[data]"</code>. Configuring
  * \c direct_io requires care; see @ref tuning_system_buffer_cache_direct_io for important warnings.

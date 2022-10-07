@@ -74,7 +74,7 @@ class test_export01(TieredConfigMixin, wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         if self.is_tiered_scenario():
-            self.session.flush_tier(None)
+            self.session.checkpoint('flush_tier=(enabled)')
 
         # Open a special backup cursor for export operation.
         export_cursor = self.session.open_cursor('backup:export', None, None)
@@ -112,7 +112,7 @@ class test_export01(TieredConfigMixin, wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         if self.is_tiered_scenario():
-            self.session.flush_tier(None)
+            self.session.checkpoint('flush_tier=(enabled)')
 
         # Open a special backup cursor for export operation.
         main_cursor = self.session.open_cursor('backup:export', None, None)
@@ -140,7 +140,7 @@ class test_export01(TieredConfigMixin, wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         if self.is_tiered_scenario():
-            self.session.flush_tier(None)
+            self.session.checkpoint('flush_tier=(enabled,force=true)')
 
         self.session.drop(uri_b)
 

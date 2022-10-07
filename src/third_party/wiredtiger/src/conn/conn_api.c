@@ -2008,12 +2008,6 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     else
         F_CLR(cache, WT_CACHE_EVICT_DEBUG_MODE);
 
-    WT_RET(__wt_config_gets(session, cfg, "debug_mode.flush_checkpoint", &cval));
-    if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_FLUSH_CKPT);
-    else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_FLUSH_CKPT);
-
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.log_retention", &cval));
     conn->debug_log_cnt = (uint32_t)cval.val;
 

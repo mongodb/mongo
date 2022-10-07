@@ -27,13 +27,6 @@
 #define WT_TIERED_NAME_SHARED 0x10u
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
-/* Flush tier flags */
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_FLUSH_TIER_FORCE 0x1u
-#define WT_FLUSH_TIER_OFF 0x2u
-#define WT_FLUSH_TIER_ON 0x4u
-/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-
 /*
  * The flush state is a simple counter we manipulate atomically.
  */

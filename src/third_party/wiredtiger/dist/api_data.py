@@ -581,10 +581,6 @@ connection_runtime_config = [
             to happen more aggressively. This includes but is not limited to not skewing newest,
             not favoring leaf pages, and modifying the eviction score mechanism.''',
             type='boolean'),
-        Config('flush_checkpoint', 'false', r'''
-            if true, call a system wide checkpoint immediately after a flush_tier completes to
-            force objects out to disk so that a flush_tier can work single-threaded''',
-            type='boolean'),
         Config('log_retention', '0', r'''
             adjust log removal to retain at least this number of log files.
             (Warning: this option can remove log files required for recovery if no checkpoints
@@ -1740,6 +1736,31 @@ methods = {
         dropped if open in a cursor. While a hot backup is in progress, checkpoints created
         prior to the start of the backup cannot be dropped''',
         type='list'),
+    Config('flush_tier', '', r'''
+        configure flushing objects to tiered storage after checkpoint''',
+        type='category', subconfig= [
+            Config('enabled', 'false', r'''
+                if true, perform one iteration of object switching and flushing objects to
+                tiered storage''',
+                type='boolean'),
+            Config('force', 'false', r'''
+                if false (the default), flush_tier of any individual object may be skipped if the
+                underlying object has not been modified since the previous flush_tier. If true,
+                this option forces the flush_tier''',
+                type='boolean'),
+            Config('sync', 'true', r'''
+                wait for all objects to be flushed to the shared storage to the level specified.
+                When false, do not wait for any objects to be written to the tiered storage system
+                but return immediately after generating the objects and work units for an internal
+                thread.  When true, the caller waits until all work queued for this call to be
+                completely processed before returning''',
+                type='boolean'),
+            Config('timeout', '0', r'''
+                amount of time, in seconds, to wait for flushing of objects to complete.
+                WiredTiger returns EBUSY if the timeout is reached. A value of zero disables
+                the timeout''',
+                type='int'),
+    ]),
     Config('force', 'false', r'''
         if false (the default), checkpoints may be skipped if the underlying object has not been
         modified. If true, this option forces the checkpoint''',

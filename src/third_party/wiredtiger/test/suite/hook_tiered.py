@@ -121,11 +121,6 @@ def wiredtiger_open_tiered(ignored_self, args):
 
     tier_string += ',' + ext_string + ',\"%s\"]' % extension_libs[0]
 
-    # The current implementation of flush_tier cannot complete until a new checkpoint has completed.
-    # Single threaded tests without a checkpoint thread would hang, so have WT do the checkpoint
-    # during the flush_tier call.
-    tier_string += ',debug_mode=(flush_checkpoint=true),'
-
     args = list(args)         # convert from a readonly tuple to a writeable list
     args[-1] += tier_string   # Modify the list
 

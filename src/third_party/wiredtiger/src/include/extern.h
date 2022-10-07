@@ -769,8 +769,6 @@ extern int __wt_filename_construct(WT_SESSION_IMPL *session, const char *path,
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_find_import_metadata(WT_SESSION_IMPL *session, const char *uri, const char **config)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_fopen(WT_SESSION_IMPL *session, const char *name, uint32_t open_flags,
   uint32_t flags, WT_FSTREAM **fstrp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_fsync_background(WT_SESSION_IMPL *session)

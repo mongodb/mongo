@@ -105,10 +105,10 @@ class test_tiered10(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.check(c2, 20, 1)
         c1.close()
         c2.close()
-        session1.checkpoint()
-        session1.flush_tier(None)
-        session2.checkpoint()
-        session2.flush_tier(None)
+        # Use force to make sure the new object is created. Otherwise there is no
+        # existing checkpoint yet and the flush will think there is no work to do.
+        session1.checkpoint('flush_tier=(enabled,force=true)')
+        session2.checkpoint('flush_tier=(enabled,force=true)')
         conn1_obj1 = os.path.join(self.bucket, self.bucket_prefix + self.obj1file)
         conn2_obj1 = os.path.join(self.bucket, self.bucket_prefix1 + self.obj1file)
 

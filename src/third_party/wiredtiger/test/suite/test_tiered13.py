@@ -65,8 +65,9 @@ class test_tiered13(test_import_base, TieredConfigMixin):
         c = self.session.open_cursor(self.uri)
         c["0"] = "0"
         c.close()
-        self.session.checkpoint()
-        self.session.flush_tier(None)
+        # Use force to make sure the new object is created. Otherwise there is no
+        # existing checkpoint yet and the flush will think there is no work to do.
+        self.session.checkpoint('flush_tier=(enabled,force=true)')
         c = self.session.open_cursor(self.uri)
         c["1"] = "1"
         c.close()

@@ -102,7 +102,7 @@ class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
         if (self.first_ckpt):
             self.session.checkpoint()
         self.pr('After data, call flush_tier')
-        self.session.flush_tier(None)
+        self.session.checkpoint('flush_tier=(enabled)')
         if (not self.first_ckpt):
             self.session.checkpoint()
 

@@ -70,7 +70,6 @@ def get_conn_config(storage_source):
     if storage_source.ss_name == 'dir_store' and not os.path.exists(storage_source.bucket):
             os.mkdir(storage_source.bucket)
     return \
-        'debug_mode=(flush_checkpoint=true),' + \
         'statistics=(all),' + \
         'tiered_storage=(auth_token=%s,' % storage_source.auth_token + \
         'bucket=%s,' % storage_source.bucket + \
@@ -164,7 +163,6 @@ class TieredConfigMixin:
 
         # Build tiered storage connection string.
         return \
-            'debug_mode=(flush_checkpoint=true),' + \
             'tiered_storage=(auth_token=%s,' % self.auth_token + \
             'bucket=%s,' % self.bucket + \
             'bucket_prefix=%s,' % self.bucket_prefix + \

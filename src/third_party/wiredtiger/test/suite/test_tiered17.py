@@ -70,8 +70,7 @@ class test_tiered17(TieredConfigMixin, wttest.WiredTigerTestCase):
         c["b"] = "b"
 
         # Do a checkpoint and flush operation.
-        self.session.checkpoint()
-        self.session.flush_tier(None)
+        self.session.checkpoint('flush_tier=(enabled)')
 
         # Add more data but don't do a checkpoint or flush in the unclean shutdown scenario.
         if not self.clean:

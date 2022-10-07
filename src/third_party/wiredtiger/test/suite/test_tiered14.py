@@ -105,7 +105,7 @@ class test_tiered14(wttest.WiredTigerTestCase, TieredConfigMixin):
             try:
                 if op == 'f':
                     self.progress('flush_tier')
-                    self.session.flush_tier(None)
+                    self.session.checkpoint('flush_tier=(enabled)')
                 elif op == 'c':
                     self.progress('checkpoint')
                     self.session.checkpoint()
