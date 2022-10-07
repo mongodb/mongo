@@ -149,7 +149,7 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
             for (size_t i = 0; i < path.getPathLength(); i++) {
                 const std::string& fieldName = path.getFieldName(i).toString();
                 if (fieldName == "$**") {
-                    // TODO: For now disallow wildcard indexes.
+                    // TODO SERVER-70309: Support wildcard indexes.
                     useIndex = false;
                     break;
                 }
@@ -202,12 +202,11 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
                                                   "" /*uniquePrefix*/);
             exprABT = make<EvalFilter>(std::move(exprABT), make<Variable>(scanProjName));
 
-            // TODO: simplify expression.
-
+            // TODO SERVER-70315: simplify partial filter expression.
             auto conversion = convertExprToPartialSchemaReq(
                 exprABT, true /*isFilterContext*/, {} /*pathToIntervalFn*/);
             if (!conversion) {
-                // TODO: should this conversion be always possible?
+                // TODO SERVER-70315: should this conversion be always possible?
                 continue;
             }
             tassert(6624257,
@@ -358,23 +357,24 @@ static void populateAdditionalScanDefs(
     const DisableIndexOptions disableIndexOptions,
     bool& disableScan) {
     for (const auto& involvedNss : involvedCollections) {
-        // TODO handle views?
+        // TODO SERVER-70304 Allow queries over views and reconsider locking strategy for
+        // multi-collection queries.
         AutoGetCollectionForReadCommandMaybeLockFree ctx(
             opCtx, involvedNss, auto_get_collection::ViewMode::kViewsForbidden);
         const CollectionPtr& collection = ctx ? ctx.getCollection() : CollectionPtr::null;
         const bool collectionExists = collection != nullptr;
         const std::string uuidStr =
             collectionExists ? collection->uuid().toString() : "<missing_uuid>";
-
         const std::string collNameStr = involvedNss.coll().toString();
-        // TODO: We cannot add the uuidStr suffix because the pipeline translation does not have
+
+        // TODO SERVER-70349: Make this consistent with the base collection scan def name.
+        // We cannot add the uuidStr suffix because the pipeline translation does not have
         // access to the metadata so it generates a scan over just the collection name.
         const std::string scanDefName = collNameStr;
 
         opt::unordered_map<std::string, optimizer::IndexDefinition> indexDefs;
         const ProjectionName& scanProjName = prefixId.getNextId("scan");
         if (collectionExists) {
-            // TODO: add locks on used indexes?
             indexDefs = buildIndexSpecsOptimizer(expCtx,
                                                  opCtx,
                                                  collection,
@@ -390,15 +390,15 @@ static void populateAdditionalScanDefs(
                                               : DistributionType::UnknownPartitioning};
 
         const CEType collectionCE = collectionExists ? collection->numRecords(opCtx) : -1.0;
-        scanDefs[scanDefName] =
-            ScanDefinition({{"type", "mongod"},
-                            {"database", involvedNss.db().toString()},
-                            {"uuid", uuidStr},
-                            {ScanNode::kDefaultCollectionNameSpec, collNameStr}},
-                           std::move(indexDefs),
-                           std::move(distribution),
-                           collectionExists,
-                           collectionCE);
+        scanDefs.emplace(scanDefName,
+                         ScanDefinition({{"type", "mongod"},
+                                         {"database", involvedNss.db().toString()},
+                                         {"uuid", uuidStr},
+                                         {ScanNode::kDefaultCollectionNameSpec, collNameStr}},
+                                        std::move(indexDefs),
+                                        std::move(distribution),
+                                        collectionExists,
+                                        collectionCE));
     }
 }
 
@@ -439,7 +439,6 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     // Add the base collection metadata.
     opt::unordered_map<std::string, optimizer::IndexDefinition> indexDefs;
     if (collectionExists) {
-        // TODO: add locks on used indexes?
         indexDefs = buildIndexSpecsOptimizer(expCtx,
                                              opCtx,
                                              collection,
