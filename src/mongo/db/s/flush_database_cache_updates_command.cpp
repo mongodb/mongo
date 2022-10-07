@@ -178,7 +178,7 @@ public:
                 auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
 
                 if (auto criticalSectionSignal = dss->getCriticalSectionSignal(
-                        ShardingMigrationCriticalSection::kRead, dssLock)) {
+                        ShardingMigrationCriticalSection::kWrite, dssLock)) {
                     oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
                 }
             }
