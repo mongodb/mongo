@@ -232,12 +232,14 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         .setFlags(DocumentValidationSettings::kDisableSchemaValidation |
                   DocumentValidationSettings::kDisableInternalValidation);
 
+    std::unique_ptr<CollectionBulkLoader> loader;
     // Retry if WCE.
     Status status = writeConflictRetry(opCtx.get(), "beginCollectionClone", nss.ns(), [&] {
         UnreplicatedWritesBlock uwb(opCtx.get());
 
         // Get locks and create the collection.
-        AutoGetCollection coll(opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_X));
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_IX);
+        AutoGetCollection coll(opCtx.get(), nss, MODE_X);
         if (coll) {
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "Collection " << nss.ns() << " already exists.");
@@ -245,7 +247,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         {
             // Create the collection.
             WriteUnitOfWork wunit(opCtx.get());
-            auto db = coll.ensureDbExists(opCtx.get());
+            auto db = autoDb.ensureDbExists(opCtx.get());
             fassert(40332, db->createCollection(opCtx.get(), nss, options, false));
             wunit.commit();
         }
@@ -255,19 +257,21 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         // the front.
         if (options.capped) {
             WriteUnitOfWork wunit(opCtx.get());
-            // `getWritableCollection` will return the newly created collection even if it didn't
-            // exist when the AutoGet was created.
-            auto writableCollection = coll.getWritableCollection(opCtx.get());
             if (!idIndexSpec.isEmpty()) {
-                auto status = writableCollection->getIndexCatalog()->createIndexOnEmptyCollection(
-                    opCtx.get(), writableCollection, idIndexSpec);
+                auto status =
+                    coll.getWritableCollection(opCtx.get())
+                        ->getIndexCatalog()
+                        ->createIndexOnEmptyCollection(
+                            opCtx.get(), coll.getWritableCollection(opCtx.get()), idIndexSpec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
             }
             for (auto&& spec : secondaryIndexSpecs) {
-                auto status = writableCollection->getIndexCatalog()->createIndexOnEmptyCollection(
-                    opCtx.get(), writableCollection, spec);
+                auto status = coll.getWritableCollection(opCtx.get())
+                                  ->getIndexCatalog()
+                                  ->createIndexOnEmptyCollection(
+                                      opCtx.get(), coll.getWritableCollection(opCtx.get()), spec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
@@ -275,16 +279,21 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
             wunit.commit();
         }
 
+        // Instantiate the CollectionBulkLoader here so that it acquires the same MODE_X lock we've
+        // used in this scope. The BulkLoader will manage an AutoGet of its own to control the
+        // lifetime of the lock. This is safe to do as we're in the initial sync phase and the node
+        // isn't yet available to users.
+        loader =
+            std::make_unique<CollectionBulkLoaderImpl>(Client::releaseCurrent(),
+                                                       std::move(opCtx),
+                                                       nss,
+                                                       options.capped ? BSONObj() : idIndexSpec);
         return Status::OK();
     });
 
     if (!status.isOK()) {
         return status;
     }
-
-    // Move locks into loader, so it now controls their lifetime.
-    auto loader = std::make_unique<CollectionBulkLoaderImpl>(
-        Client::releaseCurrent(), std::move(opCtx), nss, options.capped ? BSONObj() : idIndexSpec);
 
     status = loader->init(options.capped ? std::vector<BSONObj>() : secondaryIndexSpecs);
     if (!status.isOK()) {

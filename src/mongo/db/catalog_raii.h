@@ -180,6 +180,8 @@ public:
                       LockMode modeColl,
                       Options options = {});
 
+    AutoGetCollection(AutoGetCollection&&) = default;
+
     explicit operator bool() const {
         return static_cast<bool>(getCollection());
     }

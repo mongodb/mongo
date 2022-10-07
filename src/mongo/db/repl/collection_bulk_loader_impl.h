@@ -60,8 +60,8 @@ public:
         BSONObj toBSON() const;
     };
 
-    CollectionBulkLoaderImpl(ServiceContext::UniqueClient&& client,
-                             ServiceContext::UniqueOperationContext&& opCtx,
+    CollectionBulkLoaderImpl(ServiceContext::UniqueClient client,
+                             ServiceContext::UniqueOperationContext opCtx,
                              const NamespaceString& nss,
                              const BSONObj& idIndexSpec);
     virtual ~CollectionBulkLoaderImpl();
@@ -86,8 +86,7 @@ private:
     /**
      * For capped collections, each document will be inserted in its own WriteUnitOfWork.
      */
-    Status _insertDocumentsForCappedCollection(const CollectionPtr& coll,
-                                               std::vector<BSONObj>::const_iterator begin,
+    Status _insertDocumentsForCappedCollection(std::vector<BSONObj>::const_iterator begin,
                                                std::vector<BSONObj>::const_iterator end);
 
     /**
@@ -95,19 +94,17 @@ private:
      * collectionBulkLoaderBatchSizeInBytes or up to one document size greater. All insertions in a
      * given batch will be inserted in one WriteUnitOfWork.
      */
-    Status _insertDocumentsForUncappedCollection(const CollectionPtr& coll,
-                                                 std::vector<BSONObj>::const_iterator begin,
+    Status _insertDocumentsForUncappedCollection(std::vector<BSONObj>::const_iterator begin,
                                                  std::vector<BSONObj>::const_iterator end);
 
     /**
      * Adds document and associated RecordId to index blocks after inserting into RecordStore.
      */
-    Status _addDocumentToIndexBlocks(const CollectionPtr& coll,
-                                     const BSONObj& doc,
-                                     const RecordId& loc);
+    Status _addDocumentToIndexBlocks(const BSONObj& doc, const RecordId& loc);
 
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
+    AutoGetCollection _collection;
     NamespaceString _nss;
     std::unique_ptr<MultiIndexBlock> _idIndexBlock;
     std::unique_ptr<MultiIndexBlock> _secondaryIndexesBlock;

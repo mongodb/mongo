@@ -565,17 +565,19 @@ TEST_F(StorageInterfaceImplTest, InsertMissingDocFailesIfCollectionIsMissing) {
 
 TEST_F(StorageInterfaceImplTest, CreateCollectionWithIDIndexCommits) {
     auto opCtx = getOperationContext();
-    StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    CollectionOptions opts = generateOptionsWithUuid();
-    std::vector<BSONObj> indexes;
-    auto loaderStatus =
-        storage.createCollectionForBulkLoading(nss, opts, makeIdIndexSpec(nss), indexes);
-    ASSERT_OK(loaderStatus.getStatus());
-    auto loader = std::move(loaderStatus.getValue());
-    std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 1), BSON("_id" << 2)};
-    ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
-    ASSERT_OK(loader->commit());
+    {
+        StorageInterfaceImpl storage;
+        CollectionOptions opts = generateOptionsWithUuid();
+        std::vector<BSONObj> indexes;
+        auto loaderStatus =
+            storage.createCollectionForBulkLoading(nss, opts, makeIdIndexSpec(nss), indexes);
+        ASSERT_OK(loaderStatus.getStatus());
+        auto loader = std::move(loaderStatus.getValue());
+        std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 1), BSON("_id" << 2)};
+        ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
+        ASSERT_OK(loader->commit());
+    }
 
     AutoGetCollectionForReadCommand coll(opCtx, nss);
     ASSERT(coll);
@@ -905,14 +907,16 @@ TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsIndexOptionsConflictIfIndex
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
-                                             << "x_1"
-                                             << "partialFilterExpression" << BSON("y" << 1))};
-    auto loader = unittest::assertGet(storage.createCollectionForBulkLoading(
-        nss, generateOptionsWithUuid(), makeIdIndexSpec(nss), indexes));
-    std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 1), BSON("_id" << 2)};
-    ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
-    ASSERT_OK(loader->commit());
+    {
+        std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
+                                                 << "x_1"
+                                                 << "partialFilterExpression" << BSON("y" << 1))};
+        auto loader = unittest::assertGet(storage.createCollectionForBulkLoading(
+            nss, generateOptionsWithUuid(), makeIdIndexSpec(nss), indexes));
+        std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 1), BSON("_id" << 2)};
+        ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
+        ASSERT_OK(loader->commit());
+    }
     auto indexName = "x_1"_sd;
     ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
                   storage
