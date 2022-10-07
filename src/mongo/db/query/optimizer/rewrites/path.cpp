@@ -476,13 +476,6 @@ void PathFusion::transport(ABT& n, const EvalFilter& eval, ABT& path, ABT& input
         std::swap(n, result);
 
         _changed = true;
-    } else if (auto evalImmediateInput = input.cast<EvalFilter>(); evalImmediateInput != nullptr) {
-        // Compose immediate EvalFilter input.
-        n = make<EvalFilter>(
-            make<PathComposeM>(std::move(evalImmediateInput->getPath()), std::move(path)),
-            std::move(evalImmediateInput->getInput()));
-
-        _changed = true;
     } else if (auto evalInput = realInput.cast<EvalPath>(); evalInput) {
         // An input to 'this' EvalFilter expression is another EvalPath so we may try to fuse the
         // paths.
