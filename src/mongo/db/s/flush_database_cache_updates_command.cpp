@@ -173,8 +173,8 @@ public:
                 // consistency guarantee.
                 const auto dss = DatabaseShardingState::get(opCtx, _dbName());
                 auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-                criticalSectionSignal =
-                    dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead, dssLock);
+                criticalSectionSignal = dss->getCriticalSectionSignal(
+                    ShardingMigrationCriticalSection::kWrite, dssLock);
             }
 
             if (criticalSectionSignal)
