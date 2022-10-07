@@ -530,14 +530,14 @@ void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) no
     //
     // Under this lock the queues cannot be modified in terms of someone attempting to enqueue on
     // them, only waking threads is allowed.
-    ReleaserLockGuard lk(_queueMutex);  // NOLINT
+    ReleaserLockGuard releaserLock(_queueMutex);  // NOLINT
     _ticketsAvailable.addAndFetch(1);
     if (std::all_of(_queues.begin(), _queues.end(), [](const Queue& queue) {
             return queue.queuedElems() == 0;
         })) {
         return;
     }
-    _dequeueWaitingThread();
+    _dequeueWaitingThread(releaserLock);
 }
 
 bool PriorityTicketHolder::_tryAcquireTicket() {
@@ -569,10 +569,10 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationC
 
     bool assigned;
     {
-        stdx::unique_lock lk(_queueMutex);
+        EnqueuerLockGuard enqueuerLock(_queueMutex);
         _enqueuedElements.addAndFetch(1);
         ON_BLOCK_EXIT([&] { _enqueuedElements.subtractAndFetch(1); });
-        assigned = queue.enqueue(opCtx, lk, until, waitMode);
+        assigned = queue.enqueue(opCtx, enqueuerLock, until, waitMode);
     }
     if (assigned) {
         return Ticket{this, admCtx};
@@ -589,9 +589,9 @@ void PriorityTicketHolder::_resize(int newSize, int oldSize) noexcept {
     if (difference > 0) {
         // As we're adding tickets the waiting threads need to be notified that there are new
         // tickets available.
-        ReleaserLockGuard lk(_queueMutex);
+        ReleaserLockGuard releaserLock(_queueMutex);
         for (int i = 0; i < difference; i++) {
-            _dequeueWaitingThread();
+            _dequeueWaitingThread(releaserLock);
         }
     }
 
@@ -599,7 +599,7 @@ void PriorityTicketHolder::_resize(int newSize, int oldSize) noexcept {
     // have to wait until the current ticket holders release their tickets.
 }
 
-bool PriorityTicketHolder::Queue::attemptToDequeue() {
+bool PriorityTicketHolder::Queue::attemptToDequeue(const ReleaserLockGuard& releaserLock) {
     auto threadsToBeWoken = _threadsToBeWoken.load();
     while (threadsToBeWoken < _queuedThreads) {
         auto canDequeue = _threadsToBeWoken.compareAndSwap(&threadsToBeWoken, threadsToBeWoken + 1);
@@ -611,7 +611,7 @@ bool PriorityTicketHolder::Queue::attemptToDequeue() {
     return false;
 }
 
-void PriorityTicketHolder::Queue::_signalThreadWoken() {
+void PriorityTicketHolder::Queue::_signalThreadWoken(const EnqueuerLockGuard& enqueuerLock) {
     auto currentThreadsToBeWoken = _threadsToBeWoken.load();
     while (currentThreadsToBeWoken > 0) {
         if (_threadsToBeWoken.compareAndSwap(&currentThreadsToBeWoken,
@@ -622,7 +622,7 @@ void PriorityTicketHolder::Queue::_signalThreadWoken() {
 }
 
 bool PriorityTicketHolder::Queue::enqueue(OperationContext* opCtx,
-                                          EnqueuerLockGuard& queueLock,
+                                          EnqueuerLockGuard& enqueuerLock,
                                           const Date_t& until,
                                           WaitMode waitMode) {
     _queuedThreads++;
@@ -647,8 +647,9 @@ bool PriorityTicketHolder::Queue::enqueue(OperationContext* opCtx,
         while (_holder->_ticketsAvailable.load() <= 0) {
             // This method must be called after getting woken in all cases, so we use a ScopeGuard
             // to handle exceptions as well as early returns.
-            ON_BLOCK_EXIT([&] { _signalThreadWoken(); });
-            auto waitResult = clockSource->waitForConditionUntil(_cv, queueLock, deadline, baton);
+            ON_BLOCK_EXIT([&] { _signalThreadWoken(enqueuerLock); });
+            auto waitResult =
+                clockSource->waitForConditionUntil(_cv, enqueuerLock, deadline, baton);
             // We check if the operation has been interrupted (timeout, killed, etc.) here.
             if (waitMode == WaitMode::kInterruptible) {
                 opCtx->checkForInterrupt();
@@ -660,11 +661,11 @@ bool PriorityTicketHolder::Queue::enqueue(OperationContext* opCtx,
     return true;
 }
 
-void PriorityTicketHolder::_dequeueWaitingThread() {
+void PriorityTicketHolder::_dequeueWaitingThread(const ReleaserLockGuard& releaserLock) {
     // There should never be anything to dequeue from 'QueueType::ImmediatePriorityNoOpQueue' since
     // 'kImmediate' operations should always bypass the need to queue.
     int currentIndexQueue = static_cast<unsigned int>(QueueType::ImmediatePriorityNoOpQueue) - 1;
-    while (!_queues[currentIndexQueue].attemptToDequeue()) {
+    while (!_queues[currentIndexQueue].attemptToDequeue(releaserLock)) {
         if (currentIndexQueue == 0)
             break;
         else

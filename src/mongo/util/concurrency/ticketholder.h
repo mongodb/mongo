@@ -362,7 +362,7 @@ private:
               _threadsToBeWoken(other._threadsToBeWoken.load()),
               _holder(other._holder){};
 
-        bool attemptToDequeue();
+        bool attemptToDequeue(const ReleaserLockGuard& releaserLock);
 
         bool enqueue(OperationContext* interruptible,
                      EnqueuerLockGuard& queueLock,
@@ -387,7 +387,7 @@ private:
         }
 
     private:
-        void _signalThreadWoken();
+        void _signalThreadWoken(const EnqueuerLockGuard& enqueuerLock);
 
         int _queuedThreads{0};
         AtomicWord<int> _threadsToBeWoken{0};
@@ -435,7 +435,7 @@ private:
      * - The number of items in each queue will not change during the execution
      * - No other thread will proceed to wait during the execution of the method
      */
-    void _dequeueWaitingThread();
+    void _dequeueWaitingThread(const ReleaserLockGuard& releaserLock);
 
     /**
      * Selects the queue to use for the current thread given the provided arguments.
