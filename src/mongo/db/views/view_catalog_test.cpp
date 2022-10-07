@@ -51,7 +51,6 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/db/views/view_graph.h"
@@ -86,26 +85,9 @@ public:
     void setUp() override {
         CatalogTestFixture::setUp();
 
-        WriteUnitOfWork wuow(operationContext());
-        AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
-        _db = autoDb.ensureDbExists(operationContext());
-        invariant(_db);
-
-        // Create any additional databases used throughout the test.
-        ASSERT(AutoGetDb(operationContext(), DatabaseName(_dbName.tenantId(), "db1"), MODE_X)
-                   .ensureDbExists(operationContext()));
-        ASSERT(AutoGetDb(operationContext(), DatabaseName(_dbName.tenantId(), "db2"), MODE_X)
-                   .ensureDbExists(operationContext()));
-
-        auto durableViewCatalogUnique = std::make_unique<DurableViewCatalogImpl>(_db);
-        durableViewCatalog = durableViewCatalogUnique.get();
-
-        // Create the system views collection for the database.
-        ASSERT(_db->createCollection(
-            operationContext(),
-            NamespaceString(_dbName, NamespaceString::kSystemDotViewsCollectionName)));
-
-        wuow.commit();
+        _db = _createDatabase(_dbName);
+        _createDatabase({_dbName.tenantId(), "db1"});
+        _createDatabase({_dbName.tenantId(), "db2"});
     }
 
     void tearDown() override {
@@ -129,8 +111,8 @@ public:
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
-        Status s = getCatalog()->createView(
-            opCtx, viewName, viewOn, pipeline, collation, view_catalog_helpers::validatePipeline);
+        auto s = getCatalog()->createView(
+            opCtx, viewName, viewOn, pipeline, view_catalog_helpers::validatePipeline, collation);
         wuow.commit();
 
         return s;
@@ -148,7 +130,7 @@ public:
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
-        Status s = getCatalog()->modifyView(
+        auto s = getCatalog()->modifyView(
             opCtx, viewName, viewOn, pipeline, view_catalog_helpers::validatePipeline);
         wuow.commit();
 
@@ -184,8 +166,19 @@ private:
     DatabaseName _dbName;
     Database* _db;
 
+    Database* _createDatabase(const DatabaseName& dbName) {
+        WriteUnitOfWork wuow{operationContext()};
+
+        NamespaceString ns{dbName, NamespaceString::kSystemDotViewsCollectionName};
+        AutoGetCollection systemViews{operationContext(), ns, MODE_X};
+        auto db = systemViews.ensureDbExists(operationContext());
+        ASSERT(db->createCollection(operationContext(), ns));
+
+        wuow.commit();
+        return db;
+    }
+
 protected:
-    DurableViewCatalogImpl* durableViewCatalog;
     const BSONArray emptyPipeline;
     const BSONObj emptyCollation;
 };
@@ -545,8 +538,8 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
                                            viewName,
                                            viewOn,
                                            emptyPipeline,
-                                           emptyCollation,
-                                           view_catalog_helpers::validatePipeline));
+                                           view_catalog_helpers::validatePipeline,
+                                           emptyCollation));
     }
     auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
     ASSERT(!ResourceCatalog::get(getServiceContext()).name(resourceID));

@@ -49,7 +49,6 @@ class CollectionCatalog {
 
 public:
     using CollectionInfoFn = std::function<bool(const CollectionPtr& collection)>;
-    using ViewIteratorCallback = std::function<bool(const ViewDefinition& view)>;
 
     // Number of how many Collection references for a single Collection that is stored in the
     // catalog. Used to determine whether there are external references (uniquely owned). Needs to
@@ -112,19 +111,6 @@ public:
         }
     };
 
-    enum class ViewUpsertMode {
-        // Insert all data for that view into the view map, view graph, and durable view catalog.
-        kCreateView,
-
-        // Insert into the view map and view graph without reinserting the view into the durable
-        // view catalog. Skip view graph validation.
-        kAlreadyDurableView,
-
-        // Reload the view map, insert into the view graph (flagging it as needing refresh), and
-        // update the durable view catalog.
-        kUpdateView,
-    };
-
     static std::shared_ptr<const CollectionCatalog> get(ServiceContext* svcCtx);
     static std::shared_ptr<const CollectionCatalog> get(OperationContext* opCtx);
 
@@ -153,20 +139,22 @@ public:
 
     /**
      * Create a new view 'viewName' with contents defined by running the specified aggregation
-     * 'pipeline' with collation 'collation' on a collection or view 'viewOn'.
+     * 'pipeline' with collation 'collation' on a collection or view 'viewOn'. May insert this view
+     * into the system.views collection depending on 'durability'.
      *
      * Must be in WriteUnitOfWork. View creation rolls back if the unit of work aborts.
      *
      * Caller must ensure corresponding database exists. Expects db.system.views MODE_X lock and
-     * view namespace MODE_IX lock (unless 'insertViewMode' is set to kAlreadyDurableView).
+     * view namespace MODE_IX lock (unless 'durability' is set to kAlreadyDurable).
      */
     Status createView(OperationContext* opCtx,
                       const NamespaceString& viewName,
                       const NamespaceString& viewOn,
                       const BSONArray& pipeline,
+                      const ViewsForDatabase::PipelineValidatorFn& validatePipeline,
                       const BSONObj& collation,
-                      const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
-                      ViewUpsertMode insertViewMode = ViewUpsertMode::kCreateView) const;
+                      ViewsForDatabase::Durability durability =
+                          ViewsForDatabase::Durability::kNotYetDurable) const;
 
     /**
      * Drop the view named 'viewName'.
@@ -188,7 +176,7 @@ public:
                       const NamespaceString& viewName,
                       const NamespaceString& viewOn,
                       const BSONArray& pipeline,
-                      const ViewsForDatabase::PipelineValidatorFn& pipelineValidator) const;
+                      const ViewsForDatabase::PipelineValidatorFn& validatePipeline) const;
 
     /**
      * Reloads the in-memory state of the view catalog from the 'system.views' collection. The
@@ -261,14 +249,6 @@ public:
      * Must be called within a WriteUnitOfWork.
      */
     void dropCollection(OperationContext* opCtx, Collection* coll, bool isDropPending) const;
-
-    /**
-     * Initializes view records for database 'dbName'. Can throw a 'WriteConflictException' if this
-     * database has already been initialized.
-     */
-    void onOpenDatabase(OperationContext* opCtx,
-                        const DatabaseName& dbName,
-                        ViewsForDatabase&& viewsForDb);
 
     /**
      * Removes the view records associated with 'dbName', if any, from the in-memory
@@ -426,11 +406,9 @@ public:
      *
      * Caller must ensure corresponding database exists.
      */
-    void iterateViews(
-        OperationContext* opCtx,
-        const DatabaseName& dbName,
-        ViewIteratorCallback callback,
-        ViewCatalogLookupBehavior lookupBehavior = ViewCatalogLookupBehavior::kValidateViews) const;
+    void iterateViews(OperationContext* opCtx,
+                      const DatabaseName& dbName,
+                      const std::function<bool(const ViewDefinition& view)>& callback) const;
 
     /**
      * Look up the 'nss' in the view catalog, returning a shared pointer to a View definition,
@@ -634,6 +612,8 @@ private:
 
     std::shared_ptr<Collection> _lookupCollectionByUUID(UUID uuid) const;
 
+    CollectionPtr _lookupSystemViews(OperationContext* opCtx, const DatabaseName& dbName) const;
+
     /**
      * Retrieves the views for a given database, including any uncommitted changes for this
      * operation.
@@ -651,18 +631,6 @@ private:
      * collection name in the catalog.
      */
     void _replaceViewsForDatabase(const DatabaseName& dbName, ViewsForDatabase&& views);
-
-    /**
-     * Helper to take care of shared functionality for 'createView(...)' and 'modifyView(...)'.
-     */
-    Status _createOrUpdateView(OperationContext* opCtx,
-                               const NamespaceString& viewName,
-                               const NamespaceString& viewOn,
-                               const BSONArray& pipeline,
-                               const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
-                               std::unique_ptr<CollatorInterface> collator,
-                               ViewsForDatabase&& viewsForDb,
-                               ViewUpsertMode insertViewMode) const;
 
     /**
      * Returns true if this CollectionCatalog instance is part of an ongoing batched catalog write.

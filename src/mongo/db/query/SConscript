@@ -237,7 +237,6 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/fle_fields',
         '$BUILD_DIR/mongo/db/api_parameters',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',

@@ -2287,11 +2287,15 @@ void HandleRequest::completeOperation(DbResponse& response) {
 
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
     // this op should be written to the profiler.
-    const bool shouldProfile = currentOp.completeAndLogOperation(opCtx,
-                                                                 MONGO_LOGV2_DEFAULT_COMPONENT,
-                                                                 response.response.size(),
-                                                                 executionContext->slowMsOverride,
-                                                                 executionContext->forceLog);
+    const bool shouldProfile = currentOp.completeAndLogOperation(
+        opCtx,
+        MONGO_LOGV2_DEFAULT_COMPONENT,
+        CollectionCatalog::get(opCtx)
+            ->getDatabaseProfileSettings(currentOp.getNSS().dbName())
+            .filter,
+        response.response.size(),
+        executionContext->slowMsOverride,
+        executionContext->forceLog);
 
     Top::get(opCtx->getServiceContext())
         .incrementGlobalLatencyStats(

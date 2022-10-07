@@ -32,7 +32,6 @@
 #include "mongo/db/catalog/database_holder.h"
 
 #include "mongo/db/database_name.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
 
@@ -77,7 +76,6 @@ private:
 
     typedef stdx::unordered_map<DatabaseName, Database*> DBs;
     mutable SimpleMutex _m;
-    mutable stdx::condition_variable _c;
     DBs _dbs;
 };
 

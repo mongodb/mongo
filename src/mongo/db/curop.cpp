@@ -393,6 +393,7 @@ static constexpr size_t appendMaxElementSize = 50 * 1024;
 
 bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                                     logv2::LogComponent component,
+                                    std::shared_ptr<ProfileFilter> filter,
                                     boost::optional<size_t> responseLength,
                                     boost::optional<long long> slowMsOverride,
                                     bool forceLog) {
@@ -415,8 +416,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
 
     bool shouldLogSlowOp, shouldProfileAtLevel1;
 
-    if (auto filter =
-            CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(getNSS().db()).filter) {
+    if (filter) {
         bool passesFilter = filter->matches(opCtx, _debug, *this);
 
         shouldLogSlowOp = passesFilter;

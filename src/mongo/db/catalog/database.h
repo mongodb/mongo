@@ -84,7 +84,7 @@ public:
     /**
      * Sets up internal memory structures.
      */
-    virtual Status init(OperationContext* opCtx) = 0;
+    virtual void init(OperationContext* opCtx) = 0;
 
     virtual const DatabaseName& name() const = 0;
 

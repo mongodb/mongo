@@ -169,7 +169,13 @@ void HandleRequest::onSuccess(const DbResponse& dbResponse) {
 
     // Mark the op as complete, populate the response length, and log it if appropriate.
     currentOp->completeAndLogOperation(
-        opCtx, logv2::LogComponent::kCommand, dbResponse.response.size(), slowMsOverride);
+        opCtx,
+        logv2::LogComponent::kCommand,
+        CollectionCatalog::get(opCtx)
+            ->getDatabaseProfileSettings(currentOp->getNSS().dbName())
+            .filter,
+        dbResponse.response.size(),
+        slowMsOverride);
 
     // Update the source of stats shown in the db.serverStatus().opLatencies section.
     Top::get(opCtx->getServiceContext())

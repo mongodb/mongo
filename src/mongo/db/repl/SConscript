@@ -1082,6 +1082,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
