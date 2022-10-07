@@ -72,7 +72,7 @@ bool joinDbVersionOperation(OperationContext* opCtx,
     invariant(dssLock->has_value());
 
     if (auto critSect =
-            dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead, **dssLock)) {
+            dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite, **dssLock)) {
         LOGV2_DEBUG(6697201,
                     2,
                     "Waiting for exit from the critical section",
