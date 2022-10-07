@@ -54,6 +54,33 @@ public:
 
     void noOpBenchmark(benchmark::State& state);
 
+    void benchmarkAddIntegers(benchmark::State& state);
+    void benchmarkAddDoubles(benchmark::State& state);
+    void benchmarkAddDecimals(benchmark::State& state);
+    void benchmarkAddDates(benchmark::State& state);
+    void benchmarkAddNullAndMissing(benchmark::State& state);
+    void benchmarkAddArray(benchmark::State& state);
+
+    void benchmarkArrayArrayElemAt0(benchmark::State& state);
+    void benchmarkArrayArrayElemAtLast(benchmark::State& state);
+    void benchmarkArrayFilter0(benchmark::State& state);
+    void benchmarkArrayFilter10(benchmark::State& state);
+    void benchmarkArrayInFound0(benchmark::State& state);
+    void benchmarkArrayInFound9(benchmark::State& state);
+    void benchmarkArrayInNotFound(benchmark::State& state);
+
+    void benchmarkCompareEq(benchmark::State& state);
+    void benchmarkCompareGte(benchmark::State& state);
+    void benchmarkCompareLte(benchmark::State& state);
+    void benchmarkCompareNe(benchmark::State& state);
+
+    void benchmarkConditionalCond(benchmark::State& state);
+    void benchmarkConditionalIfNullFalse(benchmark::State& state);
+    void benchmarkConditionalIfNullTrue(benchmark::State& state);
+    void benchmarkConditionalSwitchCase0(benchmark::State& state);
+    void benchmarkConditionalSwitchCase1(benchmark::State& state);
+    void benchmarkConditionalSwitchDefault(benchmark::State& state);
+
     void benchmarkDateDiffEvaluateMinute300Years(benchmark::State& state);
     void benchmarkDateDiffEvaluateMinute2Years(benchmark::State& state);
     void benchmarkDateDiffEvaluateMinute2YearsWithTimezone(benchmark::State& state);
@@ -84,6 +111,19 @@ public:
     void benchmarkSetFieldWithRemoveExpression(benchmark::State& state);
     void benchmarkUnsetFieldEvaluateExpression(benchmark::State& state);
 
+    void benchmarkLogicalAndFalse0(benchmark::State& state);
+    void benchmarkLogicalAndFalse1(benchmark::State& state);
+    void benchmarkLogicalAndTrue(benchmark::State& state);
+    void benchmarkLogicalOrTrue0(benchmark::State& state);
+    void benchmarkLogicalOrTrue1(benchmark::State& state);
+    void benchmarkLogicalOrFalse(benchmark::State& state);
+
+    void benchmarkMultiplyIntegers(benchmark::State& state);
+    void benchmarkMultiplyDoubles(benchmark::State& state);
+    void benchmarkMultiplyDecimals(benchmark::State& state);
+    void benchmarkMultiplyNullAndMissing(benchmark::State& state);
+    void benchmarkMultiplyArray(benchmark::State& state);
+
     void benchmarkSetIsSubset_allPresent(benchmark::State& state);
     void benchmarkSetIsSubset_nonePresent(benchmark::State& state);
     void benchmarkSetIntersection(benchmark::State& state);
@@ -97,18 +137,8 @@ public:
     void benchmarkSubtractDates(benchmark::State& state);
     void benchmarkSubtractNullAndMissing(benchmark::State& state);
 
-    void benchmarkAddIntegers(benchmark::State& state);
-    void benchmarkAddDoubles(benchmark::State& state);
-    void benchmarkAddDecimals(benchmark::State& state);
-    void benchmarkAddDates(benchmark::State& state);
-    void benchmarkAddNullAndMissing(benchmark::State& state);
-    void benchmarkAddArray(benchmark::State& state);
-
-    void benchmarkMultiplyIntegers(benchmark::State& state);
-    void benchmarkMultiplyDoubles(benchmark::State& state);
-    void benchmarkMultiplyDecimals(benchmark::State& state);
-    void benchmarkMultiplyNullAndMissing(benchmark::State& state);
-    void benchmarkMultiplyArray(benchmark::State& state);
+    void benchmarkValueConst(benchmark::State& state);
+    void benchmarkValueLiteral(benchmark::State& state);
 
 private:
     void testDateDiffExpression(long long startDate,
@@ -141,11 +171,81 @@ private:
     PseudoRandom random;
 };
 
+/**
+ * SERVER-70260: When fixed, the benchmarks in this macro should be merged alphabetically into the
+ * BENCHMARK_EXPRESSIONS() macro below and the current macro deleted. Please preserve the groupings
+ * (separated by blank lines between groups), which are based on the BM names' prefixes {Array,
+ * Conditional}.
+ *
+ * Macro to register benchmark expressions that crash under the test framework in SBE.
+ *   Fixture: class name of the implementing child class for Classic engine.
+ */
+#define BENCHMARK_EXPRESSIONS_CLASSIC_ONLY(Fixture)                            \
+                                                                               \
+    BENCHMARK_F(Fixture, ArrayArrayElemAt0)(benchmark::State & state) {        \
+        benchmarkArrayArrayElemAt0(state);                                     \
+    }                                                                          \
+    BENCHMARK_F(Fixture, ArrayArrayElemAtLast)(benchmark::State & state) {     \
+        benchmarkArrayArrayElemAtLast(state);                                  \
+    }                                                                          \
+    BENCHMARK_F(Fixture, ArrayFilter0)(benchmark::State & state) {             \
+        benchmarkArrayFilter0(state);                                          \
+    }                                                                          \
+    BENCHMARK_F(Fixture, ArrayFilter10)(benchmark::State & state) {            \
+        benchmarkArrayFilter10(state);                                         \
+    }                                                                          \
+                                                                               \
+    BENCHMARK_F(Fixture, ConditionalCond)(benchmark::State & state) {          \
+        benchmarkConditionalCond(state);                                       \
+    }                                                                          \
+    BENCHMARK_F(Fixture, ConditionalIfNullFalse)(benchmark::State & state) {   \
+        benchmarkConditionalIfNullFalse(state);                                \
+    }                                                                          \
+    BENCHMARK_F(Fixture, ConditionalIfNullTrue)(benchmark::State & state) {    \
+        benchmarkConditionalIfNullTrue(state);                                 \
+    }                                                                          \
+    BENCHMARK_F(Fixture, ConditionalSwitchCase0)(benchmark::State & state) {   \
+        benchmarkConditionalSwitchCase0(state);                                \
+    }                                                                          \
+    BENCHMARK_F(Fixture, ConditionalSwitchCase1)(benchmark::State & state) {   \
+        benchmarkConditionalSwitchCase1(state);                                \
+    }                                                                          \
+    BENCHMARK_F(Fixture, ConditionalSwitchDefault)(benchmark::State & state) { \
+        benchmarkConditionalSwitchDefault(state);                              \
+    }
+
+/**
+ * Macro to register benchmark expressions for both Classic and SBE engines.
+ *   Fixture: class name of the implementing child class for current engine.
+ */
 #define BENCHMARK_EXPRESSIONS(Fixture)                                          \
                                                                                 \
     BENCHMARK_F(Fixture, NoOp)                                                  \
     (benchmark::State & state) {                                                \
         noOpBenchmark(state);                                                   \
+    }                                                                           \
+                                                                                \
+    BENCHMARK_F(Fixture, ArrayInFound0)(benchmark::State & state) {             \
+        benchmarkArrayInFound0(state);                                          \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ArrayInFound9)(benchmark::State & state) {             \
+        benchmarkArrayInFound9(state);                                          \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ArrayInNotFound)(benchmark::State & state) {           \
+        benchmarkArrayInNotFound(state);                                        \
+    }                                                                           \
+                                                                                \
+    BENCHMARK_F(Fixture, CompareEq)(benchmark::State & state) {                 \
+        benchmarkCompareEq(state);                                              \
+    }                                                                           \
+    BENCHMARK_F(Fixture, CompareGte)(benchmark::State & state) {                \
+        benchmarkCompareGte(state);                                             \
+    }                                                                           \
+    BENCHMARK_F(Fixture, CompareLte)(benchmark::State & state) {                \
+        benchmarkCompareLte(state);                                             \
+    }                                                                           \
+    BENCHMARK_F(Fixture, CompareNe)(benchmark::State & state) {                 \
+        benchmarkCompareNe(state);                                              \
     }                                                                           \
                                                                                 \
     BENCHMARK_F(Fixture, DateDiffEvaluateMinute300Years)                        \
@@ -251,6 +351,25 @@ private:
         benchmarkUnsetFieldEvaluateExpression(state);                           \
     }                                                                           \
                                                                                 \
+    BENCHMARK_F(Fixture, LogicalAndFalse0)(benchmark::State & state) {          \
+        benchmarkLogicalAndFalse0(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, LogicalAndFalse1)(benchmark::State & state) {          \
+        benchmarkLogicalAndFalse1(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, LogicalAndTrue)(benchmark::State & state) {            \
+        benchmarkLogicalAndTrue(state);                                         \
+    }                                                                           \
+    BENCHMARK_F(Fixture, LogicalOrTrue0)(benchmark::State & state) {            \
+        benchmarkLogicalOrTrue0(state);                                         \
+    }                                                                           \
+    BENCHMARK_F(Fixture, LogicalOrTrue1)(benchmark::State & state) {            \
+        benchmarkLogicalOrTrue1(state);                                         \
+    }                                                                           \
+    BENCHMARK_F(Fixture, LogicalOrFalse)(benchmark::State & state) {            \
+        benchmarkLogicalOrFalse(state);                                         \
+    }                                                                           \
+                                                                                \
     BENCHMARK_F(Fixture, SetIsSubset_allPresent)(benchmark::State & state) {    \
         benchmarkSetIsSubset_allPresent(state);                                 \
     }                                                                           \
@@ -319,5 +438,13 @@ private:
     }                                                                           \
     BENCHMARK_F(Fixture, MultiplyArray)(benchmark::State & state) {             \
         benchmarkMultiplyArray(state);                                          \
+    }                                                                           \
+                                                                                \
+    BENCHMARK_F(Fixture, ValueConst)(benchmark::State & state) {                \
+        benchmarkValueConst(state);                                             \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ValueLiteral)(benchmark::State & state) {              \
+        benchmarkValueLiteral(state);                                           \
     }
+
 }  // namespace mongo

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/expression_bm_fixture.h"
+#include "mongo/db/json.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -74,6 +75,296 @@ void ExpressionBenchmarkFixture::benchmarkExpression(BSONObj expressionSpec,
 
 void ExpressionBenchmarkFixture::noOpBenchmark(benchmark::State& state) {
     benchmarkExpression(BSON("$const" << 1), state);
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$arrayElemAt": ["$array", 0]}
+ * against document
+ *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
+ */
+void ExpressionBenchmarkFixture::benchmarkArrayArrayElemAt0(benchmark::State& state) {
+    BSONArray array = rangeBSONArray(10);
+
+    benchmarkExpression(BSON("$arrayElemAt" << BSON_ARRAY("$array" << 0)),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, array}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$arrayElemAt": ["$array", -1]}
+ * against document
+ *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
+ */
+void ExpressionBenchmarkFixture::benchmarkArrayArrayElemAtLast(benchmark::State& state) {
+    BSONArray array = rangeBSONArray(10);
+
+    benchmarkExpression(BSON("$arrayElemAt" << BSON_ARRAY("$array" << -1)),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, array}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$filter": {"input": "$array", "cond": {"$gte": ["$$this", "A"]}}}
+ * against document
+ *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
+ * No entries will pass the filter as the entries are strings, not numbers. ("Filter0" indicates
+ * 0 entries will pass the filter.)
+ */
+void ExpressionBenchmarkFixture::benchmarkArrayFilter0(benchmark::State& state) {
+    BSONArray array = rangeBSONArray(10);
+
+    benchmarkExpression(BSON("$filter" << BSON("input"
+                                               << "$array"
+                                               << "cond"
+                                               << BSON("$gte" << BSON_ARRAY("$$this"
+                                                                            << "A"_sd)))),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, array}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$filter": {"input": "$array", "cond": {"$gte": ["$$this", "0"]}}}
+ * against document
+ *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
+ * All ten entries will pass the filter and be returned in the result array. ("Filter10" indicates
+ * 10 entries will pass the filter.)
+ */
+void ExpressionBenchmarkFixture::benchmarkArrayFilter10(benchmark::State& state) {
+    BSONArray array = rangeBSONArray(10);
+
+    benchmarkExpression(BSON("$filter" << BSON("input"
+                                               << "$array"
+                                               << "cond"
+                                               << BSON("$gte" << BSON_ARRAY("$$this"
+                                                                            << "0"_sd)))),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, array}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$in": ["0", "$array"]}
+ * against document
+ *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
+ */
+void ExpressionBenchmarkFixture::benchmarkArrayInFound0(benchmark::State& state) {
+    BSONArray array = rangeBSONArray(10);
+
+    benchmarkExpression(BSON("$in" << BSON_ARRAY("0"_sd
+                                                 << "$array")),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, array}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$in": ["9", "$array"]}
+ * against document
+ *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
+ */
+void ExpressionBenchmarkFixture::benchmarkArrayInFound9(benchmark::State& state) {
+    BSONArray array = rangeBSONArray(10);
+
+    benchmarkExpression(BSON("$in" << BSON_ARRAY("9"_sd
+                                                 << "$array")),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, array}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$in": ["A", "$array"]}
+ * against document
+ *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
+ */
+void ExpressionBenchmarkFixture::benchmarkArrayInNotFound(benchmark::State& state) {
+    BSONArray array = rangeBSONArray(10);
+
+    benchmarkExpression(BSON("$in" << BSON_ARRAY("A"_sd
+                                                 << "$array")),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, array}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$eq": ["1", "$value"]}
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkCompareEq(benchmark::State& state) {
+    benchmarkExpression(BSON("$eq" << BSON_ARRAY("1"
+                                                 << "$value")),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$gte": ["1", "$value"]}
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkCompareGte(benchmark::State& state) {
+    benchmarkExpression(BSON("$gte" << BSON_ARRAY("1"
+                                                  << "$value")),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$lte": ["1", "$value"]}
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkCompareLte(benchmark::State& state) {
+    benchmarkExpression(BSON("$lte" << BSON_ARRAY("1"
+                                                  << "$value")),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$ne": ["1", "$value"]}
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkCompareNe(benchmark::State& state) {
+    benchmarkExpression(BSON("$ne" << BSON_ARRAY("1"
+                                                 << "$value")),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$cond": [{$eq: ["1", "$value"]}, "1", "0"]}
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkConditionalCond(benchmark::State& state) {
+    benchmarkExpression(BSON("$cond" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("1"_sd
+                                                                            << "$value"))
+                                                   << "1"_sd
+                                                   << "0"_sd)),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$ifNull": ["$value", "0"]}
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkConditionalIfNullFalse(benchmark::State& state) {
+    benchmarkExpression(BSON("$ifNull" << BSON_ARRAY("$value"
+                                                     << "0"_sd)),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$ifNull": ["$value", "0"]}
+ * against document
+ *   {"_id": ObjectId(...), "value": null}
+ */
+void ExpressionBenchmarkFixture::benchmarkConditionalIfNullTrue(benchmark::State& state) {
+    benchmarkExpression(BSON("$ifNull" << BSON_ARRAY("$value"
+                                                     << "0"_sd)),
+                        state,
+                        std::vector<Document>(1, {Document(fromjson("{value: null}"))}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$switch": {
+ *      "branches": [
+ *         {"case": {"$eq": ["$value", "1"]}, "then": 0},
+ *         {"case": {"$eq": ["$value", "0"]}, "then": 1},
+ *       ],
+ *       "default": -1
+ *     }
+ *   }
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ * The first case (position 0) will execute.
+ */
+void ExpressionBenchmarkFixture::benchmarkConditionalSwitchCase0(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$switch" << BSON("branches"
+                               << BSON_ARRAY(BSON("case" << BSON("$eq" << BSON_ARRAY("$value"
+                                                                                     << "1"_sd))
+                                                         << "then" << 0)
+                                             << BSON("case" << BSON("$eq" << BSON_ARRAY("$value"
+                                                                                        << "0"_sd))
+                                                            << "then" << 1))
+                               << "default" << -1)),
+        state,
+        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$switch": {
+ *      "branches": [
+ *         {"case": {"$eq": ["$value", "0"]}, "then": 0},
+ *         {"case": {"$eq": ["$value", "1"]}, "then": 1},
+ *       ],
+ *       "default": -1
+ *     }
+ *   }
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ * The second case (position 1) will execute.
+ */
+void ExpressionBenchmarkFixture::benchmarkConditionalSwitchCase1(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$switch" << BSON("branches"
+                               << BSON_ARRAY(BSON("case" << BSON("$eq" << BSON_ARRAY("$value"
+                                                                                     << "0"_sd))
+                                                         << "then" << 0)
+                                             << BSON("case" << BSON("$eq" << BSON_ARRAY("$value"
+                                                                                        << "1"_sd))
+                                                            << "then" << 1))
+                               << "default" << -1)),
+        state,
+        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$switch": {
+ *      "branches": [
+ *         {"case": {"$eq": ["$value", "0"]}, "then": 0},
+ *         {"case": {"$eq": ["$value", "2"]}, "then": 1},
+ *       ],
+ *       "default": -1
+ *     }
+ *   }
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ * The default case will execute.
+ */
+void ExpressionBenchmarkFixture::benchmarkConditionalSwitchDefault(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$switch" << BSON("branches"
+                               << BSON_ARRAY(BSON("case" << BSON("$eq" << BSON_ARRAY("$value"
+                                                                                     << "0"_sd))
+                                                         << "then" << 0)
+                                             << BSON("case" << BSON("$eq" << BSON_ARRAY("$value"
+                                                                                        << "2"_sd))
+                                                            << "then" << 1))
+                               << "default" << -1)),
+        state,
+        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
 }
 
 void ExpressionBenchmarkFixture::benchmarkDateDiffEvaluateMinute300Years(benchmark::State& state) {
@@ -291,6 +582,105 @@ void ExpressionBenchmarkFixture::benchmarkGetFieldNestedExpression(benchmark::St
                     << "c"
                     << "input" << BSON("$getField" << innerObjBuilder.obj());
     benchmarkExpression(BSON("$getField" << outerObjBuilder.obj()), state);
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$and": [{"$eq": ["$value0", "1"]}, {"$eq": ["$value1", "0"]}]}
+ * against document
+ *   {"_id": ObjectId(...), "value0": "0", "value1": "1"}
+ * This returns false on the first condition (position 0).
+ */
+void ExpressionBenchmarkFixture::benchmarkLogicalAndFalse0(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$and" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$value0"
+                                                           << "1"_sd))
+                                  << BSON("$eq" << BSON_ARRAY("$value1"
+                                                              << "0"_sd)))),
+        state,
+        std::vector<Document>(1, {Document(fromjson("{value0: \"0\", value1: \"1\"}"))}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$and": [{"$eq": ["$value0", "0"]}, {"$eq": ["$value1", "2"]}]}
+ * against document
+ *   {"_id": ObjectId(...), "value0": "0", "value1": "1"}
+ * This returns false on the second condition (position 1).
+ */
+void ExpressionBenchmarkFixture::benchmarkLogicalAndFalse1(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$and" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$value0"
+                                                           << "0"_sd))
+                                  << BSON("$eq" << BSON_ARRAY("$value1"
+                                                              << "2"_sd)))),
+        state,
+        std::vector<Document>(1, {Document(fromjson("{value0: \"0\", value1: \"1\"}"))}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$and": [{"$eq": ["$value0", "0"]}, {"$eq": ["$value1", "1"]}]}
+ * against document
+ *   {"_id": ObjectId(...), "value0": "0", "value1": "1"}
+ * This returns true as both conditions are met.
+ */
+void ExpressionBenchmarkFixture::benchmarkLogicalAndTrue(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$and" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$value0"
+                                                           << "0"_sd))
+                                  << BSON("$eq" << BSON_ARRAY("$value1"
+                                                              << "1"_sd)))),
+        state,
+        std::vector<Document>(1, {Document(fromjson("{value0: \"0\", value1: \"1\"}"))}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$or": [{"$eq": ["$value", "1"]}, {"$eq": ["$value", "0"]}]}
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ * This returns true on the first condition (position 0).
+ */
+void ExpressionBenchmarkFixture::benchmarkLogicalOrTrue0(benchmark::State& state) {
+    benchmarkExpression(BSON("$or" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$value"
+                                                                          << "1"_sd))
+                                                 << BSON("$eq" << BSON_ARRAY("$value"
+                                                                             << "0"_sd)))),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$or": [{"$eq": ["$value", "0"]}, {"$eq": ["$value", "1"]}]}
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ * This returns true on the second condition (position 1).
+ */
+void ExpressionBenchmarkFixture::benchmarkLogicalOrTrue1(benchmark::State& state) {
+    benchmarkExpression(BSON("$or" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$value"
+                                                                          << "0"_sd))
+                                                 << BSON("$eq" << BSON_ARRAY("$value"
+                                                                             << "1"_sd)))),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$or": [{"$eq": ["$value", "0"]}, {"$eq": ["$value", "2"]}]}
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ * This returns false as neither condition is met.
+ */
+void ExpressionBenchmarkFixture::benchmarkLogicalOrFalse(benchmark::State& state) {
+    benchmarkExpression(BSON("$or" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$value"
+                                                                          << "0"_sd))
+                                                 << BSON("$eq" << BSON_ARRAY("$value"
+                                                                             << "2"_sd)))),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
 }
 
 void ExpressionBenchmarkFixture::benchmarkSetFieldEvaluateExpression(benchmark::State& state) {
@@ -538,6 +928,32 @@ void ExpressionBenchmarkFixture::benchmarkMultiplyArray(benchmark::State& state)
     }
     BSONObj expr = BSON("$multiply" << operands.arr());
     benchmarkExpression(std::move(expr), state, {document});
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$const": "1"}
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkValueConst(benchmark::State& state) {
+    benchmarkExpression(BSON("$const"
+                             << "1"_sd),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression
+ *   {"$literal": "1"}
+ * against document
+ *   {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkValueLiteral(benchmark::State& state) {
+    benchmarkExpression(BSON("$literal"
+                             << "1"_sd),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
 }
 
 void ExpressionBenchmarkFixture::testDateDiffExpression(long long startDate,
