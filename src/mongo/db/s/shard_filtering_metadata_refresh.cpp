@@ -201,7 +201,7 @@ SharedSemiFuture<void> recoverRefreshDbVersion(OperationContext* opCtx,
                     str::stream() << "Canceled metadata refresh for database " << dbNameStr,
                     !cancellationToken.isCanceled());
 
-            if (status.isOK()) {
+            if (status.isOK() || status == ErrorCodes::NamespaceNotFound) {
                 LOGV2(6697204, "Refreshed database metadata", "db"_attr = dbNameStr);
             } else {
                 LOGV2_ERROR(6697205,
@@ -219,7 +219,6 @@ void onDbVersionMismatch(OperationContext* opCtx,
                          const boost::optional<DatabaseVersion> receivedDbVersion) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
-
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
     tassert(ErrorCodes::IllegalOperation,
