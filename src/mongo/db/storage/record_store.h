@@ -236,9 +236,7 @@ public:
     /**
      * Returns the version for use as an additional wake condition when used above.
      */
-    uint64_t getVersion() const {
-        return _version;
-    }
+    uint64_t getVersion() const;
 
     /**
      * Cancels the notifier if the collection is dropped/invalidated, and wakes all waiting.

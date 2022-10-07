@@ -135,6 +135,11 @@ void CappedInsertNotifier::notifyAll() const {
     _notifier.notify_all();
 }
 
+uint64_t CappedInsertNotifier::getVersion() const {
+    stdx::lock_guard<Latch> lk(_mutex);
+    return _version;
+}
+
 void CappedInsertNotifier::waitUntil(uint64_t prevVersion, Date_t deadline) const {
     stdx::unique_lock<Latch> lk(_mutex);
     while (!_dead && prevVersion == _version) {
