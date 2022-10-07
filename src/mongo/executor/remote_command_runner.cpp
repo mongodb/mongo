@@ -71,7 +71,6 @@ public:
                               "Remote command execution failed"};
             })
             .then([](TaskExecutor::ResponseOnAnyStatus r) {
-                // TODO SERVER-69592 account for interior executor shutdown
                 auto s = makeErrorIfNeeded(r);
                 uassertStatusOK(s);
                 return RemoteCommandInternalResponse{r.data, r.target.get()};

@@ -101,7 +101,11 @@ struct RemoteCommandRunnerResponse {
 
 /**
  * Execute the command asynchronously on the given target with the provided executor.
- * Returns a SemiFuture with the reply from the IDL command, or throws an error.
+ * Returns a SemiFuture with the reply from the IDL command. If there is any error, local or remote,
+ * while executing the command, the future is set with ErrorCodes::RemoteCommandExecutionError. This
+ * is the only error returned by the API. Additional information about the error, such as its
+ * provenance, code, whether it was a command-error or write{concern}error, etc, is available in the
+ * ExtraInfo object attached to the error. See remote_command_runner_error_info.h for details.
  */
 template <typename CommandType>
 SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doRequest(
@@ -112,6 +116,7 @@ SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doRequest(
     CancellationToken token,
     std::shared_ptr<RemoteCommandRetryPolicy> retryPolicy =
         std::make_shared<RemoteCommandNoRetryPolicy>()) {
+    using ReplyType = RemoteCommandRunnerResponse<typename CommandType::Reply>;
     auto tryBody = [=, targeter = std::move(targeter)] {
         // Execute the command after extracting the db name and bson from the CommandType.
         // Wrapping this function allows us to separate the CommandType parsing logic from the
@@ -129,17 +134,32 @@ SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doRequest(
                          .on(exec, CancellationToken::uncancelable());
 
     return std::move(resFuture)
-        .then([](detail::RemoteCommandInternalResponse r) {
+        .then([](detail::RemoteCommandInternalResponse r) -> ReplyType {
             // TODO SERVER-67661: Make IDL reply types have string representation for logging
             auto res = CommandType::Reply::parseSharingOwnership(
                 IDLParserContext("RemoteCommandRunner"), r.response);
 
-            struct RemoteCommandRunnerResponse<typename CommandType::Reply> fullRes = {
-                res, r.targetUsed
-            };
-
-            return fullRes;
+            return {res, r.targetUsed};
         })
+        .unsafeToInlineFuture()
+        .onError(
+            // We go inline here to intercept executor-shutdown errors and re-write them
+            // so that the API always returns RemoteCommandExecutionError.
+            [](Status s) -> StatusWith<ReplyType> {
+                if (s.code() == ErrorCodes::RemoteCommandExecutionError) {
+                    return s;
+                }
+                // The API implementation guarantees that all errors are provided as
+                // RemoteCommandExecutionError, so if we've reached this code, it means that the API
+                // internals were unable to run due to executor shutdown. Today, the only guarantee
+                // we can make about an executor-shutdown error is that it is in the cancellation
+                // category. We dassert that this is the case to make it easy to find errors in the
+                // API implementation's error-handling while still ensuring that we always return
+                // the correct error code in production.
+                dassert(ErrorCodes::isA<ErrorCategory::CancellationError>(s.code()));
+                return Status{RemoteCommandExecutionErrorInfo(s),
+                              "Remote command execution failed due to executor shutdown"};
+            })
         .semi();
 }
 }  // namespace mongo::executor::remote_command_runner

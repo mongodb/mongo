@@ -334,6 +334,30 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteError) {
     ASSERT_EQ(remoteError.getRemoteCommandResult(), Status::OK());
 }
 
+// Ensure that the RCR correctly returns RemoteCommandExecutionError when the executor
+// is shutdown mid-remote-invocation, and that the executor shutdown error is contained
+// in the error's ExtraInfo.
+TEST_F(RemoteCommandRunnerTestFixture, ExecutorShutdown) {
+    std::unique_ptr<RemoteCommandHostTargeter> targeter =
+        std::make_unique<RemoteCommandLocalHostTargeter>();
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+    auto opCtxHolder = makeOperationContext();
+    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture = doRequest(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    getExecutorPtr()->shutdown();
+    auto error = resultFuture.getNoThrow().getStatus();
+    // The error returned by our API should always be RemoteCommandExecutionError
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    // Make sure we can extract the extra error info
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+    // Make sure the extra info indicates the error was local, and that the
+    // local error (which is just a Status) has the correct code.
+    ASSERT(extraInfo->isLocal());
+    ASSERT(ErrorCodes::isA<ErrorCategory::CancellationError>(extraInfo->asLocal()));
+}
+
 /*
  * Basic Targeter that returns the host that invoked it.
  */

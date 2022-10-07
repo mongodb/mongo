@@ -149,7 +149,16 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, LocalError) {
     ASSERT_FALSE(responseFuture.isReady());
     auto exampleLocalErr = Status{ErrorCodes::InterruptedAtShutdown, "example local error"};
     request.respondWith(exampleLocalErr);
-    ASSERT_EQ(responseFuture.getNoThrow().getStatus(), exampleLocalErr);
+    auto error = responseFuture.getNoThrow().getStatus();
+    // The error returned by our API should always be RemoteCommandExecutionError.
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    // Make sure we can extract the extra error info.
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+    // Make sure the extra info indicates the error was local, and that the
+    // local error (which is just a Status) is the one we provided.
+    ASSERT(extraInfo->isLocal());
+    ASSERT_EQ(extraInfo->asLocal(), exampleLocalErr);
 }
 
 TEST_F(SyncMockRemoteCommandRunnerTestFixture, MultipleResponses) {
@@ -174,7 +183,12 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, MultipleResponses) {
     ASSERT_FALSE(responseTwoFut.isReady());
     auto exampleLocalErr = Status{ErrorCodes::InterruptedAtShutdown, "example local error"};
     requestTwo.respondWith(exampleLocalErr);
-    ASSERT_EQ(responseTwoFut.getNoThrow().getStatus(), exampleLocalErr);
+    auto error = responseTwoFut.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+    ASSERT(extraInfo->isLocal());
+    ASSERT_EQ(extraInfo->asLocal(), exampleLocalErr);
 }
 
 TEST_F(SyncMockRemoteCommandRunnerTestFixture, OnCommand) {
@@ -236,7 +250,7 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, SyncMockRemoteCommandRunnerWithRe
 // notified of the request and can schedule a response to it.
 TEST_F(AsyncMockRemoteCommandRunnerTestFixture, Expectation) {
     // We expect that some code will use the runner to send a hello
-    // to localhost on "testdb"
+    // to localhost on "testdb".
     auto matcher = [](const AsyncMockRemoteCommandRunner::Request& req) {
         bool isHello = req.cmdBSON.firstElementFieldName() == "hello"_sd;
         bool isRightTarget = req.target == HostAndPort("localhost", serverGlobalParams.port);
