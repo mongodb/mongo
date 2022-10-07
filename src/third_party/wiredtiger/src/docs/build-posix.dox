@@ -5,13 +5,16 @@
 Skip this step if you are building from a WiredTiger release package,
 and proceed with @ref posix_building.
 
-To build from the WiredTiger GitHub repository requires
+To build from the WiredTiger GitHub repository, the following is required:
 <a href="http://git-scm.com/">git</a>,
 <a href="https://gcc.gnu.org/">GCC 8.5 or later</a> or
 <a href="https://clang.llvm.org/">Clang 7.01 or later</a>, and
-<a href="https://cmake.org/">CMake 3.10.0 or later</a>, and
-<a href="https://python.org/">Python 3 or later</a> (if building to support the Python API), and
-<a href="http://www.swig.org/">SWIG</a> (if building to support the Python API).
+<a href="https://cmake.org/">CMake 3.10.0 or later</a>.
+
+To support the python API,
+<a href="https://python.org/">Python 3 or later</a>, and
+<a href="http://www.swig.org/">SWIG</a> and python3-dev are required.
+
 We also suggest <a href="https://ninja-build.org/">Ninja</a> and
 <a href="https://ccache.dev/">ccache</a> for improved incremental build times.
 
