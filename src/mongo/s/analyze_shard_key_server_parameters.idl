@@ -45,6 +45,17 @@ server_parameters:
         validator:
             gt: 0
             lte: 1
+    queryAnalysisQueryStatsSmoothingFactor:
+        description: The smoothing factor for the exponential moving average of the number
+                     of queries that a sampler executes per second. The average determines the share
+                     of the cluster-wide sample rate that will be assigned to the sampler.
+        set_at: startup
+        cpp_vartype: double
+        cpp_varname: gQueryAnalysisQueryStatsSmoothingFactor
+        default: 0.125
+        validator:
+            gt: 0
+            lt: 1
     queryAnalysisSamplerInActiveThresholdSecs:
         description: The minimum amount of time in seconds for a sampler to not report its uptime
                      before it is considered as inactive.

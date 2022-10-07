@@ -132,7 +132,15 @@ public:
         return &*_acceptableErrorInCommand;
     }
 
+    // Reset all counters. To used for testing purposes only.
+    void resetForTest() {
+        _reset();
+    }
+
 private:
+    // Reset all counters.
+    void _reset();
+
     // Increment member `counter` by `n`, resetting all counters if it was > 2^60.
     void _checkWrap(CacheExclusive<AtomicWord<long long>> OpCounters::*counter, int n);
 

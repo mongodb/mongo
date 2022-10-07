@@ -72,6 +72,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_factory.h"
@@ -89,6 +90,7 @@
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/s/query/cluster_cursor_cleanup_job.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/read_write_concern_defaults_cache_lookup_mongos.h"
 #include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/session_catalog_router.h"
@@ -308,6 +310,13 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
 
         if (auto lsc = LogicalSessionCache::get(serviceContext)) {
             lsc->joinOnShutDown();
+        }
+
+        if (analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            LOGV2_OPTIONS(
+                6973901, {LogComponent::kDefault}, "Shutting down the QueryAnalysisSampler");
+            analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
         }
 
         ReplicaSetMonitor::shutdown();
@@ -779,6 +788,12 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                     "Error completing initial health check",
                     "error"_attr = redact(status));
         return ExitCode::processHealthCheck;
+    }
+
+    if (analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        LOGV2_OPTIONS(6973900, {LogComponent::kDefault}, "Starting the QueryAnalysisSampler");
+        analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onStartup();
     }
 
     SessionKiller::set(serviceContext,

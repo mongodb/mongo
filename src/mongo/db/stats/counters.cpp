@@ -42,24 +42,28 @@ namespace mongo {
 
 using namespace fmt::literals;
 
+void OpCounters::_reset() {
+    _insert->store(0);
+    _query->store(0);
+    _update->store(0);
+    _delete->store(0);
+    _getmore->store(0);
+    _command->store(0);
+
+    _queryDeprecated->store(0);
+
+    _insertOnExistingDoc->store(0);
+    _updateOnMissingDoc->store(0);
+    _deleteWasEmpty->store(0);
+    _deleteFromMissingNamespace->store(0);
+    _acceptableErrorInCommand->store(0);
+}
+
 void OpCounters::_checkWrap(CacheExclusive<AtomicWord<long long>> OpCounters::*counter, int n) {
     static constexpr auto maxCount = 1LL << 60;
     auto oldValue = (this->*counter)->fetchAndAddRelaxed(n);
     if (oldValue > maxCount) {
-        _insert->store(0);
-        _query->store(0);
-        _update->store(0);
-        _delete->store(0);
-        _getmore->store(0);
-        _command->store(0);
-
-        _queryDeprecated->store(0);
-
-        _insertOnExistingDoc->store(0);
-        _updateOnMissingDoc->store(0);
-        _deleteWasEmpty->store(0);
-        _deleteFromMissingNamespace->store(0);
-        _acceptableErrorInCommand->store(0);
+        _reset();
     }
 }
 
