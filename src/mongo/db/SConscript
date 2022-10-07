@@ -1294,6 +1294,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/collection_validation',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
@@ -2283,7 +2284,6 @@ env.Library(
         'ttl_d',
         'update/update_driver',
         'update_index_data',
-        'views/views_mongod',
         'windows_options' if env.TargetOSIs('windows') else [],
     ],
     LIBDEPS=[

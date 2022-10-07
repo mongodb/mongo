@@ -154,9 +154,9 @@ Status DatabaseImpl::validateDBName(StringData dbname) {
 }
 
 DatabaseImpl::DatabaseImpl(const DatabaseName& dbName)
-    : _name(dbName), _viewsName(_name, DurableViewCatalog::viewsCollectionName().toString()) {}
+    : _name(dbName), _viewsName(_name, NamespaceString::kSystemDotViewsCollectionName) {}
 
-Status DatabaseImpl::init(OperationContext* const opCtx) {
+void DatabaseImpl::init(OperationContext* const opCtx) {
     Status status = validateDBName(_name.db());
 
     if (!status.isOK()) {
@@ -176,48 +176,6 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
             WriteUnitOfWork wuow(opCtx);
             collection.getWritableCollection(opCtx)->init(opCtx);
             wuow.commit();
-        }
-    }
-
-    // When in repair mode, record stores are not loaded. Thus the ViewsCatalog cannot be reloaded.
-    if (!storageGlobalParams.repair) {
-        // At construction time of this DatabaseImpl, the CollectionCatalog map wasn't populated
-        // with collections for this database yet, so no system.views collection would be found to
-        // populate the views. Now that we've loaded the collections, reload the view definitions
-        // from system.views to populate the views portion of the CollectionCatalog. If there are
-        // problems with the durable catalog contents, as might be caused by incorrect mongod
-        // versions or similar, they are found right away.
-        //
-        // Even though no one can be writing to system.views at this point, we must take an IS lock
-        // because the ViewsForDatabase::reload API requires it for other uses.
-        try {
-            Lock::CollectionLock systemViewsLock(
-                opCtx,
-                NamespaceString(_name, NamespaceString::kSystemDotViewsCollectionName),
-                MODE_IS);
-            ViewsForDatabase viewsForDb{std::make_unique<DurableViewCatalogImpl>(this)};
-            Status reloadStatus = viewsForDb.reload(opCtx);
-            if (!reloadStatus.isOK()) {
-                LOGV2_WARNING_OPTIONS(20326,
-                                      {logv2::LogTag::kStartupWarnings},
-                                      "Unable to parse views; remove any invalid views "
-                                      "from the collection to restore server functionality",
-                                      "error"_attr = redact(reloadStatus),
-                                      "namespace"_attr = _viewsName);
-            }
-
-            CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-                catalog.onOpenDatabase(opCtx, _name, std::move(viewsForDb));
-            });
-        } catch (DBException& ex) {
-            // Another operation may have tried to simultaneously open the database and register it
-            // with the CollectionCatalog. If that's the case, error out here and handle the
-            // conflict one level up.
-            if (ex.code() == ErrorCodes::AlreadyInitialized) {
-                return ex.toStatus();
-            }
-
-            throw;
         }
     }
 
@@ -289,8 +247,6 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
                           "reason"_attr = e.reason());
         }
     }
-
-    return status;
 }
 
 void DatabaseImpl::setDropPending(OperationContext* opCtx, bool dropPending) {
@@ -758,8 +714,8 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
                                                            viewName,
                                                            viewOnNss,
                                                            pipeline,
-                                                           options.collation,
-                                                           view_catalog_helpers::validatePipeline);
+                                                           view_catalog_helpers::validatePipeline,
+                                                           options.collation);
     }
 
     audit::logCreateView(

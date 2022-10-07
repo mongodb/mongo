@@ -39,7 +39,7 @@ class DatabaseImpl final : public Database {
 public:
     explicit DatabaseImpl(const DatabaseName& dbName);
 
-    Status init(OperationContext*) final;
+    void init(OperationContext*) final;
 
     const DatabaseName& name() const final {
         return _name;

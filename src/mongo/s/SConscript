@@ -421,6 +421,7 @@ env.Library(
         'sharding_router_api',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/transport/service_entry_point',
     ],
 )

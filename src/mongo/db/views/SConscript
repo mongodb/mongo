@@ -5,25 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target='views_mongod',
-    source=[
-        'durable_view_catalog.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/views/views',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/catalog/collection_crud',
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
-        '$BUILD_DIR/mongo/db/multitenancy',
-        '$BUILD_DIR/mongo/db/server_feature_flags',
-        '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
-    ],
-)
-
-env.Library(
     target='views',
     source=[
         'view.cpp',
@@ -41,6 +22,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/pipeline/aggregation',
         'resolved_view',
         'views',
@@ -62,6 +44,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='util',
+    source=[
+        'util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/namespace_string_util',
+        'views',
+    ],
+)
+
 env.CppUnitTest(
     target='db_views_test',
     source=[
@@ -77,10 +70,10 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/mongo/unittest/unittest',
         'view_catalog_helpers',
         'views',
-        'views_mongod',
     ],
 )
