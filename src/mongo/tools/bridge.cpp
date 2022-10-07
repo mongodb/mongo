@@ -88,6 +88,20 @@ boost::optional<HostAndPort> extractHostInfo(const OpMsgRequest& request) {
     return boost::none;
 }
 
+class SyncSeedGenerator {
+public:
+    explicit SyncSeedGenerator(int64_t seed) : _rand{seed} {}
+
+    int64_t operator()() {
+        stdx::lock_guard lk{_mutex};
+        return _rand.nextInt64();
+    }
+
+private:
+    Mutex _mutex;
+    PseudoRandom _rand;
+};
+
 }  // namespace
 
 class BridgeContext {
@@ -128,8 +142,8 @@ public:
     }
 
     PseudoRandom makeSeededPRNG() {
-        static StaticImmortal g = PseudoRandom{mongoBridgeGlobalParams.seed};
-        return PseudoRandom{g->nextInt64()};
+        static auto& seedGen = *new SyncSeedGenerator{mongoBridgeGlobalParams.seed};
+        return PseudoRandom{seedGen()};
     }
 
     static BridgeContext* get();
