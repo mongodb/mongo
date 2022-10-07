@@ -445,6 +445,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedO
 
     {
         TypeCollectionTimeseriesFields tsFields;
+        timeseriesOptions.setGranularity(BucketGranularityEnum::Seconds);
         tsFields.setTimeseriesOptions(timeseriesOptions);
         collectionType.setTimeseriesFields(tsFields);
 

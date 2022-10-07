@@ -55,6 +55,7 @@
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/fle/server_rewrite.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
@@ -234,9 +235,19 @@ void performValidationChecks(const OperationContext* opCtx,
  * Rebuilds the pipeline and uses a different granularity value for the 'bucketMaxSpanSeconds' field
  * in the $_internalUnpackBucket stage.
  */
-std::vector<BSONObj> rebuildPipelineWithTimeSeriesGranularity(const std::vector<BSONObj>& pipeline,
-                                                              BucketGranularityEnum granularity) {
-    const auto bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(granularity);
+std::vector<BSONObj> rebuildPipelineWithTimeSeriesGranularity(
+    const std::vector<BSONObj>& pipeline,
+    boost::optional<BucketGranularityEnum> granularity,
+    boost::optional<int32_t> maxSpanSeconds) {
+    int32_t bucketSpan = 0;
+
+    if (maxSpanSeconds) {
+        bucketSpan = *maxSpanSeconds;
+    } else {
+        bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(
+            granularity.get_value_or(BucketGranularityEnum::Seconds));
+    }
+
     std::vector<BSONObj> newPipeline;
     for (auto& stage : pipeline) {
         if (stage.firstElementFieldNameStringData() ==
@@ -579,7 +590,9 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
             const auto& cm = executionNsRoutingInfoStatus.getValue();
             if (cm.isSharded() && cm.getTimeseriesFields()) {
                 const auto patchedPipeline = rebuildPipelineWithTimeSeriesGranularity(
-                    resolvedAggRequest.getPipeline(), cm.getTimeseriesFields()->getGranularity());
+                    resolvedAggRequest.getPipeline(),
+                    cm.getTimeseriesFields()->getGranularity(),
+                    cm.getTimeseriesFields()->getBucketMaxSpanSeconds());
                 resolvedAggRequest.setPipeline(patchedPipeline);
                 snapshotCm = cm;
             }

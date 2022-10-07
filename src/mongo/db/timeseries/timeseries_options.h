@@ -65,5 +65,12 @@ int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity);
  * Rounds down timestamp to the specified granularity.
  */
 Date_t roundTimestampToGranularity(const Date_t& time, const TimeseriesOptions& options);
+
+/**
+ * Validates the combination of bucketRoundingSeconds, bucketMaxSpanSeconds and granularity in
+ * TimeseriesOptions. If the parameters are not valid we return a bad status and if no parameters
+ * are passed through we set them to their default values.
+ */
+Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions);
 }  // namespace timeseries
 }  // namespace mongo

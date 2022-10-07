@@ -9,6 +9,10 @@
 (function() {
 'use strict';
 
+load("jstests/core/timeseries/libs/timeseries.js");
+
+const testDB = db.getSiblingDB(jsTestName());
+
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
 
@@ -28,6 +32,22 @@ const getBucketMaxSpanSeconds = function(granularity) {
     }
 };
 
+const getBucketRoundingSeconds = function(granularity) {
+    switch (granularity) {
+        case 'seconds':
+            return 60;
+        case 'minutes':
+            return 60 * 60;
+        case 'hours':
+            return 60 * 60 * 24;
+        default:
+            assert(false, 'Invalid granularity: ' + granularity);
+    }
+};
+
+const bucketMaxSpanSecondsFromMinutes = getBucketMaxSpanSeconds('minutes');
+const buckeRoundingSecondsFromMinutes = getBucketRoundingSeconds('minutes');
+
 const testOptions = function(options) {
     const coll = db.getCollection(collNamePrefix + collCount++);
     coll.drop();
@@ -42,6 +62,13 @@ const testOptions = function(options) {
         Object.assign(
             options.timeseries,
             {bucketMaxSpanSeconds: getBucketMaxSpanSeconds(options.timeseries.granularity)});
+    }
+    if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
+        if (!options.timeseries.hasOwnProperty('bucketRoundingSeconds')) {
+            Object.assign(
+                options.timeseries,
+                {bucketRoundingSeconds: getBucketRoundingSeconds(options.timeseries.granularity)});
+        }
     }
 
     if (options.hasOwnProperty('collation')) {
@@ -78,13 +105,24 @@ testOptions({
         granularity: 'minutes',
     }
 });
-testOptions({
-    timeseries: {
-        timeField: timeFieldName,
-        granularity: 'minutes',
-        bucketMaxSpanSeconds: 60 * 60 * 24,
-    }
-});
+if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
+    testOptions({
+        timeseries: {
+            timeField: timeFieldName,
+            granularity: 'minutes',
+            bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
+        }
+    });
+} else {
+    testOptions({
+        timeseries: {
+            timeField: timeFieldName,
+            granularity: 'minutes',
+            bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
+            bucketRoundingSeconds: buckeRoundingSecondsFromMinutes,
+        }
+    });
+}
 testOptions({
     timeseries: {
         timeField: timeFieldName,
@@ -104,16 +142,32 @@ testOptions({
     collation: {locale: 'ja'},
 });
 testOptions({timeseries: {timeField: timeFieldName}, expireAfterSeconds: NumberLong(100)});
-testOptions({
-    timeseries: {
-        timeField: timeFieldName,
-        metaField: metaFieldName,
-        granularity: 'minutes',
-        bucketMaxSpanSeconds: 60 * 60 * 24,
-    },
-    storageEngine: {wiredTiger: {}},
-    indexOptionDefaults: {storageEngine: {wiredTiger: {}}},
-    collation: {locale: 'ja'},
-    expireAfterSeconds: NumberLong(100),
-});
+if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
+    testOptions({
+        timeseries: {
+            timeField: timeFieldName,
+            metaField: metaFieldName,
+            granularity: 'minutes',
+            bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
+        },
+        storageEngine: {wiredTiger: {}},
+        indexOptionDefaults: {storageEngine: {wiredTiger: {}}},
+        collation: {locale: 'ja'},
+        expireAfterSeconds: NumberLong(100),
+    });
+} else {
+    testOptions({
+        timeseries: {
+            timeField: timeFieldName,
+            metaField: metaFieldName,
+            granularity: 'minutes',
+            bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
+            bucketRoundingSeconds: buckeRoundingSecondsFromMinutes,
+        },
+        storageEngine: {wiredTiger: {}},
+        indexOptionDefaults: {storageEngine: {wiredTiger: {}}},
+        collation: {locale: 'ja'},
+        expireAfterSeconds: NumberLong(100),
+    });
+}
 })();

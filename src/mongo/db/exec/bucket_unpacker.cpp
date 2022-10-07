@@ -694,7 +694,8 @@ std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(
 
     int maxSpanSeconds = tsOptions.getBucketMaxSpanSeconds()
         ? *tsOptions.getBucketMaxSpanSeconds()
-        : timeseries::getMaxSpanSecondsFromGranularity(tsOptions.getGranularity());
+        : timeseries::getMaxSpanSecondsFromGranularity(
+              tsOptions.getGranularity().get_value_or(BucketGranularityEnum::Seconds));
 
     std::unique_ptr<MatchExpression> bucketMetricPredicate = metricPredicate
         ? createPredicatesOnBucketLevelField(

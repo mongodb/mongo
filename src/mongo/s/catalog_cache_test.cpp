@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
@@ -335,9 +336,10 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
     auto chunks = makeChunks(version);
     auto timeseriesOptions = TimeseriesOptions("fieldName");
 
-    // 1st refresh: we should find a bucket granularity of seconds (default)
+    // 1st refresh: we should find a bucket granularity of seconds
     {
         TypeCollectionTimeseriesFields tsFields;
+        timeseriesOptions.setGranularity(BucketGranularityEnum::Seconds);
         tsFields.setTimeseriesOptions(timeseriesOptions);
         coll.setTimeseriesFields(tsFields);
 

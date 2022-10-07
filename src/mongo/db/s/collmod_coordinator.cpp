@@ -178,8 +178,9 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         "Invalid transition for timeseries.granularity. Can only transition "
                         "from 'seconds' to 'minutes' or 'minutes' to 'hours'.",
                         timeseries::isValidTimeseriesGranularityTransition(
-                            _collInfo->timeSeriesOptions->getGranularity(),
-                            *_request.getTimeseries()->getGranularity()));
+                            _collInfo->timeSeriesOptions->getGranularity().get_value_or(
+                                BucketGranularityEnum::Seconds),
+                            _request.getTimeseries()->getGranularity().get()));
             }
         })
         .then([this, executor = executor, anchor = shared_from_this()] {

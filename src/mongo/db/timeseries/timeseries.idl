@@ -106,7 +106,7 @@ structs:
             granularity:
                 description: "Describes the expected interval between subsequent measurements"
                 type: BucketGranularity
-                default: Seconds
+                optional: true
                 stability: stable
             bucketRoundingSeconds:
                 description: "Used to determine the minimum time boundary when opening a new bucket 
