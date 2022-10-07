@@ -129,5 +129,5 @@ assert.soon(
                 ", but is not seen in config.shards");
     });
 
-st.stop();
+st.stop({parallelSupported: false});
 }());

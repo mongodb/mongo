@@ -421,6 +421,7 @@ var ShardingTest = function(params) {
                     liveNodes.push(node);
                 } catch (err) {
                     // Ignore since the node is not live
+                    print("ShardingTest replicaSetsToTerminate ignoring: " + node.host);
                     return;
                 }
 

@@ -51,5 +51,5 @@ cfg.members.push(removedMember[0]);
 cfg.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: cfg}));
 
-st.stop();
+st.stop({parallelSupported: false});
 })();
