@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -33,6 +33,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_graph.h"
 #include "mongo/stdx/unordered_map.h"
@@ -45,6 +46,7 @@ namespace mongo {
  */
 class ViewsForDatabase {
 public:
+    using ViewMap = stdx::unordered_map<NamespaceString, std::shared_ptr<ViewDefinition>>;
     using PipelineValidatorFn = std::function<StatusWith<stdx::unordered_set<NamespaceString>>(
         OperationContext*, const ViewDefinition&)>;
 
@@ -58,93 +60,69 @@ public:
         int internal = 0;
     };
 
-    enum class Durability {
-        // The view is not yet inserted into the system.views collection.
-        kNotYetDurable,
+    /**
+     * Helper method to build a collator from its spec.
+     */
+    static StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* opCtx,
+                                                                        BSONObj collationSpec);
 
-        // The view is already present in the system.views collection.
-        kAlreadyDurable,
-    };
+    std::shared_ptr<DurableViewCatalog> durable;
+    ViewMap viewMap;
+    bool valid = false;
+    ViewGraph viewGraph;
+    bool viewGraphNeedsRefresh = true;
+    Stats stats;
+    bool ignoreExternalChange = false;
 
-    bool valid() const {
-        return _valid;
-    }
+    /**
+     * uasserts with the InvalidViewDefinition error if the current in-memory state of the views for
+     * this database is invalid which can happen as a result of direct writes to the 'system.views'
+     * collection or data corruption. This prevents further use of views on this database until the
+     * issue is resolved.
+     */
+    void requireValidCatalog() const;
 
-    Stats stats() const {
-        return _stats;
-    }
-
+    /**
+     * Returns the 'ViewDefiniton' assocated with namespace 'ns' if one exists, nullptr otherwise.
+     */
     std::shared_ptr<const ViewDefinition> lookup(const NamespaceString& ns) const;
 
-    void iterate(const std::function<bool(const ViewDefinition& view)>& callback) const;
+    /**
+     * Reloads the views for this database by iterating the DurableViewCatalog.
+     */
+    Status reload(OperationContext* opCtx);
 
     /**
-     * Reloads views from the system.views collection.
+     * Inserts the view into the view map.
      */
-    Status reload(OperationContext* opCtx, const CollectionPtr& systemViews);
-
     Status insert(OperationContext* opCtx,
-                  const CollectionPtr& systemViews,
-                  const NamespaceString& viewName,
-                  const NamespaceString& viewOn,
-                  const BSONArray& pipeline,
-                  const PipelineValidatorFn& validatePipeline,
-                  const BSONObj& collator,
-                  Durability durability);
+                  const BSONObj& view,
+                  const boost::optional<TenantId>& tenantId);
 
-    Status update(OperationContext* opCtx,
-                  const CollectionPtr& systemViews,
-                  const NamespaceString& viewName,
-                  const NamespaceString& viewOn,
-                  const BSONArray& pipeline,
-                  const PipelineValidatorFn& validatePipeline,
-                  std::unique_ptr<CollatorInterface> collator);
-
-    void remove(OperationContext* opCtx,
-                const CollectionPtr& systemViews,
-                const NamespaceString& ns);
-
-    void clear(OperationContext* opCtx);
-
-private:
     /**
-     * Inserts or updates the given view into the view map.
+     * Returns Status::OK if each view namespace in 'refs' has the same default collation as
+     * 'view'. Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
      */
-    Status _upsertIntoMap(OperationContext* opCtx, std::shared_ptr<ViewDefinition> view);
+    Status validateCollation(OperationContext* opCtx,
+                             const ViewDefinition& view,
+                             const std::vector<NamespaceString>& refs) const;
 
     /**
-     * Parses the view definition pipeline, attempts to upsert into the view graph, and refreshes
-     * the graph if necessary. Returns an error status if the resulting graph would be invalid.
-     * needsValidation controls whether we check that the resulting dependency graph is acyclic and
+     * Parses the view definition pipeline, attempts to upsert into the view graph, and
+     * refreshes the graph if necessary. Returns an error status if the resulting graph
+     * would be invalid. needsValidation can be set to false if the view already exists in the
+     * durable view catalog and skips checking that the resulting dependency graph is acyclic and
      * within the maximum depth.
      */
-    Status _upsertIntoGraph(OperationContext* opCtx,
-                            const ViewDefinition& viewDef,
-                            const PipelineValidatorFn& validatePipeline,
-                            bool needsValidation);
+    Status upsertIntoGraph(OperationContext* opCtx,
+                           const ViewDefinition& viewDef,
+                           const PipelineValidatorFn&,
+                           bool needsValidation);
 
-    /**
-     * Inserts or updates the given view into the system.views collection.
-     */
-    Status _upsertIntoCatalog(OperationContext* opCtx,
-                              const CollectionPtr& systemViews,
-                              const ViewDefinition& view);
-
-    /**
-     * Returns OK if each view namespace in 'refs' has the same default collation as the given view.
-     * Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
-     */
-    Status _validateCollation(OperationContext* opCtx,
-                              const ViewDefinition& view,
-                              const std::vector<NamespaceString>& refs) const;
-
-    StringMap<std::shared_ptr<ViewDefinition>> _viewMap;
-    ViewGraph _viewGraph;
-
-    bool _valid = false;
-    bool _viewGraphNeedsRefresh = true;
-
-    Stats _stats;
+private:
+    Status _insert(OperationContext* opCtx,
+                   const BSONObj& view,
+                   const boost::optional<TenantId>& tenantId);
 };
 
 }  // namespace mongo

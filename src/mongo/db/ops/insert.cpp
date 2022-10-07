@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 

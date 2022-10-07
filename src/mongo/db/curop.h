@@ -423,7 +423,6 @@ public:
      */
     bool completeAndLogOperation(OperationContext* opCtx,
                                  logv2::LogComponent logComponent,
-                                 std::shared_ptr<ProfileFilter> filter,
                                  boost::optional<size_t> responseLength = boost::none,
                                  boost::optional<long long> slowMsOverride = boost::none,
                                  bool forceLog = false);

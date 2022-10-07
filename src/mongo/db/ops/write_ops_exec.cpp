@@ -144,12 +144,8 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
 
         // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
         // this op should be sampled for profiling.
-        const bool shouldProfile = curOp->completeAndLogOperation(
-            opCtx,
-            MONGO_LOGV2_DEFAULT_COMPONENT,
-            CollectionCatalog::get(opCtx)
-                ->getDatabaseProfileSettings(curOp->getNSS().dbName())
-                .filter);
+        const bool shouldProfile =
+            curOp->completeAndLogOperation(opCtx, MONGO_LOGV2_DEFAULT_COMPONENT);
 
         if (shouldProfile) {
             // Stash the current transaction so that writes to the profile collection are not

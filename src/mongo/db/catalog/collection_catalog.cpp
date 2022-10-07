@@ -79,13 +79,6 @@ bool isCollectionCompatible(std::shared_ptr<Collection> coll, Timestamp readTime
     return readTimestamp >= *minValidSnapshot;
 }
 
-void assertViewCatalogValid(const ViewsForDatabase& viewsForDb) {
-    uassert(ErrorCodes::InvalidViewDefinition,
-            "Invalid view definition detected in the view catalog. Remove the invalid view "
-            "manually to prevent disallowing any further usage of the view catalog.",
-            viewsForDb.valid());
-}
-
 }  // namespace
 
 class IgnoreExternalViewChangesForDatabase {
@@ -594,10 +587,12 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
                                      const NamespaceString& viewName,
                                      const NamespaceString& viewOn,
                                      const BSONArray& pipeline,
-                                     const ViewsForDatabase::PipelineValidatorFn& validatePipeline,
                                      const BSONObj& collation,
-                                     ViewsForDatabase::Durability durability) const {
-    invariant(durability == ViewsForDatabase::Durability::kAlreadyDurable ||
+                                     const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
+                                     const ViewUpsertMode insertViewMode) const {
+    // A view document direct write can occur via the oplog application path, which may only hold a
+    // lock on the collection being updated (the database views collection).
+    invariant(insertViewMode == ViewUpsertMode::kAlreadyDurableView ||
               opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
@@ -622,24 +617,25 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
 
-    IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
+    auto collator = ViewsForDatabase::parseCollator(opCtx, collation);
+    if (!collator.isOK())
+        return collator.getStatus();
 
-    assertViewCatalogValid(viewsForDb);
-    auto systemViews = _lookupSystemViews(opCtx, viewName.dbName());
+    Status result = Status::OK();
+    {
+        IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
-    ViewsForDatabase writable{viewsForDb};
-    auto status = writable.insert(
-        opCtx, systemViews, viewName, viewOn, pipeline, validatePipeline, collation, durability);
-
-    if (status.isOK()) {
-        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-        uncommittedCatalogUpdates.addView(opCtx, viewName);
-        uncommittedCatalogUpdates.replaceViewsForDatabase(viewName.dbName(), std::move(writable));
-
-        PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
+        result = _createOrUpdateView(opCtx,
+                                     viewName,
+                                     viewOn,
+                                     pipeline,
+                                     pipelineValidator,
+                                     std::move(collator.getValue()),
+                                     ViewsForDatabase{viewsForDb},
+                                     insertViewMode);
     }
 
-    return status;
+    return result;
 }
 
 Status CollectionCatalog::modifyView(
@@ -647,7 +643,7 @@ Status CollectionCatalog::modifyView(
     const NamespaceString& viewName,
     const NamespaceString& viewOn,
     const BSONArray& pipeline,
-    const ViewsForDatabase::PipelineValidatorFn& validatePipeline) const {
+    const ViewsForDatabase::PipelineValidatorFn& pipelineValidator) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_X));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
@@ -668,29 +664,21 @@ Status CollectionCatalog::modifyView(
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
 
-    IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
+    Status result = Status::OK();
+    {
+        IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
-    assertViewCatalogValid(viewsForDb);
-    auto systemViews = _lookupSystemViews(opCtx, viewName.dbName());
-
-    ViewsForDatabase writable{viewsForDb};
-    auto status = writable.update(opCtx,
-                                  systemViews,
-                                  viewName,
-                                  viewOn,
-                                  pipeline,
-                                  validatePipeline,
-                                  CollatorInterface::cloneCollator(viewPtr->defaultCollator()));
-
-    if (status.isOK()) {
-        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-        uncommittedCatalogUpdates.addView(opCtx, viewName);
-        uncommittedCatalogUpdates.replaceViewsForDatabase(viewName.dbName(), std::move(writable));
-
-        PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
+        result = _createOrUpdateView(opCtx,
+                                     viewName,
+                                     viewOn,
+                                     pipeline,
+                                     pipelineValidator,
+                                     CollatorInterface::cloneCollator(viewPtr->defaultCollator()),
+                                     ViewsForDatabase{viewsForDb},
+                                     ViewUpsertMode::kUpdateView);
     }
 
-    return status;
+    return result;
 }
 
 Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceString& viewName) const {
@@ -700,7 +688,7 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
         MODE_X));
     invariant(_viewsForDatabase.contains(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
-    assertViewCatalogValid(viewsForDb);
+    viewsForDb.requireValidCatalog();
 
     // Make sure the view exists before proceeding.
     if (auto viewPtr = viewsForDb.lookup(viewName); !viewPtr) {
@@ -712,13 +700,15 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
     {
         IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
-        auto systemViews = _lookupSystemViews(opCtx, viewName.dbName());
-
         ViewsForDatabase writable{viewsForDb};
-        writable.remove(opCtx, systemViews, viewName);
+
+        writable.durable->remove(opCtx, viewName);
+        writable.viewGraph.remove(viewName);
+        writable.viewMap.erase(viewName);
+        writable.stats = {};
 
         // Reload the view catalog with the changes applied.
-        result = writable.reload(opCtx, systemViews);
+        result = writable.reload(opCtx);
         if (result.isOK()) {
             auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
             uncommittedCatalogUpdates.removeView(viewName);
@@ -744,8 +734,17 @@ Status CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseNam
 
     LOGV2_DEBUG(22546, 1, "Reloading view catalog for database", "db"_attr = dbName.toString());
 
-    ViewsForDatabase viewsForDb;
-    auto status = viewsForDb.reload(opCtx, _lookupSystemViews(opCtx, dbName));
+    // Create a copy of the ViewsForDatabase instance to modify it. Reset the views for this
+    // database, but preserve the DurableViewCatalog pointer.
+    auto it = _viewsForDatabase.find(dbName);
+    invariant(it != _viewsForDatabase.end());
+    ViewsForDatabase viewsForDb{it->second.durable};
+    viewsForDb.valid = false;
+    viewsForDb.viewGraphNeedsRefresh = true;
+    viewsForDb.viewMap.clear();
+    viewsForDb.stats = {};
+
+    auto status = viewsForDb.reload(opCtx);
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
         catalog._replaceViewsForDatabase(dbName, std::move(viewsForDb));
     });
@@ -938,6 +937,17 @@ void CollectionCatalog::dropCollection(OperationContext* opCtx,
     // with the recovery unit. However, when the writable Collection was requested in Inplace mode
     // (or is the oplog) this is not the case. So make sure we are registered in all cases.
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
+}
+
+void CollectionCatalog::onOpenDatabase(OperationContext* opCtx,
+                                       const DatabaseName& dbName,
+                                       ViewsForDatabase&& viewsForDb) {
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS));
+    uassert(ErrorCodes::AlreadyInitialized,
+            str::stream() << "Database " << dbName << " is already initialized",
+            _viewsForDatabase.find(dbName) == _viewsForDatabase.end());
+
+    _viewsForDatabase[dbName] = std::move(viewsForDb);
 }
 
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, DatabaseName dbName) {
@@ -1229,17 +1239,24 @@ boost::optional<RecordId> CollectionCatalog::lookupCatalogIdByNSS(
     return boost::none;
 }
 
-void CollectionCatalog::iterateViews(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const std::function<bool(const ViewDefinition& view)>& callback) const {
+void CollectionCatalog::iterateViews(OperationContext* opCtx,
+                                     const DatabaseName& dbName,
+                                     ViewIteratorCallback callback,
+                                     ViewCatalogLookupBehavior lookupBehavior) const {
     auto viewsForDb = _getViewsForDatabase(opCtx, dbName);
     if (!viewsForDb) {
         return;
     }
 
-    assertViewCatalogValid(*viewsForDb);
-    viewsForDb->iterate(callback);
+    if (lookupBehavior != ViewCatalogLookupBehavior::kAllowInvalidViews) {
+        viewsForDb->requireValidCatalog();
+    }
+
+    for (auto&& view : viewsForDb->viewMap) {
+        if (!callback(*view.second)) {
+            break;
+        }
+    }
 }
 
 std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
@@ -1249,7 +1266,7 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
         return nullptr;
     }
 
-    if (!viewsForDb->valid() && opCtx->getClient()->isFromUserConnection()) {
+    if (!viewsForDb->valid && opCtx->getClient()->isFromUserConnection()) {
         // We want to avoid lookups on invalid collection names.
         if (!NamespaceString::validCollectionName(ns.ns())) {
             return nullptr;
@@ -1258,7 +1275,7 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
         // ApplyOps should work on a valid existing collection, despite the presence of bad views
         // otherwise the server would crash. The view catalog will remain invalid until the bad view
         // definitions are removed.
-        assertViewCatalogValid(*viewsForDb);
+        viewsForDb->requireValidCatalog();
     }
 
     return viewsForDb->lookup(ns);
@@ -1401,7 +1418,10 @@ CollectionCatalog::Stats CollectionCatalog::getStats() const {
 boost::optional<ViewsForDatabase::Stats> CollectionCatalog::getViewStatsForDatabase(
     OperationContext* opCtx, const DatabaseName& dbName) const {
     auto viewsForDb = _getViewsForDatabase(opCtx, dbName);
-    return viewsForDb ? boost::make_optional(viewsForDb->stats()) : boost::none;
+    if (!viewsForDb) {
+        return boost::none;
+    }
+    return viewsForDb->stats;
 }
 
 CollectionCatalog::ViewCatalogSet CollectionCatalog::getViewCatalogDbNames(
@@ -1484,19 +1504,6 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
     auto& resourceCatalog = ResourceCatalog::get(opCtx->getServiceContext());
     resourceCatalog.add({RESOURCE_DATABASE, nss.dbName()}, nss.dbName());
     resourceCatalog.add({RESOURCE_COLLECTION, nss}, nss);
-
-    if (!storageGlobalParams.repair && coll->ns().isSystemDotViews()) {
-        auto [it, emplaced] = _viewsForDatabase.try_emplace(coll->ns().dbName());
-        if (auto status = it->second.reload(opCtx, _lookupSystemViews(opCtx, coll->ns().dbName()));
-            !status.isOK()) {
-            LOGV2_WARNING_OPTIONS(20326,
-                                  {logv2::LogTag::kStartupWarnings},
-                                  "Unable to parse views; remove any invalid views from the "
-                                  "collection to restore server functionality",
-                                  "error"_attr = redact(status),
-                                  logAttrs(coll->ns()));
-        }
-    }
 }
 
 std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
@@ -1552,10 +1559,6 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     coll->onDeregisterFromCatalog(opCtx);
 
     ResourceCatalog::get(opCtx->getServiceContext()).remove({RESOURCE_COLLECTION, ns}, ns);
-
-    if (!storageGlobalParams.repair && coll->ns().isSystemDotViews()) {
-        _viewsForDatabase.erase(coll->ns().dbName());
-    }
 
     return coll;
 }
@@ -1743,10 +1746,13 @@ void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& 
 
     auto it = _viewsForDatabase.find(dbName);
     invariant(it != _viewsForDatabase.end());
-
     ViewsForDatabase viewsForDb = it->second;
-    viewsForDb.clear(opCtx);
 
+    viewsForDb.viewMap.clear();
+    viewsForDb.viewGraph.clear();
+    viewsForDb.valid = true;
+    viewsForDb.viewGraphNeedsRefresh = false;
+    viewsForDb.stats = {};
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
         catalog._replaceViewsForDatabase(dbName, std::move(viewsForDb));
     });
@@ -1906,12 +1912,6 @@ void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext
               nss.toString());
 }
 
-CollectionPtr CollectionCatalog::_lookupSystemViews(OperationContext* opCtx,
-                                                    const DatabaseName& dbName) const {
-    return lookupCollectionByNamespace(opCtx,
-                                       {dbName, NamespaceString::kSystemDotViewsCollectionName});
-}
-
 boost::optional<const ViewsForDatabase&> CollectionCatalog::_getViewsForDatabase(
     OperationContext* opCtx, const DatabaseName& dbName) const {
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
@@ -1931,6 +1931,90 @@ void CollectionCatalog::_replaceViewsForDatabase(const DatabaseName& dbName,
                                                  ViewsForDatabase&& views) {
     _viewsForDatabase[dbName] = std::move(views);
 }
+
+Status CollectionCatalog::_createOrUpdateView(
+    OperationContext* opCtx,
+    const NamespaceString& viewName,
+    const NamespaceString& viewOn,
+    const BSONArray& pipeline,
+    const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
+    std::unique_ptr<CollatorInterface> collator,
+    ViewsForDatabase&& viewsForDb,
+    ViewUpsertMode insertViewMode) const {
+    // A view document direct write can occur via the oplog application path, which may only hold a
+    // lock on the collection being updated (the database views collection).
+    invariant(insertViewMode == ViewUpsertMode::kAlreadyDurableView ||
+              opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+        MODE_X));
+
+    viewsForDb.requireValidCatalog();
+
+    // Build the BSON definition for this view to be saved in the durable view catalog and/or to
+    // insert in the viewMap. If the collation is empty, omit it from the definition altogether.
+    BSONObjBuilder viewDefBuilder;
+    // TODO SERVER-69499 Use serialize function on NamespaceString to create the string to write.
+    if (!gMultitenancySupport ||
+        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
+        viewDefBuilder.append("_id", viewName.toString());
+    } else {
+        viewDefBuilder.append("_id", viewName.toStringWithTenantId());
+    }
+    viewDefBuilder.append("viewOn", viewOn.coll());
+    viewDefBuilder.append("pipeline", pipeline);
+    if (collator) {
+        viewDefBuilder.append("collation", collator->getSpec().toBSON());
+    }
+
+    BSONObj viewDef = viewDefBuilder.obj();
+    BSONObj ownedPipeline = pipeline.getOwned();
+    ViewDefinition view(
+        viewName.dbName(), viewName.coll(), viewOn.coll(), ownedPipeline, std::move(collator));
+
+    // If the view is already in the durable view catalog, we don't need to validate the graph. If
+    // we need to update the durable view catalog, we need to check that the resulting dependency
+    // graph is acyclic and within the maximum depth.
+    const bool viewGraphNeedsValidation = insertViewMode != ViewUpsertMode::kAlreadyDurableView;
+    Status graphStatus =
+        viewsForDb.upsertIntoGraph(opCtx, view, pipelineValidator, viewGraphNeedsValidation);
+    if (!graphStatus.isOK()) {
+        return graphStatus;
+    }
+
+    if (insertViewMode != ViewUpsertMode::kAlreadyDurableView) {
+        viewsForDb.durable->upsert(opCtx, viewName, viewDef);
+    }
+
+    viewsForDb.valid = false;
+    auto res = [&] {
+        switch (insertViewMode) {
+            case ViewUpsertMode::kCreateView:
+            case ViewUpsertMode::kAlreadyDurableView:
+                return viewsForDb.insert(opCtx, viewDef, viewName.tenantId());
+            case ViewUpsertMode::kUpdateView:
+                viewsForDb.viewMap.clear();
+                viewsForDb.viewGraphNeedsRefresh = true;
+                viewsForDb.stats = {};
+
+                // Reload the view catalog with the changes applied.
+                return viewsForDb.reload(opCtx);
+        }
+        MONGO_UNREACHABLE;
+    }();
+
+    if (res.isOK()) {
+        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+        uncommittedCatalogUpdates.addView(opCtx, viewName);
+        uncommittedCatalogUpdates.replaceViewsForDatabase(viewName.dbName(), std::move(viewsForDb));
+
+        PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
+    }
+
+    return res;
+}
+
 
 bool CollectionCatalog::_isCatalogBatchWriter() const {
     return batchedCatalogWriteInstance.get() == this;

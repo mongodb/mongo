@@ -73,8 +73,7 @@
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
-#include "mongo/db/views/util.h"
-#include "mongo/db/views/view_catalog_helpers.h"
+#include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -668,32 +667,15 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
     if (nss.coll() == "system.js") {
         Scope::storedFuncMod(opCtx);
-    } else if (nss.isSystemDotViews()) {
+    } else if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         try {
             for (auto it = first; it != last; it++) {
-                view_util::validateViewDefinitionBSON(opCtx, it->doc, nss.dbName());
-
-                uassertStatusOK(CollectionCatalog::get(opCtx)->createView(
-                    opCtx,
-                    // TODO SERVER-69499 Use deserialize function on NamespaceString to reconstruct
-                    // NamespaceString correctly.
-                    !gMultitenancySupport ||
-                            (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                             gFeatureFlagRequireTenantID.isEnabled(
-                                 serverGlobalParams.featureCompatibility))
-                        ? NamespaceString{nss.dbName().tenantId(), it->doc.getStringField("_id")}
-                        : NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
-                              it->doc.getStringField("_id")),
-                    {nss.dbName(), it->doc.getStringField("viewOn")},
-                    BSONArray{it->doc.getObjectField("pipeline")},
-                    view_catalog_helpers::validatePipeline,
-                    it->doc.getObjectField("collation"),
-                    ViewsForDatabase::Durability::kAlreadyDurable));
+                uassertStatusOK(DurableViewCatalog::onExternalInsert(opCtx, it->doc, nss));
             }
         } catch (const DBException&) {
             // If a previous operation left the view catalog in an invalid state, our inserts can
             // fail even if all the definitions are valid. Reloading may help us reset the state.
-            CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName()).ignore();
+            DurableViewCatalog::onExternalChange(opCtx, nss);
         }
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace && !lastOpTime.isNull()) {
         for (auto it = first; it != last; it++) {
@@ -939,8 +921,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 
     if (args.nss.coll() == "system.js") {
         Scope::storedFuncMod(opCtx);
-    } else if (args.nss.isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, args.nss.dbName()).ignore();
+    } else if (args.nss.coll() == DurableViewCatalog::viewsCollectionName()) {
+        DurableViewCatalog::onExternalChange(opCtx, args.nss);
     } else if (args.nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -1117,8 +1099,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     if (nss.coll() == "system.js") {
         Scope::storedFuncMod(opCtx);
-    } else if (nss.isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName()).ignore();
+    } else if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
+        DurableViewCatalog::onExternalChange(opCtx, nss);
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -1307,8 +1289,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
             "dropping the server configuration collection (admin.system.version) is not allowed.",
             collectionName != NamespaceString::kServerConfigurationNamespace);
 
-    if (collectionName.isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->clearViews(opCtx, collectionName.dbName());
+    if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
+        DurableViewCatalog::onSystemViewsCollectionDrop(opCtx, collectionName);
     } else if (collectionName == NamespaceString::kSessionTransactionsTableNamespace) {
         // Disallow this drop if there are currently prepared transactions.
         const auto sessionCatalog = SessionCatalog::get(opCtx);
@@ -1419,9 +1401,9 @@ void OpObserverImpl::postRenameCollection(OperationContext* const opCtx,
                                           const boost::optional<UUID>& dropTargetUUID,
                                           bool stayTemp) {
     if (fromCollection.isSystemDotViews())
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, fromCollection.dbName()).ignore();
+        DurableViewCatalog::onExternalChange(opCtx, fromCollection);
     if (toCollection.isSystemDotViews())
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, toCollection.dbName()).ignore();
+        DurableViewCatalog::onExternalChange(opCtx, toCollection);
 }
 
 void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
