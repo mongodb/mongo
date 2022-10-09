@@ -2247,6 +2247,8 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\, reallocation of memory
 	 * will only provide the exact amount requested.  This will help with spotting memory
 	 * allocation issues more easily., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_malloc, if true\, every realloc call will force a
+	 * new memory allocation by using malloc., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a
 	 * transaction operation about every Nth operation to simulate a collision., an integer
 	 * between \c 0 and \c 10M; default \c 0.}
@@ -2972,21 +2974,22 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\, reallocation of memory will only provide
  * the exact amount requested.  This will help with spotting memory allocation issues more easily.,
  * a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a
- * WT_ROLLBACK error from a transaction operation about every Nth operation to simulate a
- * collision., an integer between \c 0 and \c 10M; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_malloc, if true\,
+ * every realloc call will force a new memory allocation by using malloc., a boolean flag; default
+ * \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a
+ * transaction operation about every Nth operation to simulate a collision., an integer between \c 0
+ * and \c 10M; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if true\, slow down
+ * checkpoint creation by slowing down internal page processing., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write transaction related information to
+ * the log for all operations\, even operations for tables with logging turned off.  This additional
+ * logging information is intended for debugging and is informational only\, that is\, it is ignored
+ * during recovery., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * slow_checkpoint, if true\, slow down checkpoint creation by slowing down internal page
- * processing., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if
- * true\, write transaction related information to the log for all operations\, even operations for
- * tables with logging turned off.  This additional logging information is intended for debugging
- * and is informational only\, that is\, it is ignored during recovery., a boolean flag; default \c
- * false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\, control all dirty page
- * evictions through forcing update restore eviction., a boolean flag; default \c false.}
- * @config{
- * ),,}
+ * update_restore_evict, if true\, control all dirty page evictions through forcing update restore
+ * eviction., a boolean flag; default \c false.}
+ * @config{ ),,}
  * @config{direct_io, Use \c O_DIRECT on POSIX systems\, and \c FILE_FLAG_NO_BUFFERING on Windows to
  * access files.  Options are given as a list\, such as <code>"direct_io=[data]"</code>. Configuring
  * \c direct_io requires care; see @ref tuning_system_buffer_cache_direct_io for important warnings.

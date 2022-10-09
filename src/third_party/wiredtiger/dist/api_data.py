@@ -593,6 +593,9 @@ connection_runtime_config = [
             if true, reallocation of memory will only provide the exact amount requested. This
             will help with spotting memory allocation issues more easily.''',
             type='boolean'),
+        Config('realloc_malloc', 'false', r'''
+            if true, every realloc call will force a new memory allocation by using malloc.''',
+            type='boolean'),
         Config('rollback_error', '0', r'''
             return a WT_ROLLBACK error from a transaction operation about every Nth operation
             to simulate a collision''',

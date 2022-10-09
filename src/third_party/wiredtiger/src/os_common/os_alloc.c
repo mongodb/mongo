@@ -105,7 +105,7 @@ __realloc_func(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t byt
   bool clear_memory, void *retp)
 {
     size_t bytes_allocated;
-    void *p;
+    void *p, *tmpp;
 
     /*
      * !!!
@@ -129,9 +129,24 @@ __realloc_func(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t byt
             WT_STAT_CONN_INCR(session, memory_grow);
     }
 
-    if ((p = realloc(p, bytes_to_allocate)) == NULL)
-        WT_RET_MSG(session, __wt_errno(), "memory allocation of %" WT_SIZET_FMT " bytes failed",
-          bytes_to_allocate);
+    /*
+     * If realloc_malloc is enabled, force a new memory allocation by using malloc, copy to the new
+     * memory, scribble over the old memory then free it.
+     */
+    tmpp = p;
+    if (session != NULL && FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_REALLOC_MALLOC) &&
+      (bytes_allocated_ret != NULL)) {
+        if ((p = malloc(bytes_to_allocate)) == NULL)
+            WT_RET_MSG(session, __wt_errno(), "memory allocation of %" WT_SIZET_FMT " bytes failed",
+              bytes_to_allocate);
+        memcpy(p, tmpp, *bytes_allocated_ret);
+        memset((uint8_t *)tmpp, WT_DEBUG_BYTE, bytes_allocated);
+        free(tmpp);
+    } else {
+        if ((p = realloc(p, bytes_to_allocate)) == NULL)
+            WT_RET_MSG(session, __wt_errno(), "memory allocation of %" WT_SIZET_FMT " bytes failed",
+              bytes_to_allocate);
+    }
 
     /*
      * Clear the allocated memory, parts of WiredTiger depend on allocated memory being cleared.
