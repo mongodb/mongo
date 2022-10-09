@@ -162,7 +162,7 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
     invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_IX));
     invariant(!opCtx->shouldParticipateInFlowControl());
 
-    const auto dbProfilingNS = NamespaceString(db->name().db(), "system.profile");
+    const auto dbProfilingNS = NamespaceString(db->name(), "system.profile");
 
     // Checking the collection exists must also be done in the WCE retry loop. Only retrying
     // collection creation would endlessly throw errors because the collection exists: must check
