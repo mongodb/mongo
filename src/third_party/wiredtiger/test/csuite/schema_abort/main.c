@@ -55,8 +55,8 @@ static char home[1024]; /* Program working dir */
  * inserted and it records the timestamp that was used for that insertion.
  */
 #define INVALID_KEY UINT64_MAX
-#define MAX_CKPT_INVL 6  /* Maximum interval between checkpoints */
-#define MAX_FLUSH_INVL 4 /* Maximum interval between flush_tier calls */
+#define MAX_CKPT_INVL 4 /* Maximum interval between checkpoints */
+#define FLUSH_INVL 3    /* Flush tier on checkpoint about every 3rd time */
 /* Set large, some slow I/O systems take tens of seconds to fsync. */
 #define MAX_STARTUP 30 /* Seconds to start up and set stable */
 #define MAX_TH 12
@@ -535,7 +535,8 @@ thread_ckpt_run(void *arg)
     uint64_t ts;
     uint32_t sleep_time;
     int i;
-    bool first_ckpt;
+    char buf[512];
+    bool first_ckpt, flush;
 
     __wt_random_init(&rnd);
 
@@ -544,6 +545,7 @@ thread_ckpt_run(void *arg)
      * Keep a separate file with the records we wrote for checking.
      */
     (void)unlink(ckpt_file);
+    memset(buf, 0, sizeof(buf));
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
     first_ckpt = true;
     ts = 0;
@@ -554,6 +556,7 @@ thread_ckpt_run(void *arg)
     for (i = 1;; ++i) {
         sleep_time = __wt_random(&rnd) % MAX_CKPT_INVL;
         sleep(sleep_time);
+        flush = ((__wt_random(&rnd) % FLUSH_INVL) == 0) ? true : false;
         if (use_ts) {
             ts = global_ts;
             /*
@@ -575,11 +578,18 @@ thread_ckpt_run(void *arg)
                 continue;
             }
         }
+
         /*
-         * Since this is the default, send in this string even if running without timestamps.
+         * Set the configurations. Set use_timestamps regardless of whether timestamps are in use.
+         * Set flush_tier even if tiered is not set in the program as it should be a no-op in that
+         * case. Only report that flush is in use in the program output if tiered is actually being
+         * used however.
          */
-        testutil_check(session->checkpoint(session, "use_timestamp=true"));
-        printf("Checkpoint %d complete.  Minimum ts %" PRIu64 "\n", i, ts);
+        testutil_check(__wt_snprintf(
+          buf, sizeof(buf), "use_timestamp=true,%s", flush ? "flush_tier=(enabled)" : ""));
+        testutil_check(session->checkpoint(session, buf));
+        printf("Checkpoint %d complete: Flush: %s. Minimum ts %" PRIu64 "\n", i,
+          flush && tiered ? "YES" : "NO", ts);
         fflush(stdout);
         /*
          * Create the checkpoint file so that the parent process knows at least one checkpoint has
@@ -592,40 +602,6 @@ thread_ckpt_run(void *arg)
             first_ckpt = false;
             testutil_assert_errno(fclose(fp) == 0);
         }
-    }
-    /* NOTREACHED */
-}
-
-/*
- * thread_flush_run --
- *     Runner function for the flush_tier thread.
- */
-static WT_THREAD_RET
-thread_flush_run(void *arg)
-{
-    THREAD_DATA *td;
-    WT_DECL_RET;
-    WT_RAND_STATE rnd;
-    WT_SESSION *session;
-    uint32_t i, sleep_time;
-
-    __wt_random_init(&rnd);
-
-    td = (THREAD_DATA *)arg;
-    testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-    for (i = 1;; ++i) {
-        sleep_time = __wt_random(&rnd) % MAX_FLUSH_INVL;
-        sleep(sleep_time);
-        /*
-         * Currently not testing any of the flush tier configuration strings other than defaults. We
-         * expect the defaults are what MongoDB wants for now.
-         */
-        if ((ret = session->flush_tier(session, NULL)) != 0) {
-            if (ret != EBUSY)
-                testutil_die(ret, "session.flush_tier");
-        } else
-            printf("Flush tier %" PRIu32 " completed.\n", i);
-        fflush(stdout);
     }
     /* NOTREACHED */
 }
@@ -844,11 +820,11 @@ run_workload(uint32_t nth)
     WT_SESSION *session;
     THREAD_DATA *td;
     wt_thread_t *thr;
-    uint32_t ckpt_id, flush_id, i, ts_id;
+    uint32_t ckpt_id, i, ts_id;
     char envconf[1024], tableconf[128];
 
-    thr = dcalloc(nth + 3, sizeof(*thr));
-    td = dcalloc(nth + 3, sizeof(THREAD_DATA));
+    thr = dcalloc(nth + 2, sizeof(*thr));
+    td = dcalloc(nth + 2, sizeof(THREAD_DATA));
     stable_set = false;
     if (chdir(home) != 0)
         testutil_die(errno, "Child chdir: %s", home);
@@ -895,13 +871,6 @@ run_workload(uint32_t nth)
         td[ts_id].info = nth;
         printf("Create timestamp thread\n");
         testutil_check(__wt_thread_create(NULL, &thr[ts_id], thread_ts_run, &td[ts_id]));
-    }
-    flush_id = nth + 2;
-    if (tiered) {
-        td[flush_id].conn = conn;
-        td[flush_id].info = nth;
-        printf("Create flush_tier thread\n");
-        testutil_check(__wt_thread_create(NULL, &thr[flush_id], thread_flush_run, &td[flush_id]));
     }
     printf("Create %" PRIu32 " writer threads\n", nth);
     for (i = 0; i < nth; ++i) {
@@ -1085,8 +1054,11 @@ main(int argc, char *argv[])
                 nth = MIN_TH;
         }
 
-        printf("Parent: compatibility: %s, in-mem log sync: %s, timestamp in use: %s\n",
-          compat ? "true" : "false", inmem ? "true" : "false", use_ts ? "true" : "false");
+        printf(
+          "Parent: compatibility: %s, in-mem log sync: %s, timestamp in use: %s, tiered in use: "
+          "%s\n",
+          compat ? "true" : "false", inmem ? "true" : "false", use_ts ? "true" : "false",
+          tiered ? "true" : "false");
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
         printf("CONFIG: %s%s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
           compat ? " -C" : "", inmem ? " -m" : "", tiered ? " -B" : "", !use_ts ? " -z" : "",
