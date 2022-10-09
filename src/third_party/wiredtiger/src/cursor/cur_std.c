@@ -198,6 +198,7 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
      * reset all of the cursors in a session. Reconfigure is left open in case it's possible in the
      * future to change these configurations.
      */
+    cursor->bound = __wt_cursor_config_notsup;
     cursor->compare = __wt_cursor_compare_notsup;
     cursor->insert = __wt_cursor_notsup;
     cursor->modify = __wt_cursor_modify_notsup;

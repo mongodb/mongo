@@ -116,5 +116,14 @@ class test_cursor_bound01(bound_base):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: cursor.largest_key(),
             '/Invalid argument/')
 
+        # Check that setting bounds doesn't work with random cursors. Turn it off with column store as column
+        # store doesn't support the next_random config.
+        if (self.key_format != 'r'):
+            cursor = self.session.open_cursor(uri, None, "next_random=true")
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 40, "lower"), 
+                '/Operation not supported/')
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 60, "upper"), 
+                '/Operation not supported/')
+
 if __name__ == '__main__':
     wttest.run()
