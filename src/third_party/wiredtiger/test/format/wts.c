@@ -599,10 +599,6 @@ wts_stats(void)
     WT_CONNECTION *conn;
     WT_SESSION *session;
 
-    /* Ignore statistics if they're not configured. */
-    if (GV(STATISTICS) == 0)
-        return;
-
     conn = g.wts_conn;
     track("stat", 0ULL);
 
