@@ -152,7 +152,7 @@ def connection_close_replace(orig_connection_close, connection_self, config):
     # Otherwise, diagnosing the original failure may be troublesome.
     if not testcase_is_readonly() and not testcase_has_failed():
         s = connection_self.open_session(None)
-        s.flush_tier(None)
+        s.checkpoint('flush_tier=(enabled,force=true)')
         s.close()
 
     ret = orig_connection_close(connection_self, config)
@@ -162,15 +162,10 @@ def connection_close_replace(orig_connection_close, connection_self, config):
 # We add a call to flush_tier after the checkpoint to make sure we are exercising tiered
 # functionality.
 def session_checkpoint_replace(orig_session_checkpoint, session_self, config):
-    ret = orig_session_checkpoint(session_self, config)
-    if ret != 0:
-        return ret
-
     # We cannot call flush_tier on a readonly connection.
     if not testcase_is_readonly():
-        WiredTigerTestCase.verbose(None, 3,
-            '    Calling flush_tier() after checkpoint')
-        return session_self.flush_tier(None)
+        config += ',flush_tier=(enabled,force=true)'
+    return orig_session_checkpoint(session_self, config)
 
 # Called to replace Session.compact
 def session_compact_replace(orig_session_compact, session_self, uri, config):
@@ -273,16 +268,16 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
                 "test_config_json",     # create replacement can't handle a json config string
                 "test_cursor_big",      # Cursor caching verified with stats
                 "tiered",               # Tiered tests already do tiering.
-                "verify_api_75pct_null",# Test damages file, then reopens connection (flushes tier)
-                                        # so local file is undamaged
+                "test_verify",          # Verify not supported on tiered tables (yet)
 
                 # FIXME-WT-9809 The following failures should be triaged and potentially
                 # individually reticketed.
 
                 # This first group currently cause severe errors, where Python crashes,
                 # whether from internal assertion or other causes.
-                "test_bug003.test_bug003",   # crashes in connection close after opening bulk cursor.
+                "test_bug003.test_bug003",   # Triggers WT-9954
                 "test_bug024.test_bug024",
+                "test_bulk01.test_bulk_load",   # Triggers WT-9954
                 "test_durable_ts03.test_durable_ts03",
                 "test_rollback_to_stable20.test_rollback_to_stable",
                 "test_stat_log01_readonly.test_stat_log01_readonly",
@@ -325,6 +320,7 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
                 "test_rollback_to_stable36.test_rollback_to_stable",
                 "test_sweep03.test_disable_idle_timeout_drop",
                 "test_sweep03.test_disable_idle_timeout_drop_force",
+                "test_truncate01.test_truncate_cursor",
                 "test_truncate01.test_truncate_cursor_end",
                 "test_truncate01.test_truncate_timestamp",
                 "test_truncate01.test_truncate_uri",
