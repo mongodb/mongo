@@ -76,6 +76,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
@@ -93,6 +94,7 @@ const std::string kTTLIndexName = "TenantMigrationRecipientTTLIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
 constexpr int kBackupCursorFileFetcherRetryAttempts = 10;
+constexpr int kRetryableBackupCursorErrorCode = 6929900;
 
 NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
     return NamespaceString(NamespaceString::kConfigDb,
@@ -181,6 +183,7 @@ MONGO_FAIL_POINT_DEFINE(fpWaitUntilTimestampMajorityCommitted);
 MONGO_FAIL_POINT_DEFINE(hangAfterUpdatingTransactionEntry);
 MONGO_FAIL_POINT_DEFINE(fpBeforeAdvancingStableTimestamp);
 MONGO_FAIL_POINT_DEFINE(hangMigrationBeforeRetryCheck);
+MONGO_FAIL_POINT_DEFINE(hangBeforeKeepingBackupCursorAlive);
 MONGO_FAIL_POINT_DEFINE(skipCreatingIndexDuringRebuildService);
 
 namespace {
@@ -414,7 +417,8 @@ TenantMigrationRecipientService::Instance::Instance(
           }
       }()) {
 }
-
+boost::optional<std::shared_ptr<executor::TaskExecutor>>
+    TenantMigrationRecipientService::Instance::_backupCursorFetcherExecutorForTest;
 boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
@@ -1062,7 +1066,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_openBackupCursor(
                     // oplog entries during the migration. We also have a check in the tenant oplog
                     // applier to detect such oplog entries. Adding a check here helps us to detect
                     // the problem earlier.
-                    uassert(6929900,
+                    uassert(kRetryableBackupCursorErrorCode,
                             "backupCursorCheckpointTimestamp should be greater than or equal to "
                             "startMigrationDonorTimestamp",
                             checkpointTimestamp >= startMigrationDonorTimestamp);
@@ -1131,8 +1135,11 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_openBackupCursor(
         }
     };
 
+    auto executor = _backupCursorFetcherExecutorForTest ? *_backupCursorFetcherExecutorForTest
+                                                        : (**_scopedExecutor);
+
     _donorFilenameBackupCursorFileFetcher = std::make_unique<Fetcher>(
-        (**_scopedExecutor).get(),
+        executor.get(),
         _client->getServerHostAndPort(),
         NamespaceString::kAdminDb.toString(),
         cmdObj,
@@ -1147,7 +1154,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_openBackupCursor(
     uassertStatusOK(_donorFilenameBackupCursorFileFetcher->schedule());
 
     return _donorFilenameBackupCursorFileFetcher->onCompletion()
-        .thenRunOn(**_scopedExecutor)
+        .thenRunOn(executor)
         .then([fetchStatus, uniqueMetadataInfo = std::move(uniqueMetadataInfo)] {
             if (!*fetchStatus) {
                 // the callback was never invoked
@@ -1163,7 +1170,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_openBackupCursorWit
     const CancellationToken& token) {
     return AsyncTry([this, self = shared_from_this(), token] { return _openBackupCursor(token); })
         .until([this, self = shared_from_this()](Status status) {
-            if (status == ErrorCodes::BackupCursorOpenConflictWithCheckpoint) {
+            if (status == ErrorCodes::BackupCursorOpenConflictWithCheckpoint ||
+                status.code() == kRetryableBackupCursorErrorCode) {
                 LOGV2_INFO(6113008,
                            "Retrying backup cursor creation after transient error",
                            "migrationId"_attr = getMigrationUUID(),
@@ -2666,7 +2674,10 @@ TenantMigrationRecipientService::Instance::_migrateUsingShardMergeProtocol(
     return ExecutorFuture(**_scopedExecutor)
         .then(
             [this, self = shared_from_this(), token] { return _openBackupCursorWithRetry(token); })
-        .then([this, self = shared_from_this(), token] { _keepBackupCursorAlive(token); })
+        .then([this, self = shared_from_this(), token] {
+            hangBeforeKeepingBackupCursorAlive.pauseWhileSet();
+            _keepBackupCursorAlive(token);
+        })
         .then([this, self = shared_from_this(), token] {
             return _advanceMajorityCommitTsToBkpCursorCheckpointTs(token);
         })

@@ -56,14 +56,20 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
+#include "mongo/executor/mock_network_fixture.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -251,9 +257,29 @@ public:
         auto fetchCommittedTransactionsFp =
             globalFailPointRegistry().find("skipFetchingCommittedTransactions");
         fetchCommittedTransactionsFp->setMode(FailPoint::alwaysOn);
+
+        // setup mock networking for split acceptance
+        auto net = std::make_unique<executor::NetworkInterfaceMock>();
+        _net = net.get();
+
+        executor::ThreadPoolMock::Options dbThreadPoolOptions;
+        dbThreadPoolOptions.onCreateThread = []() {
+            Client::initThread("Fetch Mock Task Executor");
+        };
+
+        auto pool = std::make_unique<executor::ThreadPoolMock>(_net, 1, dbThreadPoolOptions);
+        _threadpoolTaskExecutor =
+            std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+        _threadpoolTaskExecutor->startup();
+
+        TenantMigrationRecipientService::Instance::setBackupCursorFetcherExecutor_forTest(
+            _threadpoolTaskExecutor);
     }
 
     void tearDown() override {
+        _threadpoolTaskExecutor->shutdown();
+        _threadpoolTaskExecutor->join();
+
         auto authFp = globalFailPointRegistry().find("skipTenantMigrationRecipientAuth");
         authFp->setMode(FailPoint::off);
 
@@ -453,6 +479,10 @@ protected:
         return &_clkSource;
     }
 
+    executor::NetworkInterfaceMock* getNet() {
+        return _net;
+    }
+
 private:
     ClockSourceMock _clkSource;
 
@@ -463,9 +493,57 @@ private:
 
     StreamableReplicaSetMonitorForTesting _rsmMonitor;
     RAIIServerParameterControllerForTest _findHostTimeout{"defaultFindReplicaSetHostTimeoutMS", 10};
+
+    executor::NetworkInterfaceMock* _net = nullptr;
+    std::shared_ptr<executor::TaskExecutor> _threadpoolTaskExecutor;
 };
 
 #ifdef MONGO_CONFIG_SSL
+
+void waitForReadyRequest(executor::NetworkInterfaceMock* net) {
+    while (!net->hasReadyRequests()) {
+        net->advanceTime(net->now() + Milliseconds{1});
+    }
+}
+
+BSONObj createEmptyCursorResponse(const NamespaceString& nss, CursorId backupCursorId) {
+    return BSON(
+        "cursor" << BSON("nextBatch" << BSONArray() << "id" << backupCursorId << "ns" << nss.ns())
+                 << "ok" << 1.0);
+}
+
+BSONObj createBackupCursorResponse(const Timestamp& checkpointTimestamp,
+                                   const NamespaceString& nss,
+                                   CursorId backupCursorId) {
+    const UUID backupId =
+        UUID(uassertStatusOK(UUID::parse(("2b068e03-5961-4d8e-b47a-d1c8cbd4b835"))));
+    StringData remoteDbPath = "/data/db/job0/mongorunner/test-1";
+    BSONObjBuilder cursor;
+    BSONArrayBuilder batch(cursor.subarrayStart("firstBatch"));
+    auto metaData = BSON("backupId" << backupId << "checkpointTimestamp" << checkpointTimestamp
+                                    << "dbpath" << remoteDbPath);
+    batch.append(BSON("metadata" << metaData));
+
+    batch.done();
+    cursor.append("id", backupCursorId);
+    cursor.append("ns", nss.ns());
+    BSONObjBuilder backupCursorReply;
+    backupCursorReply.append("cursor", cursor.obj());
+    backupCursorReply.append("ok", 1.0);
+    return backupCursorReply.obj();
+}
+
+void sendNextResponse(executor::NetworkInterfaceMock* net,
+                      const std::string& expectedFieldName,
+                      const BSONObj& backupCursorResponse) {
+    auto noi = net->getNextReadyRequest();
+    auto request = noi->getRequest();
+    ASSERT_EQUALS(expectedFieldName, request.cmdObj.firstElementFieldNameStringData());
+    net->scheduleSuccessfulResponse(
+        noi, executor::RemoteCommandResponse(backupCursorResponse, Milliseconds()));
+    net->runReadyNetworkOperations();
+}
+
 TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientServiceInstanceCreation) {
     stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
 
@@ -3840,6 +3918,114 @@ TEST_F(TenantMigrationRecipientServiceTest,
     const auto stateDoc = getStateDoc(instance.get());
     ASSERT_EQ(stateDoc.getNumRestartsDueToDonorConnectionFailure(), 0);
     ASSERT_EQ(stateDoc.getNumRestartsDueToRecipientFailure(), 0);
+    checkStateDocPersisted(opCtx.get(), instance.get());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, ShardMergeOpenBackupCursorSuccessfully) {
+    auto hangBeforeKeepingBackupCursorAliveFp =
+        globalFailPointRegistry().find("hangBeforeKeepingBackupCursorAlive");
+    auto initialTimesEntered = hangBeforeKeepingBackupCursorAliveFp->setMode(FailPoint::alwaysOn);
+    const UUID migrationUUID = UUID::gen();
+    const CursorId backupCursorId = 12345;
+    const NamespaceString aggregateNs = NamespaceString("admin.$cmd.aggregate");
+
+    auto serviceContext = getServiceContext();
+    serviceContext->setTransportLayer(
+        transport::TransportLayerManager::makeAndStartDefaultEgressTransportLayer());
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
+    insertTopOfOplog(&replSet, OpTime(Timestamp(5, 1), 1));
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setProtocol(MigrationProtocolEnum::kShardMerge);
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    {
+        auto net = getNet();
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        waitForReadyRequest(net);
+        // Mocking the aggregate command network response of the backup cursor in order to have data
+        // to parse.
+        sendNextResponse(net,
+                         "aggregate",
+                         createBackupCursorResponse(
+                             kDefaultStartMigrationTimestamp, aggregateNs, backupCursorId));
+        sendNextResponse(net, "getMore", createEmptyCursorResponse(aggregateNs, backupCursorId));
+    }
+
+    hangBeforeKeepingBackupCursorAliveFp->waitForTimesEntered(initialTimesEntered + 1);
+    hangBeforeKeepingBackupCursorAliveFp->setMode(FailPoint::off);
+
+    checkStateDocPersisted(opCtx.get(), instance.get());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, ShardMergeOpenBackupCursorAndRetries) {
+    auto hangBeforeKeepingBackupCursorAliveFp =
+        globalFailPointRegistry().find("hangBeforeKeepingBackupCursorAlive");
+    auto initialTimesEntered = hangBeforeKeepingBackupCursorAliveFp->setMode(FailPoint::alwaysOn);
+    const UUID migrationUUID = UUID::gen();
+    const CursorId backupCursorId = 3703253128214665235ll;
+    const NamespaceString aggregateNs = NamespaceString("admin.$cmd.aggregate");
+
+    auto serviceContext = getServiceContext();
+    serviceContext->setTransportLayer(
+        transport::TransportLayerManager::makeAndStartDefaultEgressTransportLayer());
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
+    insertTopOfOplog(&replSet, OpTime(Timestamp(5, 1), 1));
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setProtocol(MigrationProtocolEnum::kShardMerge);
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    {
+        auto net = getNet();
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        waitForReadyRequest(net);
+
+        // Mocking the aggregate command network response of the backup cursor in order to have data
+        // to parse. In this case we pass a timestamp that is inferior to the
+        // startMigrationTimestamp which will cause a retry. We then provide a correct timestamp in
+        // the next response and succeed.
+        sendNextResponse(net,
+                         "aggregate",
+                         createBackupCursorResponse(Timestamp(0, 0), aggregateNs, backupCursorId));
+        sendNextResponse(net,
+                         "killCursors",
+                         createBackupCursorResponse(
+                             kDefaultStartMigrationTimestamp, aggregateNs, backupCursorId));
+        sendNextResponse(net,
+                         "aggregate",
+                         createBackupCursorResponse(
+                             kDefaultStartMigrationTimestamp, aggregateNs, backupCursorId));
+        sendNextResponse(net, "getMore", createEmptyCursorResponse(aggregateNs, backupCursorId));
+    }
+
+    hangBeforeKeepingBackupCursorAliveFp->waitForTimesEntered(initialTimesEntered + 1);
+    hangBeforeKeepingBackupCursorAliveFp->setMode(FailPoint::off);
+
     checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
