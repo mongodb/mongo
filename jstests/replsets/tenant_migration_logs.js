@@ -42,7 +42,8 @@ const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
         tenantId: "slowCommands",
     };
 
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
 
     assertNoCertificateOrPrivateKeyLogsForCmd(donorPrimary, "donorStartMigration");
     assertNoCertificateOrPrivateKeyLogsForCmd(recipientPrimary, "recipientSyncData");
