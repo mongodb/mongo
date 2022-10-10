@@ -23,9 +23,6 @@ ReplSetTest = function(opts) {
     this.startSetAsync = function(options, restart) {
         const newOptions = Object.assign({}, options || {});
 
-        const fpAssertChangeStreamNssColl =
-            tojson({mode: "alwaysOn", data: {collectionName: "system.change_collection"}});
-
         let setParameter = {};
 
         // A change collection does not exist in the config server, do not set any change collection
@@ -33,8 +30,7 @@ ReplSetTest = function(opts) {
         if (!newOptions.hasOwnProperty("configsvr")) {
             setParameter = {
                 featureFlagServerlessChangeStreams: true,
-                internalChangeStreamUseTenantIdForTesting: true,
-                "failpoint.assertChangeStreamNssCollection": fpAssertChangeStreamNssColl,
+                internalChangeStreamUseTenantIdForTesting: true
             };
         }
 
@@ -53,6 +49,15 @@ ReplSetTest = function(opts) {
         assert.commandWorked(adminDb.runCommand({setChangeStreamState: 1, enabled: true}));
         assert.eq(assert.commandWorked(adminDb.runCommand({getChangeStreamState: 1})).enabled,
                   true);
+
+        // Verify that the change stream cursor is getting opened in the change collection.
+        const explain = assert.commandWorked(adminDb.getSiblingDB("test").runCommand({
+            aggregate: 1,
+            pipeline: [{$changeStream: {}}],
+            explain: true,
+        }));
+        assert.eq(explain.stages[0].$cursor.queryPlanner.namespace,
+                  'config.system.change_collection');
     };
 };
 
@@ -72,6 +77,15 @@ ShardingTest = function(params) {
         assert.commandWorked(adminDb.runCommand({setChangeStreamState: 1, enabled: true}));
         assert.eq(assert.commandWorked(adminDb.runCommand({getChangeStreamState: 1})).enabled,
                   true);
+
+        // Verify that the change stream cursor is getting opened in the change collection.
+        const explain = assert.commandWorked(adminDb.getSiblingDB("test").runCommand({
+            aggregate: 1,
+            pipeline: [{$changeStream: {}}],
+            explain: true,
+        }));
+        assert.eq(explain.stages[0].$cursor.queryPlanner.namespace,
+                  'config.system.change_collection');
     });
 
     return retShardingTest;

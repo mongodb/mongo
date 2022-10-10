@@ -65,7 +65,5 @@ executor:
         enableTestCommands: 1
         featureFlagServerlessChangeStreams: true
         internalChangeStreamUseTenantIdForTesting: true
-        failpoint.assertChangeStreamNssCollection:
-          "{'mode': 'alwaysOn', 'data': {'collectionName': 'system.change_collection'}}"
     # TODO SERVER-69115 Set number of nodes to 2 after oplog application is working properly.
     num_nodes: 1

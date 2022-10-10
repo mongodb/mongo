@@ -95,11 +95,6 @@
 
 namespace mongo {
 
-// A fail point that provides the collection name upon which the change stream should be opened.
-// This is used to assert that the change stream is getting opened on the required namespace.
-// TODO SERVER-67594 remove the failpoint.
-MONGO_FAIL_POINT_DEFINE(assertChangeStreamNssCollection);
-
 using boost::intrusive_ptr;
 using std::shared_ptr;
 using std::string;
@@ -779,22 +774,6 @@ Status runAggregate(OperationContext* opCtx,
                     str::stream() << "Change stream was unexpectedly opened on the namespace: "
                                   << nss << " in the config server",
                     serverGlobalParams.clusterRole != ClusterRole::ConfigServer || nss.isOplog());
-
-            // If the 'assertChangeStreamNssCollection' failpoint is active then ensure that we are
-            // opening the change stream on the correct namespace.
-            if (auto scopedFp = assertChangeStreamNssCollection.scoped();
-                MONGO_unlikely(scopedFp.isActive())) {
-                tassert(6689201,
-                        str::stream()
-                            << "Change stream was opened on the namespace with collection name: "
-                            << nss.coll() << ", expected: " << scopedFp.getData()["collectionName"],
-                        scopedFp.getData()["collectionName"].String() == nss.coll());
-
-                LOGV2_INFO(6689200,
-                           "Opening change stream on the namespace: {nss}",
-                           "Opening change stream",
-                           "nss"_attr = nss.toStringWithTenantId());
-            }
 
             // Upgrade and wait for read concern if necessary.
             _adjustChangeStreamReadConcern(opCtx);

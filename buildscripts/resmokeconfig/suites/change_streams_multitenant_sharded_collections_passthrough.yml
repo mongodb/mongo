@@ -66,5 +66,3 @@ executor:
         set_parameters:
           featureFlagServerlessChangeStreams: true
           internalChangeStreamUseTenantIdForTesting: true
-          failpoint.assertChangeStreamNssCollection:
-            "{'mode': 'alwaysOn', 'data': {'collectionName': 'system.change_collection'}}"
