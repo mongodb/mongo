@@ -123,6 +123,13 @@ public:
     }
 
     /**
+     * Returns true if the pipeline begins with a $documents stage.
+     */
+    bool startsWithDocuments() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->isDocuments();
+    }
+
+    /**
      * Returns true if the pipeline has a $changeStream stage.
      */
     bool hasChangeStream() const {

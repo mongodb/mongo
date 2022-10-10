@@ -53,10 +53,11 @@ TEST_F(DispatchShardPipelineTest, DoesNotSplitPipelineIfTargetingOneShard) {
     const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
         AggregateCommandRequest(expCtx()->ns, stages));
     const bool hasChangeStream = false;
+    const bool startsWithDocuments = false;
 
     auto future = launchAsync([&] {
         auto results = sharded_agg_helpers::dispatchShardPipeline(
-            serializedCommand, hasChangeStream, std::move(pipeline));
+            serializedCommand, hasChangeStream, startsWithDocuments, std::move(pipeline));
         ASSERT_EQ(results.remoteCursors.size(), 1UL);
         ASSERT(!results.splitPipeline);
     });
@@ -84,10 +85,11 @@ TEST_F(DispatchShardPipelineTest, DoesSplitPipelineIfMatchSpansTwoShards) {
     const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
         AggregateCommandRequest(expCtx()->ns, stages));
     const bool hasChangeStream = false;
+    const bool startsWithDocuments = false;
 
     auto future = launchAsync([&] {
         auto results = sharded_agg_helpers::dispatchShardPipeline(
-            serializedCommand, hasChangeStream, std::move(pipeline));
+            serializedCommand, hasChangeStream, startsWithDocuments, std::move(pipeline));
         ASSERT_EQ(results.remoteCursors.size(), 2UL);
         ASSERT(bool(results.splitPipeline));
     });
@@ -118,10 +120,11 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineRetriesOnNetworkError) {
     const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
         AggregateCommandRequest(expCtx()->ns, stages));
     const bool hasChangeStream = false;
+    const bool startsWithDocuments = false;
     auto future = launchAsync([&] {
         // Shouldn't throw.
         auto results = sharded_agg_helpers::dispatchShardPipeline(
-            serializedCommand, hasChangeStream, std::move(pipeline));
+            serializedCommand, hasChangeStream, startsWithDocuments, std::move(pipeline));
         ASSERT_EQ(results.remoteCursors.size(), 2UL);
         ASSERT(bool(results.splitPipeline));
     });
@@ -163,11 +166,14 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
     const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
         AggregateCommandRequest(expCtx()->ns, stages));
     const bool hasChangeStream = false;
+    const bool startsWithDocuments = false;
+
     auto future = launchAsync([&] {
-        ASSERT_THROWS_CODE(sharded_agg_helpers::dispatchShardPipeline(
-                               serializedCommand, hasChangeStream, std::move(pipeline)),
-                           AssertionException,
-                           ErrorCodes::StaleConfig);
+        ASSERT_THROWS_CODE(
+            sharded_agg_helpers::dispatchShardPipeline(
+                serializedCommand, hasChangeStream, startsWithDocuments, std::move(pipeline)),
+            AssertionException,
+            ErrorCodes::StaleConfig);
     });
 
     // Mock out an error response.
@@ -197,15 +203,17 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
         AggregateCommandRequest(expCtx()->ns, stages));
     const bool hasChangeStream = false;
+    const bool startsWithDocuments = false;
     auto future = launchAsync([&] {
         // Shouldn't throw.
         sharding::router::CollectionRouter router(getServiceContext(), kTestAggregateNss);
-        auto results = router.route(operationContext(),
-                                    "dispatch shard pipeline"_sd,
-                                    [&](OperationContext* opCtx, const ChunkManager& cm) {
-                                        return sharded_agg_helpers::dispatchShardPipeline(
-                                            serializedCommand, hasChangeStream, pipeline->clone());
-                                    });
+        auto results = router.route(
+            operationContext(),
+            "dispatch shard pipeline"_sd,
+            [&](OperationContext* opCtx, const ChunkManager& cm) {
+                return sharded_agg_helpers::dispatchShardPipeline(
+                    serializedCommand, hasChangeStream, startsWithDocuments, pipeline->clone());
+            });
         ASSERT_EQ(results.remoteCursors.size(), 1UL);
         ASSERT(!bool(results.splitPipeline));
     });
