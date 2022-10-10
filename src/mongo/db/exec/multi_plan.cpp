@@ -364,7 +364,7 @@ void MultiPlanStage::removeRejectedPlans() {
     }
     size_t startIndex = 1;
     if (_backupPlanIdx != kNoSuchPlan) {
-        if (_bestPlanIdx != 1) {
+        if (_backupPlanIdx != 1) {
             std::swap(_children[_backupPlanIdx], _children[1]);
             std::swap(_candidates[_backupPlanIdx], _candidates[1]);
             _backupPlanIdx = 1;
