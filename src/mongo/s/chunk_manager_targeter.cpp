@@ -230,6 +230,8 @@ ChunkManagerTargeter::ChunkManagerTargeter(OperationContext* opCtx,
                                            boost::optional<OID> targetEpoch)
     : _nss(nss), _targetEpoch(std::move(targetEpoch)), _cm(_init(opCtx, false)) {}
 
+ChunkManagerTargeter::ChunkManagerTargeter(const ChunkManager& cm) : _nss(cm.getNss()), _cm(cm) {}
+
 /**
  * Initializes and returns the ChunkManger which needs to be used for targeting.
  * If 'refresh' is true, additionally fetches the latest routing info from the config servers.

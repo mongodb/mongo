@@ -679,6 +679,10 @@ public:
         return _rt->optRt->getUUID();
     }
 
+    const NamespaceString& getNss() const {
+        return _rt->optRt->nss();
+    }
+
     const boost::optional<TypeCollectionTimeseriesFields>& getTimeseriesFields() const {
         return _rt->optRt->getTimeseriesFields();
     }

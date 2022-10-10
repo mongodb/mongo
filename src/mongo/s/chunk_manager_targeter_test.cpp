@@ -78,6 +78,50 @@ public:
     boost::optional<ChunkManager> chunkManager;
 };
 
+
+/**
+ * This is the common part of test TargetInsertWithRangePrefixHashedShardKey and
+ * TargetInsertWithRangePrefixHashedShardKeyCustomChunkManager
+ * Tests that the destination shard is the correct one as defined from the split points
+ * when the ChunkManager was constructed.
+ */
+void testTargetInsertWithRangePrefixHashedShardKeyCommon(OperationContext* opCtx,
+                                                         const ChunkManagerTargeter& cmTargeter) {
+    // Caller has created 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1'
+    // has chunk [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
+    // [100, MaxKey).
+    auto res = cmTargeter.targetInsert(opCtx, fromjson("{a: {b: -111}, c: {d: '1'}}"));
+    ASSERT_EQUALS(res.shardName, "1");
+
+    res = cmTargeter.targetInsert(opCtx, fromjson("{a: {b: -10}}"));
+    ASSERT_EQUALS(res.shardName, "2");
+
+    res = cmTargeter.targetInsert(opCtx, fromjson("{a: {b: 0}, c: {d: 4}}"));
+    ASSERT_EQUALS(res.shardName, "3");
+
+    res = cmTargeter.targetInsert(opCtx, fromjson("{a: {b: 1000}, c: null, d: {}}"));
+    ASSERT_EQUALS(res.shardName, "4");
+
+    // Missing field will be treated as null and will be targeted to the chunk which holds null,
+    // which is shard '1'.
+    res = cmTargeter.targetInsert(opCtx, BSONObj());
+    ASSERT_EQUALS(res.shardName, "1");
+
+    res = cmTargeter.targetInsert(opCtx, BSON("a" << 10));
+    ASSERT_EQUALS(res.shardName, "1");
+
+    // Arrays along shard key path are not allowed.
+    ASSERT_THROWS_CODE(cmTargeter.targetInsert(opCtx, fromjson("{a: [1,2]}")),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(cmTargeter.targetInsert(opCtx, fromjson("{c: [1,2]}")),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(cmTargeter.targetInsert(opCtx, fromjson("{c: {d: [1,2]}}")),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
+}
+
 TEST_F(ChunkManagerTargeterTest, TargetInsertWithRangePrefixHashedShardKey) {
     // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has chunk
     // [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
@@ -87,37 +131,85 @@ TEST_F(ChunkManagerTargeterTest, TargetInsertWithRangePrefixHashedShardKey) {
     auto cmTargeter = prepare(BSON("a.b" << 1 << "c.d"
                                          << "hashed"),
                               splitPoints);
+    testTargetInsertWithRangePrefixHashedShardKeyCommon(operationContext(), cmTargeter);
+}
 
-    auto res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: -111}, c: {d: '1'}}"));
-    ASSERT_EQUALS(res.shardName, "1");
+/**
+ * Build and return a custom ChunkManager with the given shard pattern and split points.
+ * This is similar to CatalogCacheTestFixture::makeChunkManager() which prepare() calls
+ * with the distinction that it simply creates and returns a ChunkManager object
+ * and does not assign it to the Global Catalog Cache ChunkManager.
+ */
+ChunkManager makeCustomChunkManager(const ShardKeyPattern& shardKeyPattern,
+                                    const std::vector<BSONObj>& splitPoints) {
+    std::vector<ChunkType> chunks;
+    auto splitPointsIncludingEnds(splitPoints);
+    splitPointsIncludingEnds.insert(splitPointsIncludingEnds.begin(),
+                                    shardKeyPattern.getKeyPattern().globalMin());
+    splitPointsIncludingEnds.push_back(shardKeyPattern.getKeyPattern().globalMax());
+    const Timestamp timestamp{Timestamp(0, 42)};
+    ChunkVersion version({OID::gen(), timestamp}, {1, 0});
+    const auto uuid = UUID::gen();
+    for (size_t i = 1; i < splitPointsIncludingEnds.size(); ++i) {
+        ChunkType chunk(
+            uuid,
+            {shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i - 1],
+                                                              false),
+             shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i], false)},
+            version,
+            ShardId{str::stream() << (i - 1)});
+        chunk.setName(OID::gen());
 
-    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: -10}}"));
-    ASSERT_EQUALS(res.shardName, "2");
+        chunks.push_back(chunk);
+        version.incMajor();
+    }
 
-    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: 4}}"));
-    ASSERT_EQUALS(res.shardName, "3");
+    auto routingTableHistory = RoutingTableHistory::makeNew(kNss,
+                                                            uuid,
+                                                            shardKeyPattern.getKeyPattern(),
+                                                            {},     // collator
+                                                            false,  // unique
+                                                            OID::gen(),
+                                                            timestamp,
+                                                            boost::none,  // time series fields
+                                                            boost::none,  // resharding fields
+                                                            boost::none,  // chunk size bytes
+                                                            true,         // allowMigration
+                                                            chunks);
 
-    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 1000}, c: null, d: {}}"));
-    ASSERT_EQUALS(res.shardName, "4");
+    return ChunkManager(ShardId("dummyShardPrimary"),
+                        DatabaseVersion(UUID::gen(), timestamp),
+                        RoutingTableHistoryValueHandle(
+                            std::make_shared<RoutingTableHistory>(std::move(routingTableHistory))),
+                        boost::none);
+}
 
-    // Missing field will be treated as null and will be targeted to the chunk which holds null,
-    // which is shard '1'.
-    res = cmTargeter.targetInsert(operationContext(), BSONObj());
-    ASSERT_EQUALS(res.shardName, "1");
 
-    res = cmTargeter.targetInsert(operationContext(), BSON("a" << 10));
-    ASSERT_EQUALS(res.shardName, "1");
+TEST_F(ChunkManagerTargeterTest, TargetInsertWithRangePrefixHashedShardKeyCustomChunkManager) {
+    // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has chunk
+    // [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
+    // [100, MaxKey).
+    std::vector<BSONObj> splitPoints = {
+        BSON("a.b" << BSONNULL), BSON("a.b" << -100), BSON("a.b" << 0), BSON("a.b" << 100)};
+    auto shardKeyPattern = ShardKeyPattern(BSON("a.b" << 1 << "c.d"
+                                                      << "hashed"));
 
-    // Arrays along shard key path are not allowed.
-    ASSERT_THROWS_CODE(cmTargeter.targetInsert(operationContext(), fromjson("{a: [1,2]}")),
-                       DBException,
-                       ErrorCodes::ShardKeyNotFound);
-    ASSERT_THROWS_CODE(cmTargeter.targetInsert(operationContext(), fromjson("{c: [1,2]}")),
-                       DBException,
-                       ErrorCodes::ShardKeyNotFound);
-    ASSERT_THROWS_CODE(cmTargeter.targetInsert(operationContext(), fromjson("{c: {d: [1,2]}}")),
-                       DBException,
-                       ErrorCodes::ShardKeyNotFound);
+    auto cm = makeCustomChunkManager(shardKeyPattern, splitPoints);
+    auto cmTargeter = ChunkManagerTargeter(cm);
+    ASSERT_EQ(cmTargeter.getRoutingInfo().numChunks(), 5);
+
+    // Cause the global chunk manager to have some other configuration.
+    std::vector<BSONObj> differentPoints = {BSON("c" << BSONNULL), BSON("c" << 0)};
+    auto cm2 = makeChunkManager(kNss,
+                                ShardKeyPattern(BSON("c" << 1 << "d"
+                                                         << "hashed")),
+                                nullptr,
+                                false,
+                                differentPoints);
+    ASSERT_EQ(cm2.numChunks(), 3);
+
+    // Run common test on the custom ChunkManager of ChunkManagerTargeter.
+    testTargetInsertWithRangePrefixHashedShardKeyCommon(operationContext(), cmTargeter);
 }
 
 TEST_F(ChunkManagerTargeterTest, TargetInsertsWithVaryingHashedPrefixAndConstantRangedSuffix) {

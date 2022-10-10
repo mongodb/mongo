@@ -73,6 +73,10 @@ public:
                          const NamespaceString& nss,
                          boost::optional<OID> expectedEpoch = boost::none);
 
+    /* Initializes the targeter with a custom ChunkManager cm, in order to support
+     * using a custom (synthetic) routing table */
+    ChunkManagerTargeter(const ChunkManager& cm);
+
     const NamespaceString& getNS() const override;
 
     ShardEndpoint targetInsert(OperationContext* opCtx, const BSONObj& doc) const override;
