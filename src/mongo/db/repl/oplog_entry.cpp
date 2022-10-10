@@ -184,10 +184,6 @@ DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
         return DurableOplogEntry::CommandType::kCreateGlobalIndex;
     } else if (commandString == "dropGlobalIndex") {
         return DurableOplogEntry::CommandType::kDropGlobalIndex;
-    } else if (commandString == "xi") {
-        return DurableOplogEntry::CommandType::kInsertGlobalIndexKey;
-    } else if (commandString == "xd") {
-        return DurableOplogEntry::CommandType::kDeleteGlobalIndexKey;
     } else {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "Unknown oplog entry command type: " << commandString

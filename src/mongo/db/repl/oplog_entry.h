@@ -459,8 +459,6 @@ public:
         kModifyShardedCollectionGlobalIndexCatalog,
         kCreateGlobalIndex,
         kDropGlobalIndex,
-        kInsertGlobalIndexKey,
-        kDeleteGlobalIndexKey,
     };
 
     // Get the in-memory size in bytes of a ReplOperation.
