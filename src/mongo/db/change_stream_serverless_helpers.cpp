@@ -56,12 +56,11 @@ bool isChangeStreamEnabled(OperationContext* opCtx, const TenantId& tenantId) {
 
     // A change stream in the serverless is declared as enabled if both the change collection and
     // the pre-images collection exist for the provided tenant.
-    // TODO SERVER-66643 Pass 'tenantId' to the pre-images collection.
     return isChangeCollectionsModeActive() &&
         static_cast<bool>(catalog->lookupCollectionByNamespace(
             opCtx, NamespaceString::makeChangeCollectionNSS(tenantId))) &&
         static_cast<bool>(catalog->lookupCollectionByNamespace(
-            opCtx, NamespaceString::makePreImageCollectionNSS(boost::none)));
+            opCtx, NamespaceString::makePreImageCollectionNSS(tenantId)));
 }
 
 bool canInitializeServices() {

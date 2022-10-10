@@ -399,6 +399,7 @@ env.Library(
         'document_source_change_stream_unwind_transaction.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/change_stream_serverless_helpers',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',

@@ -1160,9 +1160,8 @@ void writeChangeStreamPreImage(OperationContext* opCtx,
     ChangeStreamPreImage preImageDocument{
         std::move(preImageId), oplogEntry.getWallClockTimeForPreImage(), preImage};
 
-    // TODO SERVER-66643 Pass tenant id to the pre-images collection if running in the serverless.
     ChangeStreamPreImagesCollectionManager::insertPreImage(
-        opCtx, /* tenantId */ boost::none, preImageDocument);
+        opCtx, oplogEntry.getTid(), preImageDocument);
 }
 }  // namespace
 

@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -108,7 +107,8 @@ void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
     uassert(5868501,
             "Failpoint failPreimagesCollectionCreation enabled. Throwing exception",
             !MONGO_unlikely(failPreimagesCollectionCreation.shouldFail()));
-    const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(tenantId);
+    const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(
+        change_stream_serverless_helpers::resolveTenantId(tenantId));
 
     CollectionOptions preImagesCollectionOptions;
 
@@ -126,7 +126,8 @@ void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
 
 void ChangeStreamPreImagesCollectionManager::dropPreImagesCollection(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
-    const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(tenantId);
+    const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(
+        change_stream_serverless_helpers::resolveTenantId(tenantId));
     DropReply dropReply;
     const auto status =
         dropCollection(opCtx,
@@ -152,7 +153,8 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
             preImage.getId().getApplyOpsIndex() >= 0);
 
     // TODO SERVER-66642 Consider using internal test-tenant id if applicable.
-    const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(tenantId);
+    const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(
+        change_stream_serverless_helpers::resolveTenantId(tenantId));
 
     // This lock acquisition can block on a stronger lock held by another operation modifying
     // the pre-images collection. There are no known cases where an operation holding an

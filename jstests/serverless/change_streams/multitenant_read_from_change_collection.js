@@ -32,13 +32,16 @@ const secondTenantConn =
 function verifyEventsAndGetResumeTokens(csCursor, expectedEvents) {
     let resumeTokens = [];
 
-    for (const [expectedOpType, expectedDoc] of expectedEvents) {
+    for (const [expectedOpType, expectedPostImage, expectedPreImage] of expectedEvents) {
         assert.soon(() => csCursor.hasNext());
         const event = csCursor.next();
 
         assert.eq(event.operationType, expectedOpType, event);
         if (event.operationType == "insert") {
-            assert.eq(event.fullDocument, expectedDoc);
+            assert.eq(event.fullDocument, expectedPostImage);
+        } else if (event.operationType == "update") {
+            assert.eq(event.fullDocumentBeforeChange, expectedPreImage, event);
+            assert.eq(event.fullDocument, expectedPostImage, event);
         } else if (event.operationType == "drop") {
             assert.soon(() => csCursor.hasNext());
             assert.eq(csCursor.isClosed(), true);
@@ -54,9 +57,16 @@ function verifyEventsAndGetResumeTokens(csCursor, expectedEvents) {
 const firstTenantTestDb = firstTenantConn.getDB("test");
 const secondTenantTestDb = secondTenantConn.getDB("test");
 
-// Recreate the 'stockPrice' collection to delete any old documents.
-assertDropAndRecreateCollection(firstTenantTestDb, "stockPrice");
-assertDropAndRecreateCollection(secondTenantTestDb, "stockPrice");
+// Recreate the 'stockPrice' collections to delete any old documents and enable pre-images
+// collections for them.
+assertDropAndRecreateCollection(
+    firstTenantTestDb, "stockPrice", {changeStreamPreAndPostImages: {enabled: true}});
+assert(firstTenantTestDb.getCollectionInfos({name: "stockPrice"})[0]
+           .options.changeStreamPreAndPostImages.enabled);
+assertDropAndRecreateCollection(
+    secondTenantTestDb, "stockPrice", {changeStreamPreAndPostImages: {enabled: true}});
+assert(secondTenantTestDb.getCollectionInfos({name: "stockPrice"})[0]
+           .options.changeStreamPreAndPostImages.enabled);
 
 // Create a new incarnation of the change collection for the first tenant.
 replSetTest.setChangeStreamState(firstTenantConn, false);
@@ -153,6 +163,19 @@ replSetTest.setChangeStreamState(secondTenantConn, true);
 assert.throwsWithCode(
     () => secondTenantTestDb.stockPrice.watch([], {resumeAfter: secondTenantResumeTokens[0]}),
     ErrorCodes.ChangeStreamHistoryLost);
+
+const firstTenantCsCursorWithPreAndPostImages = firstTenantTestDb.stockPrice.watch(
+    [], {fullDocument: "required", fullDocumentBeforeChange: "required"});
+const secondTenantCsCursorWithPreAndPostImages = secondTenantTestDb.stockPrice.watch(
+    [], {fullDocument: "required", fullDocumentBeforeChange: "required"});
+
+assert.commandWorked(firstTenantTestDb.stockPrice.updateOne({_id: "mdb"}, {$set: {price: 450}}));
+assert.commandWorked(secondTenantTestDb.stockPrice.updateOne({_id: "amzn"}, {$set: {price: 300}}));
+
+verifyEventsAndGetResumeTokens(firstTenantCsCursorWithPreAndPostImages,
+                               [["update", {_id: "mdb", price: 450}, {_id: "mdb", price: 350}]]);
+verifyEventsAndGetResumeTokens(secondTenantCsCursorWithPreAndPostImages,
+                               [["update", {_id: "amzn", price: 300}, {_id: "amzn", price: 3000}]]);
 
 replSetTest.stopSet();
 }());

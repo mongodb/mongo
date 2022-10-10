@@ -113,11 +113,6 @@ public:
     static ChangeStreamChangeCollectionManager& get(OperationContext* opCtx);
 
     /**
-     * Returns true if the change stream is enabled for the provided tenant, false otherwise.
-     */
-    bool isChangeStreamEnabled(OperationContext* opCtx, boost::optional<TenantId> tenantId) const;
-
-    /**
      * Creates a change collection for the specified tenant, if it doesn't exist.
      */
     void createChangeCollection(OperationContext* opCtx, const TenantId& tenantId);

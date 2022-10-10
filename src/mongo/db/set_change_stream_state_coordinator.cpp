@@ -34,8 +34,6 @@
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_state_gen.h"
-#include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/logv2/log.h"
 
@@ -100,34 +98,7 @@ private:
         auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
         changeCollectionManager.createChangeCollection(opCtx, tenantId);
 
-        // TODO SERVER-66643 Remove this code. A change collection must have atleast one entry for
-        // the change stream to advance. As such artifically create any oplog entry such that it
-        // will be captured by the change collection. With SERVER-66643, the pre-images collection
-        // 'create' oplog entry will be auto captured by the change collection and hence writing
-        // this entry will not be required. Also remove the necessary header and linked library
-        // after removing this code.
-        [&]() {
-            writeConflictRetry(
-                opCtx, "writeNoop", NamespaceString::kRsOplogNamespace.ns(), [&] {
-                    Lock::GlobalLock lock(opCtx, MODE_IX);
-                    WriteUnitOfWork wuow(opCtx);
-                    opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
-                        opCtx,
-                        NamespaceString::makeChangeCollectionNSS(tenantId),
-                        boost::none,
-                        BSON("msg"
-                             << "enable change stream"),
-                        boost::none,
-                        boost::none,
-                        boost::none,
-                        boost::none,
-                        boost::none);
-                    wuow.commit();
-                });
-        }();
-
-        // TODO SERVER-66643 Pass 'tenantId' to the pre-images collection.
-        ChangeStreamPreImagesCollectionManager::createPreImagesCollection(opCtx, boost::none);
+        ChangeStreamPreImagesCollectionManager::createPreImagesCollection(opCtx, tenantId);
 
         // Wait until the create requests are majority committed.
         waitForMajority(opCtx);
@@ -141,8 +112,7 @@ private:
         auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
         changeCollectionManager.dropChangeCollection(opCtx, tenantId);
 
-        // TODO SERVER-66643 Pass 'tenantId' to the pre-images collection.
-        ChangeStreamPreImagesCollectionManager::dropPreImagesCollection(opCtx, boost::none);
+        ChangeStreamPreImagesCollectionManager::dropPreImagesCollection(opCtx, tenantId);
 
         // Wait until the drop requests are majority committed.
         waitForMajority(opCtx);

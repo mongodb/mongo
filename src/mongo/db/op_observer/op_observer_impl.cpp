@@ -894,10 +894,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             ChangeStreamPreImageId id(args.uuid, opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc.value());
 
-            // TODO SERVER-66643 Pass tenant id to the pre-images collection if running in the
-            // serverless.
             ChangeStreamPreImagesCollectionManager::insertPreImage(
-                opCtx, /* tenantId */ boost::none, preImage);
+                opCtx, args.nss.tenantId(), preImage);
         }
 
         SessionTxnRecord sessionTxnRecord;
@@ -1072,10 +1070,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             ChangeStreamPreImageId id(uuid, opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, *args.deletedDoc);
 
-            // TODO SERVER-66643 Pass tenant id to the pre-images collection if running in the
-            // serverless.
-            ChangeStreamPreImagesCollectionManager::insertPreImage(
-                opCtx, /* tenantId */ boost::none, preImage);
+            ChangeStreamPreImagesCollectionManager::insertPreImage(opCtx, nss.tenantId(), preImage);
         }
 
         SessionTxnRecord sessionTxnRecord;
@@ -1513,11 +1508,9 @@ void writeChangeStreamPreImagesForApplyOpsEntries(
             invariant(operation.getUuid());
             invariant(!operation.getPreImage().isEmpty());
 
-            // TODO SERVER-66643 Pass tenant id to the pre-images collection if running in the
-            // serverless.
             ChangeStreamPreImagesCollectionManager::insertPreImage(
                 opCtx,
-                /* tenantId */ boost::none,
+                operation.getTid(),
                 ChangeStreamPreImage{
                     ChangeStreamPreImageId{*operation.getUuid(), applyOpsTimestamp, applyOpsIndex},
                     operationTime,

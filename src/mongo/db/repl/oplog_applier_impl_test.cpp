@@ -751,11 +751,10 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncorr
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncludesTenantId) {
     // Setup the pre-images collection.
-    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(_opCtx.get(),
-                                                                      boost::none /* tenantId */);
+    const TenantId tid(OID::gen());
+    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(_opCtx.get(), tid);
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    const TenantId tid(OID::gen());
     const NamespaceString nss(tid, "test.t");
     BSONObj doc = BSON("_id" << 0);
 

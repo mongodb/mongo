@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
@@ -120,8 +121,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext()
 boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
     boost::intrusive_ptr<ExpressionContext> pExpCtx, const Document& preImageId) {
     // Look up the pre-image document on the local node by id.
-    // TODO SERVER-66642 Consider using internal test-tenant id if applicable.
-    const auto tenantId = pExpCtx->ns.tenantId();
+    const auto tenantId = change_stream_serverless_helpers::resolveTenantId(pExpCtx->ns.tenantId());
     auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocumentLocally(
         pExpCtx,
         NamespaceString::makePreImageCollectionNSS(tenantId),
