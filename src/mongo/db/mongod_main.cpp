@@ -323,8 +323,6 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
             MirrorMaestro::onReceiveMirroredRead(opCtx);
         }
     };
-
-    MirrorMaestro::init(serviceContext);
     CommandInvocationHooks::set(serviceContext, std::make_unique<MongodCommandInvocationHooks>());
 }
 
@@ -396,6 +394,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 #endif
 
     logProcessDetails(nullptr);
+
+    initializeCommandHooks(serviceContext);
 
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
 
@@ -677,7 +677,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         replCoord->startup(startupOpCtx.get(), lastShutdownState);
     }
 
-    initializeCommandHooks(serviceContext);
+    MirrorMaestro::init(serviceContext);
 
     if (!storageGlobalParams.queryableBackupMode) {
 
