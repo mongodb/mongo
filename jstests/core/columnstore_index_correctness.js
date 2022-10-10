@@ -19,10 +19,31 @@ load("jstests/libs/analyze_plan.js");         // For "planHasStage."
 load("jstests/aggregation/extras/utils.js");  // For "resultsEq."
 
 const coll = db.columnstore_index_correctness;
-coll.drop();
 
-// Intentionally not using _id as the unique identifier, to avoid getting IDHACK plans when we
-// query by it.
+(function testColumnScanIsUsed() {
+    coll.drop();
+    coll.insert([{_id: 0, x: 42}]);  // the content doesn't matter for this test
+    assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
+
+    let explain = coll.find({}, {_id: 0, x: 1}).explain();
+    assert(planHasStage(db, explain, "COLUMN_SCAN"),
+           "Projection of existing column " + tojson(explain));
+
+    explain = coll.find({}, {_id: 0, "x.y.z": 1, a: 1}).explain();
+    assert(planHasStage(db, explain, "COLUMN_SCAN"),
+           "Projection of non-existing columns " + tojson(explain));
+
+    explain = coll.find({}, {x: 1, a: 1}).explain();
+    assert(planHasStage(db, explain, "COLUMN_SCAN"),
+           "Projection includes _id column " + tojson(explain));
+
+    explain = coll.find({}, {_id: 0}).explain();
+    assert(!planHasStage(db, explain, "COLUMN_SCAN"),
+           "Exclusive projection cannot use column scan " + tojson(explain));
+})();
+
+// Multiple tests in this file use the same dataset. Intentionally not using _id as the unique
+// identifier, to avoid getting IDHACK plans when we query by it.
 const docs = [
     {num: 0},
     {num: 1, a: null},
@@ -122,13 +143,12 @@ const docs = [
     {num: 95, a: [{m: 1, n: 2}, {m: 2, o: 1}]},
 ];
 
-let docNum = 0;
+coll.drop();
 let bulk = coll.initializeUnorderedBulkOp();
 for (let doc of docs) {
-    let numObj = {num: docNum++};
     let insertObj = {};
-    Object.assign(insertObj, numObj, doc);
-    if (docNum % 2 == 0) {
+    Object.assign(insertObj, doc);
+    if (doc.num % 2 == 0) {
         insertObj.optionalField = "foo";
     }
     bulk.insert(insertObj);
@@ -136,129 +156,133 @@ for (let doc of docs) {
 bulk.execute();
 
 assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
-const kProjection = {
-    _id: 0,
-    "a.b.c": 1,
-    num: 1,
-    optionalField: 1
-};
 
-// Run an explain.
-let explain = coll.find({}, kProjection).explain();
-assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+(function testProjectionOfIndependentPaths() {
+    const kProjection = {_id: 0, "a.b.c": 1, num: 1, optionalField: 1};
 
-// Run a query getting all of the results using the column index.
-let results = coll.find({}, kProjection).toArray();
-assert.gt(results.length, 0);
+    let explain = coll.find({}, kProjection).explain();
+    assert(planHasStage(db, explain, "COLUMN_SCAN"),
+           "Should have used column scan " + tojson(explain));
 
-for (let res of results) {
-    const trueResult = coll.find({num: res.num}, kProjection).hint({$natural: 1}).toArray();
-    const originalDoc = coll.findOne({num: res.num});
-    assert(resultsEq([res], trueResult),
-           () => `column store index output ${tojson(res)}, collection scan output ${
-               tojson(trueResult[0])}, original document was: ${tojson(originalDoc)}`);
-}
+    let results = coll.find({}, kProjection).toArray();
+    assert.eq(results.length, docs.length, "With no filter should have returned all docs");
+
+    for (let res of results) {
+        const trueResult = coll.find({num: res.num}, kProjection).hint({$natural: 1}).toArray()[0];
+        const originalDoc = coll.findOne({num: res.num});
+        assert.eq(res, trueResult, "Mismatched projection of " + tojson(originalDoc));
+    }
+})();
 
 // Run a similar query that projects multiple fields with a shared parent object.
-const kSiblingProjection = {
-    _id: 0,
-    "a.m": 1,
-    "a.n": 1,
-    num: 1
-};
+(function testProjectionOfSiblingPaths() {
+    const kSiblingProjection = {_id: 0, "a.m": 1, "a.n": 1, num: 1};
 
-explain = coll.find({}, kSiblingProjection).explain();
-assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+    let explain = coll.find({}, kSiblingProjection).explain();
+    assert(planHasStage(db, explain, "COLUMN_SCAN"),
+           "Should have used column scan " + tojson(explain));
 
-results = coll.find({}, kSiblingProjection).toArray();
-assert.gt(results.length, 0);
-for (let res of results) {
-    const trueResult =
-        coll.find({num: res.num}, kSiblingProjection).hint({$natural: 1}).toArray()[0];
-    const originalDoc = coll.findOne({num: res.num});
-    assert.eq(res, trueResult, originalDoc);
-}
+    let results = coll.find({}, kSiblingProjection).toArray();
+    assert.eq(results.length, docs.length, "With no filter should have returned all docs");
 
-// Run a query that tests the SERVER-67742 fix
-const kPrefixProjection = {
-    _id: 0,
-    "a": 1,
-    num: 1
-};
+    for (let res of results) {
+        const trueResult =
+            coll.find({num: res.num}, kSiblingProjection).hint({$natural: 1}).toArray()[0];
+        const originalDoc = coll.findOne({num: res.num});
+        assert.eq(res, trueResult, "Mismatched projection of " + tojson(originalDoc));
+    }
+})();
 
-results = coll.find({"a.m": 1}, kPrefixProjection).hint({"$**": "columnstore"}).toArray();
-assert.gt(results.length, 0);
-for (let res of results) {
-    const trueResult =
-        coll.find({num: res.num}, kPrefixProjection).hint({$natural: 1}).toArray()[0];
-    const originalDoc = coll.findOne({num: res.num});
-    assert.eq(res, trueResult, originalDoc);
-}
+// Run a query that tests the SERVER-67742 fix.
+(function testPrefixPath() {
+    const kPrefixProjection = {_id: 0, "a": 1, num: 1};
 
-// Now test grouping semantics.
+    // Have to use the index hint because SERVER-67264 blocks selection of CSI.
+    let explain = coll.find({"a.m": 1}, kPrefixProjection).hint({"$**": "columnstore"}).explain();
+    assert(planHasStage(db, explain, "COLUMN_SCAN"),
+           "Should have used column scan " + tojson(explain));
 
-// Sanity check that we are comparing the plans we expect to be.
-let pipeline = [
-    {$group: {_id: "$a.b.c", docs: {$push: "$num"}}},
-    {$set: {docs: {$sortArray: {input: "$docs", sortBy: 1}}}}
-];
-let naturalExplain = coll.explain().aggregate(pipeline, {hint: {$natural: 1}});
-assert(aggPlanHasStage(naturalExplain, "COLLSCAN"), naturalExplain);
+    let results = coll.find({"a.m": 1}, kPrefixProjection).hint({"$**": "columnstore"}).toArray();
+    let trueResults = coll.find({"a.m": 1}, kPrefixProjection).hint({$natural: 1}).toArray();
+    assert.eq(results.length,
+              trueResults.length,
+              `Should have found the same number of docs but found:\n with index: ${
+                  tojson(results)}\n without index: ${tojson(trueResults)}`);
 
-let nonHintedExplain = coll.explain().aggregate(pipeline);
-assert(aggPlanHasStage(nonHintedExplain, "COLUMN_SCAN"), nonHintedExplain);
-assert(!aggPlanHasStage(nonHintedExplain, "PROJECTION_DEFAULT"), nonHintedExplain);
-assert(!aggPlanHasStage(nonHintedExplain, "PROJECTION_SIMPLE"), nonHintedExplain);
+    for (let res of results) {
+        const trueResult =
+            coll.find({num: res.num}, kPrefixProjection).hint({$natural: 1}).toArray()[0];
+        const originalDoc = coll.findOne({num: res.num});
+        assert.eq(res, trueResult, "Mismatched projection of " + tojson(originalDoc));
+    }
+})();
 
-assert(resultsEq(coll.aggregate(pipeline, {hint: {$natural: 1}}).toArray(),
-                 coll.aggregate(pipeline).toArray()),
-       () => {
-           print(`Results mismatch for $group query. Running resultsEq with verbose`);
-           resultsEq(expectedResults, coll.aggregate(pipeline).toArray(), true);
-       });
+// Now test grouping semantics. Grouping limits the set of paths visible downstream which should
+// allow column scan plans.
+(function testGroup() {
+    // Sanity check that we are comparing the plans we expect to be.
+    let pipeline = [
+        {$group: {_id: "$a.b.c", docs: {$push: "$num"}}},
+        {$set: {docs: {$sortArray: {input: "$docs", sortBy: 1}}}}
+    ];
+    let naturalExplain = coll.explain().aggregate(pipeline, {hint: {$natural: 1}});
+    assert(aggPlanHasStage(naturalExplain, "COLLSCAN"), naturalExplain);
 
-// For readers who are taking on the massachistic task of trying to
-// verify that these results are in fact expected, the major expectations are that all arrays are
-// traversed and output as the "structure" EXCEPT if there's a doubly nested array without any
-// intervening path as in {a: [[{b: {c: 1}}]]}.
-const expectedResults = [
-    {_id: "scalar", docs: [8]},
-    {_id: ["scalar", "scalar2"], docs: [21]},
-    {_id: ["scalar"], docs: [11, 20, 23, 47, 50, 59, 63]},
-    {_id: [1, 2], docs: [93]},
-    {_id: [1, []], docs: [90]},
-    {_id: [1], docs: [86, 87, 88, 89]},
-    {_id: [["scalar"]], docs: [51, 67, 72]},
-    {_id: [[1, 2], [{}], 2], docs: [10]},
-    {_id: [[1, 2]], docs: [92]},
-    {_id: [[1, {}, 2]], docs: [61, 65]},
-    {_id: [[1]], docs: [84, 85]},
-    {_id: [[["scalar"]]], docs: [52, 53]},
-    {_id: [[[1, 2], [{}], 2]], docs: [22, 24, 25, 48]},
-    {_id: [[[1, {}, 2]]], docs: [69, 73]},
-    {_id: [[[]]], docs: [64]},
-    {_id: [[], []], docs: [91]},
-    // Note "$a.b.c" does not descend into double (directly nested) arrays as in 42,45. Might have
-    // expected [[[]]]. Similarly in 56,57, it does not find the "c" values "hidden" within a
-    // directly-nested array.
-    {_id: [[]], docs: [39, 40, 41, 42, 43, 44, 45, 54, 55, 56, 57, 66, 70, 74, 75, 76]},
-    {_id: [[null]], docs: [71]},
-    {_id: [[{x: 1}]], docs: [68]},
-    {
-        _id: [],
-        docs: [
-            13, 14, 15, 16, 17, 18, 19, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-            36, 37, 38, 46, 49, 58, 62, 77, 78, 79, 80, 81, 82, 83, 94, 95
-        ]
-    },
-    {_id: [{x: 1}], docs: [60]},
-    {_id: null, docs: [0, 1, 2, 3, 4, 5, 6, 7, 9]},
-    {_id: {x: 1}, docs: [12]},
-];
+    let nonHintedExplain = coll.explain().aggregate(pipeline);
+    assert(aggPlanHasStage(nonHintedExplain, "COLUMN_SCAN"), nonHintedExplain);
+    assert(!aggPlanHasStage(nonHintedExplain, "PROJECTION_DEFAULT"), nonHintedExplain);
+    assert(!aggPlanHasStage(nonHintedExplain, "PROJECTION_SIMPLE"), nonHintedExplain);
 
-assert(resultsEq(expectedResults, coll.aggregate(pipeline).toArray()), () => {
-    print(`Results mismatch for $group query. Actual results: ${
-        tojson(coll.aggregate(pipeline).toArray())} Running resultsEq with verbose`);
-    resultsEq(expectedResults, coll.aggregate(pipeline).toArray(), true);
-});
+    assert(resultsEq(coll.aggregate(pipeline, {hint: {$natural: 1}}).toArray(),
+                     coll.aggregate(pipeline).toArray()),
+           () => {
+               print(`Results mismatch for $group query. Running resultsEq with verbose`);
+               resultsEq(expectedResults, coll.aggregate(pipeline).toArray(), true);
+           });
+
+    // For readers who are taking on the massachistic task of trying to
+    // verify that these results are in fact expected, the major expectations are that all arrays
+    // are traversed and output as the "structure" EXCEPT if there's a doubly nested array without
+    // any intervening path as in {a: [[{b: {c: 1}}]]}.
+    const expectedResults = [
+        {_id: "scalar", docs: [8]},
+        {_id: ["scalar", "scalar2"], docs: [21]},
+        {_id: ["scalar"], docs: [11, 20, 23, 47, 50, 59, 63]},
+        {_id: [1, 2], docs: [93]},
+        {_id: [1, []], docs: [90]},
+        {_id: [1], docs: [86, 87, 88, 89]},
+        {_id: [["scalar"]], docs: [51, 67, 72]},
+        {_id: [[1, 2], [{}], 2], docs: [10]},
+        {_id: [[1, 2]], docs: [92]},
+        {_id: [[1, {}, 2]], docs: [61, 65]},
+        {_id: [[1]], docs: [84, 85]},
+        {_id: [[["scalar"]]], docs: [52, 53]},
+        {_id: [[[1, 2], [{}], 2]], docs: [22, 24, 25, 48]},
+        {_id: [[[1, {}, 2]]], docs: [69, 73]},
+        {_id: [[[]]], docs: [64]},
+        {_id: [[], []], docs: [91]},
+        // Note "$a.b.c" does not descend into double (directly nested) arrays as in 42,45. Might
+        // have expected [[[]]]. Similarly in 56,57, it does not find the "c" values "hidden" within
+        // a directly-nested array.
+        {_id: [[]], docs: [39, 40, 41, 42, 43, 44, 45, 54, 55, 56, 57, 66, 70, 74, 75, 76]},
+        {_id: [[null]], docs: [71]},
+        {_id: [[{x: 1}]], docs: [68]},
+        {
+            _id: [],
+            docs: [
+                13, 14, 15, 16, 17, 18, 19, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
+                36, 37, 38, 46, 49, 58, 62, 77, 78, 79, 80, 81, 82, 83, 94, 95
+            ]
+        },
+        {_id: [{x: 1}], docs: [60]},
+        {_id: null, docs: [0, 1, 2, 3, 4, 5, 6, 7, 9]},
+        {_id: {x: 1}, docs: [12]},
+    ];
+
+    assert(resultsEq(expectedResults, coll.aggregate(pipeline).toArray()), () => {
+        print(`Results mismatch for $group query. Actual results: ${
+            tojson(coll.aggregate(pipeline).toArray())} Running resultsEq with verbose`);
+        resultsEq(expectedResults, coll.aggregate(pipeline).toArray(), true);
+    });
+})();
 })();
