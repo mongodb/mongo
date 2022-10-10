@@ -34,6 +34,7 @@
 
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/background.h"
@@ -201,6 +202,20 @@ public:
     void notifyWaiters();
 
     /**
+     * Records the connection waittime in the connAcquisitionWaitTime histogram
+     */
+    inline void recordConnectionWaitTime(Date_t requestedAt) {
+        _connAcquisitionWaitTimeStats.increment(Date_t::now() - requestedAt);
+    }
+
+    /**
+     * Returns the connAcquisitionWaitTime histogram
+     */
+    const executor::ConnectionWaitTimeHistogram& connectionWaitTimeStats() const {
+        return _connAcquisitionWaitTimeStats;
+    }
+
+    /**
      * Shuts down this pool, notifying all waiters.
      */
     void shutdown();
@@ -245,6 +260,8 @@ private:
 
     // Whether our parent DBConnectionPool object is in destruction
     bool _parentDestroyed;
+
+    executor::ConnectionWaitTimeHistogram _connAcquisitionWaitTimeStats{};
 
     stdx::condition_variable _cv;
 
@@ -390,9 +407,12 @@ private:
 
     DBConnectionPool(DBConnectionPool& p);
 
-    DBClientBase* _get(const std::string& ident, double socketTimeout);
+    DBClientBase* _get(const std::string& ident, double socketTimeout, Date_t& connRequestedAt);
 
-    DBClientBase* _finishCreate(const std::string& ident, double socketTimeout, DBClientBase* conn);
+    DBClientBase* _finishCreate(const std::string& ident,
+                                double socketTimeout,
+                                DBClientBase* conn,
+                                Date_t& connRequestedAt);
 
     struct PoolKey {
         PoolKey(const std::string& i, double t) : ident(i), timeout(t) {}
