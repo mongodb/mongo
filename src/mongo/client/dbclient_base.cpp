@@ -538,11 +538,13 @@ list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& 
 
 vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
                                                const bool nameOnly,
-                                               const bool authorizedDatabases) {
+                                               const bool authorizedDatabases,
+                                               const bool useListDatabasesForAllTenants) {
     vector<BSONObj> infos;
 
     BSONObjBuilder bob;
-    bob.append("listDatabases", 1);
+    useListDatabasesForAllTenants ? bob.append("listDatabasesForAllTenants", 1)
+                                  : bob.append("listDatabases", 1);
     bob.append("filter", filter);
 
     if (nameOnly) {

@@ -123,18 +123,16 @@ public:
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
                 auto tid = cmd.getDbName().tenantId();
-                // TODO SERVER-70098: Uncomment this when AllDatabasesCloner uses
-                // listDatabsesForAllTenants
-                // if (gMultitenancySupport &&
-                //     serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                //     gFeatureFlagRequireTenantID.isEnabled(
-                //         serverGlobalParams.featureCompatibility) &&
-                //     !tid) {
-                //     dbNames = {};
-                // } else {
-                //     dbNames = storageEngine->listDatabases(tid);
-                // }
-                dbNames = storageEngine->listDatabases(tid);
+
+                if (gMultitenancySupport &&
+                    serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                    gFeatureFlagRequireTenantID.isEnabled(
+                        serverGlobalParams.featureCompatibility) &&
+                    !tid) {
+                    dbNames = {};
+                } else {
+                    dbNames = storageEngine->listDatabases(tid);
+                }
             }
             std::vector<ListDatabasesReplyItem> items;
             int64_t totalSize = list_databases::setReplyItems(opCtx,

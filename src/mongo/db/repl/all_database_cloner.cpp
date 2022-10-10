@@ -33,9 +33,11 @@
 #include <algorithm>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/repl/all_database_cloner.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
@@ -140,7 +142,17 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::getInitialSyncIdStage() {
 }
 
 BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
-    auto databasesArray = getClient()->getDatabaseInfos(BSONObj(), true /* nameOnly */);
+    std::vector<mongo::BSONObj> databasesArray;
+    if (gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+        databasesArray = getClient()->getDatabaseInfos(BSONObj(),
+                                                       true /* nameOnly */,
+                                                       false /*authorizedDatabases*/,
+                                                       true /*useListDatabsesForAllTenants*/);
+    } else {
+        databasesArray = getClient()->getDatabaseInfos(BSONObj(), true /* nameOnly */);
+    }
+
     for (const auto& dbBSON : databasesArray) {
         if (!dbBSON.hasField("name")) {
             LOGV2_DEBUG(21055,

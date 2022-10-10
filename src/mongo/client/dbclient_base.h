@@ -404,10 +404,12 @@ public:
      * 'filter': A filter for the results
      * 'nameOnly': Only return the names of the databases
      * 'authorizedDatabases': Only return the databases the user is authorized on
+     * 'useListDatabasesForAllTenants': Use command listDatabasesForAllTenants
      */
     std::vector<BSONObj> getDatabaseInfos(const BSONObj& filter = BSONObj(),
                                           bool nameOnly = false,
-                                          bool authorizedDatabases = false);
+                                          bool authorizedDatabases = false,
+                                          bool useListDatabasesForAllTenants = false);
 
     bool exists(const std::string& ns);
 

@@ -90,18 +90,13 @@ function runTest(featureFlagRequireTenantId) {
         expectedDbs.push("config");
         expectedDbs.push("local");
 
-        // TODO SERVER-70098: Return an empty list if featureFlagRequireTenantId is enabled and no
-        // $tenant is passed to the listDatabases command. Return all databases if
-        // featureFlagRequireTenantId is disabled and no $tenant is passed to the listDatabases
-        // command. if (featureFlagRequireTenantId) {
-        //     assert.eq(0, allDbs.databases.length);
-        //     assert(arrayEq([], allDbs.databases.map(db => db.name)));
-        // } else {
-        //     assert.eq(5, allDbs.databases.length);
-        //     assert(arrayEq(expectedDbs, allDbs.databases.map(db => db.name)));
-        // }
-        assert.eq(5, allDbs.databases.length);
-        assert(arrayEq(expectedDbs, allDbs.databases.map(db => db.name)));
+        if (featureFlagRequireTenantId) {
+            assert.eq(0, allDbs.databases.length);
+            assert(arrayEq([], allDbs.databases.map(db => db.name)));
+        } else {
+            assert.eq(5, allDbs.databases.length);
+            assert(arrayEq(expectedDbs, allDbs.databases.map(db => db.name)));
+        }
     }
 
     // Test insert, agg, find, getMore, and explain commands.
