@@ -810,11 +810,6 @@ functions:
       display_name: Pip Requirements
 
   "send benchmark results":
-  - command: json.send
-    params:
-      name: perf
-      file: src/perf.json
-
   - command: perf.send
     params:
       aws_key: ${aws_key}
