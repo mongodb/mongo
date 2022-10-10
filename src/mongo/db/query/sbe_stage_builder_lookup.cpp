@@ -322,6 +322,25 @@ std::pair<SlotId /* keyValueSlot */, std::unique_ptr<sbe::PlanStage>> buildForei
     return {keyValueSlot, std::move(currentStage)};
 }
 
+std::pair<SlotId /* keyValuesSetSlot */, EvalStage> replaceEmptySetWithNullArray(
+    EvalStage innerStage,
+    SlotId innerRecordSlot,
+    SlotIdGenerator& slotIdGenerator,
+    const PlanNodeId nodeId) {
+    auto [arrayWithNullTag, arrayWithNullVal] = makeNewArray();
+    auto arrayWithNull = makeConstant(arrayWithNullTag, arrayWithNullVal);
+    value::Array* arrayWithNullView = getArrayView(arrayWithNullVal);
+    arrayWithNullView->push_back(TypeTags::Null, 0);
+    auto nonEmptySetSlot = slotIdGenerator.generate();
+    return {nonEmptySetSlot,
+            makeProject(std::move(innerStage),
+                        nodeId,
+                        nonEmptySetSlot,
+                        makeE<EIf>(makeFunction("isArrayEmpty", makeVariable(innerRecordSlot)),
+                                   std::move(arrayWithNull),
+                                   makeVariable(innerRecordSlot)))};
+}
+
 // Creates stages for traversing path 'fp' in the record from 'inputSlot'. Puts the set of key
 // values into 'keyValuesSetSlot. For example, if the record in the 'inputSlot' is:
 //     {a: [{b:[1,[2,3]]}, {b:4}, {b:1}, {b:2}]},
@@ -359,35 +378,21 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
     // that contains a single 'null' value. The set of foreign key values also can be empty but it
     // should produce no matches so we leave it empty.
     if (joinSide == JoinSide::Local) {
-        auto [arrayWithNullTag, arrayWithNullVal] = makeNewArray();
-        std::unique_ptr<EExpression> arrayWithNull =
-            makeConstant(arrayWithNullTag, arrayWithNullVal);
-        value::Array* arrayWithNullView = getArrayView(arrayWithNullVal);
-        arrayWithNullView->push_back(TypeTags::Null, 0);
-
-        std::unique_ptr<EExpression> isNonEmptySetExpr =
-            makeBinaryOp(EPrimBinary::greater,
-                         makeFunction("getArraySize", makeVariable(keyValuesSetSlot)),
-                         makeConstant(TypeTags::NumberInt32, 0));
-
-        SlotId nonEmptySetSlot = slotIdGenerator.generate();
-        packedKeyValuesStage = makeProject(std::move(packedKeyValuesStage),
-                                           nodeId,
-                                           nonEmptySetSlot,
-                                           makeE<EIf>(std::move(isNonEmptySetExpr),
-                                                      makeVariable(keyValuesSetSlot),
-                                                      std::move(arrayWithNull)));
-        keyValuesSetSlot = nonEmptySetSlot;
+        std::tie(keyValuesSetSlot, packedKeyValuesStage) = replaceEmptySetWithNullArray(
+            std::move(packedKeyValuesStage),  // NOLINT(bugprone-use-after-move)
+            keyValuesSetSlot,
+            slotIdGenerator,
+            nodeId);
     }
 
     // Attach the set of key values to the original local record.
-    std::unique_ptr<sbe::PlanStage> nljLocalWithKeyValuesSet =
-        makeS<LoopJoinStage>(std::move(inputStage),
-                             packedKeyValuesStage.extractStage(nodeId),
-                             makeSV(recordSlot) /* outerProjects */,
-                             makeSV(recordSlot) /* outerCorrelated */,
-                             nullptr /* predicate */,
-                             nodeId);
+    std::unique_ptr<sbe::PlanStage> nljLocalWithKeyValuesSet = makeS<LoopJoinStage>(
+        std::move(inputStage),
+        packedKeyValuesStage.extractStage(nodeId),  // NOLINT(bugprone-use-after-move)
+        makeSV(recordSlot) /* outerProjects */,
+        makeSV(recordSlot) /* outerCorrelated */,
+        nullptr /* predicate */,
+        nodeId);
 
     return {keyValuesSetSlot, std::move(nljLocalWithKeyValuesSet)};
 }
@@ -457,51 +462,124 @@ std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeign
         makeLimitSkip(std::move(unionStage), nodeId, 1 /* limit */).extractStage(nodeId));
 }
 
-// Creates stages that extract key values from the given foreign record, compares them to the local
-// key values and groups the matching records into an array.
+/**
+ * Build keys set for NLJ foreign side using traverseF expression. Creates stages that extract key
+ * values from the given foreign record, compares them to the local key values and groups the
+ * matching records into an array.
+ *
+ * The traverseF expression will iterate each key value, including terminal arrays as
+ * a whole value, and compare it against local key set 'localKeySlot'. For example,
+ * if the record in the 'foreignRecordSlot' is:
+ *     {a: [{b:[1,[2,3]]}, {b:4}, {b:1}, {b:2}]},
+ * path "a.b" will be iterated as: 1, [2,3], [1, [2, 3]], 4, 1, 2.
+ * Scalars inside arrays on the path are skipped, that is, if the record in the 'foreignRecordSlot'
+ * is:  {a: [42, {b:{c:1}}, {b: [41,42,{c:2}]}, {b:42}, {b:{c:3}}]},
+ * path "a.b.c" will be iterated as: 1, 2, null, 3.
+ * Replaces other missing terminals with 'null', that is, if the record in the 'foreignRecordSlot'
+ * is:  {a: [{b:1}, {b:[]}, {no_b:42}, {b:2}]},
+ * path "a.b" will be iterated as: 1, [], null, 2.
+ *
+ * Here is an example plan for the NLJ inner side:
+ * limit 1
+ * union [unionOutputSlot] [
+ *   branch0[projOutputSlot]
+ *     project [projOutputSlot = getElement(groupSlot, 0)]
+ *     group [] [groupSlot = addToArrayCapped(foreignRecordSlot, 104857600)]
+ *     filter {traverseF (
+ *       let [
+ *           l11.0 = fillEmpty (getField (foreignRecordSlot, "a"), null)
+ *       ]
+ *       in
+ *           if typeMatch (l11.0, 24)
+ *           then l11.0
+ *           else Nothing
+ *       , lambda(l3.0) {
+ *           if fillEmpty (isObject (l3.0), true)
+ *           then traverseF (
+ *             fillEmpty (getField (l3.0, "b"), null), lambda(l2.0) {isMember (l2.0, localKeySlot)},
+ *             true),
+ *           else false
+ *        }, false)}
+ *     scan foreignRecordSlot recordIdSlot none none none none [] @uuid true false
+ * branch1[emptySlot] project [emptySlot = []] limit 1 coscan
+ * ]
+ */
 std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildForeignMatches(
-    SlotId localKeysSetSlot,
+    SlotId localKeySlot,
     std::unique_ptr<sbe::PlanStage> foreignStage,
     SlotId foreignRecordSlot,
     const FieldPath& foreignFieldName,
     boost::optional<SlotId> collatorSlot,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator,
+    FrameIdGenerator& frameIdGenerator,
     bool allowDiskUse) {
-    // 'buildForeignKeysStream()' does not take a child stage. To connect the extraction of key
-    // values it does to the 'foreignStage' we'll use an 'nlj', inner branch of which will do the
-    // key value extraction and filtering. It's possible that the same foreign record contains
-    // multiple matching values and to avoid duplication of the record we must limit the inner
-    // branch to '1'.
-    auto [foreignValueSlot, currentRootStage] =
-        buildForeignKeysStream(foreignRecordSlot, foreignFieldName, nodeId, slotIdGenerator);
+    auto frameId = frameIdGenerator.generate();
+    auto lambdaArg = makeVariable(frameId, 0);
+    auto filter = collatorSlot
+        ? makeFunction("collIsMember"_sd,
+                       makeVariable(*collatorSlot),
+                       lambdaArg->clone(),
+                       makeVariable(localKeySlot))
+        : makeFunction("isMember"_sd, lambdaArg->clone(), makeVariable(localKeySlot));
 
-    currentRootStage =
-        makeLimitTree(makeS<FilterStage<false /*IsConst*/>>(
-                          std::move(currentRootStage),
-                          collatorSlot ? makeFunction("collIsMember",
-                                                      makeVariable(*collatorSlot),
-                                                      makeVariable(foreignValueSlot),
-                                                      makeVariable(localKeysSetSlot))
-                                       : makeFunction("isMember",
-                                                      makeVariable(foreignValueSlot),
-                                                      makeVariable(localKeysSetSlot)),
-                          nodeId),
-                      nodeId,
-                      1 /* take the foreign record once, even if multiple key values match */);
+    // Recursively create traverseF expressions to iterate elements in 'foreignRecordSlot' with path
+    // 'foreignFieldName', and check if key is in set 'localKeySlot'.
+    //
+    // If a non-terminal field is an array, we will ignore any element that is not an object inside
+    // the array.
+    const int32_t foreignPathLength = foreignFieldName.getPathLength();
+    for (int32_t i = foreignPathLength - 1; i >= 0; --i) {
+        auto arrayLambda = makeE<ELocalLambda>(frameId, std::move(filter));
+        frameId = frameIdGenerator.generate();
+        lambdaArg = i == 0 ? makeVariable(foreignRecordSlot) : makeVariable(frameId, 0);
 
-    currentRootStage = makeS<LoopJoinStage>(std::move(foreignStage) /* outer */,
-                                            std::move(currentRootStage) /* inner */,
-                                            makeSV(foreignRecordSlot) /* outerProjects */,
-                                            makeSV(foreignRecordSlot) /* outerCorrelated */,
-                                            nullptr,
-                                            nodeId);
+        auto getFieldOrNull = makeFillEmptyNull(makeFunction(
+            "getField"_sd, lambdaArg->clone(), makeConstant(foreignFieldName.getFieldName(i))));
+
+        // Non object/array field will be converted into Nothing, passing along recursive traverseF
+        // and will be treated as null to compared against local key set.
+        if (i != foreignPathLength - 1) {
+            getFieldOrNull = makeLocalBind(
+                &frameIdGenerator,
+                [&](sbe::EVariable var) {
+                    return sbe::makeE<sbe::EIf>(
+                        makeFunction("typeMatch"_sd,
+                                     var.clone(),
+                                     makeConstant(sbe::value::TypeTags::NumberInt64,
+                                                  sbe::value::bitcastFrom<int64_t>(
+                                                      getBSONTypeMask(BSONType::Array) |
+                                                      getBSONTypeMask(BSONType::Object)))),
+                        var.clone(),
+                        makeConstant(sbe::value::TypeTags::Nothing, 0));
+                },
+                std::move(getFieldOrNull));
+        }
+
+        filter = makeFunction(
+            "traverseF"_sd,
+            std::move(getFieldOrNull),
+            std::move(arrayLambda),
+            makeConstant(TypeTags::Boolean, i == foreignPathLength - 1) /*compareArray*/);
+
+        if (i > 0) {
+            // Ignoring the nulls produced by missing field in array.
+            filter =
+                sbe::makeE<sbe::EIf>(makeFunction("fillEmpty"_sd,
+                                                  makeFunction("isObject"_sd, lambdaArg->clone()),
+                                                  makeConstant(TypeTags::Boolean, true)),
+                                     std::move(filter),
+                                     makeConstant(TypeTags::Boolean, false));
+        }
+    }
 
     // Group the matched foreign documents into a list.
     // It creates a union stage internally so that when there's no matching foreign records, an
     // empty array will be returned.
     return buildForeignMatchedArray(
-        EvalStage{std::move(currentRootStage), makeSV(foreignRecordSlot)},
+        makeFilter<false /*IsConst*/>(EvalStage{std::move(foreignStage), makeSV(foreignRecordSlot)},
+                                      std::move(filter),
+                                      nodeId),
         foreignRecordSlot,
         nodeId,
         slotIdGenerator,
@@ -515,10 +593,11 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
     const FieldPath& localFieldName,
     std::unique_ptr<sbe::PlanStage> foreignStage,
     SlotId foreignRecordSlot,
-    StringData foreignFieldName,
+    const FieldPath& foreignFieldName,
     boost::optional<SlotId> collatorSlot,
     const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator) {
+    SlotIdGenerator& slotIdGenerator,
+    FrameIdGenerator& frameIdGenerator) {
     CurOp::get(state.opCtx)->debug().nestedLoopJoin += 1;
 
     // Build the outer branch that produces the set of local key values.
@@ -540,6 +619,7 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
                                                                     collatorSlot,
                                                                     nodeId,
                                                                     slotIdGenerator,
+                                                                    frameIdGenerator,
                                                                     state.allowDiskUse);
 
     // 'innerRootStage' should not participate in trial run tracking as the number of reads that
@@ -556,7 +636,6 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
                              makeSV(localKeySlot) /* outerCorrelated */,
                              nullptr /* predicate */,
                              nodeId);
-
     return {matchedRecordsSlot, std::move(nlj)};
 }
 
@@ -864,6 +943,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                                                      collatorSlot,
                                                                      nodeId,
                                                                      slotIdGenerator,
+                                                                     frameIdGenerator,
                                                                      state.allowDiskUse);
 
     // 'foreignGroupStage' should not participate in trial run tracking as the number of reads
@@ -953,7 +1033,8 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildLookupS
     const FieldPath& foreignFieldName,
     boost::optional<SlotId> collatorSlot,
     const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator) {
+    SlotIdGenerator& slotIdGenerator,
+    FrameIdGenerator& frameIdGenerator) {
     switch (lookupStrategy) {
         case EqLookupNode::LookupStrategy::kNestedLoopJoin:
             return buildNljLookupStage(state,
@@ -962,10 +1043,11 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildLookupS
                                        localFieldName,
                                        std::move(foreignStage),
                                        foreignRecordSlot,
-                                       foreignFieldName.fullPath(),
+                                       foreignFieldName,
                                        collatorSlot,
                                        nodeId,
-                                       slotIdGenerator);
+                                       slotIdGenerator,
+                                       frameIdGenerator);
         case EqLookupNode::LookupStrategy::kHashJoin:
             return buildHashJoinLookupStage(state,
                                             std::move(localStage),
@@ -1138,7 +1220,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                         eqLookupNode->joinFieldForeign,
                                         collatorSlot,
                                         eqLookupNode->nodeId(),
-                                        _slotIdGenerator);
+                                        _slotIdGenerator,
+                                        _frameIdGenerator);
             }
             default:
                 MONGO_UNREACHABLE_TASSERT(5842605);
