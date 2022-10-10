@@ -86,6 +86,9 @@ st.rs0.getReplSetConfig().members.forEach(node => {
     }
 });
 
+jsTestLog("Wait for the electable secondary to reach the SECONDARY after initial sync.");
+st.rs0.waitForState(electableRsSecondary, ReplSetTest.State.SECONDARY);
+
 // Terminate the primary and wait for the secondary to step up, trigger a topology change
 jsTestLog("Terminating the primary.");
 st.rs0.stop(rsPrimary, 15);
