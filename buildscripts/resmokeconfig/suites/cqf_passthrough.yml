@@ -35,6 +35,7 @@ selector:
   - jstests/core/plan_cache_shell_helpers.js
   - jstests/core/plan_cache_stats_shard_and_host.js
   - jstests/core/profile_query_hash.js
+  - jstests/core/sbe/from_plan_cache_flag.js
   - jstests/core/sbe/plan_cache_sbe_with_or_queries.js
   - jstests/core/sbe_plan_cache_autoparameterize_collscan.js
   # TODO SERVER-62034 Prevent distinct() from using CQF.

@@ -831,6 +831,7 @@ void OpDebug::report(OperationContext* opCtx,
     OPDEBUG_TOATTR_HELP_BOOL(hasSortStage);
     OPDEBUG_TOATTR_HELP_BOOL(usedDisk);
     OPDEBUG_TOATTR_HELP_BOOL(fromMultiPlanner);
+    OPDEBUG_TOATTR_HELP_BOOL(fromPlanCache);
     if (replanReason) {
         bool replanned = true;
         OPDEBUG_TOATTR_HELP_BOOL(replanned);
@@ -999,6 +1000,7 @@ void OpDebug::append(OperationContext* opCtx,
     OPDEBUG_APPEND_BOOL(b, hasSortStage);
     OPDEBUG_APPEND_BOOL(b, usedDisk);
     OPDEBUG_APPEND_BOOL(b, fromMultiPlanner);
+    OPDEBUG_APPEND_BOOL(b, fromPlanCache);
     if (replanReason) {
         bool replanned = true;
         OPDEBUG_APPEND_BOOL(b, replanned);
@@ -1228,6 +1230,9 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     addIfNeeded("fromMultiPlanner", [](auto field, auto args, auto& b) {
         OPDEBUG_APPEND_BOOL2(b, field, args.op.fromMultiPlanner);
     });
+    addIfNeeded("fromPlanCache", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.fromPlanCache);
+    });
     addIfNeeded("replanned", [](auto field, auto args, auto& b) {
         if (args.op.replanReason) {
             OPDEBUG_APPEND_BOOL2(b, field, true);
@@ -1443,6 +1448,7 @@ void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     sortTotalDataSizeBytes = planSummaryStats.sortTotalDataSizeBytes;
     keysSorted = planSummaryStats.keysSorted;
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
+    fromPlanCache = planSummaryStats.fromPlanCache;
     replanReason = planSummaryStats.replanReason;
 }
 

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/plan_executor_sbe.h"
@@ -102,9 +101,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         _yieldPolicy->clearRegisteredPlans();
         _yieldPolicy->registerPlan(_root.get());
     }
-
     const auto isMultiPlan = candidates.plans.size() > 1;
-
+    const auto isCachedCandidate = candidates.winner().isCachedCandidate;
     if (!_cq || !_cq->getExpCtx()->explain) {
         // If we're not in explain mode, there is no need to keep rejected candidate plans around.
         candidates.plans.clear();
@@ -123,6 +121,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   std::move(optimizerData),
                                                   std::move(candidates.plans),
                                                   isMultiPlan,
+                                                  isCachedCandidate,
                                                   _rootData.debugInfo);
 }
 

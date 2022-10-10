@@ -57,6 +57,7 @@ std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                                     bool isMultiPlan) {
     // Pre-compute Debugging info for explain use.
+
     auto debugInfoSBE = std::make_shared<const plan_cache_debug_info::DebugInfoSBE>(
         plan_cache_util::buildDebugInfo(solution));
     return std::make_unique<PlanExplainerSBE>(root,
@@ -65,6 +66,7 @@ std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                               std::move(optimizerData),
                                               std::move(rejectedCandidates),
                                               isMultiPlan,
+                                              false, /* isFromPlanCache */
                                               debugInfoSBE);
 }
 
@@ -75,6 +77,7 @@ std::unique_ptr<PlanExplainer> make(
     std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
     bool isMultiPlan,
+    bool isFromPlanCache,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfoSBE) {
     // TODO SERVER-64882: Consider invariant(debugInfoSBE) as we may not need to create a
     // DebugInfoSBE from QuerySolution after the feature flag is removed. We currently need it
@@ -90,6 +93,7 @@ std::unique_ptr<PlanExplainer> make(
                                               std::move(optimizerData),
                                               std::move(rejectedCandidates),
                                               isMultiPlan,
+                                              isFromPlanCache,
                                               debugInfoSBE);
 }
 }  // namespace mongo::plan_explainer_factory

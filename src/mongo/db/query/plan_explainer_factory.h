@@ -61,5 +61,6 @@ std::unique_ptr<PlanExplainer> make(
     std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
     bool isMultiPlan,
+    bool isFromPlanCache,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo);
 }  // namespace mongo::plan_explainer_factory

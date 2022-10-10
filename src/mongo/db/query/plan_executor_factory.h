@@ -118,7 +118,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     NamespaceString nss,
-    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
+    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+    bool isFromPlanCache);
 
 /**
  * Similar to the factory function above in that it also constructs an executor for the winning SBE

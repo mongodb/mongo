@@ -110,6 +110,8 @@ struct PlanSummaryStats {
     // candidates?
     bool fromMultiPlanner = false;
 
+    // Was this plan recovered from the cache?
+    bool fromPlanCache = false;
     // Was a replan triggered during the execution of this query?
     boost::optional<std::string> replanReason;
 

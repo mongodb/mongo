@@ -521,10 +521,17 @@ public:
     std::tuple<std::unique_ptr<PlanStage>, std::unique_ptr<QuerySolution>> extractResultData() {
         return std::make_tuple(std::move(_root), std::move(_solution));
     }
+    void setRecoveredFromPlanCache(bool val) {
+        _fromPlanCache = val;
+    }
+    bool isRecoveredFromPlanCache() {
+        return _fromPlanCache;
+    }
 
 private:
     std::unique_ptr<PlanStage> _root;
     std::unique_ptr<QuerySolution> _solution;
+    bool _fromPlanCache{false};
 };
 
 /**
@@ -601,12 +608,21 @@ public:
         _recoveredPinnedCacheEntry = pinnedEntry;
     }
 
+    void setRecoveredFromPlanCache(bool val) {
+        _fromPlanCache = val;
+    }
+
+    bool isRecoveredFromPlanCache() {
+        return _fromPlanCache;
+    }
+
 private:
     QuerySolutionVector _solutions;
     PlanStageVector _roots;
     boost::optional<size_t> _decisionWorks;
     bool _needSubplanning{false};
     bool _recoveredPinnedCacheEntry{false};
+    bool _fromPlanCache{false};
 };
 
 /**
@@ -1156,6 +1172,7 @@ protected:
                 result->setDecisionWorks(cacheEntry->decisionWorks);
                 result->setRecoveredPinnedCacheEntry(cacheEntry->isPinned());
                 result->emplace(std::make_pair(std::move(root), std::move(stageData)));
+                result->setRecoveredFromPlanCache(true);
                 return result;
             }
         }
@@ -1197,7 +1214,7 @@ protected:
 
                 result->emplace(std::move(execTree), std::move(querySolution));
                 result->setDecisionWorks(cs->decisionWorks);
-
+                result->setRecoveredFromPlanCache(true);
                 return result;
             }
         }
@@ -1308,7 +1325,7 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     invariant(numSolutions == 1);
 
     // If we have a single solution and the plan is not pinned or plan contains a hash_lookup stage,
-    // we will need we will need to do the runtime planning to check if the cached plan still
+    // we will need to do the runtime planning to check if the cached plan still
     // performs efficiently, or requires re-planning.
     tassert(6693503, "PlanStageData must be present", planStageData);
     const bool hasHashLookup = !planStageData->foreignHashJoinCollections.empty();
@@ -1411,7 +1428,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     // Prepare the SBE tree for execution.
     stage_builder::prepareSlotBasedExecutableTree(
         opCtx, root.get(), &data, *cq, collections, yieldPolicy.get(), true);
-
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),
                                        std::move(solutions[0]),
@@ -1420,7 +1436,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        collections,
                                        plannerParams.options,
                                        std::move(nss),
-                                       std::move(yieldPolicy));
+                                       std::move(yieldPolicy),
+                                       planningResult->isRecoveredFromPlanCache());
 }
 }  // namespace
 

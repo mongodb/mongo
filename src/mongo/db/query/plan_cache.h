@@ -706,8 +706,8 @@ private:
             // We do nothing.
             res.shouldBeCreated = false;
         } else if (newWorks > oldWorks) {
-            // This plan performed worse than expected. Rather than immediately overwriting the
-            // cache, lower the bar to what is considered good performance and keep the entry
+            // The cached plan performed worse than expected. Rather than immediately overwriting
+            // the cache, lower the bar to what is considered good performance and keep the entry
             // inactive.
 
             // Be sure that 'works' always grows by at least 1, in case its current
@@ -725,7 +725,7 @@ private:
             res.shouldBeCreated = true;
             res.increasedWorks.emplace(increasedWorks);
         } else {
-            // This plan performed just as well or better than we expected, based on the
+            // This cached plan performed just as well or better than we expected, based on the
             // inactive entry's works. We use this as an indicator that it's safe to
             // cache (as an active entry) the plan this query used for the future.
             if (callbacks) {

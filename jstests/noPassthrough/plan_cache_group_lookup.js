@@ -36,12 +36,15 @@ assert.commandWorked(db.setProfilingLevel(2));
  * Assert that the last aggregation command has a corresponding plan cache entry with the desired
  * properties. 'version' is 1 if it's classic cache, 2 if it's SBE cache. 'isActive' is true if the
  * cache entry is active. 'fromMultiPlanner' is true if the query part of aggregation has been
- * multi-planned. 'forcesClassicEngine' is true if the query is forced to use classic engine.
+ * multi-planned. 'fromPlanCache' is true if the winning plan was retrieved from the plan cache.
+ * 'forcesClassicEngine' is true if the query is forced to use classic engine.
  */
-function assertCacheUsage({version, fromMultiPlanner, isActive, forcesClassicEngine = false}) {
+function assertCacheUsage(
+    {version, fromMultiPlanner, fromPlanCache, isActive, forcesClassicEngine = false}) {
     const profileObj = getLatestProfilerEntry(
         db, {op: "command", "command.pipeline": {$exists: true}, ns: coll.getFullName()});
     assert.eq(fromMultiPlanner, !!profileObj.fromMultiPlanner, profileObj);
+    assert.eq(fromPlanCache, !!profileObj.fromPlanCache, profileObj);
 
     const entries = coll.getPlanCache().list();
     assert.eq(entries.length, 1, entries);
@@ -71,19 +74,34 @@ function assertCacheUsage({version, fromMultiPlanner, isActive, forcesClassicEng
 function testLoweredPipeline({pipeline, version, forcesClassicEngine = false}) {
     let results = coll.aggregate(pipeline).toArray();
     assert.eq(results.length, 1, results);
-    const entry = assertCacheUsage(
-        {version: version, fromMultiPlanner: true, isActive: false, forcesClassicEngine});
+    const entry = assertCacheUsage({
+        version: version,
+        fromMultiPlanner: true,
+        fromPlanCache: false,
+        isActive: false,
+        forcesClassicEngine
+    });
 
     results = coll.aggregate(pipeline).toArray();
     assert.eq(results.length, 1, results);
-    let nextEntry = assertCacheUsage(
-        {version: version, fromMultiPlanner: true, isActive: true, forcesClassicEngine});
+    let nextEntry = assertCacheUsage({
+        version: version,
+        fromMultiPlanner: true,
+        fromPlanCache: false,
+        isActive: true,
+        forcesClassicEngine
+    });
     assert.eq(entry.planCacheKey, nextEntry.planCacheKey, {entry, nextEntry});
 
     results = coll.aggregate(pipeline).toArray();
     assert.eq(results.length, 1, results);
-    nextEntry = assertCacheUsage(
-        {version: version, fromMultiPlanner: false, isActive: true, forcesClassicEngine});
+    nextEntry = assertCacheUsage({
+        version: version,
+        fromMultiPlanner: false,
+        fromPlanCache: true,
+        isActive: true,
+        forcesClassicEngine
+    });
     assert.eq(entry.planCacheKey, nextEntry.planCacheKey, {entry, nextEntry});
 
     return nextEntry;

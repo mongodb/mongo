@@ -251,6 +251,7 @@ public:
     // single solution).
     bool fromMultiPlanner{false};
 
+    bool fromPlanCache{false};
     // True if a replan was triggered during the execution of this operation.
     boost::optional<std::string> replanReason;
 

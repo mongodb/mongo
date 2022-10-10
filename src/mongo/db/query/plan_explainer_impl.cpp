@@ -722,6 +722,10 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
             const CachedPlanStats* cachedStats =
                 static_cast<const CachedPlanStats*>(cachedPlan->getSpecificStats());
             statsOut->replanReason = cachedStats->replanReason;
+            // Nonnull replanReason indicates cached plan was less effecient than expected and an
+            // alternative plan was chosen.
+            statsOut->replanReason ? statsOut->fromPlanCache = false
+                                   : statsOut->fromPlanCache = true;
         } else if (STAGE_MULTI_PLAN == stages[i]->stageType()) {
             statsOut->fromMultiPlanner = true;
         } else if (STAGE_COLLSCAN == stages[i]->stageType()) {

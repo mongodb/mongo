@@ -93,7 +93,6 @@ CandidatePlans CachedSolutionPlanner::plan(
                 _opCtx, _collections, _cq, *solutions[0], _yieldPolicy);
         }
     }
-
     // If the '_decisionReads' is not present then we do not run a trial period, keeping the current
     // plan.
     if (!_decisionReads) {
@@ -110,7 +109,9 @@ CandidatePlans CachedSolutionPlanner::plan(
                                                       std::move(roots[0].first),
                                                       std::move(roots[0].second),
                                                       false /* exitedEarly*/,
-                                                      Status::OK()}),
+                                                      Status::OK(),
+                                                      true,
+                                                      /*isFromPlanCache */}),
                 0};
     }
 
@@ -131,6 +132,7 @@ CandidatePlans CachedSolutionPlanner::plan(
         {},    /* optimizedData */
         {},    /* rejectedCandidates */
         false, /* isMultiPlan */
+        true,  /* isFromPlanCache */
         candidate.data.debugInfo
             ? std::make_unique<plan_cache_debug_info::DebugInfoSBE>(*candidate.data.debugInfo)
             : nullptr);
@@ -185,7 +187,9 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
                                          std::move(root),
                                          std::move(data),
                                          false /* exitedEarly*/,
-                                         Status::OK()};
+                                         Status::OK(),
+                                         true,
+                                         /*is Cached plan*/};
 
     ON_BLOCK_EXIT([rootPtr = candidate.root.get()] { rootPtr->detachFromTrialRunTracker(); });
 

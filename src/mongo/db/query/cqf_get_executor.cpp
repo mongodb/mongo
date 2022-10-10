@@ -342,7 +342,8 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
         MultipleCollectionAccessor(collection),
         QueryPlannerParams::Options::DEFAULT,
         nss,
-        std::move(yieldPolicy)));
+        std::move(yieldPolicy),
+        false /*isFromPlanCache*/));
     return planExec;
 }
 

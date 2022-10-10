@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <iostream>
 
 #include "mongo/platform/basic.h"
 
@@ -128,7 +129,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     NamespaceString nss,
-    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
+    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+    bool planIsFromCache) {
     auto&& [rootStage, data] = root;
 
     LOGV2_DEBUG(4822860,
@@ -137,17 +139,21 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 "slots"_attr = data.debugString(),
                 "stages"_attr = sbe::DebugPrinter{}.print(*rootStage));
 
-    return {{new PlanExecutorSBE(
-                 opCtx,
-                 std::move(cq),
-                 std::move(optimizerData),
-                 {makeVector<sbe::plan_ranker::CandidatePlan>(sbe::plan_ranker::CandidatePlan{
-                      std::move(solution), std::move(rootStage), std::move(data)}),
-                  0},
-                 plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
-                 std::move(nss),
-                 false,
-                 std::move(yieldPolicy)),
+    return {{new PlanExecutorSBE(opCtx,
+                                 std::move(cq),
+                                 std::move(optimizerData),
+                                 {makeVector<sbe::plan_ranker::CandidatePlan>(
+                                      sbe::plan_ranker::CandidatePlan{std::move(solution),
+                                                                      std::move(rootStage),
+                                                                      std::move(data),
+                                                                      false,
+                                                                      Status::OK(),
+                                                                      planIsFromCache}),
+                                  0},
+                                 plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
+                                 std::move(nss),
+                                 false,
+                                 std::move(yieldPolicy)),
              PlanExecutor::Deleter{opCtx}}};
 }
 
