@@ -427,7 +427,8 @@ long long RangeDeleterService::totalNumOfRegisteredTasks() {
 SharedSemiFuture<void> RangeDeleterService::registerTask(
     const RangeDeletionTask& rdt,
     SemiFuture<void>&& waitForActiveQueriesToComplete,
-    bool fromResubmitOnStepUp) {
+    bool fromResubmitOnStepUp,
+    bool pending) {
 
     if (disableResumableRangeDeleter.load()) {
         LOGV2_INFO(6872509,
@@ -439,10 +440,13 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
             .share();
     }
 
-    auto scheduleRangeDeletionChain = [&]() {
-        // Step 1: wait for ongoing queries retaining the range to drain
-        (void)std::move(waitForActiveQueriesToComplete)
-            .thenRunOn(_executor)
+    auto scheduleRangeDeletionChain = [&](SharedSemiFuture<void> pendingFuture) {
+        (void)pendingFuture.thenRunOn(_executor)
+            .then([this,
+                   waitForOngoingQueries = std::move(waitForActiveQueriesToComplete).share()]() {
+                // Step 1: wait for ongoing queries retaining the range to drain
+                return waitForOngoingQueries;
+            })
             .then([this, when = rdt.getWhenToClean()]() {
                 // Step 2: schedule wait for secondaries orphans cleanup delay
                 const auto delayForActiveQueriesOnSecondariesToComplete =
@@ -467,19 +471,23 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
 
     auto lock =
         fromResubmitOnStepUp ? _acquireMutexUnconditionally() : _acquireMutexFailIfServiceNotUp();
+
     auto [registeredTask, firstRegistration] =
         _rangeDeletionTasks[rdt.getCollectionUuid()].insert(std::make_shared<RangeDeletion>(rdt));
 
+    auto task = static_cast<RangeDeletion*>(registeredTask->get());
+
+    // Register the task on the service only once, duplicate registrations will join
     if (firstRegistration) {
-        scheduleRangeDeletionChain();
-    } else {
-        LOGV2_WARNING(6804200,
-                      "Tried to register duplicate range deletion task. This results in a no-op.",
-                      "collectionUUID"_attr = rdt.getCollectionUuid(),
-                      "range"_attr = rdt.getRange());
+        scheduleRangeDeletionChain(task->getPendingFuture());
     }
 
-    return static_cast<RangeDeletion*>(registeredTask->get())->getCompletionFuture();
+    // Allow future chain to progress in case the task is flagged as non-pending
+    if (!pending) {
+        task->clearPending();
+    }
+
+    return task->getCompletionFuture();
 }
 
 void RangeDeleterService::deregisterTask(const UUID& collUUID, const ChunkRange& range) {

@@ -30,6 +30,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -82,18 +83,20 @@ public:
     }
 
     void appendInfoForServerStatus(BSONObjBuilder* builder) {
-        auto totalNumberOfRangesScheduledForDeletion = ([this] {
-            stdx::lock_guard lg(_mutex);
-            return std::accumulate(_collections.begin(),
-                                   _collections.end(),
-                                   0LL,
-                                   [](long long total, const auto& coll) {
-                                       return total +
-                                           coll.second->numberOfRangesScheduledForDeletion();
-                                   });
-        })();
+        if (!mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+            auto totalNumberOfRangesScheduledForDeletion = ([this] {
+                stdx::lock_guard lg(_mutex);
+                return std::accumulate(_collections.begin(),
+                                       _collections.end(),
+                                       0LL,
+                                       [](long long total, const auto& coll) {
+                                           return total +
+                                               coll.second->numberOfRangesScheduledForDeletion();
+                                       });
+            })();
 
-        builder->appendNumber("rangeDeleterTasks", totalNumberOfRangesScheduledForDeletion);
+            builder->appendNumber("rangeDeleterTasks", totalNumberOfRangesScheduledForDeletion);
+        }
     }
 
     std::vector<NamespaceString> getCollectionNames() {

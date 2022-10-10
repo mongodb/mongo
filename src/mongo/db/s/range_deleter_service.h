@@ -64,6 +64,16 @@ private:
             }
         }
 
+        SharedSemiFuture<void> getPendingFuture() {
+            return _pendingPromise.getFuture();
+        }
+
+        void clearPending() {
+            if (!_pendingPromise.getFuture().isReady()) {
+                _pendingPromise.emplaceValue();
+            }
+        }
+
         SharedSemiFuture<void> getCompletionFuture() const {
             return _completionPromise.getFuture().semi().share();
         }
@@ -75,6 +85,8 @@ private:
     private:
         // Marked ready once the range deletion has been fully processed
         SharedPromise<void> _completionPromise;
+
+        SharedPromise<void> _pendingPromise;
     };
 
     /*
@@ -149,12 +161,6 @@ private:
          */
         void _runRangeDeletions();
 
-        /* Queue containing scheduled range deletions */
-        std::queue<RangeDeletionTask> _queue;
-        /* Thread consuming the range deletions queue */
-        stdx::thread _thread;
-        /* Pointer to the (one and only) operation context used by the thread */
-        boost::optional<ServiceContext::UniqueOperationContext> _threadOpCtxHolder;
         /*
          * Condition variable notified when:
          * - The component has been initialized (the operation context has been instantiated)
@@ -164,6 +170,13 @@ private:
         stdx::condition_variable _condVar;
 
         Mutex _mutex = MONGO_MAKE_LATCH("ReadyRangeDeletionsProcessor");
+
+        /* Queue containing scheduled range deletions */
+        std::queue<RangeDeletionTask> _queue;
+        /* Thread consuming the range deletions queue */
+        stdx::thread _thread;
+        /* Pointer to the (one and only) operation context used by the thread */
+        boost::optional<ServiceContext::UniqueOperationContext> _threadOpCtxHolder;
     };
 
     // Keeping track of per-collection registered range deletion tasks
@@ -203,12 +216,18 @@ public:
      * Register a task on the range deleter service.
      * Returns a future that will be marked ready once the range deletion will be completed.
      *
-     * In case of trying to register an already existing task, the future will contain an error.
+     * In case of trying to register an already existing task, the original future will be returned.
+     *
+     * A task can be registered only if the service is up (except for tasks resubmitted on step-up).
+     *
+     * When a task is registered as `pending`, it can be unblocked by calling again the same method
+     * with `pending=false`.
      */
     SharedSemiFuture<void> registerTask(
         const RangeDeletionTask& rdt,
         SemiFuture<void>&& waitForActiveQueriesToComplete = SemiFuture<void>::makeReady(),
-        bool fromResubmitOnStepUp = false);
+        bool fromResubmitOnStepUp = false,
+        bool pending = false);
 
     /*
      * Deregister a task from the range deleter service.

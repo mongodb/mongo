@@ -85,15 +85,15 @@ std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngo
         createRangeDeletionTask(collectionUUID, min, max, whenToClean, pending, keyPattern));
 }
 
-// TODO review this method: the task may be registered, finish and be recreated by inserting the
-// document
 SharedSemiFuture<void> registerAndCreatePersistentTask(
     OperationContext* opCtx,
     const RangeDeletionTask& rdt,
     SemiFuture<void>&& waitForActiveQueriesToComplete) {
     auto rds = RangeDeleterService::get(opCtx);
 
-    auto completionFuture = rds->registerTask(rdt, std::move(waitForActiveQueriesToComplete));
+    // Register task as `pending` in order to block it until the persistent document is non-pending
+    auto completionFuture = rds->registerTask(
+        rdt, std::move(waitForActiveQueriesToComplete), false /* fromStepUp */, true /* pending*/);
 
     // Range deletion task will only proceed if persistent doc exists and its `pending` field
     // doesn't exist

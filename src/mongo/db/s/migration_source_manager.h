@@ -290,7 +290,7 @@ private:
     // Optional future that is populated if the migration succeeds and range deletion is scheduled
     // on this node. The future is set when the range deletion completes. Used if the moveChunk was
     // sent with waitForDelete.
-    boost::optional<SemiFuture<void>> _cleanupCompleteFuture;
+    boost::optional<SharedSemiFuture<void>> _cleanupCompleteFuture;
 };
 
 }  // namespace mongo
