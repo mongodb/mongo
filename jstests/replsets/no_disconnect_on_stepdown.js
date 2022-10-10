@@ -76,7 +76,7 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
     const replMetrics =
         assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
     assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
-    assert.eq(replMetrics.stateTransition.userOperationsKilled, 1);
+    assert.gte(replMetrics.stateTransition.userOperationsKilled, 1);
     assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, 0);
 
     // Allow the primary to be re-elected, and wait for it.
