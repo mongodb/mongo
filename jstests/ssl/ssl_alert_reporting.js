@@ -20,21 +20,21 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
     let expectedRegex;
     if (implementation === "openssl") {
         expectedRegex =
-            /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: tlsv1 alert protocol version/;
+            /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: .*tlsv1 alert protocol version/;
 
         // OpenSSL does not send alerts and TLS 1.3 is too difficult to identify as incompatible
         // because it shows up in a TLS extension.
         if (!sslProviderSupportsTLS1_1()) {
             expectedRegex =
-                /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: stream truncated/;
+                /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: .*stream truncated/;
         }
 
     } else if (implementation === "windows") {
         expectedRegex =
-            /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: The function requested is not supported/;
+            /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: .*The function requested is not supported/;
     } else if (implementation === "apple") {
         expectedRegex =
-            /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: Secure.Transport: bad protocol version/;
+            /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: .*Secure.Transport: bad protocol version/;
     } else {
         throw Error("Unrecognized TLS implementation!");
     }

@@ -193,7 +193,7 @@ Status TransportLayerASIO::ASIOSession::waitForData() noexcept try {
     ensureSync();
     asio::error_code ec;
     getSocket().wait(asio::ip::tcp::socket::wait_read, ec);
-    return errorCodeToStatus(ec);
+    return errorCodeToStatus(ec, "waitForData");
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
@@ -343,7 +343,7 @@ void TransportLayerASIO::ASIOSession::ensureSync() {
     asio::error_code ec;
     if (_blockingMode != Sync) {
         getSocket().non_blocking(false, ec);
-        fassert(40490, errorCodeToStatus(ec));
+        fassert(40490, errorCodeToStatus(ec, "ensureSync non_blocking"));
         _blockingMode = Sync;
     }
 
@@ -356,14 +356,14 @@ void TransportLayerASIO::ASIOSession::ensureSync() {
                         "session send timeout",
                         logv2::LogSeverity::Info(),
                         ec);
-        uassertStatusOK(errorCodeToStatus(ec));
+        uassertStatusOK(errorCodeToStatus(ec, "ensureSync session send timeout"));
 
         setSocketOption(getSocket(),
                         ASIOSocketTimeoutOption<SO_RCVTIMEO>(timeout),
                         "session receive timeout",
                         logv2::LogSeverity::Info(),
                         ec);
-        uassertStatusOK(errorCodeToStatus(ec));
+        uassertStatusOK(errorCodeToStatus(ec, "ensureSync session receive timeout"));
 
         _socketTimeout = _configuredTimeout;
     }
@@ -379,7 +379,7 @@ void TransportLayerASIO::ASIOSession::ensureAsync() {
 
     asio::error_code ec;
     getSocket().non_blocking(true, ec);
-    fassert(50706, errorCodeToStatus(ec));
+    fassert(50706, errorCodeToStatus(ec, "ensureAsync non_blocking"));
     _blockingMode = Async;
 }
 

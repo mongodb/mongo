@@ -116,7 +116,7 @@ auto prepareTCPSocketPair(asio::io_context& io_context) {
     {
         std::error_code ec;
         acceptor.bind(ep, ec);
-        uassertStatusOK(errorCodeToStatus(ec));
+        uassertStatusOK(errorCodeToStatus(ec, "prepareTCPSocketPair bind"));
     }
     acceptor.listen();
 
