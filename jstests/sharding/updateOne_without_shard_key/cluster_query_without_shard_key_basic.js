@@ -41,10 +41,19 @@ function testCommandFailsOnMongod(testCase) {
     jsTest.log(
         "Test that _clusterQueryWithoutShardKey is not a registered command on a mongod with" +
         " write command: " + tojson(testCase.writeCommand));
+
+    // The command is not sent to the shard in this case, so the transaction is never officially
+    // started.
+    let lsid = {id: UUID()};
+    let txnNumber = NumberLong(1);
     let cmdObj = {
         _clusterQueryWithoutShardKey: 1,
         writeCmd: testCase.writeCommand,
-        stmtId: NumberInt(0)
+        stmtId: NumberInt(0),
+        txnNumber: txnNumber,
+        lsid: lsid,
+        startTransaction: true,
+        autocommit: false
     };
     assert.commandFailedWithCode(shardConn.runCommand(cmdObj), ErrorCodes.CommandNotFound);
 }
@@ -53,12 +62,20 @@ function testCommandNoMatchingDocument(testCase) {
     jsTest.log("Test that running the command against a collection with no match yields an empty" +
                " document and shard id for write command : " + tojson(testCase.writeCommand));
 
+    let lsid = {id: UUID()};
+    let txnNumber = NumberLong(1);
     let cmdObj = {
         _clusterQueryWithoutShardKey: 1,
         writeCmd: testCase.writeCommand,
-        stmtId: NumberInt(0)
+        stmtId: NumberInt(0),
+        txnNumber: txnNumber,
+        lsid: lsid,
+        startTransaction: true,
+        autocommit: false
     };
     let res = assert.commandWorked(mongosConn.runCommand(cmdObj));
+    assert.commandWorked(mongosConn.adminCommand(
+        {commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}));
     assert.eq(res.targetDoc, null);
     assert.eq(res.shardId, null);
 
@@ -71,10 +88,18 @@ function testCommandUnshardedCollection(testCase) {
         "Test that running the command against an unsharded collection fails with write command: " +
         tojson(testCase.writeCommand));
 
+    // The command is not sent to the shard in this case, so the transaction is never officially
+    // started.
+    let lsid = {id: UUID()};
+    let txnNumber = NumberLong(1);
     let cmdObj = {
         _clusterQueryWithoutShardKey: 1,
         writeCmd: testCase.writeCommand,
-        stmtId: NumberInt(0)
+        stmtId: NumberInt(0),
+        txnNumber: txnNumber,
+        lsid: lsid,
+        startTransaction: true,
+        autocommit: false
     };
     assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.InvalidOptions);
 }
@@ -94,12 +119,20 @@ function testCommandShardedCollectionOnSingleShard(testCase) {
         _id: testCase.shardKeyValShard1
     });
 
+    let lsid = {id: UUID()};
+    let txnNumber = NumberLong(1);
     let cmdObj = {
         _clusterQueryWithoutShardKey: 1,
         writeCmd: testCase.writeCommand,
-        stmtId: NumberInt(0)
+        stmtId: NumberInt(0),
+        txnNumber: txnNumber,
+        lsid: lsid,
+        startTransaction: true,
+        autocommit: false
     };
     let res = assert.commandWorked(mongosConn.runCommand(cmdObj));
+    assert.commandWorked(mongosConn.adminCommand(
+        {commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}));
     assert.neq(res.targetDoc["_id"], null);
 
     // Make sure we are targeting the primary shard.
@@ -134,12 +167,20 @@ function testCommandShardedCollectionOnMultipleShards(testCase) {
         _id: testCase.shardKeyValShard1
     });
 
+    let lsid = {id: UUID()};
+    let txnNumber = NumberLong(1);
     let cmdObj = {
         _clusterQueryWithoutShardKey: 1,
         writeCmd: testCase.writeCommand,
-        stmtId: NumberInt(0)
+        stmtId: NumberInt(0),
+        txnNumber: txnNumber,
+        lsid: lsid,
+        startTransaction: true,
+        autocommit: false
     };
     let res = assert.commandWorked(mongosConn.runCommand(cmdObj));
+    assert.commandWorked(mongosConn.adminCommand(
+        {commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}));
     assert.neq(res.targetDoc["_id"], null);
 
     // We can't actually get the shard key from the response since the command projects out only

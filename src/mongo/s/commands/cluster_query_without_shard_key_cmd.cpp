@@ -84,12 +84,6 @@ BSONObj createAggregateCmdObj(OperationContext* opCtx,
                                       {BSON("$match" << parsedInfo.query),
                                        BSON("$limit" << 1),
                                        BSON("$project" << BSON("_id" << 1))});
-
-    // These fields are required to be specified for any internally executed commands. If the
-    // operation is not run in a transaction then the cluster-wide read concern is used, otherwise
-    // use the client transaction provided read concern.
-    aggregate.setReadConcern(repl::ReadConcernArgs::get(opCtx).toBSONInner());
-    aggregate.setWriteConcern(WriteConcernOptions());
     return aggregate.toBSON({});
 }
 
