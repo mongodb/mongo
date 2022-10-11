@@ -9,7 +9,7 @@ const EXIT_WATCHDOG = 61;
 function CharybdefsControl(test_name) {
     'use strict';
 
-    const python = "/opt/mongodbtoolchain/v3/bin/python3";
+    const python = "python";
     let control_py = "/data/charybdefs/mongo/control.py";
 
     // Use the minimum watchdog period
