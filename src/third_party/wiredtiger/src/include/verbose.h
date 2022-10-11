@@ -74,30 +74,18 @@
         case WT_VERBOSE_INFO:                  \
             (level_str) = "INFO";              \
             break;                             \
-        case WT_VERBOSE_DEBUG_1:               \
-            (level_str) = "DEBUG_1";           \
-            break;                             \
-        case WT_VERBOSE_DEBUG_2:               \
-            (level_str) = "DEBUG_2";           \
-            break;                             \
-        case WT_VERBOSE_DEBUG_3:               \
-            (level_str) = "DEBUG_3";           \
-            break;                             \
-        case WT_VERBOSE_DEBUG_4:               \
-            (level_str) = "DEBUG_4";           \
-            break;                             \
-        case WT_VERBOSE_DEBUG_5:               \
-            (level_str) = "DEBUG_5";           \
+        case WT_VERBOSE_DEBUG:                 \
+            (level_str) = "DEBUG";             \
             break;                             \
         }                                      \
     } while (0)
 
 /*
- * Default verbosity level. WT_VERBOSE_DEBUG_1 being the default level assigned to verbose messages
+ * Default verbosity level. WT_VERBOSE_DEBUG being the default level assigned to verbose messages
  * prior to the introduction of verbosity levels.
  */
 #ifndef WT_VERBOSE_LEVEL_DEFAULT
-#define WT_VERBOSE_LEVEL_DEFAULT WT_VERBOSE_DEBUG_1
+#define WT_VERBOSE_LEVEL_DEFAULT WT_VERBOSE_DEBUG
 #endif
 
 /* Default category for messages that don't explicitly specify a category. */
@@ -174,7 +162,7 @@ struct __wt_verbose_multi_category {
  *     Wrapper to __wt_verbose_level using the default verbosity level.
  */
 #define __wt_verbose_debug(session, category, fmt, ...) \
-    __wt_verbose_level(session, category, WT_VERBOSE_DEBUG_1, fmt, __VA_ARGS__)
+    __wt_verbose_level(session, category, WT_VERBOSE_DEBUG, fmt, __VA_ARGS__)
 
 /*
  * __wt_verbose --
