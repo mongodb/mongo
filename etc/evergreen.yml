@@ -118,7 +118,6 @@ variables:
     vars:
       resmoke_args: --help
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - &jepsen_config_vars
   jepsen_key_time_limit: --key-time-limit 15
@@ -807,12 +806,6 @@ functions:
       permissions: public-read
       content_type: atext-plain
       display_name: Pip Requirements
-
-  "send benchmark results":
-    command: json.send
-    params:
-      name: perf
-      file: src/perf.json
 
   "cleanup environment": &cleanup_environment
     command: subprocess.exec
@@ -2792,7 +2785,6 @@ tasks:
       exec_timeout_secs: 10800  # 3 hour timeout.
       resmoke_args: --suites=benchmarks
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - <<: *benchmark_template
   name: benchmarks_sharding
@@ -2803,7 +2795,6 @@ tasks:
     vars:
       resmoke_args: --suites=benchmarks_sharding
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - <<: *benchmark_template
   name: benchmarks_cst
@@ -2814,7 +2805,6 @@ tasks:
     vars:
       resmoke_args: --suites=benchmarks_cst
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify
