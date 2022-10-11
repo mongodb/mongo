@@ -372,8 +372,39 @@ function runTest(featureFlagRequireTenantId) {
                        getIndexesKeyAndName(res.cursor.firstBatch)));
     }
 
+    // Test collMod
+    {
+        // Create the index used for collMod
+        let res = assert.commandWorked(testDb.runCommand({
+            createIndexes: kCollName,
+            indexes: [{key: {c: 1}, name: "indexC", expireAfterSeconds: 50}],
+            '$tenant': kTenant
+        }));
+        assert.eq(2, res.numIndexesAfter);
+
+        // Modyfing the index without the tenantId should not work
+        assert.commandFailed(testDb.runCommand({
+            "collMod": kCollName,
+            "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100},
+        }));
+
+        // Modify the index with the tenantId
+        res = assert.commandWorked(testDb.runCommand({
+            "collMod": kCollName,
+            "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100},
+            '$tenant': kTenant
+        }));
+        assert.eq(50, res.expireAfterSeconds_old);
+        assert.eq(100, res.expireAfterSeconds_new);
+
+        // Drop the index created
+        assert.commandWorked(
+            testDb.runCommand({dropIndexes: kCollName, index: ["indexC"], '$tenant': kTenant}));
+    }
+
     rst.stopSet();
 }
+
 runTest(true);
 runTest(false);
 })();

@@ -384,6 +384,26 @@ function runTest(featureFlagRequireTenantId) {
         }
     }
 
+    // Test collMod
+    {
+        // Create the index used for collMod
+        let res = assert.commandWorked(tokenDB.runCommand({
+            createIndexes: kCollName,
+            indexes: [{key: {c: 1}, name: "indexC", expireAfterSeconds: 50}]
+        }));
+        assert.eq(2, res.numIndexesAfter);
+        jsTestLog(`Created index`);
+
+        // Modify the index with the tenantId
+        res = assert.commandWorked(tokenDB.runCommand(
+            {"collMod": kCollName, "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100}}));
+        assert.eq(50, res.expireAfterSeconds_old);
+        assert.eq(100, res.expireAfterSeconds_new);
+
+        // Drop the index created
+        assert.commandWorked(tokenDB.runCommand({dropIndexes: kCollName, index: ["indexC"]}));
+    }
+
     rst.stopSet();
 }
 runTest(true);

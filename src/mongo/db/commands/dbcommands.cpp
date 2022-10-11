@@ -502,6 +502,10 @@ public:
         return true;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     bool collectsResourceConsumptionMetrics() const override {
         return true;
     }

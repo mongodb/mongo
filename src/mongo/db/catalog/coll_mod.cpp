@@ -706,7 +706,7 @@ Status _collModInternal(OperationContext* opCtx,
         MODE_X,
         AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
     auto nss = coll.getNss();
-    StringData dbName = nss.db();
+    auto dbName = nss.dbName();
     Lock::CollectionLock systemViewsLock(
         opCtx, NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X);
 
