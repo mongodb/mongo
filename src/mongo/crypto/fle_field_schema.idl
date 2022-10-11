@@ -288,8 +288,8 @@ structs:
             type: bindata_generic
             cpp_name: eccDerivedToken
 
-    FLE2FindRangePayload:
-        description: "Payload for a range find"
+    FLE2FindRangePayloadEdgesInfo:
+        description: "Tokken information for find range payload."
         strict: true
         fields:
           g:
@@ -304,6 +304,23 @@ structs:
             description: "Queryable Encryption max counter"
             type: long
             cpp_name: maxCounter
+
+    FLE2FindRangePayload:
+        description: "Payload for a range find"
+        strict: true
+        fields:
+          payload:
+            description: "Token information for a find range payload"
+            type: FLE2FindRangePayloadEdgesInfo
+            optional: true
+          payloadId:
+            description: "Id of payload - must be paired with another payload"
+            type: safeInt
+            optional: false
+          operatorType:
+            description: "One of gt, lt, gte, lte"
+            type: string
+            optional: false
 
     EncryptionInformation:
         description: "Implements Encryption Information which includes the schema for Queryable Encryption that is consumed by query_analysis, queries and write_ops"
@@ -343,10 +360,9 @@ structs:
             description: "Encrypted value"
             type: bindata_generic
 
-    FLE2RangeFindSpec:
-        description: "Range find specification that is encoded inside of a FLE2EncryptionPlaceholder."
+    FLE2RangeFindSpecEdgesInfo:
+        description: "Edges Information for FLE2 Range Spec"
         strict: true
-        cpp_validator_func: "validateIDLFLE2RangeFindSpec"
         fields:
           lowerBound:
             description: "The lower bound for an encrypted range query."
@@ -366,6 +382,24 @@ structs:
           indexMax:
             description: "Maximum value for the encrypted index that this query is using."
             type: encrypted_numeric_element
+
+    FLE2RangeFindSpec:
+        description: "Range find specification that is encoded inside of a FLE2EncryptionPlaceholder."
+        strict: true
+        cpp_validator_func: "validateIDLFLE2RangeFindSpec"
+        fields:
+          edgesInfo:
+            description: "Information about the edges in an FLE2 find payload."
+            type: FLE2RangeFindSpecEdgesInfo
+            optional: true
+          payloadId:
+            description: "Id of payload - must be paired with another payload"
+            type: safeInt
+            optional: false
+          operatorType:
+            description: "One of gt, lt, gte, lte"
+            type: string
+            optional: false
 
     FLE2RangeInsertSpec:
         description: "Range insert specification that is encoded inside of a FLE2EncryptionPlaceholder."

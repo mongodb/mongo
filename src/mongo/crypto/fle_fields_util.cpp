@@ -137,11 +137,17 @@ void validateQueryBounds(BSONType indexType, ImplicitValue lb, ImplicitValue ub)
 }
 
 void validateIDLFLE2RangeFindSpec(const FLE2RangeFindSpec* placeholder) {
-    auto min = placeholder->getIndexMin().getElement();
-    auto max = placeholder->getIndexMax().getElement();
+    if (!placeholder->getEdgesInfo()) {
+        return;
+    }
+
+    auto& edgesInfo = placeholder->getEdgesInfo().get();
+
+    auto min = edgesInfo.getIndexMin().getElement();
+    auto max = edgesInfo.getIndexMax().getElement();
     uassert(6901304, "Range min and range max must be the same type.", min.type() == max.type());
-    auto lb = placeholder->getLowerBound().getElement();
-    auto ub = placeholder->getUpperBound().getElement();
+    auto lb = edgesInfo.getLowerBound().getElement();
+    auto ub = edgesInfo.getUpperBound().getElement();
     validateQueryBounds(min.type(), lb, ub);
 }  // namespace mongo
 }  // namespace mongo

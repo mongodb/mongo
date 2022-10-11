@@ -756,13 +756,21 @@ std::vector<char> generatePlaceholder(
     insertSpec.setValue(value);
     auto specDoc = BSON("s" << insertSpec.toBSON());
 
+    FLE2RangeFindSpecEdgesInfo edgesInfo;
     FLE2RangeFindSpec findSpec;
-    findSpec.setLowerBound(lowerDoc.firstElement());
-    findSpec.setLbIncluded(true);
-    findSpec.setUpperBound(upperDoc.firstElement());
-    findSpec.setUbIncluded(true);
-    findSpec.setIndexMin(lowerDoc.firstElement());
-    findSpec.setIndexMax(upperDoc.firstElement());
+
+    edgesInfo.setLowerBound(lowerDoc.firstElement());
+    edgesInfo.setLbIncluded(true);
+    edgesInfo.setUpperBound(upperDoc.firstElement());
+    edgesInfo.setUbIncluded(true);
+    edgesInfo.setIndexMin(lowerDoc.firstElement());
+    edgesInfo.setIndexMax(upperDoc.firstElement());
+
+    findSpec.setEdgesInfo(edgesInfo);
+
+    // TODO: change in SERVER-70305
+    findSpec.setOperatorType(StringData("gt"));
+    findSpec.setPayloadId(1234);
 
     auto findDoc = BSON("s" << findSpec.toBSON());
 
@@ -2572,7 +2580,23 @@ void assertMinCoverResult(A lb,
     std::vector<BSONElement> elems;
     auto vals = BSON_ARRAY(lb << ub << min << max);
     vals.elems(elems);
-    auto spec = FLE2RangeFindSpec(elems[0], lbIncluded, elems[1], ubIncluded, elems[2], elems[3]);
+
+    FLE2RangeFindSpecEdgesInfo edgesInfo;
+
+    edgesInfo.setLowerBound(elems[0]);
+    edgesInfo.setLbIncluded(lbIncluded);
+    edgesInfo.setUpperBound(elems[1]);
+    edgesInfo.setUbIncluded(ubIncluded);
+    edgesInfo.setIndexMin(elems[2]);
+    edgesInfo.setIndexMax(elems[3]);
+
+    FLE2RangeFindSpec spec;
+    spec.setEdgesInfo(edgesInfo);
+
+    // TODO: change in SERVER-70305
+    spec.setOperatorType(StringData("gt"));
+    spec.setPayloadId(1234);
+
     auto result = getMinCover(spec, sparsity);
     ASSERT_EQ(result.size(), expected.size());
     for (size_t i = 0; i < result.size(); i++) {
@@ -3489,7 +3513,23 @@ DEATH_TEST_REGEX(MinCoverInterfaceTest, Error_MinMaxTypeMismatch, "Tripwire asse
     std::vector<BSONElement> elems;
     auto vals = BSON_ARRAY(10 << 11 << 4 << 11.5);
     vals.elems(elems);
-    auto spec = FLE2RangeFindSpec(elems[0], true, elems[1], true, elems[2], elems[3]);
+
+    FLE2RangeFindSpecEdgesInfo edgesInfo;
+    edgesInfo.setLowerBound(elems[0]);
+    edgesInfo.setLbIncluded(true);
+    edgesInfo.setUpperBound(elems[1]);
+    edgesInfo.setUbIncluded(true);
+    edgesInfo.setIndexMin(elems[2]);
+    edgesInfo.setIndexMax(elems[3]);
+
+    FLE2RangeFindSpec spec;
+    spec.setEdgesInfo(edgesInfo);
+
+    // TODO: change in SERVER-70305
+    spec.setOperatorType(StringData("gt"));
+    spec.setPayloadId(1234);
+
+
     getMinCover(spec, 1);
 }
 }  // namespace mongo

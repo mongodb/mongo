@@ -1351,6 +1351,10 @@ struct FLEFindEdgeTokenSet {
 struct ParsedFindRangePayload {
     std::vector<FLEFindEdgeTokenSet> edges;
     ServerDataEncryptionLevel1Token serverToken;
+
+    std::string operatorType;
+    std::int32_t payloadId;
+
     std::int64_t maxCounter;
 
     explicit ParsedFindRangePayload(BSONElement fleFindRangePayload);

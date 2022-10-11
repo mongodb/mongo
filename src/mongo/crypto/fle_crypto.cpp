@@ -1486,15 +1486,21 @@ boost::multiprecision::int128_t exp10(int x) {
 }  // namespace
 
 std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t sparsity) {
-    auto indexMin = spec.getIndexMin().getElement();
-    auto indexMax = spec.getIndexMax().getElement();
+    uassert(7030000,
+            "getMinCover should never be passed a findSpec without edges information",
+            spec.getEdgesInfo());
+
+    auto& edgesInfo = spec.getEdgesInfo().get();
+
+    auto indexMin = edgesInfo.getIndexMin().getElement();
+    auto indexMax = edgesInfo.getIndexMax().getElement();
     tassert(6901300, "Min and max must have the same type", indexMin.type() == indexMax.type());
     auto bsonType = indexMin.type();
 
-    auto lowerBound = spec.getLowerBound().getElement();
-    auto upperBound = spec.getUpperBound().getElement();
-    auto includeLowerBound = spec.getLbIncluded();
-    auto includeUpperBound = spec.getUbIncluded();
+    auto lowerBound = edgesInfo.getLowerBound().getElement();
+    auto upperBound = edgesInfo.getUpperBound().getElement();
+    auto includeLowerBound = edgesInfo.getLbIncluded();
+    auto includeUpperBound = edgesInfo.getUbIncluded();
 
     // Open-ended ranges are represented with infinity as the other endpoint. Resolve infinite
     // bounds at this point to end at the min or max for this index.
@@ -2233,10 +2239,15 @@ FLE2FindRangePayload FLEClientCrypto::serializeFindRangePayload(
     }
 
     FLE2FindRangePayload payload;
+    FLE2FindRangePayloadEdgesInfo edgesInfo;
 
-    payload.setEdges(std::move(tokens));
-    payload.setMaxCounter(maxContentionFactor);
-    payload.setServerEncryptionToken(serverToken.toCDR());
+    edgesInfo.setEdges(std::move(tokens));
+    edgesInfo.setMaxCounter(maxContentionFactor);
+    edgesInfo.setServerEncryptionToken(serverToken.toCDR());
+
+    payload.setPayload(edgesInfo);
+    payload.setOperatorType(StringData("$gt"));  // TODO: Change for SERVER-70305
+    payload.setPayloadId(1234);
 
     return payload;
 }
@@ -3196,7 +3207,13 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
 
     auto payload = parseFromCDR<FLE2FindRangePayload>(subCdr);
 
-    for (auto const& edge : payload.getEdges()) {
+    if (!payload.getPayload()) {
+        return;
+    }
+
+    auto& stub = payload.getPayload().get();
+
+    for (auto const& edge : stub.getEdges()) {
 
         auto escToken =
             FLETokenFromCDR<FLETokenType::ESCDerivedFromDataToken>(edge.getEscDerivedToken());
@@ -3209,9 +3226,12 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
     }
 
     serverToken = FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
-        payload.getServerEncryptionToken());
+        stub.getServerEncryptionToken());
 
-    maxCounter = payload.getMaxCounter();
+    maxCounter = stub.getMaxCounter();
+
+    payloadId = payload.getPayloadId();
+    operatorType = payload.getOperatorType().toString();
 }
 
 
