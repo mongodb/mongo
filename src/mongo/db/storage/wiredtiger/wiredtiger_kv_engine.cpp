@@ -1972,7 +1972,8 @@ void WiredTigerKVEngine::_checkpoint(OperationContext* opCtx, WT_SESSION* sessio
     } catch (const WriteConflictException&) {
         LOGV2_WARNING(22346, "Checkpoint encountered a write conflict exception.");
     } catch (const AssertionException& exc) {
-        invariant(ErrorCodes::isShutdownError(exc.code()) || ErrorCodes::isInterruption(exc.code()),
+        invariant(exc.code() == ErrorCodes::InterruptedAtShutdown ||
+                      exc.code() == ErrorCodes::Interrupted,
                   exc.toString());
         LOGV2(7021300, "Skipping checkpoint due to exception", "exception"_attr = exc.toStatus());
     }
