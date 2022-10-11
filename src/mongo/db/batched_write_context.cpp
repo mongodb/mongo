@@ -37,7 +37,7 @@ const OperationContext::Decoration<BatchedWriteContext> BatchedWriteContext::get
 BatchedWriteContext::BatchedWriteContext() {}
 
 void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx,
-                                              const repl::ReplOperation& operation) {
+                                              const BatchedOperation& operation) {
     invariant(_batchWrites);
 
     // Current support is only limited to insert update and delete operations, no change stream
@@ -51,13 +51,13 @@ void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx,
     invariant(!opCtx->getTxnNumber());
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
-    _batchedOperations.push_back(operation);
+    invariantStatusOK(_batchedOperations.addOperation(operation));
 }
 
-std::vector<repl::ReplOperation>& BatchedWriteContext::getBatchedOperations(
+std::vector<BatchedWriteContext::BatchedOperation>* BatchedWriteContext::getBatchedOperations(
     OperationContext* opCtx) {
     invariant(_batchWrites);
-    return _batchedOperations;
+    return _batchedOperations.getMutableOperationsForOpObserver();
 }
 
 void BatchedWriteContext::clearBatchedOperations(OperationContext* opCtx) {

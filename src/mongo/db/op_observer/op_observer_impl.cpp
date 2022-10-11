@@ -2104,21 +2104,21 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     }
 
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
-    auto& batchedOps = batchedWriteContext.getBatchedOperations(opCtx);
+    auto* batchedOps = batchedWriteContext.getBatchedOperations(opCtx);
 
-    if (!batchedOps.size()) {
+    if (batchedOps->empty()) {
         return;
     }
 
     // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
     // reserve enough entries for all statements in the transaction.
-    auto oplogSlots = _oplogWriter->getNextOpTimes(opCtx, batchedOps.size());
+    auto oplogSlots = _oplogWriter->getNextOpTimes(opCtx, batchedOps->size());
 
     // Throw TenantMigrationConflict error if the database for the transaction statements is being
     // migrated. We only need check the namespace of the first statement since a transaction's
     // statements must all be for the same tenant.
     tenant_migration_access_blocker::checkIfCanWriteOrThrow(
-        opCtx, batchedOps.begin()->getNss().db(), oplogSlots.back().getTimestamp());
+        opCtx, batchedOps->begin()->getNss().db(), oplogSlots.back().getTimestamp());
 
     auto noPrePostImage = boost::optional<ImageBundle>(boost::none);
 
@@ -2126,10 +2126,10 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     // entries.
     const auto applyOpsOplogSlotAndOperationAssignment =
         getApplyOpsOplogSlotAndOperationAssignmentForTransaction(
-            opCtx, oplogSlots, false /*prepare*/, batchedOps);
+            opCtx, oplogSlots, false /*prepare*/, *batchedOps);
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
     logOplogEntries(opCtx,
-                    &batchedOps,
+                    batchedOps,
                     oplogSlots,
                     applyOpsOplogSlotAndOperationAssignment,
                     &noPrePostImage,

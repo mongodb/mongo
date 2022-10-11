@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/transaction/transaction_operations.h"
 
 namespace mongo {
 
@@ -45,6 +46,9 @@ namespace mongo {
  */
 class BatchedWriteContext {
 public:
+    using BatchedOperation = TransactionOperations::TransactionOperation;
+    using BatchedOperations = TransactionOperations;
+
     static const OperationContext::Decoration<BatchedWriteContext> get;
 
     BatchedWriteContext();
@@ -64,10 +68,12 @@ public:
      * The stored operations must generate an applyOps entry that's within the max BSON size.
      * Anything larger will throw a TransactionTooLarge exception at commit.
      */
-    void addBatchedOperation(OperationContext* opCtx, const repl::ReplOperation& operation);
+    void addBatchedOperation(OperationContext* opCtx, const BatchedOperation& operation);
 
-    // Returns a reference to the stored operations for the current WUOW.
-    std::vector<repl::ReplOperation>& getBatchedOperations(OperationContext* opCtx);
+    /**
+     * Returns a pointerto the stored operations for the current WUOW.
+     */
+    std::vector<BatchedOperation>* getBatchedOperations(OperationContext* opCtx);
     void clearBatchedOperations(OperationContext* opCtx);
 
 private:
@@ -78,7 +84,7 @@ private:
      * Holds oplog data for operations which have been applied in the current batched
      * write context.
      */
-    std::vector<repl::ReplOperation> _batchedOperations;
+    BatchedOperations _batchedOperations;
 };
 
 }  // namespace mongo
