@@ -73,7 +73,6 @@ variables:
     vars:
       resmoke_args: --help
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - &jepsen_config_vars
   jepsen_key_time_limit: --key-time-limit 15
@@ -1205,12 +1204,6 @@ functions:
       permissions: public-read
       content_type: atext-plain
       display_name: Pip Requirements
-
-  "send benchmark results":
-    command: json.send
-    params:
-      name: perf
-      file: src/perf.json
 
   "do setup":
   - *set_task_expansion_macros
@@ -4653,7 +4646,6 @@ tasks:
     vars:
       resmoke_args: --suites=benchmarks
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - <<: *benchmark_template
   name: benchmarks_sharding
@@ -4664,7 +4656,6 @@ tasks:
     vars:
       resmoke_args: --suites=benchmarks_sharding
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify
