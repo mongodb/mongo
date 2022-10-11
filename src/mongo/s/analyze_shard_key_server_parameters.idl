@@ -75,3 +75,13 @@ server_parameters:
         default: 5
         validator:
             gt: 0
+    queryAnalysisSamplerBurstMultiplier:
+        description: The ratio between the number of queries allowed to be sampled during a burst
+                     and the number of queries allowed to be sampled per second (i.e. the sample
+                     rate).
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<double>
+        cpp_varname: gQueryAnalysisSamplerBurstMultiplier
+        default: 2
+        validator:
+            gte: 1

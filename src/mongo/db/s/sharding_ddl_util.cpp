@@ -323,7 +323,7 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx,
     if (uuid) {
         deleteCmd.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
-            entry.setQ(BSON(QueryAnalyzerDocument::kCollectionUuidFieldName << uuid->toString()));
+            entry.setQ(BSON(QueryAnalyzerDocument::kCollectionUuidFieldName << *uuid));
             entry.setMulti(false);
             return entry;
         }()});

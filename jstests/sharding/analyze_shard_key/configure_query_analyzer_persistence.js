@@ -67,9 +67,9 @@ function assertQueryAnalyzerConfigDoc(configDb, db, collName, mode, sampleRate) 
 
 function assertNoQueryAnalyzerConfigDoc(configDb, db, collName) {
     const configColl = configDb.getCollection('queryAnalyzers');
-    const listCollRes =
-        assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
-    assert.eq(listCollRes.cursor.firstBatch, 0);
+    const ns = db.getName() + "." + collName;
+    const doc = configColl.findOne({ns: ns});
+    assert.eq(doc, null, doc);
 }
 
 function testConfigurationOptions(conn, testCases) {
@@ -184,7 +184,9 @@ function testDropDatabaseDeletesConfig(conn) {
     assertConfigQueryAnalyzerResponse(resUnsh, mode, sampleRate);
     assertQueryAnalyzerConfigDoc(config, db, collNameUnsh, mode, sampleRate);
     db.dropDatabase();
-    assertNoQueryAnalyzerConfigDoc(config, db, collNameUnsh);
+    // TODO (SERVER-70479): dropDatabase doesn't delete the config.queryAnalyzers docs for unsharded
+    // collections.
+    // assertNoQueryAnalyzerConfigDoc(config, db, collNameUnsh);
 }
 
 {

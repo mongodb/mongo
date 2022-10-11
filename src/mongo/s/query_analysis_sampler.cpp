@@ -36,6 +36,7 @@
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/util/net/socket_utils.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -48,6 +49,10 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisSampler);
 
 const auto getQueryAnalysisSampler = ServiceContext::declareDecoration<QueryAnalysisSampler>();
+
+bool isApproximatelyEqual(double val0, double val1, double epsilon) {
+    return std::fabs(val0 - val1) < (epsilon + std::numeric_limits<double>::epsilon());
+}
 
 }  // namespace
 
@@ -123,6 +128,43 @@ void QueryAnalysisSampler::_refreshQueryStats() {
     _queryStats.refreshTotalCount(newTotalCount);
 }
 
+double QueryAnalysisSampler::SampleRateLimiter::_getBurstCapacity(double numTokensPerSecond) {
+    return std::max(1.0, gQueryAnalysisSamplerBurstMultiplier.load() * numTokensPerSecond);
+}
+
+void QueryAnalysisSampler::SampleRateLimiter::_refill(double numTokensPerSecond,
+                                                      double burstCapacity) {
+    auto now = _serviceContext->getFastClockSource()->now();
+    double numSecondsElapsed =
+        duration_cast<Microseconds>(now - _lastRefillTime).count() / 1000000.0;
+    if (numSecondsElapsed > 0) {
+        _lastNumTokens =
+            std::min(burstCapacity, numSecondsElapsed * numTokensPerSecond + _lastNumTokens);
+        _lastRefillTime = now;
+    }
+}
+
+bool QueryAnalysisSampler::SampleRateLimiter::tryConsume() {
+    _refill(_numTokensPerSecond, _getBurstCapacity(_numTokensPerSecond));
+
+    if (_lastNumTokens >= 1) {
+        _lastNumTokens -= 1;
+        return true;
+    } else if (isApproximatelyEqual(_lastNumTokens, 1, kEpsilon)) {
+        // To avoid skipping queries that could have been sampled, allow one token to be consumed
+        // if there is nearly one.
+        _lastNumTokens = 0;
+        return true;
+    }
+    return false;
+}
+
+void QueryAnalysisSampler::SampleRateLimiter::refreshRate(double numTokensPerSecond) {
+    // Fill the bucket with tokens created by the previous rate before setting a new rate.
+    _refill(_numTokensPerSecond, _getBurstCapacity(numTokensPerSecond));
+    _numTokensPerSecond = numTokensPerSecond;
+}
+
 void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
     if (MONGO_unlikely(disableQueryAnalysisSampler.shouldFail())) {
         return;
@@ -159,7 +201,38 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
         IDLParserContext("configurationRefresher"), swResponse.getValue().response);
 
     stdx::lock_guard<Latch> lk(_mutex);
-    _configurations = response.getConfigurations();
+    std::map<NamespaceString, SampleRateLimiter> sampleRateLimiters;
+    for (const auto& configuration : response.getConfigurations()) {
+        auto it = _sampleRateLimiters.find(configuration.getNs());
+        if (it == _sampleRateLimiters.end() ||
+            it->second.getCollectionUuid() != configuration.getCollectionUuid()) {
+            // There is no existing SampleRateLimiter for the collection with this specific
+            // collection uuid so create one for it.
+            sampleRateLimiters.emplace(configuration.getNs(),
+                                       SampleRateLimiter{opCtx->getServiceContext(),
+                                                         configuration.getNs(),
+                                                         configuration.getCollectionUuid(),
+                                                         configuration.getSampleRate()});
+        } else {
+            auto rateLimiter = it->second;
+            invariant(rateLimiter.getNss() == configuration.getNs());
+            rateLimiter.refreshRate(configuration.getSampleRate());
+            sampleRateLimiters.emplace(configuration.getNs(), std::move(rateLimiter));
+        }
+    }
+    _sampleRateLimiters = std::move(sampleRateLimiters);
+}
+
+bool QueryAnalysisSampler::shouldSample(const NamespaceString& nss) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    auto it = _sampleRateLimiters.find(nss);
+
+    if (it == _sampleRateLimiters.end()) {
+        return false;
+    }
+
+    auto& rateLimiter = it->second;
+    return rateLimiter.tryConsume();
 }
 
 }  // namespace analyze_shard_key
