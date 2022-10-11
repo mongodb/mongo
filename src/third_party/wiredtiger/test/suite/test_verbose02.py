@@ -118,9 +118,9 @@ class test_verbose02(test_verbose_base):
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
                 lambda:self.wiredtiger_open(self.home, 'verbose=[api:-1]'),
                 '/Failed to parse verbose option \'api\'/')
-        # Any value greater than WT_VERBOSE_DEBUG (1) is invalid.
+        # Any value greater than WT_VERBOSE_DEBUG_5 (5) is invalid.
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
-                lambda:self.wiredtiger_open(self.home, 'verbose=[api:2]'),
+                lambda:self.wiredtiger_open(self.home, 'verbose=[api:6]'),
                 '/Failed to parse verbose option \'api\'/')
 
 if __name__ == '__main__':

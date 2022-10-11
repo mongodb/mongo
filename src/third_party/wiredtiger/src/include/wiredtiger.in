@@ -7492,7 +7492,7 @@ typedef enum {
 /*!
  * WiredTiger verbosity levels. The levels define a range of severity categories, with
  * \c WT_VERBOSE_ERROR being the lowest, most critical level (used by messages on critical error
- * paths) and \c WT_VERBOSE_DEBUG being the highest verbosity/informational level (mostly adopted
+ * paths) and \c WT_VERBOSE_DEBUG_5 being the highest verbosity/informational level (mostly adopted
  * for debugging).
  */
 typedef enum {
@@ -7502,8 +7502,16 @@ typedef enum {
     WT_VERBOSE_NOTICE,      /*!< Messages for significant events in WiredTiger, usually worth
                             noting. */
     WT_VERBOSE_INFO,        /*!< Informational style messages. */
-    WT_VERBOSE_DEBUG        /*!< Low severity messages, useful for debugging purposes. */
+    WT_VERBOSE_DEBUG_1,     /*!< Low severity messages, useful for debugging purposes. This is
+                            the default level when debugging. */
+    WT_VERBOSE_DEBUG_2,     /*!< Low severity messages, an increase in verbosity from
+                            the previous level. */
+    WT_VERBOSE_DEBUG_3,     /*!< Low severity messages. */
+    WT_VERBOSE_DEBUG_4,     /*!< Low severity messages. */
+    WT_VERBOSE_DEBUG_5      /*!< Lowest severity messages. */
 } WT_VERBOSE_LEVEL;
+/*! Temporary, for compatibility. FIXME: WT-9925. */
+#define WT_VERBOSE_DEBUG WT_VERBOSE_DEBUG_1
 /*! @} */
 /*
  * Verbose section: END

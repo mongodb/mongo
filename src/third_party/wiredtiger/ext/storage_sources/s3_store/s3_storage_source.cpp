@@ -869,7 +869,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
     s3->verbose = WT_VERBOSE_ERROR;
     s3->log = Aws::MakeShared<S3LogSystem>("storage", s3->wtApi, s3->verbose);
 
-    if (ret == 0 && v.val >= WT_VERBOSE_ERROR && v.val <= WT_VERBOSE_DEBUG) {
+    if (ret == 0 && v.val >= WT_VERBOSE_ERROR && v.val <= WT_VERBOSE_DEBUG_5) {
         s3->verbose = v.val;
         s3->log->SetWtVerbosityLevel(s3->verbose);
     } else if (ret != WT_NOTFOUND) {
