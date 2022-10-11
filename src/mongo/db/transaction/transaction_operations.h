@@ -36,6 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/repl/oplog_entry.h"  // for ReplOperation
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -48,6 +49,7 @@ namespace mongo {
 class TransactionOperations {
 public:
     using TransactionOperation = repl::ReplOperation;
+    using CollectionUUIDs = stdx::unordered_set<UUID, UUID::Hash>;
 
     TransactionOperations() = default;
 
@@ -89,6 +91,15 @@ public:
      */
     Status addOperation(const TransactionOperation& operation,
                         boost::optional<std::size_t> transactionSizeLimitBytes = boost::none);
+
+    /**
+     * Returns a set of collection UUIDs for the operations stored in this container.
+     *
+     * This allows the caller to check which collections will be modified as a resulting of
+     * executing this transaction. The set of UUIDs returned by this function does not include
+     * collection UUIDs for no-op operations, e.g. {op: 'n', ...}.
+     */
+    CollectionUUIDs getCollectionUUIDs() const;
 
     /**
      * Returns pointer to vector of operations for integrating with

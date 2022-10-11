@@ -171,5 +171,37 @@ TEST(TransactionOperationsTest, AddTransactionEnforceTotalOperationSizeLimit) {
     ASSERT_EQ(ErrorCodes::TransactionTooLarge, ops.addOperation(op2, sizeLimit));
 }
 
+TEST(TransactionOperationsTest, GetCollectionUUIDsIgnoresNoopOperations) {
+    TransactionOperations::TransactionOperation op1;
+    op1.setOpType(repl::OpTypeEnum::kCommand);
+    op1.setUuid(UUID::gen());
+
+    TransactionOperations::TransactionOperation op2;
+    op2.setOpType(repl::OpTypeEnum::kInsert);
+    op2.setUuid(UUID::gen());
+
+    // This operation's UUID will not be included in the getCollectionUUIDs() result.
+    TransactionOperations::TransactionOperation op3;
+    op3.setOpType(repl::OpTypeEnum::kNoop);
+    op3.setUuid(UUID::gen());
+
+    // This operation has no UUID and is added to ensure operations without UUIDs
+    // are handled properly.
+    TransactionOperations::TransactionOperation op4;
+    op4.setOpType(repl::OpTypeEnum::kDelete);
+    ASSERT_FALSE(op4.getUuid());
+
+    TransactionOperations ops;
+    ASSERT_OK(ops.addOperation(op1));
+    ASSERT_OK(ops.addOperation(op2));
+    ASSERT_OK(ops.addOperation(op3));
+    ASSERT_OK(ops.addOperation(op4));
+
+    auto uuids = ops.getCollectionUUIDs();
+    ASSERT_EQ(uuids.size(), 2U);
+    ASSERT(uuids.count(*op1.getUuid()));
+    ASSERT(uuids.count(*op2.getUuid()));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -103,6 +103,27 @@ Status TransactionOperations::addOperation(const TransactionOperation& operation
     return Status::OK();
 }
 
+TransactionOperations::CollectionUUIDs TransactionOperations::getCollectionUUIDs() const {
+    CollectionUUIDs uuids;
+    for (const auto& op : _transactionOperations) {
+        if (op.getOpType() == repl::OpTypeEnum::kNoop) {
+            // No-ops can't modify data, so there's no need to check if they involved a temporary
+            // collection.
+            continue;
+        }
+
+        // Ignore operations without collection UUIDs. No need for invariant.
+        auto uuid = op.getUuid();
+        if (!uuid) {
+            continue;
+        }
+
+        uuids.insert(*uuid);
+    }
+
+    return uuids;
+}
+
 std::vector<TransactionOperations::TransactionOperation>*
 TransactionOperations::getMutableOperationsForTransactionParticipant() {
     return &_transactionOperations;
