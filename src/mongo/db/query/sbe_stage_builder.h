@@ -458,6 +458,9 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSort(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSortCovered(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSortKeyGeneraror(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
