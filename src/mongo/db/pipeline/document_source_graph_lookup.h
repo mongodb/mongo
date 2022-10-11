@@ -79,6 +79,13 @@ public:
         return _startWith.get();
     }
 
+    /*
+     * Returns a ref to '_startWith' that can be swapped out with a new expression.
+     */
+    boost::intrusive_ptr<Expression>& getMutableStartWithField() {
+        return _startWith;
+    }
+
     void setStartWithField(boost::intrusive_ptr<Expression> startWith) {
         _startWith.swap(startWith);
     }

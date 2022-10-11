@@ -94,8 +94,18 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    /**
+     * Returns the groupBy expression. The mutable getter can be used to alter
+     * the expression, but should not be used after execution has begun.
+     */
     boost::intrusive_ptr<Expression> getGroupByExpression() const;
+    boost::intrusive_ptr<Expression>& getMutableGroupByExpression();
+    /**
+     * Returns the accumulated fields expressions. The mutable getter can be used to alter
+     * the expression, but should not be used after execution has begun.
+     */
     const std::vector<AccumulationStatement>& getAccumulatedFields() const;
+    std::vector<AccumulationStatement>& getMutableAccumulatedFields();
 
 protected:
     GetNextResult doGetNext() final;

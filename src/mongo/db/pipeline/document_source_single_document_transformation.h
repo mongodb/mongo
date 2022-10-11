@@ -103,6 +103,9 @@ public:
     const auto& getTransformer() const {
         return *_parsedTransform;
     }
+    auto& getTransformer() {
+        return *_parsedTransform;
+    }
 
     const projection_ast::Projection* getProjectionAST() const {
         tassert(6684603, "Expected a projection AST but found none", hasProjectionAST());

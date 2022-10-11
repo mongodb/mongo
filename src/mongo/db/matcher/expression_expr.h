@@ -109,6 +109,13 @@ public:
         return _expression;
     }
 
+    /**
+     * Use if the caller needs to modify the expression held by this $expr.
+     */
+    boost::intrusive_ptr<Expression>& getExpressionRef() {
+        return _expression;
+    }
+
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }

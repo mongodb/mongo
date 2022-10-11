@@ -103,7 +103,19 @@ public:
     const char* getSourceName() const final;
     GetModPathsReturn getModifiedPaths() const final;
     StringMap<boost::intrusive_ptr<Expression>> getIdFields() const;
+
+    /**
+     * Can be used to change or swap out individual _id fields, but should not be used
+     * once execution has begun.
+     */
+    std::vector<boost::intrusive_ptr<Expression>>& getMutableIdFields();
     const std::vector<AccumulationStatement>& getAccumulatedFields() const;
+
+    /**
+     * Can be used to change or swap out individual accumulated fields, but should not be used
+     * once execution has begun.
+     */
+    std::vector<AccumulationStatement>& getMutableAccumulatedFields();
 
     /**
      * Convenience method for creating a new $group stage. If maxMemoryUsageBytes is boost::none,

@@ -82,6 +82,10 @@ public:
         return _newRoot;
     }
 
+    boost::intrusive_ptr<Expression>& getExpressionToModify() {
+        return _newRoot;
+    }
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final {
         expression::addVariableRefs(_newRoot.get(), refs);
     }

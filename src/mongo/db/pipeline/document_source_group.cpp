@@ -404,7 +404,17 @@ StringMap<boost::intrusive_ptr<Expression>> DocumentSourceGroup::getIdFields() c
     }
 }
 
+std::vector<boost::intrusive_ptr<Expression>>& DocumentSourceGroup::getMutableIdFields() {
+    tassert(7020503, "Can't mutate _id fields after initialization", !_initialized);
+    return _idExpressions;
+}
+
 const std::vector<AccumulationStatement>& DocumentSourceGroup::getAccumulatedFields() const {
+    return _accumulatedFields;
+}
+
+std::vector<AccumulationStatement>& DocumentSourceGroup::getMutableAccumulatedFields() {
+    tassert(7020504, "Can't mutate accumulated fields after initialization", !_initialized);
     return _accumulatedFields;
 }
 
