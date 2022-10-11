@@ -115,7 +115,8 @@ reshardingTest.withReshardingInBackground(
             const configRS = reshardingTest.getReplSetForShard(reshardingTest.configShardName);
             configRS.awaitSecondaryNodes();
             configRS.awaitReplication();
-            reshardCollectionJoinedFailPointsList.forEach(fp => fp.off());
+            reshardCollectionJoinedFailPointsList.forEach(
+                fp => reshardingTest.retryOnceOnNetworkError(fp.off));
             shardsvrAbortReshardCollectionFailpoint.off();
         },
     });

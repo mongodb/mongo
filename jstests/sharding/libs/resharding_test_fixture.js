@@ -594,18 +594,15 @@ var ReshardingTest = class {
             });
         } else {
             this._callFunctionSafely(() => {
-                this.retryOnceOnNetworkError(  //
-                    () => this._pauseCoordinatorBeforeBlockingWritesFailpoints.forEach(
-                        fp => fp.off()));
-
+                this._pauseCoordinatorBeforeBlockingWritesFailpoints.forEach(
+                    fp => this.retryOnceOnNetworkError(fp.off));
                 postCheckConsistencyFn();
-                this.retryOnceOnNetworkError(
-                    () => this._pauseCoordinatorBeforeDecisionPersistedFailpoints.forEach(
-                        fp => fp.off()));
+                this._pauseCoordinatorBeforeDecisionPersistedFailpoints.forEach(
+                    fp => this.retryOnceOnNetworkError(fp.off));
 
                 postDecisionPersistedFn();
-                this.retryOnceOnNetworkError(
-                    () => this._pauseCoordinatorBeforeCompletionFailpoints.forEach(fp => fp.off()));
+                this._pauseCoordinatorBeforeCompletionFailpoints.forEach(
+                    fp => this.retryOnceOnNetworkError(fp.off));
             });
         }
 
