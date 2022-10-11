@@ -125,7 +125,7 @@ TransactionOperations::CollectionUUIDs TransactionOperations::getCollectionUUIDs
 }
 
 std::vector<TransactionOperations::TransactionOperation>*
-TransactionOperations::getMutableOperationsForTransactionParticipant() {
+TransactionOperations::getMutableOperationsForOpObserver() {
     return &_transactionOperations;
 }
 

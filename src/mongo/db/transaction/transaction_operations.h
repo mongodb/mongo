@@ -103,12 +103,16 @@ public:
 
     /**
      * Returns pointer to vector of operations for integrating with
-     * TransactionParticipant and OpObserver interfaces for multi-doc transactions.
+     * BatchedWriteContext, TransactionParticipant, and OpObserver interfaces
+     * for multi-doc transactions.
      *
      * Caller assumes responsibility for keeping contents referenced by the pointer
      * in sync with statistics maintained in this container.
+     *
+     * This function can be removed when we have migrated callers of BatchedWriteContext
+     * and TransactionParticipant to use the methods on this class directly.
      */
-    std::vector<TransactionOperation>* getMutableOperationsForTransactionParticipant();
+    std::vector<TransactionOperation>* getMutableOperationsForOpObserver();
 
     /**
      * Returns copy of operations for TransactionParticipant testing.

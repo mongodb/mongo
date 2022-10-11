@@ -51,9 +51,10 @@ TEST(TransactionOperationsTest, Basic) {
     ASSERT(op.getPostImage().isEmpty());
     ASSERT_EQ(ops.getTotalOperationBytes(), opSize);
 
-    // The getMutableOperationsForTransactionParticipant() method supports integration with
-    // existing TransactionParticipant usage and OpObserver interfaces.
-    auto* mutableOps = ops.getMutableOperationsForTransactionParticipant();
+    // The getMutableOperationsForOpObserver() method supports integration with
+    // existing BatchedWriteContext, TransactionParticipant usage and OpObserver
+    // interfaces.
+    auto* mutableOps = ops.getMutableOperationsForOpObserver();
     ASSERT_EQ(mutableOps->size(), ops.numOperations());
     std::size_t mutableOpsTotalOperationBytes = 0;
     for (const auto& mutableOp : *mutableOps) {

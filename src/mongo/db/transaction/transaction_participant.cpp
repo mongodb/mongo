@@ -1764,7 +1764,7 @@ TransactionParticipant::Participant::retrieveCompletedTransactionOperations(
     invariant(o().txnState.isInSet(TransactionState::kInProgress | TransactionState::kPrepared),
               str::stream() << "Current state: " << o().txnState);
 
-    return p().transactionOperations.getMutableOperationsForTransactionParticipant();
+    return p().transactionOperations.getMutableOperationsForOpObserver();
 }
 
 TxnResponseMetadata TransactionParticipant::Participant::getResponseMetadata() {
