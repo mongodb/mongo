@@ -401,6 +401,7 @@ static int
 __posix_file_read(
   WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_off_t offset, size_t len, void *buf)
 {
+    WT_DECL_RET;
     WT_FILE_HANDLE_POSIX *pfh;
     WT_SESSION_IMPL *session;
     size_t chunk;
@@ -420,10 +421,16 @@ __posix_file_read(
           len >= S2C(session)->buffer_alignment && len % S2C(session)->buffer_alignment == 0));
 
     /* Break reads larger than 1GB into 1GB chunks. */
+    nr = 0;
     for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
         chunk = WT_MIN(len, WT_GIGABYTE);
-        if ((nr = pread(pfh->fd, addr, chunk, offset)) <= 0)
-            WT_RET_MSG(session, nr == 0 ? WT_ERROR : __wt_errno(),
+        /*
+         * The WT_SYSCALL_RETRY macro expects 0 for success. pread returns > 0 when successful,
+         * adjust the return value.
+         */
+        WT_SYSCALL_RETRY((nr = pread(pfh->fd, addr, chunk, offset)) <= 0 ? -1 : 0, ret);
+        if (ret != 0)
+            WT_RET_MSG(session, nr == 0 ? WT_ERROR : ret,
               "%s: handle-read: pread: failed to read %" WT_SIZET_FMT " bytes at offset %" PRIuMAX,
               file_handle->name, chunk, (uintmax_t)offset);
     }
