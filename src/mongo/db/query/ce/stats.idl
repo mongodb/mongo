@@ -35,8 +35,6 @@ structs:
     StatsBucket:
         description: "Histogram bucket"
         fields:
-            upperBoundary:
-                type: IDLAnyType
             boundaryCount:
                 type: long
             rangeCount:
@@ -47,6 +45,14 @@ structs:
                 type: long
             cumulativeDistincts:
                 type: long
+
+    Histogram:
+        description: "MaxDiff Histogram"
+        fields:
+            buckets:
+                type: array<StatsBucket>
+            bounds:
+                type: array<IDLAnyType>
 
     BoolCount:
         description: "Tracks count of booleans separately from histogram buckets and other type
@@ -69,32 +75,21 @@ counts"
         description: "Array Histogram"
         fields:
             minHistogram:
-                type: array<StatsBucket>
+                type: Histogram 
             maxHistogram:
-                type: array<StatsBucket>
+                type: Histogram 
             uniqueHistogram:
-                type: array<StatsBucket>
+                type: Histogram 
             boolCount:
                 type: BoolCount
             typeCount:
                 type: array<TypeTag>
 
-    StatsPath:
+    Statistics:
         description: "Serialized representation of data statistics for a key path"
         fields:
-            _id:
-                type: string
             documents:
                 type: long
-            documentsSampled:
-                type: long
-                optional: true
-            samplingRate:
-                type: double
-                optional: true
-            samplesRequested:
-                type: long
-                optional: true
             boolCount:
                 type: BoolCount
                 optional: true
@@ -102,8 +97,16 @@ counts"
                 type: array<TypeTag>
                 optional: true
             scalarHistogram:
-                type: array<StatsBucket>
+                type: Histogram
                 optional: true
             arrayStatistics:
                 type: StatsArrayHistogram
                 optional: true
+
+    StatsPath:
+        description: "Key path to statstics"
+        fields:
+            _id:
+                type: string
+            statistics:
+                type: Statistics

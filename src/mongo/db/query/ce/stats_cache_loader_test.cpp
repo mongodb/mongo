@@ -64,11 +64,14 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoad) {
     NamespaceString statsNss(nss.db(), statsColl);
 
     std::list<BSONObj> buckets;
-    for (long long i = 1; i <= 3; i++) {
-        auto typeValue = stats_serialization_utils::TypeValuePair(
-            sbe::value::TypeTags::NumberDouble, double{i + 1.0});
+    auto [boundsTag, boundsVal] = sbe::value::makeNewArray();
+    sbe::value::ValueGuard boundsGuard{boundsTag, boundsVal};
 
-        auto bucket = stats_serialization_utils::makeStatsBucket(typeValue, i, i, i, 3 * i, i + 2);
+    auto bounds = sbe::value::getArrayView(boundsVal);
+    for (long long i = 1; i <= 3; i++) {
+        bounds->push_back(sbe::value::TypeTags::NumberDouble, double{i + 1.0});
+
+        auto bucket = stats_serialization_utils::makeStatsBucket(i, i, i, 3 * i, i + 2);
         buckets.push_back(bucket);
     }
     stats_serialization_utils::TypeCount types;
@@ -79,7 +82,7 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoad) {
         types.push_back(typeElem);
     }
     auto serializedPath = stats_serialization_utils::makeStatsPath(
-        "somePath", 100, 10, 0.1, 10, std::make_pair(4LL, 6LL), types, buckets, boost::none);
+        "somePath", 100, std::make_pair(4LL, 6LL), types, buckets, bounds, boost::none);
 
     createStatsCollection(statsNss);
 
@@ -92,6 +95,7 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoad) {
             operationContext(), coll, InsertStatement(serializedPath), nullptr));
         wuow.commit();
     }
+
     auto newStats =
         _statsCacheLoader.getStats(operationContext(), std::make_pair(nss, "somePath")).get();
     std::cout << newStats->toString() << std::endl;

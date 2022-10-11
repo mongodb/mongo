@@ -59,16 +59,18 @@ std::string Bucket::toString() const {
 
 ScalarHistogram::ScalarHistogram() : ScalarHistogram({}, {}) {}
 
-ScalarHistogram::ScalarHistogram(std::vector<StatsBucket> buckets) {
+ScalarHistogram::ScalarHistogram(const Histogram& histogram) {
 
-    for (const auto& bucket : buckets) {
+    for (const auto& bucket : histogram.getBuckets()) {
         Bucket b(bucket.getBoundaryCount(),
                  bucket.getRangeCount(),
                  bucket.getCumulativeCount(),
                  bucket.getRangeDistincts(),
                  bucket.getCumulativeDistincts());
         _buckets.push_back(std::move(b));
-        auto value = sbe::bson::convertFrom<1>(bucket.getUpperBoundary().getElement());
+    }
+    for (const auto& bound : histogram.getBounds()) {
+        auto value = sbe::bson::convertFrom<1>(bound.getElement());
         _bounds.push_back(value.first, value.second);
     }
 }

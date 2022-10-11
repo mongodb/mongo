@@ -39,13 +39,11 @@
 namespace mongo::stats_serialization_utils {
 
 using TypeCount = std::list<std::pair<std::string, long long>>;
-using TypeValuePair = std::pair<sbe::value::TypeTags, sbe::value::Value>;
 
 /**
  * Returns owned BSON Object representing data matching mongo::StatsBucket IDL.
  */
-BSONObj makeStatsBucket(TypeValuePair typeValue,
-                        long long boundaryCount,
+BSONObj makeStatsBucket(long long boundaryCount,
                         long long rangeCount,
                         long long rangeDistincts,
                         long long cumulativeCount,
@@ -55,12 +53,10 @@ BSONObj makeStatsBucket(TypeValuePair typeValue,
  */
 BSONObj makeStatsPath(StringData path,
                       long long documents,
-                      boost::optional<long long> documentsSampled,
-                      boost::optional<double> samplingRate,
-                      boost::optional<long long> samplesRequested,
                       boost::optional<std::pair<long long, long long>> boolCount,
                       boost::optional<TypeCount> typeCount,
-                      boost::optional<std::list<BSONObj>> scalarHistogram,
+                      boost::optional<std::list<BSONObj>> buckets,
+                      sbe::value::Array* bounds,
                       boost::optional<BSONObj> arrayHistogram);
 
 }  // namespace mongo::stats_serialization_utils

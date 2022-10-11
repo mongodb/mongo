@@ -44,40 +44,16 @@ IDLParserContext ctx("StatsPath");
 
 
 /**
- *  Validate round trip convertion for numeric SBE values using NumberDouble datatype.
+ *  Validate round trip convertion for histogram bucket
  */
 TEST(StatsPath, BasicValidStatsBucketDouble) {
 
-    auto value =
-        stats_serialization_utils::TypeValuePair(sbe::value::TypeTags::NumberDouble, double{1});
-    auto serializedBucket = stats_serialization_utils::makeStatsBucket(value, 1, 2, 3, 4, 5);
+    auto serializedBucket = stats_serialization_utils::makeStatsBucket(1, 2, 3, 4, 5);
     auto parsedBucket = StatsBucket::parse(ctx, serializedBucket);
-
-    // Verify the upperBoundary field conversion.
-    ASSERT(sbe::bson::convertFrom<1>(parsedBucket.getUpperBoundary().getElement()) == value);
 
     // roundtrip
     auto bucketToBSON = parsedBucket.toBSON();
     ASSERT_BSONOBJ_EQ(serializedBucket, bucketToBSON);
-}
-
-/**
- *  Validate round trip convertion for heap SBE values using StringBig datatype.
- */
-TEST(StatsPath, BasicValidStatsBucketString) {
-    auto aString = "abcdef"_sd;
-    auto value = sbe::value::makeBigString(aString);
-    auto serializedBucket = stats_serialization_utils::makeStatsBucket(value, 1, 2, 3, 4, 5);
-    auto parsedBucket = StatsBucket::parse(ctx, serializedBucket);
-
-    // Verify the upperBoundary field conversion.
-    auto rtValue = sbe::bson::convertFrom<1>(parsedBucket.getUpperBoundary().getElement());
-    ASSERT(sbe::value::getStringView(rtValue.first, rtValue.second) == aString);
-
-    // roundtrip
-    auto bucketToBSON = parsedBucket.toBSON();
-    ASSERT_BSONOBJ_EQ(serializedBucket, bucketToBSON);
-    sbe::value::releaseValueDeep(value.first, value.second);
 }
 
 /**
@@ -86,11 +62,14 @@ TEST(StatsPath, BasicValidStatsBucketString) {
 TEST(StatsPath, BasicValidStatsPath) {
 
     std::list<BSONObj> buckets;
-    for (long long i = 1; i <= 3; i++) {
-        auto typeValue = stats_serialization_utils::TypeValuePair(
-            sbe::value::TypeTags::NumberDouble, double{i + 1.0});
+    auto [boundsTag, boundsVal] = sbe::value::makeNewArray();
+    sbe::value::ValueGuard boundsGuard{boundsTag, boundsVal};
+    auto bounds = sbe::value::getArrayView(boundsVal);
 
-        auto bucket = stats_serialization_utils::makeStatsBucket(typeValue, i, i, i, i, i);
+    for (long long i = 1; i <= 3; i++) {
+        bounds->push_back(sbe::value::TypeTags::NumberDouble, double{i + 1.0});
+
+        auto bucket = stats_serialization_utils::makeStatsBucket(i, i, i, i, i);
         buckets.push_back(bucket);
     }
     stats_serialization_utils::TypeCount types;
@@ -101,7 +80,7 @@ TEST(StatsPath, BasicValidStatsPath) {
         types.push_back(typeElem);
     }
     auto serializedPath = stats_serialization_utils::makeStatsPath(
-        "somePath", 100, 10, 0.1, 10, std::make_pair(4LL, 6LL), types, buckets, boost::none);
+        "somePath", 100, std::make_pair(4LL, 6LL), types, buckets, bounds, boost::none);
 
     auto parsedPath = StatsPath::parse(ctx, serializedPath);
     auto pathToBSON = parsedPath.toBSON();

@@ -27,14 +27,23 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/ce/max_diff.h"
+#include "mongo/db/query/ce/scalar_histogram.h"
+#include "mongo/db/query/ce/value_utils.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/basic.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -46,7 +55,7 @@ REGISTER_ACCUMULATOR(
 
 AccumulatorInternalConstructStats::AccumulatorInternalConstructStats(
     ExpressionContext* const expCtx)
-    : AccumulatorState(expCtx) {
+    : AccumulatorState(expCtx), _count(0) {
     assertAllowedInternalIfRequired(
         expCtx->opCtx, "_internalConstructStats", AllowedWithClientType::kInternal);
     _memUsageBytes = sizeof(*this);
@@ -58,21 +67,56 @@ intrusive_ptr<AccumulatorState> AccumulatorInternalConstructStats::create(
 }
 
 void AccumulatorInternalConstructStats::processInternal(const Value& input, bool merging) {
-    if (_key.empty()) {
-        _key = input.getDocument()["key"].getString();
+    uassert(8423375, "Can not merge analyze pipelines", !merging);
+
+    _count++;
+    const auto& doc = input.getDocument();
+    auto key = doc["key"];
+    auto valArray = doc["val"];
+    for (const auto& val : valArray.getArray()) {
+        LOGV2_DEBUG(6735800, 4, "Extracted document", "val"_attr = val);
+        _values.emplace_back(ce::SBEValue(mongo::optimizer::convertFrom(val)));
     }
-    _memUsageBytes = sizeof(*this) + _output.getApproximateSize();
+
+    _memUsageBytes = sizeof(*this);
 }
 
 Value AccumulatorInternalConstructStats::getValue(bool toBeMerged) {
-    _output.setNestedField(FieldPath(_key), Value(1));
-    return _output.freezeToValue();
+    uassert(8423374, "Can not merge analyze pipelines", !toBeMerged);
+
+    BSONObjBuilder pathBuilder;
+    pathBuilder.appendNumber("documents", _count);
+
+    if (!_values.empty()) {
+        ce::sortValueVector(_values);
+        auto data = ce::getDataDistribution(_values);
+        auto histogram = genMaxDiffHistogram(data, ce::ScalarHistogram::kMaxBuckets);
+        auto bounds = histogram.getBounds();
+        auto buckets = histogram.getBuckets();
+        BSONObjBuilder histogramBuilder(pathBuilder.subobjStart("scalarHistogram"));
+
+        BSONArrayBuilder bucketsBuilder(histogramBuilder.subarrayStart("buckets"));
+        for (const auto& bucket : buckets) {
+            auto bucketBSON = BSON(
+                "boundaryCount" << bucket._equalFreq << "rangeCount" << bucket._rangeFreq
+                                << "cumulativeCount" << bucket._cumulativeFreq << "rangeDistincts"
+                                << bucket._ndv << "cumulativeDistincts" << bucket._cumulativeNDV);
+            bucketsBuilder.append(bucketBSON);
+        }
+        bucketsBuilder.doneFast();
+        BSONArrayBuilder boundsBuilder(histogramBuilder.subarrayStart("bounds"));
+        sbe::bson::convertToBsonObj(boundsBuilder, &bounds);
+        boundsBuilder.doneFast();
+        histogramBuilder.doneFast();
+    }
+    pathBuilder.doneFast();
+    return Value(pathBuilder.obj());
 }
 
 void AccumulatorInternalConstructStats::reset() {
     _memUsageBytes = sizeof(*this);
-    _key = "";
-    _output.reset();
+    _count = 0;
+    _values.clear();
 }
 
 }  // namespace mongo

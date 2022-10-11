@@ -76,7 +76,7 @@ struct Bucket {
 class ScalarHistogram {
 public:
     ScalarHistogram();
-    ScalarHistogram(std::vector<StatsBucket> histogram);
+    ScalarHistogram(const Histogram& histogram);
     ScalarHistogram(sbe::value::Array bounds, std::vector<Bucket> buckets);
 
     std::string toString() const;
@@ -88,6 +88,8 @@ public:
     bool empty() const {
         return _buckets.empty();
     }
+
+    static constexpr size_t kMaxBuckets = 100;
 
 private:
     // Bucket bounds representing the **highest** value in each bucket.

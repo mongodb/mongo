@@ -69,7 +69,7 @@ SemiFuture<StatsCacheVal> StatsCacheLoaderImpl::getStats(OperationContext* opCtx
             IDLParserContext ctx("StatsPath");
             BSONObj document = cursor->nextSafe().getOwned();
             auto parsedStats = StatsPath::parse(ctx, document);
-            if (auto parsedHistogram = parsedStats.getScalarHistogram()) {
+            if (auto parsedHistogram = parsedStats.getStatistics().getScalarHistogram()) {
                 ScalarHistogram scalar(*parsedHistogram);
                 std::map<sbe::value::TypeTags, size_t> typeCounts;
                 // TODO: translate type strings to sbe TypeTags

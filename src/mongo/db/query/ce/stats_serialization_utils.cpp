@@ -36,15 +36,12 @@
 
 namespace mongo::stats_serialization_utils {
 
-BSONObj makeStatsBucket(TypeValuePair typeValue,
-                        long long boundaryCount,
+BSONObj makeStatsBucket(long long boundaryCount,
                         long long rangeCount,
                         long long rangeDistincts,
                         long long cumulativeCount,
                         long long cumulativeDistincts) {
     BSONObjBuilder bucketBuilder;
-    sbe::bson::appendValueToBsonObj(
-        bucketBuilder, "upperBoundary", typeValue.first, typeValue.second);
     bucketBuilder.append("boundaryCount", boundaryCount);
     bucketBuilder.append("rangeCount", rangeCount);
     bucketBuilder.append("rangeDistincts", rangeDistincts);
@@ -55,25 +52,15 @@ BSONObj makeStatsBucket(TypeValuePair typeValue,
 
 BSONObj makeStatsPath(StringData path,
                       long long documents,
-                      boost::optional<long long> documentsSampled,
-                      boost::optional<double> samplingRate,
-                      boost::optional<long long> samplesRequested,
                       boost::optional<std::pair<long long, long long>> boolCount,
                       boost::optional<TypeCount> typeCount,
-                      boost::optional<std::list<BSONObj>> scalarHistogram,
+                      boost::optional<std::list<BSONObj>> histogram,
+                      sbe::value::Array* bounds,
                       boost::optional<BSONObj> arrayHistogram) {
-    BSONObjBuilder statsBuilder;
-    statsBuilder.append("_id", path);
+    BSONObjBuilder builder;
+    builder.append("_id", path);
+    BSONObjBuilder statsBuilder(builder.subobjStart("statistics"));
     statsBuilder.append("documents", documents);
-    if (documentsSampled) {
-        statsBuilder.append("documentsSampled", *documentsSampled);
-    }
-    if (samplingRate) {
-        statsBuilder.append("samplingRate", *samplingRate);
-    }
-    if (samplesRequested) {
-        statsBuilder.append("samplesRequested", *samplesRequested);
-    }
     if (boolCount) {
         BSONObjBuilder boolCountBuilder = statsBuilder.subobjStart("boolCount");
         boolCountBuilder.append("trueCount", boolCount->first);
@@ -88,15 +75,21 @@ BSONObj makeStatsPath(StringData path,
         }
         typeCountBuilder.done();
     }
-    if (scalarHistogram) {
-        BSONArrayBuilder histArrBuilder = statsBuilder.subarrayStart("scalarHistogram");
-        histArrBuilder.append(*scalarHistogram);
-        histArrBuilder.done();
+    if (histogram) {
+        BSONObjBuilder histBuilder(statsBuilder.subobjStart("scalarHistogram"));
+        BSONArrayBuilder bucketsBuilder = histBuilder.subarrayStart("buckets");
+        bucketsBuilder.append(*histogram);
+        bucketsBuilder.done();
+        BSONArrayBuilder boundsBuilder = histBuilder.subarrayStart("bounds");
+        sbe::bson::convertToBsonObj(boundsBuilder, bounds);
+        boundsBuilder.done();
     }
     if (arrayHistogram) {
         statsBuilder.append("arrayHistogram", *arrayHistogram);
     }
-    return statsBuilder.obj();
+    statsBuilder.doneFast();
+    builder.doneFast();
+    return builder.obj();
 }
 
 }  // namespace mongo::stats_serialization_utils
