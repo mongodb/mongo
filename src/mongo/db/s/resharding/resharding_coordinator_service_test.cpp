@@ -563,7 +563,14 @@ public:
         runReshardingToCompletion(TransitionFunctionMap{});
     }
 
-    void runReshardingToCompletion(const TransitionFunctionMap& transitionFunctions) {
+    void runReshardingToCompletion(
+        const TransitionFunctionMap& transitionFunctions,
+        std::unique_ptr<PauseDuringStateTransitions> stateTransitionsGuard = nullptr,
+        const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
+                                                          CoordinatorStateEnum::kCloning,
+                                                          CoordinatorStateEnum::kApplying,
+                                                          CoordinatorStateEnum::kBlockingWrites,
+                                                          CoordinatorStateEnum::kCommitting}) {
         auto runFunctionForState = [&](CoordinatorStateEnum state) {
             auto it = transitionFunctions.find(state);
             if (it == transitionFunctions.end()) {
@@ -572,50 +579,41 @@ public:
             it->second();
         };
 
-        const std::vector<CoordinatorStateEnum> states{CoordinatorStateEnum::kPreparingToDonate,
-                                                       CoordinatorStateEnum::kCloning,
-                                                       CoordinatorStateEnum::kApplying,
-                                                       CoordinatorStateEnum::kBlockingWrites,
-                                                       CoordinatorStateEnum::kCommitting};
-        PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+        if (!stateTransitionsGuard) {
+            stateTransitionsGuard =
+                std::make_unique<PauseDuringStateTransitions>(controller(), states);
+        }
 
         auto opCtx = operationContext();
         auto coordinator = initializeAndGetCoordinator();
 
-        stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
-        runFunctionForState(CoordinatorStateEnum::kPreparingToDonate);
-        stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
-        waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
-        makeDonorsReadyToDonate(opCtx);
+        for (const auto state : states) {
+            stateTransitionsGuard->wait(state);
+            runFunctionForState(state);
+            stateTransitionsGuard->unset(state);
+            waitUntilCommittedCoordinatorDocReach(opCtx, state);
 
-        stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
-        runFunctionForState(CoordinatorStateEnum::kCloning);
-        stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
-        waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
-
-        makeRecipientsFinishedCloning(opCtx);
-        stateTransitionsGuard.wait(CoordinatorStateEnum::kApplying);
-        runFunctionForState(CoordinatorStateEnum::kApplying);
-        stateTransitionsGuard.unset(CoordinatorStateEnum::kApplying);
-        waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
-
-        coordinator->onOkayToEnterCritical();
-        stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
-        runFunctionForState(CoordinatorStateEnum::kBlockingWrites);
-        stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
-        waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
-
-        makeRecipientsBeInStrictConsistency(opCtx);
-
-        stateTransitionsGuard.wait(CoordinatorStateEnum::kCommitting);
-        runFunctionForState(CoordinatorStateEnum::kCommitting);
-        stateTransitionsGuard.unset(CoordinatorStateEnum::kCommitting);
-
-        waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCommitting);
-
-        makeDonorsProceedToDone(opCtx);
-        makeRecipientsProceedToDone(opCtx);
-
+            switch (state) {
+                case CoordinatorStateEnum::kPreparingToDonate:
+                    makeDonorsReadyToDonate(opCtx);
+                    break;
+                case CoordinatorStateEnum::kCloning:
+                    makeRecipientsFinishedCloning(opCtx);
+                    break;
+                case CoordinatorStateEnum::kApplying:
+                    coordinator->onOkayToEnterCritical();
+                    break;
+                case CoordinatorStateEnum::kBlockingWrites:
+                    makeRecipientsBeInStrictConsistency(opCtx);
+                    break;
+                case CoordinatorStateEnum::kCommitting:
+                    makeDonorsProceedToDone(opCtx);
+                    makeRecipientsProceedToDone(opCtx);
+                    break;
+                default:
+                    break;
+            }
+        }
         coordinator->getCompletionFuture().get(opCtx);
     }
 
@@ -928,6 +926,14 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNo
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, MultipleReshardingOperationsFail) {
+    const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
+                                                      CoordinatorStateEnum::kCloning,
+                                                      CoordinatorStateEnum::kApplying,
+                                                      CoordinatorStateEnum::kBlockingWrites,
+                                                      CoordinatorStateEnum::kCommitting};
+
+    auto stateTransitionsGuard =
+        std::make_unique<PauseDuringStateTransitions>(controller(), states);
     auto coordinator = initializeAndGetCoordinator();
 
     // Asserts that a resharding op with same namespace and same shard key fails with
@@ -968,7 +974,7 @@ TEST_F(ReshardingCoordinatorServiceTest, MultipleReshardingOperationsFail) {
                        DBException,
                        ErrorCodes::ConflictingOperationInProgress);
 
-    runReshardingToCompletion();
+    runReshardingToCompletion(TransitionFunctionMap{}, std::move(stateTransitionsGuard));
 }
 
 }  // namespace
