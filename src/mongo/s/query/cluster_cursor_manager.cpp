@@ -352,8 +352,8 @@ void ClusterCursorManager::detachAndKillCursor(stdx::unique_lock<Latch> lk,
 
 std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContext* opCtx,
                                                                  Date_t cutoff) {
-    return killCursorsSatisfying(
-        opCtx, [cutoff](CursorId cursorId, const CursorEntry& entry) -> bool {
+    auto cursorsKilled =
+        killCursorsSatisfying(opCtx, [cutoff](CursorId cursorId, const CursorEntry& entry) -> bool {
             if (entry.getLifetimeType() == CursorLifetime::Immortal ||
                 entry.getOperationUsingCursor() ||
                 (entry.getLsid() && !enableTimeoutOfInactiveSessionCursors.load())) {
@@ -371,6 +371,11 @@ std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContex
 
             return res;
         });
+
+    stdx::lock_guard<Latch> lk(_mutex);
+    _cursorsTimedOut += cursorsKilled;
+
+    return cursorsKilled;
 }
 
 void ClusterCursorManager::killAllCursors(OperationContext* opCtx) {
@@ -419,6 +424,11 @@ std::size_t ClusterCursorManager::killCursorsSatisfying(
     }
 
     return nKilled;
+}
+
+size_t ClusterCursorManager::cursorsTimedOut() const {
+    stdx::lock_guard<Latch> lk(_mutex);
+    return _cursorsTimedOut;
 }
 
 ClusterCursorManager::Stats ClusterCursorManager::stats() const {

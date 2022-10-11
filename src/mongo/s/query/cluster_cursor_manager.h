@@ -473,6 +473,7 @@ public:
     /**
      * Informs the manager that all mortal cursors with a 'last active' time equal to or earlier
      * than 'cutoff' should be killed.  The cursors need not necessarily be in the 'idle' state.
+     * The number of killed cursors is added to '_cursorsTimedOut' counter.
      *
      * May block waiting for other threads to finish, but does not block on the network.
      *
@@ -515,13 +516,7 @@ public:
      */
     stdx::unordered_set<CursorId> getCursorsForSession(LogicalSessionId lsid) const;
 
-    void incrementCursorsTimedOut(size_t inc) {
-        _cursorsTimedOut += inc;
-    }
-
-    size_t cursorsTimedOut() const {
-        return _cursorsTimedOut;
-    }
+    size_t cursorsTimedOut() const;
 
 private:
     using CursorEntryMap = stdx::unordered_map<CursorId, CursorEntry>;

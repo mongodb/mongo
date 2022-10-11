@@ -498,6 +498,21 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceMultipleCursors) 
     }
 }
 
+// Test that killMortalCursorsInactiveSince() increases cursorsTimeOut().
+TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceCursorsTimedOut) {
+    ASSERT_EQ(0ULL, getManager()->cursorsTimedOut());
+    ASSERT_OK(getManager()->registerCursor(getOperationContext(),
+                                           allocateMockCursor(),
+                                           nss,
+                                           ClusterCursorManager::CursorType::SingleTarget,
+                                           ClusterCursorManager::CursorLifetime::Mortal,
+                                           boost::none));
+    ASSERT_EQ(1ULL,
+              getManager()->killMortalCursorsInactiveSince(getOperationContext(),
+                                                           getClockSource()->now()));
+    ASSERT_EQ(1ULL, getManager()->cursorsTimedOut());
+}
+
 // Test that killing all cursors successfully kills all cursors.
 TEST_F(ClusterCursorManagerTest, KillAllCursors) {
     const size_t numCursors = 10;
