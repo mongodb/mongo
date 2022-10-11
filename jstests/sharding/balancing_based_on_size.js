@@ -14,8 +14,16 @@
 load("jstests/sharding/libs/find_chunks_util.js");
 
 const maxChunkSizeMB = 1;
-const st = new ShardingTest(
-    {shards: 2, mongos: 1, other: {chunkSize: maxChunkSizeMB, enableBalancer: false}});
+const st = new ShardingTest({
+    shards: 2,
+    mongos: 1,
+    other: {
+        chunkSize: maxChunkSizeMB,
+        enableBalancer: false,
+        configOptions: {setParameter: {logComponentVerbosity: tojson({sharding: {verbosity: 2}})}}
+    }
+});
+
 const dbName = 'test';
 const coll = st.getDB(dbName).getCollection('foo');
 const ns = coll.getFullName();
@@ -67,6 +75,9 @@ const chunksBeforeNoopRound = findChunksUtil.findChunksByNs(st.config, ns).toArr
 
 // Check that the collection is balanced
 st.verifyCollectionIsBalanced(coll);
+
+jsTestLog("Printing sharding status after wait for collection balance");
+st.printShardingStatus();
 
 // Wait for some more rounds and then check the balancer is not wrongly moving around data
 st.forEachConfigServer((conn) => {
