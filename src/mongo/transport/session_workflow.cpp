@@ -197,6 +197,10 @@ public:
         *this = std::move(other);
     }
     SessionWorkflowMetrics& operator=(SessionWorkflowMetrics&& other) {
+        if (&other == this) {
+            return *this;
+        }
+
         _isFinalized = other._isFinalized;
         _timer = std::move(other._timer);
         _splits = std::move(other._splits);
