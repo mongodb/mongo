@@ -16,7 +16,6 @@ env.Library(
         'transaction_participant.cpp',
         'transaction_participant_resource_yielder.cpp',
         'internal_transactions_reap_service.idl',
-        'transaction_operations.cpp',
         'transaction_participant.idl',
         'transactions_stats.idl',
     ],
@@ -49,6 +48,18 @@ env.Library(
         '$BUILD_DIR/mongo/db/update/update_driver',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'transaction_operations',
+    ],
+)
+
+env.Library(
+    target='transaction_operations',
+    source=[
+        'transaction_operations.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/repl/oplog_entry',
     ],
 )
 
@@ -101,5 +112,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/stats/transaction_stats',
         'transaction',
         'transaction_api',
+        'transaction_operations',
     ],
 )

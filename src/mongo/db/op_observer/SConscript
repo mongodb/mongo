@@ -155,6 +155,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/storage/recovery_unit_base',
         '$BUILD_DIR/mongo/db/transaction/transaction',
+        '$BUILD_DIR/mongo/db/transaction/transaction_operations',
         '$BUILD_DIR/mongo/db/write_block_bypass',
         'op_observer_impl',
         'op_observer_util',
