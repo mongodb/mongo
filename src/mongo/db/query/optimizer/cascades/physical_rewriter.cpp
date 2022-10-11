@@ -104,16 +104,20 @@ private:
     const PhysProps& _availableProps;
 };
 
-PhysicalRewriter::PhysicalRewriter(Memo& memo,
+PhysicalRewriter::PhysicalRewriter(const Metadata& metadata,
+                                   Memo& memo,
                                    const GroupIdType rootGroupId,
+                                   const DebugInfo& debugInfo,
                                    const QueryHints& hints,
                                    const RIDProjectionsMap& ridProjections,
                                    const CostingInterface& costDerivation,
                                    const PathToIntervalFn& pathToInterval,
                                    std::unique_ptr<LogicalRewriter>& logicalRewriter)
-    : _memo(memo),
+    : _metadata(metadata),
+      _memo(memo),
       _rootGroupId(rootGroupId),
       _costDerivation(costDerivation),
+      _debugInfo(debugInfo),
       _hints(hints),
       _ridProjections(ridProjections),
       _pathToInterval(pathToInterval),
@@ -146,11 +150,11 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
                                              PrefixId& prefixId,
                                              PhysOptimizationResult& bestResult) {
     const CostAndCE nodeCostAndCE = _costDerivation.deriveCost(
-        _memo, bestResult._physProps, node->ref(), childProps, nodeCEMap);
+        _metadata, _memo, bestResult._physProps, node->ref(), childProps, nodeCEMap);
     const CostType nodeCost = nodeCostAndCE._cost;
     uassert(6624056, "Must get non-infinity cost for physical node.", !nodeCost.isInfinite());
 
-    if (_memo.getDebugInfo().hasDebugLevel(3)) {
+    if (_debugInfo.hasDebugLevel(3)) {
         std::cout << "Requesting optimization\n";
         printCandidateInfo(*node, groupId, nodeCost, childProps, bestResult);
     }
@@ -161,7 +165,7 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
     const bool improvement =
         success && (!bestResult._nodeInfo || cost < bestResult._nodeInfo->_cost);
 
-    if (_memo.getDebugInfo().hasDebugLevel(3)) {
+    if (_debugInfo.hasDebugLevel(3)) {
         std::cout << (success ? (improvement ? "Improved" : "Did not improve")
                               : "Failed optimizing")
                   << "\n";
@@ -236,7 +240,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
                                                                       PrefixId& prefixId,
                                                                       CostType costLimit) {
     const size_t localPlanExplorationCount = ++_memo._stats._physPlanExplorationCount;
-    if (_memo.getDebugInfo().hasDebugLevel(2)) {
+    if (_debugInfo.hasDebugLevel(2)) {
         std::cout << "#" << localPlanExplorationCount << " Optimizing group " << groupId
                   << ", cost limit: " << costLimit.toString() << "\n";
         std::cout << ExplainGenerator::explainPhysProps("Physical properties", physProps) << "\n";
@@ -278,7 +282,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
             return {};
         } else {
             // Reuse result under identical properties.
-            if (_memo.getDebugInfo().hasDebugLevel(3)) {
+            if (_debugInfo.hasDebugLevel(3)) {
                 std::cout << "Reusing winner's circle entry: group: " << groupId
                           << ", id: " << physNode._index
                           << ", cost: " << physNode._nodeInfo->_cost.toString()
@@ -314,7 +318,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
             }
 
             if (physNode->_nodeInfo->_cost < costLimit) {
-                if (_memo.getDebugInfo().hasDebugLevel(3)) {
+                if (_debugInfo.hasDebugLevel(3)) {
                     std::cout << "Reducing cost limit: group: " << groupId
                               << ", id: " << physNode->_index
                               << ", cost: " << physNode->_nodeInfo->_cost.toString()
@@ -342,7 +346,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
     if (groupId != _rootGroupId) {
         // Verify properties can be enforced and add enforcers if necessary.
         addEnforcers(groupId,
-                     _memo.getMetadata(),
+                     _metadata,
                      _ridProjections,
                      prefixId,
                      bestResult._queue,
@@ -360,7 +364,8 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
 
         // Add rewrites to convert logical into physical nodes. Only add rewrites for newly added
         // logical nodes.
-        addImplementers(_memo,
+        addImplementers(_metadata,
+                        _memo,
                         _hints,
                         _ridProjections,
                         prefixId,
@@ -400,7 +405,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
     }
 
     // We have a successful rewrite.
-    if (_memo.getDebugInfo().hasDebugLevel(2)) {
+    if (_debugInfo.hasDebugLevel(2)) {
         std::cout << "#" << localPlanExplorationCount << " Optimized group: " << groupId
                   << ", id: " << bestResult._index
                   << ", cost: " << bestResult._nodeInfo->_cost.toString() << "\n";

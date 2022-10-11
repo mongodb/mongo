@@ -73,7 +73,6 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
         std::cout << ExplainGenerator::explainV2(abt) << std::endl;
     }
 
-    // TODO SERVER-68914. We currently need to construct the Phase manager in place.
     OptPhaseManager phaseManager{_optPhases,
                                  _prefixId,
                                  false /*requireRID*/,
@@ -96,7 +95,7 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
     // the original ABT (usually testing the CE for FilterNodes). The memo won't have any groups for
     // us to estimate directly yet.
     if (_optPhases.empty()) {
-        auto card = cht->deriveCE(memo, {}, abt.ref());
+        auto card = cht->deriveCE(_metadata, memo, {}, abt.ref());
 
         if constexpr (kCETestLogOnly) {
             std::cout << "CE: " << card << std::endl;
@@ -123,7 +122,7 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
 
         // Conversely, here we call deriveCE() on the ABT produced by the optimization phases, which
         // has all its delegators dereferenced.
-        auto card = cht->deriveCE(memo, group._logicalProperties, node);
+        auto card = cht->deriveCE(_metadata, memo, group._logicalProperties, node);
 
         if constexpr (!kCETestLogOnly) {
             // Ensure that the CE stored for the logical nodes of each group is what we would expect

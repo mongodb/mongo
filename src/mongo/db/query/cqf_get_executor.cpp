@@ -252,7 +252,7 @@ static QueryHints getHintsFromQueryKnobs() {
 }
 
 static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExecutor(
-    OptPhaseManager& phaseManager,
+    OptPhaseManager phaseManager,
     ABT abt,
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -482,6 +482,75 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     return {std::move(scanDefs), numberOfPartitions};
 }
 
+enum class CEMode { kSampling, kHistogram, kHeuristic };
+
+static OptPhaseManager createPhaseManager(const CEMode mode,
+                                          const NamespaceString& nss,
+                                          OperationContext* opCtx,
+                                          const int64_t collectionSize,
+                                          PrefixId& prefixId,
+                                          const bool requireRID,
+                                          Metadata metadata,
+                                          QueryHints hints) {
+    switch (mode) {
+        case CEMode::kSampling: {
+            Metadata metadataForSampling = metadata;
+            // Do not use indexes for sampling.
+            for (auto& entry : metadataForSampling._scanDefs) {
+                entry.second.getIndexDefs().clear();
+            }
+
+            // TODO: consider a limited rewrite set.
+            OptPhaseManager phaseManagerForSampling{OptPhaseManager::getAllRewritesSet(),
+                                                    prefixId,
+                                                    false /*requireRID*/,
+                                                    std::move(metadataForSampling),
+                                                    std::make_unique<HeuristicCE>(),
+                                                    std::make_unique<DefaultCosting>(),
+                                                    defaultConvertPathToInterval,
+                                                    DebugInfo::kDefaultForProd,
+                                                    {} /*hints*/};
+            return {OptPhaseManager::getAllRewritesSet(),
+                    prefixId,
+                    requireRID,
+                    std::move(metadata),
+                    std::make_unique<CESamplingTransport>(
+                        opCtx, std::move(phaseManagerForSampling), collectionSize),
+                    std::make_unique<DefaultCosting>(),
+                    defaultConvertPathToInterval,
+                    DebugInfo::kDefaultForProd,
+                    std::move(hints)};
+        }
+
+        case CEMode::kHistogram:
+            // TODO SERVER-70352: Take into account statistics cache (maybe fallback to heuristic).
+            return {OptPhaseManager::getAllRewritesSet(),
+                    prefixId,
+                    requireRID,
+                    std::move(metadata),
+                    std::make_unique<CEHistogramTransport>(
+                        std::make_shared<ce::CollectionStatisticsImpl>(collectionSize, nss)),
+                    std::make_unique<DefaultCosting>(),
+                    defaultConvertPathToInterval,
+                    DebugInfo::kDefaultForProd,
+                    std::move(hints)};
+
+        case CEMode::kHeuristic:
+            return {OptPhaseManager::getAllRewritesSet(),
+                    prefixId,
+                    requireRID,
+                    std::move(metadata),
+                    std::make_unique<HeuristicCE>(),
+                    std::make_unique<DefaultCosting>(),
+                    defaultConvertPathToInterval,
+                    DebugInfo::kDefaultForProd,
+                    std::move(hints)};
+
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOptimizer(
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -542,82 +611,32 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
         6264803, 5, "Translated ABT", "explain"_attr = ExplainGenerator::explainV2Compact(abt));
 
     const int64_t numRecords = collectionExists ? collection->numRecords(opCtx) : -1;
+    CEMode mode = CEMode::kHeuristic;
 
-    // TODO SERVER-68919: Move OptPhaseManager construction to its own function.
-    if (internalQueryCardinalityEstimatorMode == ce::kSampling && collectionExists &&
-        numRecords > 0) {
-        Metadata metadataForSampling = metadata;
-        // Do not use indexes for sampling.
-        for (auto& entry : metadataForSampling._scanDefs) {
-            entry.second.getIndexDefs().clear();
+    // TODO: SERVER-70241: Handle "auto" estimation mode.
+    if (internalQueryCardinalityEstimatorMode == ce::kSampling) {
+        if (collectionExists && numRecords > 0) {
+            mode = CEMode::kSampling;
         }
-
-        // TODO: consider a limited rewrite set.
-        OptPhaseManager phaseManagerForSampling(OptPhaseManager::getAllRewritesSet(),
-                                                prefixId,
-                                                false /*requireRID*/,
-                                                std::move(metadataForSampling),
-                                                std::make_unique<HeuristicCE>(),
-                                                std::make_unique<DefaultCosting>(),
-                                                defaultConvertPathToInterval,
-                                                DebugInfo::kDefaultForProd,
-                                                {});
-
-        OptPhaseManager phaseManager{
-            OptPhaseManager::getAllRewritesSet(),
-            prefixId,
-            requireRID,
-            std::move(metadata),
-            std::make_unique<CESamplingTransport>(opCtx, phaseManagerForSampling, numRecords),
-            std::make_unique<DefaultCosting>(),
-            defaultConvertPathToInterval,
-            DebugInfo::kDefaultForProd,
-            std::move(queryHints)};
-
-        return optimizeAndCreateExecutor(phaseManager,
-                                         std::move(abt),
-                                         opCtx,
-                                         expCtx,
-                                         nss,
-                                         collection,
-                                         std::move(canonicalQuery),
-                                         requireRID);
-
     } else if (internalQueryCardinalityEstimatorMode == ce::kHistogram) {
-        auto ceDerivation =
-            std::make_unique<CEHistogramTransport>(std::shared_ptr<ce::CollectionStatistics>(
-                new ce::CollectionStatisticsImpl(numRecords, nss)));
-        OptPhaseManager phaseManager{OptPhaseManager::getAllRewritesSet(),
-                                     prefixId,
-                                     requireRID,
-                                     std::move(metadata),
-                                     std::move(ceDerivation),
-                                     std::make_unique<DefaultCosting>(),
-                                     defaultConvertPathToInterval,
-                                     DebugInfo::kDefaultForProd,
-                                     std::move(queryHints)};
-
-        return optimizeAndCreateExecutor(phaseManager,
-                                         std::move(abt),
-                                         opCtx,
-                                         expCtx,
-                                         nss,
-                                         collection,
-                                         std::move(canonicalQuery),
-                                         requireRID);
+        mode = CEMode::kHistogram;
+    } else if (internalQueryCardinalityEstimatorMode == ce::kHeuristic) {
+        mode = CEMode::kHeuristic;
+    } else {
+        tasserted(6624252,
+                  str::stream() << "Unknown estimator mode: "
+                                << internalQueryCardinalityEstimatorMode);
     }
-    // Default to using heuristics.
-    OptPhaseManager phaseManager{OptPhaseManager::getAllRewritesSet(),
-                                 prefixId,
-                                 requireRID,
-                                 std::move(metadata),
-                                 std::make_unique<HeuristicCE>(),
-                                 std::make_unique<DefaultCosting>(),
-                                 defaultConvertPathToInterval,
-                                 DebugInfo::kDefaultForProd,
-                                 std::move(queryHints)};
 
-    return optimizeAndCreateExecutor(phaseManager,
+    OptPhaseManager phaseManager = createPhaseManager(mode,
+                                                      nss,
+                                                      opCtx,
+                                                      numRecords,
+                                                      prefixId,
+                                                      requireRID,
+                                                      std::move(metadata),
+                                                      std::move(queryHints));
+    return optimizeAndCreateExecutor(std::move(phaseManager),
                                      std::move(abt),
                                      opCtx,
                                      expCtx,

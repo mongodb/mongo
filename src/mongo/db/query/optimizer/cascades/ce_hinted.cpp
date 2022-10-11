@@ -38,8 +38,6 @@ class CEHintedTransport {
 public:
     CEType transport(const ABT& n,
                      const SargableNode& node,
-                     const Memo& memo,
-                     const LogicalProps& logicalProps,
                      CEType childResult,
                      CEType /*bindsResult*/,
                      CEType /*refsResult*/) {
@@ -58,39 +56,47 @@ public:
     }
 
     template <typename T, typename... Ts>
-    CEType transport(const ABT& n,
-                     const T& /*node*/,
-                     const Memo& memo,
-                     const LogicalProps& logicalProps,
-                     Ts&&...) {
+    CEType transport(const ABT& n, const T& /*node*/, Ts&&...) {
         if (canBeLogicalNode<T>()) {
-            return _heuristicCE.deriveCE(memo, logicalProps, n.ref());
+            return _heuristicCE.deriveCE(_metadata, _memo, _logicalProps, n.ref());
         }
         return 0.0;
     }
 
-    static CEType derive(const Memo& memo,
+    static CEType derive(const Metadata& metadata,
+                         const Memo& memo,
                          const PartialSchemaSelHints& hints,
                          const LogicalProps& logicalProps,
                          const ABT::reference_type logicalNodeRef) {
-        CEHintedTransport instance(memo, hints);
-        return algebra::transport<true>(logicalNodeRef, instance, memo, logicalProps);
+        CEHintedTransport instance(metadata, memo, logicalProps, hints);
+        return algebra::transport<true>(logicalNodeRef, instance);
     }
 
 private:
-    CEHintedTransport(const Memo& memo, const PartialSchemaSelHints& hints)
-        : _heuristicCE(), _hints(hints) {}
+    CEHintedTransport(const Metadata& metadata,
+                      const Memo& memo,
+                      const LogicalProps& logicalProps,
+                      const PartialSchemaSelHints& hints)
+        : _heuristicCE(),
+          _metadata(metadata),
+          _memo(memo),
+          _logicalProps(logicalProps),
+          _hints(hints) {}
 
     HeuristicCE _heuristicCE;
 
     // We don't own this.
+    const Metadata& _metadata;
+    const Memo& _memo;
+    const LogicalProps& _logicalProps;
     const PartialSchemaSelHints& _hints;
 };
 
-CEType HintedCE::deriveCE(const Memo& memo,
+CEType HintedCE::deriveCE(const Metadata& metadata,
+                          const Memo& memo,
                           const LogicalProps& logicalProps,
                           const ABT::reference_type logicalNodeRef) const {
-    return CEHintedTransport::derive(memo, _hints, logicalProps, logicalNodeRef);
+    return CEHintedTransport::derive(metadata, memo, _hints, logicalProps, logicalNodeRef);
 }
 
 }  // namespace mongo::optimizer::cascades

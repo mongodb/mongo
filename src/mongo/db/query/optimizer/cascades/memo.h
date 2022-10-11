@@ -158,11 +158,32 @@ struct Group {
     PhysNodes _physicalNodes;
 };
 
+/**
+ * TODO SERVER-70407: Improve documentation around the Memo and related classes.
+ */
 class Memo {
+    // To be able to access _stats field.
     friend class PhysicalRewriter;
 
 public:
     using GroupIdVector = std::vector<GroupIdType>;
+
+    /**
+     * This structure is essentially a parameter pack to simplify passing multiple references to
+     * external objects to facilitate derivation of the memo group's logical properties.
+     */
+    struct Context {
+        Context(const Metadata* metadata,
+                const DebugInfo* debugInfo,
+                const LogicalPropsInterface* logicalPropsDerivation,
+                const CEInterface* ceDerivation);
+
+        // None of those should be null.
+        const Metadata* _metadata;
+        const DebugInfo* _debugInfo;
+        const LogicalPropsInterface* _logicalPropsDerivation;
+        const CEInterface* _ceDerivation;
+    };
 
     struct Stats {
         // Number of calls to integrate()
@@ -189,16 +210,11 @@ public:
     using NodeTargetGroupMap =
         opt::unordered_map<ABT::reference_type, GroupIdType, NodeTargetGroupHash>;
 
-    Memo(DebugInfo debugInfo,
-         const Metadata& metadata,
-         std::unique_ptr<LogicalPropsInterface> logicalPropsDerivation,
-         std::unique_ptr<CEInterface> ceDerivation);
-
-    // TODO SERVER-68914: Fix object ownership issues of data members of the Memo class.
-    Memo(const Memo&) = delete;
-    Memo& operator=(const Memo&) = delete;
-    Memo(Memo&&) = delete;
-    Memo& operator=(Memo&&) = delete;
+    Memo() = default;
+    Memo(const Memo& /*other*/) = default;
+    Memo(Memo&& /*other*/) = default;
+    Memo& operator=(const Memo& /*other*/) = delete;
+    Memo& operator=(Memo&& /*other*/) = delete;
 
     const Group& getGroup(GroupIdType groupId) const;
     Group& getGroup(GroupIdType groupId);
@@ -208,37 +224,32 @@ public:
 
     ABT::reference_type getNode(MemoLogicalNodeId nodeMemoId) const;
 
-    void estimateCE(GroupIdType groupId, bool useHeuristicCE);
+    void estimateCE(const Context& ctx, GroupIdType groupId);
 
-    MemoLogicalNodeId addNode(GroupIdVector groupVector,
+    MemoLogicalNodeId addNode(const Context& ctx,
+                              GroupIdVector groupVector,
                               ProjectionNameSet projections,
                               GroupIdType targetGroupId,
                               NodeIdSet& insertedNodeIds,
                               ABT n,
-                              LogicalRewriteType rule,
-                              bool useHeuristicCE = false);
+                              LogicalRewriteType rule);
 
-    GroupIdType integrate(const ABT& node,
+    GroupIdType integrate(const Context& ctx,
+                          const ABT& node,
                           NodeTargetGroupMap targetGroupMap,
                           NodeIdSet& insertedNodeIds,
                           LogicalRewriteType rule = LogicalRewriteType::Root,
-                          bool addExistingNodeWithNewChild = false,
-                          bool useHeuristicCE = false);
+                          bool addExistingNodeWithNewChild = false);
 
     void clearLogicalNodes(GroupIdType groupId);
 
     const InputGroupsToNodeIdMap& getInputGroupsToNodeIdMap() const;
-
-    const DebugInfo& getDebugInfo() const;
 
     void clear();
 
     const Stats& getStats() const;
     size_t getLogicalNodeCount() const;
     size_t getPhysicalNodeCount() const;
-
-    const Metadata& getMetadata() const;
-    const CEInterface& getCEDerivation() const;
 
 private:
     GroupIdType addGroup(ProjectionNameSet projections);
@@ -253,14 +264,6 @@ private:
     InputGroupsToNodeIdMap _inputGroupsToNodeIdMap;
 
     NodeIdToInputGroupsMap _nodeIdToInputGroupsMap;
-
-    const Metadata& _metadata;
-    std::unique_ptr<LogicalPropsInterface> _logicalPropsDerivation;
-    std::unique_ptr<CEInterface> _ceDerivation;
-    // Used during the substitution phase, where we don't need to call _ceDerivation.
-    HeuristicCE _heuristicCE;
-
-    const DebugInfo _debugInfo;
 
     Stats _stats;
 };

@@ -52,16 +52,22 @@ public:
      */
     using RewriteSet = opt::unordered_map<LogicalRewriteType, double>;
 
-    LogicalRewriter(Memo& memo,
+    LogicalRewriter(const Metadata& metadata,
+                    Memo& memo,
                     PrefixId& prefixId,
                     RewriteSet rewriteSet,
+                    const DebugInfo& debugInfo,
                     const QueryHints& hints,
                     const PathToIntervalFn& pathToInterval,
-                    bool useHeuristicCE);
+                    const LogicalPropsInterface& logicalPropsDerivation,
+                    const CEInterface& ceDerivation);
 
+    // This is a transient structure. We do not allow copying or moving.
     LogicalRewriter() = delete;
     LogicalRewriter(const LogicalRewriter& other) = delete;
-    LogicalRewriter(LogicalRewriter&& other) = default;
+    LogicalRewriter(LogicalRewriter&& other) = delete;
+    LogicalRewriter& operator=(const LogicalRewriter& /*other*/) = delete;
+    LogicalRewriter& operator=(LogicalRewriter&& /*other*/) = delete;
 
     GroupIdType addRootNode(const ABT& node);
     std::pair<GroupIdType, NodeIdSet> addNode(const ABT& node,
@@ -115,10 +121,14 @@ private:
     std::set<int> _groupsPending;
 
     // We don't own those:
+    const Metadata& _metadata;
     Memo& _memo;
     PrefixId& _prefixId;
+    const DebugInfo& _debugInfo;
     const QueryHints& _hints;
     const PathToIntervalFn& _pathToInterval;
+    const LogicalPropsInterface& _logicalPropsDerivation;
+    const CEInterface& _ceDerivation;
 
     RewriteFnMap _rewriteMap;
 
@@ -128,9 +138,6 @@ private:
 
     // Track number of times a SargableNode at a given position in the memo has been split.
     opt::unordered_map<MemoLogicalNodeId, size_t, NodeIdHash> _sargableSplitCountMap;
-
-    // Indicates whether we should only use the heuristic CE during rewrites.
-    const bool _useHeuristicCE;
 };
 
 

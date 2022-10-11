@@ -40,7 +40,8 @@ namespace mongo::optimizer::cascades {
  */
 class HeuristicCE : public CEInterface {
 public:
-    CEType deriveCE(const Memo& memo,
+    CEType deriveCE(const Metadata& metadata,
+                    const Memo& memo,
                     const properties::LogicalProps& /*logicalProps*/,
                     ABT::reference_type logicalNodeRef) const override final;
 };

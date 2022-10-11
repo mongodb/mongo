@@ -102,10 +102,11 @@ TEST(LogicalRewriter, Memo) {
     using namespace properties;
 
     Metadata metadata{{{"test", {}}}};
-    Memo memo(DebugInfo::kDefaultForTests,
-              metadata,
-              std::make_unique<DefaultLogicalPropsDerivation>(),
-              std::make_unique<HeuristicCE>());
+    auto debugInfo = DebugInfo::kDefaultForTests;
+    DefaultLogicalPropsDerivation lPropsDerivation;
+    HeuristicCE heuristicCE;
+    Memo::Context memoCtx{&metadata, &debugInfo, &lPropsDerivation, &heuristicCE};
+    Memo memo;
 
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT filterNode = make<FilterNode>(
@@ -118,7 +119,7 @@ TEST(LogicalRewriter, Memo) {
         std::move(filterNode));
 
     NodeIdSet insertedNodeIds;
-    const GroupIdType rootGroupId = memo.integrate(evalNode, {}, insertedNodeIds);
+    const GroupIdType rootGroupId = memo.integrate(memoCtx, evalNode, {}, insertedNodeIds);
     ASSERT_EQ(2, rootGroupId);
     ASSERT_EQ(3, memo.getGroupCount());
 
@@ -200,7 +201,7 @@ TEST(LogicalRewriter, Memo) {
     {
         // Try to insert into the memo again.
         NodeIdSet insertedNodeIds;
-        const GroupIdType group = memo.integrate(evalNode, {}, insertedNodeIds);
+        const GroupIdType group = memo.integrate(memoCtx, evalNode, {}, insertedNodeIds);
         ASSERT_EQ(2, group);
         ASSERT_EQ(3, memo.getGroupCount());
 
@@ -219,7 +220,7 @@ TEST(LogicalRewriter, Memo) {
 
     {
         NodeIdSet insertedNodeIds1;
-        const GroupIdType rootGroupId1 = memo.integrate(evalNode1, {}, insertedNodeIds1);
+        const GroupIdType rootGroupId1 = memo.integrate(memoCtx, evalNode1, {}, insertedNodeIds1);
         ASSERT_EQ(3, rootGroupId1);
         ASSERT_EQ(4, memo.getGroupCount());
 

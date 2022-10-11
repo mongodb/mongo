@@ -60,7 +60,8 @@ class CEInterface {
 public:
     virtual ~CEInterface() = default;
 
-    virtual CEType deriveCE(const Memo& memo,
+    virtual CEType deriveCE(const Metadata& metadata,
+                            const Memo& memo,
                             const properties::LogicalProps& logicalProps,
                             ABT::reference_type logicalNodeRef) const = 0;
 };
@@ -71,7 +72,8 @@ public:
 class CostingInterface {
 public:
     virtual ~CostingInterface() = default;
-    virtual CostAndCE deriveCost(const Memo& memo,
+    virtual CostAndCE deriveCost(const Metadata& metadata,
+                                 const Memo& memo,
                                  const properties::PhysProps& physProps,
                                  ABT::reference_type physNodeRef,
                                  const ChildPropsType& childProps,

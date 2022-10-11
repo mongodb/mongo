@@ -318,13 +318,14 @@ public:
         return {0.0, 0.0};
     }
 
-    static CostAndCEInternal derive(const Memo& memo,
+    static CostAndCEInternal derive(const Metadata& metadata,
+                                    const Memo& memo,
                                     const PhysProps& physProps,
                                     const ABT::reference_type physNodeRef,
                                     const ChildPropsType& childProps,
                                     const NodeCEMap& nodeCEMap) {
         CostAndCEInternal result =
-            deriveInternal(memo, physProps, physNodeRef, childProps, nodeCEMap);
+            deriveInternal(metadata, memo, physProps, physNodeRef, childProps, nodeCEMap);
 
         switch (getPropertyConst<DistributionRequirement>(physProps)
                     .getDistributionAndProjections()
@@ -337,7 +338,7 @@ public:
             case DistributionType::HashPartitioning:
             case DistributionType::RangePartitioning:
             case DistributionType::UnknownPartitioning:
-                result._cost /= memo.getMetadata()._numberOfPartitions;
+                result._cost /= metadata._numberOfPartitions;
                 break;
 
             default:
@@ -348,12 +349,14 @@ public:
     }
 
 private:
-    CostDerivation(const Memo& memo,
+    CostDerivation(const Metadata& metadata,
+                   const Memo& memo,
                    const CEType ce,
                    const PhysProps& physProps,
                    const ChildPropsType& childProps,
                    const NodeCEMap& nodeCEMap)
-        : _memo(memo),
+        : _metadata(metadata),
+          _memo(memo),
           _physProps(physProps),
           _cardinalityEstimate(getAdjustedCE(ce, _physProps)),
           _childProps(childProps),
@@ -371,7 +374,8 @@ private:
         return false;
     }
 
-    static CostAndCEInternal deriveInternal(const Memo& memo,
+    static CostAndCEInternal deriveInternal(const Metadata& metadata,
+                                            const Memo& memo,
                                             const PhysProps& physProps,
                                             const ABT::reference_type physNodeRef,
                                             const ChildPropsType& childProps,
@@ -383,14 +387,14 @@ private:
                 found || physNodeRef.is<MemoLogicalDelegatorNode>());
         const CEType ce = (found ? it->second : 0.0);
 
-        CostDerivation instance(memo, ce, physProps, childProps, nodeCEMap);
+        CostDerivation instance(metadata, memo, ce, physProps, childProps, nodeCEMap);
         CostAndCEInternal costCEestimates = physNodeRef.visit(instance);
         return costCEestimates;
     }
 
     CostAndCEInternal deriveChild(const ABT& child, const size_t childIndex) {
         PhysProps physProps = _childProps.empty() ? _physProps : _childProps.at(childIndex).second;
-        return deriveInternal(_memo, physProps, child.ref(), {}, _nodeCEMap);
+        return deriveInternal(_metadata, _memo, physProps, child.ref(), {}, _nodeCEMap);
     }
 
     static CEType getAdjustedCE(CEType baseCE, const PhysProps& physProps) {
@@ -421,6 +425,7 @@ private:
     }
 
     // We don't own this.
+    const Metadata& _metadata;
     const Memo& _memo;
     const PhysProps& _physProps;
     const CEType _cardinalityEstimate;
@@ -428,13 +433,14 @@ private:
     const NodeCEMap& _nodeCEMap;
 };
 
-CostAndCE DefaultCosting::deriveCost(const Memo& memo,
+CostAndCE DefaultCosting::deriveCost(const Metadata& metadata,
+                                     const Memo& memo,
                                      const PhysProps& physProps,
                                      const ABT::reference_type physNodeRef,
                                      const ChildPropsType& childProps,
                                      const NodeCEMap& nodeCEMap) const {
     const CostAndCEInternal result =
-        CostDerivation::derive(memo, physProps, physNodeRef, childProps, nodeCEMap);
+        CostDerivation::derive(metadata, memo, physProps, physNodeRef, childProps, nodeCEMap);
     return {CostType::fromDouble(result._cost), result._ce};
 }
 

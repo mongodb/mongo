@@ -76,24 +76,30 @@ LogicalRewriter::RewriteSet LogicalRewriter::_substitutionSet = {
     {LogicalRewriteType::EvaluationSubstitute, 2},
     {LogicalRewriteType::SargableMerge, 2}};
 
-LogicalRewriter::LogicalRewriter(Memo& memo,
+LogicalRewriter::LogicalRewriter(const Metadata& metadata,
+                                 Memo& memo,
                                  PrefixId& prefixId,
                                  const RewriteSet rewriteSet,
+                                 const DebugInfo& debugInfo,
                                  const QueryHints& hints,
                                  const PathToIntervalFn& pathToInterval,
-                                 const bool useHeuristicCE)
+                                 const LogicalPropsInterface& logicalPropsDerivation,
+                                 const CEInterface& ceDerivation)
     : _activeRewriteSet(std::move(rewriteSet)),
       _groupsPending(),
+      _metadata(metadata),
       _memo(memo),
       _prefixId(prefixId),
+      _debugInfo(debugInfo),
       _hints(hints),
       _pathToInterval(pathToInterval),
-      _useHeuristicCE(useHeuristicCE) {
+      _logicalPropsDerivation(logicalPropsDerivation),
+      _ceDerivation(ceDerivation) {
     initializeRewrites();
 
     if (_activeRewriteSet.count(LogicalRewriteType::SargableSplit) > 0) {
         // If we are performing SargableSplit exploration rewrite, populate helper map.
-        for (const auto& [scanDefName, scanDef] : _memo.getMetadata()._scanDefs) {
+        for (const auto& [scanDefName, scanDef] : _metadata._scanDefs) {
             for (const auto& [indexDefName, indexDef] : scanDef.getIndexDefs()) {
                 for (const IndexCollationEntry& entry : indexDef.getCollationSpec()) {
                     if (auto pathPtr = entry._path.cast<PathGet>(); pathPtr != nullptr) {
@@ -120,12 +126,13 @@ std::pair<GroupIdType, NodeIdSet> LogicalRewriter::addNode(const ABT& node,
         targetGroupMap = {{node.ref(), targetGroupId}};
     }
 
-    const GroupIdType resultGroupId = _memo.integrate(node,
-                                                      std::move(targetGroupMap),
-                                                      insertNodeIds,
-                                                      rule,
-                                                      addExistingNodeWithNewChild,
-                                                      _useHeuristicCE);
+    const GroupIdType resultGroupId = _memo.integrate(
+        Memo::Context{&_metadata, &_debugInfo, &_logicalPropsDerivation, &_ceDerivation},
+        node,
+        std::move(targetGroupMap),
+        insertNodeIds,
+        rule,
+        addExistingNodeWithNewChild);
 
     uassert(6624046,
             "Result group is not the same as target group",
@@ -184,7 +191,7 @@ public:
     }
 
     const Metadata& getMetadata() const {
-        return _rewriter._memo.getMetadata();
+        return _rewriter._metadata;
     }
 
     PrefixId& getPrefixId() const {
@@ -1399,7 +1406,7 @@ bool LogicalRewriter::rewriteToFixPoint() {
 
     while (!_groupsPending.empty()) {
         iterationCount++;
-        if (_memo.getDebugInfo().exceedsIterationLimit(iterationCount)) {
+        if (_debugInfo.exceedsIterationLimit(iterationCount)) {
             // Iteration limit exceeded.
             return false;
         }

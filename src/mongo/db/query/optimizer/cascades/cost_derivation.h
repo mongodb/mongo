@@ -39,7 +39,8 @@ namespace mongo::optimizer::cascades {
  */
 class DefaultCosting : public CostingInterface {
 public:
-    CostAndCE deriveCost(const Memo& memo,
+    CostAndCE deriveCost(const Metadata& metadata,
+                         const Memo& memo,
                          const properties::PhysProps& physProps,
                          ABT::reference_type physNodeRef,
                          const ChildPropsType& childProps,

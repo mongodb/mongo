@@ -44,7 +44,8 @@ class HintedCE : public CEInterface {
 public:
     HintedCE(PartialSchemaSelHints hints) : _hints(std::move(hints)) {}
 
-    CEType deriveCE(const Memo& memo,
+    CEType deriveCE(const Metadata& metadata,
+                    const Memo& memo,
                     const properties::LogicalProps& logicalProps,
                     ABT::reference_type logicalNodeRef) const override final;
 

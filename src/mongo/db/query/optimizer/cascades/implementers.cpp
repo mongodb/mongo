@@ -110,7 +110,7 @@ public:
         bool canUseParallelScan = false;
         if (!distributionsCompatible(
                 indexReqTarget,
-                _memo.getMetadata()._scanDefs.at(node.getScanDefName()).getDistributionAndPaths(),
+                _metadata._scanDefs.at(node.getScanDefName()).getDistributionAndPaths(),
                 node.getProjectionName(),
                 _logicalProps,
                 {},
@@ -380,7 +380,7 @@ public:
         }
 
         const std::string& scanDefName = indexingAvailability.getScanDefName();
-        const auto& scanDef = _memo.getMetadata()._scanDefs.at(scanDefName);
+        const auto& scanDef = _metadata._scanDefs.at(scanDefName);
 
 
         // We do not check indexDefs to be empty here. We want to allow evaluations to be covered
@@ -690,7 +690,7 @@ public:
         const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(_logicalProps);
         const std::string& scanDefName = indexingAvailability.getScanDefName();
         {
-            const auto& scanDef = _memo.getMetadata()._scanDefs.at(scanDefName);
+            const auto& scanDef = _metadata._scanDefs.at(scanDefName);
             if (scanDef.getIndexDefs().empty()) {
                 // Reject if we do not have any indexes.
                 return;
@@ -1224,7 +1224,8 @@ public:
         static_assert(!canBeLogicalNode<T>(), "Logical node must implement its visitor.");
     }
 
-    ImplementationVisitor(const Memo& memo,
+    ImplementationVisitor(const Metadata& metadata,
+                          const Memo& memo,
                           const QueryHints& hints,
                           const RIDProjectionsMap& ridProjections,
                           PrefixId& prefixId,
@@ -1232,7 +1233,8 @@ public:
                           const PhysProps& physProps,
                           const LogicalProps& logicalProps,
                           const PathToIntervalFn& pathToInterval)
-        : _memo(memo),
+        : _metadata(metadata),
+          _memo(memo),
           _hints(hints),
           _ridProjections(ridProjections),
           _prefixId(prefixId),
@@ -1627,6 +1629,7 @@ private:
     }
 
     // We don't own any of those:
+    const Metadata& _metadata;
     const Memo& _memo;
     const QueryHints& _hints;
     const RIDProjectionsMap& _ridProjections;
@@ -1637,7 +1640,8 @@ private:
     const PathToIntervalFn& _pathToInterval;
 };
 
-void addImplementers(const Memo& memo,
+void addImplementers(const Metadata& metadata,
+                     const Memo& memo,
                      const QueryHints& hints,
                      const RIDProjectionsMap& ridProjections,
                      PrefixId& prefixId,
@@ -1645,7 +1649,8 @@ void addImplementers(const Memo& memo,
                      const properties::LogicalProps& logicalProps,
                      const OrderPreservingABTSet& logicalNodes,
                      const PathToIntervalFn& pathToInterval) {
-    ImplementationVisitor visitor(memo,
+    ImplementationVisitor visitor(metadata,
+                                  memo,
                                   hints,
                                   ridProjections,
                                   prefixId,

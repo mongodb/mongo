@@ -76,10 +76,9 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
       _debugInfo(std::move(debugInfo)),
       _hints(std::move(queryHints)),
       _metadata(std::move(metadata)),
-      _memo(_debugInfo,
-            _metadata,
-            std::make_unique<DefaultLogicalPropsDerivation>(),
-            std::move(ceDerivation)),
+      _memo(),
+      _logicalPropsDerivation(std::make_unique<DefaultLogicalPropsDerivation>()),
+      _ceDerivation(std::move(ceDerivation)),
       _costDerivation(std::move(costDerivation)),
       _pathToInterval(std::move(pathToInterval)),
       _physicalNodeId(),
@@ -155,9 +154,17 @@ void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
 
     _memo.clear();
     const bool useHeuristicCE = phase == OptPhase::MemoSubstitutionPhase;
-    logicalRewriter = std::make_unique<LogicalRewriter>(
-        _memo, _prefixId, rewriteSet, _hints, _pathToInterval, useHeuristicCE);
-
+    HeuristicCE heuristicCE;
+    logicalRewriter =
+        std::make_unique<LogicalRewriter>(_metadata,
+                                          _memo,
+                                          _prefixId,
+                                          rewriteSet,
+                                          _debugInfo,
+                                          _hints,
+                                          _pathToInterval,
+                                          *_logicalPropsDerivation,
+                                          useHeuristicCE ? heuristicCE : *_ceDerivation);
     rootGroupId = logicalRewriter->addRootNode(input);
 
     if (runStandalone) {
@@ -203,8 +210,10 @@ void OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
                     IndexingRequirement(IndexReqTarget::Complete, true /*dedupRID*/, rootGroupId));
     }
 
-    PhysicalRewriter rewriter(_memo,
+    PhysicalRewriter rewriter(_metadata,
+                              _memo,
                               rootGroupId,
+                              _debugInfo,
                               _hints,
                               _ridProjections,
                               *_costDerivation,
@@ -213,8 +222,7 @@ void OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
 
     auto optGroupResult =
         rewriter.optimizeGroup(rootGroupId, std::move(physProps), _prefixId, CostType::kInfinity);
-
-    tassert(6808706, "Optimization group result failed.", optGroupResult._success);
+    tassert(6808706, "Optimization failed.", optGroupResult._success);
 
     _physicalNodeId = {rootGroupId, optGroupResult._index};
     std::tie(input, _nodeToGroupPropsMap) = extractPhysicalPlan(_physicalNodeId, _metadata, _memo);

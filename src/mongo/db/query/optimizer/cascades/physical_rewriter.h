@@ -52,13 +52,21 @@ public:
         CostType _cost;
     };
 
-    PhysicalRewriter(Memo& memo,
+    PhysicalRewriter(const Metadata& _metadata,
+                     Memo& memo,
                      GroupIdType rootGroupid,
+                     const DebugInfo& debugInfo,
                      const QueryHints& hints,
                      const RIDProjectionsMap& ridProjections,
                      const CostingInterface& costDerivation,
                      const PathToIntervalFn& pathToInterval,
                      std::unique_ptr<LogicalRewriter>& logicalRewriter);
+
+    // This is a transient structure. We do not allow copying or moving.
+    PhysicalRewriter(const PhysicalRewriter& /*other*/) = delete;
+    PhysicalRewriter(PhysicalRewriter&& /*other*/) = delete;
+    PhysicalRewriter& operator=(const PhysicalRewriter& /*other*/) = delete;
+    PhysicalRewriter& operator=(PhysicalRewriter&& /*other*/) = delete;
 
     /**
      * Main entry point for physical optimization.
@@ -85,9 +93,11 @@ private:
                                                CostType costLimit);
 
     // We don't own any of this.
+    const Metadata& _metadata;
     Memo& _memo;
     const GroupIdType _rootGroupId;
     const CostingInterface& _costDerivation;
+    const DebugInfo& _debugInfo;
     const QueryHints& _hints;
     const RIDProjectionsMap& _ridProjections;
     const PathToIntervalFn& _pathToInterval;

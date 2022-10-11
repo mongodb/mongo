@@ -114,6 +114,7 @@ public:
 
     CEType transport(const ABT& n,
                      const SargableNode& node,
+                     const Metadata& metadata,
                      const Memo& memo,
                      const LogicalProps& logicalProps,
                      CEType childResult,
@@ -159,7 +160,7 @@ public:
                 // For now, because of the structure of SargableNode and the implementation of
                 // HeuristicCE, we can't combine heuristic & histogram estimates. In this case,
                 // default to Heuristic if we don't have a histogram for any of the predicates.
-                return _heuristicCE.deriveCE(memo, logicalProps, n.ref());
+                return _heuristicCE.deriveCE(metadata, memo, logicalProps, n.ref());
             }
 
             // Add this path to the map. If this is not a 'PathArr' interval, add it to the vector
@@ -221,6 +222,7 @@ public:
 
     CEType transport(const ABT& n,
                      const RootNode& node,
+                     const Metadata& metadata,
                      const Memo& memo,
                      const LogicalProps& logicalProps,
                      CEType childResult,
@@ -235,11 +237,12 @@ public:
     template <typename T, typename... Ts>
     CEType transport(const ABT& n,
                      const T& /*node*/,
+                     const Metadata& metadata,
                      const Memo& memo,
                      const LogicalProps& logicalProps,
                      Ts&&...) {
         if (canBeLogicalNode<T>()) {
-            return _heuristicCE.deriveCE(memo, logicalProps, n.ref());
+            return _heuristicCE.deriveCE(metadata, memo, logicalProps, n.ref());
         }
         return 0.0;
     }
@@ -258,10 +261,11 @@ CEHistogramTransport::CEHistogramTransport(std::shared_ptr<ce::CollectionStatist
 
 CEHistogramTransport::~CEHistogramTransport() {}
 
-CEType CEHistogramTransport::deriveCE(const Memo& memo,
+CEType CEHistogramTransport::deriveCE(const Metadata& metadata,
+                                      const Memo& memo,
                                       const LogicalProps& logicalProps,
                                       const ABT::reference_type logicalNodeRef) const {
-    return algebra::transport<true>(logicalNodeRef, *this->_impl, memo, logicalProps);
+    return algebra::transport<true>(logicalNodeRef, *this->_impl, metadata, memo, logicalProps);
 }
 
 }  // namespace mongo::optimizer::cascades

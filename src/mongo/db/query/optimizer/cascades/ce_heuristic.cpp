@@ -340,7 +340,7 @@ class CEHeuristicTransport {
 public:
     CEType transport(const ScanNode& node, CEType /*bindResult*/) {
         // Default cardinality estimate.
-        const CEType metadataCE = _memo.getMetadata()._scanDefs.at(node.getScanDefName()).getCE();
+        const CEType metadataCE = _metadata._scanDefs.at(node.getScanDefName()).getCE();
         return (metadataCE < 0.0) ? kDefaultCard : metadataCE;
     }
 
@@ -525,22 +525,27 @@ public:
         return 0.0;
     }
 
-    static CEType derive(const Memo& memo, const ABT::reference_type logicalNodeRef) {
-        CEHeuristicTransport instance(memo);
+    static CEType derive(const Metadata& metadata,
+                         const Memo& memo,
+                         const ABT::reference_type logicalNodeRef) {
+        CEHeuristicTransport instance(metadata, memo);
         return algebra::transport<false>(logicalNodeRef, instance);
     }
 
 private:
-    CEHeuristicTransport(const Memo& memo) : _memo(memo) {}
+    CEHeuristicTransport(const Metadata& metadata, const Memo& memo)
+        : _metadata(metadata), _memo(memo) {}
 
     // We don't own this.
+    const Metadata& _metadata;
     const Memo& _memo;
 };
 
-CEType HeuristicCE::deriveCE(const Memo& memo,
+CEType HeuristicCE::deriveCE(const Metadata& metadata,
+                             const Memo& memo,
                              const LogicalProps& /*logicalProps*/,
                              const ABT::reference_type logicalNodeRef) const {
-    CEType card = CEHeuristicTransport::derive(memo, logicalNodeRef);
+    CEType card = CEHeuristicTransport::derive(metadata, memo, logicalNodeRef);
     return card;
 }
 
