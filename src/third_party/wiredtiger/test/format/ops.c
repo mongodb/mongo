@@ -505,7 +505,7 @@ commit_transaction(TINFO *tinfo, bool prepared)
         if (prepared)
             lock_readlock(session, &g.prepare_commit_lock);
 
-        ts = __wt_atomic_fetch_addv64(&g.timestamp, 1);
+        ts = __wt_atomic_addv64(&g.timestamp, 1);
         testutil_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_COMMIT, ts));
 
         if (prepared)
