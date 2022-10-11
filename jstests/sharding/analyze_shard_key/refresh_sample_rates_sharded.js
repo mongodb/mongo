@@ -7,7 +7,13 @@
 (function() {
 "use strict";
 
-const st = new ShardingTest({mongos: 3, shards: 1});
+// Prevent all mongoses from running _refreshQueryAnalyzerConfiguration commands by themselves in
+// the background.
+const setParameterOpts = {
+    setParameter: {"failpoint.disableQueryAnalysisSampler": tojson({mode: "alwaysOn"})}
+};
+const st = new ShardingTest(
+    {mongos: {s0: setParameterOpts, s1: setParameterOpts, s2: setParameterOpts}, shards: 1});
 
 const dbName = "testDb";
 const db = st.s0.getDB(dbName);

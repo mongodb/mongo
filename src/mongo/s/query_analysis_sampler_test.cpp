@@ -137,6 +137,10 @@ public:
         ShardingTestFixture::setUp();
         _originalIsMongos = isMongos();
         setMongos(true);
+        setRemote(HostAndPort("ClientHost", 12345));
+
+        // Set up the RemoteCommandTargeter for the config shard.
+        configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
         // Set up a periodic runner.
         auto runner = makePeriodicRunner(getServiceContext());
@@ -152,9 +156,40 @@ public:
         setMongos(_originalIsMongos);
     }
 
+    /**
+     * Asserts that the first unprocessed request corresponds to a
+     * _refreshQueryAnalyzerConfiguration command and then responds to it with the given
+     * configurations. If there are no unprocessed requests, blocks until there is.
+     */
+    void expectConfigurationRefreshReturnSuccess(
+        double expectedNumQueriesExecutedPerSecond,
+        std::vector<CollectionQueryAnalyzerConfiguration> refreshedConfigurations) {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+
+            auto refreshRequest = RefreshQueryAnalyzerConfiguration::parse(
+                IDLParserContext("QueryAnalysisSamplerTest"), opMsg.body);
+            ASSERT_EQ(refreshRequest.getNumQueriesExecutedPerSecond(),
+                      expectedNumQueriesExecutedPerSecond);
+
+            RefreshQueryAnalyzerConfigurationResponse response;
+            response.setConfigurations(refreshedConfigurations);
+            return response.toBSON();
+        });
+    }
+
 private:
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey", true};
     bool _originalIsMongos;
+
+protected:
+    const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
+
+    const NamespaceString nss0{"testDb", "testColl0"};
+    const NamespaceString nss1{"testDb", "testColl1"};
+
+    const UUID collUuid0 = UUID::gen();
+    const UUID collUuid1 = UUID::gen();
 };
 
 DEATH_TEST_F(QueryAnalysisSamplerTest, CannotGetIfFeatureFlagNotEnabled, "invariant") {
@@ -240,12 +275,19 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStats_CountCommands) {
     ASSERT_EQ(*lastAvgCount, 1);
 }
 
-TEST_F(QueryAnalysisSamplerTest, RefreshQueryStats_Average) {
+TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     auto& sampler = QueryAnalysisSampler::get(operationContext());
 
     auto queryStats0 = sampler.getQueryStatsForTest();
     ASSERT_EQ(queryStats0.getLastTotalCount(), 0);
     ASSERT_FALSE(queryStats0.getLastAvgCount());
+
+    // Force the sampler to refresh its configurations. This should not cause the sampler to send a
+    // _refreshQueryAnalyzerConfiguration command to get sent since there is no
+    // numQueriesExecutedPerSecond yet.
+    sampler.refreshConfigurationsForTest(operationContext());
+    auto configurations = sampler.getConfigurationsForTest();
+    ASSERT(configurations.empty());
 
     // The per-second counts after: [0].
     sampler.refreshQueryStatsForTest();
@@ -255,6 +297,25 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStats_Average) {
     auto actualAvgCount1 = queryStats1.getLastAvgCount();
     ASSERT(actualAvgCount1);
     ASSERT_EQ(*actualAvgCount1, expectedAvgCount1);
+
+    // Force the sampler to refresh its configurations. This should cause the sampler to send a
+    // _refreshQueryAnalyzerConfiguration command to get sent and update its configurations even
+    // though the numQueriesExecutedPerSecond is 0.
+    std::vector<CollectionQueryAnalyzerConfiguration> refreshedConfigurations1;
+    refreshedConfigurations1.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 1});
+    refreshedConfigurations1.push_back(CollectionQueryAnalyzerConfiguration{nss1, collUuid1, 0.5});
+    auto future1 = stdx::async(stdx::launch::async, [&] {
+        expectConfigurationRefreshReturnSuccess(*queryStats1.getLastAvgCount(),
+                                                refreshedConfigurations1);
+    });
+    sampler.refreshConfigurationsForTest(operationContext());
+    future1.get();
+
+    auto configurations1 = sampler.getConfigurationsForTest();
+    ASSERT_EQ(configurations1.size(), refreshedConfigurations1.size());
+    for (size_t i = 0; i < configurations1.size(); i++) {
+        ASSERT_BSONOBJ_EQ(configurations1[i].toBSON(), refreshedConfigurations1[i].toBSON());
+    }
 
     // The per-second counts after: [0, 2].
     globalOpCounters.gotInserts(2);
@@ -267,6 +328,23 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStats_Average) {
     ASSERT(actualAvgCount2);
     ASSERT_EQ(*actualAvgCount2, expectedAvgCount2);
 
+    // Force the sampler to refresh its configurations. This should cause the sampler to send a
+    // _refreshQueryAnalyzerConfiguration command to get sent and update its configurations.
+    std::vector<CollectionQueryAnalyzerConfiguration> refreshedConfigurations2;
+    refreshedConfigurations2.push_back(CollectionQueryAnalyzerConfiguration{nss1, collUuid1, 1.5});
+    auto future2 = stdx::async(stdx::launch::async, [&] {
+        expectConfigurationRefreshReturnSuccess(*queryStats2.getLastAvgCount(),
+                                                refreshedConfigurations2);
+    });
+    sampler.refreshConfigurationsForTest(operationContext());
+    future2.get();
+
+    auto configurations2 = sampler.getConfigurationsForTest();
+    ASSERT_EQ(configurations2.size(), refreshedConfigurations2.size());
+    for (size_t i = 0; i < configurations2.size(); i++) {
+        ASSERT_BSONOBJ_EQ(configurations2[i].toBSON(), refreshedConfigurations2[i].toBSON());
+    }
+
     // The per-second counts after: [0, 2, 5].
     globalOpCounters.gotInserts(5);
     sampler.refreshQueryStatsForTest();
@@ -278,6 +356,17 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStats_Average) {
     ASSERT(actualAvgCount3);
     ASSERT_APPROX_EQUAL(
         *actualAvgCount3, expectedAvgCount3, std::numeric_limits<double>::epsilon());
+
+    // Force the sampler to refresh its configurations. This should cause the sampler to send a
+    // _refreshQueryAnalyzerConfiguration command to get sent and update its configurations.
+    auto future3 = stdx::async(stdx::launch::async, [&] {
+        expectConfigurationRefreshReturnSuccess(*queryStats3.getLastAvgCount(), {});
+    });
+    sampler.refreshConfigurationsForTest(operationContext());
+    future3.get();
+
+    auto configurations3 = sampler.getConfigurationsForTest();
+    ASSERT(configurations3.empty());
 }
 
 }  // namespace

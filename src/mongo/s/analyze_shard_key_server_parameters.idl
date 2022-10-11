@@ -66,3 +66,12 @@ server_parameters:
             expr: 5 * 60
         validator:
             gt: 0
+    queryAnalysisSamplerConfigurationRefreshSecs:
+        description: The interval in seconds at which a sampler refreshes its query analysis sample
+                     rates.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gQueryAnalysisSamplerConfigurationRefreshSecs
+        default: 5
+        validator:
+            gt: 0

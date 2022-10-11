@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
+#include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -40,10 +41,13 @@ namespace analyze_shard_key {
 /**
  * Owns the machinery for sampling queries on a sampler. That consists of the following:
  * - The periodic background job that refreshes the last exponential moving average of the number of
- *   queries that this sampler executes per second. The average determines the share of the
- *   cluster-wide sample rate that will be assigned to this sampler.
+ *   queries that this sampler executes per second.
+ * - The periodic background job that sends the calculated average to the coordinator to refresh the
+ *   latest configurations. The average determines the share of the cluster-wide sample rate that
+ *   will be assigned to this sampler.
  *
- * Currently, query sampling is only supported on a sharded cluster. So a sampler must be a mongos.
+ * Currently, query sampling is only supported on a sharded cluster. So a sampler must be a mongos
+ * and the coordinator must be the config server's primary mongod.
  */
 class QueryAnalysisSampler final {
     QueryAnalysisSampler(const QueryAnalysisSampler&) = delete;
@@ -105,13 +109,27 @@ public:
         return _queryStats;
     }
 
+    void refreshConfigurationsForTest(OperationContext* opCtx) {
+        _refreshConfigurations(opCtx);
+    }
+
+    std::vector<CollectionQueryAnalyzerConfiguration> getConfigurationsForTest() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return _configurations;
+    }
+
 private:
     void _refreshQueryStats();
+
+    void _refreshConfigurations(OperationContext* opCtx);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisSampler::_mutex");
 
     PeriodicJobAnchor _periodicQueryStatsRefresher;
     QueryStats _queryStats;
+
+    PeriodicJobAnchor _periodicConfigurationsRefresher;
+    std::vector<CollectionQueryAnalyzerConfiguration> _configurations;
 };
 
 }  // namespace analyze_shard_key

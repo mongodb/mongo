@@ -34,7 +34,9 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/util/net/socket_utils.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -42,6 +44,8 @@ namespace mongo {
 namespace analyze_shard_key {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisSampler);
 
 const auto getQueryAnalysisSampler = ServiceContext::declareDecoration<QueryAnalysisSampler>();
 
@@ -70,11 +74,25 @@ void QueryAnalysisSampler::onStartup() {
         Seconds(1));
     _periodicQueryStatsRefresher = periodicRunner->makeJob(std::move(queryStatsRefresherJob));
     _periodicQueryStatsRefresher.start();
+
+    PeriodicRunner::PeriodicJob configurationsRefresherJob(
+        "QueryAnalysisConfigurationsRefresher",
+        [this](Client* client) {
+            auto opCtx = client->makeOperationContext();
+            _refreshConfigurations(opCtx.get());
+        },
+        Seconds(gQueryAnalysisSamplerConfigurationRefreshSecs));
+    _periodicConfigurationsRefresher =
+        periodicRunner->makeJob(std::move(configurationsRefresherJob));
+    _periodicConfigurationsRefresher.start();
 }
 
 void QueryAnalysisSampler::onShutdown() {
     if (_periodicQueryStatsRefresher.isValid()) {
         _periodicQueryStatsRefresher.stop();
+    }
+    if (_periodicConfigurationsRefresher.isValid()) {
+        _periodicConfigurationsRefresher.stop();
     }
 }
 
@@ -93,12 +111,55 @@ void QueryAnalysisSampler::QueryStats::refreshTotalCount(long long newTotalCount
 }
 
 void QueryAnalysisSampler::_refreshQueryStats() {
+    if (MONGO_unlikely(disableQueryAnalysisSampler.shouldFail())) {
+        return;
+    }
+
     long long newTotalCount = globalOpCounters.getQuery()->load() +
         globalOpCounters.getInsert()->load() + globalOpCounters.getUpdate()->load() +
         globalOpCounters.getDelete()->load() + globalOpCounters.getCommand()->load();
 
     stdx::lock_guard<Latch> lk(_mutex);
     _queryStats.refreshTotalCount(newTotalCount);
+}
+
+void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
+    if (MONGO_unlikely(disableQueryAnalysisSampler.shouldFail())) {
+        return;
+    }
+
+    if (!_queryStats.getLastAvgCount()) {
+        // The average number of queries executed per second has not been calculated yet.
+        return;
+    }
+
+    RefreshQueryAnalyzerConfiguration cmd;
+    cmd.setDbName(NamespaceString::kAdminDb);
+    cmd.setName(getHostNameCached() + ":" + std::to_string(serverGlobalParams.port));
+    cmd.setNumQueriesExecutedPerSecond(*_queryStats.getLastAvgCount());
+
+    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto swResponse = configShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        NamespaceString::kAdminDb.toString(),
+        cmd.toBSON({}),
+        Shard::RetryPolicy::kIdempotent);
+    auto status = Shard::CommandResponse::getEffectiveStatus(swResponse);
+
+    if (!status.isOK()) {
+        LOGV2(6973904,
+              "Failed to refresh query analysis configurations, will try again at the next "
+              "refresh interval",
+              "error"_attr = redact(status));
+        return;
+    }
+
+    auto response = RefreshQueryAnalyzerConfigurationResponse::parse(
+        IDLParserContext("configurationRefresher"), swResponse.getValue().response);
+
+    stdx::lock_guard<Latch> lk(_mutex);
+    _configurations = response.getConfigurations();
 }
 
 }  // namespace analyze_shard_key
