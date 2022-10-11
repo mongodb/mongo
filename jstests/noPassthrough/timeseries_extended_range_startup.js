@@ -54,11 +54,6 @@ assert.eq(1, primaryDB.standard.count());
 assert.eq(1, primaryDB.extended.count());
 
 // Make sure the collections get flagged properly again after startup.
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6679402, {"nss": "testDB.standard", "timeField": "time"}, 0));
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6679402, {"nss": "testDB.extended", "timeField": "time"}, 1));
-
 assert.eq(1, getExtendedRangeCount(primary));
 
 rst.stopSet();
