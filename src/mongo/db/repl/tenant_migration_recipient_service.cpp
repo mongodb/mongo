@@ -1774,11 +1774,11 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     // Fetch all oplog entries for shard merge protocol.
     if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
         oplogFetcherConfig.queryFilter = _getOplogFetcherFilter();
+        oplogFetcherConfig.requestResumeToken = true;
     }
 
     oplogFetcherConfig.queryReadConcern =
         ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-    oplogFetcherConfig.requestResumeToken = true;
     oplogFetcherConfig.name =
         "TenantOplogFetcher_" + getTenantId() + "_" + getMigrationUUID().toString();
     oplogFetcherConfig.startingPoint = resumingFromOplogBuffer
@@ -1818,6 +1818,13 @@ Status TenantMigrationRecipientService::Instance::_enqueueDocuments(
         // Buffer docs for later application.
         _donorOplogBuffer->push(opCtx.get(), begin, end);
     }
+
+    if (_protocol == MigrationProtocolEnum::kShardMerge) {
+        // Shard merge does not need to write no-op oplog entries since it fetches all oplog
+        // entries.
+        return Status::OK();
+    }
+
     if (info.resumeToken.isNull()) {
         return Status(ErrorCodes::Error(5124600), "Resume token returned is null");
     }
