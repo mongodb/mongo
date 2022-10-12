@@ -507,7 +507,7 @@ TEST(SetupOptions, SlowMsCommandLineParamParsesSuccessfully) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.slowMS, 300);
+    ASSERT_EQ(::mongo::serverGlobalParams.slowMS.load(), 300);
 }
 
 TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromINIConfigFile) {
@@ -532,7 +532,7 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromINIConfigFile) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.slowMS, 300);
+    ASSERT_EQ(::mongo::serverGlobalParams.slowMS.load(), 300);
 }
 
 TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromYAMLConfigFile) {
@@ -559,7 +559,7 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromYAMLConfigFile) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.slowMS, 300);
+    ASSERT_EQ(::mongo::serverGlobalParams.slowMS.load(), 300);
 }
 
 TEST(SetupOptions, NonNumericSlowMsCommandLineOptionFailsToParse) {
@@ -615,7 +615,7 @@ TEST(SetupOptions, SampleRateCommandLineParamParsesSuccessfully) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate, 0.5);
+    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate.load(), 0.5);
 }
 
 TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromINIConfigFile) {
@@ -640,7 +640,7 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromINIConfigFile) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate, 0.5);
+    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate.load(), 0.5);
 }
 
 TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromYAMLConfigFile) {
@@ -667,7 +667,7 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromYAMLConfigFile) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate, 0.5);
+    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate.load(), 0.5);
 }
 
 TEST(SetupOptions, NonNumericSampleRateCommandLineOptionFailsToParse) {

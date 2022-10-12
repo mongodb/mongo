@@ -397,7 +397,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                                     boost::optional<size_t> responseLength,
                                     boost::optional<long long> slowMsOverride,
                                     bool forceLog) {
-    const long long slowMs = slowMsOverride.value_or(serverGlobalParams.slowMS);
+    const long long slowMs = slowMsOverride.value_or(serverGlobalParams.slowMS.load());
 
     // Record the size of the response returned to the client, if applicable.
     if (responseLength) {

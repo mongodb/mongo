@@ -65,9 +65,10 @@ auto scenario(bool debugLogEnabled, bool slowOp, bool forceSample) {
     auto loggedSeverityGuard = unittest::MinimumLoggedSeverityGuard(
         component, debugLogEnabled ? logv2::LogSeverity::Debug(1) : logv2::LogSeverity::Info());
 
-    ScopeGuard sampleRateGuard(
-        [savedRate = serverGlobalParams.sampleRate] { serverGlobalParams.sampleRate = savedRate; });
-    serverGlobalParams.sampleRate = forceSample ? 1.0 : 0.0;
+    ScopeGuard sampleRateGuard([savedRate = serverGlobalParams.sampleRate.load()] {
+        serverGlobalParams.sampleRate.store(savedRate);
+    });
+    serverGlobalParams.sampleRate.store(forceSample ? 1.0 : 0.0);
 
     return shouldLogSlowOpWithSampling(
         opCtx.get(), component, Milliseconds{slowOp ? 11 : 9}, Milliseconds{10});

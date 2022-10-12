@@ -1728,7 +1728,7 @@ void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
     if (shouldLogSlowOpWithSampling(opCtx,
                                     MONGO_LOGV2_DEFAULT_COMPONENT,
                                     opDuration,
-                                    Milliseconds(serverGlobalParams.slowMS))
+                                    Milliseconds(serverGlobalParams.slowMS.load()))
             .first) {
         _logSlowTransaction(opCtx, terminationCause);
     }

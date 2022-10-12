@@ -2796,7 +2796,7 @@ TEST_F(OplogApplierImplTest, DropDatabaseSucceedsInRecovering) {
 
 TEST_F(OplogApplierImplWithFastAutoAdvancingClockTest, LogSlowOpApplicationWhenSuccessful) {
     // This duration is greater than "slowMS", so the op would be considered slow.
-    auto applyDuration = serverGlobalParams.slowMS * 10;
+    auto applyDuration = serverGlobalParams.slowMS.load() * 10;
 
     // We are inserting into an existing collection.
     const NamespaceString nss("test.t");
@@ -2820,7 +2820,7 @@ TEST_F(OplogApplierImplWithFastAutoAdvancingClockTest, LogSlowOpApplicationWhenS
 
 TEST_F(OplogApplierImplWithFastAutoAdvancingClockTest, DoNotLogSlowOpApplicationWhenFailed) {
     // This duration is greater than "slowMS", so the op would be considered slow.
-    auto applyDuration = serverGlobalParams.slowMS * 10;
+    auto applyDuration = serverGlobalParams.slowMS.load() * 10;
 
     // We are trying to insert into a non-existing database.
     NamespaceString nss("test.t");
@@ -2842,7 +2842,7 @@ TEST_F(OplogApplierImplWithFastAutoAdvancingClockTest, DoNotLogSlowOpApplication
 
 TEST_F(OplogApplierImplWithSlowAutoAdvancingClockTest, DoNotLogNonSlowOpApplicationWhenSuccessful) {
     // This duration is below "slowMS", so the op would *not* be considered slow.
-    auto applyDuration = serverGlobalParams.slowMS / 10;
+    auto applyDuration = serverGlobalParams.slowMS.load() / 10;
 
     // We are inserting into an existing collection.
     const NamespaceString nss("test.t");

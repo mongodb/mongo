@@ -2386,7 +2386,7 @@ TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionsUnderSlowMSThres
     // slowMS setting.
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kTransaction,
                                                               logv2::LogSeverity::Log()};
-    serverGlobalParams.slowMS = 100;
+    serverGlobalParams.slowMS.store(100);
     startCapturingLogMessages();
 
     TransactionCoordinator coordinator(
@@ -2418,7 +2418,7 @@ TEST_F(
     // slowMS setting.
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kTransaction,
                                                               logv2::LogSeverity::Log()};
-    serverGlobalParams.slowMS = 100;
+    serverGlobalParams.slowMS.store(100);
     startCapturingLogMessages();
 
     TransactionCoordinator coordinator(
@@ -2448,7 +2448,7 @@ TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionsOverSlowMSThreshold) {
     // slowMS setting.
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kTransaction,
                                                               logv2::LogSeverity::Log()};
-    serverGlobalParams.slowMS = 100;
+    serverGlobalParams.slowMS.store(100);
     startCapturingLogMessages();
 
     TransactionCoordinator coordinator(

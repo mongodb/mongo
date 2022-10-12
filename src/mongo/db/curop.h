@@ -529,7 +529,7 @@ public:
         if (CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(getNSS().db()).filter)
             return true;
 
-        return elapsedTimeExcludingPauses() >= Milliseconds{serverGlobalParams.slowMS};
+        return elapsedTimeExcludingPauses() >= Milliseconds{serverGlobalParams.slowMS.load()};
     }
 
     /**

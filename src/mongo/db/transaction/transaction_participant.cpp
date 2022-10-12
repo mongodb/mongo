@@ -2656,7 +2656,7 @@ void TransactionParticipant::Participant::_logSlowTransaction(
         if (shouldLogSlowOpWithSampling(opCtx,
                                         logv2::LogComponent::kTransaction,
                                         opDuration,
-                                        Milliseconds(serverGlobalParams.slowMS))
+                                        Milliseconds(serverGlobalParams.slowMS.load()))
                 .first) {
             logv2::DynamicAttributes attr;
             _transactionInfoForLog(

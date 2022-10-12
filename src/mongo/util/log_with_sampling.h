@@ -50,7 +50,7 @@ inline std::pair<bool, bool> shouldLogSlowOpWithSampling(OperationContext* opCtx
 
     const auto client = opCtx->getClient();
     const bool shouldSample =
-        client->getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate;
+        client->getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate.load();
 
     // Log the transaction if we should sample and its duration is greater than or equal to the
     // slowMS command threshold.

@@ -370,7 +370,7 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                       "key"_attr = redact(prettyKey(keyPattern, frequentKey)));
     }
 
-    if (elapsedMillisToFindSplitPoints > serverGlobalParams.slowMS) {
+    if (elapsedMillisToFindSplitPoints > serverGlobalParams.slowMS.load()) {
         LOGV2_WARNING(5865005,
                       "Finding the auto split vector completed",
                       "namespace"_attr = nss,

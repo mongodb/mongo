@@ -3221,7 +3221,7 @@ protected:
         txnRouter().beginOrContinueTxn(
             operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
         txnRouter().setDefaultAtClusterTime(operationContext());
-        tickSource()->advance(Milliseconds(serverGlobalParams.slowMS + 1));
+        tickSource()->advance(Milliseconds(serverGlobalParams.slowMS.load() + 1));
     }
 
     void beginRecoverCommitWithDefaultTxnNumber() {
@@ -3234,7 +3234,7 @@ protected:
         txnRouter().beginOrContinueTxn(
             operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
         txnRouter().setDefaultAtClusterTime(operationContext());
-        tickSource()->advance(Milliseconds(serverGlobalParams.slowMS + 1));
+        tickSource()->advance(Milliseconds(serverGlobalParams.slowMS.load() + 1));
     }
 
     void assertDurationIs(Microseconds micros) {
@@ -3492,16 +3492,16 @@ private:
 //
 
 TEST_F(TransactionRouterMetricsTest, DoesNotLogTransactionsUnderSlowMSThreshold) {
-    const auto originalSlowMS = serverGlobalParams.slowMS;
-    const auto originalSampleRate = serverGlobalParams.sampleRate;
+    const auto originalSlowMS = serverGlobalParams.slowMS.load();
+    const auto originalSampleRate = serverGlobalParams.sampleRate.load();
 
-    serverGlobalParams.slowMS = 100;
-    serverGlobalParams.sampleRate = 1;
+    serverGlobalParams.slowMS.store(100);
+    serverGlobalParams.sampleRate.store(1);
 
     // Reset the global parameters to their original values after this test exits.
     ON_BLOCK_EXIT([originalSlowMS, originalSampleRate] {
-        serverGlobalParams.slowMS = originalSlowMS;
-        serverGlobalParams.sampleRate = originalSampleRate;
+        serverGlobalParams.slowMS.store(originalSlowMS);
+        serverGlobalParams.sampleRate.store(originalSampleRate);
     });
 
     beginTxnWithDefaultTxnNumber();
@@ -3511,16 +3511,16 @@ TEST_F(TransactionRouterMetricsTest, DoesNotLogTransactionsUnderSlowMSThreshold)
 }
 
 TEST_F(TransactionRouterMetricsTest, LogsTransactionsOverSlowMSThreshold) {
-    const auto originalSlowMS = serverGlobalParams.slowMS;
-    const auto originalSampleRate = serverGlobalParams.sampleRate;
+    const auto originalSlowMS = serverGlobalParams.slowMS.load();
+    const auto originalSampleRate = serverGlobalParams.sampleRate.load();
 
-    serverGlobalParams.slowMS = 100;
-    serverGlobalParams.sampleRate = 1;
+    serverGlobalParams.slowMS.store(100);
+    serverGlobalParams.sampleRate.store(1);
 
     // Reset the global parameters to their original values after this test exits.
     ON_BLOCK_EXIT([originalSlowMS, originalSampleRate] {
-        serverGlobalParams.slowMS = originalSlowMS;
-        serverGlobalParams.sampleRate = originalSampleRate;
+        serverGlobalParams.slowMS.store(originalSlowMS);
+        serverGlobalParams.sampleRate.store(originalSampleRate);
     });
 
     beginTxnWithDefaultTxnNumber();
@@ -3530,16 +3530,16 @@ TEST_F(TransactionRouterMetricsTest, LogsTransactionsOverSlowMSThreshold) {
 }
 
 TEST_F(TransactionRouterMetricsTest, LogsTransactionsWithAPIParameters) {
-    const auto originalSlowMS = serverGlobalParams.slowMS;
-    const auto originalSampleRate = serverGlobalParams.sampleRate;
+    const auto originalSlowMS = serverGlobalParams.slowMS.load();
+    const auto originalSampleRate = serverGlobalParams.sampleRate.load();
 
-    serverGlobalParams.slowMS = 100;
-    serverGlobalParams.sampleRate = 1;
+    serverGlobalParams.slowMS.store(100);
+    serverGlobalParams.sampleRate.store(1);
 
     // Reset the global parameters to their original values after this test exits.
     ON_BLOCK_EXIT([originalSlowMS, originalSampleRate] {
-        serverGlobalParams.slowMS = originalSlowMS;
-        serverGlobalParams.sampleRate = originalSampleRate;
+        serverGlobalParams.slowMS.store(originalSlowMS);
+        serverGlobalParams.sampleRate.store(originalSampleRate);
     });
 
     APIParameters::get(operationContext()).setAPIVersion("1");
@@ -3567,16 +3567,16 @@ TEST_F(TransactionRouterMetricsTest, LogsTransactionsWithAPIParameters) {
 }
 
 TEST_F(TransactionRouterMetricsTest, DoesNotLogTransactionsWithSampleRateZero) {
-    const auto originalSlowMS = serverGlobalParams.slowMS;
-    const auto originalSampleRate = serverGlobalParams.sampleRate;
+    const auto originalSlowMS = serverGlobalParams.slowMS.load();
+    const auto originalSampleRate = serverGlobalParams.sampleRate.load();
 
-    serverGlobalParams.slowMS = 100;
-    serverGlobalParams.sampleRate = 0;
+    serverGlobalParams.slowMS.store(100);
+    serverGlobalParams.sampleRate.store(0);
 
     // Reset the global parameters to their original values after this test exits.
     ON_BLOCK_EXIT([originalSlowMS, originalSampleRate] {
-        serverGlobalParams.slowMS = originalSlowMS;
-        serverGlobalParams.sampleRate = originalSampleRate;
+        serverGlobalParams.slowMS.store(originalSlowMS);
+        serverGlobalParams.sampleRate.store(originalSampleRate);
     });
 
     beginTxnWithDefaultTxnNumber();

@@ -237,14 +237,14 @@ class OplogApplierImplWithFastAutoAdvancingClockTest : public OplogApplierImplTe
 protected:
     OplogApplierImplWithFastAutoAdvancingClockTest()
         : OplogApplierImplTest(
-              Options{}.useMockClock(true, Milliseconds{serverGlobalParams.slowMS * 10})) {}
+              Options{}.useMockClock(true, Milliseconds{serverGlobalParams.slowMS.load() * 10})) {}
 };
 
 class OplogApplierImplWithSlowAutoAdvancingClockTest : public OplogApplierImplTest {
 protected:
     OplogApplierImplWithSlowAutoAdvancingClockTest()
         : OplogApplierImplTest(
-              Options{}.useMockClock(true, Milliseconds{serverGlobalParams.slowMS / 10})) {}
+              Options{}.useMockClock(true, Milliseconds{serverGlobalParams.slowMS.load() / 10})) {}
 };
 
 // Utility class to allow easily scanning a collection.  Scans in forward order, returns

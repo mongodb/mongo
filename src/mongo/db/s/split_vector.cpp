@@ -337,7 +337,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         // Remove the sentinel at the beginning before returning
         splitKeys.erase(splitKeys.begin());
 
-        if (timer.millis() > serverGlobalParams.slowMS) {
+        if (timer.millis() > serverGlobalParams.slowMS.load()) {
             LOGV2_WARNING(
                 22115,
                 "Finding the split vector for {namespace} over {keyPattern} keyCount: {keyCount} "

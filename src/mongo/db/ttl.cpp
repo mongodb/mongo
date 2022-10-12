@@ -584,7 +584,7 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
         if (shouldLogSlowOpWithSampling(opCtx,
                                         logv2::LogComponent::kIndex,
                                         duration,
-                                        Milliseconds(serverGlobalParams.slowMS))
+                                        Milliseconds(serverGlobalParams.slowMS.load()))
                 .first) {
             LOGV2(5479200,
                   "Deleted expired documents using index",
@@ -658,7 +658,7 @@ bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
         if (shouldLogSlowOpWithSampling(opCtx,
                                         logv2::LogComponent::kIndex,
                                         duration,
-                                        Milliseconds(serverGlobalParams.slowMS))
+                                        Milliseconds(serverGlobalParams.slowMS.load()))
                 .first) {
             LOGV2(5400702,
                   "Deleted expired documents using collection scan",
