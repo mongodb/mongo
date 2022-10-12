@@ -203,8 +203,7 @@ public:
                        const UUID& uuid) final {}
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPrePostImagesToWrite) final {}
+                                       TransactionOperations* transactionOperations) final {}
 
     void onBatchedWriteStart(OperationContext* opCtx) final {}
 

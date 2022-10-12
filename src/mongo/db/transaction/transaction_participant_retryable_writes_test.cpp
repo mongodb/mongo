@@ -119,11 +119,9 @@ public:
     std::function<void()> onTransactionPrepareFn = [this]() { transactionPrepared = true; };
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPrePostImagesToWrite) override {
+                                       TransactionOperations* transactionOperations) override {
         ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-        OpObserverNoop::onUnpreparedTransactionCommit(
-            opCtx, statements, numberOfPrePostImagesToWrite);
+        OpObserverNoop::onUnpreparedTransactionCommit(opCtx, transactionOperations);
 
         uassert(ErrorCodes::OperationFailed,
                 "onUnpreparedTransactionCommit() failed",

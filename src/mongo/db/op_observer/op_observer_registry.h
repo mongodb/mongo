@@ -413,11 +413,10 @@ public:
     }
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPrePostImagesToWrite) override {
+                                       TransactionOperations* transactionOperations) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onUnpreparedTransactionCommit(opCtx, statements, numberOfPrePostImagesToWrite);
+            o->onUnpreparedTransactionCommit(opCtx, transactionOperations);
     }
 
     void onPreparedTransactionCommit(

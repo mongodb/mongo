@@ -2024,8 +2024,10 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 }  // namespace
 
 void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                                   std::vector<repl::ReplOperation>* statements,
-                                                   size_t numberOfPrePostImagesToWrite) {
+                                                   TransactionOperations* transactionOperations) {
+    auto statements = transactionOperations->getMutableOperationsForOpObserver();
+    auto numberOfPrePostImagesToWrite = transactionOperations->getNumberOfPrePostImagesToWrite();
+
     invariant(opCtx->getTxnNumber());
 
     if (!opCtx->writesAreReplicated()) {

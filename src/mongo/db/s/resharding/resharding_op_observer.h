@@ -227,8 +227,7 @@ public:
                        const UUID& uuid) override {}
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPrePostImagesToWrite) override {}
+                                       TransactionOperations* transactionOperations) override {}
 
     void onPreparedTransactionCommit(
         OperationContext* opCtx,

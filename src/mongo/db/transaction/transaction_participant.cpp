@@ -1785,10 +1785,7 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
 
-    opObserver->onUnpreparedTransactionCommit(
-        opCtx,
-        txnOps->getMutableOperationsForOpObserver(),
-        p().transactionOperations.getNumberOfPrePostImagesToWrite());
+    opObserver->onUnpreparedTransactionCommit(opCtx, txnOps);
 
     // Read-only transactions with all read concerns must wait for any data they read to be majority
     // committed. For local read concern this is to match majority read concern. For both local and

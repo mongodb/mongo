@@ -200,8 +200,7 @@ public:
                        const NamespaceString& collectionName,
                        const UUID& uuid) final {}
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPrePostImagesToWrite) final {}
+                                       TransactionOperations* transactionOperations) final {}
 
     void onPreparedTransactionCommit(
         OperationContext* opCtx,
