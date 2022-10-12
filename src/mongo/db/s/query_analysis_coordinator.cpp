@@ -213,11 +213,13 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
     stdx::lock_guard<Latch> lk(_mutex);
 
     // Update the last ping time and last number of queries executed per second of this sampler.
+    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
     auto it = _samplers.find(samplerName);
     if (it == _samplers.end()) {
-        auto sampler = Sampler{samplerName.toString(),
-                               opCtx->getServiceContext()->getFastClockSource()->now()};
+        auto sampler = Sampler{samplerName.toString(), now};
         it = _samplers.emplace(samplerName, std::move(sampler)).first;
+    } else {
+        it->second.setLastPingTime(now);
     }
     it->second.setLastNumQueriesExecutedPerSecond(numQueriesExecutedPerSecond);
 

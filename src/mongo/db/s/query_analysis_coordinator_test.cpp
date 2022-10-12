@@ -445,7 +445,7 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateSamplersOnUpdate) {
 
     advanceTime(Seconds(1));
     auto mongosDocPostUpdate = makeConfigMongosDocument(mongosName0);
-    ASSERT_NE(mongosDocPostUpdate.getPing(), mongosDocPreUpdate.getPing());
+    ASSERT_GT(mongosDocPostUpdate.getPing(), mongosDocPreUpdate.getPing());
     uassertStatusOK(updateToConfigCollection(operationContext(),
                                              MongosType::ConfigNS,
                                              BSON(MongosType::name << mongosName0),
@@ -520,7 +520,7 @@ TEST_F(QueryAnalysisCoordinatorTest, CreateSamplersOnStartup) {
     assertContainsSampler(samplers, mongosDoc2);
 }
 
-TEST_F(QueryAnalysisCoordinatorTest, CreateSamplerOnGetNewConfiguration) {
+TEST_F(QueryAnalysisCoordinatorTest, CreateSamplerOnGetNewConfigurations) {
     auto coordinator = QueryAnalysisCoordinator::get(operationContext());
 
     // There are no samplers initially.
@@ -536,6 +536,37 @@ TEST_F(QueryAnalysisCoordinatorTest, CreateSamplerOnGetNewConfiguration) {
     samplers = coordinator->getSamplersForTest();
     ASSERT_EQ(samplers.size(), 1U);
     assertContainsSampler(samplers, mongosName0, pingTime, numQueriesExecutedPerSecond);
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, UpdateSamplerOnGetNewConfigurations) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    // There are no samplers initially.
+    auto samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    auto oldPingTime = now();
+    auto oldNumQueriesExecutedPerSecond = 0.5;
+    coordinator->getNewConfigurationsForSampler(
+        operationContext(), mongosName0, oldNumQueriesExecutedPerSecond);
+
+    // The refresh should cause the sampler to get created.
+    samplers = coordinator->getSamplersForTest();
+    ASSERT_EQ(samplers.size(), 1U);
+    assertContainsSampler(samplers, mongosName0, oldPingTime, oldNumQueriesExecutedPerSecond);
+
+    advanceTime(Seconds(1));
+
+    auto newPingTime = now();
+    auto newNumQueriesExecutedPerSecond = 1;
+    ASSERT_GT(newPingTime, oldPingTime);
+    coordinator->getNewConfigurationsForSampler(
+        operationContext(), mongosName0, newNumQueriesExecutedPerSecond);
+
+    // The refresh should cause the sampler to get updated.
+    samplers = coordinator->getSamplersForTest();
+    ASSERT_EQ(samplers.size(), 1U);
+    assertContainsSampler(samplers, mongosName0, newPingTime, newNumQueriesExecutedPerSecond);
 }
 
 TEST_F(QueryAnalysisCoordinatorTest, ResetLastNumQueriesExecutedOnStepUp) {
@@ -563,7 +594,7 @@ TEST_F(QueryAnalysisCoordinatorTest, ResetLastNumQueriesExecutedOnStepUp) {
         samplers, mongosName0, pingTime, boost::none /* numQueriesExecutedPerSecond */);
 }
 
-TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationOneSamplerBasic) {
+TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsOneSamplerBasic) {
     auto coordinator = QueryAnalysisCoordinator::get(operationContext());
 
     auto analyzerDoc0 =
@@ -591,7 +622,7 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationOneSamplerBasic) {
                                 *analyzerDoc1.getSampleRate());
 }
 
-TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationOneSamplerOneDisabledColl) {
+TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsOneSamplerOneDisabledColl) {
     auto coordinator = QueryAnalysisCoordinator::get(operationContext());
 
     auto analyzerDoc0 =
@@ -616,7 +647,7 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationOneSamplerOneDisabledCol
                                 *analyzerDoc1.getSampleRate());
 }
 
-TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationMultipleSamplersBasic) {
+TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsMultipleSamplersBasic) {
     auto coordinator = QueryAnalysisCoordinator::get(operationContext());
 
     // There are no samplers initially.
