@@ -7779,6 +7779,18 @@ tasks:
     vars:
       suite: query_golden_cqf
 
+- name: vpc_connectivity
+  commands:
+  - *f_expansions_write
+  - func: "do non-compile setup"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "evergreen/vpc_connectivity.py"
+
 #######################################
 #             Task Groups             #
 #######################################

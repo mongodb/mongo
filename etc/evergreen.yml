@@ -827,6 +827,15 @@ buildvariants:
   tasks:
   - name: blackduck_scanner
 
+- name: tooling-metrics
+  display_name: "Tooling Metrics"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - ubuntu1804-small
+  stepback: false
+  tasks:
+  - name: vpc_connectivity
+
 ###########################################
 #         Windows buildvariants           #
 ###########################################
