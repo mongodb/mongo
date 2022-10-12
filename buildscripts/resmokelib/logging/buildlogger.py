@@ -17,7 +17,7 @@ APPEND_TEST_LOGS_ENDPOINT = "/build/%(build_id)s/test/%(test_id)s"
 
 _BUILDLOGGER_CONFIG = os.getenv("BUILDLOGGER_CREDENTIALS", "mci.buildlogger")
 
-_SEND_AFTER_LINES = 15000
+_SEND_AFTER_LINES = 2000
 _SEND_AFTER_SECS = 10
 
 # Initialized by resmokelib.logging.loggers.configure_loggers()
@@ -236,11 +236,12 @@ class BuildloggerTestHandler(_BaseBuildloggerHandler):
                 "X-Sendlogs-Test-Failed": "true" if failed else "false",
             })
 
-    def close(self, test_failed_flag=False):  # pylint: disable=arguments-differ
+    def close(self):
         """Close the buildlogger handler."""
 
-        _BaseBuildloggerHandler.close(self, test_failed_flag=test_failed_flag)
+        _BaseBuildloggerHandler.close(self)
 
+        # TODO: pass the test status (success/failure) to this method
         self._finish_test()
 
 

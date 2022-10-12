@@ -3,7 +3,6 @@
 import json
 import logging
 import threading
-import traceback
 import warnings
 
 import requests
@@ -51,11 +50,6 @@ class BufferedHandler(logging.Handler):
 
         self.capacity = capacity
         self.interval_secs = interval_secs
-
-        # Wait 50 seconds before starting to flush the logs. This allows tests that pass in 30 seconds
-        # to not flush.
-        self.initial_interval_secs = 50
-        self.use_initial_interval = True
 
         # self.__emit_lock prohibits concurrent access to 'self.__emit_buffer',
         # 'self.__flush_event', and self.__flush_scheduled_by_emit.
@@ -106,13 +100,9 @@ class BufferedHandler(logging.Handler):
 
             if self.__flush_event is None:
                 # Now that we've added our first record to the buffer, we schedule a call to flush()
-                # to occur 'self.interval_secs' or `self.initial_interval_secs` seconds from now.
-                # 'self.__flush_event' should never be None after this point.
-                delay = self.interval_secs
-                if self.use_initial_interval:
-                    delay = self.initial_interval_secs
-                    self.use_initial_interval = False
-                self.__flush_event = flush.flush_after(self, delay=delay)
+                # to occur 'self.interval_secs' seconds from now. 'self.__flush_event' should never
+                # be None after this point.
+                self.__flush_event = flush.flush_after(self, delay=self.interval_secs)
 
             if not self.__flush_scheduled_by_emit and len(self.__emit_buffer) >= self.capacity:
                 # Attempt to flush the buffer early if we haven't already done so. We don't bother
@@ -155,24 +145,14 @@ class BufferedHandler(logging.Handler):
         raise NotImplementedError("_flush_buffer_with_lock must be implemented by BufferedHandler"
                                   " subclasses")
 
-    def close(self, **kwargs):
+    def close(self):
         """Flush the buffer and tidies up any resources used by this handler."""
-
-        # Import here after the build id has been set.
-        from buildscripts.resmokelib.config import EVERGREEN_BUILD_ID
 
         with self.__emit_lock:
             self.__close_called = True
 
             if self.__flush_event is not None:
                 flush.cancel(self.__flush_event)
-
-            # Don't flush successful tests in patch builds to save on logkeeper space.
-            # Keep the last item so flush doesn't hang on an empty buffer.
-            if EVERGREEN_BUILD_ID is not None and "_patch_" in EVERGREEN_BUILD_ID and not kwargs.get(
-                    "test_failed_flag", False):
-                self.use_initial_interval = True
-                self.__emit_buffer = []
 
         self.__flush(close_called=True)
 

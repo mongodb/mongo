@@ -151,12 +151,10 @@ class TestReport(unittest.TestResult):
 
         unittest.TestResult.stopTest(self, test)
 
-        failed_test_status = "failed"
-
         with self._lock:
             test_info = self.find_test_info(test)
             test_info.end_time = time.time()
-            test_status = "no failures detected" if test_info.status == "pass" else failed_test_status
+            test_status = "no failures detected" if test_info.status == "pass" else "failed"
 
         time_taken = test_info.end_time - test_info.start_time
         self.job_logger.info("%s ran in %0.2f seconds: %s.", test.basename(), time_taken,
@@ -167,7 +165,7 @@ class TestReport(unittest.TestResult):
         for handler in test.logger.handlers:
             # We ignore the cancellation token returned by close_later() since we always want the
             # logs to eventually get flushed.
-            logging.flush.close_later(handler, test_failed_flag=(test_status == failed_test_status))
+            logging.flush.close_later(handler)
 
         # Restore the original logger for the test.
         test.reset_logger()

@@ -53,7 +53,7 @@ def flush_after(handler, delay):
     return _FLUSH_THREAD.submit(handler.flush, delay)
 
 
-def close_later(handler, **kwargs):
+def close_later(handler):
     """Add 'handler' to the queue so that it is closed later by the flush thread.
 
     Return the scheduled event which may be used for later cancelation (see cancel()).
@@ -66,7 +66,7 @@ def close_later(handler, **kwargs):
     # handler.close() if it has fallen behind as a result of other events taking longer to run than
     # the time available before the next event.
     no_delay = 0.0
-    return _FLUSH_THREAD.submit(handler.close, no_delay, **kwargs)
+    return _FLUSH_THREAD.submit(handler.close, no_delay)
 
 
 def cancel(event):
@@ -145,13 +145,13 @@ class _FlushThread(threading.Thread):
             # Need to pass a timeout to wait() so that KeyboardInterrupt exceptions are propagated.
             self.__terminated.wait(_FlushThread._TIMEOUT)
 
-    def submit(self, action, delay, **kwargs):
+    def submit(self, action, delay):
         """Schedule 'action' for 'delay' seconds from now.
 
         Return the scheduled event which may be used for later cancelation (see cancel_event()).
         """
 
-        event = self.__scheduler.enter(delay, 0, action, kwargs=kwargs)
+        event = self.__scheduler.enter(delay, 0, action, ())
         self.__schedule_updated.set()
         return event
 
