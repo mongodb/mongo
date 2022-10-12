@@ -1845,8 +1845,15 @@ col_insert_resolve(TABLE *table, void *arg)
     do {
         WT_ORDERED_READ(max_rows, table->rows_current);
         for (i = 0, p = cip->insert_list; i < WT_ELEMENTS(cip->insert_list); ++i, ++p) {
-            if (*p == max_rows + 1) {
-                testutil_assert(__wt_atomic_casv32(&table->rows_current, max_rows, max_rows + 1));
+            /*
+             * A thread may have allocated a record number that is now less than or equal to the
+             * current maximum number of rows. In this case, simply reset the insert list.
+             * Otherwise, update the maximum number of rows with the newly inserted record.
+             */
+            if (*p > 0 && *p <= max_rows + 1) {
+                if (*p == max_rows + 1)
+                    testutil_assert(
+                      __wt_atomic_casv32(&table->rows_current, max_rows, max_rows + 1));
                 *p = 0;
                 --cip->insert_list_cnt;
                 break;
