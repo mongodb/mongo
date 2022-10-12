@@ -2306,10 +2306,9 @@ tasks:
             set -o verbose
             env CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:/opt/java/jdk11/bin:$PATH sh s_release `date +%Y%m%d`
 
+  # Note that the project settings use this task name to compile the documentation during PR
+  # testing, keep this in mind if you decide to change it.
   - name: doc-compile
-    tags: ["pull_request"]
-    run_on:
-    - ubuntu2004-test
     commands:
       - func: "get project"
       - func: "compile wiredtiger docs"
@@ -3980,6 +3979,7 @@ buildvariants:
   tasks:
     - name: ".pull_request !.pull_request_compilers"
     - name: compile
+    - name: doc-compile
     - name: make-check-test
     - name: unit-test
     - name: configure-combinations
