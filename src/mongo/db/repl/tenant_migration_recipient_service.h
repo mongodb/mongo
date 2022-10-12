@@ -211,14 +211,6 @@ public:
             return _excludedDonorHosts;
         }
 
-        /**
-         * Only used for testing. Allows setting a custom task executor for backup cursor fetcher.
-         */
-        static void setBackupCursorFetcherExecutor_forTest(
-            std::shared_ptr<executor::TaskExecutor> taskExecutor) {
-            _backupCursorFetcherExecutorForTest = taskExecutor;
-        }
-
     private:
         friend class TenantMigrationRecipientServiceTest;
 
@@ -657,9 +649,6 @@ public:
         std::unique_ptr<DBClientConnection> _oplogFetcherClient;  // (S)
 
         std::unique_ptr<Fetcher> _donorFilenameBackupCursorFileFetcher;  // (M)
-        // A task executor used for the backup cursor Fetcher for unit test only.
-        static boost::optional<std::shared_ptr<executor::TaskExecutor>>
-            _backupCursorFetcherExecutorForTest;                         // (S)
         CancellationSource _backupCursorKeepAliveCancellation = {};      // (X)
         boost::optional<SemiFuture<void>> _backupCursorKeepAliveFuture;  // (M)
 
