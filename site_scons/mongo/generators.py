@@ -89,7 +89,15 @@ def empty_buildinfo_environment_data():
     return {}
 
 
-# TODO: SERVER-69064 Improve default_variant_dir_generator in Build System
+# Special cases - if debug is not enabled and optimization is not specified,
+# default to full optimizationm otherwise turn it off.
+def get_opt_options(env) -> str:
+    if env.GetOption('opt') == 'auto':
+        return "on" if not env.GetOption('dbg') == 'on' else "off"
+    else:
+        return env.GetOption('opt')
+
+
 def default_variant_dir_generator(target, source, env, for_signature):
 
     if env.GetOption('cache') != None:
@@ -106,7 +114,10 @@ def default_variant_dir_generator(target, source, env, for_signature):
     hasher = hashlib.md5()
     for option in variant_options:
         hasher.update(option.encode('utf-8'))
-        hasher.update(str(env.GetOption(option)).encode('utf-8'))
+        if option == 'opt':
+            hasher.update(get_opt_options(env).encode('utf-8'))
+        else:
+            hasher.update(str(env.GetOption(option)).encode('utf-8'))
     variant_dir = str(hasher.hexdigest()[0:8])
 
     # If our option hash yields a well known hash, replace it with its name.

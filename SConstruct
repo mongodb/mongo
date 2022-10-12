@@ -1834,8 +1834,8 @@ env.AddMethod(get_toolchain_name, 'ToolchainName')
 env.AddMethod(is_toolchain, 'ToolchainIs')
 
 releaseBuild = has_option("release")
-optBuild = get_option('opt')
 debugBuild = get_option('dbg') == "on"
+optBuild = mongo_generators.get_opt_options(env)
 
 if env.ToolchainIs('clang'):
     # LLVM utilizes the stack extensively without optimization enabled, which
@@ -1848,11 +1848,6 @@ if env.ToolchainIs('clang'):
     if has_option('sanitize') and optBuild not in ("on", "debug"):
         env.FatalError("Error: A clang --sanitize build must have either --opt=debug or --opt=on " +
                        "to prevent crashes due to excessive stack usage")
-
-# Special cases - if debug is not enabled and optimization is not specified,
-# default to full optimizationm otherwise turn it off.
-if optBuild == "auto":
-    optBuild = "on" if not debugBuild else "off"
 
 if releaseBuild and (debugBuild or optBuild != "on"):
     env.FatalError(
