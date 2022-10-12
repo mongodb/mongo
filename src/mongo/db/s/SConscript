@@ -225,6 +225,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/storage/remove_saver',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
+        '$BUILD_DIR/mongo/db/transaction/transaction_operations',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/future_util',
         'sharding_catalog',

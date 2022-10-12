@@ -618,8 +618,7 @@ public:
          * to the transaction.  It is legal to call this method only when the transaction state is
          * in progress or committed.
          */
-        std::vector<repl::ReplOperation>* retrieveCompletedTransactionOperations(
-            OperationContext* opCtx);
+        TransactionOperations* retrieveCompletedTransactionOperations(OperationContext* opCtx);
 
         /**
          * Returns an object containing transaction-related metadata to append on responses.

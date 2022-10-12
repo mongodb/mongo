@@ -135,7 +135,9 @@ void commitUnpreparedTransaction(OperationContext* opCtx, OpObserverType& opObse
     auto txnParticipant = TransactionParticipant::get(opCtx);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx);
     opObserver.onUnpreparedTransactionCommit(
-        opCtx, txnOps, txnParticipant.getNumberOfPrePostImagesToWriteForTest());
+        opCtx,
+        txnOps->getMutableOperationsForOpObserver(),
+        txnParticipant.getNumberOfPrePostImagesToWriteForTest());
 }
 
 std::vector<repl::OpTime> reserveOpTimesInSideTransaction(OperationContext* opCtx, size_t count) {
@@ -1146,12 +1148,12 @@ protected:
                             size_t numberOfPrePostImagesToWrite = 0) {
         auto txnOps = txnParticipant().retrieveCompletedTransactionOperations(opCtx());
         auto currentTime = Date_t::now();
-        auto applyOpsAssignment =
-            opObserver().preTransactionPrepare(opCtx(), reservedSlots, currentTime, txnOps);
+        auto applyOpsAssignment = opObserver().preTransactionPrepare(
+            opCtx(), reservedSlots, currentTime, txnOps->getMutableOperationsForOpObserver());
         opCtx()->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
         opObserver().onTransactionPrepare(opCtx(),
                                           reservedSlots,
-                                          txnOps,
+                                          txnOps->getMutableOperationsForOpObserver(),
                                           applyOpsAssignment.get(),
                                           numberOfPrePostImagesToWrite,
                                           currentTime);
@@ -1366,7 +1368,8 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
             opCtx(),
             commitSlot,
             prepareTimestamp,
-            *txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
+            *(txnParticipant.retrieveCompletedTransactionOperations(opCtx())
+                  ->getMutableOperationsForOpObserver()));
     }
     repl::OplogInterfaceLocal oplogInterface(opCtx());
     auto oplogIter = oplogInterface.makeIterator();
@@ -1592,7 +1595,8 @@ TEST_F(OpObserverTransactionTest, CommittingUnpreparedNonEmptyTransactionWritesT
     }
 
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
     opCtx()->getWriteUnitOfWork()->commit();
 
     assertTxnRecord(txnNum(), {}, DurableTxnStateEnum::kCommitted);
@@ -1604,7 +1608,8 @@ TEST_F(OpObserverTransactionTest,
     txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
 
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
 
     txnParticipant.stashTransactionResources(opCtx());
 
@@ -1644,7 +1649,8 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
             opCtx(),
             commitSlot,
             prepareOpTime.getTimestamp(),
-            *txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
+            *(txnParticipant.retrieveCompletedTransactionOperations(opCtx())
+                  ->getMutableOperationsForOpObserver()));
     }
     assertTxnRecord(txnNum(), commitOpTime, DurableTxnStateEnum::kCommitted);
 }
@@ -1673,7 +1679,8 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
     opObserver().onInserts(opCtx(), *autoColl1, inserts1.begin(), inserts1.end(), false);
     opObserver().onInserts(opCtx(), *autoColl2, inserts2.begin(), inserts2.end(), false);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntryObj);
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
@@ -1737,7 +1744,8 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTestIncludesTenantId) {
     opObserver().onInserts(opCtx(), *autoColl2, inserts2.begin(), inserts2.end(), false);
 
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
 
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntryObj);
@@ -1810,7 +1818,8 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     opObserver().onUpdate(opCtx(), update1);
     opObserver().onUpdate(opCtx(), update2);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
     auto oplogEntry = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntry);
     auto o = oplogEntry.getObjectField("o");
@@ -1864,7 +1873,8 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
     opObserver().onUpdate(opCtx(), update2);
 
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
 
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntryObj);
@@ -1915,7 +1925,8 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
                                           << "y"));
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, {});
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
     auto oplogEntry = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntry);
     auto o = oplogEntry.getObjectField("o");
@@ -1956,7 +1967,8 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, {});
 
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
 
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntryObj);
@@ -2003,7 +2015,8 @@ TEST_F(OpObserverTransactionTest,
     donorMtab->startBlockingWrites();
 
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    ASSERT_THROWS_CODE(opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0),
+    ASSERT_THROWS_CODE(opObserver().onUnpreparedTransactionCommit(
+                           opCtx(), txnOps->getMutableOperationsForOpObserver(), 0),
                        DBException,
                        ErrorCodes::TenantMigrationConflict);
 
@@ -3427,7 +3440,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionSingleStatementTest) {
     WriteUnitOfWork wuow(opCtx());
     opObserver().onInserts(opCtx(), *autoColl, inserts.begin(), inserts.end(), false);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
     auto oplogEntryObj = getNOplogEntries(opCtx(), 1)[0];
     checkSessionAndTransactionFields(oplogEntryObj);
     auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
@@ -3460,7 +3474,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
     opObserver().onInserts(opCtx(), *autoColl1, inserts1.begin(), inserts1.end(), false);
     opObserver().onInserts(opCtx(), *autoColl2, inserts2.begin(), inserts2.end(), false);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 4);
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
@@ -3537,7 +3552,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
     opObserver().onUpdate(opCtx(), update1);
     opObserver().onUpdate(opCtx(), update2);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
@@ -3595,7 +3611,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
                                           << "y"));
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, {});
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
@@ -3896,7 +3913,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
             opCtx(),
             commitSlot,
             commitTimestamp,
-            *txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
+            *(txnParticipant.retrieveCompletedTransactionOperations(opCtx())
+                  ->getMutableOperationsForOpObserver()));
     }
     oplogEntryObjs = getNOplogEntries(opCtx(), 3);
     const auto commitOplogObj = oplogEntryObjs.back();
@@ -3995,7 +4013,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, UnpreparedTransactionPackingTest) {
     opObserver().onInserts(opCtx(), *autoColl1, inserts1.begin(), inserts1.end(), false);
     opObserver().onInserts(opCtx(), *autoColl2, inserts2.begin(), inserts2.end(), false);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 1);
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
@@ -4144,7 +4163,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedPackingTest) {
         opCtx(),
         commitSlot,
         commitTimestamp,
-        *txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
+        *(txnParticipant.retrieveCompletedTransactionOperations(opCtx())
+              ->getMutableOperationsForOpObserver()));
 
     oplogEntryObjs = getNOplogEntries(opCtx(), 2);
     const auto commitOplogObj = oplogEntryObjs.back();
@@ -4203,7 +4223,8 @@ TEST_F(OpObserverLargeTransactionTest, LargeTransactionCreatesMultipleOplogEntri
     txnParticipant.addTransactionOperation(opCtx(), operation1);
     txnParticipant.addTransactionOperation(opCtx(), operation2);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 0);
+    opObserver().onUnpreparedTransactionCommit(
+        opCtx(), txnOps->getMutableOperationsForOpObserver(), 0);
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
