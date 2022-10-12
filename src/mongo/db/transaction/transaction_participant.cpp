@@ -1672,10 +1672,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     const auto wallClockTime = opCtx->getServiceContext()->getFastClockSource()->now();
     auto applyOpsOplogSlotAndOperationAssignment = opObserver->preTransactionPrepare(
-        opCtx,
-        reservedSlots,
-        wallClockTime,
-        completedTransactionOperations->getMutableOperationsForOpObserver());
+        opCtx, reservedSlots, wallClockTime, completedTransactionOperations);
 
     opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.getTimestamp());
     opCtx->getWriteUnitOfWork()->prepare();

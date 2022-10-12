@@ -2178,7 +2178,8 @@ std::unique_ptr<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>
 OpObserverImpl::preTransactionPrepare(OperationContext* opCtx,
                                       const std::vector<OplogSlot>& reservedSlots,
                                       Date_t wallClockTime,
-                                      std::vector<repl::ReplOperation>* statements) {
+                                      TransactionOperations* transactionOperations) {
+    auto* statements = transactionOperations->getMutableOperationsForOpObserver();
     auto applyOpsOplogSlotAndOperationAssignment =
         getApplyOpsOplogSlotAndOperationAssignmentForTransaction(
             opCtx, reservedSlots, true /*prepare*/, *statements);

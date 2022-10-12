@@ -487,14 +487,15 @@ public:
      * The 'wallClockTime' is the time to record as wall clock time on oplog entries resulting from
      * transaction preparation.
      *
-     * The 'statements' are the list of CRUD operations to be applied in this transaction. The
-     * operations may be modified by setting pre-image and post-image oplog entry timestamps.
+     * The 'transactionOperations' contains the list of CRUD operations to be applied in this
+     * transaction. The operations may be modified by setting pre-image and post-image oplog entry
+     * timestamps.
      */
     virtual std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
         Date_t wallClockTime,
-        std::vector<repl::ReplOperation>* statements) = 0;
+        TransactionOperations* transactionOperations) = 0;
 
     /**
      * The onTransactionPrepare method is called when an atomic transaction is prepared. It must be

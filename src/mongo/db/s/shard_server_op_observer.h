@@ -218,7 +218,7 @@ public:
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
         Date_t wallClockTime,
-        std::vector<repl::ReplOperation>* statements) override {
+        TransactionOperations* transactionOperations) override {
         return nullptr;
     }
 

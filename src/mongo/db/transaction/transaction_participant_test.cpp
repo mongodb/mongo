@@ -103,7 +103,7 @@ public:
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
         Date_t wallClockTime,
-        std::vector<repl::ReplOperation>* statements) override;
+        TransactionOperations* transactionOperations) override;
 
     void onTransactionPrepare(
         OperationContext* opCtx,
@@ -156,7 +156,7 @@ std::unique_ptr<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>
 OpObserverMock::preTransactionPrepare(OperationContext* opCtx,
                                       const std::vector<OplogSlot>& reservedSlots,
                                       Date_t wallClockTime,
-                                      std::vector<repl::ReplOperation>* statements) {
+                                      TransactionOperations* transactionOperations) {
     return std::make_unique<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>(
         OpObserver::ApplyOpsOplogSlotAndOperationAssignment{{}, {}});
 }
