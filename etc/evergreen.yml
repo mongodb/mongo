@@ -2450,7 +2450,7 @@ buildvariants:
 - &enterprise-rhel-80-64-dynamic-clang-tidy
   name: enterprise-rhel80-dynamic-clang-tidy-required
   display_name: "! Enterprise Clang Tidy"
-  cron: "0 4 * * *"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   modules:
   - enterprise
   run_on:
