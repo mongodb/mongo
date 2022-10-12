@@ -27,37 +27,25 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/query/cost_model/cost_model_manager.h"
 
-#include "mongo/db/query/optimizer/cascades/cost_model_gen.h"
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
-#include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 
-namespace mongo::optimizer::cascades {
+namespace mongo::cost_model {
+using optimizer::cascades::CostModelCoefficients;
 
-/**
- * Populate given cost model coefficients object with default values.
- */
-void initializeCoefficients(CostModelCoefficients& coefficients);
+CostModelManager::CostModelManager() {
+    CostModelCoefficients coefficients;
+    initializeCoefficients(coefficients);
+    _coefficients = coefficients.toBSON();
+}
 
-/**
- * Default costing for physical nodes with logical delegator (not-yet-optimized) inputs.
- */
-class DefaultCosting : public CostingInterface {
-public:
-    DefaultCosting();
-    DefaultCosting(CostModelCoefficients coefficicients)
-        : _coefficients{std::move(coefficicients)} {}
+CostModelCoefficients CostModelManager::getDefaultCoefficients() const {
+    return CostModelCoefficients::parse(IDLParserContext{"CostModelCoefficients"}, _coefficients);
+}
 
-    CostAndCE deriveCost(const Metadata& metadata,
-                         const Memo& memo,
-                         const properties::PhysProps& physProps,
-                         ABT::reference_type physNodeRef,
-                         const ChildPropsType& childProps,
-                         const NodeCEMap& nodeCEMap) const override final;
-
-private:
-    const CostModelCoefficients _coefficients;
-};
-
-}  // namespace mongo::optimizer::cascades
+CostModelCoefficients CostModelManager::getCoefficients(const BSONObj& overrides) const {
+    return CostModelCoefficients::parse(IDLParserContext{"CostModelCoefficients"},
+                                        _coefficients.addFields(overrides));
+}
+}  // namespace mongo::cost_model

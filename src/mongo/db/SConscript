@@ -1484,6 +1484,7 @@ env.Library(
         'matcher/expressions_mongod_only',
         'ops/parsed_update',
         'pipeline/pipeline',
+        'query/cost_model/query_cost_model',
         'query/plan_yield_policy',
         'query/query_common',
         'query/query_plan_cache',

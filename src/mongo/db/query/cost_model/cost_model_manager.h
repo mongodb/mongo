@@ -30,34 +30,35 @@
 #pragma once
 
 #include "mongo/db/query/optimizer/cascades/cost_model_gen.h"
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
-#include "mongo/db/query/optimizer/cascades/memo.h"
 
-namespace mongo::optimizer::cascades {
+namespace mongo::cost_model {
 
 /**
- * Populate given cost model coefficients object with default values.
+ * This class is main access point to Cost Model Coefficients, it rerieves them and applies
+ * overrides.
  */
-void initializeCoefficients(CostModelCoefficients& coefficients);
-
-/**
- * Default costing for physical nodes with logical delegator (not-yet-optimized) inputs.
- */
-class DefaultCosting : public CostingInterface {
+class CostModelManager {
 public:
-    DefaultCosting();
-    DefaultCosting(CostModelCoefficients coefficicients)
-        : _coefficients{std::move(coefficicients)} {}
+    CostModelManager();
 
-    CostAndCE deriveCost(const Metadata& metadata,
-                         const Memo& memo,
-                         const properties::PhysProps& physProps,
-                         ABT::reference_type physNodeRef,
-                         const ChildPropsType& childProps,
-                         const NodeCEMap& nodeCEMap) const override final;
+    /**
+     * Returns default version of Cost Model Coefficients with applied overrides specified in the
+     * 'overrides' parameters as a BSON Object. See the IDL definition of 'CostModelCoefficients'
+     * for the names of the fields.
+     *
+     * Usage:
+     * @code
+     * costModelManager.getCoefficients(BSON("scanIncrementalCost" << 0.001));
+     * @endcode
+     */
+    optimizer::cascades::CostModelCoefficients getCoefficients(const BSONObj& overrides) const;
+
+    /**
+     * Returns default version of Cost Model Coefficients.
+     */
+    optimizer::cascades::CostModelCoefficients getDefaultCoefficients() const;
 
 private:
-    const CostModelCoefficients _coefficients;
+    BSONObj _coefficients;
 };
-
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::cost_model

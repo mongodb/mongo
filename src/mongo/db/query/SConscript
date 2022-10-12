@@ -8,6 +8,7 @@ env.SConscript(
     dirs=[
         'ce',
         'collation',
+        'cost_model',
         'datetime',
         'optimizer',
     ],

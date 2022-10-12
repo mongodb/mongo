@@ -39,9 +39,11 @@
 #include "mongo/db/query/ce/ce_sampling.h"
 #include "mongo/db/query/ce/collection_statistics_impl.h"
 #include "mongo/db/query/ce_mode_parameter.h"
+#include "mongo/db/query/cost_model/cost_model_manager.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
+#include "mongo/db/query/optimizer/cascades/cost_model_gen.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
@@ -56,8 +58,21 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-
 using namespace optimizer;
+using cost_model::CostModelManager;
+
+namespace {
+const auto costModelManager = ServiceContext::declareDecoration<CostModelManager>();
+
+BSONObj getCostModelCoefficientsOverride() {
+    if (internalCostModelCoefficients.empty()) {
+        return BSONObj();
+    }
+
+    return fromjson(internalCostModelCoefficients);
+}
+}  // namespace
+
 
 static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpecsOptimizer(
     boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -485,6 +500,7 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
 enum class CEMode { kSampling, kHistogram, kHeuristic };
 
 static OptPhaseManager createPhaseManager(const CEMode mode,
+                                          const CostModelCoefficients& costModel,
                                           const NamespaceString& nss,
                                           OperationContext* opCtx,
                                           const int64_t collectionSize,
@@ -506,7 +522,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                                                     false /*requireRID*/,
                                                     std::move(metadataForSampling),
                                                     std::make_unique<HeuristicCE>(),
-                                                    std::make_unique<DefaultCosting>(),
+                                                    std::make_unique<DefaultCosting>(costModel),
                                                     defaultConvertPathToInterval,
                                                     DebugInfo::kDefaultForProd,
                                                     {} /*hints*/};
@@ -516,7 +532,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     std::move(metadata),
                     std::make_unique<CESamplingTransport>(
                         opCtx, std::move(phaseManagerForSampling), collectionSize),
-                    std::make_unique<DefaultCosting>(),
+                    std::make_unique<DefaultCosting>(costModel),
                     defaultConvertPathToInterval,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
@@ -530,7 +546,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     std::move(metadata),
                     std::make_unique<CEHistogramTransport>(
                         std::make_shared<ce::CollectionStatisticsImpl>(collectionSize, nss)),
-                    std::make_unique<DefaultCosting>(),
+                    std::make_unique<DefaultCosting>(costModel),
                     defaultConvertPathToInterval,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
@@ -541,7 +557,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     requireRID,
                     std::move(metadata),
                     std::make_unique<HeuristicCE>(),
-                    std::make_unique<DefaultCosting>(),
+                    std::make_unique<DefaultCosting>(costModel),
                     defaultConvertPathToInterval,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
@@ -628,7 +644,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
                                 << internalQueryCardinalityEstimatorMode);
     }
 
+    auto costModel = costModelManager(opCtx->getServiceContext())
+                         .getCoefficients(getCostModelCoefficientsOverride());
+
     OptPhaseManager phaseManager = createPhaseManager(mode,
+                                                      costModel,
                                                       nss,
                                                       opCtx,
                                                       numRecords,

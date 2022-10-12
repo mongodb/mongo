@@ -913,6 +913,13 @@ server_parameters:
     default:
         expr: false
 
+  internalCostModelCoefficients:
+    description: "Cost Model Coefficients Override"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCostModelCoefficients"
+    cpp_vartype: "std::string"
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
   # TODO SERVER-68341 Remove this query knob after tenancy is supported in the sharded cluster.
   internalChangeStreamUseTenantIdForTesting:
     description: "If true, then change streams will operate upon an internal tenant id for testing

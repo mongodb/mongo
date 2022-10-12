@@ -19,6 +19,7 @@ env.Library(
         "cascades/ce_heuristic.cpp",
         "cascades/ce_hinted.cpp",
         "cascades/cost_derivation.cpp",
+        "cascades/cost_model.idl",
         "cascades/enforcers.cpp",
         "cascades/implementers.cpp",
         "cascades/logical_props_derivation.cpp",
