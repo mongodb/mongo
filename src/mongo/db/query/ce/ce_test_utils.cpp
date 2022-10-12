@@ -52,22 +52,29 @@ CETester::CETester(std::string collName,
     addCollection(collName, collCard);
 }
 
+template <class T>
 optimizer::CEType CETester::getMatchCE(const std::string& predicate) const {
-    return getCE("[{$match: " + predicate + "}]");
+    return getCE<T>("[{$match: " + predicate + "}]");
 }
 
+template <class T>
 optimizer::CEType CETester::getCE(const std::string& pipeline) const {
     if constexpr (kCETestLogOnly) {
-        std::cout << "Query: " << pipeline << "\n";
+        std::cout << "\n\nQuery: " << pipeline << "\n";
     }
 
     // Construct ABT from pipeline and optimize.
     ABT abt = translatePipeline(pipeline, _collName);
 
     // Get cardinality estimate.
-    return getCE(abt);
+    return getCE<T>(abt);
 }
 
+template optimizer::CEType CETester::getCE<optimizer::RootNode>(const std::string& query) const;
+template optimizer::CEType CETester::getCE<optimizer::SargableNode>(const std::string& query) const;
+
+
+template <class T>
 optimizer::CEType CETester::getCE(ABT& abt) const {
     if constexpr (kCETestLogOnly) {
         std::cout << ExplainGenerator::explainV2(abt) << std::endl;
@@ -138,7 +145,7 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
             }
         }
 
-        if (node.is<optimizer::RootNode>()) {
+        if (node.is<T>()) {
             // We want to return the cardinality for the entire ABT.
             outCard = memoCE;
         }
@@ -153,11 +160,19 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
     return outCard;
 }
 
+template optimizer::CEType CETester::getCE<optimizer::RootNode>(ABT& abt) const;
+template optimizer::CEType CETester::getCE<optimizer::SargableNode>(ABT& abt) const;
+template optimizer::CEType CETester::getMatchCE<optimizer::RootNode>(
+    const std::string& matchPredicate) const;
+template optimizer::CEType CETester::getMatchCE<optimizer::SargableNode>(
+    const std::string& matchPredicate) const;
+
 ScanDefinition& CETester::getCollScanDefinition() {
     auto it = _metadata._scanDefs.find(_collName);
     invariant(it != _metadata._scanDefs.end());
     return it->second;
 }
+
 
 void CETester::setCollCard(double card) {
     auto& scanDef = getCollScanDefinition();

@@ -177,10 +177,10 @@ public:
             const CEType totalCard = _stats->getCardinality();
 
             if (conjunctReq.intervals.empty() && !conjunctReq.includeScalar) {
-                // TODO SERVER-69795: handle the case where we have a single 'PathArr' interval for
-                // this field by returning the number of arrays we expect in the output based on
-                // histogram type counters.
-                topLevelSelectivities.push_back(1.0);
+                // In this case there is a single 'PathArr' interval for this field.
+                // The selectivity of this interval is: (count of all arrays) / totalCard
+                double pathArrSel = conjunctReq.histogram.getArrayCount() / totalCard;
+                topLevelSelectivities.push_back(pathArrSel);
             }
 
             // Intervals are in DNF.

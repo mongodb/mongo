@@ -61,7 +61,7 @@ protected:
 
 TEST(CEDataflowTest, EstimateTrivialNodes) {
     DataflowCETester t;
-    const auto matchCard = t.getMatchCE("{a: 1}");
+    const auto matchCard = t.getMatchCE<optimizer::RootNode>("{a: 1}");
 
     // Verify 'CollationNode' estimate returns the input cardinality.
     ASSERT_CE(t, "[{$sort: {a: 1}}]", kCollCard);
@@ -132,7 +132,7 @@ TEST(CEDataflowTest, EstimateUnionNode) {
 
 TEST(CEDataflowTest, EstimateLimitSkipNode) {
     DataflowCETester t;
-    const CEType matchCard = t.getMatchCE("{a: 1}");
+    const CEType matchCard = t.getMatchCE<optimizer::RootNode>("{a: 1}");
 
     // Verify that 'LimitSkipNode' estimate with only a limit set is min(limit, inputCE).
     ASSERT_CE(t, "[{$limit: 1}]", 1.0);
@@ -204,7 +204,7 @@ TEST(CEDataflowTest, EstimateLimitSkipNode) {
 
 TEST(CEDataflowTest, EstimateUnwindNode) {
     DataflowCETester t;
-    const CEType matchCard = t.getMatchCE("{a: 1}");
+    const CEType matchCard = t.getMatchCE<optimizer::RootNode>("{a: 1}");
 
     // We assume that arrays on average have ~10 elements, so we estimate this as inputCard*10.
     ASSERT_CE(t, "[{$unwind: '$a'}]", 10 * kCollCard);

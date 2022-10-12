@@ -137,6 +137,9 @@ std::string plotArrayEstimator(const ArrayHistogram& estimator, const std::strin
             os << tagCount.first << "=" << tagCount.second << " ";
         }
     }
+    if (estimator.isArray()) {
+        os << "\nEmpty array count: " << estimator.getEmptyArrayCount();
+    }
     os << "\n";
 
     return os.str();

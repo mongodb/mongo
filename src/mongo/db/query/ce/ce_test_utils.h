@@ -86,7 +86,8 @@ const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
     (str::stream() << "{" << field << ": {$elemMatch: " << predicate << "}}")
 
 // This macro verifies the cardinality of a pipeline or an input ABT.
-#define ASSERT_CE(ce, pipeline, expectedCE) _ASSERT_CE(ce.getCE(pipeline), (expectedCE))
+#define ASSERT_CE(ce, pipeline, expectedCE) \
+    _ASSERT_CE(ce.getCE<optimizer::RootNode>(pipeline), (expectedCE))
 
 // This macro does the same as above but also sets the collection cardinality.
 #define ASSERT_CE_CARD(ce, pipeline, expectedCE, collCard) \
@@ -95,7 +96,10 @@ const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
 
 // This macro verifies the cardinality of a pipeline with a single $match predicate.
 #define ASSERT_MATCH_CE(ce, predicate, expectedCE) \
-    _ASSERT_CE(ce.getMatchCE(predicate), (expectedCE))
+    _ASSERT_CE(ce.getMatchCE<optimizer::RootNode>(predicate), (expectedCE))
+
+#define ASSERT_MATCH_CE_NODE(ce, predicate, expectedCE, nodeType) \
+    _ASSERT_CE(ce.getMatchCE<nodeType>(predicate), (expectedCE))
 
 // This macro does the same as above but also sets the collection cardinality.
 #define ASSERT_MATCH_CE_CARD(ce, predicate, expectedCE, collCard) \
@@ -124,16 +128,19 @@ public:
     /**
      * Returns the estimated cardinality of a given 'matchPredicate'.
      */
+    template <class T>
     CEType getMatchCE(const std::string& matchPredicate) const;
 
     /**
      * Returns the estimated cardinality of a given 'pipeline'.
      */
+    template <class T>
     CEType getCE(const std::string& pipeline) const;
 
     /**
      * Returns the estimated cardinality of a given 'abt'.
      */
+    template <class T>
     CEType getCE(ABT& abt) const;
 
     /**
