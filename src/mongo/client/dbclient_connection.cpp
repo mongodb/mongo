@@ -213,10 +213,10 @@ executor::RemoteCommandResponse initWireVersion(
 
     BSONObj isMasterObj = result->getCommandReply().getOwned();
 
-    if (isMasterObj.hasField("minWireVersion") && isMasterObj.hasField("maxWireVersion")) {
-        int minWireVersion = isMasterObj["minWireVersion"].numberInt();
-        int maxWireVersion = isMasterObj["maxWireVersion"].numberInt();
-        conn->setWireVersions(minWireVersion, maxWireVersion);
+    auto replyWireVersion = wire_version::parseWireVersionFromHelloReply(isMasterObj);
+    if (replyWireVersion.isOK()) {
+        conn->setWireVersions(replyWireVersion.getValue().minWireVersion,
+                              replyWireVersion.getValue().maxWireVersion);
     }
 
     if (isMasterObj.hasField("saslSupportedMechs") &&
