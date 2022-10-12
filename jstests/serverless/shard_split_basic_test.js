@@ -1,7 +1,6 @@
 /**
- *
  * Tests that runs a shard split to completion.
- * @tags: [requires_fcv_52, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/serverless/libs/shard_split_test.js");

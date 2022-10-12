@@ -1,7 +1,7 @@
 /**
  * Commits a shard split and shut down prior to marking the state document as garbage collectable.
  * Checks that we recover the tenant access blockers with `commitOpTime` and `blockOpTime` set.
- * @tags: [requires_fcv_52, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");                         // for "configureFailPoint"

@@ -1,7 +1,7 @@
 /**
  *
  * Test that starts a shard split and abort it while doing a write.
- * @tags: [requires_fcv_52, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/serverless/libs/shard_split_test.js");

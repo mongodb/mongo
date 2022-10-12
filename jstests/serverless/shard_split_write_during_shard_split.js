@@ -1,7 +1,7 @@
 /**
  *
  * Tests that runs a shard split to completion and tries to write before and during the split.
- * @tags: [requires_fcv_52, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/serverless/libs/shard_split_test.js");

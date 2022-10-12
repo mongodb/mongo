@@ -1,8 +1,7 @@
 /**
  * @tags: [
  *   serverless,
- *   requires_fcv_52,
- *   featureFlagShardSplit,
+ *   requires_fcv_62,
  *   featureFlagShardMerge
  * ]
  */

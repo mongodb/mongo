@@ -1,7 +1,7 @@
 /*
  * Test that tenant access blockers are installed and prevent writes during shard split
  *
- * @tags: [requires_fcv_52, featureFlagShardSplit, serverless]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");

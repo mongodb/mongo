@@ -12,8 +12,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
- *   requires_fcv_52,
- *   featureFlagShardSplit
+ *   requires_fcv_62
  * ]
  */
 

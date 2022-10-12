@@ -1,7 +1,7 @@
 /*
  * Prove that shard splits are aborted during FCV upgrade/downgrade.
  *
- * @tags: [requires_fcv_52, featureFlagShardSplit, serverless]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 (function() {

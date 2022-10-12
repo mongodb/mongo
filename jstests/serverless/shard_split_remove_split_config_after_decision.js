@@ -1,7 +1,7 @@
 /*
  * Test that a split config is removed after a decision is reached.
  *
- * @tags: [requires_fcv_52, featureFlagShardSplit, serverless]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");

@@ -1,7 +1,7 @@
 /*
  * Test that tenant access blockers are removed when applying the recipient config
  *
- * @tags: [requires_fcv_52, featureFlagShardSplit, serverless]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");

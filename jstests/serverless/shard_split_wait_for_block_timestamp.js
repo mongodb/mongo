@@ -3,7 +3,7 @@
  * pausing replication and observing the operation time out, then reenabling replication and
  * observing a successful split.
  *
- * @tags: [requires_fcv_52, featureFlagShardSplit, serverless]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");                         // for "configureFailPoint"

@@ -4,7 +4,7 @@
  * and then issues a forgetShardSplit command. Finally, starts a second shard split operation with
  * the same tenantIds as the aborted shard split, and expects this second one to go through.
  *
- * @tags: [requires_fcv_52, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 (function() {
@@ -32,7 +32,7 @@ const test = new ShardSplitTest({recipientTagName, recipientSetName, quickGarbag
     // Start a shard split with the "abortShardSplitBeforeLeavingBlockingState" failPoint
     // enabled. The split will abort as a result, and a status of "kAborted" should be returned.
     jsTestLog(
-        `Starting a shard split that is expected to abort due to setting 
+        `Starting a shard split that is expected to abort due to setting
             abortShardSplitBeforeLeavingBlockingState failpoint. migrationId:
             ${operation.migrationId} , tenantIds: ${tenantIds}`);
 
@@ -50,7 +50,7 @@ const test = new ShardSplitTest({recipientTagName, recipientSetName, quickGarbag
     test.addRecipientNodes();
     const operation2 = test.createSplitOperation(tenantIds);
     jsTestLog(
-        `Attempting to run a shard split with the same tenantIds. New migrationId: 
+        `Attempting to run a shard split with the same tenantIds. New migrationId:
             ${operation2.migrationId}, tenantIds: ${tenantIds}`);
 
     operation2.commit();
@@ -70,7 +70,7 @@ const test = new ShardSplitTest({recipientTagName, recipientSetName, quickGarbag
 
     const operation = test.createSplitOperation(tenantIds);
     jsTestLog(
-        `Starting a shard split that is expected to abort in blocking state due to receiving 
+        `Starting a shard split that is expected to abort in blocking state due to receiving
         abortShardSplit. migrationId: ${operation.migrationId}, tenantIds: ${tenantIds}`);
     const commitAsyncRes = operation.commitAsync();
 

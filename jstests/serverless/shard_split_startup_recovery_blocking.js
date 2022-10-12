@@ -1,7 +1,7 @@
 /**
  * Commits a shard split and shuts down while being in a blocking state. Tests that we recover the
  * tenant access blockers in blocking state with `blockOpTime` set.
- * @tags: [requires_fcv_52, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");                         // for "configureFailPoint"

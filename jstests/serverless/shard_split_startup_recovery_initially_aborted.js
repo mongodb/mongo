@@ -3,7 +3,7 @@
  * recovered since we do not recover access blockers for aborted split marked garbage collectable.
  * Also verifies the serverless operation lock is not acquired when starting a split in aborted
  * state.
- * @tags: [requires_fcv_62, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");                         // for "configureFailPoint"

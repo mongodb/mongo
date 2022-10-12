@@ -1,6 +1,6 @@
 /**
  * Prove that shard split commands are not supported outside of serverless mode.
- * @tags: [requires_fcv_52, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 (function() {

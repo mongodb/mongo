@@ -3,7 +3,7 @@
  * Tests that runs a shard split, a stepdown and writes operation simultaneously to verify the
  * commands return the expected errors and success.
  * result of write operations.
- * @tags: [requires_fcv_52, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/serverless/libs/shard_split_test.js");

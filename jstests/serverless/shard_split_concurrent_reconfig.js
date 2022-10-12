@@ -1,7 +1,7 @@
 /**
  * Prove that it's possible to run reconfigs during a shard split.
  *
- * @tags: [requires_fcv_52, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/serverless/libs/shard_split_test.js");

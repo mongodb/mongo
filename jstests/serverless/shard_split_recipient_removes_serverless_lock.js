@@ -2,7 +2,7 @@
  * Test the serverless operation lock is released from recipients when the state document is
  * removed.
  *
- * @tags: [requires_fcv_62, featureFlagShardSplit, serverless]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");

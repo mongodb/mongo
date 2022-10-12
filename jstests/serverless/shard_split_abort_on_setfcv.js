@@ -2,7 +2,7 @@
  * Prove that shard splits are eagerly aborted when the `setFeatureCompatibilityVersion` command is
  * received for both upgrade and downgrade paths.
  *
- * @tags: [requires_fcv_52, featureFlagShardSplit, serverless]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 (function() {

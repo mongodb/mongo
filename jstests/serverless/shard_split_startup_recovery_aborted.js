@@ -2,7 +2,7 @@
  * Commits a shard split and abort it due to timeout prior to marking it for garbage collection and
  * checks that we recover the tenant access blockers since the split is aborted but not marked as
  *  garbage collectable. Checks that `abortOpTime` and `blockOpTime` are set.
- * @tags: [requires_fcv_52, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");                         // for "configureFailPoint"

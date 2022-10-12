@@ -1,7 +1,7 @@
 /**
  *
  * Tests that we can't run concurrent shard splits.
- * @tags: [requires_fcv_52, featureFlagShardSplit]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");         // for "configureFailPoint"

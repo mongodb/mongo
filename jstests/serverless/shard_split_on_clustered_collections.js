@@ -3,7 +3,6 @@
  * shard split.
  *
  * @tags: [
- *   requires_fcv_52,
  *   assumes_against_mongod_not_mongos,
  *   assumes_unsharded_collection,
  *   # Basic tags for tenant migration tests.
@@ -13,7 +12,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
- *   featureFlagShardSplit
+ *   requires_fcv_62
  * ]
  */
 

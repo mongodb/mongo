@@ -1,7 +1,7 @@
 /*
  * Test that a well timed abortShardSplit command does not abort an already committed split.
  *
- * @tags: [requires_fcv_52, featureFlagShardSplit, serverless]
+ * @tags: [requires_fcv_62, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");
