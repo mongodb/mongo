@@ -977,5 +977,16 @@ TEST_F(ReshardingCoordinatorServiceTest, MultipleReshardingOperationsFail) {
     runReshardingToCompletion(TransitionFunctionMap{}, std::move(stateTransitionsGuard));
 }
 
+TEST_F(ReshardingCoordinatorServiceTest, SuccessfullyAbortReshardOperationImmediately) {
+    auto pauseBeforeCTHolderInitialization =
+        globalFailPointRegistry().find("pauseBeforeCTHolderInitialization");
+    auto timesEnteredFailPoint = pauseBeforeCTHolderInitialization->setMode(FailPoint::alwaysOn, 0);
+    auto coordinator = initializeAndGetCoordinator();
+    coordinator->abort();
+    pauseBeforeCTHolderInitialization->waitForTimesEntered(timesEnteredFailPoint + 1);
+    pauseBeforeCTHolderInitialization->setMode(FailPoint::off, 0);
+    coordinator->getCompletionFuture().wait();
+}
+
 }  // namespace
 }  // namespace mongo

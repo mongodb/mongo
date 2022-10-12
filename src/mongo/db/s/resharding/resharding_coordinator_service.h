@@ -553,6 +553,13 @@ private:
         MONGO_MAKE_LATCH("ReshardingCoordinatorService::_fulfillmentMutex");
 
     /**
+     * Must be locked while the _abortCalled is being set to true.
+     */
+    mutable Mutex _abortCalledMutex =
+        MONGO_MAKE_LATCH("ReshardingCoordinatorService::_abortCalledMutex");
+
+
+    /**
      * Coordinator does not enter the critical section until this is fulfilled.
      * Can be set by "commitReshardCollection" command or by metrics determining
      * that it's okay to proceed.
@@ -572,6 +579,10 @@ private:
     std::shared_ptr<resharding::CoordinatorCommitMonitor> _commitMonitor;
 
     std::shared_ptr<ReshardingCoordinatorExternalState> _reshardingCoordinatorExternalState;
+
+    // Used to catch the case when an abort() is called but the cancellation source (_ctHolder) has
+    // not been initialized.
+    bool _abortCalled{false};
 };
 
 }  // namespace mongo

@@ -92,6 +92,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeStartingErrorFlow);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforePersistingStateTransition);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeTellDonorToRefresh);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeInsertCoordinatorDoc);
+MONGO_FAIL_POINT_DEFINE(pauseBeforeCTHolderInitialization);
 
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -1376,7 +1377,18 @@ ReshardingCoordinatorService::ReshardingCoordinator::_commitAndFinishReshardOper
 SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
-    _ctHolder = std::make_unique<CoordinatorCancellationTokenHolder>(stepdownToken);
+    pauseBeforeCTHolderInitialization.pauseWhileSet();
+
+    auto abortCalled = [&] {
+        stdx::lock_guard<Latch> lk(_abortCalledMutex);
+        _ctHolder = std::make_unique<CoordinatorCancellationTokenHolder>(stepdownToken);
+        return _abortCalled;
+    }();
+
+    if (abortCalled) {
+        _ctHolder->abort();
+    }
+
     _markKilledExecutor->startup();
     _cancelableOpCtxFactory.emplace(_ctHolder->getAbortToken(), _markKilledExecutor);
 
@@ -1532,7 +1544,15 @@ ReshardingCoordinatorService::ReshardingCoordinator::_onAbortCoordinatorAndParti
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::abort() {
-    _ctHolder->abort();
+    auto ctHolderInitialized = [&] {
+        stdx::lock_guard<Latch> lk(_abortCalledMutex);
+        _abortCalled = true;
+        return !(_ctHolder == nullptr);
+    }();
+
+    if (ctHolderInitialized) {
+        _ctHolder->abort();
+    }
 }
 
 boost::optional<BSONObj> ReshardingCoordinatorService::ReshardingCoordinator::reportForCurrentOp(
