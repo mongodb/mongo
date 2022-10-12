@@ -29,6 +29,13 @@
 #include "test_util.h"
 #include "workgen_func.h"
 
+/*
+ * This data symbol is also declared in the WiredTiger library. Since it is not initialized in
+ * either place, it is legal (as a "common symbol") to be declared in both. If we do not declare it
+ * in the workgen library, there are circumstances where it will be undefined at link time.
+ */
+WT_PROCESS __wt_process;
+
 /* workgen_random_state is used as an opaque type handle. */
 typedef struct workgen_random_state {
     WT_RAND_STATE state;
