@@ -71,5 +71,8 @@ assert.soonNoExcept(function() {
     return true;
 }, "expected primary node to shut down and not be connectable");
 
+// We need to ensure that the primary that is shutting down completes the shutdown
+// process before attempting to stop the set.
+MongoRunner.stopMongod(primary);
 replTest.stopSet();
 })();
