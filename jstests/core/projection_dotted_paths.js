@@ -13,7 +13,6 @@
 
 load("jstests/libs/analyze_plan.js");
 load("jstests/aggregation/extras/utils.js");  // arrayEq
-load("jstests/libs/sbe_explain_helpers.js");
 
 let coll = db["projection_dotted_paths"];
 coll.drop();
@@ -65,10 +64,7 @@ resultDoc = coll.findOne({_id: 1}, {_id: 0, "b.c": 1, "b.e": 1, c: 1});
 assert.docEq(resultDoc, {b: {c: 1, e: 1}, c: 1});
 explain = coll.find({_id: 1}, {_id: 0, "b.c": 1, "b.e": 1, c: 1}).explain("queryPlanner");
 
-engineSpecificAssertion(isIdhack(db, getWinningPlan(explain.queryPlanner)),
-                        isIxscan(db, getWinningPlan(explain.queryPlanner)),
-                        db,
-                        explain);
+assert(isIdhack(db, getWinningPlan(explain.queryPlanner)), explain);
 
 // If we make a dotted path multikey, projections using that path cannot be covered. But
 // projections which do not include the multikey path can still be covered.

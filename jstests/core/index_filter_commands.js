@@ -38,7 +38,7 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
-load("jstests/libs/sbe_explain_helpers.js");
+load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 
 const coll = db.jstests_index_filter_commands;
 
@@ -205,8 +205,7 @@ if (collectionIsClustered) {
     assert(isClusteredIxscan(db, getWinningPlan(explain.queryPlanner)),
            "Expected clustered ixscan: " + tojson(explain));
 } else {
-    engineSpecificAssertion(
-        isIdhack(db, winningPlan), isIdIndexScan(db, winningPlan, "FETCH"), db, winningPlan);
+    assert(isIdhack(db, winningPlan), winningPlan);
 }
 
 // Clearing filters on a missing collection should be a no-op.

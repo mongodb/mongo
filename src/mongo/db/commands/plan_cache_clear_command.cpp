@@ -43,8 +43,8 @@
 #include "mongo/db/query/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/sbe_plan_cache.h"
-#include "mongo/db/query/sbe_utils.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand

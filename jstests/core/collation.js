@@ -725,9 +725,7 @@ if (!isClustered) {
     explainRes =
         coll.explain("executionStats").find({_id: "foo"}).collation({locale: "en_US"}).finish();
     assert.commandWorked(explainRes);
-    classicAssert = null !== getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-    sbeAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
-    engineSpecificAssertion(classicAssert, sbeAssert, db, explainRes);
+    assert.neq(null, getPlanStage(explainRes.executionStats.executionStages, "IDHACK"), explainRes);
 
     // Find on _id should not use idhack stage when query collation does not match collection
     // default.
@@ -737,9 +735,7 @@ if (!isClustered) {
         coll.explain("executionStats").find({_id: "foo"}).collation({locale: "fr_CA"}).finish();
     assert.commandWorked(explainRes);
 
-    classicAssert = null === getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-    sbeAssert = null === getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
-    engineSpecificAssertion(classicAssert, sbeAssert, db, explainRes);
+    assert.eq(null, getPlanStage(explainRes.executionStats.executionStages, "IDHACK"), explainRes);
 }
 
 // Find should select compatible index when no collation specified and collection has a default

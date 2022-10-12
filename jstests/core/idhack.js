@@ -11,7 +11,7 @@ t.drop();
 
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_explain_helpers.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 assert.commandWorked(t.insert({_id: {x: 1}, z: 1}));
 assert.commandWorked(t.insert({_id: {x: 2}, z: 2}));
@@ -40,34 +40,32 @@ let explain = t.find(query).explain("allPlansExecution");
 assert.eq(1, explain.executionStats.nReturned, explain);
 assert.eq(1, explain.executionStats.totalKeysExamined, explain);
 let winningPlan = getWinningPlan(explain.queryPlanner);
-engineSpecificAssertion(
-    isIdhack(db, winningPlan), isIdIndexScan(db, winningPlan, "FETCH"), db, winningPlan);
+assert(isIdhack(db, winningPlan), winningPlan);
 
 // ID hack cannot be used with hint().
 t.createIndex({_id: 1, a: 1});
 explain = t.find(query).hint({_id: 1, a: 1}).explain();
 winningPlan = getWinningPlan(explain.queryPlanner);
-engineSpecificAssertion(!isIdhack(db, winningPlan), isIxscan(db, winningPlan), db, winningPlan);
+assert(!isIdhack(db, winningPlan), winningPlan);
 
 // ID hack cannot be used with skip().
 explain = t.find(query).skip(1).explain();
 winningPlan = getWinningPlan(explain.queryPlanner);
-engineSpecificAssertion(!isIdhack(db, winningPlan), isIxscan(db, winningPlan), db, winningPlan);
+assert(!isIdhack(db, winningPlan), winningPlan);
 
 // ID hack cannot be used with a regex predicate.
 assert.commandWorked(t.insert({_id: "abc"}));
 explain = t.find({_id: /abc/}).explain();
 assert.eq({_id: "abc"}, t.findOne({_id: /abc/}));
 winningPlan = getWinningPlan(explain.queryPlanner);
-engineSpecificAssertion(!isIdhack(db, winningPlan), isIxscan(db, winningPlan), db, winningPlan);
+assert(!isIdhack(db, winningPlan), winningPlan);
 
 // Covered query returning _id field only can be handled by ID hack.
 const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 const parentStage = isSbeEnabled ? "PROJECTION_COVERED" : "FETCH";
 explain = t.find(query, {_id: 1}).explain();
 winningPlan = getWinningPlan(explain.queryPlanner);
-engineSpecificAssertion(
-    isIdhack(db, winningPlan), isIdIndexScan(db, winningPlan, parentStage), db, winningPlan);
+assert(isIdhack(db, winningPlan), winningPlan);
 
 // Check doc from covered ID hack query.
 assert.eq({_id: {x: 2}}, t.findOne(query, {_id: 1}), explain);
@@ -116,5 +114,5 @@ assert.eq(0, t.find({_id: 1}).hint({_id: 1}).min({_id: 2}).itcount());
 
 explain = t.find({_id: 2}).hint({_id: 1}).min({_id: 1}).max({_id: 3}).explain();
 winningPlan = getWinningPlan(explain.queryPlanner);
-engineSpecificAssertion(!isIdhack(db, winningPlan), isIxscan(db, winningPlan), db, winningPlan);
+assert(!isIdhack(db, winningPlan), winningPlan);
 })();

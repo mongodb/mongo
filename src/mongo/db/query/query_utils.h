@@ -32,11 +32,16 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/canonical_query.h"
 
-namespace mongo::sbe {
+namespace mongo {
+/**
+ * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
+ */
+bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& query);
+
 /**
  * Checks if the given query can be executed with the SBE engine.
  */
 bool isQuerySbeCompatible(const CollectionPtr* collection,
                           const CanonicalQuery* cq,
                           size_t plannerOptions);
-}  // namespace mongo::sbe
+}  // namespace mongo

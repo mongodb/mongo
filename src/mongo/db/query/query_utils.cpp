@@ -28,12 +28,22 @@
  */
 
 
-#include "mongo/db/query/sbe_utils.h"
+#include "mongo/db/query/query_utils.h"
 
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/query/query_planner_params.h"
 
-namespace mongo::sbe {
+namespace mongo {
+
+bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& query) {
+    const auto& findCommand = query.getFindCommandRequest();
+    return !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
+        findCommand.getMin().isEmpty() && findCommand.getMax().isEmpty() &&
+        !findCommand.getSkip() && CanonicalQuery::isSimpleIdQuery(findCommand.getFilter()) &&
+        !findCommand.getTailable() &&
+        CollatorInterface::collatorsMatch(query.getCollator(), collection->getDefaultCollator());
+}
+
 bool isQuerySbeCompatible(const CollectionPtr* collection,
                           const CanonicalQuery* cq,
                           size_t plannerOptions) {
@@ -49,7 +59,7 @@ bool isQuerySbeCompatible(const CollectionPtr* collection,
     const bool doesNotSortOnMetaOrPathWithNumericComponents =
         !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {
             return part.fieldPath &&
-                !MatchPath(part.fieldPath->fullPath()).hasNumericPathComponents();
+                !sbe::MatchPath(part.fieldPath->fullPath()).hasNumericPathComponents();
         });
 
     // Queries against a time-series collection are not currently supported by SBE.
@@ -70,6 +80,7 @@ bool isQuerySbeCompatible(const CollectionPtr* collection,
     return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
         isQueryNotAgainstTimeseriesCollection && isQueryNotAgainstClusteredCollection &&
         doesNotSortOnMetaOrPathWithNumericComponents && isNotOplog && doesNotRequireMatchDetails &&
-        doesNotHaveElemMatchProject && isNotChangeCollection && isNotInnerSideOfLookup;
+        doesNotHaveElemMatchProject && isNotChangeCollection && isNotInnerSideOfLookup &&
+        !(*collection && isIdHackEligibleQuery(*collection, *cq));
 }
-}  // namespace mongo::sbe
+}  // namespace mongo
