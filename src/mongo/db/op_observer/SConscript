@@ -84,6 +84,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_extended_range',
         '$BUILD_DIR/mongo/db/transaction/transaction',
+        '$BUILD_DIR/mongo/db/transaction/transaction_operations',
         '$BUILD_DIR/mongo/db/views/util',
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         '$BUILD_DIR/mongo/s/coreshard',

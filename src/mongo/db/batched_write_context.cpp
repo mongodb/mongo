@@ -54,10 +54,9 @@ void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx,
     invariantStatusOK(_batchedOperations.addOperation(operation));
 }
 
-std::vector<BatchedWriteContext::BatchedOperation>* BatchedWriteContext::getBatchedOperations(
-    OperationContext* opCtx) {
+TransactionOperations* BatchedWriteContext::getBatchedOperations(OperationContext* opCtx) {
     invariant(_batchWrites);
-    return _batchedOperations.getMutableOperationsForOpObserver();
+    return &_batchedOperations;
 }
 
 void BatchedWriteContext::clearBatchedOperations(OperationContext* opCtx) {

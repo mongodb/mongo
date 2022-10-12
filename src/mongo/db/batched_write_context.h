@@ -71,9 +71,9 @@ public:
     void addBatchedOperation(OperationContext* opCtx, const BatchedOperation& operation);
 
     /**
-     * Returns a pointerto the stored operations for the current WUOW.
+     * Returns a pointer to the stored operations for the current WUOW.
      */
-    std::vector<BatchedOperation>* getBatchedOperations(OperationContext* opCtx);
+    TransactionOperations* getBatchedOperations(OperationContext* opCtx);
     void clearBatchedOperations(OperationContext* opCtx);
 
 private:
