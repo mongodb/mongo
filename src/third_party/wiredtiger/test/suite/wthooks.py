@@ -309,6 +309,10 @@ class WiredTigerHookPlatformAPI(object):
     def getTimestamp(self):
         """The timestamp generator for this test case."""
         raise NotImplementedError('getTimestamp method not implemented')
+    
+    def getTierSharePercent(self):
+        """The tier share percentage generator for this test case."""
+        raise NotImplementedError('getTierSharePercent method not implemented')
 
 class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
     def tableExists(self, name):
@@ -327,6 +331,11 @@ class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
     def getTimestamp(self):
         return None
 
+    # By default, all the populated data lies in the local storage.
+    def getTierSharePercent(self):
+        return 0
+
+    #def getpopulate_share(self):
 class MultiPlatformAPI(WiredTigerHookPlatformAPI):
     def __init__(self, platform_apis):
         self.apis = platform_apis
@@ -367,3 +376,12 @@ class MultiPlatformAPI(WiredTigerHookPlatformAPI):
             except NotImplementedError:
                 pass
         raise Exception('getTimestamp: no implementation')  # should never happen
+
+    def getTierSharePercent(self):
+        """The tier share value for this test case."""
+        for api in self.apis:
+            try:
+                return api.getTierSharePercent()
+            except NotImplementedError:
+                pass
+        raise Exception('getTierSharePercent: no implementation')  # should never happen
