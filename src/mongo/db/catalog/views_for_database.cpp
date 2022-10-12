@@ -34,8 +34,6 @@
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/views/util.h"
 #include "mongo/logv2/log.h"
 
@@ -46,23 +44,13 @@ namespace mongo {
 namespace {
 RecordId find(OperationContext* opCtx,
               const CollectionPtr& systemViews,
-              const NamespaceString& ns) {
+              const NamespaceString& viewName) {
     return systemViews->getIndexCatalog()
         ->findIdIndex(opCtx)
         ->getEntry()
         ->accessMethod()
         ->asSortedData()
-        ->findSingle(
-            opCtx,
-            systemViews,
-            BSON("_id" <<
-                 // TODO SERVER-67155 Move this check into a function on NamespaceString.
-                 (!gMultitenancySupport ||
-                          (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                           gFeatureFlagRequireTenantID.isEnabled(
-                               serverGlobalParams.featureCompatibility))
-                      ? ns.toString()
-                      : ns.toStringWithTenantId())));
+        ->findSingle(opCtx, systemViews, BSON("_id" << NamespaceStringUtil::serialize(viewName)));
 }
 
 StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* opCtx,
