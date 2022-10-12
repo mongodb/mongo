@@ -18,8 +18,16 @@ download_clang_format() {
 	fi
 }
 
-# Find the top-level WiredTiger directory and move to there.
-cd `git rev-parse --show-toplevel` || exit 1
+# Find the top-level WiredTiger directory.
+dest_dir=$(git rev-parse --show-toplevel)
+
+# If this is a MongoDB source tree, move to the WiredTiger subtree.
+git_repo_str=$(git config remote.origin.url)
+is_mongo_repo=$(echo "$git_repo_str" | grep "mongodb/mongo")
+if [ -n "$is_mongo_repo" ] ; then
+       dest_dir="$dest_dir/src/third_party/wiredtiger"
+fi
+cd "$dest_dir" || exit 1
 
 # Override existing Clang Format versions in the PATH.
 export PATH="${PWD}/dist":$PATH
