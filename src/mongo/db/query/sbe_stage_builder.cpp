@@ -193,18 +193,32 @@ public:
     }
 };
 
+sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs, const PlanStageSlots& outputs) {
+    std::vector<std::pair<StringData, sbe::value::SlotId>> pairs;
+    outputs.forEachSlot(
+        reqs, [&](auto&& slot, const StringData& name) { pairs.emplace_back(name, slot); });
+    std::sort(pairs.begin(), pairs.end());
+
+    auto outputSlots = sbe::makeSV();
+    for (auto&& p : pairs) {
+        outputSlots.emplace_back(p.second);
+    }
+    return outputSlots;
+}
+
 /**
  * Generates an EOF plan. Note that even though this plan will return nothing, it will still define
  * the slots specified by 'reqs'.
  */
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
     PlanNodeId nodeId, const PlanStageReqs& reqs, sbe::value::SlotIdGenerator* slotIdGenerator) {
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
-
     PlanStageSlots outputs(reqs, slotIdGenerator);
-    outputs.forEachSlot(reqs, [&](auto&& slot) {
+
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+    auto slots = getSlotsToForward(reqs, outputs);
+    for (auto&& slot : slots) {
         projects.insert({slot, sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0)});
-    });
+    }
 
     auto stage = sbe::makeS<sbe::LimitSkipStage>(
         sbe::makeS<sbe::CoScanStage>(nodeId), 0, boost::none, nodeId);
@@ -951,9 +965,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     uassert(5113713, "Index key pattern slot is not defined", outputs.has(kIndexKeyPattern));
 
     auto forwardingReqs = reqs.copy().clear(kResult).clear(kRecordId);
-
-    auto relevantSlots = sbe::makeSV();
-    outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
+    auto relevantSlots = getSlotsToForward(forwardingReqs, outputs);
 
     // Forward slots for components of the index key if our parent requested them.
     if (auto indexKeySlots = outputs.getIndexKeySlots()) {
@@ -984,9 +996,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     if (fn->filter) {
         forwardingReqs = reqs.copy().set(kResult);
-
-        relevantSlots = sbe::makeSV();
-        outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
+        auto relevantSlots = getSlotsToForward(forwardingReqs, outputs);
 
         // Forward slots for components of the index key if our parent requested them.
         if (auto indexKeySlots = outputs.getIndexKeySlots()) {
@@ -1247,10 +1257,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     sbe::value::SlotVector orderBy;
     std::vector<sbe::value::SortDirection> direction;
 
-    // Slots for sort stage to forward to parent stage. Values in these slots are not used during
-    // sorting.
-    auto forwardedSlots = sbe::makeSV();
-
     if (!hasPartsWithCommonPrefix) {
         // Handle the case where we are using kResult and there are no common prefixes.
         sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projectMap;
@@ -1381,7 +1387,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                               makeVariable(outputs.get(kResult))));
     }
 
-    outputs.forEachSlot(childReqs, [&](auto&& slot) { forwardedSlots.push_back(slot); });
+    // Slots for sort stage to forward to parent stage. Values in these slots are not used during
+    // sorting.
+    auto forwardedSlots = getSlotsToForward(childReqs, outputs);
 
     stage =
         sbe::makeS<sbe::SortStage>(std::move(stage),
@@ -1447,10 +1455,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     sbe::value::SlotVector orderBy;
     std::vector<sbe::value::SortDirection> direction;
 
-    // Slots for sort stage to forward to parent stage. Values in these slots are not used during
-    // sorting.
-    auto forwardedSlots = sbe::makeSV();
-
     // Handle the case where we are using IndexKeySlots.
     auto indexKeySlots = *outputs.extractIndexKeySlots();
 
@@ -1514,6 +1518,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projectMap), root->nodeId());
     }
 
+    // Slots for sort stage to forward to parent stage. Values in these slots are not used during
+    // sorting.
+    auto forwardedSlots = getSlotsToForward(childReqs, outputs);
+
     if (parentIndexKeyBitset.any()) {
         auto parentIndexKeySlots = makeIndexKeyOutputSlotsMatchingParentReqs(
             indexKeyPattern, parentIndexKeyBitset, childIndexKeyBitset, indexKeySlots);
@@ -1530,8 +1538,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // Make sure to store all of the slots requested by the parent into 'outputs'.
         outputs.setIndexKeySlots(std::move(parentIndexKeySlots));
     }
-
-    outputs.forEachSlot(childReqs, [&](auto&& slot) { forwardedSlots.push_back(slot); });
 
     stage =
         sbe::makeS<sbe::SortStage>(std::move(stage),
@@ -1665,8 +1671,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         inputKeys.push_back(std::move(inputKeysForChild));
         inputStages.push_back(std::move(stage));
 
-        auto sv = sbe::makeSV();
-        outputs.forEachSlot(childReqs, [&](auto&& slot) { sv.push_back(slot); });
+        auto sv = getSlotsToForward(childReqs, outputs);
 
         // If the parent of 'root' has requested index keys, then we need to pass along our input
         // keys as input values, as they will be part of the output 'root' provides its parent.
@@ -1678,10 +1683,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         inputVals.push_back(std::move(sv));
     }
 
-    auto outputVals = sbe::makeSV();
-
     PlanStageSlots outputs(childReqs, &_slotIdGenerator);
-    outputs.forEachSlot(childReqs, [&](auto&& slot) { outputVals.push_back(slot); });
+    auto outputVals = getSlotsToForward(childReqs, outputs);
 
     // If the parent of 'root' has requested index keys, then we need to generate output slots to
     // hold the index keys that will be used as input to the parent of 'root'.
@@ -1824,8 +1827,7 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
 
     auto [stage, outputs] = build(pn->children[0].get(), childReqs);
 
-    auto relevantSlots = sbe::makeSV();
-    outputs.forEachSlot(childReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
+    auto relevantSlots = getSlotsToForward(childReqs, outputs);
 
     auto [resultSlot, resultStage] =
         generateProjection(_state,
@@ -1929,18 +1931,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     for (auto&& child : orn->children) {
         auto [stage, outputs] = build(child.get(), childReqs);
 
-        auto sv = sbe::makeSV();
-        outputs.forEachSlot(childReqs, [&](auto&& slot) { sv.push_back(slot); });
+        auto sv = getSlotsToForward(childReqs, outputs);
 
         inputStages.push_back(std::move(stage));
         inputSlots.emplace_back(std::move(sv));
     }
 
     // Construct a union stage whose branches are translated children of the 'Or' node.
-    auto unionOutputSlots = sbe::makeSV();
-
     PlanStageSlots outputs(childReqs, &_slotIdGenerator);
-    outputs.forEachSlot(childReqs, [&](auto&& slot) { unionOutputSlots.push_back(slot); });
+    auto unionOutputSlots = getSlotsToForward(childReqs, outputs);
 
     auto stage = sbe::makeS<sbe::UnionStage>(
         std::move(inputStages), std::move(inputSlots), std::move(unionOutputSlots), root->nodeId());
@@ -1956,9 +1955,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     if (orn->filter) {
         auto forwardingReqs = reqs.copy().set(kResult);
-
-        auto relevantSlots = sbe::makeSV();
-        outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
+        auto relevantSlots = getSlotsToForward(forwardingReqs, outputs);
 
         auto [_, outputStage] = generateFilter(_state,
                                                orn->filter.get(),
@@ -2849,8 +2846,7 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
         childReqs.setIsTailableCollScanResumeBranch(isTailableCollScanResumeBranch);
         auto [branch, outputs] = build(root, childReqs);
 
-        auto branchSlots = sbe::makeSV();
-        outputs.forEachSlot(reqs, [&](auto&& slot) { branchSlots.push_back(slot); });
+        auto branchSlots = getSlotsToForward(reqs, outputs);
 
         return {std::move(branchSlots), std::move(branch)};
     };
@@ -2879,10 +2875,8 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
     auto branchSlots = makeVector<sbe::value::SlotVector>(std::move(anchorBranchSlots),
                                                           std::move(resumeBranchSlots));
 
-    auto unionOutputSlots = sbe::makeSV();
-
     PlanStageSlots outputs(reqs, &_slotIdGenerator);
-    outputs.forEachSlot(reqs, [&](auto&& slot) { unionOutputSlots.push_back(slot); });
+    auto unionOutputSlots = getSlotsToForward(reqs, outputs);
 
     // Branch output slots become the input slots to the union.
     auto unionStage =

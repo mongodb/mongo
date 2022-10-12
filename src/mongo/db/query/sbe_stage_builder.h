@@ -168,7 +168,11 @@ public:
      * only if) the corresponding flag in 'reqs' is true.
      */
     inline void forEachSlot(const PlanStageReqs& reqs,
-                            const std::function<void(sbe::value::SlotId)>& fn);
+                            const std::function<void(sbe::value::SlotId)>& fn) const;
+
+    inline void forEachSlot(
+        const PlanStageReqs& reqs,
+        const std::function<void(sbe::value::SlotId, const StringData&)>& fn) const;
 
 private:
     StringMap<sbe::value::SlotId> _slots;
@@ -245,8 +249,12 @@ public:
     friend PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
                                           sbe::value::SlotIdGenerator* slotIdGenerator);
 
-    friend void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
-                                            const std::function<void(sbe::value::SlotId)>& fn);
+    friend void PlanStageSlots::forEachSlot(
+        const PlanStageReqs& reqs, const std::function<void(sbe::value::SlotId)>& fn) const;
+
+    friend void PlanStageSlots::forEachSlot(
+        const PlanStageReqs& reqs,
+        const std::function<void(sbe::value::SlotId, const StringData&)>& fn) const;
 
 private:
     StringMap<bool> _slots;
@@ -272,12 +280,40 @@ private:
 };
 
 void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
-                                 const std::function<void(sbe::value::SlotId)>& fn) {
-    for (auto&& [slotName, isRequired] : reqs._slots) {
+                                 const std::function<void(sbe::value::SlotId)>& fn) const {
+    for (auto&& [name, isRequired] : reqs._slots) {
         if (isRequired) {
+            // Clang raises an error if we attempt to use 'name' in the tassert() below, because
+            // tassert() is a macro that uses lambdas and 'name' is defined via "local binding".
+            // We work-around this by copying 'name' to a local variable 'slotName'.
+            auto slotName = StringData(name);
             auto it = _slots.find(slotName);
-            invariant(it != _slots.end());
+            tassert(7050900,
+                    str::stream() << "Could not find '" << slotName
+                                  << "' slot in the map, expected slot to exist",
+                    it != _slots.end());
+
             fn(it->second);
+        }
+    }
+}
+
+void PlanStageSlots::forEachSlot(
+    const PlanStageReqs& reqs,
+    const std::function<void(sbe::value::SlotId, const StringData&)>& fn) const {
+    for (auto&& [name, isRequired] : reqs._slots) {
+        if (isRequired) {
+            // Clang raises an error if we attempt to use 'name' in the tassert() below, because
+            // tassert() is a macro that uses lambdas and 'name' is defined via "local binding".
+            // We work-around this by copying 'name' to a local variable 'slotName'.
+            auto slotName = StringData(name);
+            auto it = _slots.find(slotName);
+            tassert(7050901,
+                    str::stream() << "Could not find '" << slotName
+                                  << "' slot in the map, expected slot to exist",
+                    it != _slots.end());
+
+            fn(it->second, slotName);
         }
     }
 }
