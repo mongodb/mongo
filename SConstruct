@@ -1028,6 +1028,22 @@ env_vars.Add(
     help='Path to the dsymutil utility',
 )
 
+
+def validate_dwarf_version(key, val, env):
+    if val == '4' or val == '5':
+        return
+
+    print(f"Invalid DWARF_VERSION '{val}'. Only valid versions are 4 or 5.")
+    Exit(1)
+
+
+env_vars.Add(
+    'DWARF_VERSION',
+    help='Sets the DWARF version (non-Windows). Incompatible with SPLIT_DWARF=1.',
+    validator=validate_dwarf_version,
+    converter=int,
+)
+
 env_vars.Add(
     'GITDIFFFLAGS',
     help='Sets flags for git diff',
@@ -1330,8 +1346,11 @@ env_vars.Add(
 
 env_vars.Add(
     'SPLIT_DWARF',
-    help='Set the boolean (auto, on/off true/false 1/0) to enable gsplit-dwarf (non-Windows).',
-    converter=split_dwarf_converter, default="auto")
+    help=
+    'Set the boolean (auto, on/off true/false 1/0) to enable gsplit-dwarf (non-Windows). Incompatible with DWARF_VERSION=5',
+    converter=split_dwarf_converter,
+    default="auto",
+)
 
 env_vars.Add(
     'TAPI',
@@ -2816,6 +2835,14 @@ if env.TargetOSIs('posix'):
             "-Wno-unknown-pragmas",
             "-Winvalid-pch",
         ], )
+
+    if env.get('DWARF_VERSION'):
+        if env.TargetOSIs('darwin'):
+            env.FatalError("Setting DWARF_VERSION on darwin is not supported.")
+        env.AppendUnique(
+            CCFLAGS=['-gdwarf-$DWARF_VERSION'],
+            LINKFLAGS=['-gdwarf-$DWARF_VERSION'],
+        )
 
     # TODO: At least on x86, glibc as of 2.3.4 will consult the
     # .eh_frame info via _Unwind_Backtrace to do backtracing without
@@ -5547,11 +5574,19 @@ if env['SPLIT_DWARF'] == "auto":
     # For static builds, splitting out the dwarf info reduces memory requirments, link time
     # and binary size significantly. It's affect is less prominent in dynamic builds. The downside
     # is .dwo files use absolute paths in the debug info, so it's not relocatable.
-    env['SPLIT_DWARF'] = (not link_model == "dynamic" and env.ToolchainIs('gcc', 'clang')
-                          and not env.TargetOSIs('darwin')
-                          and env.CheckCCFLAGSSupported('-gsplit-dwarf'))
+    # We also found the running splitdwarf with dwarf5 failed to compile
+    # so unless we set DWARF_VERSION = 4 we are going to turn off split dwarf
+    env['SPLIT_DWARF'] = (not link_model == "dynamic" and not env.TargetOSIs('darwin')
+                          and env.CheckCCFLAGSSupported('-gsplit-dwarf')
+                          and env.get('DWARF_VERSION') == 4)
 
 if env['SPLIT_DWARF']:
+    if env.TargetOSIs('darwin'):
+        env.FatalError("Setting SPLIT_DWARF=1 on darwin is not supported.")
+    if env.get('DWARF_VERSION') != 4:
+        env.FatalError(
+            'Running split dwarf outside of DWARF4 has shown compilation issues when using DWARF5 and gdb index. Disabling this functionality for now. Use SPLIT_DWARF=0 to disable building with split dwarf or use DWARF_VERSION=4 to pin to DWARF version 4.'
+        )
     if env.ToolchainIs('gcc', 'clang'):
         env.AddToLINKFLAGSIfSupported('-Wl,--gdb-index')
     env.Tool('split_dwarf')
