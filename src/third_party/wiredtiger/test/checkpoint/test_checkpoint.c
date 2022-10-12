@@ -535,7 +535,7 @@ flcs_modify(WT_MODIFY *entries, int nentries, uint8_t oldval)
 
     if (oldval == FLCS_NONE) {
         offset = 0;
-        digit = 0;
+        digit = '\0';
     } else
         flcs_decode_value(oldval, &offset, &digit);
 
