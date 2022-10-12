@@ -5576,7 +5576,8 @@ if env['SPLIT_DWARF'] == "auto":
     # is .dwo files use absolute paths in the debug info, so it's not relocatable.
     # We also found the running splitdwarf with dwarf5 failed to compile
     # so unless we set DWARF_VERSION = 4 we are going to turn off split dwarf
-    env['SPLIT_DWARF'] = (not link_model == "dynamic" and not env.TargetOSIs('darwin')
+    env['SPLIT_DWARF'] = (not link_model == "dynamic" and env.ToolchainIs('gcc', 'clang')
+                          and not env.TargetOSIs('darwin')
                           and env.CheckCCFLAGSSupported('-gsplit-dwarf')
                           and env.get('DWARF_VERSION') == 4)
 
