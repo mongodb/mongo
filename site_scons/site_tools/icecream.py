@@ -564,16 +564,16 @@ def exists(env):
     else:
         icerun = env.File("$ICECC").File("icerun")
     if not icerun:
-        print(f"Error: the icerun wrapper does not exist at {icerun} as expected")
+        print(f"Error: the icerun wrapper does not exist which is needed for icecream")
+        return False
 
     if "ICECC_CREATE_ENV" in env:
         icecc_create_env_bin = env.WhereIs("$ICECC_CREATE_ENV")
     else:
         icecc_create_env_bin = env.File("ICECC").File("icecc-create-env")
     if not icecc_create_env_bin:
-        print(
-            f"Error: the icecc-create-env utility does not exist at {icecc_create_env_bin} as expected"
-        )
+        print(f"Error: the icecc-create-env utility does not exist which is needed for icecream")
+        return False
 
     for line in pipe.stdout:
         line = line.decode("utf-8")
