@@ -29,9 +29,66 @@
 
 #include "mongo/db/transaction/transaction_operations.h"
 
+#include <algorithm>
 #include <fmt/format.h>
 
 namespace mongo {
+namespace {
+
+/**
+ * Returns operations that can fit into an "applyOps" entry. The returned operations are
+ * serialized to BSON. The operations are given by range ['operationsBegin',
+ * 'operationsEnd').
+ * Multi-document transactions follow the following constraints for fitting the operations: (1) the
+ * resulting "applyOps" entry shouldn't exceed the 16MB limit, unless only one operation is
+ * allocated to it; (2) the number of operations is not larger than the maximum number of
+ * transaction statements allowed in one entry as defined by
+ * 'gMaxNumberOfTransactionOperationsInSingleOplogEntry'. Batched writes (WUOWs that pack writes
+ * into a single applyOps outside of a multi-doc transaction) are exempt from the constraints above.
+ * If the operations cannot be packed into a single applyOps that's within the BSON size limit
+ * (16MB), the batched write will fail with TransactionTooLarge.
+ */
+std::vector<BSONObj> packOperationsIntoApplyOps(
+    std::vector<repl::ReplOperation>::const_iterator operationsBegin,
+    std::vector<repl::ReplOperation>::const_iterator operationsEnd,
+    boost::optional<std::size_t> oplogEntryCountLimit,
+    boost::optional<std::size_t> oplogEntrySizeLimitBytes) {
+    std::vector<BSONObj> operations;
+    std::size_t totalOperationsSize{0};
+    for (auto operationIter = operationsBegin; operationIter != operationsEnd; ++operationIter) {
+        const auto& operation = *operationIter;
+
+        if (oplogEntryCountLimit) {
+            if (operations.size() == *oplogEntryCountLimit) {
+                break;
+            }
+        }
+        if (oplogEntrySizeLimitBytes) {
+            if ((operations.size() > 0 &&
+                 (totalOperationsSize +
+                      repl::DurableOplogEntry::getDurableReplOperationSize(operation) >
+                  *oplogEntrySizeLimitBytes))) {
+                break;
+            }
+        }
+        // If neither 'oplogEntryCountLimit' nor 'oplogEntrySizeLimitBytes' is provided,
+        // this is a batched write, so we don't break the batch into multiple applyOps. It is the
+        // responsibility of the caller to generate a batch that fits within a single applyOps.
+        // If the batch doesn't fit within an applyOps, we throw a TransactionTooLarge later
+        // on when serializing to BSON.
+        auto serializedOperation = operation.toBSON();
+        totalOperationsSize += static_cast<std::size_t>(serializedOperation.objsize());
+
+        // Add BSON array element overhead since operations will ultimately be packed into BSON
+        // array.
+        totalOperationsSize += TransactionOperations::ApplyOpsInfo::kBSONArrayElementOverhead;
+
+        operations.emplace_back(std::move(serializedOperation));
+    }
+    return operations;
+}
+
+}  // namespace
 
 bool TransactionOperations::isEmpty() const {
     return _transactionOperations.empty();
@@ -122,6 +179,52 @@ TransactionOperations::CollectionUUIDs TransactionOperations::getCollectionUUIDs
     }
 
     return uuids;
+}
+
+TransactionOperations::ApplyOpsInfo TransactionOperations::getApplyOpsInfo(
+    const std::vector<OplogSlot>& oplogSlots,
+    bool prepare,
+    boost::optional<std::size_t> oplogEntryCountLimit,
+    boost::optional<std::size_t> oplogEntrySizeLimitBytes) const {
+    const auto& operations = _transactionOperations;
+    if (operations.empty()) {
+        return {{}, /*numberOfOplogSlotsUsed=*/0};
+    }
+    tassert(6278504, "Insufficient number of oplogSlots", operations.size() <= oplogSlots.size());
+
+    std::vector<ApplyOpsInfo::ApplyOpsEntry> applyOpsEntries;
+    auto oplogSlotIter = oplogSlots.begin();
+    auto getNextOplogSlot = [&]() {
+        tassert(6278505, "Unexpected end of oplog slot vector", oplogSlotIter != oplogSlots.end());
+        return *oplogSlotIter++;
+    };
+
+    auto hasNeedsRetryImage = [](const repl::ReplOperation& operation) {
+        return static_cast<bool>(operation.getNeedsRetryImage());
+    };
+
+    // Assign operations to "applyOps" entries.
+    for (auto operationIt = operations.begin(); operationIt != operations.end();) {
+        auto applyOpsOperations = packOperationsIntoApplyOps(
+            operationIt, operations.end(), oplogEntryCountLimit, oplogEntrySizeLimitBytes);
+        const auto opCountWithNeedsRetryImage =
+            std::count_if(operationIt, operationIt + applyOpsOperations.size(), hasNeedsRetryImage);
+        if (opCountWithNeedsRetryImage > 0) {
+            // Reserve a slot for a forged no-op entry.
+            getNextOplogSlot();
+        }
+        operationIt += applyOpsOperations.size();
+        applyOpsEntries.emplace_back(
+            ApplyOpsInfo::ApplyOpsEntry{getNextOplogSlot(), std::move(applyOpsOperations)});
+    }
+
+    // In the special case of writing the implicit 'prepare' oplog entry, we use the last reserved
+    // oplog slot. This may mean we skipped over some reserved slots, but there's no harm in that.
+    if (prepare) {
+        applyOpsEntries.back().oplogSlot = oplogSlots.back();
+    }
+    return {std::move(applyOpsEntries),
+            static_cast<std::size_t>(oplogSlotIter - oplogSlots.begin())};
 }
 
 std::vector<TransactionOperations::TransactionOperation>*

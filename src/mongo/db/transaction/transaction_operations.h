@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/repl/oplog.h"        // for OplogSlot
 #include "mongo/db/repl/oplog_entry.h"  // for ReplOperation
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/uuid.h"
@@ -50,6 +51,28 @@ class TransactionOperations {
 public:
     using TransactionOperation = repl::ReplOperation;
     using CollectionUUIDs = stdx::unordered_set<UUID, UUID::Hash>;
+
+    /**
+     * Contains "applyOps" oplog entries for a transaction. "applyOps" entries are not actual
+     * "applyOps" entries to be written to the oplog, but comprise certain parts of those entries -
+     * BSON serialized operations, and the assigned oplog slot. The operations in field
+     * 'ApplyOpsEntry::operations' should be considered opaque outside the OpObserver.
+     */
+    struct ApplyOpsInfo {
+        // Conservative BSON array element overhead assuming maximum 6 digit array index.
+        static constexpr std::size_t kBSONArrayElementOverhead = 8U;
+
+        struct ApplyOpsEntry {
+            OplogSlot oplogSlot;
+            std::vector<BSONObj> operations;
+        };
+
+        // Representation of "applyOps" oplog entries.
+        std::vector<ApplyOpsEntry> applyOpsEntries;
+
+        // Number of oplog slots utilized.
+        std::size_t numberOfOplogSlotsUsed;
+    };
 
     TransactionOperations() = default;
 
@@ -100,6 +123,18 @@ public:
      * collection UUIDs for no-op operations, e.g. {op: 'n', ...}.
      */
     CollectionUUIDs getCollectionUUIDs() const;
+
+    /**
+     * Returns oplog slots to be used for "applyOps" oplog entries, BSON serialized operations,
+     * their assignments to "applyOps" entries, and oplog slots to be used for writing pre- and
+     * post- image oplog entries for the transaction consisting of 'operations'. Allocates oplog
+     * slots from 'oplogSlots'. The 'prepare' indicates if the function is called when preparing a
+     * transaction.
+     */
+    ApplyOpsInfo getApplyOpsInfo(const std::vector<OplogSlot>& oplogSlots,
+                                 bool prepare,
+                                 boost::optional<std::size_t> oplogEntryCountLimit,
+                                 boost::optional<std::size_t> oplogEntrySizeLimitBytes) const;
 
     /**
      * Returns pointer to vector of operations for integrating with

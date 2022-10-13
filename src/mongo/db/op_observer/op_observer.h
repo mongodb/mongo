@@ -112,6 +112,8 @@ struct IndexCollModInfo {
  */
 class OpObserver {
 public:
+    using ApplyOpsOplogSlotAndOperationAssignment = TransactionOperations::ApplyOpsInfo;
+
     enum class CollectionDropType {
         // The collection is being dropped immediately, in one step.
         kOnePhase,
@@ -452,25 +454,6 @@ public:
      * should be fine for cleanup purposes.
      */
     virtual void onBatchedWriteAbort(OperationContext* opCtx) = 0;
-
-    /**
-     * Contains "applyOps" oplog entries for a transaction. "applyOps" entries are not actual
-     * "applyOps" entries to be written to the oplog, but comprise certain parts of those entries -
-     * BSON serialized operations, and the assigned oplog slot. The operations in field
-     * 'ApplyOpsEntry::operations' should be considered opaque outside the OpObserver.
-     */
-    struct ApplyOpsOplogSlotAndOperationAssignment {
-        struct ApplyOpsEntry {
-            OplogSlot oplogSlot;
-            std::vector<BSONObj> operations;
-        };
-
-        // Representation of "applyOps" oplog entries.
-        std::vector<ApplyOpsEntry> applyOpsEntries;
-
-        // Number of oplog slots utilized.
-        size_t numberOfOplogSlotsUsed;
-    };
 
     /**
      * This method is called before an atomic transaction is prepared. It must be called when a

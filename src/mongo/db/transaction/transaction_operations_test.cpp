@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -202,6 +203,229 @@ TEST(TransactionOperationsTest, GetCollectionUUIDsIgnoresNoopOperations) {
     ASSERT_EQ(uuids.size(), 2U);
     ASSERT(uuids.count(*op1.getUuid()));
     ASSERT(uuids.count(*op2.getUuid()));
+}
+
+TEST(TransactionOperationsTest, GetApplyOpsInfoEmptyOps) {
+    TransactionOperations ops;
+    auto info = ops.getApplyOpsInfo(/*oplogSlots=*/{},
+                                    /*prepare=*/false,
+                                    /*oplogEntryCountLimit=*/boost::none,
+                                    /*oplogEntrySizeLimitBytes=*/boost::none);
+    ASSERT_EQ(info.applyOpsEntries.size(), 0);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 0);
+}
+
+DEATH_TEST(TransactionOperationsTest,
+           GetApplyOpsInfoInsufficientSlots,
+           "Insufficient number of oplogSlots") {
+    TransactionOperations ops;
+    TransactionOperations::TransactionOperation op;
+    ASSERT_OK(ops.addOperation(op));
+    ops.getApplyOpsInfo(/*oplogSlots=*/{},
+                        /*prepare=*/false,
+                        /*oplogEntryCountLimit=*/boost::none,
+                        /*oplogEntrySizeLimitBytes=*/boost::none);
+}
+
+TEST(TransactionOperationsTest, GetApplyOpsInfoReturnsOneEntryContainingTwoOperations) {
+    TransactionOperations ops;
+
+    TransactionOperations::TransactionOperation op1;
+    op1.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
+    op1.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
+    op1.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    ASSERT_OK(ops.addOperation(op1));
+
+    TransactionOperations::TransactionOperation op2;
+    op2.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
+    op2.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
+    op2.setObject(BSON("_id" << 2));           // required for DurableReplOperation::serialize()
+    ASSERT_OK(ops.addOperation(op2));
+
+    // We have to allocate as many oplog slots as operations even though only
+    // one applyOps entry will be generated.
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    /*prepare=*/false,
+                                    /*oplogEntryCountLimit=*/boost::none,
+                                    /*oplogEntrySizeLimitBytes=*/boost::none);
+
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 1U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+    ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[0]);  // first oplog slot
+    ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 2U);
+    ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op1.toBSON());
+    ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[1], op2.toBSON());
+}
+
+TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationCountLimit) {
+    TransactionOperations ops;
+
+    TransactionOperations::TransactionOperation op1;
+    op1.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
+    op1.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
+    op1.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    ASSERT_OK(ops.addOperation(op1));
+
+    TransactionOperations::TransactionOperation op2;
+    op2.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
+    op2.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
+    op2.setObject(BSON("_id" << 2));           // required for DurableReplOperation::serialize()
+    ASSERT_OK(ops.addOperation(op2));
+
+    // We have to allocate as many oplog slots as operations even though only
+    // one applyOps entry will be generated.
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
+    // Restrict each applyOps entry to holding at most one operation.
+    auto info = ops.getApplyOpsInfo(
+        oplogSlots,
+        /*prepare=*/false,
+        /*oplogEntryCountLimit=*/1U,
+        /*oplogEntrySizeLimitBytes=*/static_cast<std::size_t>(BSONObjMaxUserSize));
+
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 2U);
+
+    // Check first applyOps entry.
+    ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[0]);
+    ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 1U);
+    ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op1.toBSON());
+
+    // Check second applyOps entry.
+    ASSERT_EQ(info.applyOpsEntries[1].oplogSlot, oplogSlots[1]);
+    ASSERT_EQ(info.applyOpsEntries[1].operations.size(), 1U);
+    ASSERT_BSONOBJ_EQ(info.applyOpsEntries[1].operations[0], op2.toBSON());
+}
+
+TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationSizeLimit) {
+    TransactionOperations ops;
+
+    TransactionOperations::TransactionOperation op1;
+    op1.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
+    op1.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
+    op1.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    ASSERT_OK(ops.addOperation(op1));
+
+    TransactionOperations::TransactionOperation op2;
+    op2.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
+    op2.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
+    op2.setObject(BSON("_id" << 2));           // required for DurableReplOperation::serialize()
+    ASSERT_OK(ops.addOperation(op2));
+
+    // We have to allocate as many oplog slots as operations even though only
+    // one applyOps entry will be generated.
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
+    // Restrict each applyOps entry to holding at most one operation.
+    auto info = ops.getApplyOpsInfo(
+        oplogSlots,
+        /*prepare=*/false,
+        /*oplogEntryCountLimit=*/100U,
+        /*oplogEntrySizeLimitBytes=*/repl::DurableOplogEntry::getDurableReplOperationSize(op1) +
+            TransactionOperations::ApplyOpsInfo::kBSONArrayElementOverhead);
+
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 2U);
+
+    // Check first applyOps entry.
+    ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[0]);
+    ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 1U);
+    ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op1.toBSON());
+
+    // Check second applyOps entry.
+    ASSERT_EQ(info.applyOpsEntries[1].oplogSlot, oplogSlots[1]);
+    ASSERT_EQ(info.applyOpsEntries[1].operations.size(), 1U);
+    ASSERT_BSONOBJ_EQ(info.applyOpsEntries[1].operations[0], op2.toBSON());
+}
+
+DEATH_TEST(TransactionOperationsTest,
+           GetApplyOpsInfoInsufficientSlotsDueToPreImage,
+           "Unexpected end of oplog slot vector") {
+    TransactionOperations ops;
+
+    // Setting the "needs retry image" flag on 'op' forces getApplyOpsInfo()
+    // to request an additional slot, which will not be available due to an
+    // insufficiently sized 'oplogSlots' array.
+    TransactionOperations::TransactionOperation op;
+    op.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
+    op.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
+    op.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
+    op.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    ASSERT_OK(ops.addOperation(op));
+
+    // We allocated a slot for the operation but not for the pre-image.
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+
+    ops.getApplyOpsInfo(oplogSlots,
+                        /*prepare=*/false,
+                        /*oplogEntryCountLimit=*/boost::none,
+                        /*oplogEntrySizeLimitBytes=*/boost::none);
+}
+
+TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsPreImageSlotBeforeOperation) {
+    TransactionOperations ops;
+
+    // Setting the "needs retry image" flag on 'op' forces getApplyOpsInfo()
+    // to request an additional slot, which will not be available due to an
+    // insufficiently sized 'oplogSlots' array.
+    TransactionOperations::TransactionOperation op;
+    op.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
+    op.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
+    op.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
+    op.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    ASSERT_OK(ops.addOperation(op));
+
+    // We allocated a slot for the operation but not for the pre-image.
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    /*prepare=*/false,
+                                    /*oplogEntryCountLimit=*/boost::none,
+                                    /*oplogEntrySizeLimitBytes=*/boost::none);
+
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+    ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[1]);
+    ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 1U);
+    ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op.toBSON());
+}
+
+TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsLastOplogSlotForPrepare) {
+    TransactionOperations ops;
+
+    TransactionOperations::TransactionOperation op;
+    op.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
+    op.setNss(NamespaceString{"test.t"});     // required for DurableReplOperation::serialize()
+    op.setObject(BSON("_id" << 1));           // required for DurableReplOperation::serialize()
+    ASSERT_OK(ops.addOperation(op));
+
+    // We allocate two oplog slots and confirm that the second oplog slot is assigned
+    // to the only applyOps entry
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    /*prepare=*/true,
+                                    /*oplogEntryCountLimit=*/boost::none,
+                                    /*oplogEntrySizeLimitBytes=*/boost::none);
+
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 1U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+    ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[1]);  // last oplog slot
+    ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 1U);
+    ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op.toBSON());
 }
 
 }  // namespace
