@@ -2344,7 +2344,7 @@ buildvariants:
   - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
   - name: .sharding .common !.csrs
