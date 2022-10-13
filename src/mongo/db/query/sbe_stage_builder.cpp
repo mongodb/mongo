@@ -1804,93 +1804,112 @@ SlotBasedStageBuilder::buildProjectionCovered(const QuerySolutionNode* root,
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
                                               const PlanStageReqs& reqs) {
-    invariant(!reqs.getIndexKeyBitset());
-
-    auto childReqs = reqs.copy();
+    tassert(7055400,
+            "buildProjectionDefault() does not support index key bitsets",
+            !reqs.getIndexKeyBitset());
 
     auto pn = static_cast<const ProjectionNodeDefault*>(root);
     const auto& projection = pn->proj;
-    const auto [indexScanNode, indexScanCount] = getFirstNodeByType(root, STAGE_IXSCAN);
+
     // TODO SERVER-57533: Support multiple index scan nodes located below OR and SORT_MERGE stages.
-    const auto isCoveredProjection =
-        !pn->fetched() && indexScanCount == 1 && projection.isInclusionOnly();
-
-    boost::optional<IndexKeyPatternTreeNode> patternRoot;
-    std::vector<IndexKeyPatternTreeNode*> patternNodesForSlots;
-    if (isCoveredProjection) {
-        // Convert projection fieldpaths into the tree of 'IndexKeyPatternTreeNode'.
-        IndexKeysBuilderContext context;
-        IndexKeysPreBuilder preVisitor{&context};
-        IndexKeysInBuilder inVisitor{&context};
-        IndexKeysPostBuilder postVisitor{&context};
-        projection_ast::ProjectionASTConstWalker walker{&preVisitor, &inVisitor, &postVisitor};
-        tree_walker::walk<true, projection_ast::ASTNode>(projection.root(), &walker);
-        patternRoot = std::move(context.root);
-
-        // Construct a bitset requesting slots from the underlying index scan. These slots
-        // correspond to index keys for projection fieldpaths.
-        auto& indexKeyPattern = static_cast<const IndexScanNode*>(indexScanNode)->index.keyPattern;
-        size_t i = 0;
-        sbe::IndexKeysInclusionSet patternBitSet;
-        for (const auto& element : indexKeyPattern) {
-            sbe::MatchPath fieldRef{element.fieldNameStringData()};
-            // Projection field paths are always leaf nodes. In other words, projection like
-            // {a: 1, 'a.b': 1} would produce a path collision error.
-            if (auto node = patternRoot->findLeafNode(fieldRef); node) {
-                patternBitSet.set(i);
-                patternNodesForSlots.push_back(node);
-            }
-
-            ++i;
-        }
-
-        childReqs.getIndexKeyBitset() = patternBitSet;
-
-        // We do not need index scan to restore the entire object. Instead, we will restore only
-        // necessary parts of it below.
-        childReqs.clear(kResult);
-    } else {
-        // The child must produce all of the slots required by the parent of this
-        // ProjectionNodeDefault. In addition to that, the child must always produce a 'resultSlot'
-        // because it's needed by the projection logic below.
-        childReqs.set(kResult);
+    if (const auto [ixn, ct] = getFirstNodeByType(root, STAGE_IXSCAN);
+        !pn->fetched() && projection.isInclusionOnly() && ixn && ct == 1) {
+        return buildProjectionDefaultCovered(root, reqs, static_cast<const IndexScanNode*>(ixn));
     }
 
-    auto [inputStage, outputs] = build(pn->children[0].get(), childReqs);
+    // The child must produce all of the slots required by the parent of this ProjectionNodeDefault.
+    // In addition to that, the child must always produce 'kResult' because it's needed by the
+    // projection logic below.
+    auto childReqs = reqs.copy().set(kResult);
 
-    sbe::value::SlotId resultSlot;
-    std::unique_ptr<sbe::PlanStage> resultStage;
-    if (isCoveredProjection) {
-        auto indexKeySlots = *outputs.extractIndexKeySlots();
+    auto [stage, outputs] = build(pn->children[0].get(), childReqs);
 
-        // Extract slots corresponding to each of the projection fieldpaths.
-        invariant(indexKeySlots.size() == patternNodesForSlots.size());
-        for (size_t i = 0; i < indexKeySlots.size(); i++) {
-            patternNodesForSlots[i]->indexKeySlot = indexKeySlots[i];
-        }
+    auto relevantSlots = sbe::makeSV();
+    outputs.forEachSlot(childReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
 
-        // Finally, build the expression to create object with requested projection fieldpaths.
-        resultSlot = _slotIdGenerator.generate();
-        auto resultExpr = buildNewObjExpr(&*patternRoot);
-        resultStage = sbe::makeProjectStage(
-            std::move(inputStage), root->nodeId(), resultSlot, std::move(resultExpr));
-    } else {
-        auto relevantSlots = sbe::makeSV();
-        outputs.forEachSlot(childReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
+    auto [resultSlot, resultStage] =
+        generateProjection(_state,
+                           &projection,
+                           {std::move(stage), std::move(relevantSlots)},
+                           outputs.get(kResult),
+                           root->nodeId());
 
-        EvalStage stage;
-        std::tie(resultSlot, stage) =
-            generateProjection(_state,
-                               &projection,
-                               {std::move(inputStage), std::move(relevantSlots)},
-                               outputs.get(kResult),
-                               root->nodeId());
-
-        resultStage = stage.extractStage(root->nodeId());
-    }
+    stage = resultStage.extractStage(root->nodeId());
 
     outputs.set(kResult, resultSlot);
-    return {std::move(resultStage), std::move(outputs)};
+    return {std::move(stage), std::move(outputs)};
+}
+
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
+SlotBasedStageBuilder::buildProjectionDefaultCovered(const QuerySolutionNode* root,
+                                                     const PlanStageReqs& reqs,
+                                                     const IndexScanNode* ixn) {
+    tassert(7055401,
+            "buildProjectionDefaultCovered() does not support index key bitsets",
+            !reqs.getIndexKeyBitset());
+
+    auto pn = static_cast<const ProjectionNodeDefault*>(root);
+    const auto& projection = pn->proj;
+
+    tassert(7055402,
+            "buildProjectionDefaultCovered() expected 'pn' to be an inclusion-only projection",
+            projection.isInclusionOnly());
+    tassert(
+        7055403, "buildProjectionDefaultCovered() expected 'pn' to not be fetched", !pn->fetched());
+
+    // Convert projection fieldpaths into the tree of 'IndexKeyPatternTreeNode'.
+    IndexKeysBuilderContext context;
+    IndexKeysPreBuilder preVisitor{&context};
+    IndexKeysInBuilder inVisitor{&context};
+    IndexKeysPostBuilder postVisitor{&context};
+    projection_ast::ProjectionASTConstWalker walker{&preVisitor, &inVisitor, &postVisitor};
+    tree_walker::walk<true, projection_ast::ASTNode>(projection.root(), &walker);
+
+    IndexKeyPatternTreeNode patternRoot = std::move(context.root);
+
+    // Construct a bitset requesting slots from the underlying index scan. These slots
+    // correspond to index keys for projection fieldpaths.
+    if (!ixn) {
+        ixn = static_cast<const IndexScanNode*>(getLoneNodeByType(root, STAGE_IXSCAN));
+    }
+    auto& indexKeyPattern = ixn->index.keyPattern;
+    sbe::IndexKeysInclusionSet patternBitSet;
+    std::vector<IndexKeyPatternTreeNode*> patternNodesForSlots;
+    size_t i = 0;
+    for (const auto& element : indexKeyPattern) {
+        sbe::MatchPath fieldRef{element.fieldNameStringData()};
+        // Projection field paths are always leaf nodes. In other words, projection like
+        // {a: 1, 'a.b': 1} would produce a path collision error.
+        if (auto node = patternRoot.findLeafNode(fieldRef); node) {
+            patternBitSet.set(i);
+            patternNodesForSlots.push_back(node);
+        }
+
+        ++i;
+    }
+
+    // We do not need index scan to restore the entire object. Instead, we will restore only
+    // necessary parts of it below.
+    auto childReqs = reqs.copy().clear(kResult);
+    childReqs.getIndexKeyBitset() = patternBitSet;
+
+    auto [stage, outputs] = build(pn->children[0].get(), childReqs);
+
+    auto indexKeySlots = *outputs.extractIndexKeySlots();
+
+    // Extract slots corresponding to each of the projection fieldpaths.
+    invariant(indexKeySlots.size() == patternNodesForSlots.size());
+    for (size_t i = 0; i < indexKeySlots.size(); i++) {
+        patternNodesForSlots[i]->indexKeySlot = indexKeySlots[i];
+    }
+
+    // Finally, build the expression to create object with requested projection fieldpaths.
+    auto resultSlot = _slotIdGenerator.generate();
+    stage = sbe::makeProjectStage(
+        std::move(stage), root->nodeId(), resultSlot, buildNewObjExpr(&patternRoot));
+
+    outputs.set(kResult, resultSlot);
+    return {std::move(stage), std::move(outputs)};
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildOr(

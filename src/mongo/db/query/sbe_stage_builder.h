@@ -476,6 +476,11 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionDefault(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionDefaultCovered(
+        const QuerySolutionNode* root,
+        const PlanStageReqs& reqs,
+        const IndexScanNode* ixn = nullptr);
+
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildOr(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
