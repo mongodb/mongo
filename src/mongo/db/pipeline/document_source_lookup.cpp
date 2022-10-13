@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_documents.h"
@@ -115,7 +116,8 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
                       << nss.db() << " and coll: " << nss.coll(),
         nss.isConfigDotCacheDotChunks() || nss == NamespaceString::kRsOplogNamespace ||
-            nss == NamespaceString::kTenantMigrationOplogView);
+            nss == NamespaceString::kTenantMigrationOplogView ||
+            nss == NamespaceString::kConfigsvrCollectionsNamespace);
     return nss;
 }
 
@@ -376,6 +378,11 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
     } else if (pipeState == Pipeline::SplitState::kSplitForShards) {
         // This stage will only be on the shards pipeline if $lookup on sharded foreign collections
         // is allowed.
+        hostRequirement = HostTypeRequirement::kAnyShard;
+    } else if (_fromNs == NamespaceString::kConfigsvrCollectionsNamespace) {
+        // This is an unsharded collection, but the primary shard would be the config server, and
+        // the config servers are not prepared to take queries. Instead, we'll merge on any of the
+        // other shards.
         hostRequirement = HostTypeRequirement::kAnyShard;
     } else {
         // If the pipeline is unsplit or this stage is on the merging part of the pipeline,

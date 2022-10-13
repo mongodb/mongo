@@ -85,6 +85,10 @@ public:
         const DocumentSourceCollStatsSpec _spec;
     };
 
+    static BSONObj makeStatsForNs(const boost::intrusive_ptr<ExpressionContext>&,
+                                  const NamespaceString&,
+                                  const DocumentSourceCollStatsSpec&);
+
     DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                             DocumentSourceCollStatsSpec spec)
         : DocumentSource(kStageName, pExpCtx), _collStatsSpec(std::move(spec)) {}
