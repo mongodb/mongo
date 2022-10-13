@@ -156,6 +156,14 @@ commands:
                 - privilege: # $backupCursorExtend, backupCursor
                     resource_pattern: cluster
                     action_type: fsync
+                - privilege: # $_internalAllCollectionStats
+                     agg_stage: _internalAllCollectionStats
+                     resource_pattern: cluster
+                     action_type: allCollectionStats
+                - privilege: # $shardedDataDistribution
+                     agg_stage: shardedDataDistribution
+                     resource_pattern: cluster
+                     action_type: shardedDataDistribution
         # Note that the 'CursorInitialReply' is not the only response that an aggregate command
         # could return. With 'explain' or 'exchange', the response would not include the fields in
         # 'CursorInitialReply'. But using 'explain' or 'exchange' is unstable, but otherwise the

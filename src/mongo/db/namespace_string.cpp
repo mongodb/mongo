@@ -169,6 +169,9 @@ const NamespaceString NamespaceString::kClusterParametersNamespace(NamespaceStri
 const NamespaceString NamespaceString::kConfigsvrShardsNamespace(NamespaceString::kConfigDb,
                                                                  "shards");
 
+const NamespaceString NamespaceString::kConfigsvrCollectionsNamespace(NamespaceString::kConfigDb,
+                                                                      "collections");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }

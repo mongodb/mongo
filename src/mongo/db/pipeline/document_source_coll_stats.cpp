@@ -71,18 +71,15 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     return make_intrusive<DocumentSourceCollStats>(pExpCtx, std::move(spec));
 }
 
-DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
-    if (_finished) {
-        return GetNextResult::makeEOF();
-    }
-
-    _finished = true;
-
+BSONObj DocumentSourceCollStats::makeStatsForNs(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    const DocumentSourceCollStatsSpec& spec) {
     BSONObjBuilder builder;
 
-    builder.append("ns", pExpCtx->ns.ns());
+    builder.append("ns", nss.ns());
 
-    auto shardName = pExpCtx->mongoProcessInterface->getShardName(pExpCtx->opCtx);
+    auto shardName = expCtx->mongoProcessInterface->getShardName(expCtx->opCtx);
 
     if (!shardName.empty()) {
         builder.append("shard", shardName);
@@ -91,33 +88,42 @@ DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
     builder.append("host", getHostNameCachedAndPort());
     builder.appendDate("localTime", jsTime());
 
-    if (auto latencyStatsSpec = _collStatsSpec.getLatencyStats()) {
-        pExpCtx->mongoProcessInterface->appendLatencyStats(
-            pExpCtx->opCtx, pExpCtx->ns, latencyStatsSpec->getHistograms(), &builder);
+    if (auto latencyStatsSpec = spec.getLatencyStats()) {
+        expCtx->mongoProcessInterface->appendLatencyStats(
+            expCtx->opCtx, nss, latencyStatsSpec->getHistograms(), &builder);
     }
 
-    if (auto storageStats = _collStatsSpec.getStorageStats()) {
+    if (auto storageStats = spec.getStorageStats()) {
         // If the storageStats field exists, it must have been validated as an object when parsing.
         BSONObjBuilder storageBuilder(builder.subobjStart("storageStats"));
-        uassertStatusOKWithContext(pExpCtx->mongoProcessInterface->appendStorageStats(
-                                       pExpCtx->opCtx, pExpCtx->ns, *storageStats, &storageBuilder),
+        uassertStatusOKWithContext(expCtx->mongoProcessInterface->appendStorageStats(
+                                       expCtx->opCtx, nss, *storageStats, &storageBuilder),
                                    "Unable to retrieve storageStats in $collStats stage");
         storageBuilder.doneFast();
     }
 
-    if (_collStatsSpec.getCount()) {
-        uassertStatusOKWithContext(pExpCtx->mongoProcessInterface->appendRecordCount(
-                                       pExpCtx->opCtx, pExpCtx->ns, &builder),
-                                   "Unable to retrieve count in $collStats stage");
+    if (spec.getCount()) {
+        uassertStatusOKWithContext(
+            expCtx->mongoProcessInterface->appendRecordCount(expCtx->opCtx, nss, &builder),
+            "Unable to retrieve count in $collStats stage");
     }
 
-    if (_collStatsSpec.getQueryExecStats()) {
-        uassertStatusOKWithContext(pExpCtx->mongoProcessInterface->appendQueryExecStats(
-                                       pExpCtx->opCtx, pExpCtx->ns, &builder),
-                                   "Unable to retrieve queryExecStats in $collStats stage");
+    if (spec.getQueryExecStats()) {
+        uassertStatusOKWithContext(
+            expCtx->mongoProcessInterface->appendQueryExecStats(expCtx->opCtx, nss, &builder),
+            "Unable to retrieve queryExecStats in $collStats stage");
+    }
+    return builder.obj();
+}
+
+DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
+    if (_finished) {
+        return GetNextResult::makeEOF();
     }
 
-    return {Document(builder.obj())};
+    _finished = true;
+
+    return {Document(makeStatsForNs(pExpCtx, pExpCtx->ns, _collStatsSpec))};
 }
 
 Value DocumentSourceCollStats::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {

@@ -222,6 +222,9 @@ public:
     // Namespace used for storing the list of shards on the CSRS
     static const NamespaceString kConfigsvrShardsNamespace;
 
+    // Namespace used for storing the list of sharded collections on the CSRS.
+    static const NamespaceString kConfigsvrCollectionsNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */
