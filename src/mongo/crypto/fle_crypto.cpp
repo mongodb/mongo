@@ -3456,6 +3456,11 @@ OSTType_Double getTypeInfoDouble(double value,
                 value >= min.value() && value <= max.value());
     }
 
+    // Map negative 0 to zero so sign bit is 0.
+    if (std::signbit(value) && value == 0) {
+        value = 0;
+    }
+
     // When we translate the double into "bits", the sign bit means that the negative numbers
     // get mapped into the higher 63 bits of a 64-bit integer. We want them to map into the lower
     // 64-bits so we invert the sign bit.
