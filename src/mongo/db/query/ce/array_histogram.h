@@ -74,9 +74,9 @@ public:
     const TypeCounts& getTypeCounts() const;
     const TypeCounts& getArrayTypeCounts() const;
     // The total number of arrays in the histogram's path including empty arrays.
-    const size_t getArrayCount() const;
+    size_t getArrayCount() const;
     // The total number of empty arrays ( [] ) in the histogram's path.
-    const size_t getEmptyArrayCount() const;
+    size_t getEmptyArrayCount() const;
 
 private:
     /* ScalarHistogram fields for all paths. */

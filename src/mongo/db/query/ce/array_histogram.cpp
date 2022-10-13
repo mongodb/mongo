@@ -123,7 +123,7 @@ const TypeCounts& ArrayHistogram::getArrayTypeCounts() const {
     return *_arrayTypeCounts;
 }
 
-const size_t ArrayHistogram::getArrayCount() const {
+size_t ArrayHistogram::getArrayCount() const {
     if (isArray()) {
         auto findArray = _typeCounts.find(value::TypeTags::Array);
         uassert(6979504,
@@ -136,7 +136,7 @@ const size_t ArrayHistogram::getArrayCount() const {
     return 0;
 }
 
-const size_t ArrayHistogram::getEmptyArrayCount() const {
+size_t ArrayHistogram::getEmptyArrayCount() const {
     if (isArray()) {
         size_t nonEmptyArrayCount = _arrayMin->empty() ? 0 : _arrayMin->getCardinality();
         size_t totalArrCount = getArrayCount();
