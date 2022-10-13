@@ -49,6 +49,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -1638,7 +1639,21 @@ StatusWith<bool> WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* o
         invariantWTOK(ret);
 
         // Second phase looks up for existence of key to avoid insertion of duplicate key
-        if (_keyExists(opCtx, c, keyString.getBuffer(), sizeWithoutRecordId)) {
+        // The usage of 'prefix_search=true' enables an optimization that allows this search to
+        // return more quickly. See SERVER-56509.
+        // Does not work on prefixed indexes.
+        auto prefixSearch =
+            gWiredTigerPrefixSearchForUniqueIndexes.load() && _prefix == KVPrefix::kNotPrefixed;
+        if (prefixSearch) {
+            c->reconfigure(c, "prefix_search=true");
+        }
+        ON_BLOCK_EXIT([&] {
+            if (prefixSearch) {
+                c->reconfigure(c, "prefix_search=false");
+            }
+        });
+        auto keyExists = _keyExists(opCtx, c, keyString.getBuffer(), sizeWithoutRecordId);
+        if (keyExists) {
             auto key = KeyString::toBson(
                 keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits());
             return buildDupKeyErrorStatus(
