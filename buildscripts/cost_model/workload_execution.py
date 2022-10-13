@@ -29,8 +29,8 @@
 
 from __future__ import annotations
 from dataclasses import asdict, dataclass
-import json
 from typing import Sequence
+import bson.json_util as json
 from bson.objectid import ObjectId
 from data_generator import CollectionInfo
 from database_instance import DatabaseInstance, Pipeline
@@ -44,7 +44,8 @@ class Query:
     """Query pipleline and related model input parameters."""
 
     pipeline: Pipeline
-    keys_length_in_bytes: int
+    keys_length_in_bytes: int = 0
+    number_of_fields: int = 0
 
 
 @dataclass
@@ -53,6 +54,7 @@ class QueryParameters:
 
     keys_length_in_bytes: int
     average_document_size_in_bytes: float
+    number_of_fields: int = 0
 
     def to_json(self) -> str:
         """Serialize the parameters to JSON."""
@@ -111,6 +113,7 @@ class WorkloadExecution:
         run_id = ObjectId()
         avg_doc_size = await self.database.get_average_document_size(coll_info.name)
         parameters = QueryParameters(keys_length_in_bytes=query.keys_length_in_bytes,
+                                     number_of_fields=query.number_of_fields,
                                      average_document_size_in_bytes=avg_doc_size)
         for _ in range(self.config.runs):
             explain = await self.database.explain(coll_info.name, query.pipeline)

@@ -73,21 +73,28 @@ class DatabaseInstance:
         subprocess.run(['mongodump', '--db', self.config.database_name], cwd=self.config.dump_path,
                        check=True)
 
+    async def set_parameter(self, name: str, value: any) -> None:
+        """Set MongoDB Parameter."""
+        await self.client.admin.command({'setParameter': 1, name: value})
+
     async def enable_sbe(self, state: bool) -> None:
         """Enable new query execution engine. Throw pymongo.errors.OperationFailure in case of failure."""
-        await self.client.admin.command({
-            'setParameter': 1,
-            'internalQueryFrameworkControl': 'trySbeEngine' if state else 'forceClassicEngine'
-        })
+        await self.set_parameter('internalQueryFrameworkControl',
+                                 'trySbeEngine' if state else 'forceClassicEngine')
 
     async def enable_cascades(self, state: bool) -> None:
         """Enable new query optimizer. Requires featureFlagCommonQueryFramework set to True."""
+
+        # Set FeatureCompatibilityVersion compatible with featureFlagCommonQueryFramework.
+        version = (await self.client.admin.command(
+            {'getParameter': 1,
+             'featureFlagCommonQueryFramework': 1}))['featureFlagCommonQueryFramework']['version']
+        await self.client.admin.command({'setFeatureCompatibilityVersion': version})
+
         await self.client.admin.command(
             {'configureFailPoint': 'enableExplainInBonsai', 'mode': 'alwaysOn'})
-        await self.client.admin.command({
-            'setParameter': 1,
-            'internalQueryFrameworkControl': 'tryBonsai' if state else 'trySbeEngine'
-        })
+        await self.set_parameter('internalQueryFrameworkControl',
+                                 'forceBonsai' if state else 'trySbeEngine')
 
     async def explain(self, collection_name: str, pipeline: Pipeline) -> dict[str, any]:
         """Return explain for the given pipeline."""

@@ -93,9 +93,14 @@ sns.scatterplot(x=ixscan_df['n_processed'], y=ixscan_df['execution_time'])
 sns.lineplot(x=ixscan_df['n_processed'],y=y_pred, color='red')
 """
 
-import json
+from __future__ import annotations
 import dataclasses
+import bson.json_util as json
+import seaborn as sns
 import pandas as pd
+import statsmodels.api as sm
+from sklearn.metrics import r2_score
+from sklearn.linear_model import LinearRegression
 from database_instance import DatabaseInstance
 import execution_tree as sbe
 import physical_tree as abt
@@ -166,12 +171,49 @@ def extract_abt_nodes(df: pd.DataFrame) -> pd.DataFrame:
         for abt_type, es in es_dict.items():
             row = {
                 'abt_type': abt_type, **dataclasses.asdict(es),
-                **json.loads(df_seq['query_parameters']), 'run_id': df_seq['run_id']
+                **json.loads(df_seq['query_parameters']), 'run_id': df_seq.run_id,
+                'pipeline': df_seq.pipeline, 'source': df_seq.name
             }
             rows.append(row)
         return rows
 
     return pd.DataFrame(list(df.apply(extract, axis=1).explode()))
+
+
+def print_trees(calibration_df: pd.DataFrame, abt_df: pd.DataFrame, row_index: int = 0):
+    """Print SBE and ABT Trees."""
+    row = calibration_df.loc[abt_df.iloc[row_index].source]
+    print('SBE')
+    row.sbe.print()
+    print('\nABT')
+    row.abt.print()
+
+
+def print_explain(calibration_df: pd.DataFrame, abt_df: pd.DataFrame, row_index: int = 0):
+    """Print explain."""
+    row = calibration_df.loc[abt_df.iloc[row_index].source]
+    explain = json.loads(row.explain)
+    explain_str = json.dumps(explain, indent=4)
+    print(explain_str)
+
+
+def calibrate(abt_node_df: pd.DataFrame, variables: list[str] = None):
+    """Calibrate the ABT node given in abd_node_df with the given model input variables."""
+    # pylint: disable=invalid-name
+    if variables is None:
+        variables = ['n_processed']
+    y = abt_node_df['execution_time']
+    X = abt_node_df[variables]
+    X = sm.add_constant(X)
+
+    nnls = LinearRegression(positive=True, fit_intercept=False)
+    model = nnls.fit(X, y)
+    y_pred = model.predict(X)
+    print(f'R2: {r2_score(y, y_pred)}')
+    print(f'Coefficients: {model.coef_}')
+
+    sns.scatterplot(x=abt_node_df['n_processed'], y=abt_node_df['execution_time'])
+    sns.lineplot(x=abt_node_df['n_processed'], y=y_pred, color='red')
 
 
 if __name__ == '__main__':

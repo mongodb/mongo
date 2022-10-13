@@ -35,7 +35,6 @@ import asyncio
 import pymongo
 from pymongo import IndexModel
 from motor.motor_asyncio import AsyncIOMotorCollection
-from motor.motor_asyncio import AsyncIOMotorDatabase
 from random_generator import RandomDistribution
 from config import DataGeneratorConfig, DataType
 from database_instance import DatabaseInstance
@@ -155,10 +154,7 @@ async def create_single_field_indexes(coll: AsyncIOMotorCollection,
     indexes = [IndexModel([(field.name, pymongo.ASCENDING)]) for field in fields if field.indexed]
     if len(indexes) > 0:
         await coll.create_indexes(indexes)
-
-    index_spec = [(field.name, pymongo.ASCENDING) for field in fields]
-
-    print(f'create_single_field_indexes done. {index_spec}')
+        print(f'create_single_field_indexes done. {[index.document for index in indexes]}')
 
 
 async def create_compound_indexes(coll: AsyncIOMotorCollection, coll_info: CollectionInfo) -> None:
@@ -172,5 +168,4 @@ async def create_compound_indexes(coll: AsyncIOMotorCollection, coll_info: Colle
         index_specs.append([(field, pymongo.ASCENDING) for field in compound_index])
     if len(indexes_spec) > 0:
         await coll.create_indexes(indexes_spec)
-
-    print(f'createCompoundIndex done. {index_specs}')
+        print(f'create_compound_indexes done. {index_specs}')

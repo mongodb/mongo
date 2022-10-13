@@ -30,7 +30,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
-from typing import Sequence
+from typing import Callable, Sequence
 from random_generator import RandomDistribution
 
 
@@ -109,6 +109,13 @@ class DataType(Enum):
 
 
 @dataclass
+class AbtNodeCalibrationConfig:
+    type: str
+    filter_function: Callable[[any], any] = None
+    variables_override: Sequence[str] = None
+
+
+@dataclass
 class AbtCalibratorConfig:
     """ABT Calibrator configuration."""
 
@@ -117,6 +124,7 @@ class AbtCalibratorConfig:
     test_size: float
     input_collection_name: str
     trace: bool
+    nodes: Sequence[AbtNodeCalibrationConfig]
 
 
 class WriteMode(Enum):

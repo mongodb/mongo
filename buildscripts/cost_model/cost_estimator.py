@@ -29,8 +29,6 @@
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Sequence
-from sklearn import linear_model
 from sklearn.metrics import mean_squared_error, r2_score, explained_variance_score
 from sklearn.model_selection import train_test_split
 from workload_execution import QueryParameters
@@ -65,18 +63,9 @@ class LinearModel:
     evs: float  # Explained Variance Score
 
 
-def estimate(params: Sequence[ModelParameters], test_size: float, trace: bool = False):
-    """Estimate cost model parameters from the given statistics of SBE stage."""
-    # pylint: disable=invalid-name
-    # clean data
-    params = list(filter(lambda s: s.execution_stats.n_processed > 0, params))
-
-    # prepare data
-    X = [[
-        s.execution_stats.n_processed, s.query_params.average_document_size_in_bytes,
-        s.query_params.keys_length_in_bytes
-    ] for s in params]
-    y = [s.execution_stats.execution_time for s in params]
+# pylint: disable=invalid-name
+def estimate(fit, X, y, test_size: float, trace: bool = False) -> LinearModel:
+    """Estimate cost model parameters."""
 
     # split data
     X_training, X_test, y_training, y_test = train_test_split(X, y, test_size=test_size)
@@ -90,15 +79,11 @@ def estimate(params: Sequence[ModelParameters], test_size: float, trace: bool = 
         # no data to trainn return empty model
         return LinearModel(coef=[], intercept=0, mse=0, rs=0, evs=0)
 
-    # train
-    reg = linear_model.LinearRegression()
-    reg.fit(X_training, y_training)
-
-    # Error estimation
-    y_predict = reg.predict(X_test)
+    model = fit(X, y)
+    y_predict = model.predict(X_test)
 
     mse = mean_squared_error(y_test, y_predict)
     r2 = r2_score(y_test, y_predict)
     evs = explained_variance_score(y_test, y_predict)
 
-    return LinearModel(coef=reg.coef_, intercept=reg.intercept_, mse=mse, r2=r2, evs=evs)
+    return LinearModel(coef=model.coef_, intercept=model.intercept_, mse=mse, r2=r2, evs=evs)

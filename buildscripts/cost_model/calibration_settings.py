@@ -28,7 +28,7 @@
 """Calibration configuration."""
 
 import config
-from random_generator import RangeGenerator, DataType, RandomDistribution
+from random_generator import RangeGenerator, DataType, RandomDistribution, ArrayRandomDistribution
 
 __all__ = ['main_config', 'distributions']
 
@@ -67,6 +67,12 @@ distributions['string_mixed'] = RandomDistribution.mixed(
 distributions['string_uniform'] = RandomDistribution.uniform(
     RangeGenerator(DataType.STRING, "helloworldaa", "helloworldd_"))
 
+distributions['int_normal'] = RandomDistribution.normal(
+    RangeGenerator(DataType.INTEGER, 0, 1000, 2))
+
+lengths_distr = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 1, 10))
+distributions['array_small'] = ArrayRandomDistribution(lengths_distr, distributions['int_normal'])
+
 # Database settings
 database = config.DatabaseConfig(connection_string='mongodb://localhost',
                                  database_name='abt_calibration', dump_path='~/data/dump',
@@ -93,20 +99,54 @@ c_str_05 = config.CollectionTemplate(
                              distribution=distributions["string_mixed"], indexed=True),
     ], compound_indexes=[["choice1", "mixed1"]])
 
+c_int_05 = config.CollectionTemplate(
+    name="c_int_05", fields=[
+        config.FieldTemplate(name="in1", data_type=config.DataType.INTEGER,
+                             distribution=distributions["int_normal"], indexed=True),
+        config.FieldTemplate(name="mixed1", data_type=config.DataType.STRING,
+                             distribution=distributions["string_mixed"], indexed=False),
+        config.FieldTemplate(name="uniform1", data_type=config.DataType.STRING,
+                             distribution=distributions["string_uniform"], indexed=False),
+        config.FieldTemplate(name="in2", data_type=config.DataType.INTEGER,
+                             distribution=distributions["int_normal"], indexed=True),
+        config.FieldTemplate(name="mixed2", data_type=config.DataType.STRING,
+                             distribution=distributions["string_mixed"], indexed=False),
+    ], compound_indexes=[])
+
+c_arr_01 = config.CollectionTemplate(
+    name="c_arr_01", fields=[
+        config.FieldTemplate(name="as", data_type=config.DataType.INTEGER,
+                             distribution=distributions["array_small"], indexed=False)
+    ], compound_indexes=[])
+
 # Data Generator settings
-data_generator = config.DataGeneratorConfig(enabled=True, collection_cardinalities=[100, 200, 500],
-                                            batch_size=10000,
-                                            collection_templates=[c_str_01, c_str_05])
+data_generator = config.DataGeneratorConfig(
+    enabled=True, collection_cardinalities=list(range(10000, 50001, 2500)), batch_size=10000,
+    collection_templates=[c_str_01, c_str_05, c_int_05, c_arr_01])
 
 # Workload Execution settings
 workload_execution = config.WorkloadExecutionConfig(
     enabled=True, output_collection_name='calibrationData', write_mode=config.WriteMode.REPLACE,
-    warmup_runs=1, runs=5)
+    warmup_runs=3, runs=10)
 
+abt_nodes = [
+    config.AbtNodeCalibrationConfig(type='PhysicalScan'),
+    config.AbtNodeCalibrationConfig(type='IndexScan'),
+    config.AbtNodeCalibrationConfig(type='Seek'),
+    config.AbtNodeCalibrationConfig(type='Filter'),
+    config.AbtNodeCalibrationConfig(type='Evaluation'),
+    config.AbtNodeCalibrationConfig(type='BinaryJoin'),
+    config.AbtNodeCalibrationConfig(type='HashJoin'),
+    config.AbtNodeCalibrationConfig(type='MergeJoin'),
+    config.AbtNodeCalibrationConfig(type='Union'),
+    config.AbtNodeCalibrationConfig(type='LimitSkip'),
+    config.AbtNodeCalibrationConfig(type='GroupBy'),
+    config.AbtNodeCalibrationConfig(type='Unwind'),
+]
 # Calibrator settings
 abt_calibrator = config.AbtCalibratorConfig(
     enabled=True, test_size=0.2, input_collection_name=workload_execution.output_collection_name,
-    trace=False)
+    trace=False, nodes=abt_nodes)
 
 main_config = config.Config(database=database, data_generator=data_generator,
                             abt_calibrator=abt_calibrator, workload_execution=workload_execution)

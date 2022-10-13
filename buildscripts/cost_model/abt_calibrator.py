@@ -28,24 +28,49 @@
 """Calibrate ABT nodes."""
 
 from __future__ import annotations
-from typing import Sequence
-from config import AbtCalibratorConfig
+import pandas as pd
+import statsmodels.api as sm
+from sklearn.linear_model import LinearRegression
+from config import AbtCalibratorConfig, AbtNodeCalibrationConfig
 from database_instance import DatabaseInstance
 from cost_estimator import estimate
-from parameters_extractor import extract_parameters
+import experiment as exp
 
 __all__ = ['calibrate']
 
 
-async def calibrate(config: AbtCalibratorConfig, database: DatabaseInstance,
-                    abt_types: Sequence[str]):
+async def calibrate(config: AbtCalibratorConfig, database: DatabaseInstance):
     """Main entry-point for ABT calibration."""
 
     if not config.enabled:
         return {}
 
+    df = await exp.load_calibration_data(database, config.input_collection_name)
+    noout_df = exp.remove_outliers(df, 0.0, 0.90)
+    abt_df = exp.extract_abt_nodes(noout_df)
     result = {}
-    stats = await extract_parameters(config, database, abt_types)
-    for abt, abt_stats in stats.items():
-        result[abt] = estimate(abt_stats, config.test_size, config.trace)
+    for node_config in config.nodes:
+        result[node_config.type] = calibrate_node(abt_df, config, node_config)
     return result
+
+
+def calibrate_node(abt_df: pd.DataFrame, config: AbtCalibratorConfig,
+                   node_config: AbtNodeCalibrationConfig):
+    abt_node_df = abt_df[abt_df.abt_type == node_config.type]
+    if node_config.filter_function is not None:
+        abt_node_df = node_config.filter_function(abt_node_df)
+
+    # pylint: disable=invalid-name
+    if node_config.variables_override is None:
+        variables = ['n_processed']
+    else:
+        variables = node_config.variables_override
+    y = abt_node_df['execution_time']
+    X = abt_node_df[variables]
+    X = sm.add_constant(X)
+
+    def fit(X, y):
+        nnls = LinearRegression(positive=True, fit_intercept=False)
+        return nnls.fit(X, y)
+
+    return estimate(fit, X, y, config.test_size, config.trace)
