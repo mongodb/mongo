@@ -858,7 +858,7 @@ StringData serializeTimeUnit(TimeUnit unit) {
         case TimeUnit::millisecond:
             return "millisecond"_sd;
     }
-    MONGO_UNREACHABLE_TASSERT(5339900);
+    MONGO_UNREACHABLE_TASSERT(5339903);
 }
 
 DayOfWeek parseDayOfWeek(StringData dayOfWeek) {

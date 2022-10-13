@@ -26,7 +26,7 @@ class TestErrorcodes(unittest.TestCase):
             captured_error_codes.append(code)
 
         errorcodes.parse_source_files(accumulate_files, TESTDATA_DIR + 'regex_matching/')
-        self.assertEqual(30, len(captured_error_codes))
+        self.assertEqual(31, len(captured_error_codes))
 
     def test_dup_checking(self):
         """Test dup checking."""

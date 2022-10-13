@@ -97,7 +97,7 @@ std::unique_ptr<MatchExpression> EqualityPredicate::rewriteToTagDisjunction(
         default:
             MONGO_UNREACHABLE_TASSERT(6911300);
     }
-    MONGO_UNREACHABLE_TASSERT(6911301);
+    MONGO_UNREACHABLE_TASSERT(6911302);
 };
 
 namespace {
@@ -175,7 +175,7 @@ std::unique_ptr<MatchExpression> EqualityPredicate::rewriteToRuntimeComparison(
             if (numFFPs == 0) {
                 return nullptr;
             }
-            uassert(6911300,
+            uassert(6911301,
                     "If any elements in a $in expression are encrypted, then all elements should "
                     "be encrypted.",
                     numFFPs == inExpr->getEqualities().size());

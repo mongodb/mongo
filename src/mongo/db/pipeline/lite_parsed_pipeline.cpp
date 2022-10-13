@@ -193,7 +193,7 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
 
     // Validates that the pipeline contains at most one $_internalUnpackBucket or $_unpackBucket
     // stage.
-    uassert(5348302,
+    uassert(5348304,
             str::stream() << "Encountered pipeline with more than one "
                           << DocumentSourceInternalUnpackBucket::kStageNameInternal << " or "
                           << DocumentSourceInternalUnpackBucket::kStageNameExternal << " stage",

@@ -192,9 +192,9 @@ function explainUnit(unit) {
     return coll.runCommand(
         {explain: {aggregate: coll.getName(), cursor: {}, pipeline: [derivativeStage(unit)]}});
 }
-assert.commandFailedWithCode(explainUnit('year'), 5490704);
-assert.commandFailedWithCode(explainUnit('quarter'), 5490704);
-assert.commandFailedWithCode(explainUnit('month'), 5490704);
+assert.commandFailedWithCode(explainUnit('year'), 5490710);
+assert.commandFailedWithCode(explainUnit('quarter'), 5490710);
+assert.commandFailedWithCode(explainUnit('month'), 5490710);
 assert.commandWorked(explainUnit('week'));
 assert.commandWorked(explainUnit('day'));
 assert.commandWorked(explainUnit('hour'));
