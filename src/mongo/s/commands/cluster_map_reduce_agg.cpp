@@ -238,7 +238,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
                 kSpecificShardOnly: {
                 // It should not be possible to pass $_passthroughToShard to a map reduce command.
-                MONGO_UNREACHABLE_TASSERT(6273803);
+                MONGO_UNREACHABLE_TASSERT(6273805);
             }
         }
     } catch (DBException& e) {

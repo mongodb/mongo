@@ -456,7 +456,7 @@ protected:
                 case TimeUnit::year:
                 case TimeUnit::quarter:
                 case TimeUnit::month:
-                    uasserted(5490704, "unit must be 'week' or smaller");
+                    uasserted(5490710, "unit must be 'week' or smaller");
                 // Only these time units are allowed.
                 case TimeUnit::week:
                 case TimeUnit::day:
@@ -690,11 +690,11 @@ public:
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
-        MONGO_UNREACHABLE_TASSERT(5490701);
+        MONGO_UNREACHABLE_TASSERT(5490706);
     }
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
-        MONGO_UNREACHABLE_TASSERT(5490702);
+        MONGO_UNREACHABLE_TASSERT(5490707);
     }
 };
 
@@ -712,11 +712,11 @@ public:
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
-        MONGO_UNREACHABLE_TASSERT(5490701);
+        MONGO_UNREACHABLE_TASSERT(5490708);
     }
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
-        MONGO_UNREACHABLE_TASSERT(5490702);
+        MONGO_UNREACHABLE_TASSERT(5490709);
     }
 };
 

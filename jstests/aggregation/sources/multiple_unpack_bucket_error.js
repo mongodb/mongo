@@ -18,7 +18,7 @@ assert.commandFailedWithCode(db.runCommand({
     ],
     cursor: {}
 }),
-                             5348302);
+                             5348304);
 
 // $_unpackBucket is an alias of $_internalUnpackBucket, the same restriction should apply.
 assert.commandFailedWithCode(db.runCommand({
@@ -29,7 +29,7 @@ assert.commandFailedWithCode(db.runCommand({
     ],
     cursor: {}
 }),
-                             5348302);
+                             5348304);
 assert.commandFailedWithCode(db.runCommand({
     aggregate: coll.getName(),
     pipeline: [
@@ -38,11 +38,11 @@ assert.commandFailedWithCode(db.runCommand({
     ],
     cursor: {}
 }),
-                             5348302);
+                             5348304);
 assert.commandFailedWithCode(db.runCommand({
     aggregate: coll.getName(),
     pipeline: [{$_unpackBucket: {timeField: 'time'}}, {$_unpackBucket: {timeField: 'time'}}],
     cursor: {}
 }),
-                             5348302);
+                             5348304);
 })();
