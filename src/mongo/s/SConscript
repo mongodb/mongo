@@ -642,6 +642,7 @@ env.CppUnitTest(
         'write_ops/batched_command_request_test.cpp',
         'write_ops/batched_command_response_test.cpp',
         'write_ops/write_op_test.cpp',
+        'write_ops/write_without_shard_key_util_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
@@ -656,6 +657,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/commands/cluster_commands_common',
         '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
         '$BUILD_DIR/mongo/s/write_ops/cluster_write_ops',
+        '$BUILD_DIR/mongo/s/write_ops/write_without_shard_key_util',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
         'coreshard',

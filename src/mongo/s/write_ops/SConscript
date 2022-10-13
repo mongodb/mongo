@@ -25,6 +25,16 @@ env.Library(
 )
 
 env.Library(
+    target='write_without_shard_key_util',
+    source=[
+        'write_without_shard_key_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/s/grid',
+    ],
+)
+
+env.Library(
     target='cluster_write_ops',
     source=[
         'batch_write_exec.cpp',
