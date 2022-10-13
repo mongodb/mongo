@@ -3281,11 +3281,10 @@ public:
         std::pair<boost::intrusive_ptr<Expression>&, boost::intrusive_ptr<Expression>&>;
 
     ExpressionSwitch(ExpressionContext* const expCtx,
-                     std::vector<boost::intrusive_ptr<Expression>> children,
-                     std::vector<ExpressionPair> branches)
-        : Expression(expCtx, std::move(children)),
-          _default(_children.back()),
-          _branches(std::move(branches)) {}
+                     std::vector<boost::intrusive_ptr<Expression>> children)
+        : Expression(expCtx, std::move(children)) {
+        uassert(40068, "$switch requires at least one branch", numBranches() >= 1);
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     boost::intrusive_ptr<Expression> optimize() final;
@@ -3302,9 +3301,35 @@ public:
         return visitor->visit(this);
     }
 
+    /**
+     * Returns the number of cases in the switch expression. Each branch is made up of two
+     * expressions ('case' and 'then').
+     */
+    int numBranches() const {
+        return _children.size() / 2;
+    }
+
+    /**
+     * Returns a pair of expression pointers representing the 'case' and 'then' expressions for the
+     * i-th branch of the switch.
+     */
+    std::pair<const Expression*, const Expression*> getBranch(int i) const {
+        invariant(i >= 0);
+        invariant(i < numBranches());
+        return {_children[i * 2].get(), _children[i * 2 + 1].get()};
+    }
+
+    /**
+     * Returns the 'default' expression, or nullptr if there is no 'default'.
+     */
+    const Expression* defaultExpr() const {
+        return _children.back().get();
+    }
+
 private:
-    boost::intrusive_ptr<Expression>& _default;
-    std::vector<ExpressionPair> _branches;
+    // Helper for 'optimize()'. Deletes the 'case' and 'then' children associated with the i-th
+    // branch of the switch.
+    void deleteBranch(int i);
 };
 
 

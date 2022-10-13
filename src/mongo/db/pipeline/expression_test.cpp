@@ -1123,7 +1123,7 @@ TEST(ExpressionSwitch, ExpressionSwitchWithAllConstantFalsesAndNoDefaultErrors) 
     ASSERT_THROWS_CODE(switchExp->optimize(), AssertionException, 40069);
 }
 
-TEST(ExpressionSwitch, ExpressionSwitchWithZeroAsConstantFalsesAndNoDefaulErrors) {
+TEST(ExpressionSwitch, ExpressionSwitchWithZeroAsConstantFalseAndNoDefaultErrors) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
@@ -1233,6 +1233,62 @@ TEST(ExpressionSwitch, ExpressionSwitchWithNoConstantsShouldStayTheSame) {
     ASSERT_FALSE(notExprConstant);
 
     ASSERT_BSONOBJ_BINARY_EQ(switchQ, expressionToBson(optimizedStaySame));
+}
+
+// This test was designed to provide coverage for SERVER-70190, a bug in which optimizing a $switch
+// expression could leave its children vector in a bad state. By walking the tree after optimizing
+// we make sure that the expected children are found.
+TEST(ExpressionSwitch, CaseEliminationShouldLeaveTreeInWalkableState) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj switchQ = fromjson(R"(
+        {$switch: {
+            branches: [
+                {case: false, then: {$const: 0}},
+                {case: "$z", then: {$const: 1}},
+                {case: "$y", then: {$const: 3}},
+                {case: true, then: {$const: 4}},
+                {case: "$a", then: {$const: 5}},
+                {case: "$b", then: {$const: 6}},
+                {case: "$c", then: {$const: 7}}
+            ],
+            default: {$const: 8}
+        }}
+    )");
+    auto switchExp = ExpressionSwitch::parse(&expCtx, switchQ.firstElement(), vps);
+    auto optimizedExpr = switchExp->optimize();
+
+    BSONObj optimizedQ = fromjson(R"(
+        {$switch: {
+            branches: [
+                {case: "$z", then: {$const: 1}},
+                {case: "$y", then: {$const: 3}}
+            ],
+            default: {$const: 4}
+        }}
+    )");
+
+    ASSERT_BSONOBJ_BINARY_EQ(optimizedQ, expressionToBson(optimizedExpr));
+
+    // Make sure that the expression tree appears as expected when the children are traversed using
+    // a for-each loop.
+    int childNum = 0;
+    int numConstants = 0;
+    for (auto&& child : optimizedExpr->getChildren()) {
+        // Children 0 and 2 are field path expressions, whereas 1, 3, and 4 are constants.
+        auto constExpr = dynamic_cast<ExpressionConstant*>(child.get());
+        if (constExpr) {
+            ASSERT_VALUE_EQ(constExpr->getValue(), Value{childNum});
+            ++numConstants;
+        } else {
+            ASSERT(dynamic_cast<ExpressionFieldPath*>(child.get()));
+        }
+        ++childNum;
+    }
+    // We should have seen 5 children total, 3 of which are constants.
+    ASSERT_EQ(childNum, 5);
+    ASSERT_EQ(numConstants, 3);
 }
 
 TEST(ExpressionArray, ExpressionArrayShouldOptimizeSubExpressionToExpressionConstant) {
@@ -4176,7 +4232,7 @@ TEST(ExpressionBetweenTest, ParseRoundTrip) {
     auto serializedExpr = expr->serialize(false);
     auto expectedExpr = fromjson(R"({$between: [
         {$const: "age"},
-        { $const: 
+        { $const:
             {$binary: {
                 "base64": "ZW5jcnlwdGVkIHBheWxvYWQ=",
                 "subType": "6"

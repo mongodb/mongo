@@ -5614,19 +5614,20 @@ const char* ExpressionSubtract::getOpName() const {
 REGISTER_STABLE_EXPRESSION(switch, ExpressionSwitch::parse);
 
 Value ExpressionSwitch::evaluate(const Document& root, Variables* variables) const {
-    for (auto&& branch : _branches) {
-        Value caseExpression(branch.first->evaluate(root, variables));
+    for (int i = 0; i < numBranches(); ++i) {
+        auto [caseExpr, thenExpr] = getBranch(i);
+        Value caseResult = caseExpr->evaluate(root, variables);
 
-        if (caseExpression.coerceToBool()) {
-            return branch.second->evaluate(root, variables);
+        if (caseResult.coerceToBool()) {
+            return thenExpr->evaluate(root, variables);
         }
     }
 
     uassert(40066,
             "$switch could not find a matching branch for an input, and no default was specified.",
-            _default);
+            defaultExpr());
 
-    return _default->evaluate(root, variables);
+    return defaultExpr()->evaluate(root, variables);
 }
 
 boost::intrusive_ptr<Expression> ExpressionSwitch::parse(ExpressionContext* const expCtx,
@@ -5635,7 +5636,7 @@ boost::intrusive_ptr<Expression> ExpressionSwitch::parse(ExpressionContext* cons
     uassert(40060,
             str::stream() << "$switch requires an object as an argument, found: "
                           << typeName(expr.type()),
-            expr.type() == Object);
+            expr.type() == BSONType::Object);
 
     boost::intrusive_ptr<Expression> expDefault;
     std::vector<boost::intrusive_ptr<Expression>> children;
@@ -5647,13 +5648,13 @@ boost::intrusive_ptr<Expression> ExpressionSwitch::parse(ExpressionContext* cons
             uassert(40061,
                     str::stream() << "$switch expected an array for 'branches', found: "
                                   << typeName(elem.type()),
-                    elem.type() == Array);
+                    elem.type() == BSONType::Array);
 
             for (auto&& branch : elem.Array()) {
                 uassert(40062,
                         str::stream() << "$switch expected each branch to be an object, found: "
                                       << typeName(branch.type()),
-                        branch.type() == Object);
+                        branch.type() == BSONType::Object);
 
                 boost::intrusive_ptr<Expression> switchCase, switchThen;
 
@@ -5685,69 +5686,67 @@ boost::intrusive_ptr<Expression> ExpressionSwitch::parse(ExpressionContext* cons
             uasserted(40067, str::stream() << "$switch found an unknown argument: " << field);
         }
     }
+
+    // The the 'default' expression is always the final child. If no 'default' expression is
+    // provided, then the final child is nullptr.
     children.push_back(std::move(expDefault));
-    // Obtain references to the case and branch expressions two-by-two from the children vector,
-    // ignore the last.
-    std::vector<ExpressionPair> branches;
-    boost::optional<boost::intrusive_ptr<Expression>&> first;
-    for (auto&& child : children) {
-        if (first) {
-            branches.emplace_back(*first, child);
-            first = boost::none;
-        } else {
-            first = child;
-        }
-    }
 
-    uassert(40068, "$switch requires at least one branch.", !branches.empty());
+    return new ExpressionSwitch(expCtx, std::move(children));
+}
 
-    return new ExpressionSwitch(expCtx, std::move(children), std::move(branches));
+void ExpressionSwitch::deleteBranch(int i) {
+    invariant(i >= 0);
+    invariant(i < numBranches());
+    // Delete the two elements corresponding to this branch at positions 2i and 2i + 1.
+    _children.erase(std::next(_children.begin(), i * 2), std::next(_children.begin(), i * 2 + 2));
 }
 
 boost::intrusive_ptr<Expression> ExpressionSwitch::optimize() {
-    if (_default) {
-        _default = _default->optimize();
+    if (defaultExpr()) {
+        _children.back() = _children.back()->optimize();
     }
 
-    std::vector<ExpressionPair>::iterator it = _branches.begin();
-    bool true_const = false;
+    bool trueConst = false;
 
-    while (!true_const && it != _branches.end()) {
-        (it->first) = (it->first)->optimize();
+    int i = 0;
+    while (!trueConst && i < numBranches()) {
+        boost::intrusive_ptr<Expression>& caseExpr = _children[i * 2];
+        boost::intrusive_ptr<Expression>& thenExpr = _children[i * 2 + 1];
+        caseExpr = caseExpr->optimize();
 
-        if (auto* val = dynamic_cast<ExpressionConstant*>((it->first).get())) {
-            if (!((val->getValue()).coerceToBool())) {
+        if (auto* val = dynamic_cast<ExpressionConstant*>(caseExpr.get())) {
+            if (!val->getValue().coerceToBool()) {
                 // Case is constant and evaluates to false, so it is removed.
-                it = _branches.erase(it);
+                deleteBranch(i);
             } else {
-                // Case is constant and true so it is set to default and then removed.
-                true_const = true;
-
-                // Optimizing this case's then, so that default will remain optimized.
-                (it->second) = (it->second)->optimize();
-                _default = it->second;
-                it = _branches.erase(it);
+                // Case optimized to a constant true value. Set the optimized version of the
+                // corresponding 'then' expression as the new 'default'. Break out of the loop and
+                // fall through to the logic to remove this and all subsequent branches.
+                trueConst = true;
+                _children.back() = thenExpr->optimize();
+                break;
             }
         } else {
             // Since case is not removed from the switch, its then is now optimized.
-            (it->second) = (it->second)->optimize();
-            ++it;
+            thenExpr = thenExpr->optimize();
+            ++i;
         }
     }
 
     // Erasing the rest of the cases because found a default true value.
-    if (true_const) {
-        _branches.erase(it, _branches.end());
+    if (trueConst) {
+        while (i < numBranches()) {
+            deleteBranch(i);
+        }
     }
 
     // If there are no cases, make the switch its default.
-    if (_branches.size() == 0 && _default) {
-        return _default;
-    } else if (_branches.size() == 0) {
+    if (numBranches() == 0) {
         uassert(40069,
-                "One cannot execute a switch statement where all the cases evaluate to false "
-                "without a default.",
-                _branches.size());
+                "Cannot execute a switch statement where all the cases evaluate to false "
+                "without a default",
+                defaultExpr());
+        return _children.back();
     }
 
     return this;
@@ -5755,17 +5754,18 @@ boost::intrusive_ptr<Expression> ExpressionSwitch::optimize() {
 
 Value ExpressionSwitch::serialize(bool explain) const {
     std::vector<Value> serializedBranches;
-    serializedBranches.reserve(_branches.size());
+    serializedBranches.reserve(numBranches());
 
-    for (auto&& branch : _branches) {
-        serializedBranches.push_back(Value(Document{{"case", branch.first->serialize(explain)},
-                                                    {"then", branch.second->serialize(explain)}}));
+    for (int i = 0; i < numBranches(); ++i) {
+        auto [caseExpr, thenExpr] = getBranch(i);
+        serializedBranches.push_back(Value(Document{{"case", caseExpr->serialize(explain)},
+                                                    {"then", thenExpr->serialize(explain)}}));
     }
 
-    if (_default) {
+    if (defaultExpr()) {
         return Value(Document{{"$switch",
                                Document{{"branches", Value(serializedBranches)},
-                                        {"default", _default->serialize(explain)}}}});
+                                        {"default", defaultExpr()->serialize(explain)}}}});
     }
 
     return Value(Document{{"$switch", Document{{"branches", Value(serializedBranches)}}}});

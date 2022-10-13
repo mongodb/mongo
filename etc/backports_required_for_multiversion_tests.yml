@@ -306,6 +306,8 @@ last-continuous:
       test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_cannot_vote_twice_same_term.js
     - ticket: SERVER-69861
       test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
+    - ticket: SERVER-70190
+      test_file: jstests/aggregation/expressions/switch_errors.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -743,6 +745,8 @@ last-lts:
       test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_cannot_vote_twice_same_term.js
     - ticket: SERVER-69861
       test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
+    - ticket: SERVER-70190
+      test_file: jstests/aggregation/expressions/switch_errors.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
