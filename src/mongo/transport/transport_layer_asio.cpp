@@ -1472,16 +1472,20 @@ ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
 }
 
 namespace {
-void handleConnectionAcceptASIOError(const asio::system_error& e) {
-    // Swallow connection reset errors. Connection reset errors classically present as
-    // asio::error::eof, but can bubble up as asio::error::invalid_argument when calling
-    // into socket.set_option().
-    if (e.code() != asio::error::eof && e.code() != asio::error::invalid_argument) {
-        LOGV2_WARNING(5746600,
-                      "Error accepting new connection: {error}",
-                      "Error accepting new connection",
-                      "error"_attr = e.code().message());
-    }
+bool isConnectionResetError(const std::error_code& ec) {
+    // Connection reset errors classically present as asio::error::eof, but can bubble up as
+    // asio::error::invalid_argument when calling into socket.set_option().
+    return ec == asio::error::eof || ec == asio::error::invalid_argument;
+}
+
+/** Tricky: TCP can be represented by IPPROTO_IP or IPPROTO_TCP. */
+template <typename Protocol>
+bool isTcp(Protocol&& p) {
+    auto pf = p.family();
+    auto pt = p.type();
+    auto pp = p.protocol();
+    return (pf == AF_INET || pf == AF_INET6) && (pt == SOCK_STREAM) &&
+        (pp == IPPROTO_IP || pp == IPPROTO_TCP);
 }
 }  // namespace
 
@@ -1529,7 +1533,13 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
                 _sep->startSession(std::move(session));
             }
         } catch (const asio::system_error& e) {
-            handleConnectionAcceptASIOError(e);
+            // Swallow connection reset errors.
+            if (!isConnectionResetError(e.code())) {
+                LOGV2_WARNING(5746600,
+                              "Error accepting new connection: {error}",
+                              "Error accepting new connection",
+                              "error"_attr = e.code().message());
+            }
         } catch (const DBException& e) {
             LOGV2_WARNING(23023,
                           "Error accepting new connection: {error}",
@@ -1554,17 +1564,23 @@ void TransportLayerASIO::_trySetListenerSocketBacklogQueueDepth(
     GenericAcceptor& acceptor) noexcept {
 #ifdef __linux__
     try {
+        if (!isTcp(acceptor.local_endpoint().protocol()))
+            return;
         auto matchingRecord =
             std::find_if(begin(_acceptorRecords), end(_acceptorRecords), [&](const auto& record) {
                 return acceptor.local_endpoint() == record->acceptor.local_endpoint();
             });
         invariant(matchingRecord != std::end(_acceptorRecords));
-
         TcpInfoOption tcpi;
         acceptor.get_option(tcpi);
         (*matchingRecord)->backlogQueueDepth.store(tcpi->tcpi_unacked);
     } catch (const asio::system_error& e) {
-        handleConnectionAcceptASIOError(e);
+        // Swallow connection reset errors.
+        if (!isConnectionResetError(e.code())) {
+            LOGV2_WARNING(7006800,
+                          "Error retrieving tcp acceptor socket queue length",
+                          "error"_attr = e.code().message());
+        }
     }
 #endif
 }
