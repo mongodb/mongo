@@ -29,10 +29,7 @@
 
 #include "mongo/db/s/migration_coordinator.h"
 
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_util.h"
-#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
@@ -145,8 +142,7 @@ void MigrationCoordinator::setMigrationDecision(DecisionEnum decision) {
 }
 
 
-boost::optional<SharedSemiFuture<void>> MigrationCoordinator::completeMigration(
-    OperationContext* opCtx) {
+boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(OperationContext* opCtx) {
     auto decision = _migrationInfo.getDecision();
     if (!decision) {
         LOGV2(
@@ -169,7 +165,7 @@ boost::optional<SharedSemiFuture<void>> MigrationCoordinator::completeMigration(
         launchReleaseRecipientCriticalSection(opCtx);
     }
 
-    boost::optional<SharedSemiFuture<void>> cleanupCompleteFuture = boost::none;
+    boost::optional<SemiFuture<void>> cleanupCompleteFuture = boost::none;
 
     switch (*decision) {
         case DecisionEnum::kAborted:
@@ -187,7 +183,7 @@ boost::optional<SharedSemiFuture<void>> MigrationCoordinator::completeMigration(
     return cleanupCompleteFuture;
 }
 
-SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
+SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
     OperationContext* opCtx) {
     hangBeforeMakingCommitDecisionDurable.pauseWhileSet();
 
@@ -237,6 +233,19 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
                                                       _migrationInfo.getRange(),
                                                       _migrationInfo.getId());
 
+    LOGV2_DEBUG(23897,
+                2,
+                "Marking range deletion task on donor as ready for processing",
+                "migrationId"_attr = _migrationInfo.getId());
+    migrationutil::markAsReadyRangeDeletionTaskLocally(
+        opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange());
+
+    // At this point the decision cannot be changed and will be recovered in the event of a
+    // failover, so it is safe to schedule the deletion task after updating the persisted state.
+    LOGV2_DEBUG(23898,
+                2,
+                "Scheduling range deletion task on donor",
+                "migrationId"_attr = _migrationInfo.getId());
     RangeDeletionTask deletionTask(_migrationInfo.getId(),
                                    _migrationInfo.getNss(),
                                    _migrationInfo.getCollectionUuid(),
@@ -245,52 +254,7 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
                                    _waitForDelete ? CleanWhenEnum::kNow : CleanWhenEnum::kDelayed);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     deletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
-
-    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
-        LOGV2_DEBUG(23897,
-                    2,
-                    "Marking range deletion task on donor as ready for processing",
-                    "migrationId"_attr = _migrationInfo.getId());
-        migrationutil::markAsReadyRangeDeletionTaskLocally(
-            opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange());
-
-        // At this point the decision cannot be changed and will be recovered in the event of a
-        // failover, so it is safe to schedule the deletion task after updating the persisted state.
-        LOGV2_DEBUG(23898,
-                    2,
-                    "Scheduling range deletion task on donor",
-                    "migrationId"_attr = _migrationInfo.getId());
-
-        return migrationutil::submitRangeDeletionTask(opCtx, deletionTask).share();
-    }
-
-
-    auto waitForActiveQueriesToComplete = [&]() {
-        AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
-        return CollectionShardingRuntime::get(opCtx, deletionTask.getNss())
-            ->getOngoingQueriesCompletionFuture(deletionTask.getCollectionUuid(),
-                                                deletionTask.getRange())
-            .semi();
-    }();
-
-    // Register the range deletion task as pending in order to get the completion future
-    auto rangeDeletionCompletionFuture =
-        RangeDeleterService::get(opCtx)->registerTask(deletionTask,
-                                                      std::move(waitForActiveQueriesToComplete),
-                                                      false /* fromStepUp*/,
-                                                      true /* pending */);
-
-    LOGV2_DEBUG(6555800,
-                2,
-                "Marking range deletion task on donor as ready for processing",
-                "rangeDeletion"_attr = deletionTask);
-
-    // Mark the range deletion task document as non-pending in order to unblock the previously
-    // registered range deletion
-    migrationutil::markAsReadyRangeDeletionTaskLocally(
-        opCtx, deletionTask.getCollectionUuid(), deletionTask.getRange());
-
-    return rangeDeletionCompletionFuture;
+    return migrationutil::submitRangeDeletionTask(opCtx, deletionTask).semi();
 }
 
 void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* opCtx) {

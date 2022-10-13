@@ -89,7 +89,7 @@ public:
      * If the decision was to commit, returns a future that is set when range deletion for
      * the donated range completes.
      */
-    boost::optional<SharedSemiFuture<void>> completeMigration(OperationContext* opCtx);
+    boost::optional<SemiFuture<void>> completeMigration(OperationContext* opCtx);
 
     /**
      * Deletes the persistent state for this migration from config.migrationCoordinators.
@@ -109,7 +109,7 @@ private:
      * the donor as ready to be processed. Returns a future that is set when range deletion for
      * the donated range completes.
      */
-    SharedSemiFuture<void> _commitMigrationOnDonorAndRecipient(OperationContext* opCtx);
+    SemiFuture<void> _commitMigrationOnDonorAndRecipient(OperationContext* opCtx);
 
     /**
      * Deletes the range deletion task from the donor node and marks the range deletion task on the

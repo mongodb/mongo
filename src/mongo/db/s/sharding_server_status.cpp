@@ -33,7 +33,6 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -126,11 +125,6 @@ public:
 
             ShardingStatistics::get(opCtx).report(&result);
             catalogCache->report(&result);
-            if (mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
-                auto nRangeDeletions = RangeDeleterService::get(opCtx)->totalNumOfRegisteredTasks();
-                result.appendNumber("rangeDeleterTasks", nRangeDeletions);
-            }
-
             CollectionShardingState::appendInfoForServerStatus(opCtx, &result);
         }
 

@@ -851,32 +851,4 @@ TEST_F(RangeDeleterServiceTest, GetOverlappingRangeDeletionsWithNonContiguousTas
     ASSERT_OK(futureReadyWhenTask30Ready.getNoThrow(opCtx));
 }
 
-TEST_F(RangeDeleterServiceTest, RegisterPendingTaskAndMarkItNonPending) {
-    // Set delay for waiting secondary queries to 0
-    int defaultOrphanCleanupDelaySecs = orphanCleanupDelaySecs.load();
-    ScopeGuard reset([=] { orphanCleanupDelaySecs.store(defaultOrphanCleanupDelaySecs); });
-    orphanCleanupDelaySecs.store(0);
-
-    auto rds = RangeDeleterService::get(opCtx);
-    auto taskWithOngoingQueries = rangeDeletionTask0ForCollA;
-
-    // Drain queries since the beginning
-    taskWithOngoingQueries->drainOngoingQueries();
-
-    // Register task as pending (will not be processed until someone registers it again as !pending)
-    auto completionFuture = rds->registerTask(taskWithOngoingQueries->getTask(),
-                                              taskWithOngoingQueries->getOngoingQueriesFuture(),
-                                              false /* from step up*/,
-                                              true /* pending */);
-
-    ASSERT(!completionFuture.isReady());
-
-    // Re-registering the task as non-pending must unblock the range deletion
-    registerAndCreatePersistentTask(
-        opCtx, taskWithOngoingQueries->getTask(), taskWithOngoingQueries->getOngoingQueriesFuture())
-        .get(opCtx);
-
-    ASSERT(completionFuture.isReady());
-}
-
 }  // namespace mongo

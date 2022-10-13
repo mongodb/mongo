@@ -33,11 +33,9 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/duration.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -262,14 +260,9 @@ void CollectionShardingRuntime::clearFilteringMetadataForDroppedCollection(
 
 SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const& range,
                                                                CleanWhen when) {
-    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
-        stdx::lock_guard lk(_metadataManagerLock);
-        invariant(_metadataType == MetadataType::kSharded);
-        return _metadataManager->cleanUpRange(range, when == kDelayed);
-    }
-
-    // This method must never be called if the range deleter service feature flag is enabled
-    MONGO_UNREACHABLE;
+    stdx::lock_guard lk(_metadataManagerLock);
+    invariant(_metadataType == MetadataType::kSharded);
+    return _metadataManager->cleanUpRange(range, when == kDelayed);
 }
 
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
@@ -278,8 +271,9 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                                ChunkRange orphanRange,
                                                Date_t deadline) {
     while (true) {
-        const StatusWith<SharedSemiFuture<void>> swOrphanCleanupFuture =
-            [&]() -> StatusWith<SharedSemiFuture<void>> {
+        boost::optional<SharedSemiFuture<void>> stillScheduled;
+
+        {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             auto* const self = CollectionShardingRuntime::get(opCtx, nss);
             stdx::lock_guard lk(self->_metadataManagerLock);
@@ -293,27 +287,16 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                         "metadata reset"};
             }
 
-            if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
-                return RangeDeleterService::get(opCtx)->getOverlappingRangeDeletionsFuture(
-                    self->_metadataManager->getCollectionUuid(), orphanRange);
-            } else {
-                return self->_metadataManager->trackOrphanedDataCleanup(orphanRange);
+            stillScheduled = self->_metadataManager->trackOrphanedDataCleanup(orphanRange);
+            if (!stillScheduled) {
+                LOGV2_OPTIONS(21918,
+                              {logv2::LogComponent::kShardingMigration},
+                              "Finished waiting for deletion of {namespace} range {orphanRange}",
+                              "Finished waiting for deletion of orphans",
+                              "namespace"_attr = nss.ns(),
+                              "orphanRange"_attr = redact(orphanRange.toString()));
+                return Status::OK();
             }
-        }();
-
-        if (!swOrphanCleanupFuture.isOK()) {
-            return swOrphanCleanupFuture.getStatus();
-        }
-
-        auto orphanCleanupFuture = std::move(swOrphanCleanupFuture.getValue());
-        if (orphanCleanupFuture.isReady()) {
-            LOGV2_OPTIONS(21918,
-                          {logv2::LogComponent::kShardingMigration},
-                          "Finished waiting for deletion of {namespace} range {orphanRange}",
-                          "Finished waiting for deletion of orphans",
-                          "namespace"_attr = nss.ns(),
-                          "orphanRange"_attr = redact(orphanRange.toString()));
-            return Status::OK();
         }
 
         LOGV2_OPTIONS(21919,
@@ -324,12 +307,12 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                       "orphanRange"_attr = orphanRange);
         try {
             opCtx->runWithDeadline(
-                deadline, ErrorCodes::ExceededTimeLimit, [&] { orphanCleanupFuture.get(opCtx); });
+                deadline, ErrorCodes::ExceededTimeLimit, [&] { stillScheduled->get(opCtx); });
         } catch (const DBException& ex) {
             auto result = ex.toStatus();
             // Swallow RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist error since the
-            // collection could either never exist or get dropped directly from the shard after the
-            // range deletion task got scheduled.
+            // collection could either never exist or get dropped directly from the shard after
+            // the range deletion task got scheduled.
             if (result != ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
                 return result.withContext(str::stream() << "Failed to delete orphaned " << nss.ns()
                                                         << " range " << orphanRange.toString());

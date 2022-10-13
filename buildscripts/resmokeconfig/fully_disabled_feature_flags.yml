@@ -12,3 +12,5 @@
 # released create the transactions collection index and is only meant to be enabled adhoc, so only
 # its targeted tests should enable it.
 - featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
+# Disable 'featureFlagRangeDeleterService' as long as the service is not performing actual range deletions
+- featureFlagRangeDeleterService

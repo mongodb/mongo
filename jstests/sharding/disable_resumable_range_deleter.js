@@ -51,6 +51,7 @@ st.rs0.restart(0, {
 });
 
 jsTest.log("Shard0 should fail to submit the range deletion task on stepup.");
+checkLog.contains(st.rs0.getPrimary(), "Failed to submit range deletion task");
 
 jsTest.log("Shard0 should fail to receive a range that overlaps the range deletion task.");
 // The error from moveChunk gets wrapped as an OperationFailed error, so we have to check the error
