@@ -98,7 +98,6 @@ public:
             // The change collection does not exist for a particular tenant because either the
             // change collection is not enabled or is in the process of enablement. Ignore this
             // insert for now.
-            // TODO SERVER-67170 Move this check before inserting to the map.
             if (!tenantChangeCollection) {
                 continue;
             }
@@ -142,7 +141,6 @@ private:
     bool _shouldAddEntry(const InsertStatement& insertStatement) {
         auto& oplogDoc = insertStatement.doc;
 
-        // TODO SERVER-67170 avoid inspecting the oplog BSON object.
         if (auto nssFieldElem = oplogDoc[repl::OplogEntry::kNssFieldName]) {
             // Avoid writing entry with empty 'ns' field, for eg. 'periodic noop' entry.
             if (nssFieldElem.String().empty()) {
