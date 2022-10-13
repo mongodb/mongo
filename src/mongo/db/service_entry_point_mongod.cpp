@@ -225,7 +225,9 @@ public:
 
     bool refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) const
         noexcept override {
-        return onShardVersionMismatchNoExcept(opCtx, se.getNss(), se.getVersionReceived()).isOK();
+        return onCollectionPlacementVersionMismatchNoExcept(
+                   opCtx, se.getNss(), ChunkVersion(se.getVersionReceived()))
+            .isOK();
     }
 
     bool refreshCatalogCache(OperationContext* opCtx,

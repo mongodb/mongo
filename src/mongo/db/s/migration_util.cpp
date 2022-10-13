@@ -249,7 +249,7 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
             hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(newOpCtx);
 
             try {
-                onShardVersionMismatch(newOpCtx, nss, boost::none);
+                onCollectionPlacementVersionMismatch(newOpCtx, nss, boost::none);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 // Can throw NamespaceNotFound if the collection/database was dropped
             }
@@ -259,7 +259,7 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
                 hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
                     .pauseWhileSet();
                 uasserted(ErrorCodes::InternalError,
-                          "simulate an error response for onShardVersionMismatch");
+                          "simulate an error response for onCollectionPlacementVersionMismatch");
             }
         });
 }
@@ -507,7 +507,7 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                                      logAttrs(deletionTask.getNss()),
                                      "status"_attr = redact(status));
 
-                               onShardVersionMismatch(
+                               onCollectionPlacementVersionMismatch(
                                    uniqueOpCtx.get(), deletionTask.getNss(), boost::none);
 
                                return status;
@@ -1224,7 +1224,7 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx) {
     while (store.count(opCtx)) {
         store.forEach(opCtx, BSONObj(), [opCtx](const MigrationCoordinatorDocument& doc) {
             try {
-                onShardVersionMismatch(opCtx, doc.getNss(), boost::none);
+                onCollectionPlacementVersionMismatch(opCtx, doc.getNss(), boost::none);
             } catch (DBException& ex) {
                 ex.addContext(str::stream() << "Failed to recover pending migration for document "
                                             << doc.toBSON());

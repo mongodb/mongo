@@ -169,7 +169,8 @@ auto withOneStaleConfigRetry(OperationContext* opCtx, Callable&& callable) {
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         if (auto sce = ex.extraInfo<StaleConfigInfo>()) {
             const auto refreshed =
-                onShardVersionMismatchNoExcept(opCtx, sce->getNss(), sce->getVersionReceived())
+                onCollectionPlacementVersionMismatchNoExcept(
+                    opCtx, sce->getNss(), ChunkVersion(sce->getVersionReceived()))
                     .isOK();
 
             if (refreshed) {

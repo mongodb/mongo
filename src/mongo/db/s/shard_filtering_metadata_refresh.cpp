@@ -294,16 +294,18 @@ void onDbVersionMismatch(OperationContext* opCtx,
 
 /**
  * Blocking method, which will wait for any concurrent operations that could change the shard
- * version to complete (namely critical section and concurrent onShardVersionMismatch invocations).
+ * version to complete (namely critical section and concurrent onCollectionPlacementVersionMismatch
+ * invocations).
  *
  * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
  * will be dropped). If there were none, returns false and the locks continue to be held.
  */
-bool joinShardVersionOperation(OperationContext* opCtx,
-                               CollectionShardingRuntime* csr,
-                               boost::optional<Lock::DBLock>* dbLock,
-                               boost::optional<Lock::CollectionLock>* collLock,
-                               boost::optional<CollectionShardingRuntime::CSRLock>* csrLock) {
+bool joinCollectionPlacementVersionOperation(
+    OperationContext* opCtx,
+    CollectionShardingRuntime* csr,
+    boost::optional<Lock::DBLock>* dbLock,
+    boost::optional<Lock::CollectionLock>* collLock,
+    boost::optional<CollectionShardingRuntime::CSRLock>* csrLock) {
     invariant(dbLock->has_value());
     invariant(collLock->has_value());
     invariant(csrLock->has_value());
@@ -337,10 +339,11 @@ bool joinShardVersionOperation(OperationContext* opCtx,
     return false;
 }
 
-SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext,
-                                                  const NamespaceString& nss,
-                                                  bool runRecover,
-                                                  CancellationToken cancellationToken) {
+SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
+    ServiceContext* serviceContext,
+    const NamespaceString& nss,
+    bool runRecover,
+    CancellationToken cancellationToken) {
     auto executor = Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor();
     return ExecutorFuture<void>(executor)
         .then([=] {
@@ -432,8 +435,8 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
             if (cancellationToken.isCanceled() &&
                 (status.isOK() || status == ErrorCodes::Interrupted)) {
                 uasserted(ErrorCodes::ShardVersionRefreshCanceled,
-                          "Shard version refresh canceled by an interruption, probably due to a "
-                          "'clearFilteringMetadata'");
+                          "Collection placement version refresh canceled by an interruption, "
+                          "probably due to a 'clearFilteringMetadata'");
             }
             return status;
         })
@@ -443,9 +446,9 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
 
 }  // namespace
 
-void onShardVersionMismatch(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            boost::optional<ShardVersion> shardVersionReceived) {
+void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          boost::optional<ChunkVersion> chunkVersionReceived) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
@@ -460,11 +463,11 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
     LOGV2_DEBUG(22061,
                 2,
-                "Metadata refresh requested for {namespace} at shard version "
-                "{shardVersionReceived}",
+                "Metadata refresh requested for {namespace} at chunk version "
+                "{chunkVersionReceived}",
                 "Metadata refresh requested for collection",
                 "namespace"_attr = nss,
-                "shardVersionReceived"_attr = shardVersionReceived);
+                "chunkVersionReceived"_attr = chunkVersionReceived);
 
     while (true) {
         boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
@@ -477,19 +480,21 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
             auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
-            if (shardVersionReceived) {
+            if (chunkVersionReceived) {
                 boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
                     CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
-                if (joinShardVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
+                if (joinCollectionPlacementVersionOperation(
+                        opCtx, csr, &dbLock, &collLock, &csrLock)) {
                     continue;
                 }
 
                 if (auto metadata = csr->getCurrentMetadataIfKnown()) {
-                    const auto currentShardVersion = metadata->getShardVersion();
+                    const auto currentCollectionPlacementVersion = metadata->getShardVersion();
                     // Don't need to remotely reload if the requested version is smaller than the
                     // known one. This means that the remote side is behind.
-                    if (shardVersionReceived->isOlderOrEqualThan(currentShardVersion)) {
+                    if (chunkVersionReceived->isOlderOrEqualThan(
+                            currentCollectionPlacementVersion)) {
                         return;
                     }
                 }
@@ -498,7 +503,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
             boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
                 CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
 
-            if (joinShardVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
+            if (joinCollectionPlacementVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
                 continue;
             }
 
@@ -510,7 +515,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
             CancellationSource cancellationSource;
             CancellationToken cancellationToken = cancellationSource.token();
             csr->setShardVersionRecoverRefreshFuture(
-                recoverRefreshShardVersion(
+                recoverRefreshCollectionPlacementVersion(
                     opCtx->getServiceContext(), nss, runRecover, std::move(cancellationToken)),
                 std::move(cancellationSource),
                 *csrLock);
@@ -528,11 +533,12 @@ void onShardVersionMismatch(OperationContext* opCtx,
     }
 }
 
-Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      boost::optional<ShardVersion> shardVersionReceived) noexcept {
+Status onCollectionPlacementVersionMismatchNoExcept(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<ChunkVersion> chunkVersionReceived) noexcept {
     try {
-        onShardVersionMismatch(opCtx, nss, shardVersionReceived);
+        onCollectionPlacementVersionMismatch(opCtx, nss, chunkVersionReceived);
         return Status::OK();
     } catch (const DBException& ex) {
         LOGV2(22062,

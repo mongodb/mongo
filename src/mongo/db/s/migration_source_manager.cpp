@@ -162,7 +162,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
     // Make sure the latest shard version is recovered as of the time of the invocation of the
     // command.
-    onShardVersionMismatch(_opCtx, nss(), boost::none);
+    onCollectionPlacementVersionMismatch(_opCtx, nss(), boost::none);
 
     const auto shardId = ShardingState::get(opCtx)->shardId();
 
@@ -514,8 +514,8 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         }
         scopedGuard.dismiss();
         _cleanup(false);
-        // Best-effort recover of the shard version.
-        onShardVersionMismatchNoExcept(_opCtx, nss(), boost::none).ignore();
+        // Best-effort recover of the chunk version.
+        onCollectionPlacementVersionMismatchNoExcept(_opCtx, nss(), boost::none).ignore();
         throw;
     }
 

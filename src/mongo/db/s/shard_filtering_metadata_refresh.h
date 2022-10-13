@@ -40,10 +40,11 @@ class OperationContext;
 
 /**
  * Must be invoked whenever code, which is executing on a shard encounters a StaleConfig exception
- * and should be passed the 'version received' from the exception. If the shard's current version is
- * behind 'shardVersionReceived', causes the shard's filtering metadata to be refreshed from the
- * config server, otherwise does nothing and immediately returns. If there are other threads
- * currently performing refresh, blocks so that only one of them hits the config server.
+ * and should be passed the placement version from the 'version received' in the exception. If the
+ * shard's current placement version is behind 'chunkVersionReceived', causes the shard's filtering
+ * metadata to be refreshed from the config server, otherwise does nothing and immediately returns.
+ * If there are other threads currently performing refresh, blocks so that only one of them hits the
+ * config server.
  *
  * If refresh fails for any reason (most commonly ExceededTimeLimit), returns a failed status.
  *
@@ -55,13 +56,14 @@ class OperationContext;
  * execution state in the response. This is specifically problematic for write commands, which are
  * expected to return the set of write batch entries that succeeded.
  */
-Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      boost::optional<ShardVersion> shardVersionReceived) noexcept;
+Status onCollectionPlacementVersionMismatchNoExcept(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<ChunkVersion> chunkVersionReceived) noexcept;
 
-void onShardVersionMismatch(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            boost::optional<ShardVersion> shardVersionReceived);
+void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          boost::optional<ChunkVersion> chunkVersionReceived);
 
 /**
  * Unconditionally get the shard's filtering metadata from the config server on the calling thread.

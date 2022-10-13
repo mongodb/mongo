@@ -129,7 +129,7 @@ public:
 
         // We force a refresh immediately after registering this migration to guarantee that this
         // shard will not receive a chunk after refreshing.
-        onShardVersionMismatch(opCtx, nss, boost::none);
+        onCollectionPlacementVersionMismatch(opCtx, nss, boost::none);
         const auto shardId = ShardingState::get(opCtx)->shardId();
 
         const auto collectionEpoch = [&] {

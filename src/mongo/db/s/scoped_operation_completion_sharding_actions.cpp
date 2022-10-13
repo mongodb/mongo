@@ -92,8 +92,8 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
             resharding_metrics::onCriticalSectionError(_opCtx, *staleInfo);
         }
 
-        auto handleMismatchStatus = onShardVersionMismatchNoExcept(
-            _opCtx, staleInfo->getNss(), staleInfo->getVersionReceived());
+        auto handleMismatchStatus = onCollectionPlacementVersionMismatchNoExcept(
+            _opCtx, staleInfo->getNss(), ChunkVersion(staleInfo->getVersionReceived()));
         if (!handleMismatchStatus.isOK())
             LOGV2(22053,
                   "Failed to handle stale version exception as part of the current operation: "

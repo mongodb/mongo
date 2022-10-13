@@ -120,8 +120,8 @@ public:
                     }
 
                     auto opCtx = tc->makeOperationContext();
-                    onShardVersionMismatch(
-                        opCtx.get(), nss, boost::none /* shardVersionReceived */);
+                    onCollectionPlacementVersionMismatch(
+                        opCtx.get(), nss, boost::none /* chunkVersionReceived */);
                 })
                 .onError([](const Status& status) {
                     LOGV2_WARNING(5808100,

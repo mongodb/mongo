@@ -161,7 +161,7 @@ public:
         // Check that the preconditions for split chunk are met and throw StaleShardVersion
         // otherwise.
         {
-            onShardVersionMismatch(opCtx, nss, boost::none);
+            onCollectionPlacementVersionMismatch(opCtx, nss, boost::none);
             OperationShardingState::
                 unsetShardRoleForLegacyDDLOperationsSentWithShardVersionIfNeeded(opCtx, nss);
             const auto metadata = checkCollectionIdentity(

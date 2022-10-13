@@ -367,7 +367,8 @@ void clearFilteringMetadata(OperationContext* opCtx,
             }
 
             auto opCtx = tc->makeOperationContext();
-            onShardVersionMismatch(opCtx.get(), nss, boost::none /* shardVersionReceived */);
+            onCollectionPlacementVersionMismatch(
+                opCtx.get(), nss, boost::none /* chunkVersionReceived */);
         })
             .until([](const Status& status) {
                 if (!status.isOK()) {

@@ -207,7 +207,7 @@ public:
             return false;
         }
 
-        onShardVersionMismatch(opCtx, nss, boost::none);
+        onCollectionPlacementVersionMismatch(opCtx, nss, boost::none);
 
         CleanupResult cleanupResult = cleanupOrphanedData(opCtx, nss, startingFromKey, &errmsg);
 

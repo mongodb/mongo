@@ -66,7 +66,7 @@ BSONObj getShardKeyPattern(OperationContext* opCtx,
             optNss = collection.getNss();
         }
 
-        onShardVersionMismatchNoExcept(opCtx, *optNss, boost::none).ignore();
+        onCollectionPlacementVersionMismatchNoExcept(opCtx, *optNss, boost::none).ignore();
         continue;
     }
 }

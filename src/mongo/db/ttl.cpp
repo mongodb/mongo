@@ -483,7 +483,12 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
                     auto uniqueOpCtx = tc->makeOperationContext();
                     auto opCtx = uniqueOpCtx.get();
 
-                    onShardVersionMismatchNoExcept(opCtx, *nss, staleInfo->getVersionWanted())
+                    onCollectionPlacementVersionMismatchNoExcept(
+                        opCtx,
+                        *nss,
+                        staleInfo->getVersionWanted()
+                            ? boost::make_optional(ChunkVersion(*staleInfo->getVersionWanted()))
+                            : boost::none)
                         .ignore();
                 })
                 .getAsync([](auto) {});
