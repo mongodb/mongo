@@ -310,6 +310,27 @@ public:
         return {{}, nullptr, sel};
     }
 
+    EvalFilterSelectivityResult transport(const UnaryOp& node,
+                                          CEType /*inputCard*/,
+                                          EvalFilterSelectivityResult childResult) {
+        switch (node.op()) {
+            case Operations::Not:
+                childResult.selectivity = negationSel(childResult.selectivity);
+                return childResult;
+            case Operations::Neg:
+                // If we see negation (-) in a UnaryOp, we ignore it for CE purposes.
+                return childResult;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
+    EvalFilterSelectivityResult transport(const PathConstant& /*node*/,
+                                          CEType /*inputCard*/,
+                                          EvalFilterSelectivityResult childResult) {
+        return childResult;
+    }
+
     template <typename T, typename... Ts>
     EvalFilterSelectivityResult transport(const T& /*node*/, Ts&&...) {
         _hasTraverse = false;
@@ -323,6 +344,10 @@ public:
     }
 
 private:
+    SelectivityType negationSel(const SelectivityType in) {
+        return 1.0 - in;
+    }
+
     SelectivityType conjunctionSel(const SelectivityType left, const SelectivityType right) {
         return left * right;
     }

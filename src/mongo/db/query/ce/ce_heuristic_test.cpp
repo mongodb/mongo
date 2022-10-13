@@ -808,5 +808,188 @@ TEST(CEHeuristicTest, CEAfterMemoSubstitutionExplorationPhases) {
     ASSERT_MATCH_CE(ht, "{a : 13, b : 42}", 10.0);
 }
 
+TEST(CEHeuristicTest, CENotEquality) {
+    double collCard = kCollCard;
+    HeuristicCETester opt(collName);
+
+    // We avoid optimizing in order to verify heuristic estimate of FilterNode subtree. Note that we
+    // do not generate SargableNodes for $not predicates, but we do generate SargableNodes without
+    // it; for the purposes of this test, we want to demonstrate that $not returns the inverse of
+    // the FilterNode estimate.
+    HeuristicCETester noOpt(collName, kNoOptPhaseSet);
+
+    // Equality selectivity is sqrt(kCollCard)/kCollCard = 0.01. We then add 0.1 when we see a
+    // Traverse, obtaining a selectivity of 0.11. When we see a UnaryOp [Not] above this subtree, we
+    // invert the selectivity 1.0 - 0.11 = 0.89.
+    double ce = 1100.0;
+    double inverseCE = collCard - ce;
+    ASSERT_MATCH_CE(noOpt, "{a: {$eq: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$eq: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$eq: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$eq: 1}}}", inverseCE);
+
+    // Update cardinality to 25.
+    collCard = 25;
+    opt.setCollCard(collCard);
+    noOpt.setCollCard(collCard);
+
+    // Selectivity is sqrt(25)/25 + 0.1 for traverse.
+    ce = 7.5;
+    inverseCE = collCard - ce;
+    ASSERT_MATCH_CE(noOpt, "{a: {$eq: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$eq: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$eq: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$eq: 1}}}", inverseCE);
+
+    // Update cardinality to 9.
+    collCard = 9;
+    opt.setCollCard(collCard);
+    noOpt.setCollCard(collCard);
+
+    // Selectivity is sqrt(3)/9 + 0.1 for traverse.
+    ce = 3.90;
+    inverseCE = collCard - ce;
+    ASSERT_MATCH_CE(noOpt, "{a: {$eq: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$eq: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$eq: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$eq: 1}}}", inverseCE);
+}
+
+TEST(CEHeuristicTest, CENotOpenRange) {
+    // Repeat the above test for open ranges; the $not cardinality estimate should add up with the
+    // non-$not estimate to the collection cardinality.
+    double collCard = kCollCard;
+    HeuristicCETester opt(collName);
+    HeuristicCETester noOpt(collName, kNoOptPhaseSet);
+
+    // Expect open-range selectivity for input card > 100 (0.33 + 0.10 for traverse).
+    double ce = 4300;
+    double inverseCE = collCard - ce;
+
+    ASSERT_MATCH_CE(noOpt, "{a: {$lt: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$lt: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$lte: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$lte: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gt: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gt: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gte: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gte: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$gte: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$gte: 1}}}", inverseCE);
+
+    // Update cardinality to 25.
+    collCard = 25;
+    opt.setCollCard(collCard);
+    noOpt.setCollCard(collCard);
+
+    // Expect open-range selectivity for input card in range (20, 100) (0.45 + 0.10 for traverse).
+    ce = 13.75;
+    inverseCE = collCard - ce;
+
+    ASSERT_MATCH_CE(noOpt, "{a: {$lt: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$lt: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$lte: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$lte: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gt: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gt: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gte: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gte: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$gte: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$gte: 1}}}", inverseCE);
+
+    // Update cardinality to 10.
+    collCard = 10.0;
+    opt.setCollCard(collCard);
+    noOpt.setCollCard(collCard);
+
+    // Expect open-range selectivity for input card < 20 (0.70 + 0.10 for traverse).
+    ce = 8.0;
+    inverseCE = collCard - ce;
+
+    ASSERT_MATCH_CE(noOpt, "{a: {$lt: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$lt: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$lte: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$lte: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gt: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gt: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gte: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gte: 1}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$gte: 1}}", ce);
+    ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$gte: 1}}}", inverseCE);
+}
+
+TEST(CEHeuristicTest, CENotClosedRange) {
+    // Repeat the above test for closed ranges; the $not cardinality estimate should add up with the
+    // non-$not estimate to the collection cardinality.
+    double collCard = kCollCard;
+    double ce = 1849.0;
+    double inverseCE = collCard - ce;
+    HeuristicCETester opt(collName);
+    HeuristicCETester noOpt(collName, kNoOptPhaseSet);
+
+    ASSERT_MATCH_CE(noOpt, "{a: {$gt: 10, $lt: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gt: 10, $lt: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gte: 10, $lt: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gte: 10, $lt: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gte: 10, $lte: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gte: 10, $lte: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gt: 10, $lte: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gt: 10, $lte: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$gte: 10, $lt: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$gte: 10, $lt: 20}}}", inverseCE);
+
+    /*
+     * Update cardinality to 25. Here we observe an interesting edge case where the estimated
+     * cardinality is not the inverse of the actual cardinality.
+     *
+     * Consider the predicate {a: {$gt: 10, $lt: 20}}. This generates two FilterNodes stacked on top
+     * of each other. However, the predicate {a: {$not: {$gt: 10, $lt: 20}}} generates just one
+     * FilterNode.
+     *
+     * We always use input cardinality to determine which interval selectivity we're going to use.
+     * However, we have a different input cardinality for the one FilterNode case (collCard) than
+     * for the two FilterNodes case: the first node gets collCard, and the second node gets a
+     * smaller value after the selectivity of the first filter is applied.
+     *
+     * Because we use a piecewise function to pick the selectivity, and because we go from inputCard
+     * < 100 to inputCard < 20, we choose different selectivities for the intervals in the second
+     * FilterNode (0.50) than in the first (0.33).
+     */
+    collCard = 25;
+    ce = 11.0;
+    inverseCE = 17.4375;
+    opt.setCollCard(collCard);
+    noOpt.setCollCard(collCard);
+
+    ASSERT_MATCH_CE(noOpt, "{a: {$gt: 10, $lt: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gt: 10, $lt: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gte: 10, $lt: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gte: 10, $lt: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gte: 10, $lte: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gte: 10, $lte: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gt: 10, $lte: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gt: 10, $lte: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$gte: 10, $lt: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$gte: 10, $lt: 20}}}", inverseCE);
+
+    // Update cardinality to 10.
+    collCard = 10.0;
+    ce = 6.4;
+    inverseCE = collCard - ce;
+    opt.setCollCard(collCard);
+    noOpt.setCollCard(collCard);
+
+    ASSERT_MATCH_CE(noOpt, "{a: {$gt: 10, $lt: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gt: 10, $lt: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gte: 10, $lt: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gte: 10, $lt: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gte: 10, $lte: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gte: 10, $lte: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{a: {$gt: 10, $lte: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{a: {$not: {$gt: 10, $lte: 20}}}", inverseCE);
+    ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$gte: 10, $lt: 20}}", ce);
+    ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$gte: 10, $lt: 20}}}", inverseCE);
+}
+
 }  // namespace
 }  // namespace mongo::ce
