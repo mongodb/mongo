@@ -65,7 +65,7 @@ def generate_scons_cache_expansions():
         default_cache_path = os.path.join(shared_mount_root, system_uuid, "scons-cache")
         expansions["scons_cache_path"] = default_cache_path
         expansions[
-            "scons_cache_args"] = "--cache={0} --cache-signature-mode=validate --cache-dir={1}".format(
+            "scons_cache_args"] = "--cache={0} --cache-signature-mode=validate --cache-dir={1} --cache-show".format(
                 scons_cache_mode, shlex.quote(default_cache_path))
 
     # Local shared cache - host-based
@@ -79,7 +79,7 @@ def generate_scons_cache_expansions():
         default_cache_path = os.path.join(default_cache_path_base, system_uuid)
         expansions["scons_cache_path"] = default_cache_path
         expansions[
-            "scons_cache_args"] = "--cache={0} --cache-signature-mode=validate --cache-dir={1}".format(
+            "scons_cache_args"] = "--cache={0} --cache-signature-mode=validate --cache-dir={1} --cache-show".format(
                 scons_cache_mode, shlex.quote(default_cache_path))
     # No cache
     else:
