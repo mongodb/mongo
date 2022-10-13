@@ -1616,7 +1616,6 @@ std::vector<BSONObj> packOperationsIntoApplyOps(
  */
 OpObserver::ApplyOpsOplogSlotAndOperationAssignment
 getApplyOpsOplogSlotAndOperationAssignmentForTransaction(
-    OperationContext* opCtx,
     const std::vector<OplogSlot>& oplogSlots,
     bool prepare,
     boost::optional<std::size_t> oplogEntryCountLimit,
@@ -1653,11 +1652,6 @@ getApplyOpsOplogSlotAndOperationAssignmentForTransaction(
             OpObserver::ApplyOpsOplogSlotAndOperationAssignment::ApplyOpsEntry{
                 getNextOplogSlot(), std::move(applyOpsOperations)});
     }
-
-    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
-    tassert(6501800,
-            "batched writes must generate a single applyOps entry",
-            !batchedWriteContext.writesAreBatched() || applyOpsEntries.size() == 1);
 
     // In the special case of writing the implicit 'prepare' oplog entry, we use the last reserved
     // oplog slot. This may mean we skipped over some reserved slots, but there's no harm in that.
@@ -2087,7 +2081,6 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     // entries.
     const auto applyOpsOplogSlotAndOperationAssignment =
         getApplyOpsOplogSlotAndOperationAssignmentForTransaction(
-            opCtx,
             oplogSlots,
             /*prepare=*/false,
             getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
@@ -2161,12 +2154,16 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     // entries.
     const auto applyOpsOplogSlotAndOperationAssignment =
         getApplyOpsOplogSlotAndOperationAssignmentForTransaction(
-            opCtx,
             oplogSlots,
             false /*prepare*/,
             /*oplogEntryCountLimit=*/boost::none,
             /*oplogEntrySizeLimitBytes=*/boost::none,
             *(batchedOps->getMutableOperationsForOpObserver()));
+
+    tassert(6501800,
+            "batched writes must generate a single applyOps entry",
+            applyOpsOplogSlotAndOperationAssignment.applyOpsEntries.size() == 1);
+
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
     logOplogEntries(opCtx,
                     batchedOps->getMutableOperationsForOpObserver(),
@@ -2216,7 +2213,6 @@ OpObserverImpl::preTransactionPrepare(OperationContext* opCtx,
     auto* statements = transactionOperations->getMutableOperationsForOpObserver();
     auto applyOpsOplogSlotAndOperationAssignment =
         getApplyOpsOplogSlotAndOperationAssignmentForTransaction(
-            opCtx,
             reservedSlots,
             /*prepare=*/true,
             getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
