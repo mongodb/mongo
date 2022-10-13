@@ -708,9 +708,10 @@ private:
     void _mergeChunksInTransaction(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const UUID& collectionUUID,
-                                   const ChunkVersion& initialVersion,
                                    const ChunkVersion& mergeVersion,
                                    const boost::optional<Timestamp>& validAfter,
+                                   const ChunkRange& chunkRange,
+                                   const ShardId& shardId,
                                    std::shared_ptr<std::vector<ChunkType>> chunksToMerge);
 
     struct SplitChunkInTransactionResult {
