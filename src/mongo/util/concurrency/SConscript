@@ -26,11 +26,13 @@ env.Library(
     target='ticketholder',
     source=['ticketholder.cpp'],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/third_party/shim_boost',
+        '$BUILD_DIR/mongo/base', '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/third_party/shim_boost', 'admission_context'
     ],
 )
+
+env.Library(target='admission_context', source=['admission_context.cpp'],
+            LIBDEPS=['$BUILD_DIR/mongo/base'])
 
 env.Library(
     target='spin_lock',

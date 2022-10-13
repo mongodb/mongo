@@ -694,6 +694,8 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
     if (_debug.dataThroughputAverage) {
         builder->append("dataThroughputAverage", *_debug.dataThroughputAverage);
     }
+
+    builder->append("admissionPriority", toString(opCtx->lockState()->getAdmissionPriority()));
 }
 
 namespace {
@@ -879,6 +881,8 @@ void OpDebug::report(OperationContext* opCtx,
     if (responseLength > 0) {
         pAttrs->add("reslen", responseLength);
     }
+
+    pAttrs->add("admissionPriority", opCtx->lockState()->getAdmissionPriority());
 
     if (lockStats) {
         BSONObjBuilder locks;

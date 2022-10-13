@@ -63,7 +63,7 @@ public:
      * (e.g. FTDC), and any operation that is releasing resources (e.g. committing or aborting
      * prepared transactions). Should be used sparingly.
      */
-    enum class Priority { kLow, kNormal, kImmediate };
+    enum class Priority { kLow = 0, kNormal, kImmediate };
 
     void start(TickSource* tickSource) {
         admissions++;
@@ -107,5 +107,7 @@ private:
     // TODO SERVER-68933: Don't default _priority to kNormal.
     boost::optional<Priority> _priority{Priority::kNormal};
 };
+
+StringData toString(AdmissionContext::Priority priority);
 
 }  // namespace mongo

@@ -517,7 +517,7 @@ public:
         _admCtx.setPriority(priority);
     }
 
-    AdmissionContext::Priority getAcquisitionPriority() {
+    AdmissionContext::Priority getAdmissionPriority() {
         return _admCtx.getPriority();
     }
 

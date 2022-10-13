@@ -430,7 +430,7 @@ public:
         delete;
     explicit SetTicketAquisitionPriorityForLock(OperationContext* opCtx,
                                                 AdmissionContext::Priority priority)
-        : _opCtx(opCtx), _originalPriority(opCtx->lockState()->getAcquisitionPriority()) {
+        : _opCtx(opCtx), _originalPriority(opCtx->lockState()->getAdmissionPriority()) {
         uassert(ErrorCodes::IllegalOperation,
                 "It is illegal for an operation to demote a high priority to a lower priority "
                 "operation",
