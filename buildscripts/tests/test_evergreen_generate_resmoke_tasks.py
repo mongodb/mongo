@@ -1214,3 +1214,13 @@ class TestShouldTasksBeGenerated(unittest.TestCase):
 
         self.assertTrue(under_test.should_tasks_be_generated(evg_api, task_id))
         evg_api.task_by_id.assert_called_with(task_id, fetch_all_executions=True)
+
+    def test_when_execution_is_none(self):
+        evg_api = MagicMock()
+        task_id = "task_id"
+        task = evg_api.task_by_id.return_value
+        task.execution = 5
+        task.get_execution.return_value = None
+
+        self.assertFalse(under_test.should_tasks_be_generated(evg_api, task_id))
+        evg_api.task_by_id.assert_called_with(task_id, fetch_all_executions=True)

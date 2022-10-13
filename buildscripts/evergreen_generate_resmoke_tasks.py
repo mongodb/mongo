@@ -489,7 +489,7 @@ def should_tasks_be_generated(evg_api, task_id):
     # If any previous execution was successful, do not generate more tasks.
     for i in range(task.execution):
         task_execution = task.get_execution(i)
-        if task_execution.is_success():
+        if task_execution is None or task_execution.is_success():
             return False
 
     return True
