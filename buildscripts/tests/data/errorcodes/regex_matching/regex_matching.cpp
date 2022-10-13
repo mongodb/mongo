@@ -27,4 +27,9 @@ LOGV2_ERROR(25,
             "more words");
 LOGV2_ERROR(26,
             "words",
-            "comma, more words words words words words words words words words words words words "
+            "comma, more words words words words words words words words words words words words ");
+iassert(27, "words");
+iasserted(28, "words");
+iassertNoTrace(29, "words");
+iassertedNoTrace(30, "words");
+MONGO_UNREACHABLE_TASSERT(31);

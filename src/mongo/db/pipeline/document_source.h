@@ -649,7 +649,7 @@ public:
                     return true;
             }
             // Cannot hit.
-            MONGO_UNREACHABLE_TASSERT(6434901);
+            MONGO_UNREACHABLE_TASSERT(6434902);
         }
 
         Type type;
