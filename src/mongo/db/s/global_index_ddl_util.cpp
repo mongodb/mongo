@@ -47,7 +47,7 @@
 
 namespace mongo {
 
-bool addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
+void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                                             const NamespaceString& userCollectionNss,
                                             const std::string& name,
                                             const BSONObj& keyPattern,
@@ -58,7 +58,7 @@ bool addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
     IndexCatalogType indexCatalogEntry(name, keyPattern, options, lastmod, collectionUUID);
     indexCatalogEntry.setIndexCollectionUUID(indexCollectionUUID);
 
-    return writeConflictRetry(
+    writeConflictRetry(
         opCtx, "AddIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection collsColl(
@@ -83,7 +83,7 @@ bool addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                         "collectionIndexVersion"_attr =
                             collectionDoc[CollectionType::kIndexVersionFieldName].timestamp(),
                         "expectedIndexVersion"_attr = lastmod);
-                    return false;
+                    return;
                 }
                 // Update the document (or create it) with the new index version
                 repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
@@ -120,16 +120,15 @@ bool addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                 ->onModifyShardedCollectionGlobalIndexCatalogEntry(
                     opCtx, userCollectionNss, idxColl->uuid(), entryObj);
             wunit.commit();
-            return true;
         });
 }
 
-bool removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
+void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                                                  const NamespaceString& userCollectionNss,
                                                  const UUID& collectionUUID,
                                                  const std::string& indexName,
                                                  const Timestamp& lastmod) {
-    return writeConflictRetry(
+    writeConflictRetry(
         opCtx, "RemoveIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection collsColl(
@@ -154,7 +153,7 @@ bool removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                         "collectionIndexVersion"_attr =
                             collectionDoc[CollectionType::kIndexVersionFieldName].timestamp(),
                         "expectedIndexVersion"_attr = lastmod);
-                    return false;
+                    return;
                 }
                 // Update the document (or create it) with the new index version
                 repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
@@ -195,7 +194,6 @@ bool removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                 ->onModifyShardedCollectionGlobalIndexCatalogEntry(
                     opCtx, userCollectionNss, idxColl->uuid(), entryObj);
             wunit.commit();
-            return true;
         });
 }
 

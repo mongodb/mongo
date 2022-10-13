@@ -39,7 +39,7 @@ namespace mongo {
  * section in all shards with data for userCollectionNss. This function is not currently compatible
  * with transactions.
  */
-bool addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
+void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                                             const NamespaceString& userCollectionNss,
                                             const std::string& name,
                                             const BSONObj& keyPattern,
@@ -54,7 +54,7 @@ bool addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
  * the critical section in all shards with data for userCollectionNss. This function is not
  * currently compatible with transactions.
  */
-bool removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
+void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                                                  const NamespaceString& userCollectionNss,
                                                  const UUID& collectionUUID,
                                                  const std::string& indexName,
