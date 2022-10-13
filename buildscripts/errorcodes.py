@@ -45,6 +45,7 @@ _CODE_PATTERNS = [
         r"(?:StatusOK)?"
         r"(?:WithContext)?"
         r"\s*\(",
+        r"MONGO_UNREACHABLE_TASSERT\(",
         # DBException and AssertionException constructors
         r"(?:DB|Assertion)Exception\s*[({]",
         # Calls to all LOGV2* variants

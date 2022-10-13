@@ -108,7 +108,7 @@ void AccumulatorSum::processInternal(const Value& input, bool merging) {
             applyPartialSum(
                 input.getArray(), nonDecimalTotalType, totalType, nonDecimalTotal, decimalTotal);
         } else {
-            MONGO_UNREACHABLE_TASSERT(64227002);
+            MONGO_UNREACHABLE_TASSERT(6422702);
         }
         return;
     }
