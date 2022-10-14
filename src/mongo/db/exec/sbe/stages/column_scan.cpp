@@ -46,7 +46,7 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  PlanYieldPolicy* yieldPolicy,
                                  PlanNodeId nodeId,
                                  bool participateInTrialRunTracking)
-    : PlanStage("COLUMN_SCAN"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
+    : PlanStage("columnscan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collectionUuid),
       _columnIndexName(columnIndexName),
       _paths(std::move(paths)),
@@ -705,6 +705,22 @@ std::vector<DebugPrinter::Block> ColumnScanStage::debugPrint() const {
         }
 
         ret.emplace_back(str::stream() << "\"" << _paths[idx] << "\"");
+    }
+    ret.emplace_back(DebugPrinter::Block("`]"));
+
+    // Print out output paths.
+    ret.emplace_back(DebugPrinter::Block("outputs[`"));
+    bool first = true;
+    for (size_t idx = 0; idx < _paths.size(); ++idx) {
+        if (_includeInOutput[idx]) {
+            if (!first) {
+                ret.emplace_back(DebugPrinter::Block("`,"));
+            } else {
+                first = false;
+            }
+
+            ret.emplace_back(str::stream() << "\"" << _paths[idx] << "\"");
+        }
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 

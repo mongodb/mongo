@@ -1,6 +1,6 @@
 /**
  * Tests that the row store expression is skipped when there is an appropriate group or projection
- * above a COLUMN_SCAN stage.
+ * above a columnscan stage.
  *
  * @tags: [
  *   # explain is not supported in transactions
@@ -59,11 +59,11 @@ function test({agg, requiresRowStoreExpr, rowstoreFetches}) {
         ? explainPlan.queryPlanner.winningPlan.slotBasedPlan.stages
         // SBE + classic plan
         : explainPlan.stages[0]["$cursor"].queryPlanner.winningPlan.slotBasedPlan.stages;
-    assert(sbeStages.includes('COLUMN_SCAN'), `No COLUMN_SCAN in SBE stages: ${sbeStages}`);
+    assert(sbeStages.includes('columnscan'), `No columnscan in SBE stages: ${sbeStages}`);
     const nullRegex =
-        /COLUMN_SCAN s.* ((s.*)|(none)) paths\[.*\] pathFilters\[.*\] rowStoreExpr\[\] @.* @.*/;
+        /columnscan s.* ((s.*)|(none)) paths\[.*\] pathFilters\[.*\] rowStoreExpr\[\] @.* @.*/;
     const notNullRegex =
-        /COLUMN_SCAN s.* ((s.*)|(none)) paths\[.*\] pathFilters\[.*\] rowStoreExpr\[.*, \n/;
+        /columnscan s.* ((s.*)|(none)) paths\[.*\] pathFilters\[.*\] rowStoreExpr\[.*, \n/;
     if (requiresRowStoreExpr) {
         assert(!nullRegex.test(sbeStages), `Don't expect null rowstoreExpr in ${sbeStages}`);
         assert(notNullRegex.test(sbeStages), `Expected non-null rowstoreExpr in ${sbeStages}`);

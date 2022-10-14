@@ -52,7 +52,8 @@ namespace sbe {
  *
  * Debug string representation:
  *
- *  COLUMN_SCAN reconstructedRecordSlot|none recordIdSlot|none paths[path_1, ..., path_n]
+ *  columnscan reconstructedRecordSlot|none recordIdSlot|none paths[path_1, ..., path_n]
+ *              outputs[output_1, ..., output_n]
  *              pathFilters[filter_path_1: filterSlot_1, filterExpr_1; ...]
  *              rowStoreExpr[slot, expr]|rowStoreExpr[]
  *              collectionUuid indexName

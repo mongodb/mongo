@@ -583,8 +583,8 @@ function runPerPathFiltersTest({docs, query, projection, expected, testDescripti
               expectedToMatchCount);
     const explain = coll_filters.find({x: 1, y: 1}, {_id: 1, x: 1}).explain("executionStats");
 
-    const columnScanStages = getSbePlanStages(explain, "COLUMN_SCAN");
-    assert.gt(columnScanStages.length, 0, `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
+    const columnScanStages = getSbePlanStages(explain, "columnscan");
+    assert.gt(columnScanStages.length, 0, `Could not find 'columnscan' stage: ${tojson(explain)}`);
 
     if (columnScanStages.length > 1) {
         // The test is being run in sharded environment and the state per shard would depend on

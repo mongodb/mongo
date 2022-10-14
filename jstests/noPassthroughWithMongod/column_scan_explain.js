@@ -32,8 +32,9 @@ assert.commandWorked(coll.insertMany(docs));
 (function testScanOnTwoColumns() {
     const explain = coll.find({}, {x: 1, 'y.a': 1}).explain("executionStats");
 
-    const columnScanStages = getSbePlanStages(explain, "COLUMN_SCAN");
-    assert.eq(columnScanStages.length, 1, `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
+    // Validate SBE part.
+    const columnScanStages = getSbePlanStages(explain, "columnscan");
+    assert.eq(columnScanStages.length, 1, `Could not find 'columnscan' stage: ${tojson(explain)}`);
     const columnScan = columnScanStages[0];
 
     assertArrayEq({
@@ -47,8 +48,9 @@ assert.commandWorked(coll.insertMany(docs));
     assert.eq(
         Object.keys(columns).length, 4, `Should access 4 columns but accessed: ${tojson(columns)}`);
 
-    // We seek into each column once, when setting up the cursors. The dense column is the first to
-    // hit EOF after iterating over all documents so other columns iterate at least one time less.
+    // We seek into each column once, when setting up the cursors. The dense column is the first
+    // to hit EOF after iterating over all documents so other columns iterate at least one time
+    // less.
     const expectedColumns = {
         "<<RowId Column>>": {"numNexts": docs.length, "numSeeks": 1, "usedInOutput": false},
         "_id": {"numNexts": docs.length - 1, "numSeeks": 1, "usedInOutput": true},
@@ -72,7 +74,8 @@ assert.commandWorked(coll.insertMany(docs));
               {"numNexts": 0, "numSeeks": 4},
               'Mismatching entry for parent column "y"');
 
-    // 'totalKeysExamined' should be equal to the sum of "next" and "seek" calls across all columns.
+    // 'totalKeysExamined' should be equal to the sum of "next" and "seek" calls across all
+    // columns.
     assert.eq(explain.executionStats.totalKeysExamined,
               columns["<<RowId Column>>"].numNexts + columns["<<RowId Column>>"].numSeeks +
                   columns["_id"].numNexts + columns["_id"].numSeeks + columns["x"].numNexts +
@@ -82,14 +85,25 @@ assert.commandWorked(coll.insertMany(docs));
 
     assert.eq(columnScan.numRowStoreFetches, 0, 'Mismatch in numRowStoreFetches');
     assert.eq(columnScan.nReturned, docs.length, 'nReturned: should return all docs');
+
+    // Validate QSN part.
+    const columnScanPlanStages = getPlanStages(explain, "COLUMN_SCAN");
+    assert.eq(
+        columnScanPlanStages.length, 1, `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
+    assert(documentEq(columnScanPlanStages[0],
+                      {"allFields": ["_id", "x", "y.a"], "extraFieldsPermitted": true},
+                      false /* verbose */,
+                      null /* valueComparator */,
+                      ["stage", "planNodeId"]));
 }());
 
 // Test the explain output for a scan on a nonexistent field.
 (function testNonexistentField() {
     const explain = coll.find({}, {z: 1}).explain("executionStats");
 
-    const columnScanStages = getSbePlanStages(explain, "COLUMN_SCAN");
-    assert.eq(columnScanStages.length, 1, `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
+    // Validate SBE part.
+    const columnScanStages = getSbePlanStages(explain, "columnscan");
+    assert.eq(columnScanStages.length, 1, `Could not find 'columnscan' stage: ${tojson(explain)}`);
     const columnScan = columnScanStages[0];
 
     assertArrayEq({
@@ -117,7 +131,8 @@ assert.commandWorked(coll.insertMany(docs));
     const parentColumns = columnScan.parentColumns;
     assert.eq(parentColumns, {}, "Should not access parent columns");
 
-    // 'totalKeysExamined' should be equal to the sum of "next" and "seek" calls across all columns.
+    // 'totalKeysExamined' should be equal to the sum of "next" and "seek" calls across all
+    // columns.
     assert.eq(explain.executionStats.totalKeysExamined,
               columns["<<RowId Column>>"].numNexts + columns["<<RowId Column>>"].numSeeks +
                   columns["_id"].numNexts + columns["_id"].numSeeks + columns["z"].numNexts +
@@ -126,14 +141,25 @@ assert.commandWorked(coll.insertMany(docs));
 
     assert.eq(columnScan.numRowStoreFetches, 0, 'Mismatch in numRowStoreFetches');
     assert.eq(columnScan.nReturned, docs.length, 'nReturned: should return all docs');
+
+    // Validate QSN part.
+    const columnScanPlanStages = getPlanStages(explain, "COLUMN_SCAN");
+    assert.eq(
+        columnScanPlanStages.length, 1, `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
+    assert(documentEq(columnScanPlanStages[0],
+                      {"allFields": ["_id", "z"], "extraFieldsPermitted": false},
+                      false /* verbose */,
+                      null /* valueComparator */,
+                      ["stage", "planNodeId"]));
 }());
 
 // Test the explain output for a scan on a 2-level nested field.
 (function testMultipleNestedColumns() {
     const explain = coll.find({}, {'y.b.c': 1}).explain("executionStats");
 
-    const columnScanStages = getSbePlanStages(explain, "COLUMN_SCAN");
-    assert.eq(columnScanStages.length, 1, `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
+    // Validate SBE part.
+    const columnScanStages = getSbePlanStages(explain, "columnscan");
+    assert.eq(columnScanStages.length, 1, `Could not find 'columnscan' stage: ${tojson(explain)}`);
     const columnScan = columnScanStages[0];
 
     assertArrayEq({
@@ -173,7 +199,8 @@ assert.commandWorked(coll.insertMany(docs));
               {"numNexts": 0, "numSeeks": 4},
               'Mismatching entry for parent column "y.b"');
 
-    // 'totalKeysExamined' should be equal to the sum of "next" and "seek" calls across all columns.
+    // 'totalKeysExamined' should be equal to the sum of "next" and "seek" calls across all
+    // columns.
     assert.eq(explain.executionStats.totalKeysExamined,
               columns["<<RowId Column>>"].numNexts + columns["<<RowId Column>>"].numSeeks +
                   columns["_id"].numNexts + columns["_id"].numSeeks + columns["y.b.c"].numNexts +
@@ -184,6 +211,16 @@ assert.commandWorked(coll.insertMany(docs));
 
     assert.eq(columnScan.numRowStoreFetches, 0, 'Mismatch in numRowStoreFetches');
     assert.eq(columnScan.nReturned, docs.length, 'nReturned: should return all docs');
+
+    // Validate QSN part.
+    const columnScanPlanStages = getPlanStages(explain, "COLUMN_SCAN");
+    assert.eq(
+        columnScanPlanStages.length, 1, `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
+    assert(documentEq(columnScanPlanStages[0],
+                      {"allFields": ["_id", "y.b.c"], "extraFieldsPermitted": true},
+                      false /* verbose */,
+                      null /* valueComparator */,
+                      ["stage", "planNodeId"]));
 }());
 
 // Test fallback to the row store.
@@ -204,11 +241,31 @@ assert.commandWorked(coll.insertMany(docs));
     coll_rowstore.insert(docs_rowstore);
     const explain = coll_rowstore.find({}, {_id: 0, "x.y": 1}).explain("executionStats");
 
-    const columnScanStages = getSbePlanStages(explain, "COLUMN_SCAN");
-    assert.eq(columnScanStages.length, 1, `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
+    const columnScanStages = getSbePlanStages(explain, "columnscan");
+    assert.eq(columnScanStages.length, 1, `Could not find 'columnscan' stage: ${tojson(explain)}`);
     const columnScan = columnScanStages[0];
 
     assert.eq(columnScan.numRowStoreFetches, 2, 'Mismatch in numRowStoreFetches');
     assert.eq(columnScan.nReturned, docs_rowstore.length, 'nReturned: should return all docs');
+}());
+
+// Test the QSN explain output for scans with different types of filters.
+(function testScanWithFilters() {
+    const explain =
+        coll.find({x: 1, 'y.b': 5, $or: [{x: 2}, {'y.a': 3}]}, {_id: 0, x: 1}).explain();
+
+    const columnScanPlanStages = getPlanStages(explain, "COLUMN_SCAN");
+    assert.eq(
+        columnScanPlanStages.length, 1, `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
+    assert(documentEq(columnScanPlanStages[0],
+                      {
+                          "allFields": ["x", "y.b", "y.a"],
+                          "filtersByPath": {"x": {"$eq": 1}, "y.b": {"$eq": 5}},
+                          "residualPredicate": {"$or": [{"x": {"$eq": 2}}, {"y.a": {"$eq": 3}}]},
+                          "extraFieldsPermitted": true
+                      },
+                      false /* verbose */,
+                      null /* valueComparator */,
+                      ["stage", "planNodeId"]));
 }());
 }());
