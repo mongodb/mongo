@@ -1137,7 +1137,7 @@ SharedSemiFuture<void> Balancer::applyLegacyChunkSizeConstraintsOnClusterData(
             NamespaceString::kLogicalSessionsNamespace,
             0,
             boost::none /*defragmentCollection*/,
-            false /*enableAutoSplitter*/);
+            boost::none /*enableAutoSplitter*/);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
         // config.system.collections does not appear in config.collections; continue.
     }

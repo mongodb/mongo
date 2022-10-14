@@ -563,14 +563,6 @@ void ShardingCatalogManager::configureCollectionBalancing(
     boost::optional<bool> defragmentCollection,
     boost::optional<bool> enableAutoSplitter) {
 
-    // Hold the FCV region to serialize with the setFeatureCompatibilityVersion command
-    FixedFCVRegion fcvRegion(opCtx);
-    uassert(ErrorCodes::IllegalOperation,
-            "_configsvrConfigureCollectionBalancing can only be run when the cluster is in feature "
-            "compatibility versions greater or equal than 5.3.",
-            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                multiversion::FeatureCompatibilityVersion::kVersion_5_3));
-
     uassert(ErrorCodes::InvalidOptions,
             "invalid configure collection balancing update",
             chunkSizeMB || defragmentCollection || enableAutoSplitter);
@@ -636,8 +628,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
                                                                      false /* multi */),
                                 txnNumber);
                             const auto numDocsModified = UpdateOp::parseResponse(res).getN();
-                            // TODO SERVER-66915 replace error code with NamespaceNotSharded
-                            uassert(ErrorCodes::ConflictingOperationInProgress,
+                            uassert(ErrorCodes::NamespaceNotSharded,
                                     str::stream() << "Expected to match one doc for query " << query
                                                   << " but matched " << numDocsModified,
                                     numDocsModified == 1);

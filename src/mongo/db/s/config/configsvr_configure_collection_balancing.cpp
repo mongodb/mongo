@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/balancer/balancer.h"
@@ -60,6 +61,16 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             opCtx->setAlwaysInterruptAtStepDownOrUp();
+
+            // Hold the FCV region to serialize with the setFeatureCompatibilityVersion command
+            FixedFCVRegion fcvRegion(opCtx);
+            uassert(ErrorCodes::IllegalOperation,
+                    "_configsvrConfigureCollectionBalancing can only be run when the cluster is in "
+                    "feature "
+                    "compatibility versions greater or equal than 5.3.",
+                    serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                        multiversion::FeatureCompatibilityVersion::kVersion_5_3));
+
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName << " can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
