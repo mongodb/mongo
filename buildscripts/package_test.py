@@ -1,18 +1,22 @@
-import json
-import sys
-import os
-from concurrent import futures
-import dataclasses
-from pathlib import Path
-import platform
-from typing import Any, Dict, Generator, List, Optional, Set
 import argparse
-import uuid
+import dataclasses
+import json
+import logging
+import os
+import platform
+import sys
 import time
 import traceback
-import logging
-import requests
+import uuid
+
+from concurrent import futures
+from pathlib import Path
+from typing import Any, Dict, Generator, List, Optional, Tuple, Set
+
 import docker
+import docker.errors
+import requests
+
 from simple_report import Result, Report
 
 root = logging.getLogger()
@@ -24,24 +28,47 @@ formatter = logging.Formatter('[%(asctime)s]%(levelname)s:%(message)s')
 handler.setFormatter(formatter)
 root.addHandler(handler)
 
-APT_PYTHON_INSTALL = "apt update && apt install -y python3 && python3"
-YUM_PYTHON_INSTALL = "yum update && yum install -y python3 && python3"
-ZYPPER_PYTHON_INSTALL = "zypper -n update && zypper -n install python3 && python3"
-UBI7_PYTHON_INSTALL = "yum update -y && yum install -y rh-python38.x86_64 && /opt/rh/rh-python38/root/usr/bin/python3"
-AMAZON1_PYTHON_INSTALL = "yum update -y && yum install -y python38 && python3"
+PACKAGE_MANAGER_COMMANDS = {
+    "apt": {
+        "update": "export DEBIAN_FRONTEND=noninteractive; apt-get update -y",
+        "install": "export DEBIAN_FRONTEND=noninteractive; apt-get install -y {}",
+    },
+    "yum": {
+        "update": "yum update -y",
+        "install": "yum install -y {}",
+    },
+    "zypper": {
+        "update": "zypper -n update",
+        "install": "zypper -n install {}",
+    },
+}
 
+DOCKER_SYSTEMCTL_REPO = "https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement"
+SYSTEMCTL_URL = f"{DOCKER_SYSTEMCTL_REPO}/master/files/docker/systemctl3.py"
+JOURNALCTL_URL = f"{DOCKER_SYSTEMCTL_REPO}/master/files/docker/journalctl3.py"
+
+# Lookup table used when building and running containers
+# os_name, Optional[(base_image, package_manager, frozenset(base_packages), python_command)]
 OS_DOCKER_LOOKUP = {
     'amazon': None,
     'amzn64': None,
     # TODO(SERVER-69982) This can be reenabled when the ticket is fixed
-    # 'amazon': ('amazonlinux:1', AMAZON1_PYTHON_INSTALL),
-    # 'amzn64': ('amazonlinux:1', AMAZON1_PYTHON_INSTALL),
-    'amazon2': ('amazonlinux:2', YUM_PYTHON_INSTALL),
-    'debian10': ('debian:10-slim', APT_PYTHON_INSTALL),
-    'debian11': ('debian:11-slim', APT_PYTHON_INSTALL),
-    'debian71': ('debian:7-slim', APT_PYTHON_INSTALL),
-    'debian81': ('debian:8-slim', APT_PYTHON_INSTALL),
-    'debian92': ('debian:9-slim', APT_PYTHON_INSTALL),
+    # 'amazon': ('amazonlinux:1', "yum", frozenset(["python38", "wget", "pkgconfig", "systemd"]), "python3"),
+    # 'amzn64': ('amazonlinux:1', "yum", frozenset(["python38", "wget", "pkgconfig", "systemd"]), "python3"),
+    'amazon2': ('amazonlinux:2', "yum", frozenset(["python3", "wget", "pkgconfig", "systemd"]),
+                "python3"),
+    'amazon2022': ('amazonlinux:2022', "yum", frozenset(["python3", "wget", "pkgconfig",
+                                                         "systemd"]), "python3"),
+    'debian10': ('debian:10-slim', "apt", frozenset(["python3", "wget", "pkg-config", "systemd"]),
+                 "python3"),
+    'debian11': ('debian:11-slim', "apt", frozenset(["python3", "wget", "pkg-config", "systemd"]),
+                 "python3"),
+    'debian71': ('debian:7-slim', "apt", frozenset(["python3", "wget", "pkg-config", "systemd"]),
+                 "python3"),
+    'debian81': ('debian:8-slim', "apt", frozenset(["python3", "wget", "pkg-config", "systemd"]),
+                 "python3"),
+    'debian92': ('debian:9-slim', "apt", frozenset(["python3", "wget", "pkg-config", "systemd"]),
+                 "python3"),
     'linux_i686': None,
     'linux_x86_64': None,
     'macos': None,
@@ -50,29 +77,46 @@ OS_DOCKER_LOOKUP = {
     'rhel55': None,
     'rhel57': None,
     'rhel62': None,
-    'rhel70': ('registry.access.redhat.com/ubi7/ubi:7.9', UBI7_PYTHON_INSTALL),
-    'rhel71': ('registry.access.redhat.com/ubi7/ubi:7.9', UBI7_PYTHON_INSTALL),
-    'rhel72': ('registry.access.redhat.com/ubi7/ubi:7.9', UBI7_PYTHON_INSTALL),
-    'rhel80': ('redhat/ubi8', YUM_PYTHON_INSTALL),
-    'rhel81': ('redhat/ubi8', YUM_PYTHON_INSTALL),
-    'rhel82': ('redhat/ubi8', YUM_PYTHON_INSTALL),
-    'rhel83': ('redhat/ubi8', YUM_PYTHON_INSTALL),
+    'rhel70': ('registry.access.redhat.com/ubi7/ubi:7.9', "yum",
+               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd"]),
+               "/opt/rh/rh-python38/root/usr/bin/python3"),
+    'rhel71': ('registry.access.redhat.com/ubi7/ubi:7.9', "yum",
+               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd"]),
+               "/opt/rh/rh-python38/root/usr/bin/python3"),
+    'rhel72': ('registry.access.redhat.com/ubi7/ubi:7.9', "yum",
+               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd"]),
+               "/opt/rh/rh-python38/root/usr/bin/python3"),
+    'rhel80': ('redhat/ubi8', "yum", frozenset(["python3", "wget", "pkgconfig", "systemd"]),
+               "python3"),
+    'rhel81': ('redhat/ubi8', "yum", frozenset(["python3", "wget", "pkgconfig", "systemd"]),
+               "python3"),
+    'rhel82': ('redhat/ubi8', "yum", frozenset(["python3", "wget", "pkgconfig", "systemd"]),
+               "python3"),
+    'rhel83': ('redhat/ubi8', "yum", frozenset(["python3", "wget", "pkgconfig", "systemd"]),
+               "python3"),
+    'rhel90': ('redhat/ubi9', "yum", frozenset(["python3", "wget", "pkgconfig", "systemd"]),
+               "python3"),
     'sunos5': None,
     'suse11': None,
     'suse12': None,
-    # ('registry.suse.com/suse/sles12sp5:latest', ZYPPER_PYTHON_INSTALL),
+    # ('registry.suse.com/suse/sles12sp5:latest', "zypper", frozenset(["python3", "wget", "pkg-config", "systemd"]), "python3"),
     # The offical repo fails with the following error
     # Problem retrieving the repository index file for service 'container-suseconnect-zypp':
     # [container-suseconnect-zypp|file:/usr/lib/zypp/plugins/services/container-suseconnect-zypp]
-    'suse15': ('opensuse/leap:15', ZYPPER_PYTHON_INSTALL),
-    # 'suse15': ('registry.suse.com/suse/sle15:latest', ZYPPER_PYTHON_INSTALL),
+    'suse15': ('opensuse/leap:15', "zypper", frozenset(["python3", "wget", "pkg-config",
+                                                        "systemd"]), "python3"),
+    # 'suse15': ('registry.suse.com/suse/sle15:latest', "zypper", frozenset(["python3", "wget", "pkg-config", "systemd"]), "python3"),
     # Has the same error as above
     'ubuntu1204': None,
     'ubuntu1404': None,
-    'ubuntu1604': ('ubuntu:16.04', APT_PYTHON_INSTALL),
-    'ubuntu1804': ('ubuntu:18.04', APT_PYTHON_INSTALL),
-    'ubuntu2004': ('ubuntu:20.04', APT_PYTHON_INSTALL),
-    'ubuntu2204': ('ubuntu:22.04', APT_PYTHON_INSTALL),
+    'ubuntu1604': ('ubuntu:16.04', "apt", frozenset(["python3", "wget", "pkg-config", "systemd"]),
+                   "python3"),
+    'ubuntu1804': ('ubuntu:18.04', "apt", frozenset(["python3", "wget", "pkg-config", "systemd"]),
+                   "python3"),
+    'ubuntu2004': ('ubuntu:20.04', "apt", frozenset(["python3", "wget", "pkg-config", "systemd"]),
+                   "python3"),
+    'ubuntu2204': ('ubuntu:22.04', "apt", frozenset(["python3", "wget", "pkg-config", "systemd"]),
+                   "python3"),
     'windows': None,
     'windows_i686': None,
     'windows_x86_64': None,
@@ -84,49 +128,96 @@ OS_DOCKER_LOOKUP = {
 VERSIONS_TO_SKIP = set(['3.0.15', '3.2.22', '3.4.24', '3.6.23', '4.0.28'])
 
 # TODO(SERVER-70016) These can be deleted once these versions are no longer is current.json
-DISABLED_TESTS = [("amazonlinux:2", "4.4.16"), ("amazonlinux:2", "4.4.17-rc2"),
-                  ("amazonlinux:2", "4.2.23-rc0"), ("amazonlinux:2", "4.2.23-rc1"),
-                  ("amazonlinux:2", "4.2.22")]
+DISABLED_TESTS = [("amazon2", "4.4.16"), ("amazon2", "4.4.17-rc2"), ("amazon2", "4.2.23-rc0"),
+                  ("amazon2", "4.2.23-rc1"), ("amazon2", "4.2.22")]
 
 
 @dataclasses.dataclass
 class Test:
     """Class to track a single test."""
 
-    container: str
-    start_command: str
+    os_name: str
     version: str
+    base_image: str = dataclasses.field(default="", repr=False)
+    package_manager: str = dataclasses.field(default="", repr=False)
+    update_command: str = dataclasses.field(default="", repr=False)
+    install_command: str = dataclasses.field(default="", repr=False)
+    base_packages: str = dataclasses.field(default="", repr=False)
+    python_command: str = dataclasses.field(default="", repr=False)
     packages_urls: List[str] = dataclasses.field(default_factory=list)
     packages_paths: List[Path] = dataclasses.field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        assert OS_DOCKER_LOOKUP[self.os_name] is not None
+
+        self.base_image = OS_DOCKER_LOOKUP[self.os_name][0]
+        self.package_manager = OS_DOCKER_LOOKUP[self.os_name][1]
+        self.base_packages = OS_DOCKER_LOOKUP[self.os_name][2]
+        self.python_command = OS_DOCKER_LOOKUP[self.os_name][3]
+
+        self.update_command = PACKAGE_MANAGER_COMMANDS[self.package_manager]["update"]
+        self.install_command = PACKAGE_MANAGER_COMMANDS[self.package_manager]["install"]
+
     def __repr__(self) -> str:
-        ret = f"\nTest:\n\tcontainer: {self.container}\n"
+        ret = f"\nTest:\n\tos: {self.os_name}\n"
+        ret += f"image: {self.base_image}\n"
         ret += f"\tversion: {self.version}\n"
         ret += f"\tpackages_urls: {self.packages_urls}\n"
         ret += f"\tpackages_paths: {self.packages_paths}\n"
         return ret
 
     def name(self) -> str:
-        return self.container + "-" + self.version
+        return self.os_name + "-" + self.version
+
+
+def build_image(test: Test) -> str:
+    commands: List[str] = [
+        test.update_command,
+        test.install_command.format(" ".join(test.base_packages)),
+        "mkdir -p /run/systemd/system",
+        "mkdir -p $(pkg-config systemd --variable=systemdsystempresetdir)",
+        "echo 'disable *' > $(pkg-config systemd --variable=systemdsystempresetdir)/00-test.preset",
+        f"wget -P /usr/bin {SYSTEMCTL_URL}",
+        f"wget -P /usr/bin {JOURNALCTL_URL}",
+        "chmod +x /usr/bin/systemctl3.py /usr/bin/journalctl3.py",
+        "ln -sf /usr/bin/systemctl3.py /bin/systemd",
+        "ln -sf /usr/bin/systemctl3.py /usr/bin/systemd",
+    ]
+
+    if test.python_command != 'python3':
+        commands.append(f"ln -s {test.python_command} /usr/bin/python3")
+
+    logging.info("Building base image for %s: %s", test.os_name, test.base_image)
+
+    client = docker.from_env()
+    container = client.containers.run(
+        test.base_image, ["/bin/bash", "-x", "-c", " && ".join(commands)], detach=True, tty=True)
+
+    # Wait for the container to finish and exit (timeout is in seconds)
+    container.wait(timeout=120)
+    logging.debug(container.logs().decode('utf-8'))
+    return container.commit(repository=f"localhost/{test.os_name}", changes="CMD /bin/systemd")
 
 
 def run_test(test: Test) -> Result:
     result = Result(status="pass", test_file=test.name(), start=time.time(), log_raw="")
     client = docker.from_env()
 
-    log_name = f"logs/{test.container.replace(':','-').replace('/', '_')}_{test.version}_{uuid.uuid4().hex}.log"
-    test_docker_root = Path("/mnt/package_test")
+    log_name = f"logs/{test.os_name}_{test.version}_{uuid.uuid4().hex}.log"
+    test_docker_root = Path("/mnt/package_test").resolve()
     log_docker_path = Path.joinpath(test_docker_root, log_name)
-    test_external_root = Path(__file__).parent
+    test_external_root = Path(__file__).parent.resolve()
+    logging.debug(test_external_root)
     log_external_path = Path.joinpath(test_external_root, log_name)
 
     os.makedirs(log_external_path.parent, exist_ok=True)
-    command = f"bash -c \"{test.start_command} /mnt/package_test/package_test_internal.py {log_docker_path} {' '.join(test.packages_urls)}\""
+    command = f"bash -c \"{test.python_command} /mnt/package_test/package_test_internal.py {log_docker_path} {' '.join(test.packages_urls)}\""
     logging.debug("Attemtping to run the following docker command: %s", command)
 
     try:
+        image = build_image(test)
         container: docker.Container = client.containers.run(
-            test.container, command=command, auto_remove=True, detach=True,
+            image, command=command, auto_remove=True, detach=True,
             volumes=[f'{test_external_root}:{test_docker_root}'])
         for log in container.logs(stream=True):
             result["log_raw"] += log.decode('UTF-8')
@@ -134,8 +225,8 @@ def run_test(test: Test) -> Result:
             logging.debug(log.decode('UTF-8').strip())
         exit_code = container.wait()
         result["exit_code"] = exit_code['StatusCode']
-    except:  # pylint: disable=bare-except
-        traceback.print_exception()  # pylint: disable=no-value-for-parameter
+    except docker.errors.APIError as exc:
+        traceback.print_exception(type(exc), exc, exc.__traceback__)
         logging.error("Failed to start docker container")
         result["end"] = time.time()
         result['status'] = 'fail'
@@ -221,12 +312,12 @@ parser.add_argument(
     choices=["all", "none"] + list(oses), default="all")
 parser.add_argument(
     "-e", "--extra-test", type=str, help=
-    "Comma seperated tuple of (OS to run test on, Path to packages to use to do the install test). For example ubuntu2004,https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz.",
-    action='append', nargs='+', default=[])
+    "Space-separated tuple of (test_os, package_archive_path). For example ubuntu2004,https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz.",
+    action='append', nargs=2, default=[])
 args = parser.parse_args()
 
 mongo_os: str = args.os
-extra_tests: List[str] = args.extra_test
+extra_tests: List[Tuple[str, str]] = args.extra_test
 arch: str = args.arch
 if arch == "auto":
     arch = platform.machine()
@@ -234,28 +325,31 @@ if arch == "auto":
 tests: List[Test] = []
 for extra_test in extra_tests:
     test_os = extra_test[0]
-    urls: List[str] = extra_test[1:]
+    logging.info(extra_test[1])
+    urls: List[str] = [extra_test[1]]
     if test_os not in OS_DOCKER_LOOKUP:
         logging.error("We have not seen this OS %s before, please add it to OS_DOCKER_LOOKUP",
                       test_os)
         sys.exit(1)
-    start_command = OS_DOCKER_LOOKUP[test_os][1]
+
+    if not OS_DOCKER_LOOKUP[test_os]:
+        logging.info("Skipping test on target because the OS has no associated container %s->???",
+                     test_os)
+        continue
 
     tools_package = get_tools_package(arch, test_os)
     mongosh_package = get_mongosh_package(arch, test_os)
     if tools_package:
         urls.append(tools_package)
     else:
-        logging.warn("Could not find tools package for %s and %s", arch, test_os)
+        logging.warning("Could not find tools package for %s and %s", arch, test_os)
 
     if mongosh_package:
         urls.append(mongosh_package)
     else:
-        logging.warn("Could not find mongosh package for %s and %s", arch, test_os)
+        logging.warning("Could not find mongosh package for %s and %s", arch, test_os)
 
-    tests.append(
-        Test(container=OS_DOCKER_LOOKUP[test_os][0], start_command=start_command, version="custom",
-             packages_urls=urls))
+    tests.append(Test(os_name=test_os, version="custom", packages_urls=urls))
 
 # If os is None we only want to do the tests specified in the arguments
 if mongo_os != "none":
@@ -277,15 +371,11 @@ if mongo_os != "none":
                 dl['target'], dl['version'])
             continue
 
-        container_name = OS_DOCKER_LOOKUP[dl["target"]][0]
-        start_command = OS_DOCKER_LOOKUP[dl["target"]][1]
-
-        if (container_name, dl["version"]) in DISABLED_TESTS:
+        if (dl["target"], dl["version"]) in DISABLED_TESTS:
             continue
 
         tests.append(
-            Test(container=container_name, start_command=start_command,
-                 packages_urls=dl["packages"], version=dl["version"]))
+            Test(os_name=dl["target"], packages_urls=dl["packages"], version=dl["version"]))
 
 report = Report(results=[], failures=0)
 with futures.ThreadPoolExecutor() as tpe:

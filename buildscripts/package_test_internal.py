@@ -52,7 +52,6 @@ def download_extract_package(package: str) -> List[str]:
 
 def run_apt_test(packages: List[str]):
     logging.info("Detected apt running test.")
-    run_and_log("DEBIAN_FRONTEND=noninteractive apt install -y wget")
     install_together = ""
     for package in packages:
         deb_names = download_extract_package(package)
@@ -63,7 +62,6 @@ def run_apt_test(packages: List[str]):
 
 def run_yum_test(packages: List[str]):
     logging.info("Detected yum running test.")
-    run_and_log("yum install -y wget")
     install_together = ""
     for package in packages:
         rpm_names = download_extract_package(package)
@@ -73,12 +71,43 @@ def run_yum_test(packages: List[str]):
 
 def run_zypper_test(packages: List[str]):
     logging.info("Detected zypper running test.")
-    run_and_log("zypper -n install wget")
     install_together = ""
     for package in packages:
         rpm_names = download_extract_package(package)
         install_together += ' '.join(rpm_names) + " "
     run_and_log("zypper -n --no-gpg-checks install {}".format(install_together))
+
+
+def run_startup_test():
+    logging.info("Starting mongod.")
+
+    # TODO SERVER-70425: We can remove these once we have figured out why
+    # packager.py sometimes uses distro files from older revisions.
+    # Remove the PIDFile, PermissionsStartOnly, and Type configurations from
+    # the systemd service file because they are not needed for simple-type
+    # (non-forking) services and confuse the systemd emulator script.
+    run_and_log(
+        "sed -Ei '/^PIDFile=|PermissionsStartOnly=|Type=/d' $(pkg-config systemd --variable=systemdsystemunitdir)/mongod.service"
+    )
+    # Remove the journal: line (and the next) from mongod.conf, which is a
+    # removed configuration. The Debian version of the config never got updated.
+    run_and_log("sed -i '/journal:/,+1d' /etc/mongod.conf")
+    # Remove fork: and pidFilePath: from mongod.conf because we want mongod to be
+    # a non-forking service under systemd.
+    run_and_log("sed -Ei '/fork:|pidFilePath:/d' /etc/mongod.conf")
+
+    # Overwrite the installed systemd with the emulator script and set up
+    # the required symlinks so it all works correctly.
+    # TODO SERVER-70426: Remove these when we have a fake systemd package
+    # that does all of this for us.
+    run_and_log("ln -sf /usr/bin/systemctl3.py /bin/systemctl")
+    run_and_log("ln -sf /usr/bin/systemctl3.py /usr/bin/systemctl")
+    run_and_log("ln -sf /usr/bin/systemctl3.py /bin/systemd")
+    run_and_log("ln -sf /usr/bin/systemctl3.py /usr/bin/systemd")
+    run_and_log("ln -sf /usr/bin/journalctl3.py /bin/journalctl")
+    run_and_log("ln -sf /usr/bin/journalctl3.py /usr/bin/journalctl")
+    run_and_log("systemctl enable mongod.service")
+    run_and_log("systemctl start mongod.service")
 
 
 package_urls = sys.argv[2:]
@@ -100,5 +129,7 @@ elif zypper_proc.returncode == 0:
 else:
     logging.error("Found no supported package manager...Failing Test\n")
     sys.exit(1)
+
+run_startup_test()
 
 sys.exit(0)

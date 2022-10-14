@@ -13,9 +13,9 @@ class Result(TypedDict, total=False):
     status: str
     exit_code: int
     test_file: str
-    start: int
-    end: int
-    elapsed: int
+    start: float
+    end: float
+    elapsed: float
     log_raw: str
 
 

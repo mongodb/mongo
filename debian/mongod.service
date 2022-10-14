@@ -9,7 +9,6 @@ User=mongodb
 Group=mongodb
 EnvironmentFile=-/etc/default/mongod
 ExecStart=/usr/bin/mongod --config /etc/mongod.conf
-PIDFile=/var/run/mongodb/mongod.pid
 # file size
 LimitFSIZE=infinity
 # cpu time

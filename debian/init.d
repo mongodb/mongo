@@ -72,10 +72,10 @@ NUMACTL_ARGS="--interleave=all"
 if which numactl >/dev/null 2>/dev/null && numactl $NUMACTL_ARGS ls / >/dev/null 2>/dev/null
 then
     NUMACTL="`which numactl` -- $NUMACTL_ARGS"
-    DAEMON_OPTS=${DAEMON_OPTS:-"--config $CONF"}
+    DAEMON_OPTS=${DAEMON_OPTS:-"--config $CONF --fork --pidfilepath $PIDFILE"}
 else
     NUMACTL=""
-    DAEMON_OPTS="-- "${DAEMON_OPTS:-"--config $CONF"}
+    DAEMON_OPTS="-- "${DAEMON_OPTS:-"--config $CONF --fork --pidfilepath $PIDFILE"}
 fi
 
 

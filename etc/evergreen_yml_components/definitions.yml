@@ -1571,6 +1571,7 @@ functions:
       - "src/evergreen/run_python_script.sh"
       - "buildscripts/package_test.py"
       - "--os=none"
+      - "--arch=${packager_arch}"
       - "--extra-test"
       - "${packager_distro}"
       - "https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"

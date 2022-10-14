@@ -292,6 +292,8 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
+    distros:
+    - ubuntu1804-arm64-build
   - name: .publish
     distros:
     - rhel80-small
@@ -423,6 +425,8 @@ buildvariants:
     distros:
     - amazon2-arm64-large
   - name: test_packages
+    distros:
+    - ubuntu1804-arm64-build
   - name: .publish
     distros:
     - rhel80-small
@@ -472,7 +476,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-arm64-large
   - name: .publish
     distros:
     - rhel80-small
@@ -595,7 +599,7 @@ buildvariants:
     - amazon2022-arm64-large
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-arm64-large
   - name: .publish
     distros:
     - rhel80-small
@@ -777,7 +781,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: .publish
     distros:
     - debian11-small
@@ -841,7 +845,7 @@ buildvariants:
   - name: .publish_crypt
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: .publish
     distros:
     - debian11-small
@@ -946,9 +950,6 @@ buildvariants:
   - name: jsCore
   - name: sharding_gen
   - name: replica_sets_gen
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
 
 - name: rhel80
   display_name: RHEL 8.0
@@ -1175,7 +1176,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu1804-arm64-build
   - name: .publish
     distros:
     - rhel80-small
@@ -1243,6 +1244,8 @@ buildvariants:
     - rhel82-arm64-large
   - name: .publish_crypt
   - name: test_packages
+    distros:
+    - ubuntu1804-arm64-build
   - name: .publish
     distros:
     - rhel80-small
@@ -1293,7 +1296,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: selinux_rhel9_org
   - name: .publish
     distros:
@@ -1370,7 +1373,7 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: selinux_rhel9_enterprise
   - name: .publish
     distros:
@@ -1427,6 +1430,9 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
   - name: .publish
     distros:
     - suse12-small
@@ -1810,6 +1816,8 @@ buildvariants:
     distros:
     - ubuntu1804-test
   - name: test_packages
+    distros:
+    - ubuntu1804-arm64-build
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -1849,6 +1857,8 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: test_packages
+    distros:
+    - ubuntu1804-arm64-build
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -1904,7 +1914,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: .publish
     distros:
     - ubuntu2204-small
@@ -1961,7 +1971,6 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
-  - name: test_packages_complete
   - name: .publish
     distros:
     - ubuntu2004-small
@@ -2094,7 +2103,10 @@ buildvariants:
   - name: sharding_auth_gen
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
+  - name: test_packages_complete
+    distros:
+    - ubuntu2204-large
   - name: .publish
     distros:
     - ubuntu2204-small
@@ -2106,7 +2118,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - ubuntu2004-arm64-large
+  - ubuntu1804-arm64-build
   expansions:
     additional_package_targets: >-
       archive-mongocryptd
@@ -2156,6 +2168,8 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: test_packages
+    distros:
+    - ubuntu1804-arm64-build
   - name: .publish
     distros:
     - ubuntu2004-test
@@ -2165,7 +2179,7 @@ buildvariants:
   display_name: Ubuntu 20.04 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu2004-arm64-large
+  - ubuntu1804-arm64-build
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -2193,7 +2207,8 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: test_packages
-  - name: test_packages_complete
+    distros:
+    - ubuntu1804-arm64-build
   - name: .publish
     distros:
     - ubuntu2004-test
@@ -2212,7 +2227,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
-    push_arch: aarch64-enterprise-ubuntu2204
+    push_arch: arm64-enterprise-ubuntu2204
     compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
@@ -2250,7 +2265,10 @@ buildvariants:
   - name: .publish_crypt
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-arm64-large
+  - name: test_packages_complete
+    distros:
+    - ubuntu2204-arm64-large
   - name: .publish
     distros:
     - ubuntu2204-small
@@ -2265,7 +2283,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
-    push_arch: aarch64-ubuntu2204
+    push_arch: arm64-ubuntu2204
     compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -2285,7 +2303,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-arm64-large
   - name: .publish
     distros:
     - ubuntu2204-small

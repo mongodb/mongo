@@ -16,10 +16,13 @@
 . /etc/rc.status
 rc_reset
 
+PIDFILEPATH="/var/run/mongodb/mongod.pid"
+PIDDIR=`dirname $PIDFILEPATH`
+
 # NOTE: if you change any OPTIONS here, you get what you pay for:
 # this script assumes all options are in the config file.
 CONFIGFILE="/etc/mongod.conf"
-OPTIONS=" -f $CONFIGFILE"
+OPTIONS=" -f $CONFIGFILE --fork --pidfilepath $PIDFILEPATH"
 
 mongod=${MONGOD-/usr/bin/mongod}
 
@@ -43,10 +46,6 @@ then
 else
     NUMACTL=""
 fi
-
-# things from mongod.conf get there by mongod reading it
-PIDFILEPATH=`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*(processManagement\.)?pidfilepath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d "[:blank:]\"'" | awk -F'#' '{print $1}'`
-PIDDIR=`dirname $PIDFILEPATH`
 
 start()
 {
