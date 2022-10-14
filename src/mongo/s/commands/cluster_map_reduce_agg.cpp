@@ -187,6 +187,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                                                                cm,
                                                                involvedNamespaces,
                                                                false,   // hasChangeStream
+                                                               false,   // startsWithDocuments
                                                                true,    // allowedToPassthrough
                                                                false);  // perShardCursor
     try {
@@ -230,7 +231,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                     namespaces,
                     privileges,
                     &tempResults,
-                    false));  // hasChangeStream
+                    false,    // hasChangeStream
+                    false));  // startsWithDocuments
                 break;
             }
 

@@ -9,8 +9,6 @@
 (function() {
 "use strict";
 
-// TODO SERVER-63811 Ensure the database exists so we get back non-empty results even in a sharded
-// cluster.
 assert.commandWorked(db[jsTestName()].insert({dummy: 1}));
 
 let windowResults = db.aggregate([

@@ -563,6 +563,7 @@ AggregationTargeter AggregationTargeter::make(
     boost::optional<ChunkManager> cm,
     stdx::unordered_set<NamespaceString> involvedNamespaces,
     bool hasChangeStream,
+    bool startsWithDocuments,
     bool allowedToPassthrough,
     bool perShardCursor) {
     if (perShardCursor) {
@@ -583,10 +584,11 @@ AggregationTargeter AggregationTargeter::make(
 
     // Determine whether this aggregation must be dispatched to all shards in the cluster.
     const bool mustRunOnAll =
-        sharded_agg_helpers::mustRunOnAllShards(executionNss, hasChangeStream);
+        sharded_agg_helpers::mustRunOnAllShards(executionNss, hasChangeStream, startsWithDocuments);
 
-    // If we don't have a routing table, then this is a $changeStream which must run on all shards.
-    invariant(cm || (mustRunOnAll && hasChangeStream));
+    // If we don't have a routing table, then this is either a $changeStream which must run on all
+    // shards or a $documents stage which must not.
+    invariant(cm || (mustRunOnAll && hasChangeStream) || (startsWithDocuments && !mustRunOnAll));
 
     // A pipeline is allowed to passthrough to the primary shard iff the following conditions are
     // met:
@@ -663,11 +665,12 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                 const ClusterAggregate::Namespaces& namespaces,
                                 const PrivilegeVector& privileges,
                                 BSONObjBuilder* result,
-                                bool hasChangeStream) {
+                                bool hasChangeStream,
+                                bool startsWithDocuments) {
     auto expCtx = targeter.pipeline->getContext();
     // If not, split the pipeline as necessary and dispatch to the relevant shards.
     auto shardDispatchResults = sharded_agg_helpers::dispatchShardPipeline(
-        serializedCommand, hasChangeStream, std::move(targeter.pipeline));
+        serializedCommand, hasChangeStream, startsWithDocuments, std::move(targeter.pipeline));
 
     // If the operation is an explain, then we verify that it succeeded on all targeted
     // shards, write the results to the output builder, and return immediately.

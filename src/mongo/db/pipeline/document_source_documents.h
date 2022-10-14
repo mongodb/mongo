@@ -35,6 +35,30 @@
 namespace mongo {
 
 namespace DocumentSourceDocuments {
+class LiteParsed : public LiteParsedDocumentSource {
+public:
+    static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss, const BSONElement& spec) {
+        return std::make_unique<LiteParsed>(spec.fieldName());
+    }
+
+    LiteParsed(std::string parseTimeName) : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+
+    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+        return stdx::unordered_set<NamespaceString>();
+    }
+
+    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
+        return {};
+    }
+
+    bool isDocuments() const final {
+        return true;
+    }
+
+    bool allowedToPassthroughFromMongos() const final {
+        return false;
+    }
+};
 
 static constexpr StringData kStageName = "$documents"_sd;
 

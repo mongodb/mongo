@@ -171,6 +171,13 @@ public:
     }
 
     /**
+     * Returns true if this is a $documents stage.
+     */
+    virtual bool isDocuments() const {
+        return false;
+    }
+
+    /**
      * Returns true if this stage does not require an input source.
      */
     virtual bool isInitialSource() const {

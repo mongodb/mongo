@@ -769,9 +769,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
 
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
+    auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
     auto shardDispatchResults =
         dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
                               hasChangeStream,
+                              startsWithDocuments,
                               std::move(pipeline),
                               shardTargetingPolicy,
                               std::move(readConcern));
@@ -1007,6 +1009,7 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
 DispatchShardPipelineResults dispatchShardPipeline(
     Document serializedCommand,
     bool hasChangeStream,
+    bool startsWithDocuments,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
@@ -1051,7 +1054,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
         : expCtx->getCollatorBSON();
 
     // Determine whether we can run the entire aggregation on a single shard.
-    const bool mustRunOnAll = mustRunOnAllShards(expCtx->ns, hasChangeStream);
+    const bool mustRunOnAll = mustRunOnAllShards(expCtx->ns, hasChangeStream, startsWithDocuments);
     std::set<ShardId> shardIds = getTargetedShards(
         expCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, shardTargetingCollation);
 
@@ -1486,9 +1489,11 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
     AggregateCommandRequest aggRequest(expCtx->ns, rawStages);
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
+    auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
     auto shardDispatchResults =
         dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
                               hasChangeStream,
+                              startsWithDocuments,
                               std::move(pipeline));
     BSONObjBuilder explainBuilder;
     auto appendStatus =
@@ -1523,11 +1528,13 @@ Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx) {
     return Shard::RetryPolicy::kIdempotent;
 }
 
-bool mustRunOnAllShards(const NamespaceString& nss, bool hasChangeStream) {
+bool mustRunOnAllShards(const NamespaceString& nss,
+                        bool hasChangeStream,
+                        bool startsWithDocuments) {
     // The following aggregations must be routed to all shards:
     // - Any collectionless aggregation, such as non-localOps $currentOp.
     // - Any aggregation which begins with a $changeStream stage.
-    return nss.isCollectionlessAggregateNS() || hasChangeStream;
+    return !startsWithDocuments && (nss.isCollectionlessAggregateNS() || hasChangeStream);
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
