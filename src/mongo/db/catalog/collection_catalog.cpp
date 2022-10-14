@@ -1328,7 +1328,7 @@ NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "UUID " << nsOrUUID.toString() << " specified in " << nsOrUUID.dbname()
                           << " resolved to a collection in a different database: " << *resolvedNss,
-            resolvedNss->db() == nsOrUUID.dbname());
+            resolvedNss->dbName() == nsOrUUID.dbName());
 
     return std::move(*resolvedNss);
 }

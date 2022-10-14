@@ -179,7 +179,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsWithSpecificUuidNoExisti
     auto uuid = UUID::gen();
     Lock::DBLock lock(opCtx.get(), newNss.dbName(), MODE_IX);
     ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
-                                          newNss.db().toString(),
+                                          newNss.dbName(),
                                           uuid,
                                           BSON("create" << newNss.coll()),
                                           /*allowRenameOutOfTheWay*/ false));
@@ -208,7 +208,7 @@ TEST_F(CreateCollectionTest,
     // This should rename the existing collection 'curNss' to the collection 'newNss' we are trying
     // to create.
     ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
-                                          newNss.db().toString(),
+                                          newNss.dbName(),
                                           uuid,
                                           BSON("create" << newNss.coll()),
                                           /*allowRenameOutOfTheWay*/ true));
@@ -237,7 +237,7 @@ TEST_F(CreateCollectionTest,
 
     // This should rename the existing collection 'newNss' to a randomly generated collection name.
     ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
-                                          newNss.db().toString(),
+                                          newNss.dbName(),
                                           uuid,
                                           BSON("create" << newNss.coll()),
                                           /*allowRenameOutOfTheWay*/ true));
@@ -278,7 +278,7 @@ TEST_F(CreateCollectionTest,
     // state.
     ASSERT_EQUALS(ErrorCodes::NamespaceExists,
                   createCollectionForApplyOps(opCtx.get(),
-                                              newNss.db().toString(),
+                                              newNss.dbName(),
                                               uuid,
                                               BSON("create" << newNss.coll()),
                                               /*allowRenameOutOfTheWay*/ false));
