@@ -1527,7 +1527,7 @@ bool IndexCatalogImpl::haveAnyIndexesInProgress() const {
 }
 
 int IndexCatalogImpl::numIndexesTotal(OperationContext* opCtx) const {
-    return _readyIndexes.size() + _buildingIndexes.size();
+    return _readyIndexes.size() + _buildingIndexes.size() + _frozenIndexes.size();
 }
 
 int IndexCatalogImpl::numIndexesReady(OperationContext* opCtx) const {

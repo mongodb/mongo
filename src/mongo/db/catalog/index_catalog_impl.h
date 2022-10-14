@@ -85,7 +85,7 @@ public:
     int numIndexesTotal(OperationContext* opCtx) const override;
     int numIndexesReady(OperationContext* opCtx) const override;
     int numIndexesInProgress(OperationContext* opCtx) const {
-        return numIndexesTotal(opCtx) - numIndexesReady(opCtx);
+        return numIndexesTotal(opCtx) - numIndexesReady(opCtx) - _frozenIndexes.size();
     }
 
     /**
