@@ -156,8 +156,11 @@ assert.commandWorked(recipientPrimary.getDB(kDbName).runCommand({
 
 // The dbhash between the donor and the recipient should still match after retrying
 // commitTransaction and the retryable writes because they should be noop.
-TenantMigrationUtil.checkTenantDBHashes(
-    tenantMigrationTest.getDonorRst(), tenantMigrationTest.getRecipientRst(), kTenantId);
+TenantMigrationUtil.checkTenantDBHashes({
+    donorRst: tenantMigrationTest.getDonorRst(),
+    recipientRst: tenantMigrationTest.getRecipientRst(),
+    tenantId: kTenantId
+});
 
 tenantMigrationTest.stop();
 })();

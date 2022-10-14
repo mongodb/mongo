@@ -61,6 +61,8 @@ namespace mongo {
 
 namespace {
 
+constexpr char SKIP_TEMP_COLLECTION[] = "skipTempCollections";
+
 class DBHashCmd : public BasicCommand {
 public:
     DBHashCmd() : BasicCommand("dbHash", "dbhash") {}
@@ -134,6 +136,12 @@ public:
                         e.type() == String);
                 desiredCollections.insert(e.String());
             }
+        }
+
+        const bool skipTempCollections =
+            cmdObj.hasField(SKIP_TEMP_COLLECTION) && cmdObj[SKIP_TEMP_COLLECTION].trueValue();
+        if (skipTempCollections) {
+            LOGV2(6859700, "Skipping hash computation for temporary collections");
         }
 
         // For empty databasename on first command field, the following code depends on the "."
@@ -253,6 +261,10 @@ public:
                 if (collNss.coll().startsWith("tmp.mr.")) {
                     // We skip any incremental map reduce collections as they also aren't
                     // replicated.
+                    return true;
+                }
+
+                if (skipTempCollections && collection->isTemporary()) {
                     return true;
                 }
 

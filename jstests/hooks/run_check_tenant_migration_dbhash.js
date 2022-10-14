@@ -39,12 +39,16 @@ while (true) {
     }
 }
 
+const skipTempCollections = TestData.skipTempCollections ? true : false;
+
 // We assume every db is under the tenant being migrated.
 if (TestData.tenantIds) {
-    TestData.tenantIds.forEach(tenantId => TenantMigrationUtil.checkTenantDBHashes(
-                                   donorRst, recipientRst, tenantId, excludedDBs));
+    TestData.tenantIds.forEach(
+        tenantId => TenantMigrationUtil.checkTenantDBHashes(
+            {donorRst, recipientRst, tenantId, excludedDBs, skipTempCollections}));
 } else {
-    TenantMigrationUtil.checkTenantDBHashes(donorRst, recipientRst, tenantId, excludedDBs);
+    TenantMigrationUtil.checkTenantDBHashes(
+        {donorRst, recipientRst, tenantId, excludedDBs, skipTempCollections});
 }
 
 // Mark that we have completed the dbhash check.

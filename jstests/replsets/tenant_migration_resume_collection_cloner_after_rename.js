@@ -111,8 +111,11 @@ TenantMigrationTest.assertCommitted(migrationThread.returnData());
 recipientColl = newRecipientPrimary.getDB(dbName).getCollection(collNameRenamed);
 assert.eq(4, recipientColl.find().itcount());
 assert.eq(recipientColl.find().sort({_id: 1}).toArray(), docs);
-TenantMigrationUtil.checkTenantDBHashes(
-    tenantMigrationTest.getDonorRst(), tenantMigrationTest.getRecipientRst(), tenantId);
+TenantMigrationUtil.checkTenantDBHashes({
+    donorRst: tenantMigrationTest.getDonorRst(),
+    recipientRst: tenantMigrationTest.getRecipientRst(),
+    tenantId
+});
 
 tenantMigrationTest.stop();
 recipientRst.stopSet();

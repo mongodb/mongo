@@ -107,8 +107,11 @@ resultsArr = appliedNoOps.toArray();
 assert.eq(3, appliedNoOps.count(), appliedNoOps);
 assert.eq(docsToApply[2], resultsArr[2].o2.o, resultsArr);
 
-TenantMigrationUtil.checkTenantDBHashes(
-    tenantMigrationTest.getDonorRst(), tenantMigrationTest.getRecipientRst(), tenantId);
+TenantMigrationUtil.checkTenantDBHashes({
+    donorRst: tenantMigrationTest.getDonorRst(),
+    recipientRst: tenantMigrationTest.getRecipientRst(),
+    tenantId
+});
 tenantMigrationTest.stop();
 recipientRst.stopSet();
 })();

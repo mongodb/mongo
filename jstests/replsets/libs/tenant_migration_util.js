@@ -352,12 +352,15 @@ var TenantMigrationUtil = (function() {
      * Compares the hashes for DBs that belong to the specified tenant between the donor and
      * recipient primaries.
      */
-    function checkTenantDBHashes(donorRst,
-                                 recipientRst,
-                                 tenantId,
-                                 excludedDBs = [],
-                                 msgPrefix = 'checkTenantDBHashes',
-                                 ignoreUUIDs = false) {
+    function checkTenantDBHashes({
+        donorRst,
+        recipientRst,
+        tenantId,
+        excludedDBs = [],
+        msgPrefix = 'checkTenantDBHashes',
+        ignoreUUIDs = false,
+        skipTempCollections = false
+    }) {
         // Always skip db hash checks for the config, admin, and local database.
         excludedDBs = [...excludedDBs, "config", "admin", "local"];
 
@@ -394,10 +397,10 @@ var TenantMigrationUtil = (function() {
                 for (const dbName of combinedDBNames) {
                     // Pass in an empty array for the secondaries, since we only wish to compare
                     // the DB hashes between the donor and recipient primary in this test.
-                    const donorDBHash =
-                        assert.commandWorked(donorRst.getHashes(dbName, []).primary);
-                    const recipientDBHash =
-                        assert.commandWorked(recipientRst.getHashes(dbName, []).primary);
+                    const donorDBHash = assert.commandWorked(
+                        donorRst.getHashes(dbName, [], skipTempCollections).primary);
+                    const recipientDBHash = assert.commandWorked(
+                        recipientRst.getHashes(dbName, [], skipTempCollections).primary);
 
                     const donorCollections = Object.keys(donorDBHash.collections);
                     const donorCollInfos = new CollInfos(donorPrimaryConn, 'donorPrimary', dbName);

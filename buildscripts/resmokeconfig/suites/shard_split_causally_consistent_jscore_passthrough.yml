@@ -132,6 +132,9 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
+          # Temp collections are removed when the recipient steps up. We expect a mismatch, this
+          # ensures we don't compare them.
+          skipTempCollections: true
   hooks:
   - class: ContinuousShardSplit
     shell_options:

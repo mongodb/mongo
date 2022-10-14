@@ -266,7 +266,7 @@ function TenantMigrationTest({
         // between the donor and recipient.
         if (stateRes.state === TenantMigrationTest.State.kCommitted) {
             TenantMigrationUtil.checkTenantDBHashes(
-                this.getDonorRst(), this.getRecipientRst(), tenantId);
+                {donorRst: this.getDonorRst(), recipientRst: this.getRecipientRst(), tenantId});
         }
 
         return stateRes;

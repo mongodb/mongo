@@ -2262,9 +2262,9 @@ var ReplSetTest = function(opts) {
         }
     };
 
-    this.getHashesUsingSessions = function(sessions, dbName, {
-        readAtClusterTime,
-    } = {}) {
+    this.getHashesUsingSessions = function(
+        sessions, dbName, {readAtClusterTime,
+                           skipTempCollections = false} = {skipTempCollections: false}) {
         return sessions.map(session => {
             const commandObj = {dbHash: 1};
             const db = session.getDatabase(dbName);
@@ -2277,6 +2277,9 @@ var ReplSetTest = function(opts) {
                     commandObj.$_internalReadAtClusterTime = readAtClusterTime;
                 }
             }
+            if (skipTempCollections) {
+                commandObj.skipTempCollections = 1;
+            }
 
             return assert.commandWorked(db.runCommand(commandObj));
         });
@@ -2284,7 +2287,7 @@ var ReplSetTest = function(opts) {
 
     // Gets the dbhash for the current primary and for all secondaries (or the members of
     // 'secondaries', if specified).
-    this.getHashes = function(dbName, secondaries) {
+    this.getHashes = function(dbName, secondaries, skipTempCollections) {
         assert.neq(dbName, 'local', 'Cannot run getHashes() on the "local" database');
 
         // _determineLiveSecondaries() repopulates both 'self._secondaries' and 'self._primary'. If
@@ -2298,7 +2301,7 @@ var ReplSetTest = function(opts) {
             })
         ].map(conn => conn.getDB('test').getSession());
 
-        const hashes = this.getHashesUsingSessions(sessions, dbName);
+        const hashes = this.getHashesUsingSessions(sessions, dbName, {skipTempCollections});
         return {primary: hashes[0], secondaries: hashes.slice(1)};
     };
 
