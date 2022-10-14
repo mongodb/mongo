@@ -1895,10 +1895,16 @@ public:
 
     ExplainPrinter transport(const Constant& expr) {
         ExplainPrinter printer("Const");
-        printer.separator(" [")
-            .fieldName("value", ExplainVersion::V3)
-            .print(expr.get())
-            .separator("]");
+        printer.separator(" [").fieldName("tag", ExplainVersion::V3);
+
+        if (version == ExplainVersion::V3) {
+            std::stringstream ss;
+            ss << expr.get().first;
+            std::string tagAsString = ss.str();
+            printer.print(tagAsString);
+        }
+
+        printer.fieldName("value", ExplainVersion::V3).print(expr.get()).separator("]");
         return printer;
     }
 

@@ -744,5 +744,16 @@ TEST(Explain, ExplainV2Compact) {
         evalNode);
 }
 
+TEST(Explain, ExplainBsonForConstant) {
+    ABT cNode = Constant::int64(3);
+    auto [tag, val] = ExplainGenerator::explainBSON(cNode);
+    sbe::value::ValueGuard vg(tag, val);
+    ASSERT_EQ(
+        "{\n    nodeType: \"Const\", \n"
+        "    tag: \"NumberInt64\", \n"
+        "    value: 3\n}\n",
+        ExplainGenerator::printBSON(tag, val));
+}
+
 }  // namespace
 }  // namespace mongo::optimizer
