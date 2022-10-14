@@ -79,8 +79,23 @@ var $config = extendWorkload($config, function($config, $super) {
 
             print(`Started resharding collection ${ns}: ${tojson({newShardKey})}`);
             if (TestData.runningWithShardStepdowns) {
-                assert.commandWorkedOrFailedWithCode(db.adminCommand(reshardCollectionCmdObj),
-                                                     [ErrorCodes.SnapshotUnavailable]);
+                assert.soon(function() {
+                    var res = db.adminCommand(reshardCollectionCmdObj);
+                    if (res.ok) {
+                        return true;
+                    }
+                    assert(res.hasOwnProperty("code"));
+                    // Expected error.
+                    if (res.code === ErrorCodes.SnapshotUnavailable) {
+                        return true;
+                    }
+                    // Race to retry.
+                    if (res.code === ErrorCodes.ReshardCollectionInProgress) {
+                        return false;
+                    }
+                    // Unexpected error.
+                    doassart(`Failed with unexpected ${tojson(res)}`);
+                }, "Reshard command failed", 10 * 1000);
             } else {
                 assert.commandWorked(db.adminCommand(reshardCollectionCmdObj));
             }
