@@ -46,7 +46,6 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/storage/storage_engine_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -696,10 +695,7 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
         builder->append("dataThroughputAverage", *_debug.dataThroughputAverage);
     }
 
-    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        builder->append("admissionPriority", toString(opCtx->lockState()->getAdmissionPriority()));
-    }
+    builder->append("admissionPriority", toString(opCtx->lockState()->getAdmissionPriority()));
 }
 
 namespace {
@@ -886,10 +882,7 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("reslen", responseLength);
     }
 
-    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        pAttrs->add("admissionPriority", opCtx->lockState()->getAdmissionPriority());
-    }
+    pAttrs->add("admissionPriority", opCtx->lockState()->getAdmissionPriority());
 
     if (lockStats) {
         BSONObjBuilder locks;
