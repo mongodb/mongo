@@ -559,20 +559,18 @@ PlanState ColumnScanStage::getNext() {
 
         const auto& path = cursor.path();
 
-        if (!useRowStore) {
-            if (splitCellView &&
-                (splitCellView->hasSubPaths || splitCellView->hasDuplicateFields)) {
-                useRowStore = true;
-            } else {
-                if (!splitCellView || splitCellView->isSparse) {
-                    // Must read in the parent information first.
-                    readParentsIntoObj(path, &outObj, &pathsRead);
-                }
-                if (splitCellView) {
-                    auto translatedCell = translateCell(path, *splitCellView);
-                    addCellToObject(translatedCell, outObj);
-                    pathsRead.insert(path);
-                }
+        if (splitCellView && (splitCellView->hasSubPaths || splitCellView->hasDuplicateFields)) {
+            useRowStore = true;
+            break;
+        } else {
+            if (!splitCellView || splitCellView->isSparse) {
+                // Must read in the parent information first.
+                readParentsIntoObj(path, &outObj, &pathsRead);
+            }
+            if (splitCellView) {
+                auto translatedCell = translateCell(path, *splitCellView);
+                addCellToObject(translatedCell, outObj);
+                pathsRead.insert(path);
             }
         }
     }
