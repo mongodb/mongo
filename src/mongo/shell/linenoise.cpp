@@ -119,6 +119,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/data_view.h"
 #include "mongo/util/errno_util.h"
 
 using std::string;
@@ -352,7 +353,7 @@ public:
         }
         Utf32String killedText(text, textLen);
         if (lastAction == actionKill && size > 0) {
-            int slot = indexToSlot[0];
+            int slot = mongo::ConstDataView(&indexToSlot[0]).read<uint8_t>();
             int currentLen = theRing[slot].length();
             int resultLen = currentLen + textLen;
             Utf32String temp(resultLen + 1);
@@ -375,7 +376,7 @@ public:
                 size++;
                 theRing.push_back(killedText);
             } else {
-                int slot = indexToSlot[capacity - 1];
+                int slot = mongo::ConstDataView(&indexToSlot[capacity - 1]).read<uint8_t>();
                 theRing[slot] = killedText;
                 memmove(&indexToSlot[1], &indexToSlot[0], capacity - 1);
                 indexToSlot[0] = slot;
