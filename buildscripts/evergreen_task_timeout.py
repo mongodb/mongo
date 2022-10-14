@@ -49,6 +49,8 @@ SPECIFIC_TASK_OVERRIDES = {
     },
     "macos-arm64": {"sharded_collections_jscore_passthrough": timedelta(hours=5)},
     "enterprise-macos": {"replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30), },
+    "enterprise-rhel-72-s390x": {"integration_tests_sharded": timedelta(hours=4)},
+    "enterprise-rhel-72-s390x-inmem": {"integration_tests_sharded": timedelta(hours=4)},
 
     # unittests outliers
     # repeated execution runs a suite 10 times
