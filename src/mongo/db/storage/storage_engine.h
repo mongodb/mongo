@@ -170,6 +170,28 @@ public:
     };
 
     /**
+     * RAII lock to protect checkpointing. Operations performing a checkpoint take this lock in
+     * exclusive mode. Operations which need to conflict with checkpointing but do not need to
+     * conflict with each other may take this lock in shared mode.
+     */
+    class CheckpointLock {
+    public:
+        enum class Mode {
+            kShared,
+            kExclusive,
+        };
+
+        CheckpointLock(const CheckpointLock&) = delete;
+        CheckpointLock(CheckpointLock&&) = delete;
+        CheckpointLock& operator=(const CheckpointLock&) = delete;
+
+        virtual ~CheckpointLock() = default;
+
+    protected:
+        CheckpointLock() = default;
+    };
+
+    /**
      * The destructor should only be called if we are tearing down but not exiting the process.
      */
     virtual ~StorageEngine() {}
@@ -482,6 +504,12 @@ public:
      * Acquires a resource mutex before taking the checkpoint.
      */
     virtual void checkpoint(OperationContext* opCtx) = 0;
+
+    /**
+     * Returns a checkpoint lock in the requested mode.
+     */
+    virtual std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx,
+                                                              CheckpointLock::Mode mode) = 0;
 
     /**
      * Recovers the storage engine state to the last stable timestamp. "Stable" in this case

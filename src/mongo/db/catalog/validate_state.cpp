@@ -229,12 +229,13 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         _dataThrottle.turnThrottlingOff();
     }
 
-    boost::optional<Lock::ResourceLock> checkpointLock;
-    if (isBackground()) {
-        // Acquires a resource mutex to prevent taking a checkpoint during opening the checkpoint
-        // cursors to make sure all cursors are reading from the same point in time.
-        checkpointLock.emplace(opCtx, ResourceId(RESOURCE_MUTEX, "checkpoint"), MODE_X);
-    }
+    // Acquire the checkpoint lock to prevent a checkpoint from being taken while we are opening our
+    // checkpoint cursors. This ensures all cursors are reading from the same point in time.
+    auto checkpointLock = isBackground()
+        ? opCtx->getServiceContext()->getStorageEngine()->getCheckpointLock(
+              opCtx, StorageEngine::CheckpointLock::Mode::kShared)
+        : nullptr;
+
     StringSet readyDurableIndexes;
     try {
         _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(

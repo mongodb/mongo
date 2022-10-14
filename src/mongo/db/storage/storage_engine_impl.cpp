@@ -1242,6 +1242,11 @@ void StorageEngineImpl::checkpoint(OperationContext* opCtx) {
     _engine->checkpoint(opCtx);
 }
 
+std::unique_ptr<StorageEngine::CheckpointLock> StorageEngineImpl::getCheckpointLock(
+    OperationContext* opCtx, CheckpointLock::Mode mode) {
+    return _engine->getCheckpointLock(opCtx, mode);
+}
+
 void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp) {
     // No drop-pending idents present if getEarliestDropTimestamp() returns boost::none.
     if (auto earliestDropTimestamp = _dropPendingIdentReaper.getEarliestDropTimestamp()) {

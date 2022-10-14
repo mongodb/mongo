@@ -181,6 +181,11 @@ public:
 
     void checkpoint(OperationContext* opCtx) final {}
 
+    std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx,
+                                                      CheckpointLock::Mode mode) final {
+        return nullptr;
+    }
+
     int64_t sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) final {
         return 0;
     }
