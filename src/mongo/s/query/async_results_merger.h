@@ -484,8 +484,8 @@ private:
 
     OperationContext* _opCtx;
     std::shared_ptr<executor::TaskExecutor> _executor;
-    TailableModeEnum _tailableMode;
     AsyncResultsMergerParams _params;
+    TailableModeEnum _tailableMode;
 
     // Must be acquired before accessing any data members (other than _params, which is read-only).
     mutable Mutex _mutex = MONGO_MAKE_LATCH("AsyncResultsMerger::_mutex");

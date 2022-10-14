@@ -104,16 +104,16 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
                                        AsyncResultsMergerParams params)
     : _opCtx(opCtx),
       _executor(std::move(executor)),
+      _params(std::move(params)),
       // This strange initialization is to work around the fact that the IDL does not currently
       // support a default value for an enum. The default tailable mode should be 'kNormal', but
       // since that is not supported we treat boost::none (unspecified) to mean 'kNormal'.
-      _tailableMode(params.getTailableMode().value_or(TailableModeEnum::kNormal)),
-      _params(std::move(params)),
+      _tailableMode(_params.getTailableMode().value_or(TailableModeEnum::kNormal)),
       _mergeQueue(MergingComparator(
           _remotes, _params.getSort().value_or(BSONObj()), _params.getCompareWholeSortKey())),
       _promisedMinSortKeys(PromisedMinSortKeyComparator(_params.getSort().value_or(BSONObj()))) {
-    if (params.getTxnNumber()) {
-        invariant(params.getSessionId());
+    if (_params.getTxnNumber()) {
+        invariant(_params.getSessionId());
     }
 
     size_t remoteIndex = 0;
