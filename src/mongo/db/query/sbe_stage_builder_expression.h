@@ -38,6 +38,8 @@
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
+class PlanStageSlots;
+
 /**
  * Translates an input Expression into an SBE EExpression. The 'stage' parameter provides the input
  * subtree to build on top of.
@@ -46,7 +48,8 @@ EvalExprStagePair generateExpression(StageBuilderState& state,
                                      const Expression* expr,
                                      EvalStage stage,
                                      boost::optional<sbe::value::SlotId> optionalRootSlot,
-                                     PlanNodeId planNodeId);
+                                     PlanNodeId planNodeId,
+                                     const PlanStageSlots* slots = nullptr);
 
 /**
  * Generate an EExpression that converts a value (contained in a variable bound to 'branchRef') that

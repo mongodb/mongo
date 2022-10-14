@@ -41,7 +41,10 @@ namespace mongo::stage_builder {
 class PlanStageSlots;
 
 /**
- * Generates an SBE plan stage sub-tree implementing an collection scan.
+ * Generates an SBE plan stage sub-tree implementing an collection scan. 'fields' can be used to
+ * specify top-level fields that should be retrieved during the scan. For each name in 'fields',
+ * there will be a corresponding kField slot in the PlanStageSlots object returned with the same
+ * name.
  *
  * On success, a tuple containing the following data is returned:
  *   * A slot to access a fetched document (a resultSlot)
@@ -56,6 +59,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     StageBuilderState& state,
     const CollectionPtr& collection,
     const CollectionScanNode* csn,
+    const std::vector<std::string>& fields,
     PlanYieldPolicy* yieldPolicy,
     bool isTailableResumeBranch);
 

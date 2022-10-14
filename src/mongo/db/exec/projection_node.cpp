@@ -48,7 +48,8 @@ void ProjectionNode::addProjectionForPath(const FieldPath& path) {
 void ProjectionNode::_addProjectionForPath(const FieldPath& path) {
     makeOptimizationsStale();
     if (path.getPathLength() == 1) {
-        _projectedFields.insert(path.fullPath());
+        auto it = _projectedFields.insert(_projectedFields.end(), path.fullPath());
+        _projectedFieldsSet.insert(StringData(*it));
         return;
     }
     // FieldPath can't be empty, so it is safe to obtain the first path component here.
@@ -141,7 +142,7 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
     while (it.more()) {
         auto fieldName = it.fieldName();
 
-        if (_projectedFields.find(fieldName) != _projectedFields.end()) {
+        if (_projectedFieldsSet.find(fieldName) != _projectedFieldsSet.end()) {
             outputProjectedField(
                 fieldName, applyLeafProjectionToValue(it.next().second), outputDoc);
             ++projectedFields;
@@ -280,7 +281,7 @@ void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explai
     const bool projVal = !applyLeafProjectionToValue(Value(true)).missing();
 
     // Always put "_id" first if it was projected (implicitly or explicitly).
-    if (_projectedFields.find("_id") != _projectedFields.end()) {
+    if (_projectedFieldsSet.find("_id") != _projectedFieldsSet.end()) {
         output->addField("_id", Value(projVal));
     }
 

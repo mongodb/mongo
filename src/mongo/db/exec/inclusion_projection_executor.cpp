@@ -68,7 +68,7 @@ void FastPathEligibleInclusionNode::_applyProjections(BSONObj bson, BSONObjBuild
         const auto bsonElement{it.next()};
         const auto fieldName{bsonElement.fieldNameStringData()};
 
-        if (_projectedFields.find(fieldName) != _projectedFields.end()) {
+        if (_projectedFieldsSet.find(fieldName) != _projectedFieldsSet.end()) {
             bob->append(bsonElement);
             --nFieldsNeeded;
         } else if (auto childIt = _children.find(fieldName); childIt != _children.end()) {
@@ -169,7 +169,8 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
 
             if (std::get<2>(expressionSpec)) {
                 // Replace the expression with an inclusion projected field.
-                _projectedFields.insert(fieldName);
+                auto it = _projectedFields.insert(_projectedFields.end(), fieldName);
+                _projectedFieldsSet.insert(StringData(*it));
                 _expressions.erase(fieldName);
                 // Only computed projections at the beginning of the list were marked to become
                 // projected fields. The new projected field is at the beginning of the
