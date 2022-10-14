@@ -181,6 +181,18 @@ public:
         const NamespaceString& collName,
         const Timestamp& clusterTime) override;
 
+    /*
+        * Return all shards that used to own data for the database at the given clusterTime.
+        * The result is
+            1. a vector of unique shardids
+            2. An empty array if the collection and the database are not found
+        * In case at least one of the shard is no longer active, a SnapshotTooOld error is thrown.
+    */
+    std::vector<ShardId> getShardsThatOwnDataForDbAtClusterTime(
+        OperationContext* opCtx,
+        const NamespaceString& dbName,
+        const Timestamp& clusterTime) override;
+
 private:
     /**
      * Updates a single document (if useMultiUpdate is false) or multiple documents (if

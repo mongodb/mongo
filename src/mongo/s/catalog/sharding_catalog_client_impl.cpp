@@ -351,6 +351,191 @@ AggregateCommandRequest makeCollectionAndIndexesAggregation(OperationContext* op
     return AggregateCommandRequest(CollectionType::ConfigNS, std::move(serializedPipeline));
 }
 
+AggregateCommandRequest makePlacementHistoryAggregation(OperationContext* opCtx,
+                                                        const Timestamp& minClusterTime,
+                                                        boost::optional<NamespaceString> nss) {
+    /*
+        Stage 1. Select only the entry with timestamp <= clusterTime and filter out all nss that are
+        not the collection or the database
+        Stage 2. sort by timestamp
+        Stage 3. Extract the first document for each database and collection matching the received
+        namespace
+        Stage 4. Discard the entries with empty shards (i.e. the collection was dropped or
+        renamed)
+
+        CASE COLLECTION
+            Stage 5. Sort by namespace to ensure that the collection is before the database
+            Stage 6. Extract only one document (the collection or the database if the first was
+            discarded at Stage 4.)
+        ELSE
+            Stage 5. Group all documents and concat shards (this will generate an array of arrays)
+            Stage 6. Flatten the array of arrays into a set (this will also remove duplicates)
+        END
+        Stage 7. Access to the list of shards currently active in the cluster
+        Stage 8. Count the number of shards obtained on stage 6 that also appear in the list of
+        active shards
+        Stage 9. Do not return the list of active shards (used only for the count)
+
+        regex=^db(.collection)?$
+        [
+            {
+                "$match": { "timestamp": { "$lte": clusterTime } , "nss" : { $regex: regex} }
+            },
+            {
+                "$sort": { "timestamp": -1 }
+            },
+            {
+                "$group": {
+                    _id: "$nss",
+                    shards: { $first: "$shards" }
+                }
+            },
+            { "$match": { shards: { $not: { $size: 0 } } } },
+            CASE DATABASE or ALL DATA :
+                {
+                    "$group": {
+                        _id: "",
+                        shards: { $push: "$shards" }
+                    }
+                },
+                {
+                    $project: {
+                        "shards": {
+                                $reduce: {
+                                input: "$shards",
+                                initialValue: [],
+                                in: { "$setUnion": [ "$$this", "$$value"] }
+                                }
+                        }
+                    }
+                },
+            CASE COLLECTION:
+                { $sort: { _id: -1  } },
+                { $limit: 1 },
+            {
+                $lookup:
+                {
+                    from: "shards",
+                    localField: "shards",
+                    foreignField: "_id",
+                    as: "activeShards"
+                }
+            },
+            { "$set" : { "numActiveShards" : { "$size" : "$activeShards" } } },
+            { "$project": { "activeShards" : 0 } }
+        ]
+        */
+
+    auto expCtx = make_intrusive<ExpressionContext>(
+        opCtx, nullptr /*collator*/, NamespaceString::kConfigsvrPlacementHistoryNamespace);
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    resolvedNamespaces[NamespaceString::kConfigsvrShardsNamespace.coll()] = {
+        NamespaceString::kConfigsvrShardsNamespace, std::vector<BSONObj>() /* pipeline */};
+    resolvedNamespaces[NamespaceString::kConfigsvrPlacementHistoryNamespace.coll()] = {
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        std::vector<BSONObj>() /* pipeline */};
+    expCtx->setResolvedNamespaces(resolvedNamespaces);
+
+    // 1. Get all the history entries prior to the requested time concerning either the collection
+    // or the parent database.
+    bool isCollectionSearch = !nss->db().empty() && !nss->coll().empty();
+
+    auto regex = isCollectionSearch ? "^" + nss->db() + "(\\." + nss->coll() + ")?$"
+                                    : "^" + nss->db() + "(\\..*)?$";
+
+    auto matchStage = DocumentSourceMatch::create(
+        BSON("timestamp" << BSON("$lte" << minClusterTime) << "nss" << BSON("$regex" << regex)),
+        expCtx);
+
+    // 2 & 3. Sort by timestamp and extract the first document for collection and database
+    auto sortStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
+    auto groupStageBson = BSON("_id"
+                               << "$nss"
+                               << "shards"
+                               << BSON("$first"
+                                       << "$shards"));
+    auto groupStage = DocumentSourceGroup::createFromBson(
+        Document{{"$group", std::move(groupStageBson)}}.toBson().firstElement(), expCtx);
+
+    // Stage 4. Discard the entries with empty shards (i.e. the collection was dropped or renamed)
+    auto noShardsFilter =
+        DocumentSourceMatch::create(BSON("shards" << BSON("$not" << BSON("$size" << 0))), expCtx);
+
+
+    // Create pipeline
+    Pipeline::SourceContainer stages;
+    stages.emplace_back(std::move(matchStage));
+    stages.emplace_back(std::move(sortStage));
+    stages.emplace_back(std::move(groupStage));
+    stages.emplace_back(std::move(noShardsFilter));
+
+    // case only specific collection is requested
+    if (isCollectionSearch) {
+        // Stage 5. Sort by namespace to ensure that the collection is before the database
+        auto sortStage2 = DocumentSourceSort::create(expCtx, BSON("_id" << -1));
+
+        // Stage 6. Extract only one document (the collection or the database if the first was
+        // discarded at Stage 4)
+        auto limitStage = DocumentSourceLimit::create(expCtx, 1);
+
+        stages.emplace_back(std::move(sortStage2));
+        stages.emplace_back(std::move(limitStage));
+    } else {
+        // Stage 5. Group all documents and concat shards (this will generate an array of arrays)
+        auto groupStageBson2 = BSON("_id"
+                                    << ""
+                                    << "shards"
+                                    << BSON("$push"
+                                            << "$shards"));
+        auto groupStageConcat = DocumentSourceGroup::createFromBson(
+            Document{{"$group", std::move(groupStageBson2)}}.toBson().firstElement(), expCtx);
+
+        // Stage 6. Flatten the array of arrays into a set (this will also remove duplicates)
+        auto projectStageBson = BSON(
+            "shards" << BSON("$reduce" << BSON("input"
+                                               << "$shards"
+                                               << "initialValue" << BSONArray() << "in"
+                                               << BSON("$setUnion" << BSON_ARRAY("$$this"
+                                                                                 << "$$value")))));
+        auto projectStageFlatten = DocumentSourceProject::createFromBson(
+            Document{{"$project", std::move(projectStageBson)}}.toBson().firstElement(), expCtx);
+
+        stages.emplace_back(std::move(groupStageConcat));
+        stages.emplace_back(std::move(projectStageFlatten));
+    }
+
+    // Stage 7. Lookup active shards with left outer join on config.shards
+    Document lookupStageDoc = {
+        {"from", NamespaceString::kConfigsvrShardsNamespace.coll().toString()},
+        {"localField", StringData("shards")},
+        {"foreignField", StringData("_id")},
+        {"as", StringData("activeShards")}};
+
+    auto lookupStage = DocumentSourceLookUp::createFromBson(
+        Document{{"$lookup", std::move(lookupStageDoc)}}.toBson().firstElement(), expCtx);
+
+    // Stage 8. Count number of active shards
+    auto setStageDoc = Document(
+        {{"$set", Document{{"numActiveShards", Document{{"$size", "$activeShards"_sd}}}}}});
+    auto setStage =
+        DocumentSourceAddFields::createFromBson(setStageDoc.toBson().firstElement(), expCtx);
+
+    // Stage 9. Disable activeShards field to avoid sending it to the client
+    auto projectStageDoc = Document{{"activeShards", 0}};
+    auto projectStage = DocumentSourceProject::create(
+        projectStageDoc.toBson(), expCtx, "getShardsThatOwnDataForNamespaceAtClusterTime");
+
+    stages.emplace_back(std::move(lookupStage));
+    stages.emplace_back(std::move(setStage));
+    stages.emplace_back(std::move(projectStage));
+
+    const auto pipeline = Pipeline::create(stages, expCtx);
+    auto aggRequest = AggregateCommandRequest(NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                                              pipeline->serializeToBson());
+
+    return aggRequest;
+}
+
 std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
                                            AggregateCommandRequest& aggRequest,
                                            const repl::ReadConcernArgs& readConcern,
@@ -399,6 +584,31 @@ std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
     }
 
     return aggResult;
+}
+
+std::vector<ShardId> extractShardIdsFromPlacementHistoryAggregationResult(
+    const std::vector<BSONObj>& aggrResult) {
+    // This may happen in case the placementHistory is empty
+    std::vector<ShardId> activeShards;
+    if (!aggrResult.empty()) {
+        invariant(aggrResult.size() == 1);
+
+        // Extract the result
+        auto doc = aggrResult.front();
+        auto numActiveShards = doc.getField("numActiveShards").Int();
+        // Use Obj() instead of Array() to avoid instantiating a temporary std::vector.
+        auto shards = doc.getField("shards").Obj();
+
+        uassert(ErrorCodes::SnapshotTooOld,
+                "Part of the history may no longer be retrieved because of one or more removed "
+                "shards.",
+                numActiveShards == static_cast<int>(shards.nFields()));
+
+        for (const auto& shard : shards) {
+            activeShards.push_back(shard.String());
+        }
+    }
+    return activeShards;
 }
 
 }  // namespace
@@ -1206,126 +1416,10 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNe
 
 std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataForCollAtClusterTime(
     OperationContext* opCtx, const NamespaceString& collName, const Timestamp& clusterTime) {
-    /*
-    Stage 1. Select only the entry with timestamp <= clusterTime and filter out all nss that are not
-    the collection or the database
-    Stage 2. sort by timestamp
-    Stage 3. Extract the first document for collection and database
-    Stage 4. Access to the list of shards currently active in the cluster
-    Stage 5. Count the number of currently active shards among the found ones
-    Stage 6. Do not return the list of active shards (used only for the count)
-    Stage 7. Discard the entries with empty shards (i.e. the collection was dropped or renamed)
-    Stage 8. Sort by namespace to ensure that the collection is before the database
-    Stage 9. Extract only one document (the collection or the database if the first was discarded at
-    Stage 7)
 
-    regex=^db(.collection)?$
-    [
-        {
-            "$match": { "timestamp": { "$lte": clusterTime } , "nss" : { $regex: regex} }
-        },
-        {
-            "$sort": { "timestamp": -1 }
-        },
-        {
-            "$group": {
-                _id: "$nss",
-                shards: { $first: "$shards" }
-            }
-        },
-        {
-            $lookup:
-            {
-                from: "shards",
-                localField: "shards",
-                foreignField: "_id",
-                as: "activeShards"
-            }
-        },
-        { "$set" : { "numActiveShards" : { "$size" : "$activeShards" } } },
-        { "$project": { "activeShards" : 0 } }
-        { "$match": { shards: { $not: { $size: 0 } } } },
-        { $sort: { _id: -1  } },
-        { $limit: 1 }
-    ]
-    */
     uassert(ErrorCodes::InvalidOptions,
             "A full collection namespace must be specified",
             !collName.coll().empty());
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, nullptr /*collator*/, NamespaceString::kConfigsvrPlacementHistoryNamespace);
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kConfigsvrShardsNamespace.coll()] = {
-        NamespaceString::kConfigsvrShardsNamespace, std::vector<BSONObj>() /* pipeline */};
-    resolvedNamespaces[NamespaceString::kConfigsvrPlacementHistoryNamespace.coll()] = {
-        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        std::vector<BSONObj>() /* pipeline */};
-    expCtx->setResolvedNamespaces(resolvedNamespaces);
-
-    // 1. Get all the history entries prior to the requested time concerning either the collection
-    // or the parent database.
-    auto regex = "^" + collName.db() + "(." + collName.coll() + ")?$";
-    auto matchStage = DocumentSourceMatch::create(
-        BSON("timestamp" << BSON("$lte" << clusterTime) << "nss" << BSON("$regex" << regex)),
-        expCtx);
-
-    // 2 & 3. Sort by timestamp and extract the first document for collection and database
-    auto sortStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
-    auto groupStageBson = BSON("_id"
-                               << "$nss"
-                               << "shards"
-                               << BSON("$first"
-                                       << "$shards"));
-    auto groupStage = DocumentSourceGroup::createFromBson(
-        Document{{"$group", std::move(groupStageBson)}}.toBson().firstElement(), expCtx);
-
-    // 4. Lookup active shards with left outer join on config.shards
-    Document lookupStageDoc = {
-        {"from", NamespaceString::kConfigsvrShardsNamespace.coll().toString()},
-        {"localField", StringData("shards")},
-        {"foreignField", StringData("_id")},
-        {"as", StringData("activeShards")}};
-
-    auto lookupStage = DocumentSourceLookUp::createFromBson(
-        Document{{"$lookup", std::move(lookupStageDoc)}}.toBson().firstElement(), expCtx);
-
-    // 5. Count number of active shards
-    auto setStageDoc = Document(
-        {{"$set", Document{{"numActiveShards", Document{{"$size", "$activeShards"_sd}}}}}});
-    auto setStage =
-        DocumentSourceAddFields::createFromBson(setStageDoc.toBson().firstElement(), expCtx);
-
-    // 6. Disable activeShards field to avoid sending it to the client
-    auto projectStageDoc = Document{{"activeShards", 0}};
-    auto projectStage = DocumentSourceProject::create(
-        projectStageDoc.toBson(), expCtx, "getShardsThatOwnDataForCollAtClusterTime");
-
-    // Stage 7. Discard the entries with empty shards (i.e. the collection was dropped or renamed)
-    auto matchStage2 =
-        DocumentSourceMatch::create(BSON("shards" << BSON("$not" << BSON("$size" << 0))), expCtx);
-
-    // Stage 8. Sort by namespace to ensure that the collection is before the database
-    auto sortStage2 = DocumentSourceSort::create(expCtx, BSON("_id" << -1));
-
-    // Stage 9. Extract only one document (the collection or the database if the first was discarded
-    // at Stage 7)
-    auto limitStage = DocumentSourceLimit::create(expCtx, 1);
-
-    // Create pipeline
-    Pipeline::SourceContainer stages;
-    stages.emplace_back(std::move(matchStage));
-    stages.emplace_back(std::move(sortStage));
-    stages.emplace_back(std::move(groupStage));
-    stages.emplace_back(std::move(lookupStage));
-    stages.emplace_back(std::move(setStage));
-    stages.emplace_back(std::move(projectStage));
-    stages.emplace_back(std::move(matchStage2));
-    stages.emplace_back(std::move(sortStage2));
-    stages.emplace_back(std::move(limitStage));
-
-    const auto pipeline = Pipeline::create(stages, expCtx);
-    auto aggRequest = AggregateCommandRequest(NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                                              pipeline->serializeToBson());
 
     // Run the aggregation
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
@@ -1336,33 +1430,38 @@ std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataForCollAtClu
             return {time.configTime(), repl::ReadConcernLevel::kMajorityReadConcern};
         }
     }();
+
+    auto aggRequest = makePlacementHistoryAggregation(opCtx, clusterTime, collName);
     auto aggrResult =
         runCatalogAggregation(opCtx, aggRequest, readConcern, Shard::kDefaultConfigCommandTimeout);
 
-    // This may happen in case the placementHistory is empty
-    if (aggrResult.empty()) {
-        return {};
-    }
 
-    invariant(aggrResult.size() == 1);
+    return extractShardIdsFromPlacementHistoryAggregationResult(aggrResult);
+}
 
-    // Extract the result
-    auto doc = aggrResult.front();
-    auto numActiveShards = doc.getField("numActiveShards").Int();
-    // Use Obj() instead of Array() to avoid instantiating a temporary std::vector.
-    auto shards = doc.getField("shards").Obj();
 
-    uassert(ErrorCodes::SnapshotTooOld,
-            "Part of the history may no longer be retrieved because of one or more removed "
-            "shards.",
-            numActiveShards == static_cast<int>(shards.nFields()));
+std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataForDbAtClusterTime(
+    OperationContext* opCtx, const NamespaceString& dbName, const Timestamp& clusterTime) {
 
-    std::vector<ShardId> activeShards;
-    for (const auto& shard : shards) {
-        activeShards.push_back(shard.String());
-    }
+    uassert(ErrorCodes::InvalidOptions,
+            "A full db namespace must be specified",
+            dbName.coll().empty() && !dbName.db().empty());
 
-    return activeShards;
+    // Run the aggregation
+    const auto readConcern = [&]() -> repl::ReadConcernArgs {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            return {repl::ReadConcernLevel::kMajorityReadConcern};
+        } else {
+            const auto time = VectorClock::get(opCtx)->getTime();
+            return {time.configTime(), repl::ReadConcernLevel::kMajorityReadConcern};
+        }
+    }();
+
+    auto aggRequest = makePlacementHistoryAggregation(opCtx, clusterTime, dbName);
+    auto aggrResult =
+        runCatalogAggregation(opCtx, aggRequest, readConcern, Shard::kDefaultConfigCommandTimeout);
+
+    return extractShardIdsFromPlacementHistoryAggregationResult(aggrResult);
 }
 
 }  // namespace mongo

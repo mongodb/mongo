@@ -336,6 +336,9 @@ public:
     virtual std::vector<ShardId> getShardsThatOwnDataForCollAtClusterTime(
         OperationContext* opCtx, const NamespaceString& collName, const Timestamp& clusterTime) = 0;
 
+    virtual std::vector<ShardId> getShardsThatOwnDataForDbAtClusterTime(
+        OperationContext* opCtx, const NamespaceString& dbName, const Timestamp& clusterTime) = 0;
+
 protected:
     ShardingCatalogClient() = default;
 

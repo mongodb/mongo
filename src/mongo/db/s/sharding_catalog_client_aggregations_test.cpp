@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -43,7 +44,6 @@ namespace {
 // sharding_catalog_client_test.cpp are part of the s_test which does not have storage.
 
 using CatalogClientAggregationsTest = ConfigServerTestFixture;
-
 /**
  * Generates list of shards :
     _id : [shard1, shard2, shard3 ... shardN]
@@ -63,61 +63,98 @@ std::vector<BSONObj> generateConfigShardSampleData(int nShards) {
 
     return configShardData;
 }
+/*Utility class to simplify the readibility of the placement history tests*/
+class PlacementHistoryCollection {
 
-std::vector<BSONObj> getPlacementDataSample() {
-    std::vector<BSONObj> placementDataSample = {};
-    const auto coll1Uuid = UUID::gen();
-    const auto coll2Uuid = UUID::gen();
-    // create database mock
-    placementDataSample.push_back(BSON("_id' " << 1 << "nss"
-                                               << "mock"
-                                               << "timestamp" << Timestamp(1, 0) << "shards"
-                                               << BSON_ARRAY("shard1")));
-    // shard collection mock.collection1
-    placementDataSample.push_back(BSON("_id' " << 2 << "nss"
-                                               << "mock.collection1"
-                                               << "uuid" << coll1Uuid << "timestamp"
-                                               << Timestamp(2, 0) << "shards"
-                                               << BSON_ARRAY("shard1"
-                                                             << "shard2"
-                                                             << "shard3")));
-    // shard collection mock.collection2
-    placementDataSample.push_back(BSON("_id' " << 3 << "nss"
-                                               << "mock.collection2"
-                                               << "uuid" << coll2Uuid << "timestamp"
-                                               << Timestamp(3, 0) << "shards"
-                                               << BSON_ARRAY("shard1"
-                                                             << "shard2"
-                                                             << "shard3")));
-    // drop collection2
-    placementDataSample.push_back(BSON("_id' " << 4 << "nss"
-                                               << "mock.collection2"
-                                               << "uuid" << coll2Uuid << "timestamp"
-                                               << Timestamp(4, 0) << "shards"
-                                               << BSONArrayBuilder().arr()));
-    // move primary from shard1 to shard2
-    placementDataSample.push_back(BSON("_id' " << 5 << "nss"
-                                               << "mock"
-                                               << "timestamp" << Timestamp(5, 0) << "shards"
-                                               << BSON_ARRAY("shard4")));
-    // move last chunk of collection 1 located in shard1 to shard4
-    placementDataSample.push_back(BSON("_id' " << 6 << "nss"
-                                               << "mock.collection1"
-                                               << "uuid" << coll1Uuid << "timestamp"
-                                               << Timestamp(6, 0) << "shards"
-                                               << BSON_ARRAY("shard2"
-                                                             << "shard3"
-                                                             << "shard4")));
+public:
+    PlacementHistoryCollection() = default;
 
-    return placementDataSample;
-}
+    void insertEntryForShardCollection(const Timestamp& timestamp,
+                                       const std::string& ns,
+                                       const std::vector<std::string>& shards) {
+        insertEntry(timestamp, ns, shards);
+    }
+
+    void insertEntryForDropDatabase(const Timestamp& timestamp, const std::string& ns) {
+        insertEntry(timestamp, ns, {});
+    }
+
+    void insertEntryForDropCollection(const Timestamp& timestamp, const std::string& ns) {
+        insertEntry(timestamp, ns, {});
+    }
+
+    void insertEntryForMovePrimary(const Timestamp& timestamp,
+                                   const std::string& ns,
+                                   const std::string& primaryShard) {
+        insertEntry(timestamp, ns, {primaryShard});
+    }
+
+    void insertEntryForCreateDatabase(const Timestamp& timestamp,
+                                      const std::string& ns,
+                                      const std::string& primaryShard) {
+        insertEntry(timestamp, ns, {primaryShard});
+    }
+
+    void insertEntryForCompleteMigration(const Timestamp& timestamp,
+                                         const std::string& ns,
+                                         const std::vector<std::string>& newShards) {
+        insertEntry(timestamp, ns, newShards);
+    }
+
+    const std::vector<BSONObj>& getData() {
+        return _placementData;
+    }
+
+private:
+    void insertEntry(const Timestamp& timestamp,
+                     const std::string& ns,
+                     const std::vector<std::string>& shards) {
+        std::vector<ShardId> shardIds;
+        for (const auto& shard : shards) {
+            shardIds.push_back(ShardId(shard));
+        }
+        auto nss = NamespaceString(ns);
+        auto uuid = getUUID(nss);
+        auto entry = NamespacePlacementType(nss, timestamp, shardIds);
+        entry.setUuid(uuid);
+        _placementData.push_back(entry.toBSON());
+    }
+
+    boost::optional<UUID> getUUID(const NamespaceString& nss) {
+        if (nss.coll().empty()) {
+            // no uuid for database
+            return boost::none;
+        }
+
+        if (_uuidMap.find(nss.toString()) == _uuidMap.end())
+            _uuidMap.emplace(nss.toString(), UUID::gen());
+
+        const UUID& uuid = _uuidMap.at(nss.toString());
+        return uuid;
+    }
+    std::vector<BSONObj> _placementData;
+    stdx::unordered_map<std::string, UUID> _uuidMap;
+};
+}  // namespace
+
 
 TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_ShardedWithData) {
 
     auto opCtx = operationContext();
 
+    PlacementHistoryCollection placementHistoryCollection;
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "db", "shard1");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(2, 0), "db.collection1", {"shard1", "shard2", "shard3"});
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(3, 0), "db.collection2", {"shard1", "shard2", "shard3"});
+    placementHistoryCollection.insertEntryForDropCollection(Timestamp(4, 0), "db.collection2");
+    placementHistoryCollection.insertEntryForMovePrimary(Timestamp(5, 0), "db", "shard4");
+    placementHistoryCollection.insertEntryForCompleteMigration(
+        Timestamp(6, 0), "db.collection1", {"shard2", "shard3", "shard4"});
+
     // insert sample data into placementHistory collection
-    for (auto& doc : getPlacementDataSample()) {
+    for (auto& doc : placementHistoryCollection.getData()) {
         ASSERT_OK(insertToConfigCollection(
             opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, doc));
     }
@@ -128,7 +165,7 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_S
 
     // 3 shards should own collection1 at timestamp 4
     auto shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("mock.collection1"), Timestamp(4, 0));
+        opCtx, NamespaceString("db.collection1"), Timestamp(4, 0));
 
     ASSERT_EQ(3U, shards.size());
     std::sort(shards.begin(), shards.end());
@@ -138,7 +175,7 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_S
 
     // 3 shards should own collection1 at timestamp 5
     shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("mock.collection1"), Timestamp(5, 0));
+        opCtx, NamespaceString("db.collection1"), Timestamp(5, 0));
 
     ASSERT_EQ(3U, shards.size());
     std::sort(shards.begin(), shards.end());
@@ -148,7 +185,7 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_S
 
     // 3 shards should own collection1 at timestamp 7
     shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("mock.collection1"), Timestamp(7, 0));
+        opCtx, NamespaceString("db.collection1"), Timestamp(7, 0));
 
     ASSERT_EQ(3U, shards.size());
     std::sort(shards.begin(), shards.end());
@@ -157,23 +194,39 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_S
     ASSERT(shards[2] == "shard4");
 }
 
-TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_EmptyHistory) {
+TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_EmptyHistory) {
 
     auto opCtx = operationContext();
 
     // no shards should be returned
     auto shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("mock.collection1"), Timestamp(4, 0));
+        opCtx, NamespaceString("db.collection1"), Timestamp(4, 0));
 
     ASSERT_EQ(0U, shards.size());
+
+    // no shards should be returned
+    auto shards2 = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
+        opCtx, NamespaceString("db"), Timestamp(4, 0));
+
+    ASSERT_EQ(0U, shards2.size());
+
+    // TODO (SERVER-70097) add a test case for getShardsThatOwnDataAtClusterTime()
 }  // namespace
 
 TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_NoData) {
 
     auto opCtx = operationContext();
 
+    PlacementHistoryCollection placementHistoryCollection;
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "db", "shard1");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(2, 0), "db.collection1", {"shard1", "shard2", "shard3"});
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(3, 0), "db.collection2", {"shard1", "shard2", "shard3"});
+    placementHistoryCollection.insertEntryForDropCollection(Timestamp(4, 0), "db.collection2");
+
     // insert sample data into placementHistory collection
-    for (auto& doc : getPlacementDataSample()) {
+    for (auto& doc : placementHistoryCollection.getData()) {
         ASSERT_OK(insertToConfigCollection(
             opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, doc));
     }
@@ -184,26 +237,36 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_N
 
     // Collection was dropped: only primary shard should be returned
     auto shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("mock.collection2"), Timestamp(4, 0));
+        opCtx, NamespaceString("db.collection2"), Timestamp(4, 0));
 
     ASSERT_EQ(1U, shards.size());
     ASSERT(shards[0] == "shard1");
 
     // no collection was sharded yet, but the database exists: only primary shard should be returned
     shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("mock.collection2"), Timestamp(1, 0));
+        opCtx, NamespaceString("db.collection2"), Timestamp(1, 0));
 
     ASSERT_EQ(1, shards.size());
     ASSERT_EQ("shard1", shards[0]);
 }
 
 
-TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_RegexStageTest) {
+TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_RegexStageTest) {
 
     auto opCtx = operationContext();
 
+    PlacementHistoryCollection placementHistoryCollection;
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "db", "shard1");
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(2, 0), "dbXX", "shard1");
+    placementHistoryCollection.insertEntryForCreateDatabase(
+        Timestamp(3, 0), "dbXcollection1", "shard4");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(4, 0), "db.collection1", {"shard1", "shard2", "shard3"});
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(5, 0), "dbXX.collection1", {"shard1", "shard2", "shard3"});
+
     // insert sample data into placementHistory collection
-    for (auto& doc : getPlacementDataSample()) {
+    for (auto& doc : placementHistoryCollection.getData()) {
         ASSERT_OK(insertToConfigCollection(
             opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, doc));
     }
@@ -214,20 +277,26 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_R
 
     // only primary shards should be returned since collectionX is not found
     auto shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("mock.collectionX"), Timestamp(7, 0));
+        opCtx, NamespaceString("db.collectionX"), Timestamp(7, 0));
 
     ASSERT_EQ(1U, shards.size());
-    ASSERT_EQ("shard4", shards[0]);
+    ASSERT_EQ("shard1", shards[0]);
 
     // no data should be returned since the namespace is not found
     shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("mockX.collection1"), Timestamp(7, 0));
+        opCtx, NamespaceString("dbX.collection1"), Timestamp(7, 0));
 
     ASSERT_EQ(0U, shards.size());
 
     // Database and collection do not exist
     shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("mockX.collectionX"), Timestamp(7, 0));
+        opCtx, NamespaceString("dbX.collectionX"), Timestamp(7, 0));
+
+    ASSERT_EQ(0U, shards.size());
+
+    // Database does not exist
+    shards = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
+        opCtx, NamespaceString("dbX"), Timestamp(7, 0));
 
     ASSERT_EQ(0U, shards.size());
 }
@@ -236,8 +305,16 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_S
 
     auto opCtx = operationContext();
 
+    PlacementHistoryCollection placementHistoryCollection;
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "db", "shard1");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(2, 0), "db.collection1", {"shard1", "shard2", "shard3"});
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(3, 0), "db.collection2", {"shard1", "shard2", "shard3"});
+    placementHistoryCollection.insertEntryForDropCollection(Timestamp(4, 0), "db.collection2");
+
     // insert sample data into placementHistory collection
-    for (auto& doc : getPlacementDataSample()) {
+    for (auto& doc : placementHistoryCollection.getData()) {
         ASSERT_OK(insertToConfigCollection(
             opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, doc));
     }
@@ -250,7 +327,100 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_S
     // 3 shards should own collection1 at timestamp 4
     // however, since shard3 is missing, we should get an error
     ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-                           opCtx, NamespaceString("mock.collection1"), Timestamp(4, 0)),
+                           opCtx, NamespaceString("db.collection1"), Timestamp(4, 0)),
+                       DBException,
+                       ErrorCodes::SnapshotTooOld);
+}
+
+TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_ShardedWithData) {
+
+    auto opCtx = operationContext();
+
+    PlacementHistoryCollection placementHistoryCollection;
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "db", "shard1");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(2, 0), "db.collection1", {"shard1", "shard2", "shard3"});
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(3, 0), "db.collection2", {"shard1", "shard2", "shard3"});
+    placementHistoryCollection.insertEntryForDropCollection(Timestamp(4, 0), "db.collection2");
+    placementHistoryCollection.insertEntryForMovePrimary(Timestamp(5, 0), "db", "shard5");
+    placementHistoryCollection.insertEntryForCompleteMigration(
+        Timestamp(6, 0), "db.collection1", {"shard2", "shard3", "shard4"});
+
+    // insert sample data into placementHistory collection
+    for (auto& doc : placementHistoryCollection.getData()) {
+        ASSERT_OK(insertToConfigCollection(
+            opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, doc));
+    }
+
+    for (auto& doc : generateConfigShardSampleData(5)) {
+        ASSERT_OK(insertToConfigCollection(opCtx, NamespaceString::kConfigsvrShardsNamespace, doc));
+    }
+
+    // 4 shards should own data for database db at timestamp 7
+    auto shards = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
+        opCtx, NamespaceString("db"), Timestamp(7, 0));
+
+    ASSERT_EQ(4U, shards.size());
+    std::sort(shards.begin(), shards.end());
+    ASSERT(shards[0] == "shard2");
+    ASSERT(shards[1] == "shard3");
+    ASSERT(shards[2] == "shard4");
+    ASSERT(shards[3] == "shard5");
+}
+
+TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_DropDatabase) {
+
+    PlacementHistoryCollection placementHistoryCollection;
+
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "db", "shard1");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(2, 0), "db.collection", {"shard1", "shard2", "shard3", "shard4"});
+    placementHistoryCollection.insertEntryForDropCollection(Timestamp(3, 0), "db.collection");
+    placementHistoryCollection.insertEntryForDropDatabase(Timestamp(4, 0), "db");
+
+    auto opCtx = operationContext();
+
+    // insert sample data into placementHistory collection
+    for (auto& doc : placementHistoryCollection.getData()) {
+        ASSERT_OK(insertToConfigCollection(
+            opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, doc));
+    }
+
+    for (auto& doc : generateConfigShardSampleData(4)) {
+        ASSERT_OK(insertToConfigCollection(opCtx, NamespaceString::kConfigsvrShardsNamespace, doc));
+    }
+
+    auto shards = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
+        opCtx, NamespaceString("db"), Timestamp(4, 0));
+
+    ASSERT_EQ(0U, shards.size());
+}
+
+TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_SnapshotTooOld) {
+    auto opCtx = operationContext();
+
+    PlacementHistoryCollection placementHistoryCollection;
+
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "db", "shard1");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(2, 0), "db.collection1", {"shard1", "shard2", "shard3", "shard4"});
+
+    // insert sample data into placementHistory collection
+    for (auto& doc : placementHistoryCollection.getData()) {
+        ASSERT_OK(insertToConfigCollection(
+            opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, doc));
+    }
+
+    // we force shard3 to miss
+    for (auto& doc : generateConfigShardSampleData(2)) {
+        ASSERT_OK(insertToConfigCollection(opCtx, NamespaceString::kConfigsvrShardsNamespace, doc));
+    }
+
+    // 3 shards should own collection1 at timestamp 7
+    // however, since shard3 and shard4 are missing, we should get an error
+    ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
+                           opCtx, NamespaceString("db"), Timestamp(2, 0)),
                        DBException,
                        ErrorCodes::SnapshotTooOld);
 }
@@ -346,7 +516,4 @@ TEST_F(CatalogClientAggregationsTest, TestCollectionAndIndexesWithMultipleCollec
     ASSERT_EQ(collection.getTimestamp(), placementVersion.getTimestamp());
     ASSERT_EQ(collection.getUuid(), uuidColl1);
 }
-
-
-}  // namespace
 }  // namespace mongo
