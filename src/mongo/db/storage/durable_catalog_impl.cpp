@@ -269,7 +269,7 @@ std::vector<DurableCatalog::EntryIdentifier> DurableCatalogImpl::getAllCatalogEn
     return ret;
 }
 
-boost::optional<DurableCatalog::CatalogEntry> DurableCatalogImpl::scanForCatalogEntryByNss(
+boost::optional<DurableCatalogEntry> DurableCatalogImpl::scanForCatalogEntryByNss(
     OperationContext* opCtx, const NamespaceString& nss) const {
     auto cursor = _rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
@@ -283,7 +283,8 @@ boost::optional<DurableCatalog::CatalogEntry> DurableCatalogImpl::scanForCatalog
         auto entryNss =
             NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(obj["ns"].String());
         if (entryNss == nss) {
-            return CatalogEntry{obj["ident"].String(), _parseMetaData(obj["md"])};
+            return DurableCatalogEntry{
+                record->id, obj["ident"].String(), _parseMetaData(obj["md"])};
         }
     }
 
@@ -399,14 +400,14 @@ BSONObj DurableCatalogImpl::_findEntry(OperationContext* opCtx, const RecordId& 
     return data.releaseToBson().getOwned();
 }
 
-boost::optional<DurableCatalog::CatalogEntry> DurableCatalogImpl::getParsedCatalogEntry(
+boost::optional<DurableCatalogEntry> DurableCatalogImpl::getParsedCatalogEntry(
     OperationContext* opCtx, const RecordId& catalogId) const {
     BSONObj obj = _findEntry(opCtx, catalogId);
     if (obj.isEmpty()) {
         return boost::none;
     }
 
-    return CatalogEntry{obj["ident"].String(), _parseMetaData(obj["md"])};
+    return DurableCatalogEntry{catalogId, obj["ident"].String(), _parseMetaData(obj["md"])};
 }
 
 std::shared_ptr<BSONCollectionCatalogEntry::MetaData> DurableCatalogImpl::getMetaData(

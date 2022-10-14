@@ -379,7 +379,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
 }
 
 Status CollectionImpl::initFromExisting(OperationContext* opCtx,
-                                        std::shared_ptr<Collection> collection,
+                                        const std::shared_ptr<Collection>& collection,
                                         Timestamp readTimestamp) {
     LOGV2_DEBUG(
         6825402, 1, "Initializing collection using shared state", logAttrs(collection->ns()));

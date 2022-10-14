@@ -66,7 +66,7 @@ public:
     }
 
     Status initFromExisting(OperationContext* opCtx,
-                            std::shared_ptr<Collection> collection,
+                            const std::shared_ptr<Collection>& collection,
                             Timestamp readTimestamp) final {
         unimplementedTasserted();
         return Status(ErrorCodes::UnknownError, "unknown");

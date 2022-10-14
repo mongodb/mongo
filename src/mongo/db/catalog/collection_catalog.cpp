@@ -768,79 +768,112 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
         return lookupResult.collection;
     }
 
-    auto catalogId = lookupCatalogIdByNSS(nss, readTimestamp);
-    if (!catalogId) {
-        return nullptr;
-    }
-
-    auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, *catalogId);
+    // Try to find a catalog entry matching 'readTimestamp'.
+    auto catalogEntry = _fetchPITCatalogEntry(opCtx, nss, readTimestamp);
     if (!catalogEntry) {
         // Treat the collection as non-existent at a point-in-time the same as not-existent at
         // latest.
         return nullptr;
     }
 
-    const auto& collectionOptions = catalogEntry->metadata->options;
+    auto latestCollection = _lookupCollectionByUUID(*catalogEntry->metadata->options.uuid);
 
-    // Check if the collection already exists in the catalog and if it's compatible with the read
-    // timestamp.
-    std::shared_ptr<Collection> latestColl = _lookupCollectionByUUID(*collectionOptions.uuid);
-    if (isCollectionCompatible(latestColl, readTimestamp)) {
-        uncommittedCatalogUpdates.openCollection(opCtx, latestColl);
-        return latestColl;
+    // Return the in-memory Collection instance if it is compatible with the read timestamp.
+    if (isCollectionCompatible(latestCollection, readTimestamp)) {
+        uncommittedCatalogUpdates.openCollection(opCtx, latestCollection);
+        return latestCollection;
     }
 
+    // Use the shared collection state from the latest Collection in the in-memory collection
+    // catalog if it is compatible.
+    auto compatibleCollection =
+        _createCompatibleCollection(opCtx, latestCollection, readTimestamp, catalogEntry.get());
+    if (compatibleCollection) {
+        uncommittedCatalogUpdates.openCollection(opCtx, compatibleCollection);
+        return compatibleCollection;
+    }
+
+    // There is no state in-memory that matches the catalog entry. Try to instantiate a new
+    // Collection instance from scratch.
+    auto newCollection = _createNewPITCollection(opCtx, readTimestamp, catalogEntry.get());
+    if (newCollection) {
+        uncommittedCatalogUpdates.openCollection(opCtx, newCollection);
+    }
+    return newCollection;
+}
+
+boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
+    OperationContext* opCtx, const NamespaceString& nss, const Timestamp& readTimestamp) const {
+    auto catalogId = lookupCatalogIdByNSS(nss, readTimestamp);
+    if (!catalogId) {
+        return boost::none;
+    }
+
+    return DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, *catalogId);
+}
+
+std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
+    OperationContext* opCtx,
+    const std::shared_ptr<Collection>& latestCollection,
+    const Timestamp& readTimestamp,
+    const DurableCatalogEntry& catalogEntry) const {
     // Check if the collection is drop pending, not expired, and compatible with the read timestamp.
     std::shared_ptr<Collection> dropPendingColl = [&]() -> std::shared_ptr<Collection> {
-        auto dropPendingIt = _dropPendingCollection.find(catalogEntry->ident);
+        auto dropPendingIt = _dropPendingCollection.find(catalogEntry.ident);
         if (dropPendingIt == _dropPendingCollection.end()) {
             return nullptr;
         }
-
         return dropPendingIt->second.lock();
     }();
 
     if (isCollectionCompatible(dropPendingColl, readTimestamp)) {
-        uncommittedCatalogUpdates.openCollection(opCtx, dropPendingColl);
         return dropPendingColl;
     }
 
-    // Neither the latest collection or drop pending collection exist, or were compatible with the
-    // read timestamp. We'll need to instantiate a new Collection instance.
-    if (latestColl || dropPendingColl) {
-        // If the latest or drop pending collection exists, instantiate a new collection using
-        // their shared state.
+    // If either the latest or drop pending collection exists, instantiate a new collection using
+    // the shared state.
+    if (latestCollection || dropPendingColl) {
         LOGV2_DEBUG(6825400,
                     1,
                     "Instantiating a collection using shared state",
-                    logAttrs(nss),
-                    "ident"_attr = catalogEntry->ident,
-                    "md"_attr = catalogEntry->metadata->toBSON(),
+                    logAttrs(catalogEntry.metadata->nss),
+                    "ident"_attr = catalogEntry.ident,
+                    "md"_attr = catalogEntry.metadata->toBSON(),
                     "timestamp"_attr = readTimestamp);
 
-        std::shared_ptr<Collection> collToReturn = Collection::Factory::get(opCtx)->make(
-            opCtx, nss, *catalogId, catalogEntry->metadata, /*rs=*/nullptr);
+        std::shared_ptr<Collection> collToReturn =
+            Collection::Factory::get(opCtx)->make(opCtx,
+                                                  catalogEntry.metadata->nss,
+                                                  catalogEntry.catalogId,
+                                                  catalogEntry.metadata,
+                                                  /*rs=*/nullptr);
         Status status = collToReturn->initFromExisting(
-            opCtx, latestColl ? latestColl : dropPendingColl, readTimestamp);
+            opCtx, latestCollection ? latestCollection : dropPendingColl, readTimestamp);
         if (!status.isOK()) {
             LOGV2_DEBUG(
                 6857100, 1, "Failed to instantiate collection", "reason"_attr = status.reason());
             return nullptr;
         }
 
-        uncommittedCatalogUpdates.openCollection(opCtx, collToReturn);
         return collToReturn;
     }
 
+    return nullptr;
+}
+
+std::shared_ptr<Collection> CollectionCatalog::_createNewPITCollection(
+    OperationContext* opCtx,
+    const Timestamp& readTimestamp,
+    const DurableCatalogEntry& catalogEntry) const {
     // The ident is expired, but it still may not have been dropped by the reaper. Try to mark it as
     // in use.
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto newIdent = storageEngine->markIdentInUse(catalogEntry->ident);
+    auto newIdent = storageEngine->markIdentInUse(catalogEntry.ident);
     if (!newIdent) {
         LOGV2_DEBUG(6857101,
                     1,
                     "Collection ident is being dropped or is already dropped",
-                    "ident"_attr = catalogEntry->ident);
+                    "ident"_attr = catalogEntry.ident);
         return nullptr;
     }
 
@@ -848,21 +881,25 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
     LOGV2_DEBUG(6825401,
                 1,
                 "Instantiating a new collection",
-                logAttrs(nss),
-                "ident"_attr = catalogEntry->ident,
-                "md"_attr = catalogEntry->metadata->toBSON(),
+                logAttrs(catalogEntry.metadata->nss),
+                "ident"_attr = catalogEntry.ident,
+                "md"_attr = catalogEntry.metadata->toBSON(),
                 "timestamp"_attr = readTimestamp);
 
     std::unique_ptr<RecordStore> rs =
         opCtx->getServiceContext()->getStorageEngine()->getEngine()->getRecordStore(
-            opCtx, nss, catalogEntry->ident, collectionOptions);
+            opCtx, catalogEntry.metadata->nss, catalogEntry.ident, catalogEntry.metadata->options);
 
     // Set the ident to the one returned by the ident reaper. This is to prevent the ident from
     // being dropping prematurely.
     rs->setIdent(std::move(newIdent));
 
-    std::shared_ptr<Collection> collToReturn = Collection::Factory::get(opCtx)->make(
-        opCtx, nss, *catalogId, catalogEntry->metadata, std::move(rs));
+    std::shared_ptr<Collection> collToReturn =
+        Collection::Factory::get(opCtx)->make(opCtx,
+                                              catalogEntry.metadata->nss,
+                                              catalogEntry.catalogId,
+                                              catalogEntry.metadata,
+                                              std::move(rs));
     Status status = collToReturn->initFromExisting(opCtx, /*collection=*/nullptr, readTimestamp);
     if (!status.isOK()) {
         LOGV2_DEBUG(
@@ -870,7 +907,6 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
         return nullptr;
     }
 
-    uncommittedCatalogUpdates.openCollection(opCtx, collToReturn);
     return collToReturn;
 }
 

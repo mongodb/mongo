@@ -81,7 +81,7 @@ public:
 
     void init(OperationContext* opCtx) final;
     Status initFromExisting(OperationContext* opCtx,
-                            std::shared_ptr<Collection> collection,
+                            const std::shared_ptr<Collection>& collection,
                             Timestamp readTimestamp) final;
     bool isInitialized() const final;
     bool isCommitted() const final;

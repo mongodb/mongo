@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
@@ -66,14 +67,6 @@ public:
         NamespaceString nss;
     };
 
-    /**
-     * Parsed catalog entry of a single `_mdb_catalog` document.
-     */
-    struct CatalogEntry {
-        std::string ident;
-        std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata;
-    };
-
     virtual ~DurableCatalog() {}
 
     static DurableCatalog* get(OperationContext* opCtx) {
@@ -98,7 +91,7 @@ public:
     /**
      * Scans the persisted catalog until an entry is found matching 'nss'.
      */
-    virtual boost::optional<DurableCatalog::CatalogEntry> scanForCatalogEntryByNss(
+    virtual boost::optional<DurableCatalogEntry> scanForCatalogEntryByNss(
         OperationContext* opCtx, const NamespaceString& nss) const = 0;
 
     virtual EntryIdentifier getEntry(const RecordId& catalogId) const = 0;
@@ -118,7 +111,7 @@ public:
     /**
      * Like 'getCatalogEntry' above but parses the catalog entry to common types.
      */
-    virtual boost::optional<CatalogEntry> getParsedCatalogEntry(
+    virtual boost::optional<DurableCatalogEntry> getParsedCatalogEntry(
         OperationContext* opCtx, const RecordId& catalogId) const = 0;
 
     /**

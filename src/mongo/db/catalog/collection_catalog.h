@@ -38,6 +38,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/uuid.h"
@@ -613,6 +614,30 @@ private:
     std::shared_ptr<Collection> _lookupCollectionByUUID(UUID uuid) const;
 
     CollectionPtr _lookupSystemViews(OperationContext* opCtx, const DatabaseName& dbName) const;
+
+    /**
+     * Searches for a catalog entry at a point-in-time.
+     */
+    boost::optional<DurableCatalogEntry> _fetchPITCatalogEntry(
+        OperationContext* opCtx, const NamespaceString& nss, const Timestamp& readTimestamp) const;
+
+    /**
+     * Tries to create a Collection instance using existing shared collection state. Returns nullptr
+     * if unable to do so.
+     */
+    std::shared_ptr<Collection> _createCompatibleCollection(
+        OperationContext* opCtx,
+        const std::shared_ptr<Collection>& latestCollection,
+        const Timestamp& readTimestamp,
+        const DurableCatalogEntry& catalogEntry) const;
+
+    /**
+     * Creates a Collection instance from scratch if the ident has not yet been dropped.
+     */
+    std::shared_ptr<Collection> _createNewPITCollection(
+        OperationContext* opCtx,
+        const Timestamp& readTimestamp,
+        const DurableCatalogEntry& catalogEntry) const;
 
     /**
      * Retrieves the views for a given database, including any uncommitted changes for this

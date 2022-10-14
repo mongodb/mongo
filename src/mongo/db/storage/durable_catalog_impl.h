@@ -64,8 +64,8 @@ public:
 
     std::vector<EntryIdentifier> getAllCatalogEntries(OperationContext* opCtx) const;
 
-    boost::optional<DurableCatalog::CatalogEntry> scanForCatalogEntryByNss(
-        OperationContext* opCtx, const NamespaceString& nss) const;
+    boost::optional<DurableCatalogEntry> scanForCatalogEntryByNss(OperationContext* opCtx,
+                                                                  const NamespaceString& nss) const;
 
     EntryIdentifier getEntry(const RecordId& catalogId) const;
 
@@ -82,8 +82,8 @@ public:
         return _findEntry(opCtx, catalogId);
     }
 
-    boost::optional<CatalogEntry> getParsedCatalogEntry(OperationContext* opCtx,
-                                                        const RecordId& catalogId) const override;
+    boost::optional<DurableCatalogEntry> getParsedCatalogEntry(
+        OperationContext* opCtx, const RecordId& catalogId) const override;
 
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> getMetaData(
         OperationContext* opCtx, const RecordId& catalogId) const;

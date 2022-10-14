@@ -224,7 +224,7 @@ public:
      * Returns the SnapshotTooOld error if the underlying data files have already been removed.
      */
     virtual Status initFromExisting(OperationContext* opCtx,
-                                    std::shared_ptr<Collection> collection,
+                                    const std::shared_ptr<Collection>& collection,
                                     Timestamp readTimestamp) = 0;
 
     virtual bool isCommitted() const {
