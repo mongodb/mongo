@@ -38,6 +38,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/data_view.h"
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/internal_auth.h"
@@ -1048,7 +1049,7 @@ StatusWith<DERToken> DERToken::parse(ConstDataRange cdr, size_t* outLength) {
         derLength = ConstDataView(lengthBuffer.data()).read<BigEndian<uint64_t>>();
     } else {
         // Length is <= 127 bytes, i.e. short form of length
-        derLength = initialLengthByte;
+        derLength = ConstDataView(&initialLengthByte).read<uint8_t>();
     }
 
     // This is the total length of the TLV and all data
