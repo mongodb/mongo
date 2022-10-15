@@ -37,7 +37,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication

@@ -96,7 +96,6 @@ env.Library(
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/s/common_s',
-        '$BUILD_DIR/mongo/util/namespace_string_util',
         'dbcheck',
         'image_collection_entry',
         'repl_coordinator_interface',
@@ -553,7 +552,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/session/kill_sessions_local',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/storage/historical_ident_tracker',
-        '$BUILD_DIR/mongo/util/namespace_string_util',
         'drop_pending_collection_reaper',
     ],
 )

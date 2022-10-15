@@ -673,13 +673,14 @@ Status createCollection(OperationContext* opCtx, const CreateCommand& cmd) {
     return createCollection(opCtx, cmd.getNamespace(), options, idIndex);
 }
 
+// TODO SERVER-62395 Pass DatabaseName instead of dbName, and pass to isDbLockedForMode.
 Status createCollectionForApplyOps(OperationContext* opCtx,
-                                   const DatabaseName& dbName,
+                                   const std::string& dbname,
                                    const boost::optional<UUID>& ui,
                                    const BSONObj& cmdObj,
                                    const bool allowRenameOutOfTheWay,
                                    const boost::optional<BSONObj>& idIndex) {
-
+    const DatabaseName dbName(boost::none, dbname);
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
     const NamespaceString newCollName(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));

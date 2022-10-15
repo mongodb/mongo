@@ -79,7 +79,7 @@ Status createVirtualCollection(OperationContext* opCtx,
  * error.
  */
 Status createCollectionForApplyOps(OperationContext* opCtx,
-                                   const DatabaseName& dbName,
+                                   const std::string& dbName,
                                    const boost::optional<UUID>& ui,
                                    const BSONObj& cmdObj,
                                    bool allowRenameOutOfTheWay,

@@ -89,7 +89,7 @@ StringBuilder& operator<<(StringBuilder& sb, const CollectionState& state);
 
 class IdempotencyTest : public OplogApplierImplTest {
 public:
-    IdempotencyTest() : _nss(boost::none, "test.foo") {
+    IdempotencyTest() {
         globalFailPointRegistry()
             .find("doUntimestampedWritesForIdempotencyTests")
             ->setMode(FailPoint::alwaysOn);
@@ -135,7 +135,6 @@ protected:
                           const BSONArray& ops);
     virtual Status resetState();
 
-    void setNss(const NamespaceString& nss);
     /**
      * This method returns true if running the list of operations a single time is equivalent to
      * running them two times. It returns false otherwise.
@@ -161,10 +160,10 @@ protected:
     /**
      * Validate data and indexes. Return the MD5 hash of the documents ordered by _id.
      */
-    CollectionState validate(const NamespaceString& nss);
+    CollectionState validate(const NamespaceString& nss = NamespaceString("test.foo"));
     std::vector<CollectionState> validateAllCollections();
 
-    NamespaceString _nss;
+    NamespaceString nss{"test.foo"};
 };
 
 }  // namespace repl

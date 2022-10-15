@@ -154,13 +154,16 @@ function runTests(enabled) {
         MongoRunner.stopMongod(standalone);
     }
 
-    {
+    // TODO SERVER-62395: Uncomment this test once we use tid to construct namespace when applying
+    // non-txn commands.
+    /* {
         const rst = new ReplSetTest({nodes: 2, nodeOptions: opts});
         rst.startSet({keyFile: 'jstests/libs/key1'});
         rst.initiate();
         runTest(rst.getPrimary(), enabled, rst);
         rst.stopSet();
     }
+    */
     // Do not test sharding since mongos must have an authenticated connection to
     // all mongod nodes, and this conflicts with proxying tokens which we'll be
     // performing in mongoq.
