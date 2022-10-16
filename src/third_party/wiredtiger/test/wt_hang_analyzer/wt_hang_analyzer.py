@@ -39,8 +39,8 @@ Currently only supports Linux. There are two issues with the MacOS and Windows i
 2. WT-6919 - Windows cannot find the debug symbols.
 """
 
-import csv, glob, itertools, logging, re, tempfile, traceback
-import os, sys, platform, signal, subprocess, threading, time
+import csv, glob, itertools, logging, tempfile, traceback
+import os, sys, platform, subprocess, threading
 from distutils import spawn
 from io import BytesIO, TextIOWrapper
 from optparse import OptionParser
@@ -614,15 +614,17 @@ def main():
         try:
             avoid_asan_dump(pid)
         except Exception as err:
-            root_logger.warn("Error encountered when removing ASAN mappings from core dump", err)
-            trapped_exceptions.append(traceback.format_exc())
+            root_logger.warning("Error encountered when removing ASAN mappings from core dump: %s", err)
+            # Ignore permission failures caused by processes we are not interested in
+            if 'Permission denied' not in str(err):
+                trapped_exceptions.append(traceback.format_exc())
 
         process_logger = get_process_logger(options.debugger_output, pid, process_name)
         try:
             dbg.dump_info(root_logger, process_logger, pid, process_name, options.dump_core
                           and check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
         except Exception as err:
-            root_logger.info("Error encountered when invoking debugger %s", err)
+            root_logger.info("Error encountered when invoking debugger: %s", err)
             trapped_exceptions.append(traceback.format_exc())
 
     root_logger.info("Done analyzing all processes for hangs")
