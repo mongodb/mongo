@@ -55,7 +55,9 @@ main(int argc, char *argv[])
 #endif
     testutil_build_dir(opts, buf, 1024);
     testutil_check(__wt_snprintf(config, sizeof(config),
-      "create,extensions=(%s/%s=(early_load=true)),statistics=(all)", buf, WT_FAIL_FS_LIB));
+      "create,extensions=(%s/"
+      "%s=(early_load=true)),statistics=(all),statistics_log=(json,on_close,wait=1)",
+      buf, WT_FAIL_FS_LIB));
     testutil_check(wiredtiger_open(opts->home, NULL, config, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
     testutil_check(session->create(session, opts->uri, "key_format=S,value_format=S"));
@@ -72,7 +74,8 @@ main(int argc, char *argv[])
 
     /* Force to disk and re-open. */
     testutil_check(opts->conn->close(opts->conn, NULL));
-    testutil_check(wiredtiger_open(opts->home, NULL, "statistics=(all)", &opts->conn));
+    testutil_check(wiredtiger_open(
+      opts->home, NULL, "statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
     testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &cursor));

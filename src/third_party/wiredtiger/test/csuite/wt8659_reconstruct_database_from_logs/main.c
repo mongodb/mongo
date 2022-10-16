@@ -30,7 +30,8 @@
 #define MAX_KEYS 100000
 
 static const char *const conn_config =
-  "create,cache_size=100MB,log=(archive=false,enabled=true,file_max=100K),statistics=(all)";
+  "create,cache_size=100MB,log=(archive=false,enabled=true,file_max=100K),statistics=(all),"
+  "statistics_log=(json,on_close,wait=1)";
 static const char *const table_config = "key_format=S,value_format=S";
 
 static const char *const full_out = "backup_full";

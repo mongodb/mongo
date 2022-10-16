@@ -292,7 +292,8 @@ wt_connect(const char *config_open)
 
     /* Set up the basic configuration string first. */
     testutil_check(__wt_snprintf(config, sizeof(config),
-      "create,cache_cursors=false,statistics=(all),statistics_log=(json,wait=1),log=(enabled),"
+      "create,cache_cursors=false,statistics=(all),statistics_log=(json,on_close,wait=1),log=("
+      "enabled),"
       "error_prefix=\"%s\",cache_size=1G, eviction_dirty_trigger=%i, "
       "eviction_dirty_target=%i,%s%s%s",
       progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5, g.debug_mode ? DEBUG_MODE_CFG : "",

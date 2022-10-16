@@ -85,7 +85,7 @@ void
 trace_init(void)
 {
     int retain;
-    char config[100], tracedir[MAX_FORMAT_PATH * 2];
+    char config[256], tracedir[MAX_FORMAT_PATH * 2];
 
     if (!FLD_ISSET(g.trace_flags, TRACE))
         return;
@@ -99,7 +99,8 @@ trace_init(void)
 
     /* Configure logging with automatic removal, and keep the last N log files. */
     testutil_check(__wt_snprintf(config, sizeof(config),
-      "create,log=(enabled=true,remove=true),debug_mode=(log_retention=%d),statistics=(all)",
+      "create,log=(enabled=true,remove=true),debug_mode=(log_retention=%d),statistics=(all),"
+      "statistics_log=(json,on_close,wait=5)",
       retain));
     testutil_check(__wt_snprintf(tracedir, sizeof(tracedir), "%s/%s", g.home, TRACE_DIR));
     testutil_checkfmt(

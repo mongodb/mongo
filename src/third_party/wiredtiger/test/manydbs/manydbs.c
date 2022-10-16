@@ -36,7 +36,7 @@ static const char *const uri = "table:main";
 
 #define WTOPEN_CFG_COMMON                             \
     "create,log=(enabled,file_max=10M,remove=false)," \
-    "statistics=(all),statistics_log=(wait=5),"
+    "statistics=(all),statistics_log=(json,on_close,wait=5),"
 #define WT_CONFIG0    \
     WTOPEN_CFG_COMMON \
     "transaction_sync=(enabled=false)"

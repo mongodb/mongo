@@ -67,8 +67,9 @@ fuzzutil_setup(void)
     WT_CLEAR(home);
     fuzzutil_generate_home_name(home);
     testutil_make_work_dir(home);
-    testutil_check(
-      wiredtiger_open(home, NULL, "create,cache_size=5MB,statistics=(all)", &fuzz_state.conn));
+    testutil_check(wiredtiger_open(home, NULL,
+      "create,cache_size=5MB,statistics=(all),statistics_log=(json,on_close,wait=1)",
+      &fuzz_state.conn));
     testutil_check(fuzz_state.conn->open_session(fuzz_state.conn, NULL, NULL, &fuzz_state.session));
 }
 
