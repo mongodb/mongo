@@ -99,15 +99,15 @@ static const char *const uri_rev = "table:rev";
 
 #define KEY_SEP "_" /* Must be one char string */
 
-#define ENV_CONFIG                                        \
-    "create,log=(file_max=10M,enabled),statistics=(all)," \
+#define ENV_CONFIG                                                                              \
+    "create,log=(file_max=10M,enabled),statistics=(all),statistics_log=(json,on_close,wait=1)," \
     "transaction_sync=(enabled,method=%s)"
 #define ENV_CONFIG_TIER \
     ",tiered_storage=(bucket=./bucket,bucket_prefix=pfx-,local_retention=2,name=dir_store)"
 #define ENV_CONFIG_TIER_EXT                                  \
     ",extensions=(%s../../../ext/storage_sources/dir_store/" \
     "libwiredtiger_dir_store.so=(early_load=true))"
-#define ENV_CONFIG_REC "log=(recover=on),statistics=(all)"
+#define ENV_CONFIG_REC "log=(recover=on),statistics=(all),statistics_log=(json,on_close,wait=1)"
 
 /* 64 spaces */
 #define SPACES "                                                                "

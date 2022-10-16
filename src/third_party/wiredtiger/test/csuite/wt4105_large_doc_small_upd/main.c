@@ -98,7 +98,9 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, &event_handler,
-      "create,cache_size=1G,statistics_log=(json,wait=1),statistics=(all)", &opts->conn));
+      "create,cache_size=1G,statistics_log=(json,wait=1),statistics=(all),statistics_log=(json,on_"
+      "close,wait=1)",
+      &opts->conn));
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
     testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),

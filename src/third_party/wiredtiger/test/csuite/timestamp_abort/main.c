@@ -101,11 +101,12 @@ static uint64_t global_ts = 1;
     "debug_mode=(table_logging=true,checkpoint_retention=5)," \
     "eviction_updates_target=20,eviction_updates_trigger=90," \
     "log=(enabled,file_max=10M,remove=true),session_max=%d,"  \
-    "statistics=(all),statistics_log=(wait=%d,json=true)"
+    "statistics=(all),statistics_log=(wait=%d,json,on_close)"
 #define ENV_CONFIG_TXNSYNC \
     ENV_CONFIG_DEF         \
     ",transaction_sync=(enabled,method=none)"
-#define ENV_CONFIG_REC "log=(recover=on,remove=false),statistics=(all)"
+#define ENV_CONFIG_REC \
+    "log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their

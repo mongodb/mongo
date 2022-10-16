@@ -111,8 +111,8 @@ check_results(TEST_OPTS *opts, uint64_t *foundp)
 
     testutil_check(create_big_string(&bigref));
     nrecords = opts->nrecords;
-    testutil_check(
-      wiredtiger_open(opts->home, NULL, "create,log=(enabled),statistics=(all)", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL,
+      "create,log=(enabled),statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
     testutil_check(session->open_cursor(session, "table:subtest", NULL, NULL, &maincur));
@@ -523,7 +523,8 @@ subtest_main(int argc, char *argv[], bool close_test)
     testutil_build_dir(opts, buf, 1024);
     testutil_check(__wt_snprintf(config, sizeof(config),
       "create,cache_size=250M,log=(enabled),transaction_sync=(enabled,method=none),extensions=(%s/"
-      "%s=(early_load,config={environment=true,verbose=true})),statistics=(all)",
+      "%s=(early_load,config={environment=true,verbose=true})),statistics=(all),statistics_log=("
+      "json,on_close,wait=1)",
       buf, WT_FAIL_FS_LIB));
     testutil_check(wiredtiger_open(opts->home, &event_handler, config, &opts->conn));
 

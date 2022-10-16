@@ -374,8 +374,8 @@ main(int argc, char *argv[])
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
 
-    testutil_check(
-      wiredtiger_open(opts->home, &event_handler, "create,statistics=(all)", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, &event_handler,
+      "create,statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
 
     run(opts->conn, "file:file.SS", "key_format=S,value_format=S");
     run(opts->conn, "file:file.Su", "key_format=S,value_format=u");

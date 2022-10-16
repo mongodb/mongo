@@ -49,7 +49,9 @@
 #define KEY_FORMAT "key-%d-%d"
 #define TABLE_FORMAT "key_format=S,value_format=u"
 
-#define CONN_CONFIG_COMMON "timing_stress_for_test=[backup_rename],statistics=(all)"
+#define CONN_CONFIG_COMMON                                                                        \
+    "timing_stress_for_test=[backup_rename],statistics=(all),statistics_log=(json,on_close,wait=" \
+    "1)"
 
 #define NUM_ALLOC 5
 static const char *alloc_sizes[] = {"512B", "8K", "64K", "1M", "16M"};

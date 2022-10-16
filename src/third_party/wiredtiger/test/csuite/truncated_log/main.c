@@ -36,10 +36,11 @@ static bool use_columns = false;
 
 #define RECORDS_FILE "records"
 
-#define ENV_CONFIG                                     \
-    "create,log=(enabled,file_max=100K,remove=false)," \
-    "transaction_sync=(enabled,method=none),statistics=(all)"
-#define ENV_CONFIG_REC "log=(recover=on),statistics=(all)"
+#define ENV_CONFIG                                                                                \
+    "create,log=(enabled,file_max=100K,remove=false),"                                            \
+    "transaction_sync=(enabled,method=none),statistics=(all),statistics_log=(json,on_close,wait=" \
+    "1)"
+#define ENV_CONFIG_REC "log=(recover=on),statistics=(all),statistics_log=(json,on_close,wait=1)"
 
 #define LOG_FILE_1 "WiredTigerLog.0000000001"
 
