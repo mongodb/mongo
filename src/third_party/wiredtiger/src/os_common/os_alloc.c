@@ -107,10 +107,6 @@ __realloc_func(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t byt
     size_t bytes_allocated;
     void *p, *tmpp;
 
-    WT_ASSERT_ALWAYS(session, !(bytes_allocated_ret == NULL && clear_memory),
-      "bytes allocated must be passed in if clear_memory is set, otherwise use "
-      "__wt_realloc_noclear");
-
     /*
      * !!!
      * This function MUST handle a NULL WT_SESSION_IMPL handle.
