@@ -3,6 +3,7 @@ WT_CRC32_ENTRY
 WT_CURDUMP_PASS
 __bit_ffs
 __bit_nclr
+__curstd_config_value_for
 __ovfl_discard_dump
 __ovfl_reuse_dump
 __wt_bloom_drop

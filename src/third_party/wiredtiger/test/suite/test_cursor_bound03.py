@@ -123,14 +123,6 @@ class test_cursor_bound03(bound_base):
         self.assertEqual(cursor.bound("action=clear"), 0)
         self.cursor_traversal_bound(cursor, None, None, True)
         self.assertEqual(cursor.reset(), 0)
-
-        # Test bound api: Test upper bound clearing with only lower bounds.
-        self.set_bounds(cursor, 50, "lower")
-        cursor.bound("action=clear,bound=upper")
-        self.cursor_traversal_bound(cursor, None, None, self.direction, self.end_key - 49)
-
-        cursor.bound("action=clear,bound=lower")
-        self.cursor_traversal_bound(cursor, None, None)
         
         # Test bound api: Test that changing upper bounds works.
         self.set_bounds(cursor, 50, "upper", self.upper_inclusive)

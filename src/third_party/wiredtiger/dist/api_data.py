@@ -1207,18 +1207,15 @@ cursor_bound_config = [
     Config('action', 'set', r'''
         configures whether this call into the API will set or clear range bounds on the given
         cursor. It takes one of two values, "set" or "clear". If "set" is specified then "bound"
-        must also be specified. If "clear" is specified without any bounds then both bounds will
-        be cleared. The keys relevant to the given bound must have been set prior to the call using
-        WT_CURSOR::set_key. This configuration is currently a work in progress and should not be
-        used.''',
+        must also be specified. The keys relevant to the given bound must have been set prior to the
+        call using WT_CURSOR::set_key.''',
         choices=['clear','set']),
     Config('inclusive', 'true', r'''
-        configures whether the given bound is inclusive or not. This configuration is currently a
-        work in progress and should not be used.''',
+        configures whether the given bound is inclusive or not.''',
         type='boolean'),
     Config('bound', '', r'''
         configures which bound is being operated on. It takes one of two values, "lower" or "upper".
-        This configuration is currently a work in progress and should not be used.''',
+        ''',
         choices=['lower','upper']),
 ]
 

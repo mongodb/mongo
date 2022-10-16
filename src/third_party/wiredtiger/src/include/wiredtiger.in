@@ -684,18 +684,14 @@ struct __wt_cursor {
 	 * @configstart{WT_CURSOR.bound, see dist/api_data.py}
 	 * @config{action, configures whether this call into the API will set or clear range bounds
 	 * on the given cursor.  It takes one of two values\, "set" or "clear". If "set" is
-	 * specified then "bound" must also be specified.  If "clear" is specified without any
-	 * bounds then both bounds will be cleared.  The keys relevant to the given bound must have
-	 * been set prior to the call using WT_CURSOR::set_key.  This configuration is currently a
-	 * work in progress and should not be used., a string\, chosen from the following options:
-	 * \c "clear"\, \c "set"; default \c set.}
+	 * specified then "bound" must also be specified.  The keys relevant to the given bound must
+	 * have been set prior to the call using WT_CURSOR::set_key., a string\, chosen from the
+	 * following options: \c "clear"\, \c "set"; default \c set.}
 	 * @config{bound, configures which bound is being operated on.  It takes one of two values\,
-	 * "lower" or "upper". This configuration is currently a work in progress and should not be
-	 * used., a string\, chosen from the following options: \c "lower"\, \c "upper"; default
-	 * empty.}
-	 * @config{inclusive, configures whether the given bound is inclusive or not.  This
-	 * configuration is currently a work in progress and should not be used., a boolean flag;
-	 * default \c true.}
+	 * "lower" or "upper"., a string\, chosen from the following options: \c "lower"\, \c
+	 * "upper"; default empty.}
+	 * @config{inclusive, configures whether the given bound is inclusive or not., a boolean
+	 * flag; default \c true.}
 	 * @configend
 	 * @errors
 	 */
