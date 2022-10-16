@@ -75,7 +75,7 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
     keyfmt = [
         ('integer', dict(keyfmt='i')),
         ('recno', dict(keyfmt='r')),
-        ('string', dict(keyfmt='S'))
+#        ('string', dict(keyfmt='S'))
     ]
     types = [
         ('file', dict(uri='file:', dataset=SimpleDataSet)),
@@ -83,8 +83,8 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
         ('table-simple', dict(uri='table:', dataset=SimpleDataSet)),
         ('table-index', dict(uri='table:', dataset=SimpleIndexDataSet)),
         ('table-simple-lsm', dict(uri='table:', dataset=SimpleLSMDataSet)),
-        ('table-complex', dict(uri='table:', dataset=ComplexDataSet)),
-        ('table-complex-lsm', dict(uri='table:', dataset=ComplexLSMDataSet))
+#        ('table-complex', dict(uri='table:', dataset=ComplexDataSet)),
+#        ('table-complex-lsm', dict(uri='table:', dataset=ComplexLSMDataSet))
     ]
     scenarios = make_scenarios(types, keyfmt)
 

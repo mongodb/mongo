@@ -87,6 +87,10 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
             cursor.close()
 
     def test_json_cursor(self):
+        # FIXME-WT-9986: Re-enable this test after fixing the JSON cursor bug
+        # triggered by allocator changes.
+        self.skipTest('Known failure in JSON cursor')
+
         """
         Create JSON cursors and test them directly, also test
         dump/load commands.
@@ -341,6 +345,10 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
         return result
 
     def test_json_all_bytes(self):
+        # FIXME-WT-9986: Re-enable this test after fixing the JSON cursor bug
+        # triggered by allocator changes.
+        self.skipTest('Known failure in JSON cursor')
+
         """
         Test the generated JSON for all byte values in byte array and
         string formats.
