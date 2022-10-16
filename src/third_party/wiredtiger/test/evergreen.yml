@@ -2410,7 +2410,7 @@ tasks:
           remote_file: wiredtiger/${build_variant}/${revision}/coverage_report_${build_id}-${execution}/1_coverage_report_main.html
 
   - name: tiered-storage-extensions-test
-    tags: ["python", "ext"]
+    tags: ["python"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2422,7 +2422,7 @@ tasks:
           python_binary: $(pwd)/venv/bin/python3
           tiered_storage_test_name: tiered
   - name: tiered-test-small
-    tags: ["pull_request", "python", "ext"]
+    tags: ["pull_request", "python"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2434,7 +2434,7 @@ tasks:
           python_binary: $(pwd)/venv/bin/python3
           tiered_storage_test_name: tiered06
   - name: tiered-unittest-test
-    tags: ["pull_request", "ext"]
+    tags: ["pull_request"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4506,8 +4506,6 @@ buildvariants:
 
 - name: big-endian
   display_name: "~ Big-endian (s390x/zSeries)"
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-zseries-build
   batchtime: 4320 # 3 days
