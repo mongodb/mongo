@@ -207,7 +207,6 @@ testutil_progress(TEST_OPTS *opts, const char *message)
 void
 testutil_cleanup(TEST_OPTS *opts)
 {
-    int i;
     if (opts->conn != NULL)
         testutil_check(opts->conn->close(opts->conn, NULL));
 
@@ -221,13 +220,7 @@ testutil_cleanup(TEST_OPTS *opts)
     free(opts->progress_file_name);
     free(opts->home);
     free(opts->build_dir);
-    if (opts->tiered_storage) {
-        for (i = 0; i <= opts->nargc; ++i)
-            free(opts->nargv[i]);
-        free(opts->nargv);
-    }
-    if (opts->tiered_storage_source != NULL)
-        free(opts->tiered_storage_source);
+    free(opts->tiered_storage_source);
 }
 
 /*

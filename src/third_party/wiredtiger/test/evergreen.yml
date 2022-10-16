@@ -1846,6 +1846,16 @@ tasks:
         vars:
           test_name: wt8963_insert_stress
 
+  - name: csuite-wt9937-parse-opts-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "csuite test"
+        vars:
+          test_name: wt9937_parse_opts
+
   # End of csuite test tasks
 
   # Start of Python unit test tasks

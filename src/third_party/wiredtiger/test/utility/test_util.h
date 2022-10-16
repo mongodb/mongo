@@ -53,17 +53,17 @@
 typedef struct {
     char *home;
     const char *argv0; /* Exec name */
-    char **nargv;      /* New argument vector */
-    int nargc;         /* New argument count */
+    char usage[256];   /* Usage string for this parser */
 
     const char *progname;        /* Truncated program name */
     char *build_dir;             /* Build directory path */
     char *tiered_storage_source; /* Tiered storage source */
 
     enum {
-        TABLE_COL = 1, /* Fixed-length column store */
-        TABLE_FIX = 2, /* Variable-length column store */
-        TABLE_ROW = 3  /* Row-store */
+        TABLE_NOT_SET = 0, /* Not explicitly set */
+        TABLE_COL = 1,     /* Fixed-length column store */
+        TABLE_FIX = 2,     /* Variable-length column store */
+        TABLE_ROW = 3      /* Row-store */
     } table_type;
 
     FILE *progress_fp; /* Progress tracking file */
@@ -91,6 +91,12 @@ typedef struct {
     volatile uint64_t next_threadid;
     uint64_t unique_id;
     uint64_t max_inserted_id;
+
+    /* Fields used internally by testutil library. */
+    char **argv; /* Saved argument vector */
+    int argc;    /* Saved argument count */
+    const char *getopts_string;
+
 } TEST_OPTS;
 
 /*
@@ -370,6 +376,9 @@ void testutil_copy_if_exists(WT_SESSION *, const char *);
 void testutil_create_backup_directory(const char *);
 void testutil_make_work_dir(const char *);
 void testutil_modify_apply(WT_ITEM *, WT_ITEM *, WT_MODIFY *, int, uint8_t);
+void testutil_parse_begin_opt(int, char *const *, const char *, TEST_OPTS *);
+void testutil_parse_end_opt(TEST_OPTS *);
+int testutil_parse_single_opt(TEST_OPTS *, int);
 int testutil_parse_opts(int, char *const *, TEST_OPTS *);
 void testutil_print_command_line(int argc, char *const *argv);
 void testutil_progress(TEST_OPTS *, const char *);

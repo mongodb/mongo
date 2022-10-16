@@ -112,6 +112,8 @@ main(int argc, char *argv[])
         break;
     case TABLE_FIX:
         testutil_die(ENOTSUP, "Fixed-length column store not supported");
+    case TABLE_NOT_SET:
+        testutil_die(ENOTSUP, "Unknown table type (%d)\n", (int)opts->table_type);
     case TABLE_ROW:
         printf("Table type: rows\n");
         break;
