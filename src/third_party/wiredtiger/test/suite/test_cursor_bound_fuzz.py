@@ -185,7 +185,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
             for key_id in range(lower_key, upper_key + 1):
                 self.key_range[key_id].update(None, key_states.DELETED, self.current_ts, prepare)
 
-            self.verbose(2, "Truncated keys between: " + str(lower_key) + " and: " + str(upper_key))
+            self.verbose(3, "Truncated keys between: " + str(lower_key) + " and: " + str(upper_key))
 
     # Each iteration calls this function once to update the state of the keys in the database and
     # in memory.
@@ -251,7 +251,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
             step = 1
         else:
             step = -1
-        self.verbose(2, "Walking deleted range from: " + str(start_key) + " to: " + str(end_key))
+        self.verbose(3, "Walking deleted range from: " + str(start_key) + " to: " + str(end_key))
         for i in range(start_key, end_key, step):
             self.verbose(3, "Validating state of key: " + self.key_range[i].to_string())
             if (self.key_range[i].is_prepared()):
@@ -302,7 +302,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
     def run_next(self, bound_set, cursor):
         # This array gives us confidence that we have validated the full key range.
         checked_keys = []
-        self.verbose(2, "Running scenario: NEXT")
+        self.verbose(3, "Running scenario: NEXT")
         key_range_it = self.min_key - 1
         ret = self.prepare_call(lambda: cursor.next())
         while (ret != wiredtiger.WT_NOTFOUND and ret != wiredtiger.WT_PREPARE_CONFLICT):
@@ -341,7 +341,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
     def run_prev(self, bound_set, cursor):
         # This array gives us confidence that we have validated the full key range.
         checked_keys = []
-        self.verbose(2, "Running scenario: PREV")
+        self.verbose(3, "Running scenario: PREV")
         ret = self.prepare_call(lambda: cursor.prev())
         key_range_it = self.max_key
         while (ret != wiredtiger.WT_NOTFOUND and ret != wiredtiger.WT_PREPARE_CONFLICT):
@@ -406,10 +406,10 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
         for i in range(0, self.search_count):
             search_key = self.get_random_key()
             cursor.set_key(search_key)
-            self.verbose(2, "Searching for key: " + str(search_key))
+            self.verbose(3, "Searching for key: " + str(search_key))
             ret = self.prepare_call(lambda: cursor.search_near())
             if (ret == wiredtiger.WT_NOTFOUND):
-                self.verbose(2, "Nothing visible checking.")
+                self.verbose(3, "Nothing visible checking.")
                 # Nothing visible within the bound range.
                 # Validate.
             elif (ret == wiredtiger.WT_PREPARE_CONFLICT):
@@ -421,10 +421,10 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
                         found_prepare = True
                         break
                 self.assertTrue(found_prepare)
-                self.verbose(2, "Received prepare conflict in search near.")
+                self.verbose(3, "Received prepare conflict in search near.")
             else:
                 key_found = cursor.get_key()
-                self.verbose(2, "Found a key: " + str(key_found))
+                self.verbose(3, "Found a key: " + str(key_found))
                 current_key = key_found
                 # Assert the value we found matches.
                 # Equals also validates that the key is visible.
@@ -530,7 +530,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
         write_cursor = write_session.open_cursor(uri)
 
         # Initialize the value array.
-        self.verbose(2, "Generating value array")
+        self.verbose(3, "Generating value array")
         for i in range(0, self.value_array_size):
             self.value_array.append(self.generate_value())
 
@@ -548,9 +548,9 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
 
         # Begin main loop
         for  i in range(0, self.iteration_count):
-            self.verbose(2, "Iteration: " + str(i))
+            self.verbose(3, "Iteration: " + str(i))
             bound_set = self.apply_bounds(read_cursor)
-            self.verbose(2, "Generated bound set: " + bound_set.to_string())
+            self.verbose(3, "Generated bound set: " + bound_set.to_string())
 
             # Check if we are doing a prepared transaction on this iteration.
             prepare = random.uniform(0, 1) <= self.prepare_frequency and self.transactions_enabled
@@ -559,7 +559,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
             self.apply_ops(write_session, write_cursor, prepare)
             if (self.transactions_enabled):
                 if (prepare):
-                    self.verbose(2, "Preparing applied operations.")
+                    self.verbose(3, "Preparing applied operations.")
                     write_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(self.current_ts))
                 else:
                     write_session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.current_ts))
