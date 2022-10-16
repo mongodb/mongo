@@ -45,8 +45,7 @@
  * You may want to add "verbose=[compact,compact_progress]" to the connection config string to get
  * better view on what is happening.
  */
-static const char conn_config[] =
-  "create,cache_size=2GB,statistics=(all),statistics_log=(json,on_close,wait=1)";
+static const char conn_config[] = "create,cache_size=2GB,statistics=(all)";
 static const char table_config_row[] =
   "allocation_size=4KB,leaf_page_max=4KB,key_format=Q,value_format=QQQS";
 static const char table_config_col[] =

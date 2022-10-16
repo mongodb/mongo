@@ -75,6 +75,7 @@ runs.source=table
 runs.threads=16
 runs.timer=4
 runs.type=row-store
+statistics.server=0
 stress.aggressive_sweep=0
 stress.checkpoint=0
 stress.hs_sweep=0

@@ -42,16 +42,11 @@ static char home_rd2[HOME_SIZE + sizeof(HOME_RD2_SUFFIX)];
 static const char *saved_argv0; /* Program command */
 static const char *const uri = "table:main";
 
-#define ENV_CONFIG                                                                                \
-    "create,log=(enabled,file_max=10M,remove=false),"                                             \
-    "operation_tracking=(enabled=false),transaction_sync=(enabled,method=none),statistics=(all)," \
-    "statistics_log=(json,on_close,wait=1)"
-#define ENV_CONFIG_RD                                                                            \
-    "operation_tracking=(enabled=false),readonly=true,statistics=(all),statistics_log=(json,on_" \
-    "close,wait=1)"
-#define ENV_CONFIG_WR                                                                             \
-    "operation_tracking=(enabled=false),readonly=false,statistics=(all),statistics_log=(json,on_" \
-    "close,wait=1)"
+#define ENV_CONFIG                                    \
+    "create,log=(enabled,file_max=10M,remove=false)," \
+    "operation_tracking=(enabled=false),transaction_sync=(enabled,method=none),statistics=(all)"
+#define ENV_CONFIG_RD "operation_tracking=(enabled=false),readonly=true,statistics=(all)"
+#define ENV_CONFIG_WR "operation_tracking=(enabled=false),readonly=false,statistics=(all)"
 #define MAX_VAL 4096
 #define MAX_KV 10000
 

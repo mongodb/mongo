@@ -294,8 +294,7 @@ runone(bool config_cache)
       "close_handle_minimum=1,close_idle_time=1,close_scan_interval=1)"
       ", mmap=true"
       ", session_max=%u"
-      ", statistics=(all)"
-      ", statistics_log=(json,on_close,wait=1)",
+      ", statistics=(all)",
       config_cache ? "true" : "false", workers + 100));
     testutil_check(wiredtiger_open(home, NULL, buf, &conn));
 

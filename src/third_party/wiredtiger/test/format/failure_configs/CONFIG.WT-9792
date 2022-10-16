@@ -45,6 +45,7 @@ runs.tables=3
 runs.threads=16
 runs.timer=6
 runs.verify_failure_dump=0
+statistics.server=0
 stress.aggressive_sweep=0
 stress.checkpoint=0
 stress.checkpoint_evict_page=0

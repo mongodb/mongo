@@ -367,8 +367,7 @@ main(int argc, char *argv[])
       table_config, sizeof(table_config), "key_format=%s,value_format=S", use_columns ? "r" : "S"));
 
     /* Load 100 records. */
-    testutil_check(wiredtiger_open(
-      path, NULL, "create,statistics=(all),statistics_log=(json,on_close,wait=1)", &conn));
+    testutil_check(wiredtiger_open(path, NULL, "create,statistics=(all)", &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->create(session, "file:xxx", table_config));
     testutil_check(session->open_cursor(session, "file:xxx", NULL, NULL, &c));
@@ -382,8 +381,7 @@ main(int argc, char *argv[])
 
     /* Flush, reopen and verify a record. */
     testutil_check(conn->close(conn, NULL));
-    testutil_check(
-      wiredtiger_open(path, NULL, "statistics=(all),statistics_log=(json,on_close,wait=1)", &conn));
+    testutil_check(wiredtiger_open(path, NULL, "statistics=(all)", &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->create(session, "file:xxx", NULL));
     testutil_check(session->open_cursor(session, "file:xxx", NULL, NULL, &c));

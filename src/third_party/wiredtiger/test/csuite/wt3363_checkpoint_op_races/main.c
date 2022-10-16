@@ -94,8 +94,7 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, &event_handler,
-      "create,cache_size=1G,timing_stress_for_test=[checkpoint_slow],statistics=(all),statistics_"
-      "log=(json,on_close,wait=1)",
+      "create,cache_size=1G,timing_stress_for_test=[checkpoint_slow],statistics=(all)",
       &opts->conn));
 
     testutil_check(pthread_create(&ckpt_thread, NULL, do_checkpoints, opts));

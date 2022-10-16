@@ -33,8 +33,7 @@
 
 #define NUM_RECORDS 800000
 
-#define ENV_CONFIG_REC \
-    "log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
+#define ENV_CONFIG_REC "log=(recover=on,remove=false),statistics=(all)"
 /* Constants and variables declaration. */
 /*
  * You may want to add "verbose=[compact,compact_progress]" to the connection config string to get
@@ -42,7 +41,7 @@
  */
 static const char conn_config[] =
   "create,cache_size=1GB,timing_stress_for_test=[compact_slow],statistics=(all),statistics_log=("
-  "json,on_close,wait=1)";
+  "wait=1,json=true,on_close=true)";
 static const char table_config_row[] =
   "allocation_size=4KB,leaf_page_max=4KB,key_format=Q,value_format=QQQS";
 static const char table_config_col[] =

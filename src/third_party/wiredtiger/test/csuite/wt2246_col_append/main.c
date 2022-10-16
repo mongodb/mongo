@@ -104,7 +104,7 @@ main(int argc, char *argv[])
     wt_thread_t idlist[100];
     clock_t ce, cs;
     uint64_t i, id;
-    char buf[256];
+    char buf[100];
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
@@ -115,8 +115,7 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
 
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "create,cache_size=%s,eviction=(threads_max=5),statistics=(all),"
-      "statistics_log=(json,on_close,wait=1)",
+      "create,cache_size=%s,eviction=(threads_max=5),statistics=(all)",
       opts->table_type == TABLE_FIX ? "500MB" : "2GB"));
     testutil_check(wiredtiger_open(opts->home, NULL, buf, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
@@ -130,8 +129,7 @@ main(int argc, char *argv[])
 
     /* Force to disk and re-open. */
     testutil_check(opts->conn->close(opts->conn, NULL));
-    testutil_check(wiredtiger_open(
-      opts->home, NULL, "statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL, "statistics=(all)", &opts->conn));
 
     (void)signal(SIGINT, onsig);
 

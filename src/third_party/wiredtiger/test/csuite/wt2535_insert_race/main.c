@@ -105,9 +105,7 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, NULL,
-      "create,cache_size=2G,eviction=(threads_max=5),statistics=(all),statistics_log=(json,on_"
-      "close,wait=1)",
-      &opts->conn));
+      "create,cache_size=2G,eviction=(threads_max=5),statistics=(all)", &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
     testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
       "key_format=%s,value_format=%s,leaf_page_max=32k,", opts->table_type == TABLE_ROW ? "Q" : "r",

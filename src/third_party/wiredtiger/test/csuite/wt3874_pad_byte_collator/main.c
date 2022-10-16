@@ -77,8 +77,8 @@ main(int argc, char *argv[])
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
 
-    testutil_check(wiredtiger_open(opts->home, NULL,
-      "create,log=(enabled),statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
+    testutil_check(
+      wiredtiger_open(opts->home, NULL, "create,log=(enabled),statistics=(all)", &opts->conn));
     conn = opts->conn;
     testutil_check(conn->add_collator(conn, "my_coll", &my_coll, NULL));
     testutil_check(conn->open_session(opts->conn, NULL, NULL, &session));

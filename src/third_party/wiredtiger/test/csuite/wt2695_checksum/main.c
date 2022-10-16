@@ -62,8 +62,7 @@ main(int argc, char *argv[])
     memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
-    testutil_check(wiredtiger_open(opts->home, NULL,
-      "create,statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL, "create,statistics=(all)", &opts->conn));
 
     /* Initialize the RNG. */
     __wt_random_init_seed(NULL, &rnd);

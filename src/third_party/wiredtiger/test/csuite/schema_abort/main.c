@@ -87,11 +87,10 @@ typedef struct {
 static volatile THREAD_TS th_ts[MAX_TH];
 
 #define ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
-#define ENV_CONFIG_DEF                                                                             \
-    "create,"                                                                                      \
-    "eviction_updates_trigger=95,eviction_updates_target=80,"                                      \
-    "log=(enabled,file_max=10M,remove=false),statistics=(all),statistics_log=(json,on_close,wait=" \
-    "1)"
+#define ENV_CONFIG_DEF                                        \
+    "create,"                                                 \
+    "eviction_updates_trigger=95,eviction_updates_target=80," \
+    "log=(enabled,file_max=10M,remove=false),statistics=(all)"
 #define ENV_CONFIG_TIER          \
     ",tiered_storage=(bucket=./" \
     "bucket,bucket_prefix=pfx-,local_retention=2,name=dir_store)"
@@ -101,8 +100,7 @@ static volatile THREAD_TS th_ts[MAX_TH];
 #define ENV_CONFIG_TXNSYNC \
     ENV_CONFIG_DEF         \
     ",transaction_sync=(enabled,method=none)"
-#define ENV_CONFIG_REC \
-    "log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
+#define ENV_CONFIG_REC "log=(recover=on,remove=false),statistics=(all)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their

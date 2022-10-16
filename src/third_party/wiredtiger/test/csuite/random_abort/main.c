@@ -62,13 +62,11 @@ static bool inmem;
 #define MAX_RECORD_FILES 3
 
 #define ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
-#define ENV_CONFIG_DEF \
-    "create,log=(file_max=10M,enabled),statistics=(all),statistics_log=(json,on_close,wait=1)"
-#define ENV_CONFIG_TXNSYNC                                                                        \
-    "create,log=(file_max=10M,enabled),"                                                          \
-    "transaction_sync=(enabled,method=none),statistics=(all),statistics_log=(json,on_close,wait=" \
-    "1)"
-#define ENV_CONFIG_REC "log=(recover=on),statistics=(all),statistics_log=(json,on_close,wait=1)"
+#define ENV_CONFIG_DEF "create,log=(file_max=10M,enabled),statistics=(all)"
+#define ENV_CONFIG_TXNSYNC               \
+    "create,log=(file_max=10M,enabled)," \
+    "transaction_sync=(enabled,method=none),statistics=(all)"
+#define ENV_CONFIG_REC "log=(recover=on),statistics=(all)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their
