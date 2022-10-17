@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/executor/hedged_remote_command_runner.h"
+
+#include <memory>
+#include <vector>
 
 #include "mongo/client/async_remote_command_targeter.h"
 #include "mongo/client/read_preference.h"
@@ -41,6 +43,7 @@
 #include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/repl/hello_gen.h"
+#include "mongo/executor/hedged_remote_command_runner.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
@@ -56,10 +59,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
-#include <memory>
-#include <vector>
-
 
 namespace mongo {
 namespace executor {
@@ -68,78 +69,135 @@ namespace {
 
 class HedgedCommandRunnerTest : public RemoteCommandRunnerTestFixture {
 public:
-    void setUp() {
-        RemoteCommandRunnerTestFixture::setUp();
-        ReadPreferenceSetting readPref;
-
-        auto factory = RemoteCommandTargeterFactoryMock();
-        _targeter_two_hosts = factory.create(ConnectionString::forStandalones(kTwoHosts));
-        _targeter_three_hosts = factory.create(ConnectionString::forStandalones(kTwoHosts));
-        _emptyTargeter = factory.create(ConnectionString::forStandalones(kTwoHosts));
-
-        auto targeterMock = RemoteCommandTargeterMock::get(_targeter_two_hosts);
-        targeterMock->setFindHostsReturnValue(kTwoHosts);
-
-        auto threeTargeterMock = RemoteCommandTargeterMock::get(_targeter_three_hosts);
-        threeTargeterMock->setFindHostsReturnValue(kThreeHosts);
-
-        auto emptyTargeterMock = RemoteCommandTargeterMock::get(_emptyTargeter);
-        emptyTargeterMock->setFindHostsReturnValue(std::vector<HostAndPort>{});
-    }
-
-    NetworkInterface::Counters getNetworkInterfaceCounters() {
-        auto counters = getNetworkInterfaceMock()->getCounters();
-        return counters;
-    }
-
-    std::shared_ptr<RemoteCommandTargeter> getTwoHostsTargeter() {
-        return _targeter_two_hosts;
-    }
-
-    std::shared_ptr<RemoteCommandTargeter> getThreeHostsTargeter() {
-        return _targeter_three_hosts;
-    }
-
-    std::shared_ptr<RemoteCommandTargeter> getEmptyTargeter() {
-        return _emptyTargeter;
-    }
-
+    const std::vector<HostAndPort> kEmptyHosts{};
     const std::vector<HostAndPort> kTwoHosts{HostAndPort("FakeHost1", 12345),
                                              HostAndPort("FakeHost2", 12345)};
     const std::vector<HostAndPort> kThreeHosts{HostAndPort("FakeHost1", 12345),
                                                HostAndPort("FakeHost2", 12345),
                                                HostAndPort("FakeHost3", 12345)};
 
-private:
-    std::shared_ptr<RemoteCommandTargeter> _targeter_two_hosts;
-    std::shared_ptr<RemoteCommandTargeter> _targeter_three_hosts;
-    std::shared_ptr<RemoteCommandTargeter> _emptyTargeter;
-};
+    using TwoHostCallback =
+        std::function<void(NetworkInterfaceMock::NetworkOperationIterator authoritative,
+                           NetworkInterfaceMock::NetworkOperationIterator hedged)>;
+    using ThreeHostCallback =
+        std::function<void(NetworkInterfaceMock::NetworkOperationIterator authoritative,
+                           NetworkInterfaceMock::NetworkOperationIterator hedged1,
+                           NetworkInterfaceMock::NetworkOperationIterator hedged2)>;
 
-// TODO SERVER-68709: write more comprehensive test cases with the mock implementation.
+    NetworkInterface::Counters getNetworkInterfaceCounters() {
+        auto counters = getNetworkInterfaceMock()->getCounters();
+        return counters;
+    }
+
+    /**
+     * Retrieves authoritative and hedged NOIs, then performs specified behavior callback.
+     */
+    void performAuthoritativeHedgeBehavior(NetworkInterfaceMock* network,
+                                           TwoHostCallback mockBehaviorFn) {
+        NetworkInterfaceMock::NetworkOperationIterator noi1 = network->getNextReadyRequest();
+        NetworkInterfaceMock::NetworkOperationIterator noi2 = network->getNextReadyRequest();
+
+        auto firstRequest = (*noi1).getRequestOnAny();
+        auto secondRequest = (*noi2).getRequestOnAny();
+
+        bool firstRequestAuthoritative = firstRequest.target[0] == kTwoHosts[0];
+
+        auto authoritative = firstRequestAuthoritative ? noi1 : noi2;
+        auto hedged = firstRequestAuthoritative ? noi2 : noi1;
+
+        mockBehaviorFn(authoritative, hedged);
+    }
+
+    void performAuthoritativeHedgeBehavior(NetworkInterfaceMock* network,
+                                           ThreeHostCallback mockBehaviorFn) {
+        std::vector<NetworkInterfaceMock::NetworkOperationIterator> nois{
+            network->getNextReadyRequest(),
+            network->getNextReadyRequest(),
+            network->getNextReadyRequest()};
+
+        NetworkInterfaceMock::NetworkOperationIterator authoritative;
+        std::vector<NetworkInterfaceMock::NetworkOperationIterator> hedged;
+        // Find authoritative and hedged NOIs.
+        std::for_each(
+            nois.begin(), nois.end(), [&](NetworkInterfaceMock::NetworkOperationIterator& noi) {
+                if (noi->getRequestOnAny().target[0] == kThreeHosts[0]) {
+                    authoritative = noi;
+                } else {
+                    hedged.push_back(noi);
+                }
+            });
+
+        auto hedged1 = hedged.back();
+        hedged.pop_back();
+        auto hedged2 = hedged.back();
+
+        mockBehaviorFn(authoritative, hedged1, hedged2);
+    }
+
+    /**
+     * Testing wrapper to perform common set up, then call doHedgedRequest. Only safe to call once
+     * per test fixture as to not create multiple OpCtx.
+     */
+    template <typename CommandType>
+    SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doHedgedRequestWithHosts(
+        CommandType cmd,
+        std::vector<HostAndPort> hosts,
+        std::shared_ptr<RemoteCommandRetryPolicy> retryPolicy =
+            std::make_shared<RemoteCommandNoRetryPolicy>()) {
+        ReadPreferenceSetting readPref;
+
+        auto factory = RemoteCommandTargeterFactoryMock();
+        std::shared_ptr<RemoteCommandTargeter> t;
+        t = factory.create(ConnectionString::forStandalones(hosts));
+        auto targeterMock = RemoteCommandTargeterMock::get(t);
+        targeterMock->setFindHostsReturnValue(hosts);
+
+        std::unique_ptr<RemoteCommandHostTargeter> targeter =
+            std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
+
+        _opCtx = makeOperationContext();
+        return doHedgedRequest(cmd,
+                               _opCtx.get(),
+                               std::move(targeter),
+                               getExecutorPtr(),
+                               CancellationToken::uncancelable(),
+                               retryPolicy);
+    }
+
+    const NamespaceString testNS = NamespaceString("testdb", "testcoll");
+    const FindCommandRequest testFindCmd = FindCommandRequest(testNS);
+    const BSONObj testFirstBatch = BSON("x" << 1);
+
+    const Status ignorableMaxTimeMSExpiredStatus{Status(ErrorCodes::MaxTimeMSExpired, "mock")};
+    const Status fatalNetworkTimeoutStatus{Status(ErrorCodes::NetworkTimeout, "mock")};
+
+    const RemoteCommandResponse testSuccessResponse{
+        CursorResponse(testNS, 0LL, {testFirstBatch})
+            .toBSON(CursorResponse::ResponseType::InitialResponse),
+        Milliseconds::zero()};
+    const RemoteCommandResponse testFatalErrorResponse{
+        createErrorResponse(fatalNetworkTimeoutStatus), Milliseconds(1)};
+    const RemoteCommandResponse testIgnorableErrorResponse{
+        createErrorResponse(ignorableMaxTimeMSExpiredStatus), Milliseconds(1)};
+
+private:
+    // This OpCtx is used by doHedgedRequestWithHosts and is initialized when the function is
+    // first invoked and destroyed during fixture destruction.
+    ServiceContext::UniqueOperationContext _opCtx;
+};
 
 /**
  * When we send a find command to the doHedgedRequest function, it sends out two requests and
- * cancels the second one once the first has responsed.
+ * cancels the second one once the first has responded.
  */
 TEST_F(HedgedCommandRunnerTest, FindHedgeRequestTwoHosts) {
-    ReadPreferenceSetting readPref;
-    std::shared_ptr<RemoteCommandTargeter> t = getTwoHostsTargeter();
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
-    FindCommandRequest findCmd(NamespaceString("testdb", "testcoll"));
-
-    auto h = makeOperationContext();
-    auto resultFuture = doHedgedRequest(
-        findCmd, h.get(), std::move(targeter), getExecutorPtr(), CancellationToken::uncancelable());
+    auto resultFuture = doHedgedRequestWithHosts(testFindCmd, kTwoHosts);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
-        return CursorResponse(NamespaceString("testdb", "testcoll"), 0LL, {BSON("x" << 1)})
+        return CursorResponse(testNS, 0LL, {testFirstBatch})
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     });
-
-    RemoteCommandRunnerResponse<CursorInitialReply> res = resultFuture.get();
 
     auto network = getNetworkInterfaceMock();
     network->enterNetwork();
@@ -150,32 +208,19 @@ TEST_F(HedgedCommandRunnerTest, FindHedgeRequestTwoHosts) {
     ASSERT_EQ(counters.succeeded, 1);
     ASSERT_EQ(counters.canceled, 1);
 
-
-    ASSERT_BSONOBJ_EQ(res.response.getCursor()->getFirstBatch()[0], BSON("x" << 1));
-    ASSERT_EQ(res.response.getCursor()->getNs(), NamespaceString("testdb", "testcoll"));
+    auto resCursor = resultFuture.get().response.getCursor();
+    ASSERT_EQ(resCursor->getNs(), testNS);
+    ASSERT_BSONOBJ_EQ(resCursor->getFirstBatch()[0], testFirstBatch);
 }
 
 TEST_F(HedgedCommandRunnerTest, FindHedgeRequestThreeHosts) {
-    ReadPreferenceSetting readPref;
-    std::shared_ptr<RemoteCommandTargeter> t = getThreeHostsTargeter();
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
-    FindCommandRequest findCmd(NamespaceString("testdb", "testcoll"));
-
-    auto opCtxHolder = makeOperationContext();
-    auto resultFuture = doHedgedRequest(findCmd,
-                                        opCtxHolder.get(),
-                                        std::move(targeter),
-                                        getExecutorPtr(),
-                                        CancellationToken::uncancelable());
+    auto resultFuture = doHedgedRequestWithHosts(testFindCmd, kThreeHosts);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
-        return CursorResponse(NamespaceString("testdb", "testcoll"), 0LL, {BSON("x" << 1)})
+        return CursorResponse(testNS, 0LL, {testFirstBatch})
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     });
-
-    RemoteCommandRunnerResponse<CursorInitialReply> res = resultFuture.get();
 
     auto network = getNetworkInterfaceMock();
     network->enterNetwork();
@@ -186,8 +231,9 @@ TEST_F(HedgedCommandRunnerTest, FindHedgeRequestThreeHosts) {
     ASSERT_EQ(counters.succeeded, 1);
     ASSERT_EQ(counters.canceled, 2);
 
-    ASSERT_BSONOBJ_EQ(res.response.getCursor()->getFirstBatch()[0], BSON("x" << 1));
-    ASSERT_EQ(res.response.getCursor()->getNs(), NamespaceString("testdb", "testcoll"));
+    auto resCursor = resultFuture.get().response.getCursor();
+    ASSERT_EQ(resCursor->getNs(), testNS);
+    ASSERT_BSONOBJ_EQ(resCursor->getFirstBatch()[0], testFirstBatch);
 }
 
 /**
@@ -199,17 +245,7 @@ TEST_F(HedgedCommandRunnerTest, HelloHedgeRequest) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
-    ReadPreferenceSetting readPref;
-    std::shared_ptr<RemoteCommandTargeter> t = getTwoHostsTargeter();
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
-
-    auto opCtxHolder = makeOperationContext();
-    auto resultFuture = doHedgedRequest(helloCmd,
-                                        opCtxHolder.get(),
-                                        std::move(targeter),
-                                        getExecutorPtr(),
-                                        CancellationToken::uncancelable());
+    auto resultFuture = doHedgedRequestWithHosts(helloCmd, kTwoHosts);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -220,9 +256,9 @@ TEST_F(HedgedCommandRunnerTest, HelloHedgeRequest) {
     ASSERT_EQ(counters.succeeded, 1);
     ASSERT_EQ(counters.canceled, 0);
 
-    RemoteCommandRunnerResponse<HelloCommandReply> res = resultFuture.get();
+    auto response = resultFuture.get().response;
 
-    ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
+    ASSERT_BSONOBJ_EQ(response.toBSON(), helloReply.toBSON());
 }
 
 TEST_F(HedgedCommandRunnerTest, HedgedRemoteCommandRunnerRetryPolicy) {
@@ -238,18 +274,7 @@ TEST_F(HedgedCommandRunnerTest, HedgedRemoteCommandRunnerRetryPolicy) {
     testPolicy->setMaxNumRetries(maxNumRetries);
     testPolicy->setRetryDelay(retryDelay);
 
-    ReadPreferenceSetting readPref;
-    std::shared_ptr<RemoteCommandTargeter> t = getTwoHostsTargeter();
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
-
-    auto opCtxHolder = makeOperationContext();
-    auto resultFuture = doHedgedRequest(helloCmd,
-                                        opCtxHolder.get(),
-                                        std::move(targeter),
-                                        getExecutorPtr(),
-                                        CancellationToken::uncancelable(),
-                                        testPolicy);
+    auto resultFuture = doHedgedRequestWithHosts(helloCmd, kTwoHosts, testPolicy);
 
     const auto onCommandFunc = [&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -278,19 +303,7 @@ TEST_F(HedgedCommandRunnerTest, NoShardsFound) {
     HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
-
-    ReadPreferenceSetting readPref;
-    std::shared_ptr<RemoteCommandTargeter> t = getEmptyTargeter();
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
-
-
-    auto opCtxHolder = makeOperationContext();
-    auto resultFuture = doHedgedRequest(helloCmd,
-                                        opCtxHolder.get(),
-                                        std::move(targeter),
-                                        getExecutorPtr(),
-                                        CancellationToken::uncancelable());
+    auto resultFuture = doHedgedRequestWithHosts(testFindCmd, kEmptyHosts);
 
     ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::HostNotFound);
 }
@@ -300,24 +313,11 @@ TEST_F(HedgedCommandRunnerTest, NoShardsFound) {
  * that error upwards and cancel the other requests.
  */
 TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSignificantError) {
-    FindCommandRequest findCmd(NamespaceString("testdb", "testcoll"));
-
-    ReadPreferenceSetting readPref;
-    std::shared_ptr<RemoteCommandTargeter> t = getTwoHostsTargeter();
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
-
-
-    auto opCtxHolder = makeOperationContext();
-    auto resultFuture = doHedgedRequest(findCmd,
-                                        opCtxHolder.get(),
-                                        std::move(targeter),
-                                        getExecutorPtr(),
-                                        CancellationToken::uncancelable());
+    auto resultFuture = doHedgedRequestWithHosts(testFindCmd, kTwoHosts);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
-        return Status(ErrorCodes::NetworkTimeout, "mock");
+        return fatalNetworkTimeoutStatus;
     });
 
     auto network = getNetworkInterfaceMock();
@@ -329,7 +329,15 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSignificantError) {
     ASSERT_EQ(counters.failed, 1);
     ASSERT_EQ(counters.canceled, 1);
 
-    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::RemoteCommandExecutionError);
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isLocal());
+    auto localError = extraInfo->asLocal();
+    ASSERT_EQ(localError, fatalNetworkTimeoutStatus);
 }
 
 /**
@@ -337,57 +345,21 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSignificantError) {
  * propagates upwards.
  */
 TEST_F(HedgedCommandRunnerTest, BothCommandsFailWithSkippableError) {
-    FindCommandRequest findCmd(NamespaceString("testdb", "testcoll"));
-
-    ReadPreferenceSetting readPref;
-    std::shared_ptr<RemoteCommandTargeter> t = getTwoHostsTargeter();
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
-
-
-    auto opCtxHolder = makeOperationContext();
-    auto resultFuture = doHedgedRequest(findCmd,
-                                        opCtxHolder.get(),
-                                        std::move(targeter),
-                                        getExecutorPtr(),
-                                        CancellationToken::uncancelable());
+    auto resultFuture = doHedgedRequestWithHosts(testFindCmd, kTwoHosts);
 
     auto network = getNetworkInterfaceMock();
     auto now = network->now();
     network->enterNetwork();
 
-    NetworkInterfaceMock::NetworkOperationIterator noi1 = network->getNextReadyRequest();
-    NetworkInterfaceMock::NetworkOperationIterator noi2 = network->getNextReadyRequest();
-
-    auto firstRequest = (*noi1).getRequestOnAny();
-    auto secondRequest = (*noi2).getRequestOnAny();
-
-    if (firstRequest.target[0] == kTwoHosts[0]) {
-        network->scheduleResponse(
-            noi1,
-            now + Milliseconds(1000),
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    } else {
-        network->scheduleResponse(
-            noi1,
-            now,
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    }
-
-    if (secondRequest.target[0] == kTwoHosts[0]) {
-        network->scheduleResponse(
-            noi2,
-            now + Milliseconds(1000),
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    } else {
-        network->scheduleResponse(
-            noi2,
-            now,
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    }
-
-    auto remoteMaxTimeMSError = RemoteCommandResponse{
-        createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)};
+    // Send "ignorable" error responses for both requests.
+    performAuthoritativeHedgeBehavior(
+        network,
+        [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
+            NetworkInterfaceMock::NetworkOperationIterator hedged) {
+            network->scheduleResponse(hedged, now, testIgnorableErrorResponse);
+            network->scheduleSuccessfulResponse(
+                authoritative, now + Milliseconds(1000), testIgnorableErrorResponse);
+        });
 
     network->runUntil(now + Milliseconds(1500));
 
@@ -397,74 +369,35 @@ TEST_F(HedgedCommandRunnerTest, BothCommandsFailWithSkippableError) {
     ASSERT_EQ(counters.sent, 2);
     ASSERT_EQ(counters.canceled, 0);
 
-    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::RemoteCommandExecutionError);
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isRemote());
+    auto remoteError = extraInfo->asRemote();
+    ASSERT_EQ(remoteError.getRemoteCommandResult(), ignorableMaxTimeMSExpiredStatus);
 }
 
 TEST_F(HedgedCommandRunnerTest, AllCommandsFailWithSkippableError) {
-    FindCommandRequest findCmd(NamespaceString("testdb", "testcoll"));
-
-    ReadPreferenceSetting readPref;
-    std::shared_ptr<RemoteCommandTargeter> t = getThreeHostsTargeter();
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
-
-
-    auto opCtxHolder = makeOperationContext();
-    auto resultFuture = doHedgedRequest(findCmd,
-                                        opCtxHolder.get(),
-                                        std::move(targeter),
-                                        getExecutorPtr(),
-                                        CancellationToken::uncancelable());
+    auto resultFuture = doHedgedRequestWithHosts(testFindCmd, kThreeHosts);
 
     auto network = getNetworkInterfaceMock();
     auto now = network->now();
     network->enterNetwork();
 
-    NetworkInterfaceMock::NetworkOperationIterator noi1 = network->getNextReadyRequest();
-    NetworkInterfaceMock::NetworkOperationIterator noi2 = network->getNextReadyRequest();
-    NetworkInterfaceMock::NetworkOperationIterator noi3 = network->getNextReadyRequest();
-
-    auto firstRequest = (*noi1).getRequestOnAny();
-    auto secondRequest = (*noi2).getRequestOnAny();
-    auto thirdRequest = (*noi3).getRequestOnAny();
-
-    auto remoteMaxTimeMSError = RemoteCommandResponse{
-        createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)};
-    if (firstRequest.target[0] == kThreeHosts[0]) {
-        network->scheduleResponse(
-            noi1,
-            now + Milliseconds(1000),
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    } else {
-        network->scheduleResponse(
-            noi1,
-            now,
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    }
-
-    if (secondRequest.target[0] == kThreeHosts[0]) {
-        network->scheduleResponse(
-            noi2,
-            now + Milliseconds(1000),
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    } else {
-        network->scheduleResponse(
-            noi2,
-            now,
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    }
-
-    if (thirdRequest.target[0] == kThreeHosts[0]) {
-        network->scheduleResponse(
-            noi3,
-            now + Milliseconds(1000),
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    } else {
-        network->scheduleResponse(
-            noi3,
-            now,
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    }
+    // Send "ignorable" responses for all three requests.
+    performAuthoritativeHedgeBehavior(
+        network,
+        [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
+            NetworkInterfaceMock::NetworkOperationIterator hedged1,
+            NetworkInterfaceMock::NetworkOperationIterator hedged2) {
+            network->scheduleResponse(
+                authoritative, now + Milliseconds(1000), testIgnorableErrorResponse);
+            network->scheduleResponse(hedged1, now, testIgnorableErrorResponse);
+            network->scheduleResponse(hedged2, now, testIgnorableErrorResponse);
+        });
 
     network->runUntil(now + Milliseconds(1500));
 
@@ -474,65 +407,39 @@ TEST_F(HedgedCommandRunnerTest, AllCommandsFailWithSkippableError) {
     ASSERT_EQ(counters.succeeded, 3);
     ASSERT_EQ(counters.canceled, 0);
 
-    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::RemoteCommandExecutionError);
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isRemote());
+    auto remoteError = extraInfo->asRemote();
+    ASSERT_EQ(remoteError.getRemoteCommandResult(), ignorableMaxTimeMSExpiredStatus);
 }
 
 /**
- * When a hedged command is sent and the first (hedged) request fails with an ignorable error and
- * the second (authoritative request) succeeds, we get the success result.
+ * When a hedged command is sent and the first request, which is hedged, fails with an
+ * ignorable error and the second request, which is authoritative, succeeds, we get
+ * the success result.
  */
-TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSkippableErrorNextSucceeds) {
-    FindCommandRequest findCmd(NamespaceString("testdb", "testcoll"));
-
-    ReadPreferenceSetting readPref;
-    std::shared_ptr<RemoteCommandTargeter> t = getTwoHostsTargeter();
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
-
-    auto opCtxHolder = makeOperationContext();
-    auto resultFuture = doHedgedRequest(findCmd,
-                                        opCtxHolder.get(),
-                                        std::move(targeter),
-                                        getExecutorPtr(),
-                                        CancellationToken::uncancelable());
+TEST_F(HedgedCommandRunnerTest, HedgedFailsWithSkippableErrorAuthoritativeSucceeds) {
+    auto resultFuture = doHedgedRequestWithHosts(testFindCmd, kTwoHosts);
 
     auto network = getNetworkInterfaceMock();
     auto now = getNetworkInterfaceMock()->now();
-
-    RemoteCommandResponse successResponse{
-        CursorResponse(NamespaceString("testdb", "testcoll"), 0LL, {BSON("x" << 1)})
-            .toBSON(CursorResponse::ResponseType::InitialResponse),
-        Milliseconds::zero()};
-
     network->enterNetwork();
 
-    NetworkInterfaceMock::NetworkOperationIterator noi1 = network->getNextReadyRequest();
-    NetworkInterfaceMock::NetworkOperationIterator noi2 = network->getNextReadyRequest();
-
-    auto firstRequest = (*noi1).getRequestOnAny();
-    auto secondRequest = (*noi2).getRequestOnAny();
-
-    // if the first request is the authoritative one, send a delayed success response
-    // otherwise send an ignorable error
-    if (firstRequest.target[0] == kTwoHosts[0]) {
-        network->scheduleSuccessfulResponse(noi1, now + Milliseconds(1000), successResponse);
-    } else {
-        network->scheduleResponse(
-            noi1,
-            now,
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    }
-
-    // if the second request is the authoritative one, send a delayed success response
-    // otherwise send an ignorable error
-    if (secondRequest.target[0] == kTwoHosts[0]) {
-        network->scheduleSuccessfulResponse(noi2, now + Milliseconds(1000), successResponse);
-    } else {
-        network->scheduleResponse(
-            noi2,
-            now,
-            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
-    }
+    // If the request is the authoritative one, send a delayed success response
+    // otherwise send an "ignorable" error.
+    performAuthoritativeHedgeBehavior(
+        network,
+        [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
+            NetworkInterfaceMock::NetworkOperationIterator hedged) {
+            network->scheduleResponse(hedged, now, testIgnorableErrorResponse);
+            network->scheduleSuccessfulResponse(
+                authoritative, now + Milliseconds(1000), testSuccessResponse);
+        });
 
     network->runUntil(now + Milliseconds(1500));
 
@@ -543,8 +450,162 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSkippableErrorNextSucceeds)
     ASSERT_EQ(counters.canceled, 0);
 
     auto res = std::move(resultFuture).get().response;
-    ASSERT_EQ(res.getCursor()->getNs(), NamespaceString("testdb", "testcoll"));
-    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], BSON("x" << 1));
+    ASSERT_EQ(res.getCursor()->getNs(), testNS);
+    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], testFirstBatch);
+}
+
+/**
+ * When a hedged command is sent and the first request, which is authoritative, fails
+ * with an ignorable error and the second request, which is hedged, cancels, we get
+ * the ignorable error.
+ */
+TEST_F(HedgedCommandRunnerTest, AuthoritativeFailsWithIgnorableErrorHedgedCancelled) {
+    auto resultFuture = doHedgedRequestWithHosts(testFindCmd, kTwoHosts);
+
+    auto network = getNetworkInterfaceMock();
+    auto now = getNetworkInterfaceMock()->now();
+    network->enterNetwork();
+
+    // If the request is the authoritative one, send an "ignorable" error response,
+    // otherwise send a delayed success response.
+    performAuthoritativeHedgeBehavior(
+        network,
+        [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
+            NetworkInterfaceMock::NetworkOperationIterator hedged) {
+            network->scheduleResponse(authoritative, now, testIgnorableErrorResponse);
+            network->scheduleSuccessfulResponse(
+                hedged, now + Milliseconds(1000), testSuccessResponse);
+        });
+
+    network->runUntil(now + Milliseconds(1500));
+
+    auto counters = network->getCounters();
+    network->exitNetwork();
+
+    ASSERT_EQ(counters.succeeded, 1);
+    ASSERT_EQ(counters.canceled, 1);
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isRemote());
+    auto remoteError = extraInfo->asRemote();
+    ASSERT_EQ(remoteError.getRemoteCommandResult(), ignorableMaxTimeMSExpiredStatus);
+}
+
+/**
+ * When a hedged command is sent and the first request, which is authoritative, fails
+ * with a fatal error and the second request, which is hedged, cancels, we get
+ * the fatal error.
+ */
+TEST_F(HedgedCommandRunnerTest, AuthoritativeFailsWithFatalErrorHedgedCancelled) {
+    auto resultFuture = doHedgedRequestWithHosts(testFindCmd, kTwoHosts);
+
+    auto network = getNetworkInterfaceMock();
+    auto now = getNetworkInterfaceMock()->now();
+    network->enterNetwork();
+
+    // If the request is the authoritative one, send a "fatal" error response,
+    // otherwise send a delayed success response.
+    performAuthoritativeHedgeBehavior(
+        network,
+        [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
+            NetworkInterfaceMock::NetworkOperationIterator hedged) {
+            network->scheduleResponse(authoritative, now, testFatalErrorResponse);
+            network->scheduleSuccessfulResponse(
+                hedged, now + Milliseconds(1000), testSuccessResponse);
+        });
+
+    network->runUntil(now + Milliseconds(1500));
+
+    auto counters = network->getCounters();
+    network->exitNetwork();
+
+    ASSERT_EQ(counters.succeeded, 1);
+    ASSERT_EQ(counters.canceled, 1);
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isRemote());
+    auto remoteError = extraInfo->asRemote();
+    ASSERT_EQ(remoteError.getRemoteCommandResult(), fatalNetworkTimeoutStatus);
+}
+
+/**
+ * When a hedged command is sent and the first request, which is authoritative, succeeds
+ * and the second request, which is hedged, cancels, we get the success result.
+ */
+TEST_F(HedgedCommandRunnerTest, AuthoritativeSucceedsHedgedCancelled) {
+    auto resultFuture = doHedgedRequestWithHosts(testFindCmd, kTwoHosts);
+
+    auto network = getNetworkInterfaceMock();
+    auto now = getNetworkInterfaceMock()->now();
+    network->enterNetwork();
+
+    // If the request is the authoritative one, send a success response,
+    // otherwise send a delayed "fatal" error response.
+    performAuthoritativeHedgeBehavior(
+        network,
+        [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
+            NetworkInterfaceMock::NetworkOperationIterator hedged) {
+            network->scheduleSuccessfulResponse(authoritative, now, testSuccessResponse);
+            network->scheduleSuccessfulResponse(
+                hedged, now + Milliseconds(1000), testFatalErrorResponse);
+        });
+
+    network->runUntil(now + Milliseconds(1500));
+
+    auto counters = network->getCounters();
+    network->exitNetwork();
+
+    ASSERT_EQ(counters.succeeded, 1);
+    ASSERT_EQ(counters.canceled, 1);
+
+    auto res = std::move(resultFuture).get().response;
+    ASSERT_EQ(res.getCursor()->getNs(), testNS);
+    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], testFirstBatch);
+}
+
+/**
+ * When a hedged command is sent and the first request, which is hedged, succeeds
+ * and the second request, which is authoritative, cancels, we get the success result.
+ */
+TEST_F(HedgedCommandRunnerTest, HedgedSucceedsAuthoritativeCancelled) {
+    auto resultFuture = doHedgedRequestWithHosts(testFindCmd, kTwoHosts);
+
+    auto network = getNetworkInterfaceMock();
+    auto now = getNetworkInterfaceMock()->now();
+    network->enterNetwork();
+
+    // If the request is the authoritative one, send a delayed "fatal" error response,
+    // otherwise send a success response.
+    performAuthoritativeHedgeBehavior(
+        network,
+        [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
+            NetworkInterfaceMock::NetworkOperationIterator hedged) {
+            network->scheduleSuccessfulResponse(
+                authoritative, now + Milliseconds(1000), testFatalErrorResponse);
+            network->scheduleSuccessfulResponse(hedged, now, testSuccessResponse);
+        });
+
+    network->runUntil(now + Milliseconds(1500));
+
+    auto counters = network->getCounters();
+    network->exitNetwork();
+
+    ASSERT_EQ(counters.succeeded, 1);
+    ASSERT_EQ(counters.canceled, 1);
+
+    auto res = std::move(resultFuture).get().response;
+    ASSERT_EQ(res.getCursor()->getNs(), testNS);
+    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], testFirstBatch);
 }
 
 }  // namespace
