@@ -2194,7 +2194,7 @@ buildvariants:
       - name: schedule_variant_auto_tasks
 
   - name: atlas-like-M60
-    display_name: M60-Like 3-Node ReplSet
+    display_name: M60-Like-old 3-Node ReplSet
     cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
@@ -2235,6 +2235,31 @@ buildvariants:
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
+      - name: linkbench
+      - name: linkbench2
+
+  - name: atlas-like-replica-2022-10
+    display_name: M60-like-replica-2022-10 3-Node ReplSet
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas-like-replica-2022-10
+      infrastructure_provisioning: M60-like-replica-2022-10
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile-variant: -arm64
+    run_on:
+      - "rhel70-perf-M60-like"
+    depends_on: *_real_compile_amazon_linux2_arm64
+    tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      # TODO
+      # - name: tpcc
       - name: linkbench
       - name: linkbench2
 
