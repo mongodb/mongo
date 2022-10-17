@@ -75,7 +75,6 @@ Status renameCollection(OperationContext* opCtx,
  * drop-pending collection.
  */
 Status renameCollectionForApplyOps(OperationContext* opCtx,
-                                   const std::string& dbName,
                                    const boost::optional<UUID>& uuidToRename,
                                    const BSONObj& cmd,
                                    const repl::OpTime& renameOpTime);

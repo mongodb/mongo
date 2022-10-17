@@ -60,6 +60,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -886,6 +887,11 @@ Status renameCollection(OperationContext* opCtx,
                       "renaming system.js collection or renaming to system.js is not allowed");
     }
 
+    if (source.tenantId() != target.tenantId()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "renaming a collection between tenants is not allowed");
+    }
+
     StringData dropTargetMsg = options.dropTarget ? "yes"_sd : "no"_sd;
     LOGV2(20400,
           "renameCollectionForCommand: rename {source} to {target}{dropTargetMsg}",
@@ -902,7 +908,6 @@ Status renameCollection(OperationContext* opCtx,
 }
 
 Status renameCollectionForApplyOps(OperationContext* opCtx,
-                                   const std::string& dbName,
                                    const boost::optional<UUID>& uuidToRename,
                                    const BSONObj& cmd,
                                    const repl::OpTime& renameOpTime) {
@@ -914,8 +919,14 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
             "renameCollection() cannot accept a rename optime when writes are replicated.");
     }
 
-    const auto sourceNsElt = cmd.firstElement();
+    const auto tenantIdElt = cmd["tid"];
+    const auto sourceNsElt = cmd["renameCollection"];
     const auto targetNsElt = cmd["to"];
+
+    if (!tenantIdElt.eoo())
+        uassert(ErrorCodes::TypeMismatch,
+                "'tid' must be of type OID",
+                tenantIdElt.type() == BSONType::jstOID);
     uassert(ErrorCodes::TypeMismatch,
             "'renameCollection' must be of type String",
             sourceNsElt.type() == BSONType::String);
@@ -923,8 +934,20 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
             "'to' must be of type String",
             targetNsElt.type() == BSONType::String);
 
-    NamespaceString sourceNss(sourceNsElt.valueStringData());
-    NamespaceString targetNss(targetNsElt.valueStringData());
+    boost::optional<TenantId> tenantId = tenantIdElt.eoo()
+        ? boost::none
+        : boost::optional<TenantId>{TenantId::parseFromBSON(tenantIdElt)};
+
+    NamespaceString sourceNss{
+        NamespaceStringUtil::deserialize(tenantId, sourceNsElt.valueStringData())};
+    NamespaceString targetNss{
+        NamespaceStringUtil::deserialize(tenantId, targetNsElt.valueStringData())};
+
+    // TODO: not needed once we are no longer parsing for prefixed tenantIds
+    uassert(ErrorCodes::IllegalOperation,
+            "moving a collection between tenants is not allowed",
+            sourceNss.tenantId() == targetNss.tenantId());
+
     if (uuidToRename) {
         auto nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuidToRename.value());
         if (nss)
