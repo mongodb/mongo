@@ -1,9 +1,3 @@
-// @tags: [
-//   # mapReduce does not support afterClusterTime.
-//   does_not_support_causal_consistency,
-//   does_not_support_stepdowns,
-// ]
-
 // See SERVER-9448
 // Test argument and receiver (aka 'this') objects and their children can be mutated
 // in Map, Reduce and Finalize functions
@@ -11,10 +5,6 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-
-const collection = db.mrMutableReceiver;
-collection.drop();
-collection.insert({a: 1});
 
 const map = function() {
     // set property on receiver
@@ -63,17 +53,33 @@ const finalize = function(key, values) {
     return values;
 };
 
-const cmdResult = collection.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}});
+const runTest = function(coll) {
+    coll.drop();
+    coll.insert({a: 1});
 
-assertArrayEq({
-    actual: cmdResult.results[0].value.food,
-    expected: [
-        {"cake": 1, "mod": 1},
-        {"beef": 1, "mod": 1},
-        {"beat": 1, "mod": 1},
-        {"mochi": 1, "mod": 1},
-        {"ice": 1, "mod": 1},
-        {"cream": 1, "mod": 1}
-    ]
-});
+    const cmdResult = coll.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}});
+
+    assertArrayEq({
+        actual: cmdResult.results[0].value.food,
+        expected: [
+            {"cake": 1, "mod": 1},
+            {"beef": 1, "mod": 1},
+            {"beat": 1, "mod": 1},
+            {"mochi": 1, "mod": 1},
+            {"ice": 1, "mod": 1},
+            {"cream": 1, "mod": 1}
+        ]
+    });
+};
+
+let conn = MongoRunner.runMongod({setParameter: {mrEnableSingleReduceOptimization: true}});
+assert.neq(null, conn, "mongod was unable to start up");
+runTest(conn.getDB("test").mrMutableReceiver);
+MongoRunner.stopMongod(conn);
+
+let st = new ShardingTest({shards: 2, setParameter: {mrEnableSingleReduceOptimization: true}});
+assert.neq(null, st.s, "mongod was unable to start up");
+st.s.adminCommand({shardCollection: "test.mrMutableReceiver"});
+runTest(st.s.getDB("test").mrMutableReceiver);
+st.stop();
 }());

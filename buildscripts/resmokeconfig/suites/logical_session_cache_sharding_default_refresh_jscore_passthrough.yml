@@ -73,9 +73,6 @@ selector:
   - jstests/core/index_multikey.js
   - jstests/core/optimized_match_explain.js
   - jstests/core/sort_array.js
-  # TODO SERVER-61457: This test wasn't running any assertions, and needs investigating in this
-  # passthrough.
-  - jstests/core/mr_mutable_properties.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
