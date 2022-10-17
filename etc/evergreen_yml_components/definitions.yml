@@ -105,6 +105,8 @@ variables:
 - &gen_burn_in_task_template
   name: gen_burn_in_task_template
   depends_on:
+  - name: version_gen
+    variant: generate-tasks-for-version
   - name: version_burn_in_gen
     variant: generate-tasks-for-version
   - name: archive_dist_test_debug
