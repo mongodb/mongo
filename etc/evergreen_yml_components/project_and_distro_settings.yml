@@ -1,0 +1,76 @@
+###
+# Definitions for project and distro settings associated with this Evergreen project.
+###
+
+
+## Aliases.
+patch_aliases:
+  - alias: "embedded"
+    variant: ".*"
+    task: "embedded_.*"
+    variant_tags: []
+    task_tags: []
+  - alias: "hourly"
+    variant: "^(enterprise-rhel-62-64-bit-dynamic-required|enterprise-windows-required|linux-64-debug|ubuntu1804-debug-aubsan-lite|enterprise-rhel-70-64-bit|enterprise-windows|ubuntu1604-debug|macos-debug|windows-debug )$"
+    task: ".*"
+    variant_tags: []
+    task_tags: []
+  - alias: "query"
+    variant: "^(.*query-patch-only|enterprise-ubuntu-dynamic-1804-clang-tidy-required)$"
+    task: ".*"
+    variant_tags: []
+    task_tags: []
+  - alias: "required"
+    variant: "^(.*-required$|enterprise-rhel-62-64-bit-dynamic-required|enterprise-windows-required|linux-64-debug|ubuntu1804-debug-aubsan-lite)$"
+    task: ".*"
+    variant_tags: []
+    task_tags: []
+  - alias: "security"
+    variant: "^(.*security-patch-only)$"
+    task: ".*"
+    variant_tags: []
+    task_tags: []
+
+commit_queue_aliases:
+  - variant: "commit-queue"
+    task: "^(run_.*|compile_.*|lint_.*|validate_commit_message|test_api_version_compatibility|jsCore)$"
+    variant_tags: []
+    task_tags: []
+  - variant: "enterprise-ubuntu-dynamic-1804-clang-tidy-required"
+    task: "clang_tidy"
+    variant_tags: []
+    task_tags: []
+
+github_pr_aliases:
+- variant: "^(.*query-patch-only|enterprise-ubuntu-dynamic-1804-clang-tidy-required)$"
+  task: ".*"
+  variant_tags: []
+  task_tags: []
+
+git_tag_aliases: []
+
+github_checks_aliases: []
+
+## Virtual Workstation Commands.
+workstation_config:
+  git_clone: no
+  setup_commands:
+  - command: "git clone git@github.com:mongodb/server-workflow-tool.git"
+    directory: ""
+  - command: "bash virtual_workstation_setup.sh"
+    directory: "server-workflow-tool"
+
+
+## Task Sync.
+task_sync:
+  config_enabled: true
+  patch_enabled: true
+
+
+## Build Baron.
+build_baron_settings:
+  ticket_create_project: BF
+  ticket_search_projects:
+    - BF
+    - WT
+    - SERVER
