@@ -516,6 +516,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/cloner',
+        '$BUILD_DIR/mongo/db/cluster_transaction_api',
         '$BUILD_DIR/mongo/db/commands/cluster_server_parameter_commands_invocation',
         '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/commands/create_command',

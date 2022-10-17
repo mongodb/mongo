@@ -128,8 +128,10 @@ private:
      * Does the following writes:
      * 1. Updates the config.collections entry for the new sharded collection
      * 2. Updates config.chunks entries for the new sharded collection
+     * 3. Inserts an entry into config.placementHistory with the sublist of shards that will host
+     * one or more chunks of the new collections at creation time
      */
-    void _commit(OperationContext* opCtx);
+    void _commit(OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
 
     /**
      * Helper function to audit and log the shard collection event.

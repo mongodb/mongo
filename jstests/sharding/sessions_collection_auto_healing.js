@@ -3,6 +3,7 @@
  * ]
  */
 load('jstests/libs/sessions_collection.js');
+load("jstests/libs/feature_flag_util.js");
 
 (function() {
 "use strict";
@@ -119,19 +120,30 @@ var shardConfig = shard.getDB("config");
 
     validateSessionsCollection(shard, true, true);
 
-    // We will have two sessions because of the session used in the shardCollection's retryable
-    // write to shard the sessions collection. It will disappear after we run the refresh
-    // function on the shard.
-    assert.eq(shardConfig.system.sessions.countDocuments({}), 2, "did not flush config's sessions");
+    // TODO SERVER-69106 adapt the test assuming that the flag will be always enabled.
+    const historicalPlacementDataFeatureFlag = FeatureFlagUtil.isEnabled(
+        st.configRS.getPrimary().getDB('admin'), "HistoricalPlacementShardingCatalog");
+    const sessionsOpenedByShardCollectionCmd = historicalPlacementDataFeatureFlag ? 3 : 2;
+
+    // We will have sessionsOpenedByShardCollectionCmd sessions because of the sessions used in the
+    // shardCollection's retryable write to shard the sessions collection. It will disappear after
+    // we run the refresh function on the shard.
+    assert.eq(shardConfig.system.sessions.countDocuments({}),
+              sessionsOpenedByShardCollectionCmd,
+              "did not flush config's sessions");
 
     // Now, if we do refreshes on the other servers, their in-mem records will
     // be written to the collection.
     assert.commandWorked(shard.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assert.eq(shardConfig.system.sessions.countDocuments({}), 3, "did not flush shard's sessions");
+    assert.eq(shardConfig.system.sessions.countDocuments({}),
+              sessionsOpenedByShardCollectionCmd + 1,
+              "did not flush shard's sessions");
 
     rs.awaitLastOpCommitted();
     assert.commandWorked(mongos.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assert.eq(shardConfig.system.sessions.countDocuments({}), 5, "did not flush mongos' sessions");
+    assert.eq(shardConfig.system.sessions.countDocuments({}),
+              sessionsOpenedByShardCollectionCmd + 3,
+              "did not flush mongos' sessions");
 }
 
 // Test that if we drop the index on the sessions collection, only a refresh on the config
