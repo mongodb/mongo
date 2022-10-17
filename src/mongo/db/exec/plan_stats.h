@@ -180,7 +180,7 @@ private:
     BasePlanStageStats& operator=(const BasePlanStageStats<C, T>&) = delete;
 };
 
-using PlanStageStats = BasePlanStageStats<CommonStats, StageType>;
+using PlanStageStats = BasePlanStageStats<mongo::CommonStats, StageType>;
 
 struct AndHashStats : public SpecificStats {
     AndHashStats() = default;

@@ -76,7 +76,7 @@ struct Bucket {
 class ScalarHistogram {
 public:
     ScalarHistogram();
-    ScalarHistogram(const Histogram& histogram);
+    ScalarHistogram(const StatsHistogram& histogram);
     ScalarHistogram(sbe::value::Array bounds, std::vector<Bucket> buckets);
 
     std::string toString() const;

@@ -539,7 +539,6 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
         }
 
         case CEMode::kHistogram:
-            // TODO SERVER-70352: Take into account statistics cache (maybe fallback to heuristic).
             return {OptPhaseManager::getAllRewritesSet(),
                     prefixId,
                     requireRID,

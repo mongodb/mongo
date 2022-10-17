@@ -128,7 +128,7 @@ public:
         return STAGE_DELETE;
     }
 
-    std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<mongo::PlanStageStats> getStats();
 
     const SpecificStats* getSpecificStats() const;
 

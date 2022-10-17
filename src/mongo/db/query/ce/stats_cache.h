@@ -45,20 +45,10 @@ using StatsCacheValueHandle = StatsCacheType::ValueHandle;
 
 /**
  * Collectoin statistics read through cache. It reads from the persitent storage but never wrties to
- * it. Stored on the service context.
+ * it.
  */
 class StatsCache : public StatsCacheType {
 public:
-    /**
-     * Stores the cache on the specified service context. May only be called once for the lifetime
-     * of the service context.
-     */
-    static void set(ServiceContext* serviceContext, std::unique_ptr<StatsCache> cache);
-    static void clearForTests(ServiceContext* serviceContext);
-
-    static StatsCache& get(ServiceContext* serviceContext);
-    static StatsCache& get(OperationContext* opCtx);
-
     /**
      * The constructor provides the Service context under which this cache has been instantiated,
      * and a Thread pool to be used for invoking the blocking 'lookup' calls. The size is the number

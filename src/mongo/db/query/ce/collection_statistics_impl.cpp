@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/ce/collection_statistics_impl.h"
 #include "mongo/db/client.h"
-#include "mongo/db/query/ce/stats_cache.h"
+#include "mongo/db/query/ce/stats_catalog.h"
 
 namespace mongo::ce {
 
@@ -52,13 +52,17 @@ const ArrayHistogram* CollectionStatisticsImpl::getHistogram(const std::string& 
         uassert(8423368, "no current client", Client::getCurrent());
         auto opCtx = Client::getCurrent()->getOperationContext();
         uassert(8423367, "no operation context", opCtx);
-        StatsCache& cache = StatsCache::get(opCtx);
-        auto handle = cache.acquire(opCtx, std::make_pair(_nss, path));
-        if (!handle) {
+        StatsCatalog& statsCatalog = StatsCatalog::get(opCtx);
+        const auto swHistogram = statsCatalog.getHistogram(opCtx, _nss, path);
+        if (!swHistogram.isOK()) {
+            if (swHistogram != ErrorCodes::NamespaceNotFound) {
+                uasserted(swHistogram.getStatus().code(),
+                          str::stream() << "Error getting histograms for path " << _nss << " : "
+                                        << path << swHistogram.getStatus().reason());
+            }
             return nullptr;
         }
-
-        auto histogram = *(handle.get());
+        const auto histogram = std::move(swHistogram.getValue());
         addHistogram(path, histogram);
         return histogram.get();
     }

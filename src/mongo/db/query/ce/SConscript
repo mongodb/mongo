@@ -11,6 +11,7 @@ env.Library(
         'ce_sampling.cpp',
         'collection_statistics_impl.cpp',
         'histogram_estimation.cpp',
+        'stats_catalog.cpp',
         'stats_cache.cpp',
         'stats_cache_loader_impl.cpp',
     ],

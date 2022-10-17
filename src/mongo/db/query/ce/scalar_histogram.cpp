@@ -59,7 +59,7 @@ std::string Bucket::toString() const {
 
 ScalarHistogram::ScalarHistogram() : ScalarHistogram({}, {}) {}
 
-ScalarHistogram::ScalarHistogram(const Histogram& histogram) {
+ScalarHistogram::ScalarHistogram(const StatsHistogram& histogram) {
 
     for (const auto& bucket : histogram.getBuckets()) {
         Bucket b(bucket.getBoundaryCount(),

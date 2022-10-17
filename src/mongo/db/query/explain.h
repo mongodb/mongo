@@ -140,8 +140,8 @@ public:
      * intended to be human readable, and useful for debugging query performance problems related to
      * the plan cache.
      */
-    static void planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out);
-    static void planCacheEntryToBSON(const sbe::PlanCacheEntry& entry, BSONObjBuilder* out);
+    static void planCacheEntryToBSON(const mongo::PlanCacheEntry& entry, BSONObjBuilder* out);
+    static void planCacheEntryToBSON(const mongo::sbe::PlanCacheEntry& entry, BSONObjBuilder* out);
 };
 
 }  // namespace mongo

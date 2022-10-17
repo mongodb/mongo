@@ -2317,6 +2317,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
         '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
+        '$BUILD_DIR/mongo/db/query/ce/query_ce',
         '$BUILD_DIR/mongo/db/set_change_stream_state_coordinator',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter_op_observer',

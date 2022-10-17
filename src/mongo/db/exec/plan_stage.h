@@ -320,7 +320,7 @@ public:
      * Creates plan stats tree which has the same topology as the original execution tree,
      * but has a separate lifetime.
      */
-    virtual std::unique_ptr<PlanStageStats> getStats() = 0;
+    virtual std::unique_ptr<mongo::PlanStageStats> getStats() = 0;
 
     /**
      * Get the CommonStats for this stage. The pointer is *not* owned by the caller.
@@ -329,7 +329,7 @@ public:
      * It must not exist past the stage. If you need the stats to outlive the stage,
      * use the getStats(...) method above.
      */
-    const CommonStats* getCommonStats() const {
+    const mongo::CommonStats* getCommonStats() const {
         return &_commonStats;
     }
 
@@ -413,7 +413,7 @@ protected:
     }
 
     Children _children;
-    CommonStats _commonStats;
+    mongo::CommonStats _commonStats;
 
 private:
     OperationContext* _opCtx;

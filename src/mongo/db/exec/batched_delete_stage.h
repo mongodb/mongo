@@ -114,7 +114,7 @@ public:
     // Returns true when no more work can be done (there are no more deletes to commit).
     bool isEOF() final;
 
-    std::unique_ptr<PlanStageStats> getStats() final;
+    std::unique_ptr<mongo::PlanStageStats> getStats() final;
 
     const SpecificStats* getSpecificStats() const final;
 

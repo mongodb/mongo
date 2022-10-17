@@ -46,7 +46,7 @@ structs:
             cumulativeDistincts:
                 type: long
 
-    Histogram:
+    StatsHistogram:
         description: "MaxDiff Histogram"
         fields:
             buckets:
@@ -75,11 +75,11 @@ counts"
         description: "Array Histogram"
         fields:
             minHistogram:
-                type: Histogram 
+                type: StatsHistogram
             maxHistogram:
-                type: Histogram 
+                type: StatsHistogram
             uniqueHistogram:
-                type: Histogram 
+                type: StatsHistogram
             boolCount:
                 type: BoolCount
             typeCount:
@@ -97,7 +97,7 @@ counts"
                 type: array<TypeTag>
                 optional: true
             scalarHistogram:
-                type: Histogram
+                type: StatsHistogram
                 optional: true
             arrayStatistics:
                 type: StatsArrayHistogram

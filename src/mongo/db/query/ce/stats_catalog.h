@@ -27,56 +27,52 @@
  *    it in the license file.
  */
 
+#pragma once
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/ce/stats_cache.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/ce/collection_statistics.h"
-#include "mongo/util/read_through_cache.h"
-
-#include "mongo/logv2/log.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
+#include "mongo/db/query/ce/stats_cache.h"
+#include "mongo/db/query/ce/stats_cache_loader.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
+
 using namespace mongo::ce;
 
-namespace {
+/**
+ * This class owns statsCache and manages executor lifetime.
+ */
+class StatsCatalog {
+public:
+    /**
+     * Stores the catalog on the specified service context. May only be called once for the lifetime
+     * of the service context.
+     */
+    static void set(ServiceContext* serviceContext, std::unique_ptr<StatsCatalog> catalog);
 
-const auto statsCacheDecoration = ServiceContext::declareDecoration<std::unique_ptr<StatsCache>>();
+    static StatsCatalog& get(ServiceContext* serviceContext);
+    static StatsCatalog& get(OperationContext* opCtx);
 
-}  // namespace
+    /**
+     * The constructor provides the Service context under which the cache needs to be instantiated,
+     * and a Thread pool to be used for invoking the blocking 'lookup' calls. The size is the number
+     * of entries the underlying LRU cache will hold.
+     */
+    StatsCatalog(ServiceContext* service, std::unique_ptr<StatsCacheLoader> cacheLoader);
 
-StatsCache::StatsCache(ServiceContext* service,
-                       std::unique_ptr<StatsCacheLoader> cacheLoader,
-                       ThreadPoolInterface& threadPool,
-                       int size)
-    : ReadThroughCache(
-          _mutex,
-          service,
-          threadPool,
-          [this](OperationContext* opCtx,
-                 const StatsPathString& statsPath,
-                 const ValueHandle& stats) { return _lookupStats(opCtx, statsPath, stats); },
-          size),
-      _statsCacheLoader(std::move(cacheLoader)) {}
+    ~StatsCatalog();
 
-StatsCache::LookupResult StatsCache::_lookupStats(OperationContext* opCtx,
-                                                  const StatsPathString& statsPath,
-                                                  const StatsCacheValueHandle& stats) {
+    StatusWith<std::shared_ptr<ArrayHistogram>> getHistogram(OperationContext* opCtx,
+                                                             const NamespaceString& nss,
+                                                             const std::string& path);
 
-    try {
-        invariant(_statsCacheLoader);
-        auto newStats = _statsCacheLoader->getStats(opCtx, statsPath).get();
-        return LookupResult(std::move(newStats));
-    } catch (const DBException& ex) {
-        if (ex.code() == ErrorCodes::NamespaceNotFound) {
-            return StatsCache::LookupResult(boost::none);
-        }
-        throw;
-    }
-}
+private:
+    /**
+     * The executor is used by the cache.
+     */
+    std::shared_ptr<ThreadPool> _executor;
+    StatsCache _statsCache;
+};
 
 }  // namespace mongo
