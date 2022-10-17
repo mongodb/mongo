@@ -112,6 +112,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/assert_util.h"
@@ -951,7 +952,9 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             // Note, these must be done after the configOpTime is recovered via
             // ShardingStateRecovery::recover above, because they may trigger filtering metadata
             // refreshes which should use the recovered configOpTime.
-            migrationutil::resubmitRangeDeletionsOnStepUp(_service);
+            if (!mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+                migrationutil::resubmitRangeDeletionsOnStepUp(_service);
+            }
             migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
             migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
 

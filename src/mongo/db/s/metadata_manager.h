@@ -142,8 +142,7 @@ public:
      * returns a future that will be resolved when the newest overlapping range's deletion (possibly
      * the one of interest) completes or fails.
      */
-    boost::optional<SharedSemiFuture<void>> trackOrphanedDataCleanup(
-        ChunkRange const& orphans) const;
+    SharedSemiFuture<void> trackOrphanedDataCleanup(ChunkRange const& orphans) const;
 
     /**
      * Returns a future marked as ready when all the ongoing queries retaining the range complete

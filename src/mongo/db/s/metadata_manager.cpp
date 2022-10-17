@@ -320,8 +320,7 @@ size_t MetadataManager::numberOfRangesScheduledForDeletion() const {
     return _rangesScheduledForDeletion.size();
 }
 
-boost::optional<SharedSemiFuture<void>> MetadataManager::trackOrphanedDataCleanup(
-    ChunkRange const& range) const {
+SharedSemiFuture<void> MetadataManager::trackOrphanedDataCleanup(ChunkRange const& range) const {
     stdx::lock_guard<Latch> lg(_managerLock);
     for (const auto& [orphanRange, deletionComplete] : _rangesScheduledForDeletion) {
         if (orphanRange.overlapWith(range)) {
@@ -329,7 +328,7 @@ boost::optional<SharedSemiFuture<void>> MetadataManager::trackOrphanedDataCleanu
         }
     }
 
-    return boost::none;
+    return SemiFuture<void>::makeReady().share();
 }
 
 SharedSemiFuture<void> MetadataManager::getOngoingQueriesCompletionFuture(ChunkRange const& range) {

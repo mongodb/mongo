@@ -490,6 +490,8 @@ public:
 
     CatalogCacheLoaderMock* _mockCatalogCacheLoader;
     StaticCatalogClient* _mockCatalogClient;
+
+    RAIIServerParameterControllerForTest enableFeatureFlag{"featureFlagRangeDeleterService", false};
 };
 
 TEST_F(SubmitRangeDeletionTaskTest,

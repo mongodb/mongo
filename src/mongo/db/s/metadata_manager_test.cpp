@@ -44,6 +44,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/condition_variable.h"
@@ -214,6 +215,7 @@ RangeDeletionTask insertRangeDeletionTask(OperationContext* opCtx,
 }
 
 TEST_F(MetadataManagerTest, TrackOrphanedDataCleanupBlocksOnScheduledRangeDeletions) {
+    RAIIServerParameterControllerForTest enableFeatureFlag{"featureFlagRangeDeleterService", false};
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
     const auto task =
         insertRangeDeletionTask(operationContext(), kNss, _manager->getCollectionUuid(), cr1, 0);
@@ -225,14 +227,15 @@ TEST_F(MetadataManagerTest, TrackOrphanedDataCleanupBlocksOnScheduledRangeDeleti
     ASSERT_FALSE(notifn1.isReady());
     ASSERT_EQ(_manager->numberOfRangesToClean(), 1UL);
 
-    auto optNotifn = _manager->trackOrphanedDataCleanup(cr1);
+    auto future = _manager->trackOrphanedDataCleanup(cr1);
     ASSERT_FALSE(notifn1.isReady());
-    ASSERT_FALSE(optNotifn->isReady());
+    ASSERT_FALSE(future.isReady());
 
     globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::off);
 }
 
 TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIsDestroyed) {
+    RAIIServerParameterControllerForTest enableFeatureFlag{"featureFlagRangeDeleterService", false};
     const ChunkRange rangeToClean(BSON("key" << 20), BSON("key" << 30));
     const auto task = insertRangeDeletionTask(
         operationContext(), kNss, _manager->getCollectionUuid(), rangeToClean, 0);
@@ -254,15 +257,14 @@ TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIs
     auto notif = _manager->cleanUpRange(rangeToClean, false /*delayBeforeDeleting*/);
     ASSERT(!notif.isReady());
 
-    auto optNotif = _manager->trackOrphanedDataCleanup(rangeToClean);
-    ASSERT(optNotif);
-    ASSERT(!optNotif->isReady());
+    auto future = _manager->trackOrphanedDataCleanup(rangeToClean);
+    ASSERT(!future.isReady());
 
     // Reset the original shared_ptr. The cursorOnMovedMetadata will still contain its own copy of
     // the shared_ptr though, so the destructor of ~MetadataManager won't yet be called.
     _manager.reset();
     ASSERT(!notif.isReady());
-    ASSERT(!optNotif->isReady());
+    ASSERT(!future.isReady());
 
     // Destroys the ScopedCollectionDescription object and causes the destructor of MetadataManager
     // to run, which should trigger all deletion notifications.
@@ -275,7 +277,7 @@ TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIs
     }
 
     notif.wait();
-    optNotif->wait();
+    future.wait();
 }
 
 TEST_F(MetadataManagerTest, RefreshAfterSuccessfulMigrationSinglePending) {
@@ -327,6 +329,7 @@ TEST_F(MetadataManagerTest, BeginReceiveWithOverlappingRange) {
 
 // Tests membership functions for _rangesToClean
 TEST_F(MetadataManagerTest, RangesToCleanMembership) {
+    RAIIServerParameterControllerForTest enableFeatureFlag{"featureFlagRangeDeleterService", false};
     ChunkRange cr(BSON("key" << 0), BSON("key" << 10));
     const auto task =
         insertRangeDeletionTask(operationContext(), kNss, _manager->getCollectionUuid(), cr, 0);
