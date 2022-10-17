@@ -137,6 +137,8 @@ enum class ValidateExpireAfterSecondsMode {
 Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds,
                                   ValidateExpireAfterSecondsMode mode);
 
+Status validateExpireAfterSeconds(BSONElement expireAfterSeconds,
+                                  ValidateExpireAfterSecondsMode mode);
 /**
  * Returns true if 'indexSpec' refers to a TTL index.
  */

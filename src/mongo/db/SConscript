@@ -1322,6 +1322,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'catalog/catalog_helpers',
+        'catalog/index_key_validate',
         'commands/fsync_locked',
         'commands/server_status_core',
         'ops/write_ops',

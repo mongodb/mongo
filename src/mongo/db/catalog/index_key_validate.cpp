@@ -71,9 +71,9 @@ namespace {
 // specification.
 MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
 
-// When the skipTTLIndexNaNExpireAfterSecondsValidation failpoint is enabled, validation for
-// TTL index 'expireAfterSeconds' will be disabled.
-MONGO_FAIL_POINT_DEFINE(skipTTLIndexNaNExpireAfterSecondsValidation);
+// When the skipTTLIndexInvalidExpireAfterSecondsValidationForCreateIndex failpoint is enabled,
+// validation for TTL index 'expireAfterSeconds' will be disabled in certain codepaths.
+MONGO_FAIL_POINT_DEFINE(skipTTLIndexInvalidExpireAfterSecondsValidationForCreateIndex);
 
 static const std::set<StringData> allowedIdIndexFieldNames = {
     IndexDescriptor::kCollationFieldName,
@@ -290,7 +290,9 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
                           "indexSpec"_attr = redact(indexSpec));
             builder->appendBool(fieldName, true);
         } else if (IndexDescriptor::kExpireAfterSecondsFieldName == fieldName &&
-                   !(indexSpecElem.isNumber() && !indexSpecElem.isNaN())) {
+                   !validateExpireAfterSeconds(indexSpecElem,
+                                               ValidateExpireAfterSecondsMode::kSecondaryTTLIndex)
+                        .isOK()) {
             LOGV2_WARNING(6835900,
                           "Fixing expire field from TTL index spec",
                           "namespace"_attr = redact(ns.toString()),
@@ -310,7 +312,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     bool hasKeyPatternField = false;
     bool hasIndexNameField = false;
     bool hasNamespaceField = false;
-    bool isTTLIndexWithNaNExpireAfterSeconds = false;
+    bool isTTLIndexWithInvalidExpireAfterSeconds = false;
     bool hasVersionField = false;
     bool hasCollationField = false;
     bool hasWeightsField = false;
@@ -569,8 +571,12 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                     str::stream() << "The field '" << indexSpecElemFieldName
                                   << "' must be a number, but got "
                                   << typeName(indexSpecElem.type())};
-        } else if (IndexDescriptor::kExpireAfterSecondsFieldName == indexSpecElemFieldName) {
-            isTTLIndexWithNaNExpireAfterSeconds = indexSpecElem.isNaN();
+        } else if (IndexDescriptor::kExpireAfterSecondsFieldName == indexSpecElemFieldName &&
+                   !validateExpireAfterSeconds(indexSpecElem,
+                                               ValidateExpireAfterSecondsMode::kSecondaryTTLIndex)
+                        .isOK() &&
+                   !skipTTLIndexInvalidExpireAfterSecondsValidationForCreateIndex.shouldFail()) {
+            isTTLIndexWithInvalidExpireAfterSeconds = true;
         } else {
             // We can assume field name is valid at this point. Validation of fieldname is handled
             // prior to this in validateIndexSpecFieldNames().
@@ -642,10 +648,9 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
         modifiedSpec = modifiedSpec.removeField(IndexDescriptor::kNamespaceFieldName);
     }
 
-    if (isTTLIndexWithNaNExpireAfterSeconds &&
-        !skipTTLIndexNaNExpireAfterSecondsValidation.shouldFail()) {
+    if (isTTLIndexWithInvalidExpireAfterSeconds) {
         // We create a new index specification with the 'expireAfterSeconds' field set as
-        // kExpireAfterSecondsForInactiveTTLIndex if the current value is NaN. A similar
+        // kExpireAfterSecondsForInactiveTTLIndex if the current value is invalid. A similar
         // treatment is done in repairIndexSpec(). This rewrites the 'expireAfterSeconds'
         // value to be compliant with the 'safeInt' IDL type for the listIndexes response.
         BSONObjBuilder builder;
@@ -856,6 +861,38 @@ Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds,
     return Status::OK();
 }
 
+Status validateExpireAfterSeconds(BSONElement expireAfterSeconds,
+                                  ValidateExpireAfterSecondsMode mode) {
+    if (!expireAfterSeconds.isNumber()) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
+                              << "' option must be numeric, but received a type of '"
+                              << typeName(expireAfterSeconds.type())};
+    }
+
+    if (expireAfterSeconds.isNaN()) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
+                              << "' option must not be NaN"};
+    }
+
+    // Clustered indexes allow 64-bit integers for expireAfterSeconds, but secondary indexes only
+    // allow 32-bit integers, so we check the range here for secondary indexes.
+    if (mode == ValidateExpireAfterSecondsMode::kSecondaryTTLIndex &&
+        expireAfterSeconds.safeNumberInt() != expireAfterSeconds.safeNumberLong()) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
+                              << "' must be within the range of a 32-bit integer"};
+    }
+
+    if (auto status = validateExpireAfterSeconds(expireAfterSeconds.safeNumberLong(), mode);
+        !status.isOK()) {
+        return {ErrorCodes::CannotCreateIndex, str::stream() << status.reason()};
+    }
+
+    return Status::OK();
+}
+
 bool isIndexTTL(const BSONObj& indexSpec) {
     return indexSpec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName);
 }
@@ -865,22 +902,11 @@ Status validateIndexSpecTTL(const BSONObj& indexSpec) {
         return Status::OK();
     }
 
-    const BSONElement expireAfterSecondsElt =
-        indexSpec[IndexDescriptor::kExpireAfterSecondsFieldName];
-    if (!expireAfterSecondsElt.isNumber()) {
-        return {ErrorCodes::CannotCreateIndex,
-                str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
-                              << "' option must be numeric, but received a type of '"
-                              << typeName(expireAfterSecondsElt.type())
-                              << "'. Index spec: " << indexSpec};
-    }
-
     if (auto status =
-            validateExpireAfterSeconds(expireAfterSecondsElt.safeNumberLong(),
+            validateExpireAfterSeconds(indexSpec[IndexDescriptor::kExpireAfterSecondsFieldName],
                                        ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
         !status.isOK()) {
-        return {ErrorCodes::CannotCreateIndex,
-                str::stream() << status.reason() << ". Index spec: " << indexSpec};
+        return status.withContext(str::stream() << ". Index spec: " << indexSpec);
     }
 
     const BSONObj key = indexSpec["key"].Obj();

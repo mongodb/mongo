@@ -56,28 +56,28 @@ public:
     // Specifies how a collection should expire data with TTL.
     class Info {
     public:
-        explicit Info(ClusteredId) : _isClustered(true), _isExpireAfterSecondsNaN(false) {}
-        Info(IndexName indexName, bool isExpireAfterSecondsNaN)
+        explicit Info(ClusteredId) : _isClustered(true), _isExpireAfterSecondsInvalid(false) {}
+        Info(IndexName indexName, bool isExpireAfterSecondsInvalid)
             : _isClustered(false),
               _indexName(std::move(indexName)),
-              _isExpireAfterSecondsNaN(isExpireAfterSecondsNaN) {}
+              _isExpireAfterSecondsInvalid(isExpireAfterSecondsInvalid) {}
         bool isClustered() const {
             return _isClustered;
         }
         IndexName getIndexName() const {
             return _indexName;
         }
-        bool isExpireAfterSecondsNaN() const {
-            return _isExpireAfterSecondsNaN;
+        bool isExpireAfterSecondsInvalid() const {
+            return _isExpireAfterSecondsInvalid;
         }
-        void unsetExpireAfterSecondsNaN() {
-            _isExpireAfterSecondsNaN = false;
+        void unsetExpireAfterSecondsInvalid() {
+            _isExpireAfterSecondsInvalid = false;
         }
 
     private:
         bool _isClustered;
         IndexName _indexName;
-        bool _isExpireAfterSecondsNaN;
+        bool _isExpireAfterSecondsInvalid;
     };
 
     // Caller is responsible for ensuring no duplicates are registered.
@@ -89,7 +89,7 @@ public:
      * Resets expireAfterSeconds flag on TTL index.
      * For idempotency, this has no effect if index is not found.
      */
-    void unsetTTLIndexExpireAfterSecondsNaN(UUID uuid, const IndexName& indexName);
+    void unsetTTLIndexExpireAfterSecondsInvalid(UUID uuid, const IndexName& indexName);
 
     using InfoMap = stdx::unordered_map<UUID, std::vector<Info>, UUID::Hash>;
     InfoMap getTTLInfos();

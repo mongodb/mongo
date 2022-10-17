@@ -177,18 +177,16 @@ const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
         return nullptr;
     }
 
-    BSONElement secondsExpireElt = spec[IndexDescriptor::kExpireAfterSecondsFieldName];
-    if (!secondsExpireElt.isNumber() || secondsExpireElt.isNaN()) {
-        LOGV2_ERROR(
-            22542,
-            "TTL indexes require the expire field to be numeric and not a NaN, skipping TTL job",
-            "ns"_attr = collection->ns(),
-            "uuid"_attr = collection->uuid(),
-            "field"_attr = IndexDescriptor::kExpireAfterSecondsFieldName,
-            "type"_attr = typeName(secondsExpireElt.type()),
-            "index"_attr = spec);
+    if (auto status = index_key_validate::validateIndexSpecTTL(spec); !status.isOK()) {
+        LOGV2_ERROR(6909100,
+                    "Skipping TTL job due to invalid index spec",
+                    "reason"_attr = status.reason(),
+                    "ns"_attr = collection->ns(),
+                    "uuid"_attr = collection->uuid(),
+                    "index"_attr = spec);
         return nullptr;
     }
+
     return desc;
 }
 
@@ -726,13 +724,14 @@ void TTLMonitor::onStepUp(OperationContext* opCtx) {
                 if (info.isClustered()) {
                     continue;
                 }
-                if (!info.isExpireAfterSecondsNaN()) {
+
+                if (!info.isExpireAfterSecondsInvalid()) {
                     continue;
                 }
 
                 auto indexName = info.getIndexName();
                 LOGV2(6847700,
-                      "Running collMod to fix TTL index with NaN 'expireAfterSeconds'.",
+                      "Running collMod to fix TTL index with invalid 'expireAfterSeconds'.",
                       "ns"_attr = *nss,
                       "uuid"_attr = uuid,
                       "name"_attr = indexName,
@@ -740,7 +739,7 @@ void TTLMonitor::onStepUp(OperationContext* opCtx) {
                           index_key_validate::kExpireAfterSecondsForInactiveTTLIndex);
 
                 // Compose collMod command to amend 'expireAfterSeconds' to same value that
-                // would be used by listIndexes() to convert the NaN value in the catalog.
+                // would be used by listIndexes() to convert a NaN value in the catalog.
                 CollModIndex collModIndex;
                 collModIndex.setName(StringData{indexName});
                 collModIndex.setExpireAfterSeconds(mongo::durationCount<Seconds>(
@@ -753,12 +752,13 @@ void TTLMonitor::onStepUp(OperationContext* opCtx) {
                 uassertStatusOK(
                     processCollModCommand(opCtx, {nss->db(), uuid}, collModCmd, &builder));
                 auto result = builder.obj();
-                LOGV2(6847701,
-                      "Successfully fixed TTL index with NaN 'expireAfterSeconds' using collMod",
-                      "ns"_attr = *nss,
-                      "uuid"_attr = uuid,
-                      "name"_attr = indexName,
-                      "result"_attr = result);
+                LOGV2(
+                    6847701,
+                    "Successfully fixed TTL index with invalid 'expireAfterSeconds' using collMod",
+                    "ns"_attr = *nss,
+                    "uuid"_attr = uuid,
+                    "name"_attr = indexName,
+                    "result"_attr = result);
             }
         } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
             // The exception is relevant to the entire TTL monitoring process, not just the specific

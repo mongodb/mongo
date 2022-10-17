@@ -91,6 +91,9 @@ MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildAbort);
 // through the IndexBuildsCoordinator.
 MONGO_FAIL_POINT_DEFINE(hangCreateIndexesBeforeStartingIndexBuild);
 
+
+MONGO_FAIL_POINT_DEFINE(skipTTLIndexValidationOnCreateIndex);
+
 constexpr auto kCommandName = "createIndexes"_sd;
 constexpr auto kAllIndexesAlreadyExist = "all indexes already exist"_sd;
 constexpr auto kIndexAlreadyExists = "index already exists"_sd;
@@ -177,6 +180,12 @@ void appendFinalIndexFieldsToResult(CreateIndexesReply* reply,
 void validateTTLOptions(OperationContext* opCtx,
                         const NamespaceString& ns,
                         const CreateIndexesCommand& cmd) {
+    if (MONGO_unlikely(skipTTLIndexValidationOnCreateIndex.shouldFail())) {
+        LOGV2(
+            6909101, "Skipping TTL index validation due to failpoint", "cmd"_attr = cmd.toBSON({}));
+        return;
+    }
+
     const auto clusteredAndCapped = [&](LockMode mode) {
         AutoGetCollection collection(opCtx, ns, mode);
         if (collection) {

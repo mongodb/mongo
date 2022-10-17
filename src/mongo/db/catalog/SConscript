@@ -208,6 +208,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/vector_clock',
         'collection_catalog',
         'collection_query_info',
+        'index_key_validate',
     ],
 )
 

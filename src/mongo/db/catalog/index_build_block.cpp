@@ -36,6 +36,7 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -290,14 +291,15 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
             }
 
             // Add the index to the TTLCollectionCache upon successfully committing the index build.
-            // TTL indexes are not compatible with capped collections.
-            // Note that TTL deletion is supported on capped clustered collections via bounded
-            // collection scan, which does not use an index.
+            // TTL indexes are not compatible with capped collections.  Note that TTL deletion is
+            // supported on capped clustered collections via bounded collection scan, which does not
+            // use an index.
             if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) && !coll->isCapped()) {
+                auto validateStatus = index_key_validate::validateExpireAfterSeconds(
+                    spec[IndexDescriptor::kExpireAfterSecondsFieldName],
+                    index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
                 TTLCollectionCache::get(svcCtx).registerTTLInfo(
-                    coll->uuid(),
-                    TTLCollectionCache::Info{
-                        indexName, spec[IndexDescriptor::kExpireAfterSecondsFieldName].isNaN()});
+                    coll->uuid(), TTLCollectionCache::Info{indexName, !validateStatus.isOK()});
             }
         });
 }

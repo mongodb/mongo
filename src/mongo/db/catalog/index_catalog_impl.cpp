@@ -243,30 +243,35 @@ Status IndexCatalogImpl::_init(OperationContext* opCtx,
 
         auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
 
-        // TTL indexes with NaN 'expireAfterSeconds' cause problems in multiversion settings.
         if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
-            if (spec[IndexDescriptor::kExpireAfterSecondsFieldName].isNaN()) {
-                LOGV2_OPTIONS(6852200,
-                              {logv2::LogTag::kStartupWarnings},
-                              "Found an existing TTL index with NaN 'expireAfterSeconds' in the "
-                              "catalog.",
-                              "ns"_attr = collection->ns(),
-                              "uuid"_attr = collection->uuid(),
-                              "index"_attr = indexName,
-                              "spec"_attr = spec);
+            // TTL indexes with an invalid 'expireAfterSeconds' field cause problems in multiversion
+            // settings.
+            auto hasInvalidExpireAfterSeconds =
+                !index_key_validate::validateExpireAfterSeconds(
+                     spec[IndexDescriptor::kExpireAfterSecondsFieldName],
+                     index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex)
+                     .isOK();
+            if (hasInvalidExpireAfterSeconds) {
+                LOGV2_OPTIONS(
+                    6852200,
+                    {logv2::LogTag::kStartupWarnings},
+                    "Found an existing TTL index with invalid 'expireAfterSeconds' in the "
+                    "catalog.",
+                    "ns"_attr = collection->ns(),
+                    "uuid"_attr = collection->uuid(),
+                    "index"_attr = indexName,
+                    "spec"_attr = spec);
             }
-        }
 
-        // TTL indexes are not compatible with capped collections.
-        // Note that TTL deletion is supported on capped clustered collections via bounded
-        // collection scan, which does not use an index.
-        if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) &&
-            !collection->isCapped()) {
-            TTLCollectionCache::get(opCtx->getServiceContext())
-                .registerTTLInfo(
-                    collection->uuid(),
-                    TTLCollectionCache::Info{
-                        indexName, spec[IndexDescriptor::kExpireAfterSecondsFieldName].isNaN()});
+            // TTL indexes are not compatible with capped collections.
+            // Note that TTL deletion is supported on capped clustered collections via bounded
+            // collection scan, which does not use an index.
+            if (!collection->isCapped()) {
+                TTLCollectionCache::get(opCtx->getServiceContext())
+                    .registerTTLInfo(
+                        collection->uuid(),
+                        TTLCollectionCache::Info{indexName, hasInvalidExpireAfterSeconds});
+            }
         }
 
         bool ready = collection->isIndexReady(indexName);

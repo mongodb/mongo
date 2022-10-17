@@ -31,6 +31,7 @@
 #include "mongo/db/catalog/coll_mod_index.h"
 
 #include "mongo/db/catalog/cannot_convert_index_to_unique_info.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/storage/index_entry_comparison.h"
@@ -69,10 +70,12 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         // Do not refer to 'idx' within this commit handler as it may be be invalidated by
         // IndexCatalog::refreshEntry().
         opCtx->recoveryUnit()->onCommit(
-            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName(), indexExpireAfterSeconds](
-                auto _) {
+            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](auto _) {
+                // We assume the expireAfterSeconds field is valid, because we've already done
+                // validation of this field.
                 ttlCache->registerTTLInfo(
-                    uuid, TTLCollectionCache::Info{indexName, /*isExpireAfterSecondsNaN=*/false});
+                    uuid,
+                    TTLCollectionCache::Info{indexName, /*isExpireAfterSecondsInvalid=*/false});
             });
 
         // Change the value of "expireAfterSeconds" on disk.
@@ -81,9 +84,12 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         return;
     }
 
-    // If the current `expireAfterSeconds` is NaN, it can never be equal to
+    // If the current `expireAfterSeconds` is invalid, it can never be equal to
     // 'indexExpireAfterSeconds'.
-    if (oldExpireSecsElement.isNaN()) {
+    if (auto status = index_key_validate::validateExpireAfterSeconds(
+            oldExpireSecsElement,
+            index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
+        !status.isOK()) {
         // Setting *oldExpireSecs is mostly for informational purposes.
         // We could also use index_key_validate::kExpireAfterSecondsForInactiveTTLIndex but
         // 0 is more consistent with the previous safeNumberLong() behavior and avoids potential
@@ -99,8 +105,9 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
         const auto& coll = autoColl->getCollection();
         opCtx->recoveryUnit()->onCommit(
-            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName(), indexExpireAfterSeconds](
-                auto _) { ttlCache->unsetTTLIndexExpireAfterSecondsNaN(uuid, indexName); });
+            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](auto _) {
+                ttlCache->unsetTTLIndexExpireAfterSecondsInvalid(uuid, indexName);
+            });
         return;
     }
 
