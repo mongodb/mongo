@@ -297,6 +297,7 @@ class BuildloggerServer(object):
                 "builder": builder,
                 "buildnum": build_num,
                 "task_id": _config.EVERGREEN_TASK_ID,
+                "execution": _config.EVERGREEN_EXECUTION,
             })
 
         return response["id"]
@@ -315,6 +316,7 @@ class BuildloggerServer(object):
                 "command": test_command,
                 "phase": self.config.get("build_phase", "unknown"),
                 "task_id": _config.EVERGREEN_TASK_ID,
+                "execution": _config.EVERGREEN_EXECUTION,
             })
 
         return response["id"]
