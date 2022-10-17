@@ -62,33 +62,43 @@ public:
     }
 
     /**
-     * Returns a ShardEndpoint for the doc from the mock ranges
+     * Returns a ShardEndpoint for the doc from the mock ranges. If `chunkRanges` is not nullptr,
+     * also populates a set of ChunkRange for the chunks that are targeted.
      */
-    ShardEndpoint targetInsert(OperationContext* opCtx, const BSONObj& doc) const override {
-        auto endpoints = _targetQuery(doc);
+    ShardEndpoint targetInsert(OperationContext* opCtx,
+                               const BSONObj& doc,
+                               std::set<ChunkRange>* chunkRanges = nullptr) const override {
+        auto endpoints = _targetQuery(doc, chunkRanges);
         ASSERT_EQ(1U, endpoints.size());
         return endpoints.front();
     }
 
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
-     * queries of the form { field : { $gte : <value>, $lt : <value> } }.
+     * queries of the form { field : { $gte : <value>, $lt : <value> } }. If `chunkRanges` is not
+     * nullptr, also populates a set of ChunkRange for the chunks that are targeted.
      */
-    std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                            const BatchItemRef& itemRef) const override {
-        return _targetQuery(itemRef.getUpdate().getQ());
+    std::vector<ShardEndpoint> targetUpdate(
+        OperationContext* opCtx,
+        const BatchItemRef& itemRef,
+        std::set<ChunkRange>* chunkRanges = nullptr) const override {
+        return _targetQuery(itemRef.getUpdate().getQ(), chunkRanges);
     }
 
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
-     * queries of the form { field : { $gte : <value>, $lt : <value> } }.
+     * queries of the form { field : { $gte : <value>, $lt : <value> } }. If `chunkRanges` is not
+     * nullptr, also populates a set of ChunkRange for the chunks that are targeted.
      */
-    std::vector<ShardEndpoint> targetDelete(OperationContext* opCtx,
-                                            const BatchItemRef& itemRef) const override {
-        return _targetQuery(itemRef.getDelete().getQ());
+    std::vector<ShardEndpoint> targetDelete(
+        OperationContext* opCtx,
+        const BatchItemRef& itemRef,
+        std::set<ChunkRange>* chunkRanges = nullptr) const override {
+        return _targetQuery(itemRef.getDelete().getQ(), chunkRanges);
     }
 
-    std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx) const override {
+    std::vector<ShardEndpoint> targetAllShards(
+        OperationContext* opCtx, std::set<ChunkRange>* chunkRanges = nullptr) const override {
         std::vector<ShardEndpoint> endpoints;
         for (const auto& range : _mockRanges) {
             endpoints.push_back(range.endpoint);
@@ -130,9 +140,11 @@ public:
 private:
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges. Only handles queries of
-     * the form { field : { $gte : <value>, $lt : <value> } }.
+     * the form { field : { $gte : <value>, $lt : <value> } }. If chunkRanges is not nullptr, also
+     * populates set of ChunkRange for the chunks that are targeted.
      */
-    std::vector<ShardEndpoint> _targetQuery(const BSONObj& query) const;
+    std::vector<ShardEndpoint> _targetQuery(const BSONObj& query,
+                                            std::set<ChunkRange>* chunkRanges) const;
 
     NamespaceString _nss;
 

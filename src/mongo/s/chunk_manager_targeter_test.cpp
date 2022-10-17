@@ -35,12 +35,15 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
@@ -74,10 +77,68 @@ public:
         chunkManager =
             makeChunkManager(kNss, ShardKeyPattern(shardKeyPattern), nullptr, false, splitPoints);
         return ChunkManagerTargeter(operationContext(), kNss);
-    }
+    };
     boost::optional<ChunkManager> chunkManager;
+
+protected:
+    bool checkChunkRanges = false;
+
+    void testTargetInsertWithRangePrefixHashedShardKeyCommon(
+        OperationContext* opCtx, const ChunkManagerTargeter& cmTargeter);
+    void testTargetInsertWithRangePrefixHashedShardKeyCustomChunkManager();
+    void testTargetInsertWithRangePrefixHashedShardKey();
+    void testTargetInsertsWithVaryingHashedPrefixAndConstantRangedSuffix();
+    void testTargetInsertsWithConstantHashedPrefixAndVaryingRangedSuffix();
+    void testTargetUpdateWithRangePrefixHashedShardKey();
+    void testTargetUpdateWithHashedPrefixHashedShardKey();
+    void testTargetDeleteWithRangePrefixHashedShardKey();
+    void testTargetDeleteWithHashedPrefixHashedShardKey();
+    void testTargetDeleteWithExactId();
 };
 
+class ChunkManagerTargeterWithChunkRangesTest : public ChunkManagerTargeterTest {
+public:
+    ChunkManagerTargeterWithChunkRangesTest() {
+        checkChunkRanges = true;
+    };
+
+protected:
+    void testTargetInsertWithRangePrefixHashedShardKey() {
+        ChunkManagerTargeterTest::testTargetInsertWithRangePrefixHashedShardKey();
+    };
+
+    void testTargetInsertWithRangePrefixHashedShardKeyCustomChunkManager() {
+        ChunkManagerTargeterTest::testTargetInsertWithRangePrefixHashedShardKeyCustomChunkManager();
+    };
+
+    void testTargetInsertsWithVaryingHashedPrefixAndConstantRangedSuffix() {
+        ChunkManagerTargeterTest::testTargetInsertsWithVaryingHashedPrefixAndConstantRangedSuffix();
+    };
+
+    void testTargetInsertsWithConstantHashedPrefixAndVaryingRangedSuffix() {
+        ChunkManagerTargeterTest::testTargetInsertsWithConstantHashedPrefixAndVaryingRangedSuffix();
+    };
+
+    void testTargetUpdateWithRangePrefixHashedShardKey() {
+        ChunkManagerTargeterTest::testTargetUpdateWithRangePrefixHashedShardKey();
+    };
+
+    void testTargetUpdateWithHashedPrefixHashedShardKey() {
+        ChunkManagerTargeterTest::testTargetUpdateWithHashedPrefixHashedShardKey();
+    }
+
+    void testTargetDeleteWithRangePrefixHashedShardKey() {
+        ChunkManagerTargeterTest::testTargetDeleteWithRangePrefixHashedShardKey();
+    }
+
+    void testTargetDeleteWithHashedPrefixHashedShardKey() {
+        ChunkManagerTargeterTest::testTargetDeleteWithHashedPrefixHashedShardKey();
+    }
+
+    void testTargetDeleteWithExactId() {
+        ChunkManagerTargeterTest::testTargetDeleteWithExactId();
+    }
+};
 
 /**
  * This is the common part of test TargetInsertWithRangePrefixHashedShardKey and
@@ -85,44 +146,67 @@ public:
  * Tests that the destination shard is the correct one as defined from the split points
  * when the ChunkManager was constructed.
  */
-void testTargetInsertWithRangePrefixHashedShardKeyCommon(OperationContext* opCtx,
-                                                         const ChunkManagerTargeter& cmTargeter) {
+void ChunkManagerTargeterTest::testTargetInsertWithRangePrefixHashedShardKeyCommon(
+    OperationContext* opCtx, const ChunkManagerTargeter& cmTargeter) {
+    std::set<ChunkRange> chunkRanges;
+
     // Caller has created 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1'
     // has chunk [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
     // [100, MaxKey).
-    auto res = cmTargeter.targetInsert(opCtx, fromjson("{a: {b: -111}, c: {d: '1'}}"));
+    auto res = cmTargeter.targetInsert(
+        opCtx, fromjson("{a: {b: -111}, c: {d: '1'}}"), checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "1");
 
-    res = cmTargeter.targetInsert(opCtx, fromjson("{a: {b: -10}}"));
+    res = cmTargeter.targetInsert(
+        opCtx, fromjson("{a: {b: -10}}"), checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "2");
 
-    res = cmTargeter.targetInsert(opCtx, fromjson("{a: {b: 0}, c: {d: 4}}"));
+    res = cmTargeter.targetInsert(
+        opCtx, fromjson("{a: {b: 0}, c: {d: 4}}"), checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "3");
 
-    res = cmTargeter.targetInsert(opCtx, fromjson("{a: {b: 1000}, c: null, d: {}}"));
+    res = cmTargeter.targetInsert(opCtx,
+                                  fromjson("{a: {b: 1000}, c: null, d: {}}"),
+                                  checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "4");
 
     // Missing field will be treated as null and will be targeted to the chunk which holds null,
     // which is shard '1'.
-    res = cmTargeter.targetInsert(opCtx, BSONObj());
+    res = cmTargeter.targetInsert(opCtx, BSONObj(), checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "1");
 
-    res = cmTargeter.targetInsert(opCtx, BSON("a" << 10));
+    res =
+        cmTargeter.targetInsert(opCtx, BSON("a" << 10), checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "1");
 
     // Arrays along shard key path are not allowed.
-    ASSERT_THROWS_CODE(cmTargeter.targetInsert(opCtx, fromjson("{a: [1,2]}")),
+    ASSERT_THROWS_CODE(cmTargeter.targetInsert(opCtx,
+                                               fromjson("{a: [1,2]}"),
+                                               checkChunkRanges ? &chunkRanges : nullptr),
                        DBException,
                        ErrorCodes::ShardKeyNotFound);
-    ASSERT_THROWS_CODE(cmTargeter.targetInsert(opCtx, fromjson("{c: [1,2]}")),
+    ASSERT_THROWS_CODE(cmTargeter.targetInsert(opCtx,
+                                               fromjson("{c: [1,2]}"),
+                                               checkChunkRanges ? &chunkRanges : nullptr),
                        DBException,
                        ErrorCodes::ShardKeyNotFound);
-    ASSERT_THROWS_CODE(cmTargeter.targetInsert(opCtx, fromjson("{c: {d: [1,2]}}")),
+    ASSERT_THROWS_CODE(cmTargeter.targetInsert(opCtx,
+                                               fromjson("{c: {d: [1,2]}}"),
+                                               checkChunkRanges ? &chunkRanges : nullptr),
                        DBException,
                        ErrorCodes::ShardKeyNotFound);
 }
 
 TEST_F(ChunkManagerTargeterTest, TargetInsertWithRangePrefixHashedShardKey) {
+    testTargetInsertWithRangePrefixHashedShardKey();
+}
+
+TEST_F(ChunkManagerTargeterWithChunkRangesTest, TargetInsertWithRangePrefixHashedShardKey) {
+    testTargetInsertWithRangePrefixHashedShardKey();
+}
+
+void ChunkManagerTargeterTest::testTargetInsertWithRangePrefixHashedShardKey() {
+    std::set<ChunkRange> chunkRanges;
     // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has chunk
     // [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
     // [100, MaxKey).
@@ -186,6 +270,16 @@ ChunkManager makeCustomChunkManager(const ShardKeyPattern& shardKeyPattern,
 
 
 TEST_F(ChunkManagerTargeterTest, TargetInsertWithRangePrefixHashedShardKeyCustomChunkManager) {
+    testTargetInsertWithRangePrefixHashedShardKeyCustomChunkManager();
+}
+
+TEST_F(ChunkManagerTargeterWithChunkRangesTest,
+       TargetInsertWithRangePrefixHashedShardKeyCustomChunkManager) {
+    testTargetInsertWithRangePrefixHashedShardKeyCustomChunkManager();
+}
+
+void ChunkManagerTargeterTest::testTargetInsertWithRangePrefixHashedShardKeyCustomChunkManager() {
+    std::set<ChunkRange> chunkRanges;
     // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has chunk
     // [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
     // [100, MaxKey).
@@ -213,6 +307,15 @@ TEST_F(ChunkManagerTargeterTest, TargetInsertWithRangePrefixHashedShardKeyCustom
 }
 
 TEST_F(ChunkManagerTargeterTest, TargetInsertsWithVaryingHashedPrefixAndConstantRangedSuffix) {
+    testTargetInsertsWithVaryingHashedPrefixAndConstantRangedSuffix();
+}
+
+TEST_F(ChunkManagerTargeterWithChunkRangesTest,
+       TargetInsertsWithVaryingHashedPrefixAndConstantRangedSuffix) {
+    testTargetInsertsWithVaryingHashedPrefixAndConstantRangedSuffix();
+}
+
+void ChunkManagerTargeterTest::testTargetInsertsWithVaryingHashedPrefixAndConstantRangedSuffix() {
     // Create 4 chunks and 4 shards such that shardId '0' has chunk [MinKey, -2^62), '1' has chunk
     // [-2^62, 0), '2' has chunk ['0', 2^62) and '3' has chunk [2^62, MaxKey).
     std::vector<BSONObj> splitPoints = {
@@ -223,23 +326,47 @@ TEST_F(ChunkManagerTargeterTest, TargetInsertsWithVaryingHashedPrefixAndConstant
                               splitPoints);
 
     for (int i = 0; i < 1000; i++) {
+        std::set<ChunkRange> chunkRanges;
         auto insertObj = BSON("a" << BSON("b" << i) << "c" << BSON("d" << 10));
-        auto res = cmTargeter.targetInsert(operationContext(), insertObj);
+        auto res = cmTargeter.targetInsert(
+            operationContext(), insertObj, checkChunkRanges ? &chunkRanges : nullptr);
 
         // Verify that the given document is being routed based on hashed value of 'i'.
-        auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(
-            BSON("a.b" << BSONElementHasher::hash64(insertObj["a"]["b"],
-                                                    BSONElementHasher::DEFAULT_HASH_SEED)));
+        auto hashValue =
+            BSONElementHasher::hash64(insertObj["a"]["b"], BSONElementHasher::DEFAULT_HASH_SEED);
+        auto chunk =
+            chunkManager->findIntersectingChunkWithSimpleCollation(BSON("a.b" << hashValue));
         ASSERT_EQUALS(res.shardName, chunk.getShardId());
+        if (checkChunkRanges) {
+            // Verify that the chunk range returned is correct and contains the hashValue.
+            ASSERT_EQUALS(chunkRanges.size(), 1);
+            ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), chunk.getMin());
+            ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), chunk.getMax());
+            ASSERT_BSONOBJ_LTE(chunk.getMin(), BSON("a.b" << hashValue));
+            ASSERT_BSONOBJ_LT(BSON("a.b" << hashValue), chunk.getMax());
+        }
     }
 
     // Arrays along shard key path are not allowed.
-    ASSERT_THROWS_CODE(cmTargeter.targetInsert(operationContext(), fromjson("{a: [1,2]}")),
+    std::set<ChunkRange> chunkRanges;
+    ASSERT_THROWS_CODE(cmTargeter.targetInsert(operationContext(),
+                                               fromjson("{a: [1,2]}"),
+                                               checkChunkRanges ? &chunkRanges : nullptr),
                        DBException,
                        ErrorCodes::ShardKeyNotFound);
-}
+}  // namespace
 
 TEST_F(ChunkManagerTargeterTest, TargetInsertsWithConstantHashedPrefixAndVaryingRangedSuffix) {
+    testTargetInsertsWithConstantHashedPrefixAndVaryingRangedSuffix();
+}
+
+TEST_F(ChunkManagerTargeterWithChunkRangesTest,
+       TargetInsertsWithConstantHashedPrefixAndVaryingRangedSuffix) {
+    testTargetInsertsWithConstantHashedPrefixAndVaryingRangedSuffix();
+}
+
+void ChunkManagerTargeterTest::testTargetInsertsWithConstantHashedPrefixAndVaryingRangedSuffix() {
+    std::set<ChunkRange> chunkRanges;
     // For the purpose of this test, we will keep the hashed field constant to 0 so that we can
     // correctly test the targeting based on range field.
     auto hashedValueOfZero = BSONElementHasher::hash64(BSON("" << 0).firstElement(),
@@ -259,28 +386,95 @@ TEST_F(ChunkManagerTargeterTest, TargetInsertsWithConstantHashedPrefixAndVarying
                                    << "c.d" << 1),
                               splitPoints);
 
-    auto res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: -111}}"));
+    auto res = cmTargeter.targetInsert(operationContext(),
+                                       fromjson("{a: {b: 0}, c: {d: -111}}"),
+                                       checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "1");
+    if (this->checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
+                          BSON("a.b" << hashedValueOfZero << "c.d" << BSONNULL));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(),
+                          BSON("a.b" << hashedValueOfZero << "c.d" << -100));
+        chunkRanges.clear();
+    }
 
-    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: -11}}"));
+    res = cmTargeter.targetInsert(operationContext(),
+                                  fromjson("{a: {b: 0}, c: {d: -11}}"),
+                                  this->checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "2");
+    if (this->checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
+                          BSON("a.b" << hashedValueOfZero << "c.d" << -100));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(),
+                          BSON("a.b" << hashedValueOfZero << "c.d" << 0));
+        chunkRanges.clear();
+    }
 
-    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: 0}}"));
+    res = cmTargeter.targetInsert(operationContext(),
+                                  fromjson("{a: {b: 0}, c: {d: 0}}"),
+                                  this->checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "3");
+    if (this->checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
+                          BSON("a.b" << hashedValueOfZero << "c.d" << 0));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(),
+                          BSON("a.b" << hashedValueOfZero << "c.d" << 100));
+        chunkRanges.clear();
+    }
 
-    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: 111}}"));
+    res = cmTargeter.targetInsert(operationContext(),
+                                  fromjson("{a: {b: 0}, c: {d: 111}}"),
+                                  this->checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "4");
+    if (this->checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
+                          BSON("a.b" << hashedValueOfZero << "c.d" << 100));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << MAXKEY << "c.d" << MAXKEY));
+        chunkRanges.clear();
+    }
 
     // Missing field will be treated as null and will be targeted to the chunk which holds null,
     // which is shard '1'.
-    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}}"));
+    res = cmTargeter.targetInsert(
+        operationContext(), fromjson("{a: {b: 0}}"), checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "1");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
+                          BSON("a.b" << hashedValueOfZero << "c.d" << BSONNULL));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(),
+                          BSON("a.b" << hashedValueOfZero << "c.d" << -100));
+        chunkRanges.clear();
+    }
 
-    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}}, c: 5}"));
+    res = cmTargeter.targetInsert(operationContext(),
+                                  fromjson("{a: {b: 0}}, c: 5}"),
+                                  checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "1");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
+                          BSON("a.b" << hashedValueOfZero << "c.d" << BSONNULL));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(),
+                          BSON("a.b" << hashedValueOfZero << "c.d" << -100));
+        chunkRanges.clear();
+    }
 }
 
 TEST_F(ChunkManagerTargeterTest, TargetUpdateWithRangePrefixHashedShardKey) {
+    testTargetUpdateWithRangePrefixHashedShardKey();
+}
+
+TEST_F(ChunkManagerTargeterWithChunkRangesTest, TargetUpdateWithRangePrefixHashedShardKey) {
+    testTargetUpdateWithRangePrefixHashedShardKey();
+}
+
+void ChunkManagerTargeterTest::testTargetUpdateWithRangePrefixHashedShardKey() {
+    std::set<ChunkRange> chunkRanges;
     // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has chunk
     // [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
     // [100, MaxKey).
@@ -291,68 +485,137 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithRangePrefixHashedShardKey) {
                               splitPoints);
 
     // When update targets using replacement object.
-    auto request =
-        buildUpdate(kNss, fromjson("{'a.b': {$gt : 2}}"), fromjson("{a: {b: -1}}"), false);
-    auto res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&request, 0));
+    auto request = buildUpdate(
+        kNss, fromjson("{'a.b': {$gt : 2}}"), fromjson("{a: {b: -1}}"), /*upsert=*/false);
+    auto res = cmTargeter.targetUpdate(
+        operationContext(), BatchItemRef(&request, 0), checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "2");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << -100 << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << 0 << "c.d" << MINKEY));
+        chunkRanges.clear();
+    }
 
     // When update targets using query.
     auto requestAndSet = buildUpdate(kNss,
                                      fromjson("{$and: [{'a.b': {$gte : 0}}, {'a.b': {$lt: 99}}]}}"),
                                      fromjson("{$set: {p : 1}}"),
                                      false);
-    res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestAndSet, 0));
+    res = cmTargeter.targetUpdate(operationContext(),
+                                  BatchItemRef(&requestAndSet, 0),
+                                  checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "3");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << 0 << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << 100 << "c.d" << MINKEY));
+        chunkRanges.clear();
+    }
 
     auto requestLT =
         buildUpdate(kNss, fromjson("{'a.b': {$lt : -101}}"), fromjson("{a: {b: 111}}"), false);
-    res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestLT, 0));
+    res = cmTargeter.targetUpdate(
+        operationContext(), BatchItemRef(&requestLT, 0), checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
+                          BSON("a.b" << BSONNULL << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << -100 << "c.d" << MINKEY));
+        chunkRanges.clear();
+    }
 
     // For op-style updates, query on _id gets targeted to all shards.
     auto requestOpUpdate =
         buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{$set: {p: 111}}"), false);
-    res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestOpUpdate, 0));
+    res = cmTargeter.targetUpdate(operationContext(),
+                                  BatchItemRef(&requestOpUpdate, 0),
+                                  checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 5);
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 5);
+        auto itRange = chunkRanges.cbegin();
+        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << MINKEY << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << BSONNULL << "c.d" << MINKEY));
+        ++itRange;
+        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << BSONNULL << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << -100 << "c.d" << MINKEY));
+        ++itRange;
+        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << -100 << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << 0 << "c.d" << MINKEY));
+        ++itRange;
+        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << 0 << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << 100 << "c.d" << MINKEY));
+        ++itRange;
+        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << 100 << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << MAXKEY << "c.d" << MAXKEY));
+        chunkRanges.clear();
+    }
 
     // For replacement style updates, query on _id uses replacement doc to target. If the
     // replacement doc doesn't have shard key fields, then update should be routed to the shard
     // holding 'null' shard key documents.
     auto requestReplUpdate = buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{p: 111}}"), false);
-    res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestReplUpdate, 0));
+    res = cmTargeter.targetUpdate(operationContext(),
+                                  BatchItemRef(&requestReplUpdate, 0),
+                                  checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
-
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
+                          BSON("a.b" << BSONNULL << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << -100 << "c.d" << MINKEY));
+        chunkRanges.clear();
+    }
 
     // Upsert requires full shard key in query, even if the query can target a single shard.
     auto requestFullKey = buildUpdate(kNss,
                                       fromjson("{'a.b':  100, 'c.d' : {$exists: false}}}"),
                                       fromjson("{a: {b: -111}}"),
                                       true);
-    ASSERT_THROWS_CODE(
-        cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestFullKey, 0)),
-        DBException,
-        ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(cmTargeter.targetUpdate(operationContext(),
+                                               BatchItemRef(&requestFullKey, 0),
+                                               checkChunkRanges ? &chunkRanges : nullptr),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
 
     // Upsert success case.
     auto requestSuccess =
         buildUpdate(kNss, fromjson("{'a.b': 100, 'c.d': 'val'}"), fromjson("{a: {b: -111}}"), true);
-    res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestSuccess, 0));
+    res = cmTargeter.targetUpdate(operationContext(),
+                                  BatchItemRef(&requestSuccess, 0),
+                                  checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "4");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << 100 << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << MAXKEY << "c.d" << MAXKEY));
+        chunkRanges.clear();
+    }
 }
 
 TEST_F(ChunkManagerTargeterTest, TargetUpdateWithHashedPrefixHashedShardKey) {
+    testTargetUpdateWithHashedPrefixHashedShardKey();
+}
+
+TEST_F(ChunkManagerTargeterWithChunkRangesTest, TargetUpdateWithHashedPrefixHashedShardKey) {
+    testTargetUpdateWithHashedPrefixHashedShardKey();
+}
+
+void ChunkManagerTargeterTest::testTargetUpdateWithHashedPrefixHashedShardKey() {
     auto findChunk = [&](BSONElement elem) {
         return chunkManager->findIntersectingChunkWithSimpleCollation(
             BSON("a.b" << BSONElementHasher::hash64(elem, BSONElementHasher::DEFAULT_HASH_SEED)));
     };
 
-    // Create 4 chunks and 4 shards such that shardId '0' has chunk [MinKey, -2^62), '1' has chunk
-    // [-2^62, 0), '2' has chunk ['0', 2^62) and '3' has chunk [2^62, MaxKey).
+    // Create 4 chunks and 4 shards such that shardId '0' has chunk [MinKey, -2^62), '1' has
+    // chunk [-2^62, 0), '2' has chunk ['0', 2^62) and '3' has chunk [2^62, MaxKey).
     std::vector<BSONObj> splitPoints = {
         BSON("a.b" << -(1LL << 62)), BSON("a.b" << 0LL), BSON("a.b" << (1LL << 62))};
     auto cmTargeter = prepare(BSON("a.b"
@@ -361,33 +624,101 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithHashedPrefixHashedShardKey) {
                               splitPoints);
 
     for (int i = 0; i < 1000; i++) {
+        std::set<ChunkRange> chunkRanges;
         auto updateQueryObj = BSON("a" << BSON("b" << i) << "c" << BSON("d" << 10));
 
         // Verify that the given document is being routed based on hashed value of 'i' in
         // 'updateQueryObj'.
         auto request = buildUpdate(kNss, updateQueryObj, fromjson("{$set: {p: 1}}"), false);
-        const auto res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&request, 0));
+        const auto res = cmTargeter.targetUpdate(operationContext(),
+                                                 BatchItemRef(&request, 0),
+                                                 checkChunkRanges ? &chunkRanges : nullptr);
         ASSERT_EQUALS(res.size(), 1);
-        ASSERT_EQUALS(res[0].shardName, findChunk(updateQueryObj["a"]["b"]).getShardId());
+        auto chunk = findChunk(updateQueryObj["a"]["b"]);
+        ASSERT_EQUALS(res[0].shardName, chunk.getShardId());
+        if (checkChunkRanges) {
+            ASSERT_EQUALS(chunkRanges.size(), 1);
+            ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), chunk.getMin());
+            ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), chunk.getMax());
+        }
     }
 
     // Range queries on hashed field cannot be used for targeting. In this case, update will be
     // targeted based on update document.
+    std::set<ChunkRange> chunkRanges;
     const auto updateObj = fromjson("{a: {b: -1}}");
     auto requestUpdate = buildUpdate(kNss, fromjson("{'a.b': {$gt : 101}}"), updateObj, false);
-    auto res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestUpdate, 0));
+    auto res = cmTargeter.targetUpdate(operationContext(),
+                                       BatchItemRef(&requestUpdate, 0),
+                                       checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
-    ASSERT_EQUALS(res[0].shardName, findChunk(updateObj["a"]["b"]).getShardId());
+    auto chunk = findChunk(updateObj["a"]["b"]);
+    ASSERT_EQUALS(res[0].shardName, chunk.getShardId());
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), chunk.getMin());
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), chunk.getMax());
+        chunkRanges.clear();
+    }
     auto requestErr =
         buildUpdate(kNss, fromjson("{'a.b': {$gt : 101}}"), fromjson("{$set: {p: 1}}"), false);
-    ASSERT_THROWS_CODE(cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestErr, 0)),
+    ASSERT_THROWS_CODE(cmTargeter.targetUpdate(operationContext(),
+                                               BatchItemRef(&requestErr, 0),
+                                               checkChunkRanges ? &chunkRanges : nullptr),
                        DBException,
                        ErrorCodes::InvalidOptions);
 }
 
+TEST_F(ChunkManagerTargeterTest, TargetDeleteWithExactId) {
+    testTargetDeleteWithExactId();
+}
+
+TEST_F(ChunkManagerTargeterWithChunkRangesTest, TargetDeleteWithExactId) {
+    testTargetDeleteWithExactId();
+}
+
+void ChunkManagerTargeterTest::testTargetDeleteWithExactId() {
+    std::set<ChunkRange> chunkRanges;
+    std::vector<BSONObj> splitPoints = {
+        BSON("a.b" << BSONNULL), BSON("a.b" << -100), BSON("a.b" << 0), BSON("a.b" << 100)};
+    auto cmTargeter = prepare(BSON("a.b" << 1), splitPoints);
+
+    auto requestId = buildDelete(kNss, fromjson("{_id: 68755000}"));
+    auto res = cmTargeter.targetDelete(
+        operationContext(), BatchItemRef(&requestId, 0), checkChunkRanges ? &chunkRanges : nullptr);
+    ASSERT_EQUALS(res[0].shardName, "0");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 5);
+        auto itRange = chunkRanges.cbegin();
+        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << MINKEY));
+        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << BSONNULL));
+        ++itRange;
+        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << BSONNULL));
+        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << -100));
+        ++itRange;
+        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << -100));
+        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << 0));
+        ++itRange;
+        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << 0));
+        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << 100));
+        ++itRange;
+        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << 100));
+        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << MAXKEY));
+    }
+}
+
 TEST_F(ChunkManagerTargeterTest, TargetDeleteWithRangePrefixHashedShardKey) {
-    // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has chunk
-    // [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
+    testTargetDeleteWithRangePrefixHashedShardKey();
+}
+
+TEST_F(ChunkManagerTargeterWithChunkRangesTest, TargetDeleteWithRangePrefixHashedShardKey) {
+    testTargetDeleteWithRangePrefixHashedShardKey();
+}
+
+void ChunkManagerTargeterTest::testTargetDeleteWithRangePrefixHashedShardKey() {
+    std::set<ChunkRange> chunkRanges;
+    // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has
+    // chunk [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
     // [100, MaxKey).
     std::vector<BSONObj> splitPoints = {
         BSON("a.b" << BSONNULL), BSON("a.b" << -100LL), BSON("a.b" << 0LL), BSON("a.b" << 100LL)};
@@ -397,43 +728,81 @@ TEST_F(ChunkManagerTargeterTest, TargetDeleteWithRangePrefixHashedShardKey) {
 
     // Cannot delete without full shardkey in the query.
     auto requestPartialKey = buildDelete(kNss, fromjson("{'a.b': {$gt : 2}}"));
-    ASSERT_THROWS_CODE(
-        cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestPartialKey, 0)),
-        DBException,
-        ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(cmTargeter.targetDelete(operationContext(),
+                                               BatchItemRef(&requestPartialKey, 0),
+                                               checkChunkRanges ? &chunkRanges : nullptr),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
 
     auto requestPartialKey2 = buildDelete(kNss, fromjson("{'a.b': -101}"));
-    ASSERT_THROWS_CODE(
-        cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestPartialKey2, 0)),
-        DBException,
-        ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(cmTargeter.targetDelete(operationContext(),
+                                               BatchItemRef(&requestPartialKey2, 0),
+                                               checkChunkRanges ? &chunkRanges : nullptr),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
 
     // Delete targeted correctly with full shard key in query.
     auto requestFullKey = buildDelete(kNss, fromjson("{'a.b': -101, 'c.d': 5}"));
-    auto res = cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestFullKey, 0));
+    auto res = cmTargeter.targetDelete(operationContext(),
+                                       BatchItemRef(&requestFullKey, 0),
+                                       checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
+                          BSON("a.b" << BSONNULL << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << -100 << "c.d" << MINKEY));
+        chunkRanges.clear();
+    }
 
     // Query with MinKey value should go to chunk '0' because MinKey is smaller than BSONNULL.
     auto requestMinKey =
         buildDelete(kNss, BSONObjBuilder().appendMinKey("a.b").append("c.d", 4).obj());
-    res = cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestMinKey, 0));
+    res = cmTargeter.targetDelete(operationContext(),
+                                  BatchItemRef(&requestMinKey, 0),
+                                  checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "0");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << MINKEY << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(),
+                          BSON("a.b" << BSONNULL << "c.d" << MINKEY));
+        chunkRanges.clear();
+    }
 
     auto requestMinKey2 = buildDelete(kNss, fromjson("{'a.b':  0, 'c.d': 5}"));
-    res = cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestMinKey2, 0));
+    res = cmTargeter.targetDelete(operationContext(),
+                                  BatchItemRef(&requestMinKey2, 0),
+                                  checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "3");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << 0 << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << 100 << "c.d" << MINKEY));
+        chunkRanges.clear();
+    }
 }
 
 TEST_F(ChunkManagerTargeterTest, TargetDeleteWithHashedPrefixHashedShardKey) {
+    testTargetDeleteWithHashedPrefixHashedShardKey();
+}
+
+TEST_F(ChunkManagerTargeterWithChunkRangesTest, TargetDeleteWithHashedPrefixHashedShardKey) {
+    testTargetDeleteWithHashedPrefixHashedShardKey();
+}
+
+void ChunkManagerTargeterTest::testTargetDeleteWithHashedPrefixHashedShardKey() {
+    std::set<ChunkRange> chunkRanges;
     auto findChunk = [&](BSONElement elem) {
         return chunkManager->findIntersectingChunkWithSimpleCollation(
             BSON("a.b" << BSONElementHasher::hash64(elem, BSONElementHasher::DEFAULT_HASH_SEED)));
     };
 
-    // Create 4 chunks and 4 shards such that shardId '0' has chunk [MinKey, -2^62), '1' has chunk
+    // Create 4 chunks and 4 shards such that shardId '0' has chunk [MinKey, -2^62), '1' has
+    // chunk
     // [-2^62, 0), '2' has chunk ['0', 2^62) and '3' has chunk [2^62, MaxKey).
     std::vector<BSONObj> splitPoints = {
         BSON("a.b" << -(1LL << 62)), BSON("a.b" << 0LL), BSON("a.b" << (1LL << 62))};
@@ -447,14 +816,25 @@ TEST_F(ChunkManagerTargeterTest, TargetDeleteWithHashedPrefixHashedShardKey) {
         // Verify that the given document is being routed based on hashed value of 'i' in
         // 'queryObj'.
         auto request = buildDelete(kNss, queryObj);
-        const auto res = cmTargeter.targetDelete(operationContext(), BatchItemRef(&request, 0));
+        const auto res = cmTargeter.targetDelete(operationContext(),
+                                                 BatchItemRef(&request, 0),
+                                                 checkChunkRanges ? &chunkRanges : nullptr);
         ASSERT_EQUALS(res.size(), 1);
-        ASSERT_EQUALS(res[0].shardName, findChunk(queryObj["a"]["b"]).getShardId());
+        auto chunk = findChunk(queryObj["a"]["b"]);
+        ASSERT_EQUALS(res[0].shardName, chunk.getShardId());
+        if (checkChunkRanges) {
+            ASSERT_EQUALS(chunkRanges.size(), 1);
+            ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), chunk.getMin());
+            ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), chunk.getMax());
+            chunkRanges.clear();
+        }
     }
 
     // Range queries on hashed field cannot be used for targeting.
     auto request = buildDelete(kNss, fromjson("{'a.b': {$gt : 101}}"));
-    ASSERT_THROWS_CODE(cmTargeter.targetDelete(operationContext(), BatchItemRef(&request, 0)),
+    ASSERT_THROWS_CODE(cmTargeter.targetDelete(operationContext(),
+                                               BatchItemRef(&request, 0),
+                                               checkChunkRanges ? &chunkRanges : nullptr),
                        DBException,
                        ErrorCodes::ShardKeyNotFound);
 }

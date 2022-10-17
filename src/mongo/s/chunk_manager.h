@@ -261,6 +261,11 @@ public:
     void getAllShardIds(std::set<ShardId>* all) const;
 
     /**
+     * Returns all chunk ranges for the collection.
+     */
+    void getAllChunkRanges(std::set<ChunkRange>* all) const;
+
+    /**
      * Returns the number of shards on which the collection has any chunks
      */
     int getNShardsOwningChunks() const;
@@ -611,25 +616,38 @@ public:
     /**
      * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
      * collection default collation for targeting.
+     * If output parameter `changeRanges` is non-null, the set is populated with ChunkRanges that
+     * would be targeted by the query; if nullptr, no processing of chunk ranges occurs.
      */
     void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const BSONObj& query,
                              const BSONObj& collation,
-                             std::set<ShardId>* shardIds) const;
+                             std::set<ShardId>* shardIds,
+                             std::set<ChunkRange>* chunkRanges = nullptr) const;
 
     /**
      * Returns all shard ids which contain chunks overlapping the range [min, max]. Please note the
      * inclusive bounds on both sides (SERVER-20768).
+     * If output parameter `changeRanges` is non-null, the set is populated with ChunkRanges that
+     * would be targeted by the query.
      */
     void getShardIdsForRange(const BSONObj& min,
                              const BSONObj& max,
-                             std::set<ShardId>* shardIds) const;
+                             std::set<ShardId>* shardIds,
+                             std::set<ChunkRange>* chunkRanges = nullptr) const;
 
     /**
      * Returns the ids of all shards on which the collection has any chunks.
      */
     void getAllShardIds(std::set<ShardId>* all) const {
         _rt->optRt->getAllShardIds(all);
+    }
+
+    /**
+     * Returns the chunk ranges of all shards on which the collection has any chunks.
+     */
+    void getAllChunkRanges(std::set<ChunkRange>* all) const {
+        _rt->optRt->getAllChunkRanges(all);
     }
 
     /**

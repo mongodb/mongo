@@ -164,6 +164,16 @@ bool ChunkRange::operator!=(const ChunkRange& other) const {
     return !(*this == other);
 }
 
+bool ChunkRange::operator<(const ChunkRange& other) const {
+    auto minCompare = _minKey.woCompare(other._minKey);
+    if (minCompare < 0) {
+        return true;
+    } else if (minCompare == 0 && _maxKey.woCompare(other._maxKey) < 0) {
+        return true;
+    }
+    return false;
+}
+
 bool ChunkRange::covers(ChunkRange const& other) const {
     auto le = [](auto const& a, auto const& b) { return a.woCompare(b) <= 0; };
     return le(_minKey, other._minKey) && le(other._maxKey, _maxKey);

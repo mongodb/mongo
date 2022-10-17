@@ -406,8 +406,11 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef) const override {
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            invariant(chunkRange == nullptr);
             return std::vector{
                 ShardEndpoint(kShardName2,
                               ShardVersion(ChunkVersion({epoch, timestamp}, {101, 200}),
@@ -499,8 +502,11 @@ TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
         using MockNSTargeter::MockNSTargeter;
 
     protected:
-        std::vector<ShardEndpoint> targetDelete(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef) const override {
+        std::vector<ShardEndpoint> targetDelete(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            invariant(chunkRange == nullptr);
             return std::vector{ShardEndpoint(
                 kShardName2,
                 ShardVersion(ChunkVersion({epoch, Timestamp(1, 1)}, {101, 200}),
@@ -700,8 +706,11 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef) const override {
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            invariant(chunkRange == nullptr);
             return std::vector{
                 ShardEndpoint(kShardName1,
                               ShardVersion(ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -810,8 +819,11 @@ TEST_F(BatchWriteExecTest,
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef) const override {
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            invariant(chunkRange == nullptr);
             return std::vector{
                 ShardEndpoint(kShardName1,
                               ShardVersion(ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -928,8 +940,11 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef) const override {
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            invariant(chunkRange == nullptr);
             return std::vector{
                 ShardEndpoint(kShardName1,
                               ShardVersion(ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -1056,8 +1071,11 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef) const override {
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            invariant(chunkRange == nullptr);
             return std::vector{
                 ShardEndpoint(kShardName1,
                               ShardVersion(ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -1179,8 +1197,11 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef) const override {
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            invariant(chunkRange == nullptr);
             if (targetAll) {
                 return std::vector{
                     ShardEndpoint(kShardName1,
@@ -1956,8 +1977,10 @@ TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef) const override {
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            std::set<ChunkRange>* chunkRanges = nullptr) const override {
             return std::vector{
                 ShardEndpoint(kShardName1,
                               ShardVersion(ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -2102,8 +2125,11 @@ TEST_F(BatchWriteExecTransactionTargeterErrorTest, TargetedFailedAndErrorRespons
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef) const override {
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            invariant(chunkRange == nullptr);
             return std::vector{
                 ShardEndpoint(kShardName1,
                               ShardVersion(ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -2256,8 +2282,11 @@ TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorRespons
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef) const override {
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            invariant(chunkRange == nullptr);
             return std::vector{
                 ShardEndpoint(kShardName1,
                               ShardVersion(ChunkVersion({epoch, timestamp}, {100, 200}),

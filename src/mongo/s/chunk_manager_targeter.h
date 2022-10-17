@@ -30,6 +30,7 @@
 #pragma once
 
 #include <map>
+#include <set>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
@@ -79,15 +80,22 @@ public:
 
     const NamespaceString& getNS() const override;
 
-    ShardEndpoint targetInsert(OperationContext* opCtx, const BSONObj& doc) const override;
+    ShardEndpoint targetInsert(OperationContext* opCtx,
+                               const BSONObj& doc,
+                               std::set<ChunkRange>* chunkRange = nullptr) const override;
 
-    std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                            const BatchItemRef& itemRef) const override;
+    std::vector<ShardEndpoint> targetUpdate(
+        OperationContext* opCtx,
+        const BatchItemRef& itemRef,
+        std::set<ChunkRange>* chunkRange = nullptr) const override;
 
-    std::vector<ShardEndpoint> targetDelete(OperationContext* opCtx,
-                                            const BatchItemRef& itemRef) const override;
+    std::vector<ShardEndpoint> targetDelete(
+        OperationContext* opCtx,
+        const BatchItemRef& itemRef,
+        std::set<ChunkRange>* chunkRange = nullptr) const override;
 
-    std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx) const override;
+    std::vector<ShardEndpoint> targetAllShards(
+        OperationContext* opCtx, std::set<ChunkRange>* chunkRanges = nullptr) const override;
 
     void noteCouldNotTarget() override;
 
@@ -136,7 +144,8 @@ private:
     StatusWith<std::vector<ShardEndpoint>> _targetQuery(
         boost::intrusive_ptr<ExpressionContext> expCtx,
         const BSONObj& query,
-        const BSONObj& collation) const;
+        const BSONObj& collation,
+        std::set<ChunkRange>* chunkRanges) const;
 
     /**
      * Returns a ShardEndpoint for an exact shard key query.
@@ -147,7 +156,8 @@ private:
      * If 'collation' is empty, we use the collection default collation for targeting.
      */
     StatusWith<ShardEndpoint> _targetShardKey(const BSONObj& shardKey,
-                                              const BSONObj& collation) const;
+                                              const BSONObj& collation,
+                                              std::set<ChunkRange>* chunkRanges) const;
 
     // Full namespace of the collection for this targeter
     NamespaceString _nss;

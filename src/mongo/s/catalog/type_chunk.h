@@ -103,6 +103,12 @@ public:
     bool operator!=(const ChunkRange& other) const;
 
     /**
+     * Returns true if either min is less than rhs min, or in the case that min == rhs min, true if
+     * max is less than rhs max. Otherwise returns false.
+     */
+    bool operator<(const ChunkRange& rhs) const;
+
+    /**
      * Returns true iff the union of *this and the argument range is the same as *this.
      */
     bool covers(ChunkRange const& other) const;

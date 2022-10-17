@@ -413,7 +413,12 @@ bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& sha
 void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                                        const BSONObj& query,
                                        const BSONObj& collation,
-                                       std::set<ShardId>* shardIds) const {
+                                       std::set<ShardId>* shardIds,
+                                       std::set<ChunkRange>* chunkRanges) const {
+    if (chunkRanges) {
+        invariant(chunkRanges->empty());
+    }
+
     auto findCommand = std::make_unique<FindCommandRequest>(_rt->optRt->nss());
     findCommand->setFilter(query.getOwned());
 
@@ -441,6 +446,9 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
         try {
             auto chunk = findIntersectingChunk(shardKeyToFind, collation);
             shardIds->insert(chunk.getShardId());
+            if (chunkRanges) {
+                chunkRanges->insert(chunk.getRange());
+            }
             return;
         } catch (const DBException&) {
             // The query uses multiple shards
@@ -463,7 +471,7 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
     BoundList ranges = _rt->optRt->getShardKeyPattern().flattenBounds(bounds);
 
     for (BoundList::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
-        getShardIdsForRange(it->first /*min*/, it->second /*max*/, shardIds);
+        getShardIdsForRange(it->first /*min*/, it->second /*max*/, shardIds, chunkRanges);
 
         // Once we know we need to visit all shards no need to keep looping.
         // However, this optimization does not apply when we are reading from a snapshot
@@ -481,6 +489,9 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
     if (shardIds->empty()) {
         _rt->optRt->forEachChunk([&](const std::shared_ptr<ChunkInfo>& chunkInfo) {
             shardIds->insert(chunkInfo->getShardIdAt(_clusterTime));
+            if (chunkRanges) {
+                chunkRanges->insert(chunkInfo->getRange());
+            }
             return false;
         });
     }
@@ -488,7 +499,12 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
 
 void ChunkManager::getShardIdsForRange(const BSONObj& min,
                                        const BSONObj& max,
-                                       std::set<ShardId>* shardIds) const {
+                                       std::set<ShardId>* shardIds,
+                                       std::set<ChunkRange>* chunkRanges) const {
+    if (chunkRanges) {
+        invariant(chunkRanges->empty());
+    }
+
     // If our range is [MinKey, MaxKey], we can simply return all shard ids right away. However,
     // this optimization does not apply when we are reading from a snapshot because _shardVersions
     // contains shards with chunks and is built based on the last refresh. Therefore, it is
@@ -496,11 +512,17 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
     // used to at _clusterTime.
     if (!_clusterTime && allElementsAreOfType(MinKey, min) && allElementsAreOfType(MaxKey, max)) {
         getAllShardIds(shardIds);
+        if (chunkRanges) {
+            getAllChunkRanges(chunkRanges);
+        }
         return;
     }
 
     _rt->optRt->forEachOverlappingChunk(min, max, true, [&](auto& chunkInfo) {
         shardIds->insert(chunkInfo->getShardIdAt(_clusterTime));
+        if (chunkRanges) {
+            chunkRanges->insert(chunkInfo->getRange());
+        }
 
         // No need to iterate through the rest of the ranges, because we already know we need to use
         // all shards. However, this optimization does not apply when we are reading from a snapshot
@@ -554,10 +576,19 @@ ShardId ChunkManager::getMinKeyShardIdWithSimpleCollation() const {
 }
 
 void RoutingTableHistory::getAllShardIds(std::set<ShardId>* all) const {
+    invariant(all->empty());
+
     std::transform(_shardVersions.begin(),
                    _shardVersions.end(),
                    std::inserter(*all, all->begin()),
                    [](const ShardVersionMap::value_type& pair) { return pair.first; });
+}
+
+void RoutingTableHistory::getAllChunkRanges(std::set<ChunkRange>* all) const {
+    forEachChunk([&](const std::shared_ptr<ChunkInfo>& chunkInfo) {
+        all->insert(chunkInfo->getRange());
+        return true;
+    });
 }
 
 int RoutingTableHistory::getNShardsOwningChunks() const {
