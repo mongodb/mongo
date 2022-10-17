@@ -276,11 +276,6 @@ public:
 
     static int64_t getIdentSize(WT_SESSION* s, const std::string& uri);
 
-    static bool appendCustomStats(OperationContext* opCtx,
-                                  BSONObjBuilder* output,
-                                  double scale,
-                                  const std::string& uri);
-
     /**
      * Returns the bytes available for reuse for an ident. This is the amount of allocated space on
      * disk that is not storing any data.

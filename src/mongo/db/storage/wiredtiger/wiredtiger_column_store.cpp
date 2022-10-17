@@ -28,20 +28,13 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/global_settings.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_column_store.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index_cursor_generic.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_index_util.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -411,16 +404,7 @@ std::unique_ptr<ColumnStore::BulkBuilder> WiredTigerColumnStore::makeBulkBuilder
 }
 
 bool WiredTigerColumnStore::isEmpty(OperationContext* opCtx) {
-    // TODO: SERVER-65980, this logic could be shared with WiredTigerIndex::isEmpty().
-    WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
-    WT_CURSOR* c = curwrap.get();
-    if (!c)
-        return true;
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->next(c); });
-    if (ret == WT_NOTFOUND)
-        return true;
-    invariantWTOK(ret, c->session);
-    return false;
+    return WiredTigerIndexUtil::isEmpty(opCtx, _uri, _tableId);
 }
 
 long long WiredTigerColumnStore::getSpaceUsedBytes(OperationContext* opCtx) const {
@@ -443,14 +427,13 @@ long long WiredTigerColumnStore::getFreeStorageBytes(OperationContext* opCtx) co
 }
 
 Status WiredTigerColumnStore::compact(OperationContext* opCtx) {
-    // TODO: SERVER-65980.
-    uasserted(ErrorCodes::NotImplemented, "WiredTigerColumnStore::compact");
+    return WiredTigerIndexUtil::compact(opCtx, _uri);
 }
 
 bool WiredTigerColumnStore::appendCustomStats(OperationContext* opCtx,
                                               BSONObjBuilder* output,
                                               double scale) const {
-    return WiredTigerUtil::appendCustomStats(opCtx, output, scale, _uri);
+    return WiredTigerIndexUtil::appendCustomStats(opCtx, output, scale, _uri);
 }
 
 }  // namespace mongo

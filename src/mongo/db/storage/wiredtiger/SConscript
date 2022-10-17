@@ -35,6 +35,7 @@ wtEnv.Library(
         'wiredtiger_cursor_helpers.cpp',
         'wiredtiger_global_options.cpp',
         'wiredtiger_index.cpp',
+        'wiredtiger_index_util.cpp',
         'wiredtiger_kv_engine.cpp',
         'wiredtiger_oplog_manager.cpp',
         'wiredtiger_parameters.cpp',

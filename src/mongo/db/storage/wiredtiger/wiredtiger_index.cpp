@@ -28,37 +28,14 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 
-#include <fmt/format.h>
-#include <memory>
-#include <set>
-
-#include "mongo/base/checked_cast.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/catalog/validate_results.h"
-#include "mongo/db/global_settings.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/json.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
-#include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index_cursor_generic.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_index_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -83,7 +60,6 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(WTCompactIndexEBUSY);
 MONGO_FAIL_POINT_DEFINE(WTIndexPauseAfterSearchNear);
 
 static const WiredTigerItem emptyItem(nullptr, 0);
@@ -375,7 +351,7 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
 bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
                                         BSONObjBuilder* output,
                                         double scale) const {
-    return WiredTigerUtil::appendCustomStats(opCtx, output, scale, _uri);
+    return WiredTigerIndexUtil::appendCustomStats(opCtx, output, scale, _uri);
 }
 
 Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const KeyString::Value& key) {
@@ -393,15 +369,7 @@ Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const KeyString::Va
 }
 
 bool WiredTigerIndex::isEmpty(OperationContext* opCtx) {
-    WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
-    WT_CURSOR* c = curwrap.get();
-    if (!c)
-        return true;
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->next(c); });
-    if (ret == WT_NOTFOUND)
-        return true;
-    invariantWTOK(ret, c->session);
-    return false;
+    return WiredTigerIndexUtil::isEmpty(opCtx, _uri, _tableId);
 }
 
 void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
@@ -497,28 +465,7 @@ Status WiredTigerIndex::initAsEmpty(OperationContext* opCtx) {
 }
 
 Status WiredTigerIndex::compact(OperationContext* opCtx) {
-    dassert(opCtx->lockState()->isWriteLocked());
-    WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
-    if (!cache->isEphemeral()) {
-        WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
-        opCtx->recoveryUnit()->abandonSnapshot();
-        // WT compact prompts WT to take checkpoints, so we need to take the checkpoint lock around
-        // WT compact calls.
-        auto checkpointLock = opCtx->getServiceContext()->getStorageEngine()->getCheckpointLock(
-            opCtx, StorageEngine::CheckpointLock::Mode::kExclusive);
-        int ret = s->compact(s, uri().c_str(), "timeout=0");
-        if (MONGO_unlikely(WTCompactIndexEBUSY.shouldFail())) {
-            ret = EBUSY;
-        }
-
-        if (ret == EBUSY) {
-            return Status(ErrorCodes::Interrupted,
-                          str::stream() << "Compaction interrupted on " << uri().c_str()
-                                        << " due to cache eviction pressure");
-        }
-        invariantWTOK(ret, s);
-    }
-    return Status::OK();
+    return WiredTigerIndexUtil::compact(opCtx, _uri);
 }
 
 boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,
@@ -1543,7 +1490,6 @@ void WiredTigerIndexUnique::insertWithRecordIdInValue_forTest(OperationContext* 
     // Now create the table key/value, the actual data record.
     WiredTigerItem keyItem(keyString.getBuffer(), keyString.getSize());
 
-    BufBuilder bufBuilder;
     KeyString::Builder valueBuilder(keyString.getVersion(), rid);
     valueBuilder.appendTypeBits(keyString.getTypeBits());
 
