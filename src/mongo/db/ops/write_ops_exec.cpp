@@ -1421,20 +1421,37 @@ Status performAtomicTimeseriesWrites(
         auto recordId = record_id_helpers::keyForOID(update.getQ()["_id"].OID());
 
         auto original = coll->docFor(opCtx, recordId);
-        auto [updated, indexesAffected] =
-            doc_diff::applyDiff(original.value(),
-                                update.getU().getDiff(),
-                                &CollectionQueryInfo::get(*coll).getIndexKeys(opCtx),
-                                static_cast<bool>(repl::tenantMigrationInfo(opCtx)));
 
         CollectionUpdateArgs args;
         if (const auto& stmtIds = op.getStmtIds()) {
             args.stmtIds = *stmtIds;
         }
         args.preImageDoc = original.value();
-        args.update = update_oplog_entry::makeDeltaOplogEntry(update.getU().getDiff());
         args.criteria = update.getQ();
         args.source = OperationSource::kTimeseriesInsert;
+
+        BSONObj updated;
+        bool indexesAffected = true;
+        if (update.getU().type() == write_ops::UpdateModification::Type::kDelta) {
+            auto result = doc_diff::applyDiff(original.value(),
+                                              update.getU().getDiff(),
+                                              &CollectionQueryInfo::get(*coll).getIndexKeys(opCtx),
+                                              static_cast<bool>(repl::tenantMigrationInfo(opCtx)));
+            updated = result.postImage;
+            indexesAffected = result.indexesAffected;
+            args.update = update_oplog_entry::makeDeltaOplogEntry(update.getU().getDiff());
+        } else if (update.getU().type() == write_ops::UpdateModification::Type::kTransform) {
+            const auto& transform = update.getU().getTransform();
+            auto transformed = transform(original.value());
+            tassert(7050400,
+                    "Could not apply transformation to time series bucket document",
+                    transformed.has_value());
+            updated = std::move(transformed.value());
+            args.update = update_oplog_entry::makeReplacementOplogEntry(updated);
+        } else {
+            invariant(false, "Unexpected update type");
+        }
+
         if (slot) {
             args.oplogSlots = {**slot};
             fassert(5481600,
