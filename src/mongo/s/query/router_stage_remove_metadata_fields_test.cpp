@@ -194,6 +194,60 @@ TEST(RouterStageRemoveMetadataFieldsTest, ForwardsAwaitDataTimeout) {
     ASSERT_EQ(789, durationCount<Milliseconds>(awaitDataTimeout.getValue()));
 }
 
+// Grabs the next document from a stage and ensure it matches expectedDoc.
+// Assumes that remotes are exhausted after one document.
+void verifyNextDocument(RouterExecStage* stage, const BSONObj& expectedDoc) {
+    auto result = stage->next();
+    ASSERT_OK(result.getStatus());
+    ASSERT(result.getValue().getResult());
+    ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), expectedDoc);
+    ASSERT_TRUE(stage->remotesExhausted());
+}
+
+TEST(RouterStageRemoveMetadataFieldsTest, AllowsNonMetaDataDollars) {
+    auto mockStage = std::make_unique<RouterStageMock>(opCtx);
+    mockStage->queueResult(BSON("$a" << 1 << "$sortKey" << 1 << "b" << 1));
+    mockStage->queueResult(BSON("a" << 2 << "$sortKey" << 1 << "$b" << 2));
+    mockStage->markRemotesExhausted();
+
+    auto sortKeyStage = std::make_unique<RouterStageRemoveMetadataFields>(
+        opCtx, std::move(mockStage), StringDataSet{"$sortKey"_sd});
+    ASSERT_TRUE(sortKeyStage->remotesExhausted());
+
+    verifyNextDocument(sortKeyStage.get(), BSON("$a" << 1 << "b" << 1));
+    verifyNextDocument(sortKeyStage.get(), BSON("a" << 2 << "$b" << 2));
+
+    auto endResult = sortKeyStage->next();
+    ASSERT_OK(endResult.getStatus());
+    ASSERT(endResult.getValue().isEOF());
+    ASSERT_TRUE(sortKeyStage->remotesExhausted());
+}
+
+// For every keyword, ensure it's removed if it's in the first, middle, or
+// last position, and that the remainder of the document is undisturbed.
+TEST(RouterStageRemoveMetadataFieldsTest, RemovesAllMetaDataDollars) {
+    for (auto& keyword : Document::allMetadataFieldNames) {
+        auto mockStage = std::make_unique<RouterStageMock>(opCtx);
+        mockStage->queueResult(BSON(keyword << 1 << "$a" << 1));
+        mockStage->queueResult(BSON("$a" << 1 << keyword << 1));
+        mockStage->queueResult(BSON("$a" << 1 << keyword << 1 << "$b" << 1));
+        mockStage->markRemotesExhausted();
+
+        auto sortKeyStage = std::make_unique<RouterStageRemoveMetadataFields>(
+            opCtx, std::move(mockStage), Document::allMetadataFieldNames);
+        ASSERT_TRUE(sortKeyStage->remotesExhausted());
+
+        verifyNextDocument(sortKeyStage.get(), BSON("$a" << 1));
+        verifyNextDocument(sortKeyStage.get(), BSON("$a" << 1));
+        verifyNextDocument(sortKeyStage.get(), BSON("$a" << 1 << "$b" << 1));
+
+        auto endResult = sortKeyStage->next();
+        ASSERT_OK(endResult.getStatus());
+        ASSERT(endResult.getValue().isEOF());
+        ASSERT_TRUE(sortKeyStage->remotesExhausted());
+    }
+}
+
 }  // namespace
 
 }  // namespace mongo
