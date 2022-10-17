@@ -337,8 +337,9 @@ TEST_F(TicketHolderTest, PriorityTwoQueuedOperations) {
 
     auto currentStats = stats.getStats();
     auto lowPriorityStats = currentStats.getObjectField("lowPriority");
-    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 1);
-    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 1);
+    // Low priority operations always go to the queue to avoid optimistic acquisition.
+    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 2);
+    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 2);
     ASSERT_EQ(lowPriorityStats.getIntField("queueLength"), 0);
     ASSERT_EQ(lowPriorityStats.getIntField("startedProcessing"), 2);
     ASSERT_EQ(lowPriorityStats.getIntField("processing"), 0);
@@ -355,6 +356,126 @@ TEST_F(TicketHolderTest, PriorityTwoQueuedOperations) {
     ASSERT_EQ(normalPriorityStats.getIntField("finishedProcessing"), 1);
     ASSERT_EQ(normalPriorityStats.getIntField("newAdmissions"), 1);
     ASSERT_EQ(normalPriorityStats.getIntField("canceled"), 0);
+
+    auto immediatePriorityStats = currentStats.getObjectField("immediatePriority");
+    ASSERT_EQ(immediatePriorityStats.getIntField("startedProcessing"), 0);
+    ASSERT_EQ(immediatePriorityStats.getIntField("processing"), 0);
+    ASSERT_EQ(immediatePriorityStats.getIntField("finishedProcessing"), 0);
+    ASSERT_EQ(immediatePriorityStats.getIntField("totalTimeProcessingMicros"), 0);
+    ASSERT_EQ(immediatePriorityStats.getIntField("newAdmissions"), 0);
+}
+
+
+TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    PriorityTicketHolder holder(1, &serviceContext);
+    Stats stats(&holder);
+
+    {
+        // Allocate the only available ticket. Priority is irrelevant when there are tickets
+        // available.
+        MockAdmission initialAdmission(
+            "initialAdmission", this->getServiceContext(), AdmissionContext::Priority::kLow);
+        initialAdmission.ticket = holder.waitForTicket(initialAdmission.opCtx.get(),
+                                                       &initialAdmission.admCtx,
+                                                       TicketHolder::WaitMode::kInterruptible);
+        ASSERT(initialAdmission.ticket);
+
+        MockAdmission low1PriorityAdmission(
+            "low1Priority", this->getServiceContext(), AdmissionContext::Priority::kLow);
+        stdx::thread low1PriorityThread([&]() {
+            low1PriorityAdmission.ticket =
+                holder.waitForTicket(low1PriorityAdmission.opCtx.get(),
+                                     &low1PriorityAdmission.admCtx,
+                                     TicketHolder::WaitMode::kUninterruptible);
+        });
+
+
+        MockAdmission low2PriorityAdmission(
+            "low2Priority", this->getServiceContext(), AdmissionContext::Priority::kLow);
+        stdx::thread low2PriorityThread([&]() {
+            low2PriorityAdmission.ticket =
+                holder.waitForTicket(low2PriorityAdmission.opCtx.get(),
+                                     &low2PriorityAdmission.admCtx,
+                                     TicketHolder::WaitMode::kUninterruptible);
+        });
+
+
+        // Wait for threads on the queue
+        while (holder.queued() < 2) {
+        }
+
+        // Release the ticket.
+        initialAdmission.ticket.reset();
+
+        sleepFor(Milliseconds{100});
+        assertSoon([&] {
+            // Other low priority thread takes the ticket
+            ASSERT_TRUE(low1PriorityAdmission.ticket || low2PriorityAdmission.ticket);
+        });
+
+        MockAdmission low3PriorityAdmission(
+            "low3Priority", this->getServiceContext(), AdmissionContext::Priority::kLow);
+        stdx::thread low3PriorityThread([&]() {
+            low3PriorityAdmission.ticket =
+                holder.waitForTicket(low3PriorityAdmission.opCtx.get(),
+                                     &low3PriorityAdmission.admCtx,
+                                     TicketHolder::WaitMode::kUninterruptible);
+        });
+
+        // Wait for the new thread on the queue.
+        while (holder.queued() < 2) {
+        }
+
+        auto releaseCurrentTicket = [&] {
+            ASSERT_TRUE(low1PriorityAdmission.ticket || low2PriorityAdmission.ticket ||
+                        low3PriorityAdmission.ticket);
+            // Ensure only one ticket is present.
+            ASSERT_EQ(static_cast<int>(low1PriorityAdmission.ticket.has_value()) +
+                          static_cast<int>(low2PriorityAdmission.ticket.has_value()) +
+                          static_cast<int>(low3PriorityAdmission.ticket.has_value()),
+                      1);
+            low1PriorityAdmission.ticket.reset();
+            low2PriorityAdmission.ticket.reset();
+            low3PriorityAdmission.ticket.reset();
+        };
+
+        // Release the ticket.
+        assertSoon(releaseCurrentTicket);
+
+        // The other low priority thread takes the ticket.
+        assertSoon(releaseCurrentTicket);
+
+        // Third low priority thread takes the ticket.
+        assertSoon(releaseCurrentTicket);
+
+        low1PriorityThread.join();
+        low2PriorityThread.join();
+        low3PriorityThread.join();
+    }
+
+    ASSERT_EQ(stats["out"], 0);
+    ASSERT_EQ(stats["available"], 1);
+    ASSERT_EQ(stats["totalTickets"], 1);
+
+    auto currentStats = stats.getStats();
+    auto lowPriorityStats = currentStats.getObjectField("lowPriority");
+    // Low priority operations always go to the queue to avoid optimistic acquisition.
+    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 4);
+    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 4);
+    ASSERT_EQ(lowPriorityStats.getIntField("queueLength"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("startedProcessing"), 4);
+    ASSERT_EQ(lowPriorityStats.getIntField("processing"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("finishedProcessing"), 4);
+
+    auto normalPriorityStats = currentStats.getObjectField("normalPriority");
+    ASSERT_EQ(normalPriorityStats.getIntField("addedToQueue"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("removedFromQueue"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("queueLength"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("startedProcessing"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("processing"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("finishedProcessing"), 0);
 
     auto immediatePriorityStats = currentStats.getObjectField("immediatePriority");
     ASSERT_EQ(immediatePriorityStats.getIntField("startedProcessing"), 0);
@@ -444,8 +565,9 @@ TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
 
     auto currentStats = stats.getStats();
     auto lowPriorityStats = currentStats.getObjectField("lowPriority");
-    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 1);
-    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 1);
+    // Low priority operations always go to the queue to avoid optimistic acquisition.
+    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 2);
+    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 2);
     ASSERT_EQ(lowPriorityStats.getIntField("queueLength"), 0);
     ASSERT_EQ(lowPriorityStats.getIntField("startedProcessing"), 2);
     ASSERT_EQ(lowPriorityStats.getIntField("processing"), 0);
@@ -528,8 +650,9 @@ TEST_F(TicketHolderTest, PriorityBasicMetrics) {
 
     auto currentStats = stats.getStats();
     auto lowPriorityStats = currentStats.getObjectField("lowPriority");
-    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 0);
-    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 0);
+    // Low priority operations always go to the queue to avoid optimistic acquisition.
+    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 1);
     ASSERT_EQ(lowPriorityStats.getIntField("queueLength"), 0);
     ASSERT_EQ(lowPriorityStats.getIntField("startedProcessing"), 1);
     ASSERT_EQ(lowPriorityStats.getIntField("processing"), 0);
@@ -637,8 +760,9 @@ TEST_F(TicketHolderTest, PrioritImmediateMetrics) {
 
     auto currentStats = stats.getStats();
     auto lowPriorityStats = currentStats.getObjectField("lowPriority");
-    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 0);
-    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 0);
+    // Low priority operations always go to the queue to avoid optimistic acquisition.
+    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 1);
     ASSERT_EQ(lowPriorityStats.getIntField("queueLength"), 0);
     ASSERT_EQ(lowPriorityStats.getIntField("startedProcessing"), 1);
     ASSERT_EQ(lowPriorityStats.getIntField("processing"), 0);
@@ -695,8 +819,9 @@ TEST_F(TicketHolderTest, PriorityCanceled) {
 
     auto currentStats = stats.getStats();
     auto lowPriorityStats = currentStats.getObjectField("lowPriority");
-    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 0);
-    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 0);
+    // Low priority operations always go to the queue to avoid optimistic acquisition.
+    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 1);
     ASSERT_EQ(lowPriorityStats.getIntField("queueLength"), 0);
     ASSERT_EQ(lowPriorityStats.getIntField("startedProcessing"), 1);
     ASSERT_EQ(lowPriorityStats.getIntField("processing"), 0);

@@ -353,14 +353,18 @@ private:
     using ReleaserLockGuard = std::shared_lock<QueueMutex>;  // NOLINT
     using EnqueuerLockGuard = std::unique_lock<QueueMutex>;  // NOLINT
 
+    enum class QueueType : unsigned int {
+        LowPriorityQueue = 0,
+        NormalPriorityQueue = 1,
+        // Exclusively used for statistics tracking. This queue should never have any processes
+        // 'queued'.
+        ImmediatePriorityNoOpQueue = 2,
+        QueueTypeSize = 3
+    };
     class Queue {
     public:
-        Queue(PriorityTicketHolder* holder) : _holder(holder){};
-
-        Queue(Queue&& other)
-            : _queuedThreads(other._queuedThreads),
-              _threadsToBeWoken(other._threadsToBeWoken.load()),
-              _holder(other._holder){};
+        Queue(PriorityTicketHolder* holder, QueueType queueType)
+            : _holder(holder), _queueType(queueType){};
 
         bool attemptToDequeue(const ReleaserLockGuard& releaserLock);
 
@@ -386,6 +390,10 @@ private:
             return _stats;
         }
 
+        int getThreadsPendingToWake() const {
+            return _threadsToBeWoken.load();
+        }
+
     private:
         void _signalThreadWoken(const EnqueuerLockGuard& enqueuerLock);
 
@@ -394,15 +402,7 @@ private:
         stdx::condition_variable _cv;
         PriorityTicketHolder* _holder;
         QueueStats _stats;
-    };
-
-    enum class QueueType : unsigned int {
-        LowPriorityQueue = 0,
-        NormalPriorityQueue = 1,
-        // Exclusively used for statistics tracking. This queue should never have any processes
-        // 'queued'.
-        ImmediatePriorityNoOpQueue = 2,
-        QueueTypeSize = 3
+        const QueueType _queueType;
     };
 
 
@@ -438,11 +438,17 @@ private:
     void _dequeueWaitingThread(const ReleaserLockGuard& releaserLock);
 
     /**
+     * Returns whether there are higher priority threads pending to get a ticket in front of the
+     * given queue type and not enough tickets for all of them.
+     */
+    bool _hasToWaitForHigherPriority(const EnqueuerLockGuard& lk, QueueType queue);
+
+    /**
      * Selects the queue to use for the current thread given the provided arguments.
      */
     Queue& _getQueueToUse(const AdmissionContext* admCtx);
 
-    std::vector<Queue> _queues;
+    std::array<Queue, static_cast<unsigned int>(QueueType::QueueTypeSize)> _queues;
 
     QueueMutex _queueMutex;
     AtomicWord<int> _ticketsAvailable;

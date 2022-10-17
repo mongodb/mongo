@@ -110,4 +110,33 @@ private:
 
 StringData toString(AdmissionContext::Priority priority);
 
+inline int compare(AdmissionContext::Priority lhs, AdmissionContext::Priority rhs) {
+    using enum_t = std::underlying_type_t<AdmissionContext::Priority>;
+    return static_cast<enum_t>(lhs) - static_cast<enum_t>(rhs);
+}
+
+inline bool operator==(AdmissionContext::Priority lhs, AdmissionContext::Priority rhs) {
+    return compare(lhs, rhs) == 0;
+}
+
+inline bool operator!=(AdmissionContext::Priority lhs, AdmissionContext::Priority rhs) {
+    return compare(lhs, rhs) != 0;
+}
+
+inline bool operator<(AdmissionContext::Priority lhs, AdmissionContext::Priority rhs) {
+    return compare(lhs, rhs) < 0;
+}
+
+inline bool operator>(AdmissionContext::Priority lhs, AdmissionContext::Priority rhs) {
+    return compare(lhs, rhs) > 0;
+}
+
+inline bool operator<=(AdmissionContext::Priority lhs, AdmissionContext::Priority rhs) {
+    return compare(lhs, rhs) <= 0;
+}
+
+inline bool operator>=(AdmissionContext::Priority lhs, AdmissionContext::Priority rhs) {
+    return compare(lhs, rhs) >= 0;
+}
+
 }  // namespace mongo

@@ -496,11 +496,12 @@ void SemaphoreTicketHolder::_resize(int newSize, int oldSize) noexcept {
 #endif
 
 PriorityTicketHolder::PriorityTicketHolder(int numTickets, ServiceContext* serviceContext)
-    : TicketHolderWithQueueingStats(numTickets, serviceContext), _serviceContext(serviceContext) {
-    for (std::size_t i = 0; i < static_cast<unsigned int>(QueueType::QueueTypeSize); i++) {
-        _queues.emplace_back(this);
-    }
-    _queues.shrink_to_fit();
+    : TicketHolderWithQueueingStats(numTickets, serviceContext),
+      _queues{Queue(this, QueueType::LowPriorityQueue),
+              Queue(this, QueueType::NormalPriorityQueue),
+              Queue(this, QueueType::ImmediatePriorityNoOpQueue)},
+      _serviceContext(serviceContext) {
+
     _ticketsAvailable.store(numTickets);
     _enqueuedElements.store(0);
 }
@@ -551,10 +552,14 @@ bool PriorityTicketHolder::_tryAcquireTicket() {
 
 boost::optional<Ticket> PriorityTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
     invariant(admCtx);
-
-    auto hasAcquired = _tryAcquireTicket();
-    if (hasAcquired) {
-        return Ticket{this, admCtx};
+    // Low priority operations cannot use optimistic ticket acquisition and will go to the queue
+    // instead. This is done to prevent them from skipping the line before other high-priority
+    // operations.
+    if (admCtx->getPriority() >= AdmissionContext::Priority::kNormal) {
+        auto hasAcquired = _tryAcquireTicket();
+        if (hasAcquired) {
+            return Ticket{this, admCtx};
+        }
     }
     return boost::none;
 }
@@ -578,6 +583,20 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationC
         return Ticket{this, admCtx};
     } else {
         return boost::none;
+    }
+}
+
+bool PriorityTicketHolder::_hasToWaitForHigherPriority(const EnqueuerLockGuard& lk,
+                                                       QueueType queue) {
+    switch (queue) {
+        case QueueType::LowPriorityQueue: {
+            const auto& normalQueue =
+                _queues[static_cast<unsigned int>(QueueType::NormalPriorityQueue)];
+            auto pending = normalQueue.getThreadsPendingToWake();
+            return pending != 0 && pending >= _ticketsAvailable.load();
+        }
+        default:
+            return false;
     }
 }
 
@@ -644,7 +663,8 @@ bool PriorityTicketHolder::Queue::enqueue(OperationContext* opCtx,
         // check. The problem is that we must call a method that signals that the thread has been
         // woken after the condition variable wait, not before which is where the predicate would
         // go.
-        while (_holder->_ticketsAvailable.load() <= 0) {
+        while (_holder->_ticketsAvailable.load() <= 0 ||
+               _holder->_hasToWaitForHigherPriority(enqueuerLock, _queueType)) {
             // This method must be called after getting woken in all cases, so we use a ScopeGuard
             // to handle exceptions as well as early returns.
             ON_BLOCK_EXIT([&] { _signalThreadWoken(enqueuerLock); });
