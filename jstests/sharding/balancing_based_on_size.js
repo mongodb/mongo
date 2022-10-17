@@ -76,7 +76,7 @@ const chunksBeforeNoopRound = findChunksUtil.findChunksByNs(st.config, ns).toArr
 // Check that the collection is balanced
 st.verifyCollectionIsBalanced(coll);
 
-jsTestLog("Printing sharding status after wait for collection balance");
+jsTestLog("Printing sharding status after waiting for collection balance");
 st.printShardingStatus();
 
 // Wait for some more rounds and then check the balancer is not wrongly moving around data

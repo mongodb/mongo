@@ -337,14 +337,11 @@ sh.awaitCollectionBalance = function(coll, timeout, interval) {
 
         assert.soon(
             function() {
-                print("awaitCollectionBalance: Waiting for balancerCompliant.");
                 assert.soon(function() {
                     return assert
                         .commandWorked(sh._adminCommand({balancerCollectionStatus: ns}, true))
                         .balancerCompliant;
                 }, 'Timed out waiting for the collection to be balanced', timeout, interval);
-
-                print("awaitCollectionBalance: Waiting for orphans counter to be 0.");
 
                 // (SERVER-67301) Wait for orphans counter to be 0 to account for potential stale
                 // orphans count
@@ -354,7 +351,6 @@ sh.awaitCollectionBalance = function(coll, timeout, interval) {
                 }, 'Timed out waiting for orphans counter to be 0', timeout, interval);
                 sh.enableBalancing(coll);
 
-                print("awaitCollectionBalance: Waiting for second balancerCompliant.");
                 return assert.commandWorked(sh._adminCommand({balancerCollectionStatus: ns}, true))
                     .balancerCompliant;
             },
@@ -364,8 +360,6 @@ sh.awaitCollectionBalance = function(coll, timeout, interval) {
     } finally {
         db = oldDb;
     }
-
-    print("awaitCollectionBalance: Collection is balanced.");
 };
 
 /**
