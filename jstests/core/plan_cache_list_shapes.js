@@ -11,6 +11,8 @@
 //   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
 //   assumes_unsharded_collection,
+//   # Plan cache state is node-local and will not get migrated alongside tenant data.
+//   tenant_migration_incompatible,
 // ]
 (function() {
 'use strict';

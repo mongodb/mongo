@@ -12,6 +12,8 @@
 //   does_not_support_stepdowns,
 //   requires_fcv_52,
 //   requires_profiling,
+//   # Plan cache state is node-local and will not get migrated alongside tenant data.
+//   tenant_migration_incompatible,
 // ]
 (function() {
 'use strict';
