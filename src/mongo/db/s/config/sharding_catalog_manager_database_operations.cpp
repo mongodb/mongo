@@ -117,14 +117,24 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
     boost::optional<DDLLockManager::ScopedLock> dbLock;
 
+    // Resolve the shard against the received parameter (which may encode either a shard ID or a
+    // connection string).
+    if (optPrimaryShard) {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "invalid shard name: " << *optPrimaryShard,
+                optPrimaryShard->isValid());
+    }
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resolvedPrimaryShard = optPrimaryShard
+        ? uassertStatusOK(shardRegistry->getShard(opCtx, *optPrimaryShard))
+        : nullptr;
+
+
     const auto dbMatchFilter = [&] {
         BSONObjBuilder filterBuilder;
         filterBuilder.append(DatabaseType::kNameFieldName, dbName);
-        if (optPrimaryShard) {
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "invalid shard name: " << *optPrimaryShard,
-                    optPrimaryShard->isValid());
-            filterBuilder.append(DatabaseType::kPrimaryFieldName, optPrimaryShard->toString());
+        if (resolvedPrimaryShard) {
+            filterBuilder.append(DatabaseType::kPrimaryFieldName, resolvedPrimaryShard->getId());
         }
         return filterBuilder.obj();
     }();
@@ -151,7 +161,6 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
     // Expensive createDatabase code path
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
-    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     // Check if a database already exists with the same name (case insensitive), and if so, return
     // the existing entry.
@@ -174,8 +183,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
             uassert(
                 ErrorCodes::NamespaceExists,
                 str::stream() << "database already created on a primary which is different from "
-                              << *optPrimaryShard,
-                !optPrimaryShard || *optPrimaryShard == actualDb.getPrimary());
+                              << resolvedPrimaryShard->getId(),
+                !resolvedPrimaryShard || resolvedPrimaryShard->getId() == actualDb.getPrimary());
 
             // We did a local read of the database entry above and found that the database already
             // exists. However, the data may not be majority committed (a previous createDatabase
@@ -188,18 +197,19 @@ DatabaseType ShardingCatalogManager::createDatabase(
                 uassertStatusOK(shardRegistry->getShard(opCtx, actualDb.getPrimary())), actualDb);
         } else {
             // The database does not exist. Insert an entry for the new database into the sharding
-            // catalog.
-            auto const shardPtr = uassertStatusOK(shardRegistry->getShard(
-                opCtx,
-                optPrimaryShard ? *optPrimaryShard
-                                : selectShardForNewDatabase(opCtx, shardRegistry)));
+            // catalog. Assign also a primary shard if the caller hasn't specified one.
+            if (!resolvedPrimaryShard) {
+                resolvedPrimaryShard = uassertStatusOK(shardRegistry->getShard(
+                    opCtx, selectShardForNewDatabase(opCtx, shardRegistry)));
+            }
 
             const auto now = VectorClock::get(opCtx)->getTime();
             const auto clusterTime = now.clusterTime().asTimestamp();
 
             // Pick a primary shard for the new database.
-            DatabaseType db(
-                dbName.toString(), shardPtr->getId(), DatabaseVersion(UUID::gen(), clusterTime));
+            DatabaseType db(dbName.toString(),
+                            resolvedPrimaryShard->getId(),
+                            DatabaseVersion(UUID::gen(), clusterTime));
 
             LOGV2(21938,
                   "Registering new database {db} in sharding catalog",
@@ -211,7 +221,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
                 NamespacePlacementType placementInfo(
                     NamespaceString(dbName),
                     clusterTime,
-                    std::vector<mongo::ShardId>{shardPtr->getId()});
+                    std::vector<mongo::ShardId>{resolvedPrimaryShard->getId()});
                 withTransaction(
                     opCtx,
                     NamespaceString::kConfigDatabasesNamespace,
@@ -239,7 +249,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
                     ShardingCatalogClient::kMajorityWriteConcern));
             }
 
-            return std::make_pair(shardPtr, db);
+            return std::make_pair(resolvedPrimaryShard, db);
         }
     }();
 
