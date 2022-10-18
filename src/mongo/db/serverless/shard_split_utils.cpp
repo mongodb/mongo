@@ -73,8 +73,8 @@ ConnectionString makeRecipientConnectionString(const repl::ReplSetConfig& config
                    [](const repl::MemberConfig& member) { return member.getHostAndPort(); });
 
     uassert(ErrorCodes::BadValue,
-            "The recipient connection string must have at least three members.",
-            recipientNodes.size() >= kMinimumRequiredRecipientNodes);
+            "The recipient connection string must have exactly three members.",
+            recipientNodes.size() == kMinimumRequiredRecipientNodes);
 
     return ConnectionString::forReplicaSet(recipientSetName.toString(), recipientNodes);
 }
