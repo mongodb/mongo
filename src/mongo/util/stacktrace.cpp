@@ -119,3 +119,21 @@ void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanR
 }
 
 }  // namespace mongo::stack_trace_detail
+
+void mongo::StackTrace::log(bool withHumanReadable) const {
+    if (hasError()) {
+        LOGV2_ERROR(31430, "Error collecting stack trace", "error"_attr = _error);
+    }
+
+    StackTraceSink* logv2Sink = nullptr;
+    stack_trace_detail::logBacktraceObject(_stacktrace, logv2Sink, withHumanReadable);
+}
+
+void mongo::StackTrace::sink(StackTraceSink* sink, bool withHumanReadable) const {
+    using namespace fmt::literals;
+    if (hasError()) {
+        *sink << fmt::format(FMT_STRING("Error collecting stack trace: {}"), _error);
+    }
+
+    stack_trace_detail::logBacktraceObject(_stacktrace, sink, withHumanReadable);
+}

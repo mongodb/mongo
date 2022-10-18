@@ -68,11 +68,6 @@ namespace {
 
 const size_t kPathBufferSize = 1024;
 
-struct Options {
-    bool withHumanReadable = false;
-    bool rawAddress = false;
-};
-
 // On Windows the symbol handler must be initialized at process startup and cleaned up at shutdown.
 // This class wraps up that logic and gives access to the process handle associated with the
 // symbol handler. Because access to the symbol handler API is not thread-safe, it also provides
@@ -215,14 +210,11 @@ struct TraceItem {
     std::pair<std::string, size_t> symbol;
 };
 
-void appendTrace(BSONObjBuilder* bob,
-                 const std::vector<TraceItem>& traceList,
-                 const Options& options) {
+void appendTrace(BSONObjBuilder* bob, const std::vector<TraceItem>& traceList) {
     auto bt = BSONArrayBuilder(bob->subarrayStart("backtrace"));
     for (const auto& item : traceList) {
         auto o = BSONObjBuilder(bt.subobjStart());
-        if (options.rawAddress)
-            o.append("a", stack_trace_detail::Hex(item.address));
+        o.append("a", stack_trace_detail::Hex(item.address));
         if (!item.module.empty())
             o.append("module", item.module);
         if (!item.source.first.empty()) {
@@ -297,59 +289,51 @@ std::vector<TraceItem> makeTraceList(CONTEXT& context) {
     return traceList;
 }
 
-void printTraceList(const std::vector<TraceItem>& traceList,
-                    StackTraceSink* sink,
-                    const Options& options) {
-    using namespace fmt::literals;
-    if (traceList.empty())
-        return;
+StackTrace getStackTraceImpl(CONTEXT& context) {
+    std::vector<TraceItem> traceList = makeTraceList(context);
+    if (traceList.empty()) {
+        return StackTrace(BSONObj(), "");
+    }
+
     BSONObjBuilder bob;
-    appendTrace(&bob, traceList, options);
-    stack_trace_detail::logBacktraceObject(bob.done(), sink, options.withHumanReadable);
+    appendTrace(&bob, traceList);
+    return StackTrace(bob.obj(), "");
 }
+}  // namespace
 
-/** `sink` can be nullptr to emit structured logs instead of writing to a sink. */
-void printWindowsStackTraceImpl(CONTEXT& context, StackTraceSink* sink) {
-    Options options{};
-    options.withHumanReadable = true;
-    options.rawAddress = true;
-    printTraceList(makeTraceList(context), sink, options);
-}
-
-void printWindowsStackTraceImpl(StackTraceSink* sink) {
+StackTrace getStackTrace() {
     CONTEXT context;
     memset(&context, 0, sizeof(context));
     context.ContextFlags = CONTEXT_CONTROL;
     RtlCaptureContext(&context);
-    printWindowsStackTraceImpl(context, sink);
+
+    return getStackTraceImpl(context);
 }
 
-}  // namespace
-
 void printWindowsStackTrace(CONTEXT& context, StackTraceSink& sink) {
-    printWindowsStackTraceImpl(context, &sink);
+    getStackTraceImpl(context).sink(&sink);
 }
 
 void printWindowsStackTrace(CONTEXT& context, std::ostream& os) {
     OstreamStackTraceSink sink{os};
-    printWindowsStackTraceImpl(context, &sink);
+    printWindowsStackTrace(context, sink);
 }
 
 void printWindowsStackTrace(CONTEXT& context) {
-    printWindowsStackTraceImpl(context, nullptr);
+    getStackTraceImpl(context).log();
 }
 
 void printStackTrace(StackTraceSink& sink) {
-    printWindowsStackTraceImpl(&sink);
+    getStackTrace().sink(&sink);
 }
 
 void printStackTrace(std::ostream& os) {
     OstreamStackTraceSink sink{os};
-    printWindowsStackTraceImpl(&sink);
+    printStackTrace(sink);
 }
 
 void printStackTrace() {
-    printWindowsStackTraceImpl(nullptr);
+    getStackTrace().log();
 }
 
 }  // namespace mongo

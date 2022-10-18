@@ -91,6 +91,46 @@ private:
     std::string& _s;
 };
 
+/**
+ * A `StackTrace` object also encapsulates any errors encountered while attaining stacktrace
+ * information. Oddly, a `StackTrace` object can be in an error state (`hasError` returns true) and
+ * have non-empty stacktrace information via `getBSONRepresentation`. It is legal to call
+ * `getBSONRepresentation` even when in an error state.
+ *
+ * Likewise, it is always safe to call `log` or `sink`, regardless of error state. Those output
+ * methods will write out any errors along with any available stacktrace information.
+ *
+ * Disabling log truncation is strongly recommended when logging a BSONObj returned from
+ * `getBSONRepresentation` by hand.
+ */
+class StackTrace {
+public:
+    explicit StackTrace(BSONObj stacktrace) : _stacktrace(stacktrace) {}
+
+    StackTrace(BSONObj stacktrace, std::string error)
+        : _stacktrace(stacktrace), _error(std::move(error)) {}
+
+    void log(bool withHumanReadable = true) const;
+
+    void sink(StackTraceSink* sink, bool withHumanReadable = true) const;
+
+    BSONObj getBSONRepresentation() const {
+        return _stacktrace;
+    }
+
+    bool hasError() const {
+        return !_error.empty();
+    }
+
+    std::string getError() const {
+        return _error;
+    }
+
+private:
+    BSONObj _stacktrace;
+    std::string _error;
+};
+
 namespace stack_trace_detail {
 /**
  * A utility for uint64_t <=> uppercase hex string conversions. It
@@ -279,6 +319,7 @@ size_t rawBacktrace(void** addrs, size_t capacity);
 void printStackTrace(StackTraceSink& sink);
 void printStackTrace(std::ostream& os);
 void printStackTrace();
+StackTrace getStackTrace();
 
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 
