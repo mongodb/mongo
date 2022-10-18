@@ -920,8 +920,10 @@ PipelineD::supportsSort(const BucketUnpacker& bucketUnpacker,
             const CollectionScan* scan = static_cast<CollectionScan*>(root);
             if (sort.size() == 1) {
                 auto part = sort[0];
-                // Check the sort we're asking for is on time.
-                if (part.fieldPath && *part.fieldPath == bucketUnpacker.getTimeField()) {
+                // Check the sort we're asking for is on time, and that the buckets are actually
+                // ordered on time.
+                if (part.fieldPath && *part.fieldPath == bucketUnpacker.getTimeField() &&
+                    !bucketUnpacker.bucketSpec().usesExtendedRange()) {
                     // Check that the directions agree.
                     if ((scan->getDirection() == CollectionScanParams::Direction::FORWARD) ==
                         part.isAscending)
@@ -1026,6 +1028,15 @@ PipelineD::supportsSort(const BucketUnpacker& bucketUnpacker,
                     // bypass the view), so don't bother optimizing that case.
                     auto&& ixField = keyPatternIter->fieldNameStringData();
                     if (ixField != controlMinTime && ixField != controlMaxTime)
+                        return boost::none;
+
+                    // If we've inserted a date before 1-1-1970, we round the min up towards 1970,
+                    // rather then down, which has the effect of increasing the control.min.t.
+                    // This means the minimum time in the bucket is likely to be lower than
+                    // indicated and thus, actual dates may be out of order relative to what's
+                    // indicated by the bucket bounds.
+                    if (ixField == controlMinTime &&
+                        bucketUnpacker.bucketSpec().usesExtendedRange())
                         return boost::none;
 
                     if (!directionCompatible(*keyPatternIter, *sortIter))

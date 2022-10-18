@@ -210,9 +210,6 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
             }
         }
         expandedRequest.setHint(rewritten);
-
-        // JLR Possibly need to handle inappropriately forcing clustered here. Will likely be
-        // handled by removing the _id predicate, however.
     } else {
         expandedRequest.setHint(request.getHint());
     }
