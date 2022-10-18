@@ -131,3 +131,13 @@ structs:
                 optional: true
                 type: BucketGranularity
                 stability: stable
+            bucketRoundingSeconds:
+                optional: true
+                type: safeInt
+                stability: unstable
+                validator: { gte: 1 }
+            bucketMaxSpanSeconds:
+                optional: true
+                type: safeInt
+                stability: unstable
+                validator: { gte: 1 }

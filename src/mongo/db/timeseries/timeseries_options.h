@@ -39,10 +39,13 @@ namespace mongo {
 namespace timeseries {
 
 /**
- * Returns true if the granularity transition is valid.
+ * Evaluates whether the transition of timeseries granularities is valid (returning Status::OK if
+ * the transition is acceptable) and if a pointer is given, it will be modified to reflect if the
+ * options have changed.
  */
-bool isValidTimeseriesGranularityTransition(BucketGranularityEnum current,
-                                            BucketGranularityEnum target);
+Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& currentOptions,
+                                                const CollModTimeseries& targetOptions,
+                                                bool* shouldUpdateOptions = nullptr);
 
 /**
  * Returns the default bucket timespan associated with the given granularity.
