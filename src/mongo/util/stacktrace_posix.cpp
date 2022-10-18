@@ -97,9 +97,6 @@ struct Options {
     // Add the processInfo block
     bool withProcessInfo = true;
 
-    // Add "human readable" breakdown when dumping stack. 1 line per frame.
-    bool withHumanReadable = true;
-
     // only include the somap entries relevant to the backtrace
     bool trimSoMap = true;
 
@@ -424,7 +421,7 @@ private:
  * analysis tool. For example, on Linux it contains a subobject named "somap", describing
  * the objects referenced in the "b" fields of the "backtrace" list.
  */
-void printStackTraceImpl(const Options& options, StackTraceSink* sink = nullptr) {
+StackTrace getStackTraceImpl(const Options& options) {
     using namespace fmt::literals;
     std::string err;
     BSONObjBuilder bob;
@@ -441,16 +438,8 @@ void printStackTraceImpl(const Options& options, StackTraceSink* sink = nullptr)
     appendStackTraceObject(&bob, iteration, options);
 #endif
 
-    if (!err.empty()) {
-        if (sink) {
-            *sink << fmt::format(FMT_STRING("Error collecting stack trace: {}"), err);
-        } else {
-            LOGV2_ERROR(31430, "Error collecting stack trace", "error"_attr = err);
-        }
-    }
-    stack_trace_detail::logBacktraceObject(bob.done(), sink, options.withHumanReadable);
+    return StackTrace(bob.obj(), err);
 }
-
 
 }  // namespace
 }  // namespace stack_trace_detail
@@ -475,10 +464,17 @@ const StackTraceAddressMetadata& StackTraceAddressMetadataGenerator::load(void* 
     return _meta;
 }
 
+StackTrace getStackTrace() {
+    stack_trace_detail::Options options{};
+    options.rawAddress = true;
+    return getStackTraceImpl(options);
+}
+
 void printStackTrace(StackTraceSink& sink) {
     stack_trace_detail::Options options{};
     options.rawAddress = true;
-    stack_trace_detail::printStackTraceImpl(options, &sink);
+    const bool withHumanReadable = true;
+    getStackTraceImpl(options).sink(&sink, withHumanReadable);
 }
 
 void printStackTrace(std::ostream& os) {
@@ -489,7 +485,8 @@ void printStackTrace(std::ostream& os) {
 void printStackTrace() {
     stack_trace_detail::Options options{};
     options.rawAddress = true;
-    stack_trace_detail::printStackTraceImpl(options, nullptr);
+    const bool withHumanReadable = true;
+    getStackTraceImpl(options).log(withHumanReadable);
 }
 
 }  // namespace mongo
