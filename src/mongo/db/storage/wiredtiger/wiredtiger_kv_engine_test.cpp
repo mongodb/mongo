@@ -547,6 +547,10 @@ TEST_F(WiredTigerKVEngineTest, WiredTigerDowngrade) {
 TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
     // Perform each test in their own limited scope in order to establish different
     // severity levels.
+
+    // TODO SERVER-70651 Re-enable this test.
+    return;
+
     {
         auto opCtxRaii = _makeOperationContext();
         // Set the WiredTiger Checkpoint LOGV2 component severity to the Log level.
