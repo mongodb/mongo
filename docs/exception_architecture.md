@@ -4,7 +4,8 @@ MongoDB code uses the following types of assertions that are available for use:
 -   `uassert` and `iassert`
     -   Checks for per-operation user errors. Operation-fatal.
 -   `tassert`
-    -   Like uassert, but inhibits clean shutdown.
+    -   Like uassert in that it checks for per-operation user errors, but inhibits clean shutdown
+        in tests. Operation-fatal, but process-fatal in testing environments during shutdown.
 -   `massert`
     -   Checks per-operation invariants. Operation-fatal.
 -   `fassert`
@@ -32,29 +33,57 @@ C++ files using [MongoDB's IDL parser][idlc_py] at compile time. We also use err
 its children (e.g., `AssertionException`) as a means of maintaining metadata for exceptions. The
 proper usage of these constructs is described below.
 
+## Assertion Counters
+
+Some assertions will increment an assertion counter. The `serverStatus` command will generate an
+"asserts" section including these counters:
+
+-   `regular`
+    -   Incremented by `verify`.
+-   `warning`
+    -   Always 0. Nothing increments this anymore.
+-   `msg`
+    -   Incremented by `massert`.
+-   `user`
+    -   Incremented by `uassert`.
+-   `tripwire`
+    -   Incremented by `tassert`.
+-   `rollovers`
+    -   When any counter reaches a value of `1 << 30`, all of the counters are reset and
+        the "rollovers" counter is incremented.
+
 ## Considerations
 
 When per-operation invariant checks fail, the current operation fails, but the process and
 connection persist. This means that `massert`, `uassert`, `iassert` and `verify` only
 terminate the current operation, not the whole process. Be careful not to corrupt process state by
-mistakenly using these assertions midway through mutating process state. Examples of this include
-`uassert`, `iassert` and `massert` inside of constructors and destructors.
+mistakenly using these assertions midway through mutating process state.
 
 `fassert` failures will terminate the entire process; this is used for low-level checks where
-continuing might lead to corrupt data or loss of data on disk.
+continuing might lead to corrupt data or loss of data on disk. Additionally, `fassert` will log
+the assertion message with fatal severity and add a breakpoint before terminating.
 
-`tassert` is a hybrid - it will fail the operation like `uassert`, but also triggers a
-"deferred-fatality tripwire flag". If this flag is set during clean shutdown, the process will
-invoke the tripwire fatal assertion. This is useful for ensuring that operation failures will cause
-a test suite to fail, without resorting to different behavior during testing, and without allowing
-user operations to potentially disrupt production deployments by terminating the server.
+`tassert` will fail the operation like `uassert`, but also triggers a "deferred-fatality tripwire
+flag". In testing environments, if the tripwire flag is set during shutdown, the process will
+invoke the tripwire fatal assertion. In non-testing environments, there will only be a warning
+during shutdown that tripwire assertions have failed.
+
+`tassert` presents more diagnostics than `uassert`. `tassert` will log the assertion as an error,
+log scoped debug info (for more info, see ScopedDebugInfoStack defined in
+[mongo/util/assert_util.h][assert_util_h]), print the stack trace, and add a breakpoint.
+The purpose of `tassert` is to ensure that operation failures will cause a test suite to fail
+without resorting to different behavior during testing. `tassert` should only be used to check
+for unexpected values produced by defined behavior.
 
 Both `massert` and `uassert` take error codes, so that all assertions have codes associated with
 them. Currently, programmers are free to provide the error code by either [using a unique location
-number](#choosing-a-unique-location-number) or choosing a named code from `ErrorCodes`. Unique location 
+number](#choosing-a-unique-location-number) or choosing a named code from `ErrorCodes`. Unique location
 numbers have no meaning other than a way to associate a log message with a line of code.
 
-`iassert` provides similar functionality to `uassert`, but it logs at a higher level and
+`massert` will log the assertion message as an error, while `uassert` will log the message with
+debug level of 1 (for more info about log debug level, see [docs/logging.md][logging_md]).
+
+`iassert` provides similar functionality to `uassert`, but it logs at a debug level of 3 and
 does not increment user assertion counters. We should always choose `iassert` over `uassert`
 when we expect a failure, a failure might be recoverable, or failure accounting is not interesting.
 
@@ -144,3 +173,5 @@ Gotchas to watch out for:
 [idlc_py]: ../buildscripts/idl/idlc.py
 [status_with_test_cpp]: ../src/mongo/base/status_with_test.cpp
 [errorcodes_py]: ../buildscripts/errorcodes.py
+[assert_util_h]: ../src/mongo/util/assert_util.h
+[logging_md]: logging.md
