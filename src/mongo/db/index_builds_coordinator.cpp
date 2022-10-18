@@ -195,6 +195,11 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
         return;
     }
 
+    if (replState.isSettingUp()) {
+        // The index build document is not written to config.system.indexBuilds collection yet.
+        return;
+    }
+
     auto status = indexbuildentryhelpers::removeIndexBuildEntry(
         opCtx, indexBuildEntryCollection, replState.buildUUID);
     if (!status.isOK()) {
@@ -2136,9 +2141,22 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
         postSetupAction =
             _setUpIndexBuildInner(opCtx, replState, startTimestamp, indexBuildOptions);
     } catch (const DBException& ex) {
-        activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+        auto status = ex.toStatus();
+        auto collectionSharedPtr = CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForRead(
+            opCtx, replState->collectionUUID);
+        CollectionPtr collection(collectionSharedPtr.get(), CollectionPtr::NoYieldTag{});
+        invariant(collection,
+                  str::stream() << "Collection with UUID " << replState->collectionUUID
+                                << " should exist because an index build is in progress: "
+                                << replState->buildUUID);
+        if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
+            _cleanUpSinglePhaseAfterFailure(
+                opCtx, collection, replState, indexBuildOptions, status);
+        } else {
+            _cleanUpTwoPhaseAfterFailure(opCtx, collection, replState, indexBuildOptions, status);
+        }
 
-        return ex.toStatus();
+        return status;
     }
 
     // The indexes are in the durable catalog in an unfinished state. Return an OK status so
@@ -2282,15 +2300,23 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
             // changing.
             Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX);
 
-            // Index builds may not fail on secondaries. If a primary replicated an abortIndexBuild
-            // oplog entry, then this index build would have received an IndexBuildAborted error
-            // code.
             const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
             auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
             if (!replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
-                fassert(51101,
-                        status.withContext(str::stream() << "Index build: " << replState->buildUUID
-                                                         << "; Database: " << replState->dbName));
+                if (replState->isSettingUp()) {
+                    // Clean up if the error happens before StartIndexBuild oplog entry is
+                    // replicated during startup or stepdown.
+                    activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+                    return;
+                } else {
+                    // Index builds may not fail on secondaries. If a primary replicated an
+                    // abortIndexBuild oplog entry, then this index build would have received an
+                    // IndexBuildAborted error code.
+                    fassert(51101,
+                            status.withContext(str::stream()
+                                               << "Index build: " << replState->buildUUID
+                                               << "; Database: " << replState->dbName));
+                }
             }
 
             CollectionNamespaceOrUUIDLock collLock(abortCtx, dbAndUUID, MODE_X);

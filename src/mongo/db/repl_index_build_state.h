@@ -291,6 +291,11 @@ public:
     bool isAborted() const;
 
     /**
+     * Returns true if this index build is being set up.
+     */
+    bool isSettingUp() const;
+
+    /**
      * Returns abort reason. Invariants if not in aborted state.
      */
     std::string getAbortReason() const;
