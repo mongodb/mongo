@@ -470,6 +470,13 @@ public:
     }
 
     /**
+     * Returns the cache size in MB.
+     */
+    virtual size_t getCacheSizeMB() const {
+        return 0;
+    }
+
+    /**
      * The destructor will never be called from mongod, but may be called from tests.
      * Engines may assume that this will only be called in the case of clean shutdown, even if
      * cleanShutdown() hasn't been called.

@@ -334,7 +334,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
       _sizeStorerSyncTracker(cs, 100000, Seconds(60)),
       _ephemeral(ephemeral),
       _inRepairMode(repair),
-      _keepDataHistory(serverGlobalParams.enableMajorityReadConcern) {
+      _keepDataHistory(serverGlobalParams.enableMajorityReadConcern),
+      _cacheSizeMB(cacheSizeMB) {
     _pinnedOplogTimestamp.store(Timestamp::max().asULL());
     boost::filesystem::path journalPath = path;
     journalPath /= "journal";
@@ -2694,6 +2695,10 @@ KeyFormat WiredTigerKVEngine::getKeyFormat(OperationContext* opCtx, StringData i
     const std::string wtTableConfig =
         uassertStatusOK(WiredTigerUtil::getMetadataCreate(opCtx, "table:{}"_format(ident)));
     return wtTableConfig.find("key_format=u") != string::npos ? KeyFormat::String : KeyFormat::Long;
+}
+
+size_t WiredTigerKVEngine::getCacheSizeMB() const {
+    return _cacheSizeMB;
 }
 
 }  // namespace mongo

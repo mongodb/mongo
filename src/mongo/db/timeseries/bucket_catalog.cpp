@@ -41,6 +41,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_compression.h"
@@ -135,6 +136,27 @@ Status getTimeseriesBucketClearedError(const OID& bucketId,
             str::stream() << "Time-series bucket " << bucketId << nsIdentification
                           << " was cleared"};
 }
+
+/**
+ * Caluculate the bucket max size constrained by the cache size and the cardinality of active
+ * buckets.
+ */
+int32_t getCacheDerivedBucketMaxSize(StorageEngine* storageEngine, uint32_t workloadCardinality) {
+    invariant(storageEngine);
+    uint64_t storageCacheSize =
+        static_cast<uint64_t>(storageEngine->getEngine()->getCacheSizeMB() * 1024 * 1024);
+
+    if (!feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility) ||
+        storageCacheSize == 0 || workloadCardinality == 0) {
+        return INT_MAX;
+    }
+
+    uint64_t derivedMaxSize = storageCacheSize / (2 * workloadCardinality);
+    uint64_t intMax = static_cast<uint64_t>(std::numeric_limits<int32_t>::max());
+    return std::min(derivedMaxSize, intMax);
+}
+
 }  // namespace
 
 void BucketCatalog::ExecutionStatsController::incNumBucketInserts(long long increment) {
@@ -167,6 +189,12 @@ void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToSchemaChan
 void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToSize(long long increment) {
     _collectionStats->numBucketsClosedDueToSize.fetchAndAddRelaxed(increment);
     _globalStats->numBucketsClosedDueToSize.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToCachePressure(
+    long long increment) {
+    _collectionStats->numBucketsClosedDueToCachePressure.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsClosedDueToCachePressure.fetchAndAddRelaxed(increment);
 }
 
 void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToTimeForward(
@@ -489,7 +517,7 @@ void BucketCatalog::Bucket::_calculateBucketFieldsAndSizeChange(
     const BSONObj& doc,
     boost::optional<StringData> metaField,
     NewFieldNames* newFieldNamesToBeInserted,
-    uint32_t* sizeToBeAdded) const {
+    int32_t* sizeToBeAdded) const {
     // BSON size for an object with an empty object field where field name is empty string.
     // We can use this as an offset to know the size when we have real field names.
     static constexpr int emptyObjSize = 12;
@@ -957,6 +985,8 @@ void BucketCatalog::_appendExecutionStatsToBuilder(const ExecutionStats* stats,
         builder->appendNumber("numBucketsReopened", stats->numBucketsReopened.load());
         builder->appendNumber("numBucketsKeptOpenDueToLargeMeasurements",
                               stats->numBucketsKeptOpenDueToLargeMeasurements.load());
+        builder->appendNumber("numBucketsClosedDueToCachePressure",
+                              stats->numBucketsClosedDueToCachePressure.load());
     }
 }
 
@@ -1300,6 +1330,7 @@ BucketCatalog::Bucket* BucketCatalog::_reopenBucket(Stripe* stripe,
     stats.incNumBucketsReopened();
 
     _memoryUsage.addAndFetch(unownedBucket->_memoryUsage);
+    _numberOfActiveBuckets.fetchAndAdd(1);
 
     return unownedBucket;
 }
@@ -1395,13 +1426,14 @@ std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::_insertIntoBucket(
     Bucket* bucket,
     ClosedBuckets* closedBuckets) {
     NewFieldNames newFieldNamesToBeInserted;
-    uint32_t sizeToBeAdded = 0;
+    int32_t sizeToBeAdded = 0;
     bucket->_calculateBucketFieldsAndSizeChange(
         doc, info->options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
 
     bool isNewlyOpenedBucket = bucket->_ns.isEmpty();
     if (!isNewlyOpenedBucket) {
-        auto action = _determineRolloverAction(doc, info, bucket, sizeToBeAdded, mode);
+
+        auto action = _determineRolloverAction(opCtx, doc, info, bucket, sizeToBeAdded, mode);
         if (action == RolloverAction::kSoftClose && mode == AllowBucketCreation::kNo) {
             // We don't actually want to roll this bucket over yet, bail out.
             return std::shared_ptr<WriteBatch>{};
@@ -1497,6 +1529,7 @@ void BucketCatalog::_removeBucket(Stripe* stripe,
         _bucketStateManager.eraseBucketState(bucket->id());
     }
 
+    _numberOfActiveBuckets.fetchAndSubtract(1);
     stripe->allBuckets.erase(allIt);
 }
 
@@ -1511,9 +1544,12 @@ void BucketCatalog::_archiveBucket(Stripe* stripe, WithLock stripeLock, Bucket* 
         long long memory = _marginalMemoryUsageForArchivedBucket(archivedSet[bucket->getTime()],
                                                                  archivedSet.size() == 1);
         _memoryUsage.fetchAndAdd(memory);
-
         archived = true;
     }
+
+    // If we have an archived bucket, we still want to account for it in numberOfOpenBuckets so we
+    // will increase it here since removeBucket decrements the count.
+    _numberOfActiveBuckets.fetchAndAdd(1);
     _removeBucket(stripe, stripeLock, bucket, archived);
 }
 
@@ -1695,6 +1731,7 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
             archivedSet.erase(archivedSet.begin());
         }
         _memoryUsage.fetchAndSubtract(memory);
+        _numberOfActiveBuckets.fetchAndSubtract(1);
 
         stats.incNumBucketsClosedDueToMemoryThreshold();
         ++numExpired;
@@ -1714,8 +1751,10 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     tassert(6130900, "Expected bucket to be inserted", inserted);
     Bucket* bucket = it->second.get();
     stripe->openBuckets[info.key] = bucket;
+
     bool initialized = _bucketStateManager.initializeBucketState(bucketId, boost::none);
     invariant(initialized);
+    _numberOfActiveBuckets.fetchAndAdd(1);
 
     if (info.openedDuetoMetadata) {
         info.stats.incNumBucketsOpenedDueToMetadata();
@@ -1731,10 +1770,11 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     return bucket;
 }
 
-BucketCatalog::RolloverAction BucketCatalog::_determineRolloverAction(const BSONObj& doc,
+BucketCatalog::RolloverAction BucketCatalog::_determineRolloverAction(OperationContext* opCtx,
+                                                                      const BSONObj& doc,
                                                                       CreationInfo* info,
                                                                       Bucket* bucket,
-                                                                      uint32_t sizeToBeAdded,
+                                                                      int32_t sizeToBeAdded,
                                                                       AllowBucketCreation mode) {
     // If the mode is enabled to create new buckets, then we should update stats for soft closures
     // accordingly. If we specify the mode to not allow bucket creation, it means we are not sure if
@@ -1763,20 +1803,34 @@ BucketCatalog::RolloverAction BucketCatalog::_determineRolloverAction(const BSON
         info->stats.incNumBucketsClosedDueToSchemaChange();
         return RolloverAction::kHardClose;
     }
-    if (bucket->_size + sizeToBeAdded > static_cast<std::uint64_t>(gTimeseriesBucketMaxSize)) {
+
+    // In scenarios where we have a high cardinality workload and face increased cache pressure we
+    // will decrease the size of buckets before we close them.
+    int32_t cacheDerivedBucketMaxSize = getCacheDerivedBucketMaxSize(
+        opCtx->getServiceContext()->getStorageEngine(), _numberOfActiveBuckets.load());
+    int32_t effectiveMaxSize = std::min(gTimeseriesBucketMaxSize, cacheDerivedBucketMaxSize);
+
+    // Before we hit our bucket minimum count, we will allow for large measurements to be inserted
+    // into buckets. Instead of packing the bucket to the BSON size limit, 16MB, we'll limit the max
+    // bucket size to 12MB. This is to leave some space in the bucket if we need to add new internal
+    // fields to existing, full buckets.
+    static constexpr int32_t largeMeasurementsMaxBucketSize =
+        BSONObjMaxUserSize - (4 * 1024 * 1024);
+    // We restrict the ceiling of the bucket max size under cache pressure.
+    int32_t absoluteMaxSize = std::min(largeMeasurementsMaxBucketSize, cacheDerivedBucketMaxSize);
+
+    if (bucket->_size + sizeToBeAdded > effectiveMaxSize) {
         bool keepBucketOpenForLargeMeasurements =
             bucket->_numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount) &&
             feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
                 serverGlobalParams.featureCompatibility);
         if (keepBucketOpenForLargeMeasurements) {
-            // Instead of packing the bucket to the BSON size limit, 16MB, we'll limit the max
-            // bucket size to 12MB. This is to leave some space in the bucket if we need to add
-            // new internal fields to existing, full buckets.
-            static constexpr size_t largeMeasurementsMaxBucketSize =
-                BSONObjMaxUserSize - (4 * 1024 * 1024);
-
-            if (bucket->_size + sizeToBeAdded > largeMeasurementsMaxBucketSize) {
-                info->stats.incNumBucketsClosedDueToSize();
+            if (bucket->_size + sizeToBeAdded > absoluteMaxSize) {
+                if (absoluteMaxSize != largeMeasurementsMaxBucketSize) {
+                    info->stats.incNumBucketsClosedDueToCachePressure();
+                } else {
+                    info->stats.incNumBucketsClosedDueToSize();
+                }
                 return RolloverAction::kHardClose;
             }
 
@@ -1789,7 +1843,11 @@ BucketCatalog::RolloverAction BucketCatalog::_determineRolloverAction(const BSON
             }
             return RolloverAction::kNone;
         } else {
-            info->stats.incNumBucketsClosedDueToSize();
+            if (effectiveMaxSize == gTimeseriesBucketMaxSize) {
+                info->stats.incNumBucketsClosedDueToSize();
+            } else {
+                info->stats.incNumBucketsClosedDueToCachePressure();
+            }
             return RolloverAction::kHardClose;
         }
     }

@@ -71,6 +71,7 @@ protected:
         AtomicWord<long long> numBucketsClosedDueToCount;
         AtomicWord<long long> numBucketsClosedDueToSchemaChange;
         AtomicWord<long long> numBucketsClosedDueToSize;
+        AtomicWord<long long> numBucketsClosedDueToCachePressure;
         AtomicWord<long long> numBucketsClosedDueToTimeForward;
         AtomicWord<long long> numBucketsClosedDueToTimeBackward;
         AtomicWord<long long> numBucketsClosedDueToMemoryThreshold;
@@ -97,6 +98,7 @@ protected:
         void incNumBucketsClosedDueToCount(long long increment = 1);
         void incNumBucketsClosedDueToSchemaChange(long long increment = 1);
         void incNumBucketsClosedDueToSize(long long increment = 1);
+        void incNumBucketsClosedDueToCachePressure(long long increment = 1);
         void incNumBucketsClosedDueToTimeForward(long long increment = 1);
         void incNumBucketsClosedDueToTimeBackward(long long increment = 1);
         void incNumBucketsClosedDueToMemoryThreshold(long long increment = 1);
@@ -729,7 +731,7 @@ protected:
         void _calculateBucketFieldsAndSizeChange(const BSONObj& doc,
                                                  boost::optional<StringData> metaField,
                                                  NewFieldNames* newFieldNamesToBeInserted,
-                                                 uint32_t* sizeToBeAdded) const;
+                                                 int32_t* sizeToBeAdded) const;
 
         /**
          * Returns whether BucketCatalog::commit has been called at least once on this bucket.
@@ -784,7 +786,7 @@ protected:
 
         // The total size in bytes of the bucket's BSON serialization, including measurements to be
         // inserted.
-        uint64_t _size = 0;
+        int32_t _size = 0;
 
         // The total number of measurements in the bucket, including uncommitted measurements and
         // measurements to be inserted.
@@ -1010,10 +1012,11 @@ protected:
      * Determines if 'bucket' needs to be rolled over to accomodate 'doc'. If so, determines whether
      * to archive or close 'bucket'.
      */
-    RolloverAction _determineRolloverAction(const BSONObj& doc,
+    RolloverAction _determineRolloverAction(OperationContext* opCtx,
+                                            const BSONObj& doc,
                                             CreationInfo* info,
                                             Bucket* bucket,
-                                            uint32_t sizeToBeAdded,
+                                            int32_t sizeToBeAdded,
                                             AllowBucketCreation mode);
 
     /**
@@ -1060,6 +1063,9 @@ protected:
 
     // Approximate memory usage of the bucket catalog.
     AtomicWord<uint64_t> _memoryUsage;
+
+    // Approximate cardinality of opened and archived buckets.
+    AtomicWord<uint32_t> _numberOfActiveBuckets;
 
     class ServerStatus;
 };

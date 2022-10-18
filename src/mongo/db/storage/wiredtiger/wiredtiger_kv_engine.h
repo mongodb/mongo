@@ -418,6 +418,8 @@ public:
 
     KeyFormat getKeyFormat(OperationContext* opCtx, StringData ident) const override;
 
+    size_t getCacheSizeMB() const override;
+
 private:
     class WiredTigerSessionSweeper;
 
@@ -556,5 +558,8 @@ private:
     // Pins the oplog so that OplogStones will not truncate oplog history equal or newer to this
     // timestamp.
     AtomicWord<std::uint64_t> _pinnedOplogTimestamp;
+
+    // The amount of memory alloted for the WiredTiger cache.
+    size_t _cacheSizeMB;
 };
 }  // namespace mongo
