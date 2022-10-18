@@ -421,11 +421,14 @@ public:
      *  'ns': Namespace on which to create the index
      *  'keys': Document describing keys and index types. You must provide at least one field and
      *          its direction.
+     *
+     * SERVER-70433 Remove 'tenantId' as parameter.
      */
     void createIndex(StringData ns,
                      const BSONObj& keys,
-                     boost::optional<BSONObj> writeConcernObj = boost::none) {
-        return createIndex(ns, IndexSpec().addKeys(keys), writeConcernObj);
+                     boost::optional<BSONObj> writeConcernObj = boost::none,
+                     boost::optional<TenantId> tenantId = boost::none) {
+        return createIndex(ns, IndexSpec().addKeys(keys), writeConcernObj, tenantId);
     }
 
     /**
@@ -435,27 +438,37 @@ public:
      *  'ns': Namespace on which to create the index
      *  'descriptor': Configuration object describing the index to create. The descriptor must
      *                describe at least one key and index type.
+     *
+     * SERVER-70433 Remove 'tenantId' as parameter.
      */
     virtual void createIndex(StringData ns,
                              const IndexSpec& descriptor,
-                             boost::optional<BSONObj> writeConcernObj = boost::none) {
+                             boost::optional<BSONObj> writeConcernObj = boost::none,
+                             boost::optional<TenantId> tenantId = boost::none) {
         std::vector<const IndexSpec*> toBuild;
         toBuild.push_back(&descriptor);
-        createIndexes(ns, toBuild, writeConcernObj);
+        createIndexes(ns, toBuild, writeConcernObj, tenantId);
     }
 
+    /**
+     * SERVER-70433 Remove 'tenantId' as parameter.
+     */
     virtual void createIndexes(StringData ns,
                                const std::vector<const IndexSpec*>& descriptor,
-                               boost::optional<BSONObj> writeConcernObj = boost::none);
+                               boost::optional<BSONObj> writeConcernObj = boost::none,
+                               boost::optional<TenantId> tenantId = boost::none);
 
     /**
      * Creates indexes on the collection 'ns' as described by 'specs'.
      *
      * Failure to construct the indexes is reported by throwing an AssertionException.
+     *
+     * SERVER-70433 Remove 'tenantId' as parameter.
      */
     virtual void createIndexes(StringData ns,
                                const std::vector<BSONObj>& specs,
-                               boost::optional<BSONObj> writeConcernObj = boost::none);
+                               boost::optional<BSONObj> writeConcernObj = boost::none,
+                               boost::optional<TenantId> tenantId = boost::none);
 
     /**
      * Lists indexes on the collection 'nsOrUuid'.
@@ -474,13 +487,17 @@ public:
     virtual std::list<BSONObj> getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                              bool includeBuildUUIDs,
                                              int options);
-
+    /*
+     * SERVER-70433 Remove 'tenantId' as parameter.
+     */
     virtual void dropIndex(const std::string& ns,
                            BSONObj keys,
-                           boost::optional<BSONObj> writeConcernObj = boost::none);
+                           boost::optional<BSONObj> writeConcernObj = boost::none,
+                           boost::optional<TenantId> tenantId = boost::none);
     virtual void dropIndex(const std::string& ns,
                            const std::string& indexName,
-                           boost::optional<BSONObj> writeConcernObj = boost::none);
+                           boost::optional<BSONObj> writeConcernObj = boost::none,
+                           boost::optional<TenantId> tenantId = boost::none);
 
     /**
      * Drops all indexes for the collection.

@@ -127,6 +127,8 @@ struct BenchRunOp {
     bool useWriteCmd = false;
     BSONObj writeConcern;
     BSONObj value;
+    BSONObj expectedDoc;
+    boost::optional<TenantId> tenantId;
 
     // Only used for find cmds when set greater than 0. A find operation will retrieve the latest
     // cluster time from the oplog and randomly chooses a time between that timestamp and

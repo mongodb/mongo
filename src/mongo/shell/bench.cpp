@@ -209,8 +209,11 @@ int runQueryWithReadCommands(DBClientBase* conn,
                              Milliseconds delayBeforeGetMore,
                              BSONObj readPrefObj,
                              BSONObj* objOut) {
-    const auto dbName =
-        findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).db().toString();
+    const auto dbName = findCommand->getNamespaceOrUUID()
+                            .nss()
+                            .value_or(NamespaceString())
+                            .dbName()
+                            .toStringWithTenantId();
 
     BSONObj findCommandResult;
     BSONObj findCommandObj = findCommand->toBSON(readPrefObj);
@@ -380,7 +383,7 @@ BenchRunOp opFromBson(const BSONObj& op) {
         auto name = arg.fieldNameStringData();
         if (name == "batchSize") {
             uassert(34377,
-                    str::stream() << "Field 'batchSize' should be a number, instead it's type: "
+                    str::stream() << "Field 'batchSize' should be a number, instead it's of type: "
                                   << typeName(arg.type()),
                     arg.isNumber());
             uassert(34378,
@@ -399,13 +402,13 @@ BenchRunOp opFromBson(const BSONObj& op) {
             myOp.context = arg.Obj();
         } else if (name == "cpuFactor") {
             uassert(40436,
-                    str::stream() << "Field 'cpuFactor' should be a number, instead it's type: "
+                    str::stream() << "Field 'cpuFactor' should be a number, instead it's of type: "
                                   << typeName(arg.type()),
                     arg.isNumber());
             myOp.cpuFactor = arg.numberDouble();
         } else if (name == "delay") {
             uassert(34379,
-                    str::stream() << "Field 'delay' should be a number, instead it's type: "
+                    str::stream() << "Field 'delay' should be a number, instead it's of type: "
                                   << typeName(arg.type()),
                     arg.isNumber());
             myOp.delay = arg.numberInt();
@@ -418,14 +421,21 @@ BenchRunOp opFromBson(const BSONObj& op) {
             myOp.doc = arg.Obj();
         } else if (name == "expected") {
             uassert(34380,
-                    str::stream() << "Field 'Expected' should be a number, instead it's type: "
+                    str::stream() << "Field 'expected' should be a number, instead it's of type: "
                                   << typeName(arg.type()),
                     arg.isNumber());
             uassert(34400,
-                    str::stream() << "Field 'Expected' only valid for find op type. Type is "
+                    str::stream() << "Field 'expected' only valid for find op type. Type is "
                                   << opType,
                     (opType == "find") || (opType == "query"));
             myOp.expected = arg.numberInt();
+        } else if (name == "expectedDoc") {
+            uassert(
+                7056700,
+                str::stream() << "Field 'expectedDoc' should be an object, instead it's of type: "
+                              << typeName(arg.type()),
+                arg.isABSONObj());
+            myOp.expectedDoc = arg.Obj();
         } else if (name == "filter") {
             uassert(
                 34401,
@@ -450,7 +460,7 @@ BenchRunOp opFromBson(const BSONObj& op) {
                                   << opType,
                     (opType == "find") || (opType == "query"));
             uassert(ErrorCodes::BadValue,
-                    str::stream() << "Field 'limit' should be a number, instead it's type: "
+                    str::stream() << "Field 'limit' should be a number, instead it's of type: "
                                   << typeName(arg.type()),
                     arg.isNumber());
             myOp.limit = arg.numberInt();
@@ -463,13 +473,20 @@ BenchRunOp opFromBson(const BSONObj& op) {
             myOp.multi = arg.trueValue();
         } else if (name == "ns") {
             uassert(34385,
-                    str::stream() << "Field 'ns' should be a string, instead it's type: "
+                    str::stream() << "Field 'ns' should be a string, instead it's of type: "
                                   << typeName(arg.type()),
                     arg.type() == String);
             myOp.ns = arg.String();
+        } else if (name == "tenantId") {
+            uassert(
+                7056701,
+                str::stream() << "Field 'tenantId' should be an ObjectId, instead it's of type: "
+                              << typeName(arg.type()),
+                arg.type() == jstOID);
+            myOp.tenantId = TenantId{arg.OID()};
         } else if (name == "op") {
             uassert(ErrorCodes::BadValue,
-                    str::stream() << "Field 'op' is not a string, instead it's type: "
+                    str::stream() << "Field 'op' is not a string, instead it's of type: "
                                   << typeName(arg.type()),
                     arg.type() == String);
             auto type = arg.valueStringData();
@@ -1009,6 +1026,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             findCommand->setLimit(1LL);
             findCommand->setSingleBatch(true);
             findCommand->setSort(this->sort);
+            findCommand->setDollarTenant(this->tenantId);
             if (config.useSnapshotReads) {
                 findCommand->setReadConcern(readConcernSnapshot);
             }
@@ -1029,6 +1047,16 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                                      readPrefObj,
                                      &result);
             LOGV2_DEBUG(22796, 5, "Result from benchRun thread [findOne]", "result"_attr = result);
+
+            if (!this->expectedDoc.isEmpty() && this->expectedDoc.woCompare(result) != 0) {
+                LOGV2_INFO(7056702,
+                           "Bench 'findOne' on: {namespace} expected: {expected} got: {got}",
+                           "Bench 'findOne' on namespace got different results then expected",
+                           "namespace"_attr = this->ns,
+                           "expected"_attr = this->expectedDoc,
+                           "got"_attr = result);
+                verify(false);
+            }
         } break;
         case OpType::COMMAND: {
             bool ok;
@@ -1094,6 +1122,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             if (!this->sort.isEmpty()) {
                 findCommand->setSort(this->sort);
             }
+            findCommand->setDollarTenant(this->tenantId);
+
             BSONObjBuilder readConcernBuilder;
             if (config.useSnapshotReads) {
                 readConcernBuilder.append("level", "snapshot");
@@ -1132,8 +1162,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
 
             if (this->expected >= 0 && count != this->expected) {
                 LOGV2_INFO(22797,
-                           "Bench query on: {namespace} expected: {expected} got: {got}",
-                           "Bench query on namespace got diffrent results then expected",
+                           "Bench 'find' on: {namespace} expected: {expected} got: {got}",
+                           "Bench 'find' on namespace got different results then expected",
                            "namespace"_attr = this->ns,
                            "expected"_attr = this->expected,
                            "got"_attr = count);
@@ -1149,6 +1179,10 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
 
                 BSONObjBuilder builder;
                 builder.append("update", nsToCollectionSubstring(this->ns));
+                if (this->tenantId) {
+                    this->tenantId->serializeToBSON("$tenant"_sd, &builder);
+                }
+
                 BSONArrayBuilder updateArray(builder.subarrayStart("updates"));
                 {
                     BSONObjBuilder singleUpdate;
@@ -1215,6 +1249,10 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 BSONObj insertDoc;
                 BSONObjBuilder builder;
                 builder.append("insert", nsToCollectionSubstring(this->ns));
+                if (this->tenantId) {
+                    this->tenantId->serializeToBSON("$tenant"_sd, &builder);
+                }
+
                 BSONArrayBuilder docBuilder(builder.subarrayStart("documents"));
                 if (this->isDocAnArray) {
                     for (const auto& element : this->doc) {
@@ -1251,6 +1289,10 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 BSONObj predicate = fixQuery(this->query, *state->bsonTemplateEvaluator);
                 BSONObjBuilder builder;
                 builder.append("delete", nsToCollectionSubstring(this->ns));
+                if (this->tenantId) {
+                    this->tenantId->serializeToBSON("$tenant"_sd, &builder);
+                }
+
                 BSONArrayBuilder docBuilder(builder.subarrayStart("deletes"));
                 int limit = (this->multi == true) ? 0 : 1;
                 docBuilder.append(BSON("q" << predicate << "limit" << limit));
@@ -1274,10 +1316,11 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 22801, 5, "Result from benchRun thread [safe remove]", "result"_attr = result);
         } break;
         case OpType::CREATEINDEX:
-            conn->createIndex(this->ns, this->key);
+            conn->createIndex(
+                this->ns, this->key, boost::none /* writeConcernObj */, this->tenantId);
             break;
         case OpType::DROPINDEX:
-            conn->dropIndex(this->ns, this->key);
+            conn->dropIndex(this->ns, this->key, boost::none /* writeConcernObj */, this->tenantId);
             break;
         case OpType::LET: {
             BSONObjBuilder templateBuilder;

@@ -220,7 +220,6 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
     appendMetadata(opCtx, _metadataWriter, _apiParameters, request);
     auto requestMsg = request.serialize();
-
     Message replyMsg;
 
     try {
@@ -838,20 +837,26 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
 
 void DBClientBase::dropIndex(const string& ns,
                              BSONObj keys,
-                             boost::optional<BSONObj> writeConcernObj) {
-    dropIndex(ns, genIndexName(keys), writeConcernObj);
+                             boost::optional<BSONObj> writeConcernObj,
+                             boost::optional<TenantId> tenantId) {
+    dropIndex(ns, genIndexName(keys), writeConcernObj, tenantId);
 }
 
 
 void DBClientBase::dropIndex(const string& ns,
                              const string& indexName,
-                             boost::optional<BSONObj> writeConcernObj) {
+                             boost::optional<BSONObj> writeConcernObj,
+                             boost::optional<TenantId> tenantId) {
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("dropIndexes", nsToCollectionSubstring(ns));
     cmdBuilder.append("index", indexName);
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
+    if (tenantId) {
+        tenantId->serializeToBSON("$tenant"_sd, &cmdBuilder);
+    }
+
     BSONObj info;
     if (!runCommand(nsToDatabase(ns), cmdBuilder.obj(), info)) {
         LOGV2_DEBUG(20118,
@@ -905,9 +910,14 @@ string DBClientBase::genIndexName(const BSONObj& keys) {
 
 void DBClientBase::createIndexes(StringData ns,
                                  const std::vector<const IndexSpec*>& descriptors,
-                                 boost::optional<BSONObj> writeConcernObj) {
+                                 boost::optional<BSONObj> writeConcernObj,
+                                 boost::optional<TenantId> tenantId) {
     BSONObjBuilder command;
     command.append("createIndexes", nsToCollectionSubstring(ns));
+    if (tenantId) {
+        tenantId->serializeToBSON("$tenant", &command);
+    }
+
     {
         BSONArrayBuilder indexes(command.subarrayStart("indexes"));
         for (const auto& desc : descriptors) {
@@ -929,9 +939,14 @@ void DBClientBase::createIndexes(StringData ns,
 
 void DBClientBase::createIndexes(StringData ns,
                                  const std::vector<BSONObj>& specs,
-                                 boost::optional<BSONObj> writeConcernObj) {
+                                 boost::optional<BSONObj> writeConcernObj,
+                                 boost::optional<TenantId> tenantId) {
     BSONObjBuilder command;
     command.append("createIndexes", nsToCollectionSubstring(ns));
+    if (tenantId) {
+        tenantId->serializeToBSON("$tenant", &command);
+    }
+
     {
         BSONArrayBuilder indexes(command.subarrayStart("indexes"));
         for (const auto& spec : specs) {
