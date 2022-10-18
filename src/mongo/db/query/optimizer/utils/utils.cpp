@@ -33,7 +33,6 @@
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
@@ -182,167 +181,6 @@ CollationSplitResult splitCollationSpec(const ProjectionName& ridProjName,
     }
 
     return {true /*validSplit*/, std::move(leftCollationSpec), std::move(rightCollationSpec)};
-}
-/**
- * Helper class used to extract variable references from a node.
- */
-class NodeVariableTracker {
-public:
-    template <typename T, typename... Ts>
-    VariableNameSetType walk(const T&, Ts&&...) {
-        static_assert(!std::is_base_of_v<Node, T>, "Nodes must implement variable tracking");
-
-        // Default case: no variables.
-        return {};
-    }
-
-    VariableNameSetType walk(const ScanNode& /*node*/, const ABT& /*binds*/) {
-        return {};
-    }
-
-    VariableNameSetType walk(const ValueScanNode& /*node*/, const ABT& /*binds*/) {
-        return {};
-    }
-
-    VariableNameSetType walk(const PhysicalScanNode& /*node*/, const ABT& /*binds*/) {
-        return {};
-    }
-
-    VariableNameSetType walk(const CoScanNode& /*node*/) {
-        return {};
-    }
-
-    VariableNameSetType walk(const IndexScanNode& /*node*/, const ABT& /*binds*/) {
-        return {};
-    }
-
-    VariableNameSetType walk(const SeekNode& /*node*/, const ABT& /*binds*/, const ABT& refs) {
-        return extractFromABT(refs);
-    }
-
-    VariableNameSetType walk(const MemoLogicalDelegatorNode& /*node*/) {
-        return {};
-    }
-
-    VariableNameSetType walk(const MemoPhysicalDelegatorNode& /*node*/) {
-        return {};
-    }
-
-    VariableNameSetType walk(const FilterNode& /*node*/, const ABT& /*child*/, const ABT& expr) {
-        return extractFromABT(expr);
-    }
-
-    VariableNameSetType walk(const EvaluationNode& /*node*/,
-                             const ABT& /*child*/,
-                             const ABT& expr) {
-        return extractFromABT(expr);
-    }
-
-    VariableNameSetType walk(const SargableNode& /*node*/,
-                             const ABT& /*child*/,
-                             const ABT& /*binds*/,
-                             const ABT& refs) {
-        return extractFromABT(refs);
-    }
-
-    VariableNameSetType walk(const RIDIntersectNode& /*node*/,
-                             const ABT& /*leftChild*/,
-                             const ABT& /*rightChild*/) {
-        return {};
-    }
-
-    VariableNameSetType walk(const BinaryJoinNode& /*node*/,
-                             const ABT& /*leftChild*/,
-                             const ABT& /*rightChild*/,
-                             const ABT& expr) {
-        return extractFromABT(expr);
-    }
-
-    VariableNameSetType walk(const HashJoinNode& /*node*/,
-                             const ABT& /*leftChild*/,
-                             const ABT& /*rightChild*/,
-                             const ABT& refs) {
-        return extractFromABT(refs);
-    }
-
-    VariableNameSetType walk(const MergeJoinNode& /*node*/,
-                             const ABT& /*leftChild*/,
-                             const ABT& /*rightChild*/,
-                             const ABT& refs) {
-        return extractFromABT(refs);
-    }
-
-    VariableNameSetType walk(const UnionNode& /*node*/,
-                             const ABTVector& /*children*/,
-                             const ABT& /*binder*/,
-                             const ABT& refs) {
-        return extractFromABT(refs);
-    }
-
-    VariableNameSetType walk(const GroupByNode& /*node*/,
-                             const ABT& /*child*/,
-                             const ABT& /*aggBinder*/,
-                             const ABT& aggRefs,
-                             const ABT& /*groupbyBinder*/,
-                             const ABT& groupbyRefs) {
-        VariableNameSetType result;
-        extractFromABT(result, aggRefs);
-        extractFromABT(result, groupbyRefs);
-        return result;
-    }
-
-    VariableNameSetType walk(const UnwindNode& /*node*/,
-                             const ABT& /*child*/,
-                             const ABT& /*binds*/,
-                             const ABT& refs) {
-        return extractFromABT(refs);
-    }
-
-    VariableNameSetType walk(const UniqueNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
-        return extractFromABT(refs);
-    }
-
-    VariableNameSetType walk(const CollationNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
-        return extractFromABT(refs);
-    }
-
-    VariableNameSetType walk(const LimitSkipNode& /*node*/, const ABT& /*child*/) {
-        return {};
-    }
-
-    VariableNameSetType walk(const ExchangeNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
-        return extractFromABT(refs);
-    }
-
-    VariableNameSetType walk(const RootNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
-        return extractFromABT(refs);
-    }
-
-    static VariableNameSetType collect(const ABT& n) {
-        NodeVariableTracker tracker;
-        return algebra::walk<false>(n, tracker);
-    }
-
-private:
-    void extractFromABT(VariableNameSetType& vars, const ABT& v) {
-        const auto& result = VariableEnvironment::getVariables(v);
-        for (const Variable& var : result._variables) {
-            if (result._definedVars.count(var.name()) == 0) {
-                // We are interested in either free variables, or variables defined on other nodes.
-                vars.insert(var.name());
-            }
-        }
-    }
-
-    VariableNameSetType extractFromABT(const ABT& v) {
-        VariableNameSetType result;
-        extractFromABT(result, v);
-        return result;
-    }
-};
-
-VariableNameSetType collectVariableReferences(const ABT& n) {
-    return NodeVariableTracker::collect(n);
 }
 
 PartialSchemaReqConversion::PartialSchemaReqConversion(PartialSchemaRequirements reqMap)
@@ -913,12 +751,13 @@ public:
 
 bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
                                    const IndexPathSet& nonMultiKeyPaths,
-                                   PartialSchemaRequirements& reqMap) {
+                                   PartialSchemaRequirements& reqMap,
+                                   const ConstFoldFn& constFold) {
     PartialSchemaRequirements result;
     boost::optional<std::pair<PartialSchemaKey, PartialSchemaRequirement>> prevEntry;
 
-    const auto intersectFn = [](IntervalReqExpr::Node& intervals) {
-        auto intersected = intersectDNFIntervals(intervals);
+    const auto intersectFn = [&constFold](IntervalReqExpr::Node& intervals) {
+        auto intersected = intersectDNFIntervals(intervals, constFold);
         if (!intersected) {
             // Empty interval.
             return false;
@@ -1167,7 +1006,8 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
                                          const bool fastNullHandling,
-                                         bool& hasEmptyInterval) {
+                                         bool& hasEmptyInterval,
+                                         const ConstFoldFn& constFold) {
     // Contains one instance for each unmatched key.
     PartialSchemaKeySet unsatisfiedKeysInitial;
     for (const auto& [key, req] : reqMap) {
@@ -1181,7 +1021,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
             return {};
         }
 
-        if (!fastNullHandling && !req.getIsPerfOnly() && req.mayReturnNull()) {
+        if (!fastNullHandling && !req.getIsPerfOnly() && req.mayReturnNull(constFold)) {
             // We cannot use indexes to return values for fields if we have an interval with null
             // bounds.
             return {};
@@ -1208,7 +1048,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
             }
 
             const PartialSchemaRequirement& req = indexKeyIt->second;
-            if (!fastNullHandling && req.getIsPerfOnly() && req.mayReturnNull()) {
+            if (!fastNullHandling && req.getIsPerfOnly() && req.mayReturnNull(constFold)) {
                 // Skip over perf only requirements which may return Null.
                 break;
             }
@@ -1362,9 +1202,13 @@ boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
  */
 class PartialSchemaReqMayContainNullTransport {
 public:
-    bool transport(const IntervalReqExpr::Atom& node) {
+    bool transport(const IntervalReqExpr::Atom& node, const ConstFoldFn& constFold) {
         const auto& interval = node.getExpr();
 
+        const auto foldFn = [&constFold](ABT expr) {
+            constFold(expr);
+            return expr;
+        };
         if (const auto& lowBound = interval.getLowBound();
             foldFn(make<BinaryOp>(lowBound.isInclusive() ? Operations::Gt : Operations::Gte,
                                   lowBound.getBound(),
@@ -1383,32 +1227,27 @@ public:
         return true;
     }
 
-    bool transport(const IntervalReqExpr::Conjunction& node, std::vector<bool> childResults) {
+    bool transport(const IntervalReqExpr::Conjunction& node,
+                   const ConstFoldFn& constFold,
+                   std::vector<bool> childResults) {
         return std::all_of(
             childResults.cbegin(), childResults.cend(), [](const bool v) { return v; });
     }
 
-    bool transport(const IntervalReqExpr::Disjunction& node, std::vector<bool> childResults) {
+    bool transport(const IntervalReqExpr::Disjunction& node,
+                   const ConstFoldFn& constFold,
+                   std::vector<bool> childResults) {
         return std::any_of(
             childResults.cbegin(), childResults.cend(), [](const bool v) { return v; });
     }
 
-    bool check(const IntervalReqExpr::Node& intervals) {
-        return algebra::transport<false>(intervals, *this);
+    bool check(const IntervalReqExpr::Node& intervals, const ConstFoldFn& constFold) {
+        return algebra::transport<false>(intervals, *this, constFold);
     }
-
-private:
-    ABT foldFn(ABT expr) {
-        // Performs constant folding.
-        VariableEnvironment env = VariableEnvironment::build(expr);
-        ConstEval instance(env);
-        instance.optimize(expr);
-        return expr;
-    };
 };
 
-bool checkMaybeHasNull(const IntervalReqExpr::Node& intervals) {
-    return PartialSchemaReqMayContainNullTransport{}.check(intervals);
+bool checkMaybeHasNull(const IntervalReqExpr::Node& intervals, const ConstFoldFn& constFold) {
+    return PartialSchemaReqMayContainNullTransport{}.check(intervals, constFold);
 }
 
 class PartialSchemaReqLowerTransport {

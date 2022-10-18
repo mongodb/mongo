@@ -28,9 +28,9 @@
  */
 
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
 #include "mongo/unittest/golden_test.h"
+
 
 namespace mongo::optimizer {
 

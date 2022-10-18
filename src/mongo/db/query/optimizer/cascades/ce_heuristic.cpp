@@ -374,8 +374,7 @@ public:
     }
 
     CEType transport(const MemoLogicalDelegatorNode& node) {
-        return getPropertyConst<CardinalityEstimate>(
-                   _memo.getGroup(node.getGroupId())._logicalProperties)
+        return getPropertyConst<CardinalityEstimate>(_memo.getLogicalProps(node.getGroupId()))
             .getEstimate();
     }
 

@@ -152,8 +152,8 @@ bool PartialSchemaRequirement::getIsPerfOnly() const {
     return _isPerfOnly;
 }
 
-bool PartialSchemaRequirement::mayReturnNull() const {
-    return hasBoundProjectionName() && checkMaybeHasNull(getIntervals());
+bool PartialSchemaRequirement::mayReturnNull(const ConstFoldFn& constFold) const {
+    return hasBoundProjectionName() && checkMaybeHasNull(getIntervals(), constFold);
 };
 
 /**

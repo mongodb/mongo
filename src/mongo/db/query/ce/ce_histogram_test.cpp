@@ -31,6 +31,7 @@
 #include "mongo/db/query/ce/ce_test_utils.h"
 #include "mongo/db/query/ce/collection_statistics_mock.h"
 #include "mongo/db/query/ce/histogram_estimation.h"
+#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/unittest/unittest.h"
@@ -53,7 +54,7 @@ public:
 protected:
     std::unique_ptr<CEInterface> getCETransport() const override {
         // making a copy of CollecitonStatistics to override
-        return std::make_unique<CEHistogramTransport>(_stats);
+        return std::make_unique<CEHistogramTransport>(_stats, std::make_unique<HeuristicCE>());
     }
 
 private:

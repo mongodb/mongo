@@ -51,7 +51,7 @@ void combineIntervalsDNF(bool intersect,
  * TODO: handle generic interval expressions (not necessarily DNF).
  */
 boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
-    const IntervalReqExpr::Node& intervalDNF);
+    const IntervalReqExpr::Node& intervalDNF, const ConstFoldFn& constFold);
 
 /**
  * Combines a source interval over a single path with a target multi-component interval. The

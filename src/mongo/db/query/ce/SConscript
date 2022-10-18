@@ -5,10 +5,9 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="query_ce",
+    target="query_ce_histogram",
     source=[
         'ce_histogram.cpp',
-        'ce_sampling.cpp',
         'collection_statistics_impl.cpp',
         'histogram_estimation.cpp',
         'stats_catalog.cpp',
@@ -17,10 +16,21 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',
-        '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
         'query_stats',
         'stats_serialization',
+    ],
+)
+
+env.Library(
+    target="query_ce_sampling",
+    source=[
+        'ce_sampling.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
     ],
 )
 
@@ -56,9 +66,10 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values',
         '$BUILD_DIR/mongo/db/exec/sbe/sbe_abt_test_util',
-        '$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils',
+        '$BUILD_DIR/mongo/db/query/optimizer/unit_test_pipeline_utils',
         "$BUILD_DIR/mongo/unittest/unittest",
-        'query_ce',
+        'query_ce_histogram',
+        'query_ce_sampling',
         'query_stats',
     ],
 )
@@ -172,7 +183,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/pcre_wrapper',
-        'query_ce',
+        'query_ce_histogram',
         'query_stats',
         'stats_serialization',
     ],
@@ -188,7 +199,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
         'ce_test_utils',
-        'query_ce',
     ],
 )
 
@@ -216,7 +226,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/sbe/sbe_abt_test_util',
         "$BUILD_DIR/mongo/unittest/unittest",
-        'query_ce',
+        'query_ce_histogram',
         'query_stats',
         'query_stats_gen',
         'stats_serialization',

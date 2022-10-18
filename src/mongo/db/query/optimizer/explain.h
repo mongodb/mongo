@@ -30,17 +30,15 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/optimizer/cascades/memo_explain_interface.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
-namespace mongo::optimizer {
 
-namespace cascades {
-class Memo;
-}
+namespace mongo::optimizer {
 
 /**
  * This structure holds any data that is required by the BSON version of explain. It is
@@ -65,34 +63,35 @@ public:
     // whenever memo delegators are printed.
     static std::string explain(const ABT& node,
                                bool displayProperties = false,
-                               const cascades::Memo* memo = nullptr,
+                               const cascades::MemoExplainInterface* memoInterface = nullptr,
                                const NodeToGroupPropsMap& nodeMap = {});
 
     // Optionally display logical and physical properties using the memo.
     // whenever memo delegators are printed.
     static std::string explainV2(const ABT& node,
                                  bool displayProperties = false,
-                                 const cascades::Memo* memo = nullptr,
+                                 const cascades::MemoExplainInterface* memoInterface = nullptr,
                                  const NodeToGroupPropsMap& nodeMap = {});
 
     // Optionally display logical and physical properties using the memo.
     // whenever memo delegators are printed.
-    static std::string explainV2Compact(const ABT& node,
-                                        bool displayProperties = false,
-                                        const cascades::Memo* memo = nullptr,
-                                        const NodeToGroupPropsMap& nodeMap = {});
+    static std::string explainV2Compact(
+        const ABT& node,
+        bool displayProperties = false,
+        const cascades::MemoExplainInterface* memoInterface = nullptr,
+        const NodeToGroupPropsMap& nodeMap = {});
 
     static std::string explainNode(const ABT& node);
 
     static std::pair<sbe::value::TypeTags, sbe::value::Value> explainBSON(
         const ABT& node,
         bool displayProperties = false,
-        const cascades::Memo* memo = nullptr,
+        const cascades::MemoExplainInterface* memoInterface = nullptr,
         const NodeToGroupPropsMap& nodeMap = {});
 
     static BSONObj explainBSONObj(const ABT& node,
                                   bool displayProperties = false,
-                                  const cascades::Memo* memo = nullptr,
+                                  const cascades::MemoExplainInterface* memoInterface = nullptr,
                                   const NodeToGroupPropsMap& nodeMap = {});
 
     static std::string printBSON(sbe::value::TypeTags tag, sbe::value::Value val);
@@ -102,12 +101,12 @@ public:
     static std::string explainPhysProps(const std::string& description,
                                         const properties::PhysProps& props);
 
-    static std::string explainMemo(const cascades::Memo& memo);
+    static std::string explainMemo(const cascades::MemoExplainInterface& memoInterface);
 
     static std::pair<sbe::value::TypeTags, sbe::value::Value> explainMemoBSON(
-        const cascades::Memo& memo);
+        const cascades::MemoExplainInterface& memoInterface);
 
-    static BSONObj explainMemoBSONObj(const cascades::Memo& memo);
+    static BSONObj explainMemoBSONObj(const cascades::MemoExplainInterface& memoInterface);
 
     static std::string explainPartialSchemaReqMap(const PartialSchemaRequirements& reqMap);
 

@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/optimizer/metadata.h"
 
-#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/optimizer/node.h"
 
 
 namespace mongo::optimizer {
@@ -107,44 +107,28 @@ PartialSchemaRequirements& IndexDefinition::getPartialReqMap() {
     return _partialReqMap;
 }
 
-ScanDefinition::ScanDefinition() : ScanDefinition(OptionsMapType{}, {}) {}
-
-ScanDefinition::ScanDefinition(OptionsMapType options,
-                               opt::unordered_map<std::string, IndexDefinition> indexDefs)
-    : ScanDefinition(std::move(options),
-                     std::move(indexDefs),
+ScanDefinition::ScanDefinition()
+    : ScanDefinition({} /*options*/,
+                     {} /*indexDefs*/,
+                     {} /*nonMultiKeyPathSet*/,
                      {DistributionType::Centralized},
-                     true /*exists*/) {}
+                     true /*exists*/,
+                     -1.0 /*ce*/) {}
 
-ScanDefinition::ScanDefinition(OptionsMapType options,
+ScanDefinition::ScanDefinition(ScanDefOptions options,
                                opt::unordered_map<std::string, IndexDefinition> indexDefs,
+                               IndexPathSet nonMultiKeyPathSet,
                                DistributionAndPaths distributionAndPaths,
                                const bool exists,
                                const CEType ce)
     : _options(std::move(options)),
       _distributionAndPaths(std::move(distributionAndPaths)),
       _indexDefs(std::move(indexDefs)),
+      _nonMultiKeyPathSet(std::move(nonMultiKeyPathSet)),
       _exists(exists),
-      _ce(ce) {
-    // Collect non-multiKeyPaths from each index.
-    for (const auto& [indexDefName, indexDef] : _indexDefs) {
-        for (const auto& collation : indexDef.getCollationSpec()) {
-            if (!checkPathContainsTraverse(collation._path)) {
-                _nonMultiKeyPathSet.insert(collation._path);
-            }
-        }
-    }
+      _ce(ce) {}
 
-    // Simplify partial filter requirements using the non-multikey paths.
-    for (auto& [indexDefName, indexDef] : _indexDefs) {
-        [[maybe_unused]] const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
-            "" /*scanProjName*/, _nonMultiKeyPathSet, indexDef.getPartialReqMap());
-        // If "hasEmptyInterval" is set, we have a partial filter index with an unsatisfiable
-        // condition, which is thus guaranteed to never contain any documents.
-    }
-}
-
-const ScanDefinition::OptionsMapType& ScanDefinition::getOptionsMap() const {
+const ScanDefOptions& ScanDefinition::getOptionsMap() const {
     return _options;
 }
 

@@ -29,11 +29,11 @@
 
 
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
-#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
-#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
 #include "mongo/unittest/golden_test.h"
+
 
 namespace mongo::optimizer {
 
@@ -51,7 +51,7 @@ TEST(ABTTranslate, OptimizePipelineTests) {
         "collection",
         {OptPhase::MemoSubstitutionPhase},
         {{{"collection",
-           ScanDefinition{{}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}});
+           createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -61,7 +61,7 @@ TEST(ABTTranslate, OptimizePipelineTests) {
         "collection",
         {OptPhase::MemoSubstitutionPhase},
         {{{"collection",
-           ScanDefinition{{}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}});
+           createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -99,7 +99,8 @@ TEST(ABTTranslate, OptimizePipelineTests) {
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
-        {{{"collection", ScanDefinition{{}, {}, {DistributionType::UnknownPartitioning}}}},
+        {{{"collection",
+           createScanDef({}, {}, ConstEval::constFold, {DistributionType::UnknownPartitioning})}},
          5 /*numberOfPartitions*/});
 
     testABTTranslationAndOptimization(gctx,
@@ -117,7 +118,7 @@ TEST(ABTTranslate, OptimizePipelineTests) {
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         {{{"collection",
-           ScanDefinition{{}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}});
+           createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -130,11 +131,11 @@ TEST(ABTTranslate, OptimizePipelineTests) {
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         {{{"collection",
-           ScanDefinition{
+           createScanDef(
                {},
                {{"index1",
                  IndexDefinition{{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending}}},
-                                 false /*multiKey*/}}}}}}});
+                                 false /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -147,11 +148,11 @@ TEST(ABTTranslate, OptimizePipelineTests) {
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         {{{"collection",
-           ScanDefinition{
+           createScanDef(
                {},
                {{"index1",
                  IndexDefinition{{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending}}},
-                                 false /*multiKey*/}}}}}}});
+                                 false /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -164,12 +165,12 @@ TEST(ABTTranslate, OptimizePipelineTests) {
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         {{{"collection",
-           ScanDefinition{
+           createScanDef(
                {},
                {{"index1",
                  IndexDefinition{{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                    {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}}},
-                                 false /*multiKey*/}}}}}}});
+                                 false /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -182,13 +183,13 @@ TEST(ABTTranslate, OptimizePipelineTests) {
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         {{{"collection",
-           ScanDefinition{
+           createScanDef(
                {},
                {{"index1",
                  IndexDefinition{{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                    {makeNonMultikeyIndexPath("b"), CollationOp::Ascending},
                                    {makeNonMultikeyIndexPath("c"), CollationOp::Ascending}}},
-                                 false /*multiKey*/}}}}}}});
+                                 false /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -201,13 +202,13 @@ TEST(ABTTranslate, OptimizePipelineTests) {
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         {{{"collection",
-           ScanDefinition{
+           createScanDef(
                {},
                {{"index1",
                  IndexDefinition{{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                    {makeNonMultikeyIndexPath("b"), CollationOp::Ascending},
                                    {makeNonMultikeyIndexPath("c"), CollationOp::Ascending}}},
-                                 false /*multiKey*/}}}}}}});
+                                 false /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -218,7 +219,7 @@ TEST(ABTTranslate, OptimizePipelineTests) {
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         {{{"collection",
-           ScanDefinition{{}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}});
+           createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -229,7 +230,7 @@ TEST(ABTTranslate, OptimizePipelineTests) {
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         {{{"collection",
-           ScanDefinition{{}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}},
+           createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}},
         {},
         true);
 
@@ -242,11 +243,11 @@ TEST(ABTTranslate, OptimizePipelineTests) {
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         {{{"collection",
-           ScanDefinition{{},
-                          {{"index1",
-                            IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending},
-                                             {makeIndexPath("b"), CollationOp::Ascending}},
-                                            true /*multiKey*/}}}}}}});
+           createScanDef({},
+                         {{"index1",
+                           IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending},
+                                            {makeIndexPath("b"), CollationOp::Ascending}},
+                                           true /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -258,7 +259,7 @@ TEST(ABTTranslate, OptimizePipelineTests) {
          OptPhase::MemoImplementationPhase,
          OptPhase::ConstEvalPost},
         {{{"collection",
-           ScanDefinition{{}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}});
+           createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -289,7 +290,7 @@ TEST(ABTTranslate, OptimizePipelineTests) {
         "[{$project: {foo: {$add: ['$b', 1]}, bar: {$add: ['$b', 1]}}}]",
         "test",
         {OptPhase::ConstEvalPre},
-        {{{"test", {{}, {}}}}});
+        {{{"test", createScanDef({}, {})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -303,7 +304,7 @@ TEST(ABTTranslate, OptimizePipelineTests) {
          OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
-        {{{"test", {{}, {}}}}});
+        {{{"test", createScanDef({}, {})}}});
 
     testABTTranslationAndOptimization(
         gctx,
@@ -311,7 +312,7 @@ TEST(ABTTranslate, OptimizePipelineTests) {
         "[{$match: {a: {$elemMatch: {$gte: 5, $lte: 6}}, b: {$elemMatch: {$gte: 1, $lte: 3}}}}]",
         "test",
         {OptPhase::MemoSubstitutionPhase},
-        {{{"test", {{}, {}}}}},
+        {{{"test", createScanDef({}, {})}}},
         defaultConvertPathToInterval);
 }
 
@@ -335,12 +336,12 @@ TEST(ABTTranslate, PartialIndex) {
     ASSERT_FALSE(conversionResult->_retainPredicate);
     Metadata metadata = {
         {{scanDefName,
-          ScanDefinition{{},
-                         {{"index1",
-                           IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending}},
-                                           true /*multiKey*/,
-                                           {DistributionType::Centralized},
-                                           std::move(conversionResult->_reqMap)}}}}}}};
+          createScanDef({},
+                        {{"index1",
+                          IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending}},
+                                          true /*multiKey*/,
+                                          {DistributionType::Centralized},
+                                          std::move(conversionResult->_reqMap)}}})}}};
 
     testABTTranslationAndOptimization(
         gctx,

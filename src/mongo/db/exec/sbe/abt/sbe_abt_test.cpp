@@ -30,8 +30,10 @@
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
+#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
@@ -465,10 +467,11 @@ TEST_F(NodeSBE, RequireRID) {
     OptPhaseManager phaseManager(OptPhaseManager::getAllRewritesSet(),
                                  prefixId,
                                  true /*requireRID*/,
-                                 {{{"test", ScanDefinition{{}, {}}}}},
+                                 {{{"test", createScanDef({}, {})}}},
                                  std::make_unique<HeuristicCE>(),
                                  std::make_unique<DefaultCosting>(),
                                  {} /*pathToInterval*/,
+                                 ConstEval::constFold,
                                  DebugInfo::kDefaultForTests);
 
     phaseManager.optimize(tree);

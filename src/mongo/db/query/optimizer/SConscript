@@ -13,53 +13,135 @@ env.SConscript(
     ],
 )
 
+# Core definitions: ABT, Logical and physical properties, Metadata, and core utilities.
 env.Library(
-    target="optimizer",
+    target="optimizer_base",
     source=[
-        "cascades/ce_heuristic.cpp",
-        "cascades/ce_hinted.cpp",
-        "cascades/cost_derivation.cpp",
-        "cascades/cost_model.idl",
-        "cascades/enforcers.cpp",
-        "cascades/implementers.cpp",
-        "cascades/logical_props_derivation.cpp",
-        "cascades/logical_rewriter.cpp",
-        "cascades/memo.cpp",
-        "cascades/physical_rewriter.cpp",
-        "cascades/rewrite_queues.cpp",
         "defs.cpp",
         "explain.cpp",
         "index_bounds.cpp",
         "metadata.cpp",
         "node.cpp",
-        "opt_phase_manager.cpp",
         "props.cpp",
         "reference_tracker.cpp",
-        "rewrites/const_eval.cpp",
-        "rewrites/path.cpp",
-        "rewrites/path_lower.cpp",
         "syntax/expr.cpp",
         "utils/abt_hash.cpp",
-        'utils/ce_math.cpp',
+        "utils/ce_math.cpp",
         "utils/interval_utils.cpp",
-        "utils/memo_utils.cpp",
+        "utils/reftracker_utils.cpp",
         "utils/utils.cpp",
     ],
     LIBDEPS=[
+        # We should only depend on SBE for value representation and basic arithmetic for constant folding.
         "$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values",
     ],
 )
 
+# Memo, and related utilities.
+env.Library(
+    target="optimizer_memo",
+    source=[
+        "cascades/memo.cpp",
+        "cascades/memo_defs.cpp",
+        "cascades/rewrite_queues.cpp",
+        "utils/memo_utils.cpp",
+    ],
+    LIBDEPS=[
+        "optimizer_base",
+    ],
+)
+
+# Cascades rewrites.
+env.Library(
+    target="optimizer_cascades",
+    source=[
+        "cascades/enforcers.cpp",
+        "cascades/logical_props_derivation.cpp",
+        "cascades/implementers.cpp",
+        "cascades/logical_rewriter.cpp",
+        "cascades/physical_rewriter.cpp",
+    ],
+    LIBDEPS=[
+        "optimizer_memo",
+    ],
+)
+
+# Rewrites which manipulate the ABT directly.
+env.Library(
+    target="optimizer_rewrites",
+    source=[
+        "rewrites/const_eval.cpp",
+        "rewrites/path.cpp",
+        "rewrites/path_lower.cpp",
+    ],
+    LIBDEPS=[
+        "optimizer_base",
+    ],
+)
+
+# Default CE: heuristic and hinted.
+env.Library(
+    target="optimizer_default_ce",
+    source=[
+        "cascades/ce_heuristic.cpp",
+        "cascades/ce_hinted.cpp",
+    ],
+    LIBDEPS=[
+        "optimizer_memo",
+    ],
+)
+
+# Default costing module.
+env.Library(
+    target="optimizer_default_costing",
+    source=[
+        "cascades/cost_derivation.cpp",
+        "cascades/cost_model.idl",
+    ],
+    LIBDEPS=[
+        "optimizer_memo",
+    ],
+)
+
+# Main optimizer target.
+env.Library(
+    target="optimizer",
+    source=[
+        "metadata_factory.cpp",
+        "opt_phase_manager.cpp",
+    ],
+    LIBDEPS=[
+        "optimizer_cascades",
+        "optimizer_default_ce",
+        "optimizer_default_costing",
+        "optimizer_rewrites",
+    ],
+)
+
+# Lightweight test utils.
 env.Library(
     target="unit_test_utils",
     source=[
         "utils/unit_test_utils.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        # We do not depend on the entire pipeline target.
+        "$BUILD_DIR/mongo/db/pipeline/abt_utils",
         "$BUILD_DIR/mongo/db/query/optimizer/optimizer",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/unittest/unittest",
+    ],
+)
+
+# Heavyweight test utils (depend on pipeline).
+env.Library(
+    target="unit_test_pipeline_utils",
+    source=[
+        "utils/unit_test_pipeline_utils.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "unit_test_utils",
     ],
 )
 
@@ -71,11 +153,20 @@ env.CppUnitTest(
         "physical_rewriter_optimizer_test.cpp",
         "reference_tracker_test.cpp",
         "rewrites/path_optimizer_test.cpp",
+    ],
+    LIBDEPS=[
+        "unit_test_utils",
+    ],
+)
+
+env.CppUnitTest(
+    target='interval_intersection_test',
+    source=[
         "interval_intersection_test.cpp",
     ],
     LIBDEPS=[
         "optimizer",
-        "unit_test_utils",
+        "unit_test_pipeline_utils",
     ],
 )
 
@@ -85,7 +176,6 @@ env.CppUnitTest(
         "optimizer_failure_test.cpp",
     ],
     LIBDEPS=[
-        "optimizer",
         "unit_test_utils",
     ],
 )

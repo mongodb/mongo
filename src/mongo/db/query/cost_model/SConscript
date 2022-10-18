@@ -10,6 +10,6 @@ env.Library(
         'cost_model_manager.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_default_costing',
     ],
 )

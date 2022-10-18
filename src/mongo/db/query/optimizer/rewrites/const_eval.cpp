@@ -76,6 +76,12 @@ bool ConstEval::optimize(ABT& n) {
     return _changed;
 }
 
+void ConstEval::constFold(ABT& n) {
+    VariableEnvironment env = VariableEnvironment::build(n);
+    ConstEval instance(env);
+    instance.optimize(n);
+}
+
 void ConstEval::removeUnusedEvalNodes() {
     for (auto&& [k, v] : _projectRefs) {
         if (v.size() == 0) {

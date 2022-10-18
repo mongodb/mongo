@@ -31,7 +31,6 @@
 
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/query/cqf_command_utils.h"
-#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
@@ -51,7 +50,7 @@ public:
         : _memo(memo), _sampleSize(sampleSize), _phaseManager(phaseManager) {}
 
     void transport(ABT& n, const MemoLogicalDelegatorNode& node) {
-        n = extract(_memo.getGroup(node.getGroupId())._logicalNodes.at(0));
+        n = extract(_memo.getLogicalNodes(node.getGroupId()).front());
     }
 
     void transport(ABT& n, const ScanNode& /*node*/, ABT& /*binder*/) {
@@ -118,11 +117,12 @@ class CESamplingTransportImpl {
 public:
     CESamplingTransportImpl(OperationContext* opCtx,
                             OptPhaseManager phaseManager,
-                            const int64_t numRecords)
+                            const int64_t numRecords,
+                            std::unique_ptr<CEInterface> fallbackCE)
         : _phaseManager(std::move(phaseManager)),
           _opCtx(opCtx),
-          _heuristicCE(),
-          _sampleSize(std::min<int64_t>(numRecords, kMaxSampleSize)) {}
+          _sampleSize(std::min<int64_t>(numRecords, kMaxSampleSize)),
+          _fallbackCE(std::move(fallbackCE)) {}
 
     CEType transport(const ABT& n,
                      const FilterNode& node,
@@ -132,7 +132,7 @@ public:
                      CEType childResult,
                      CEType /*exprResult*/) {
         if (!hasProperty<IndexingAvailability>(logicalProps)) {
-            return _heuristicCE.deriveCE(metadata, memo, logicalProps, n.ref());
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
         }
 
         SamplingPlanExtractor planExtractor(memo, _phaseManager, _sampleSize);
@@ -151,7 +151,7 @@ public:
                      CEType /*bindResult*/,
                      CEType /*refsResult*/) {
         if (!hasProperty<IndexingAvailability>(logicalProps)) {
-            return _heuristicCE.deriveCE(metadata, memo, logicalProps, n.ref());
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
         }
 
         SamplingPlanExtractor planExtractor(memo, _phaseManager, _sampleSize);
@@ -196,7 +196,7 @@ public:
                      const LogicalProps& logicalProps,
                      Ts&&...) {
         if (canBeLogicalNode<T>()) {
-            return _heuristicCE.deriveCE(metadata, memo, logicalProps, n.ref());
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
         }
         return 0.0;
     }
@@ -223,7 +223,7 @@ private:
 
         const auto [success, selectivity] = estimateSelectivity(abtTree);
         if (!success) {
-            return _heuristicCE.deriveCE(metadata, memo, logicalProps, n.ref());
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
         }
 
         _selectivityCacheMap.emplace(std::move(abtTree), selectivity);
@@ -319,15 +319,16 @@ private:
     // We don't own this.
     OperationContext* _opCtx;
 
-    HeuristicCE _heuristicCE;
     const int64_t _sampleSize;
+    std::unique_ptr<CEInterface> _fallbackCE;
 };
 
 CESamplingTransport::CESamplingTransport(OperationContext* opCtx,
                                          OptPhaseManager phaseManager,
-                                         const int64_t numRecords)
-    : _impl(std::make_unique<CESamplingTransportImpl>(opCtx, std::move(phaseManager), numRecords)) {
-}
+                                         const int64_t numRecords,
+                                         std::unique_ptr<CEInterface> fallbackCE)
+    : _impl(std::make_unique<CESamplingTransportImpl>(
+          opCtx, std::move(phaseManager), numRecords, std::move(fallbackCE))) {}
 
 CESamplingTransport::~CESamplingTransport() {}
 

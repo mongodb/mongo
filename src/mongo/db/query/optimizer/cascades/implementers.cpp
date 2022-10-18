@@ -31,8 +31,11 @@
 
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
+#include "mongo/db/query/optimizer/utils/reftracker_utils.h"
+
 
 namespace mongo::optimizer::cascades {
 using namespace properties;
@@ -419,7 +422,7 @@ public:
 
         const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
         const GroupIdType scanGroupId = indexingAvailability.getScanGroupId();
-        const LogicalProps& scanLogicalProps = _memo.getGroup(scanGroupId)._logicalProperties;
+        const LogicalProps& scanLogicalProps = _memo.getLogicalProps(scanGroupId);
         const CEType scanGroupCE =
             getPropertyConst<CardinalityEstimate>(scanLogicalProps).getEstimate();
 
@@ -476,8 +479,7 @@ public:
 
             const auto& satisfiedPartialIndexes =
                 getPropertyConst<IndexingAvailability>(
-                    _memo.getGroup(requirements.getSatisfiedPartialIndexesGroupId())
-                        ._logicalProperties)
+                    _memo.getLogicalProps(requirements.getSatisfiedPartialIndexesGroupId()))
                     .getSatisfiedPartialIndexes();
 
             // Consider all candidate indexes, and check if they satisfy the collation and
@@ -734,8 +736,8 @@ public:
         const GroupIdType rightGroupId =
             node.getRightChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
 
-        const LogicalProps& leftLogicalProps = _memo.getGroup(leftGroupId)._logicalProperties;
-        const LogicalProps& rightLogicalProps = _memo.getGroup(rightGroupId)._logicalProperties;
+        const LogicalProps& leftLogicalProps = _memo.getLogicalProps(leftGroupId);
+        const LogicalProps& rightLogicalProps = _memo.getLogicalProps(rightGroupId);
 
         const CEType intersectedCE =
             getPropertyConst<CardinalityEstimate>(_logicalProps).getEstimate();
@@ -908,8 +910,8 @@ public:
         const GroupIdType rightGroupId =
             node.getRightChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
 
-        const LogicalProps& leftLogicalProps = _memo.getGroup(leftGroupId)._logicalProperties;
-        const LogicalProps& rightLogicalProps = _memo.getGroup(rightGroupId)._logicalProperties;
+        const LogicalProps& leftLogicalProps = _memo.getLogicalProps(leftGroupId);
+        const LogicalProps& rightLogicalProps = _memo.getLogicalProps(rightGroupId);
 
         const ProjectionNameSet& leftProjections =
             getPropertyConst<ProjectionAvailability>(leftLogicalProps).getProjections();
@@ -1645,7 +1647,8 @@ void addImplementers(const Metadata& metadata,
                      const QueryHints& hints,
                      const RIDProjectionsMap& ridProjections,
                      PrefixId& prefixId,
-                     PhysOptimizationResult& bestResult,
+                     const properties::PhysProps& physProps,
+                     PhysQueueAndImplPos& queue,
                      const properties::LogicalProps& logicalProps,
                      const OrderPreservingABTSet& logicalNodes,
                      const PathToIntervalFn& pathToInterval) {
@@ -1654,12 +1657,12 @@ void addImplementers(const Metadata& metadata,
                                   hints,
                                   ridProjections,
                                   prefixId,
-                                  bestResult._queue,
-                                  bestResult._physProps,
+                                  queue._queue,
+                                  physProps,
                                   logicalProps,
                                   pathToInterval);
-    while (bestResult._lastImplementedNodePos < logicalNodes.size()) {
-        logicalNodes.at(bestResult._lastImplementedNodePos++).visit(visitor);
+    while (queue._lastImplementedNodePos < logicalNodes.size()) {
+        logicalNodes.at(queue._lastImplementedNodePos++).visit(visitor);
     }
 }
 

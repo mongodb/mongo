@@ -60,6 +60,7 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                       std::make_unique<HeuristicCE>(),
                       std::make_unique<DefaultCosting>(),
                       {} /*pathToInterval*/,
+                      ConstEval::constFold,
                       std::move(debugInfo),
                       std::move(queryHints)) {}
 
@@ -70,6 +71,7 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  std::unique_ptr<CEInterface> ceDerivation,
                                  std::unique_ptr<CostingInterface> costDerivation,
                                  PathToIntervalFn pathToInterval,
+                                 ConstFoldFn constFold,
                                  DebugInfo debugInfo,
                                  QueryHints queryHints)
     : _phaseSet(std::move(phaseSet)),
@@ -81,6 +83,7 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
       _ceDerivation(std::move(ceDerivation)),
       _costDerivation(std::move(costDerivation)),
       _pathToInterval(std::move(pathToInterval)),
+      _constFold(std::move(constFold)),
       _physicalNodeId(),
       _requireRID(requireRID),
       _ridProjections(),
@@ -163,6 +166,7 @@ void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
                                           _debugInfo,
                                           _hints,
                                           _pathToInterval,
+                                          _constFold,
                                           *_logicalPropsDerivation,
                                           useHeuristicCE ? heuristicCE : *_ceDerivation);
     rootGroupId = logicalRewriter->addRootNode(input);
@@ -196,7 +200,7 @@ void OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
     // Also by default we do not require projections: the Root node will add those.
     PhysProps physProps = makePhysProps(DistributionRequirement(DistributionType::Centralized));
     if (_requireRID) {
-        const auto& rootLogicalProps = _memo.getGroup(rootGroupId)._logicalProperties;
+        const auto& rootLogicalProps = _memo.getLogicalProps(rootGroupId);
         tassert(6808705,
                 "We cannot optain rid for this query.",
                 hasProperty<IndexingAvailability>(rootLogicalProps));

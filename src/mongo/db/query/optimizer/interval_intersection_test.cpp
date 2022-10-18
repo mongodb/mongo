@@ -31,10 +31,11 @@
 #include <vector>
 
 #include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
-#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/processinfo.h"
@@ -51,7 +52,7 @@ std::string optimizedQueryPlan(const std::string& query,
                                const opt::unordered_map<std::string, IndexDefinition>& indexes) {
     PrefixId prefixId;
     std::string scanDefName = "coll";
-    Metadata metadata = {{{scanDefName, ScanDefinition{{}, indexes}}}};
+    Metadata metadata = {{{scanDefName, createScanDef({}, indexes)}}};
     ABT translated =
         translatePipeline(metadata, "[{$match: " + query + "}]", scanDefName, prefixId);
 
@@ -382,6 +383,8 @@ TEST(IntervalIntersection, MultiFieldIntersection) {
 }
 
 TEST(IntervalIntersection, VariableIntervals) {
+    const auto constFold = ConstEval::constFold;
+
     {
         auto interval =
             IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
@@ -393,7 +396,7 @@ TEST(IntervalIntersection, VariableIntervals) {
                         BoundRequirement(false /*inclusive*/, make<Variable>("v2")),
                         BoundRequirement::makePlusInf()})})});
 
-        auto result = intersectDNFIntervals(interval);
+        auto result = intersectDNFIntervals(interval, constFold);
         ASSERT_TRUE(result);
 
         // (max(v1, v2), +inf) U [v2 >= v1 ? MaxKey : v1, max(v1, v2)]
@@ -412,7 +415,7 @@ TEST(IntervalIntersection, VariableIntervals) {
             ExplainGenerator::explainIntervalExpr(*result));
 
         // Make sure repeated intersection does not change the result.
-        auto result1 = intersectDNFIntervals(*result);
+        auto result1 = intersectDNFIntervals(*result, constFold);
         ASSERT_TRUE(result1);
         ASSERT_TRUE(*result == *result1);
     }
@@ -428,7 +431,7 @@ TEST(IntervalIntersection, VariableIntervals) {
                         BoundRequirement(true /*inclusive*/, make<Variable>("v2")),
                         BoundRequirement(true /*inclusive*/, make<Variable>("v4"))})})});
 
-        auto result = intersectDNFIntervals(interval);
+        auto result = intersectDNFIntervals(interval, constFold);
         ASSERT_TRUE(result);
 
         // [v1, v3] ^ [v2, v4] -> [max(v1, v2), min(v3, v4)]
@@ -442,7 +445,7 @@ TEST(IntervalIntersection, VariableIntervals) {
             ExplainGenerator::explainIntervalExpr(*result));
 
         // Make sure repeated intersection does not change the result.
-        auto result1 = intersectDNFIntervals(*result);
+        auto result1 = intersectDNFIntervals(*result, constFold);
         ASSERT_TRUE(result1);
         ASSERT_TRUE(*result == *result1);
     }
@@ -458,7 +461,7 @@ TEST(IntervalIntersection, VariableIntervals) {
                         BoundRequirement(true /*inclusive*/, make<Variable>("v2")),
                         BoundRequirement(true /*inclusive*/, make<Variable>("v4"))})})});
 
-        auto result = intersectDNFIntervals(interval);
+        auto result = intersectDNFIntervals(interval, constFold);
         ASSERT_TRUE(result);
 
         ASSERT_EQ(
@@ -479,7 +482,7 @@ TEST(IntervalIntersection, VariableIntervals) {
             ExplainGenerator::explainIntervalExpr(*result));
 
         // Make sure repeated intersection does not change the result.
-        auto result1 = intersectDNFIntervals(*result);
+        auto result1 = intersectDNFIntervals(*result, constFold);
         ASSERT_TRUE(result1);
         ASSERT_TRUE(*result == *result1);
     }
@@ -495,7 +498,7 @@ TEST(IntervalIntersection, VariableIntervals) {
                         BoundRequirement(true /*inclusive*/, make<Variable>("v2")),
                         BoundRequirement(false /*inclusive*/, make<Variable>("v4"))})})});
 
-        auto result = intersectDNFIntervals(interval);
+        auto result = intersectDNFIntervals(interval, constFold);
         ASSERT_TRUE(result);
 
         ASSERT_EQ(
@@ -525,7 +528,7 @@ TEST(IntervalIntersection, VariableIntervals) {
             ExplainGenerator::explainIntervalExpr(*result));
 
         // Make sure repeated intersection does not change the result.
-        auto result1 = intersectDNFIntervals(*result);
+        auto result1 = intersectDNFIntervals(*result, constFold);
         ASSERT_TRUE(result1);
         ASSERT_TRUE(*result == *result1);
     }
@@ -611,7 +614,7 @@ void testInterval(int permutation) {
             IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
                 {low2Inc, Constant::int32(low2)}, {high2Inc, Constant::int32(high2)}})})});
 
-    auto result = intersectDNFIntervals(interval);
+    auto result = intersectDNFIntervals(interval, ConstEval::constFold);
     std::bitset<N> inclusionActual;
     if (result) {
         // Since we are testing with constants, we should have at most one interval.

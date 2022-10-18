@@ -59,17 +59,16 @@ public:
     }
 
     ABT extractLatest(const GroupIdType groupId, opt::unordered_set<GroupIdType>& visitedGroups) {
-        const cascades::Group& group = _memo.getGroup(groupId);
         if (!visitedGroups.insert(groupId).second) {
             const GroupIdType scanGroupId =
                 properties::getPropertyConst<properties::IndexingAvailability>(
-                    group._logicalProperties)
+                    _memo.getLogicalProps(groupId))
                     .getScanGroupId();
             uassert(
                 6624357, "Visited the same non-scan group more than once", groupId == scanGroupId);
         }
 
-        ABT rootNode = group._logicalNodes.getVector().back();
+        ABT rootNode = _memo.getLogicalNodes(groupId).back();
         algebra::transport<true>(rootNode, *this, visitedGroups);
         return rootNode;
     }
@@ -109,11 +108,10 @@ public:
         if constexpr (std::is_base_of_v<Node, T>) {
             using namespace properties;
 
-            const cascades::Group& group = _memo.getGroup(id._groupId);
-            const auto& physicalResult = group._physicalNodes.at(id._index);
+            const auto& physicalResult = *_memo.getPhysicalNodes(id._groupId).at(id._index);
             const auto& nodeInfo = *physicalResult._nodeInfo;
 
-            LogicalProps logicalProps = group._logicalProperties;
+            LogicalProps logicalProps = _memo.getLogicalProps(id._groupId);
             PhysProps physProps = physicalResult._physProps;
             if (!_metadata.isParallelExecution()) {
                 // Do not display availability and requirement if under centralized setting.
@@ -133,7 +131,7 @@ public:
     }
 
     ABT extract(const MemoPhysicalNodeId nodeId) {
-        const auto& result = _memo.getGroup(nodeId._groupId)._physicalNodes.at(nodeId._index);
+        const auto& result = *_memo.getPhysicalNodes(nodeId._groupId).at(nodeId._index);
         uassert(6624143,
                 "Physical delegator must be pointing to an optimized result.",
                 result._nodeInfo.has_value());

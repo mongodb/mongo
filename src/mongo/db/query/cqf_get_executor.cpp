@@ -45,8 +45,10 @@
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/cascades/cost_model_gen.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -370,6 +372,7 @@ static void populateAdditionalScanDefs(
     const size_t numberOfPartitions,
     PrefixId& prefixId,
     opt::unordered_map<std::string, ScanDefinition>& scanDefs,
+    const ConstFoldFn& constFold,
     const DisableIndexOptions disableIndexOptions,
     bool& disableScan) {
     for (const auto& involvedNss : involvedCollections) {
@@ -407,14 +410,15 @@ static void populateAdditionalScanDefs(
 
         const CEType collectionCE = collectionExists ? collection->numRecords(opCtx) : -1.0;
         scanDefs.emplace(scanDefName,
-                         ScanDefinition({{"type", "mongod"},
-                                         {"database", involvedNss.db().toString()},
-                                         {"uuid", uuidStr},
-                                         {ScanNode::kDefaultCollectionNameSpec, collNameStr}},
-                                        std::move(indexDefs),
-                                        std::move(distribution),
-                                        collectionExists,
-                                        collectionCE));
+                         createScanDef({{"type", "mongod"},
+                                        {"database", involvedNss.db().toString()},
+                                        {"uuid", uuidStr},
+                                        {ScanNode::kDefaultCollectionNameSpec, collNameStr}},
+                                       std::move(indexDefs),
+                                       constFold,
+                                       std::move(distribution),
+                                       collectionExists,
+                                       collectionCE));
     }
 }
 
@@ -447,6 +451,7 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
                           const ProjectionName& scanProjName,
                           const std::string& uuidStr,
                           const std::string& scanDefName,
+                          const ConstFoldFn& constFold,
                           QueryHints& queryHints,
                           PrefixId& prefixId) {
     auto opCtx = expCtx->opCtx;
@@ -473,14 +478,15 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     opt::unordered_map<std::string, ScanDefinition> scanDefs;
     const int64_t numRecords = collectionExists ? collection->numRecords(opCtx) : -1;
     scanDefs.emplace(scanDefName,
-                     ScanDefinition({{"type", "mongod"},
-                                     {"database", nss.db().toString()},
-                                     {"uuid", uuidStr},
-                                     {ScanNode::kDefaultCollectionNameSpec, nss.coll().toString()}},
-                                    std::move(indexDefs),
-                                    std::move(distribution),
-                                    collectionExists,
-                                    static_cast<CEType>(numRecords)));
+                     createScanDef({{"type", "mongod"},
+                                    {"database", nss.db().toString()},
+                                    {"uuid", uuidStr},
+                                    {ScanNode::kDefaultCollectionNameSpec, nss.coll().toString()}},
+                                   std::move(indexDefs),
+                                   constFold,
+                                   std::move(distribution),
+                                   collectionExists,
+                                   static_cast<CEType>(numRecords)));
 
     // Add a scan definition for all involved collections. Note that the base namespace has already
     // been accounted for above and isn't included here.
@@ -491,6 +497,7 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
                                numberOfPartitions,
                                prefixId,
                                scanDefs,
+                               constFold,
                                queryHints._disableIndexes,
                                queryHints._disableScan);
 
@@ -507,6 +514,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                                           PrefixId& prefixId,
                                           const bool requireRID,
                                           Metadata metadata,
+                                          const ConstFoldFn& constFold,
                                           QueryHints hints) {
     switch (mode) {
         case CEMode::kSampling: {
@@ -524,16 +532,20 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                                                     std::make_unique<HeuristicCE>(),
                                                     std::make_unique<DefaultCosting>(costModel),
                                                     defaultConvertPathToInterval,
+                                                    constFold,
                                                     DebugInfo::kDefaultForProd,
                                                     {} /*hints*/};
             return {OptPhaseManager::getAllRewritesSet(),
                     prefixId,
                     requireRID,
                     std::move(metadata),
-                    std::make_unique<CESamplingTransport>(
-                        opCtx, std::move(phaseManagerForSampling), collectionSize),
+                    std::make_unique<CESamplingTransport>(opCtx,
+                                                          std::move(phaseManagerForSampling),
+                                                          collectionSize,
+                                                          std::make_unique<HeuristicCE>()),
                     std::make_unique<DefaultCosting>(costModel),
                     defaultConvertPathToInterval,
+                    constFold,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
         }
@@ -544,9 +556,11 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     requireRID,
                     std::move(metadata),
                     std::make_unique<CEHistogramTransport>(
-                        std::make_shared<ce::CollectionStatisticsImpl>(collectionSize, nss)),
+                        std::make_shared<ce::CollectionStatisticsImpl>(collectionSize, nss),
+                        std::make_unique<HeuristicCE>()),
                     std::make_unique<DefaultCosting>(costModel),
                     defaultConvertPathToInterval,
+                    constFold,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
 
@@ -558,6 +572,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     std::make_unique<HeuristicCE>(),
                     std::make_unique<DefaultCosting>(costModel),
                     defaultConvertPathToInterval,
+                    constFold,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
 
@@ -599,6 +614,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     const ProjectionName& scanProjName = prefixId.getNextId("scan");
     QueryHints queryHints = getHintsFromQueryKnobs();
 
+    ConstFoldFn constFold = ConstEval::constFold;
     auto metadata = populateMetadata(expCtx,
                                      collection,
                                      involvedCollections,
@@ -607,6 +623,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
                                      scanProjName,
                                      uuidStr,
                                      scanDefName,
+                                     constFold,
                                      queryHints,
                                      prefixId);
 
@@ -654,6 +671,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
                                                       prefixId,
                                                       requireRID,
                                                       std::move(metadata),
+                                                      constFold,
                                                       std::move(queryHints));
     return optimizeAndCreateExecutor(std::move(phaseManager),
                                      std::move(abt),

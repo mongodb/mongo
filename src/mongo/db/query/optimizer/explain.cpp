@@ -30,17 +30,17 @@
 #include "mongo/db/query/optimizer/explain.h"
 
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/util/assert_util.h"
 
+
 namespace mongo::optimizer {
 
 BSONObj ABTPrinter::explainBSON() const {
     return ExplainGenerator::explainBSONObj(
-        _abtTree, true /*displayProperties*/, nullptr /*Memo*/, _nodeToPropsMap);
+        _abtTree, true /*displayProperties*/, nullptr /*memoInterface*/, _nodeToPropsMap);
 }
 
 enum class ExplainVersion { V1, V2, V2Compact, V3, Vmax };
@@ -558,16 +558,17 @@ public:
     using ExplainPrinter = ExplainPrinterImpl<version>;
 
     ExplainGeneratorTransporter(bool displayProperties = false,
-                                const cascades::Memo* memo = nullptr,
+                                const cascades::MemoExplainInterface* memoInterface = nullptr,
                                 const NodeToGroupPropsMap& nodeMap = {},
                                 const boost::optional<const NodeCEMap&>& nodeCEMap = boost::none)
         : _displayProperties(displayProperties),
-          _memo(memo),
+          _memoInterface(memoInterface),
           _nodeMap(nodeMap),
           _nodeCEMap(nodeCEMap) {
         uassert(6624005,
                 "Memo must be provided in order to display properties.",
-                !_displayProperties || (_memo != nullptr || version == ExplainVersion::V3));
+                !_displayProperties ||
+                    (_memoInterface != nullptr || version == ExplainVersion::V3));
     }
 
     /**
@@ -996,8 +997,7 @@ public:
         const auto id = node.getNodeId();
 
         if (_displayProperties) {
-            const auto& group = _memo->getGroup(id._groupId);
-            const auto& result = group._physicalNodes.at(id._index);
+            const auto& result = *_memoInterface->getPhysicalNodes(id._groupId).at(id._index);
             uassert(6624076,
                     "Physical delegator must be pointing to an optimized result.",
                     result._nodeInfo.has_value());
@@ -1011,7 +1011,8 @@ public:
                 return nodePrinter;
             }
 
-            ExplainPrinter logPropPrinter = printLogicalProps("Logical", group._logicalProperties);
+            ExplainPrinter logPropPrinter =
+                printLogicalProps("Logical", _memoInterface->getLogicalProps(id._groupId));
             ExplainPrinter physPropPrinter = printPhysProps("Physical", result._physProps);
 
             ExplainPrinter printer("Properties");
@@ -2329,32 +2330,30 @@ public:
             .print(nodeInfo._adjustedCE);
 
         ExplainGeneratorTransporter<version> subGen(
-            _displayProperties, _memo, _nodeMap, nodeInfo._nodeCEMap);
+            _displayProperties, _memoInterface, _nodeMap, nodeInfo._nodeCEMap);
         ExplainPrinter nodePrinter = subGen.generate(nodeInfo._node);
         printer.separator(", ").fieldName("node").print(nodePrinter);
     }
 
     ExplainPrinter printMemo() {
         std::vector<ExplainPrinter> groupPrinters;
-        for (size_t groupId = 0; groupId < _memo->getGroupCount(); groupId++) {
-            const cascades::Group& group = _memo->getGroup(groupId);
-
+        for (size_t groupId = 0; groupId < _memoInterface->getGroupCount(); groupId++) {
             ExplainPrinter groupPrinter;
             groupPrinter.fieldName("groupId").print(groupId).setChildCount(3);
             {
-                ExplainPrinter logicalPropPrinter =
-                    printLogicalProps("Logical properties", group._logicalProperties);
+                ExplainPrinter logicalPropPrinter = printLogicalProps(
+                    "Logical properties", _memoInterface->getLogicalProps(groupId));
                 groupPrinter.fieldName("logicalProperties", ExplainVersion::V3)
                     .print(logicalPropPrinter);
             }
 
             {
                 std::vector<ExplainPrinter> logicalNodePrinters;
-                const ABTVector& logicalNodes = group._logicalNodes.getVector();
+                const ABTVector& logicalNodes = _memoInterface->getLogicalNodes(groupId);
                 for (size_t i = 0; i < logicalNodes.size(); i++) {
                     ExplainPrinter local;
                     local.fieldName("logicalNodeId").print(i).separator(", ");
-                    const auto rule = group._rules.at(i);
+                    const auto rule = _memoInterface->getRules(groupId).at(i);
                     local.fieldName("rule").print(
                         cascades::LogicalRewriterTypeEnum::toString[static_cast<int>(rule)]);
 
@@ -2371,7 +2370,7 @@ public:
 
             {
                 std::vector<ExplainPrinter> physicalNodePrinters;
-                for (const auto& physOptResult : group._physicalNodes.getNodes()) {
+                for (const auto& physOptResult : _memoInterface->getPhysicalNodes(groupId)) {
                     ExplainPrinter local;
                     local.fieldName("physicalNodeId")
                         .print(physOptResult->_index)
@@ -2433,32 +2432,37 @@ private:
     const bool _displayProperties;
 
     // We don't own this.
-    const cascades::Memo* _memo;
+    const cascades::MemoExplainInterface* _memoInterface;
     const NodeToGroupPropsMap& _nodeMap;
     boost::optional<const NodeCEMap&> _nodeCEMap;
 };
 
+using ExplainGeneratorV1 = ExplainGeneratorTransporter<ExplainVersion::V1>;
+using ExplainGeneratorV2 = ExplainGeneratorTransporter<ExplainVersion::V2>;
+using ExplainGeneratorV2Compact = ExplainGeneratorTransporter<ExplainVersion::V2Compact>;
+using ExplainGeneratorV3 = ExplainGeneratorTransporter<ExplainVersion::V3>;
+
 std::string ExplainGenerator::explain(const ABT& node,
                                       const bool displayProperties,
-                                      const cascades::Memo* memo,
+                                      const cascades::MemoExplainInterface* memoInterface,
                                       const NodeToGroupPropsMap& nodeMap) {
-    ExplainGeneratorTransporter gen(displayProperties, memo, nodeMap);
+    ExplainGeneratorV1 gen(displayProperties, memoInterface, nodeMap);
     return gen.generate(node).str();
 }
 
 std::string ExplainGenerator::explainV2(const ABT& node,
                                         const bool displayProperties,
-                                        const cascades::Memo* memo,
+                                        const cascades::MemoExplainInterface* memoInterface,
                                         const NodeToGroupPropsMap& nodeMap) {
-    ExplainGeneratorTransporter<ExplainVersion::V2> gen(displayProperties, memo, nodeMap);
+    ExplainGeneratorV2 gen(displayProperties, memoInterface, nodeMap);
     return gen.generate(node).str();
 }
 
 std::string ExplainGenerator::explainV2Compact(const ABT& node,
                                                const bool displayProperties,
-                                               const cascades::Memo* memo,
+                                               const cascades::MemoExplainInterface* memoInterface,
                                                const NodeToGroupPropsMap& nodeMap) {
-    ExplainGeneratorTransporter<ExplainVersion::V2Compact> gen(displayProperties, memo, nodeMap);
+    ExplainGeneratorV2Compact gen(displayProperties, memoInterface, nodeMap);
     return gen.generate(node).str();
 }
 
@@ -2472,9 +2476,9 @@ std::string ExplainGenerator::explainNode(const ABT& node) {
 std::pair<sbe::value::TypeTags, sbe::value::Value> ExplainGenerator::explainBSON(
     const ABT& node,
     const bool displayProperties,
-    const cascades::Memo* memo,
+    const cascades::MemoExplainInterface* memoInterface,
     const NodeToGroupPropsMap& nodeMap) {
-    ExplainGeneratorTransporter<ExplainVersion::V3> gen(displayProperties, memo, nodeMap);
+    ExplainGeneratorV3 gen(displayProperties, memoInterface, nodeMap);
     return gen.generate(node).moveValue();
 }
 
@@ -2489,9 +2493,9 @@ BSONObj convertSbeValToBSONObj(const std::pair<sbe::value::TypeTags, sbe::value:
 
 BSONObj ExplainGenerator::explainBSONObj(const ABT& node,
                                          const bool displayProperties,
-                                         const cascades::Memo* memo,
+                                         const cascades::MemoExplainInterface* memoInterface,
                                          const NodeToGroupPropsMap& nodeMap) {
-    return convertSbeValToBSONObj(explainBSON(node, displayProperties, memo, nodeMap));
+    return convertSbeValToBSONObj(explainBSON(node, displayProperties, memoInterface, nodeMap));
 }
 
 template <class PrinterType>
@@ -2551,45 +2555,43 @@ std::string ExplainGenerator::printBSON(const sbe::value::TypeTags tag,
 
 std::string ExplainGenerator::explainLogicalProps(const std::string& description,
                                                   const properties::LogicalProps& props) {
-    return ExplainGeneratorTransporter<ExplainVersion::V2>::printLogicalProps(description, props)
-        .str();
+    return ExplainGeneratorV2::printLogicalProps(description, props).str();
 }
 
 std::string ExplainGenerator::explainPhysProps(const std::string& description,
                                                const properties::PhysProps& props) {
-    return ExplainGeneratorTransporter<ExplainVersion::V2>::printPhysProps(description, props)
-        .str();
+    return ExplainGeneratorV2::printPhysProps(description, props).str();
 }
 
-std::string ExplainGenerator::explainMemo(const cascades::Memo& memo) {
-    ExplainGeneratorTransporter<ExplainVersion::V2> gen(false /*displayProperties*/, &memo);
+std::string ExplainGenerator::explainMemo(const cascades::MemoExplainInterface& memoInterface) {
+    ExplainGeneratorV2 gen(false /*displayProperties*/, &memoInterface);
     return gen.printMemo().str();
 }
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> ExplainGenerator::explainMemoBSON(
-    const cascades::Memo& memo) {
-    ExplainGeneratorTransporter<ExplainVersion::V3> gen(false /*displayProperties*/, &memo);
+    const cascades::MemoExplainInterface& memoInterface) {
+    ExplainGeneratorV3 gen(false /*displayProperties*/, &memoInterface);
     return gen.printMemo().moveValue();
 }
 
-BSONObj ExplainGenerator::explainMemoBSONObj(const cascades::Memo& memo) {
-    return convertSbeValToBSONObj(explainMemoBSON(memo));
+BSONObj ExplainGenerator::explainMemoBSONObj(const cascades::MemoExplainInterface& memoInterface) {
+    return convertSbeValToBSONObj(explainMemoBSON(memoInterface));
 }
 
 std::string ExplainGenerator::explainPartialSchemaReqMap(const PartialSchemaRequirements& reqMap) {
-    ExplainGeneratorTransporter<ExplainVersion::V2> gen;
-    ExplainGeneratorTransporter<ExplainVersion::V2>::ExplainPrinter result;
+    ExplainGeneratorV2 gen;
+    ExplainGeneratorV2::ExplainPrinter result;
     gen.printPartialSchemaReqMap(result, reqMap);
     return result.str();
 }
 
 std::string ExplainGenerator::explainInterval(const IntervalRequirement& interval) {
-    ExplainGeneratorTransporter<ExplainVersion::V2> gen;
+    ExplainGeneratorV2 gen;
     return gen.printInterval(interval);
 }
 
 std::string ExplainGenerator::explainIntervalExpr(const IntervalReqExpr::Node& intervalExpr) {
-    ExplainGeneratorTransporter<ExplainVersion::V2> gen;
+    ExplainGeneratorV2 gen;
     return gen.printIntervalExpr(intervalExpr).str();
 }
 

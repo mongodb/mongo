@@ -31,90 +31,63 @@
 
 #include <set>
 
-#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
+
 namespace mongo::optimizer::cascades {
 
-size_t MemoNodeRefHash::operator()(const ABT::reference_type& nodeRef) const {
-    // Compare delegator as well.
-    return ABTHashGenerator::generate(nodeRef);
+PhysOptimizationResult& PhysNodes::addOptimizationResult(properties::PhysProps properties,
+                                                         CostType costLimit) {
+    const size_t index = _physicalNodes.size();
+    _physPropsToPhysNodeMap.emplace(properties, index);
+    _physicalQueues.emplace_back(std::make_unique<PhysQueueAndImplPos>());
+    return *_physicalNodes.emplace_back(std::make_unique<PhysOptimizationResult>(
+        index, std::move(properties), std::move(costLimit)));
 }
 
-bool MemoNodeRefCompare::operator()(const ABT::reference_type& left,
-                                    const ABT::reference_type& right) const {
-    // Deep comparison.
-    return left.follow() == right.follow();
+const PhysOptimizationResult& PhysNodes::at(const size_t index) const {
+    return *_physicalNodes.at(index);
 }
 
-ABT::reference_type OrderPreservingABTSet::at(const size_t index) const {
-    return _vector.at(index).ref();
+PhysOptimizationResult& PhysNodes::at(const size_t index) {
+    return *_physicalNodes.at(index);
 }
 
-std::pair<size_t, bool> OrderPreservingABTSet::emplace_back(ABT node) {
-    auto [index, found] = find(node.ref());
-    if (found) {
-        return {index, false};
-    }
-
-    const size_t id = _vector.size();
-    _vector.emplace_back(std::move(node));
-    _map.emplace(_vector.back().ref(), id);
-    return {id, true};
-}
-
-std::pair<size_t, bool> OrderPreservingABTSet::find(ABT::reference_type node) const {
-    auto it = _map.find(node);
-    if (it == _map.end()) {
+std::pair<size_t, bool> PhysNodes::find(const properties::PhysProps& props) const {
+    auto it = _physPropsToPhysNodeMap.find(props);
+    if (it == _physPropsToPhysNodeMap.cend()) {
         return {0, false};
     }
-
     return {it->second, true};
 }
 
-void OrderPreservingABTSet::clear() {
-    _map.clear();
-    _vector.clear();
+const PhysNodeVector& PhysNodes::getNodes() const {
+    return _physicalNodes;
 }
 
-size_t OrderPreservingABTSet::size() const {
-    return _vector.size();
+const PhysQueueAndImplPos& PhysNodes::getQueue(size_t index) const {
+    return *_physicalQueues.at(index);
 }
 
-const ABTVector& OrderPreservingABTSet::getVector() const {
-    return _vector;
+PhysQueueAndImplPos& PhysNodes::getQueue(const size_t index) {
+    return *_physicalQueues.at(index);
 }
 
-PhysOptimizationResult::PhysOptimizationResult()
-    : PhysOptimizationResult(0, {}, CostType::kInfinity) {}
-
-PhysOptimizationResult::PhysOptimizationResult(size_t index,
-                                               properties::PhysProps physProps,
-                                               CostType costLimit)
-    : _index(index),
-      _physProps(std::move(physProps)),
-      _costLimit(std::move(costLimit)),
-      _nodeInfo(),
-      _rejectedNodeInfo(),
-      _lastImplementedNodePos(0),
-      _queue() {}
-
-bool PhysOptimizationResult::isOptimized() const {
-    return _queue.empty();
+bool PhysNodes::isOptimized(const size_t index) const {
+    return getQueue(index)._queue.empty();
 }
 
-void PhysOptimizationResult::raiseCostLimit(CostType costLimit) {
-    _costLimit = costLimit;
+void PhysNodes::raiseCostLimit(const size_t index, CostType costLimit) {
+    at(index)._costLimit = costLimit;
     // Allow for re-optimization under the higher cost limit.
-    _lastImplementedNodePos = 0;
+    getQueue(index)._lastImplementedNodePos = 0;
 }
 
-bool PhysRewriteEntryComparator::operator()(const std::unique_ptr<PhysRewriteEntry>& x,
-                                            const std::unique_ptr<PhysRewriteEntry>& y) const {
-    // Lower numerical priority is considered last (and thus de-queued first).
-    return x->_priority > y->_priority;
+size_t PhysNodes::PhysPropsHasher::operator()(const properties::PhysProps& physProps) const {
+    return ABTHashGenerator::generateForPhysProps(physProps);
 }
 
 static ABT createBinderMap(const properties::LogicalProps& logicalProperties) {
@@ -146,38 +119,6 @@ const ExpressionBinder& Group::binder() const {
     uassert(6624048, "Invalid binder type", pointer);
 
     return *pointer;
-}
-
-PhysOptimizationResult& PhysNodes::addOptimizationResult(properties::PhysProps properties,
-                                                         CostType costLimit) {
-    const size_t index = _physicalNodes.size();
-    _physPropsToPhysNodeMap.emplace(properties, index);
-    return *_physicalNodes.emplace_back(std::make_unique<PhysOptimizationResult>(
-        index, std::move(properties), std::move(costLimit)));
-}
-
-const PhysOptimizationResult& PhysNodes::at(const size_t index) const {
-    return *_physicalNodes.at(index);
-}
-
-PhysOptimizationResult& PhysNodes::at(const size_t index) {
-    return *_physicalNodes.at(index);
-}
-
-std::pair<size_t, bool> PhysNodes::find(const properties::PhysProps& props) const {
-    auto it = _physPropsToPhysNodeMap.find(props);
-    if (it == _physPropsToPhysNodeMap.cend()) {
-        return {0, false};
-    }
-    return {it->second, true};
-}
-
-const PhysNodes::PhysNodeVector& PhysNodes::getNodes() const {
-    return _physicalNodes;
-}
-
-size_t PhysNodes::PhysPropsHasher::operator()(const properties::PhysProps& physProps) const {
-    return ABTHashGenerator::generateForPhysProps(physProps);
 }
 
 /**
@@ -758,6 +699,30 @@ GroupIdType Memo::integrate(const Memo::Context& ctx,
 
 size_t Memo::getGroupCount() const {
     return _groups.size();
+}
+
+const ExpressionBinder& Memo::getBinderForGroup(const GroupIdType groupId) const {
+    return getGroup(groupId).binder();
+}
+
+const properties::LogicalProps& Memo::getLogicalProps(GroupIdType groupId) const {
+    return getGroup(groupId)._logicalProperties;
+}
+
+const ABTVector& Memo::getLogicalNodes(GroupIdType groupId) const {
+    return getGroup(groupId)._logicalNodes.getVector();
+}
+
+const PhysNodeVector& Memo::getPhysicalNodes(GroupIdType groupId) const {
+    return getGroup(groupId)._physicalNodes.getNodes();
+}
+
+const std::vector<LogicalRewriteType>& Memo::getRules(GroupIdType groupId) const {
+    return getGroup(groupId)._rules;
+}
+
+LogicalRewriteQueue& Memo::getLogicalRewriteQueue(GroupIdType groupId) {
+    return getGroup(groupId)._logicalRewriteQueue;
 }
 
 void Memo::clearLogicalNodes(const GroupIdType groupId) {

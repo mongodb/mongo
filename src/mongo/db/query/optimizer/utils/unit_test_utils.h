@@ -30,15 +30,9 @@
 #pragma once
 
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/metadata.h"
-#include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
-#include "mongo/unittest/golden_test.h"
+
 
 namespace mongo::optimizer {
 
@@ -95,35 +89,5 @@ IndexDefinition makeIndexDefinition(FieldNameType fieldName,
                                     bool isMultiKey = true);
 IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFields,
                                              bool isMultiKey = true);
-
-ABT translatePipeline(const Metadata& metadata,
-                      const std::string& pipelineStr,
-                      ProjectionName scanProjName,
-                      std::string scanDefName,
-                      PrefixId& prefixId,
-                      const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {});
-
-ABT translatePipeline(Metadata& metadata,
-                      const std::string& pipelineStr,
-                      std::string scanDefName,
-                      PrefixId& prefixId);
-
-ABT translatePipeline(const std::string& pipelineStr, std::string scanDefName = "collection");
-
-/**
- * This function translates the given pipeline string to an ABT and (if optimization phases are
- * provided) optimizes the ABT using the parameters specified. It then writes the output to a file
- * that will be compared to the golden testing file for the test file.
- **/
-void testABTTranslationAndOptimization(
-    unittest::GoldenTestContext& gctx,
-    const std::string& variationName,
-    const std::string& pipelineStr,
-    std::string scanDefName = "collection",
-    opt::unordered_set<OptPhase> phaseSet = {},
-    Metadata metadata = {{{"collection", ScanDefinition{{}, {}}}}},
-    PathToIntervalFn pathToInterval = {},
-    bool phaseManagerDisableScan = false,
-    const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {});
 
 }  // namespace mongo::optimizer

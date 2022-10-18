@@ -142,12 +142,6 @@ CollationSplitResult splitCollationSpec(const ProjectionName& ridProjName,
                                         const ProjectionNameSet& rightProjections);
 
 /**
- * Used to extract variable references from a node.
- */
-using VariableNameSetType = opt::unordered_set<std::string>;
-VariableNameSetType collectVariableReferences(const ABT& n);
-
-/**
  * Appends a path to another path. Performs the append at PathIdentity elements.
  */
 class PathAppender {
@@ -213,7 +207,8 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
  */
 bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
                                    const IndexPathSet& nonMultiKeyPaths,
-                                   PartialSchemaRequirements& reqMap);
+                                   PartialSchemaRequirements& reqMap,
+                                   const ConstFoldFn& constFold);
 
 /**
  * Check if a path contains a Traverse element.
@@ -248,7 +243,8 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
                                          bool fastNullHandling,
-                                         bool& hasEmptyInterval);
+                                         bool& hasEmptyInterval,
+                                         const ConstFoldFn& constFold);
 
 /**
  * Computes a set of residual predicates which will be applied on top of a Scan.
@@ -261,7 +257,7 @@ boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
  * Checks if we have an interval tree which has at least one atomic interval which may include Null
  * as an endpoint.
  */
-bool checkMaybeHasNull(const IntervalReqExpr::Node& intervals);
+bool checkMaybeHasNull(const IntervalReqExpr::Node& intervals, const ConstFoldFn& constFold);
 
 /**
  * Used to lower a Sargable node to a subtree consisting of functionally equivalent Filter and Eval

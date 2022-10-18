@@ -28,20 +28,18 @@
  */
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/ce/max_diff.h"
 #include "mongo/db/query/ce/scalar_histogram.h"
 #include "mongo/db/query/ce/value_utils.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/basic.h"
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

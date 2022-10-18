@@ -29,26 +29,19 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/collection_statistics_impl.h"
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+
 
 namespace mongo::optimizer::cascades {
 
-class CEHistogramTransportImpl;
-
-class CEHistogramTransport : public CEInterface {
+/**
+ * This is an interface which is used to isolate the dependence of the reference tracker on the Memo
+ * itself.
+ */
+class MemoGroupBinderInterface {
 public:
-    CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats,
-                         std::unique_ptr<CEInterface> fallbackCE);
-    ~CEHistogramTransport();
-
-    CEType deriveCE(const Metadata& metadata,
-                    const Memo& memo,
-                    const properties::LogicalProps& logicalProps,
-                    ABT::reference_type logicalNodeRef) const final;
-
-private:
-    std::unique_ptr<CEHistogramTransportImpl> _impl;
+    virtual const ExpressionBinder& getBinderForGroup(GroupIdType groupId) const = 0;
 };
 
 }  // namespace mongo::optimizer::cascades

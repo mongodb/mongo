@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/optimizer/node.h"
+
 
 namespace mongo::optimizer {
 

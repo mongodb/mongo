@@ -32,11 +32,12 @@
 #include "mongo/db/query/ce/ce_test_utils.h"
 
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
-#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/unittest/unittest.h"
 
@@ -87,6 +88,7 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
                                  getCETransport(),
                                  std::make_unique<DefaultCosting>(),
                                  defaultConvertPathToInterval,
+                                 ConstEval::constFold,
                                  DebugInfo::kDefaultForTests,
                                  _hints};
     phaseManager.optimize(abt);
@@ -112,24 +114,23 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
     }
 
     CEType outCard = kInvalidCardinality;
-    for (size_t i = 0; i < memo.getGroupCount(); i++) {
+    for (size_t groupId = 0; groupId < memo.getGroupCount(); groupId++) {
         // Note that we always verify CE for MemoLogicalDelegatorNodes when calling getCE().
-        const auto& group = memo.getGroup(i);
 
         // If the 'optPhases' either ends with the MemoSubstitutionPhase or the
         // MemoImplementationPhase, we should have exactly one logical node per group. However, if
         // we have indexes, or a $group, we may have multiple logical nodes. In this case, we still
         // want to pick the first node.
-        const auto& node = group._logicalNodes.at(0);
+        const auto& node = memo.getLogicalNodes(groupId).front();
 
         // This gets the cardinality estimate actually produced during optimization.
-        auto memoCE =
-            properties::getPropertyConst<properties::CardinalityEstimate>(group._logicalProperties)
-                .getEstimate();
+        const auto& logicalProps = memo.getLogicalProps(groupId);
+        auto memoCE = properties::getPropertyConst<properties::CardinalityEstimate>(logicalProps)
+                          .getEstimate();
 
         // Conversely, here we call deriveCE() on the ABT produced by the optimization phases, which
         // has all its delegators dereferenced.
-        auto card = cht->deriveCE(_metadata, memo, group._logicalProperties, node);
+        auto card = cht->deriveCE(_metadata, memo, logicalProps, node.ref());
 
         if constexpr (!kCETestLogOnly) {
             // Ensure that the CE stored for the logical nodes of each group is what we would expect
@@ -139,7 +140,7 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
             ASSERT_APPROX_EQUAL(card, memoCE, kMaxCEError);
         } else {
             if (std::abs(memoCE - card) > kMaxCEError) {
-                std::cout << "ERROR: CE Group(" << i << ") " << card << " vs. " << memoCE
+                std::cout << "ERROR: CE Group(" << groupId << ") " << card << " vs. " << memoCE
                           << std::endl;
                 std::cout << ExplainGenerator::explainV2(node) << std::endl;
             }
@@ -187,8 +188,13 @@ void CETester::setIndexes(opt::unordered_map<std::string, IndexDefinition> index
 void CETester::addCollection(std::string collName,
                              double numRecords,
                              opt::unordered_map<std::string, IndexDefinition> indexes) {
-    _metadata._scanDefs.insert_or_assign(
-        collName, ScanDefinition({}, indexes, {DistributionType::Centralized}, true, numRecords));
+    _metadata._scanDefs.insert_or_assign(collName,
+                                         createScanDef({},
+                                                       indexes,
+                                                       ConstEval::constFold,
+                                                       {DistributionType::Centralized},
+                                                       true /*exists*/,
+                                                       numRecords));
 }
 
 ScalarHistogram createHistogram(const std::vector<BucketData>& data) {

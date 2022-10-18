@@ -34,6 +34,8 @@
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/cascades/logical_rewriter.h"
 #include "mongo/db/query/optimizer/cascades/physical_rewriter.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
+
 
 namespace mongo::optimizer {
 
@@ -85,6 +87,7 @@ public:
                     std::unique_ptr<CEInterface> ceDerivation,
                     std::unique_ptr<CostingInterface> costDerivation,
                     PathToIntervalFn pathToInterval,
+                    ConstFoldFn constFold,
                     DebugInfo debugInfo,
                     QueryHints queryHints = {});
 
@@ -184,6 +187,11 @@ private:
      * Path ABT node to index bounds converter implementation.
      */
     PathToIntervalFn _pathToInterval;
+
+    /**
+     * Constant fold an expression.
+     */
+    ConstFoldFn _constFold;
 
     /**
      * Root physical node if we have performed physical rewrites.

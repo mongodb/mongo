@@ -59,6 +59,7 @@ public:
                     const DebugInfo& debugInfo,
                     const QueryHints& hints,
                     const PathToIntervalFn& pathToInterval,
+                    const ConstFoldFn& constFold,
                     const LogicalPropsInterface& logicalPropsDerivation,
                     const CEInterface& ceDerivation);
 
@@ -127,6 +128,7 @@ private:
     const DebugInfo& _debugInfo;
     const QueryHints& _hints;
     const PathToIntervalFn& _pathToInterval;
+    const ConstFoldFn& _constFold;
     const LogicalPropsInterface& _logicalPropsDerivation;
     const CEInterface& _ceDerivation;
 

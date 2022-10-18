@@ -219,6 +219,18 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="abt_utils",
+    source=[
+        "abt/utils.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
+        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_base",
+        "field_path",
+    ],
+)
+
 pipelineEnv = env.Clone()
 pipelineEnv.InjectThirdParty(libraries=['snappy'])
 pipelineEnv.Library(
@@ -233,7 +245,6 @@ pipelineEnv.Library(
         'abt/match_expression_visitor.cpp',
         'abt/projection_ast_visitor.cpp',
         'abt/transformer_visitor.cpp',
-        'abt/utils.cpp',
         'accumulator_internal_construct_stats.cpp',
         'document_source.cpp',
         'document_source_add_fields.cpp',
@@ -344,6 +355,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/views/resolved_view',
         '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/third_party/shim_snappy',
+        'abt_utils',
         'accumulator',
         'dependencies',
         'document_path_support',
@@ -618,7 +630,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
-        '$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils',
+        '$BUILD_DIR/mongo/db/query/optimizer/unit_test_pipeline_utils',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/db/repl/image_collection_entry',

@@ -29,13 +29,16 @@
 
 #include "mongo/db/query/optimizer/cascades/ce_hinted.h"
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
+#include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
 
 namespace mongo::optimizer {
 namespace {
@@ -50,10 +53,11 @@ DEATH_TEST_REGEX(Optimizer, HitIterationLimitInrunStructuralPhases, "Tripwire as
     ABT evalNode = make<EvaluationNode>("evalProj1", Constant::int64(5), std::move(scanNode));
 
 
-    OptPhaseManager phaseManager({OptPhase::PathFuse, OptPhase::ConstEvalPre},
-                                 prefixId,
-                                 {{{"test1", {{}, {}}}, {"test2", {{}, {}}}}},
-                                 DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
+    OptPhaseManager phaseManager(
+        {OptPhase::PathFuse, OptPhase::ConstEvalPre},
+        prefixId,
+        {{{"test1", createScanDef({}, {})}, {"test2", createScanDef({}, {})}}},
+        DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(evalNode), DBException, 6808700);
 }
@@ -79,7 +83,7 @@ DEATH_TEST_REGEX(Optimizer,
 
     OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
                                  prefixId,
-                                 {{{"test", {{}, {}}}}},
+                                 {{{"test", createScanDef({}, {})}}},
                                  DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808702);
@@ -106,7 +110,7 @@ DEATH_TEST_REGEX(Optimizer,
 
     OptPhaseManager phaseManager({OptPhase::MemoExplorationPhase},
                                  prefixId,
-                                 {{{"test", {{}, {}}}}},
+                                 {{{"test", createScanDef({}, {})}}},
                                  DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808702);
@@ -131,7 +135,7 @@ DEATH_TEST_REGEX(Optimizer, BadGroupID, "Tripwire assertion.*6808704") {
 
     OptPhaseManager phaseManager({OptPhase::MemoImplementationPhase},
                                  prefixId,
-                                 {{{"test", {{}, {}}}}},
+                                 {{{"test", createScanDef({}, {})}}},
                                  DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808704);
@@ -162,7 +166,7 @@ DEATH_TEST_REGEX(Optimizer, EnvHasFreeVariables, "Tripwire assertion.*6808711") 
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        {{{"test", {{}, {}}}}},
+        {{{"test", createScanDef({}, {})}}},
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808711);
@@ -215,7 +219,7 @@ DEATH_TEST_REGEX(Optimizer, FailedToRetrieveRID, "Tripwire assertion.*6808705") 
         prefixId,
         true /*requireRID*/,
         {{{"c1",
-           ScanDefinition{
+           createScanDef(
                {},
                {{"index1",
                  IndexDefinition{
@@ -223,11 +227,13 @@ DEATH_TEST_REGEX(Optimizer, FailedToRetrieveRID, "Tripwire assertion.*6808705") 
                      false /*isMultiKey*/,
                      {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("a"))},
                      {}}}},
-               {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("b"))}}}},
+               ConstEval::constFold,
+               {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("b"))})}},
          5 /*numberOfPartitions*/},
         std::make_unique<HintedCE>(std::move(hints)),
         std::make_unique<DefaultCosting>(),
-        {},
+        {} /*pathToInterval*/,
+        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808705);
@@ -258,10 +264,11 @@ DEATH_TEST_REGEX(Optimizer, OptGroupFailed, "Tripwire assertion.*6808706") {
         {OptPhase::MemoExplorationPhase, OptPhase::MemoImplementationPhase},
         prefixId,
         true /*requireRID*/,
-        {{{"test", {{}, {}}}}},
+        {{{"test", createScanDef({}, {})}}},
         std::make_unique<HintedCE>(std::move(hints)),
         std::make_unique<DefaultCosting>(),
-        {},
+        {} /*pathToInterval*/,
+        ConstEval::constFold,
         DebugInfo::kDefaultForTests);
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 68087056);

@@ -29,7 +29,8 @@
 
 #include "mongo/db/query/optimizer/cascades/rewrite_queues.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
-#include <mongo/db/query/optimizer/defs.h>
+#include "mongo/db/query/optimizer/defs.h"
+
 
 namespace mongo::optimizer::cascades {
 
@@ -67,6 +68,12 @@ PhysRewriteEntry::PhysRewriteEntry(const double priority,
       _node(std::move(node)),
       _childProps(std::move(childProps)),
       _nodeCEMap(std::move(nodeCEMap)) {}
+
+bool PhysRewriteEntryComparator::operator()(const std::unique_ptr<PhysRewriteEntry>& x,
+                                            const std::unique_ptr<PhysRewriteEntry>& y) const {
+    // Lower numerical priority is considered last (and thus de-queued first).
+    return x->_priority > y->_priority;
+}
 
 void optimizeChildrenNoAssert(PhysRewriteQueue& queue,
                               const double priority,

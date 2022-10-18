@@ -31,7 +31,6 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/node.h"
-#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 
 
 namespace mongo::optimizer {
@@ -101,7 +100,8 @@ void combineIntervalsDNF(const bool intersect,
 }
 
 std::vector<IntervalRequirement> intersectIntervals(const IntervalRequirement& i1,
-                                                    const IntervalRequirement& i2) {
+                                                    const IntervalRequirement& i2,
+                                                    const ConstFoldFn& constFold) {
     // Handle trivial cases of intersection.
     if (i1.isFullyOpen()) {
         return {i2};
@@ -115,11 +115,8 @@ std::vector<IntervalRequirement> intersectIntervals(const IntervalRequirement& i
     const ABT& low2 = i2.getLowBound().getBound();
     const ABT& high2 = i2.getHighBound().getBound();
 
-    const auto foldFn = [](ABT expr) {
-        // Performs constant folding.
-        VariableEnvironment env = VariableEnvironment::build(expr);
-        ConstEval instance(env);
-        instance.optimize(expr);
+    const auto foldFn = [&constFold](ABT expr) {
+        constFold(expr);
         return expr;
     };
     const auto minMaxFn = [](const Operations op, const ABT& v1, const ABT& v2) {
@@ -226,7 +223,7 @@ std::vector<IntervalRequirement> intersectIntervals(const IntervalRequirement& i
 }
 
 boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
-    const IntervalReqExpr::Node& intervalDNF) {
+    const IntervalReqExpr::Node& intervalDNF, const ConstFoldFn& constFold) {
     IntervalReqExpr::NodeVector disjuncts;
 
     for (const auto& disjunct : intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes()) {
@@ -245,7 +242,8 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
             } else {
                 std::vector<IntervalRequirement> newResult;
                 for (const auto& intersectedInterval : intersectedIntervalDisjunction) {
-                    auto intersectionResult = intersectIntervals(intersectedInterval, interval);
+                    auto intersectionResult =
+                        intersectIntervals(intersectedInterval, interval, constFold);
                     newResult.insert(
                         newResult.end(), intersectionResult.cbegin(), intersectionResult.cend());
                 }

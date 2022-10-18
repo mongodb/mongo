@@ -81,8 +81,7 @@ public:
     }
 
     CostAndCEInternal operator()(const ABT& /*n*/, const MemoLogicalDelegatorNode& node) {
-        const LogicalProps& childLogicalProps =
-            _memo.getGroup(node.getGroupId())._logicalProperties;
+        const LogicalProps& childLogicalProps = _memo.getLogicalProps(node.getGroupId());
         // Notice that unlike all physical nodes, this logical node takes it cardinality directly
         // from the memo group logical property, ignoring _cardinalityEstimate.
         CEType baseCE = getPropertyConst<CardinalityEstimate>(childLogicalProps).getEstimate();
@@ -96,9 +95,9 @@ public:
                 if (scanGroupId == node.getGroupId()) {
                     baseCE = 1.0;
                 } else {
-                    const CEType scanGroupCE = getPropertyConst<CardinalityEstimate>(
-                                                   _memo.getGroup(scanGroupId)._logicalProperties)
-                                                   .getEstimate();
+                    const CEType scanGroupCE =
+                        getPropertyConst<CardinalityEstimate>(_memo.getLogicalProps(scanGroupId))
+                            .getEstimate();
                     if (scanGroupCE > 0.0) {
                         baseCE /= scanGroupCE;
                     }

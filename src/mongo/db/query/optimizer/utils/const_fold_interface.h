@@ -29,26 +29,13 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/collection_statistics_impl.h"
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include <functional>
 
-namespace mongo::optimizer::cascades {
+namespace mongo::optimizer {
 
-class CEHistogramTransportImpl;
+/**
+ * Used to provide a ABT constant folding mechanism. The input ABT is constant folded in-place.
+ */
+using ConstFoldFn = std::function<void(ABT& expr)>;
 
-class CEHistogramTransport : public CEInterface {
-public:
-    CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats,
-                         std::unique_ptr<CEInterface> fallbackCE);
-    ~CEHistogramTransport();
-
-    CEType deriveCE(const Metadata& metadata,
-                    const Memo& memo,
-                    const properties::LogicalProps& logicalProps,
-                    ABT::reference_type logicalNodeRef) const final;
-
-private:
-    std::unique_ptr<CEHistogramTransportImpl> _impl;
-};
-
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::optimizer

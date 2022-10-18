@@ -166,7 +166,7 @@ public:
 
     LogicalProps transport(const MemoLogicalDelegatorNode& node) {
         uassert(6624109, "Uninitialized memo", _memo != nullptr);
-        return maybeUpdateNodePropsMap(node, _memo->getGroup(node.getGroupId())._logicalProperties);
+        return maybeUpdateNodePropsMap(node, _memo->getLogicalProps(node.getGroupId()));
     }
 
     LogicalProps transport(const FilterNode& node,

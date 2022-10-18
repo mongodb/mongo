@@ -100,22 +100,22 @@ private:
     PartialSchemaRequirements _partialReqMap;
 };
 
+using ScanDefOptions = opt::unordered_map<std::string, std::string>;
+
 // Used to specify parameters to scan node, such as collection name, or file where collection is
 // read from.
 class ScanDefinition {
 public:
-    using OptionsMapType = opt::unordered_map<std::string, std::string>;
-
     ScanDefinition();
-    ScanDefinition(OptionsMapType options,
-                   opt::unordered_map<std::string, IndexDefinition> indexDefs);
-    ScanDefinition(OptionsMapType options,
-                   opt::unordered_map<std::string, IndexDefinition> indexDefs,
-                   DistributionAndPaths distributionAndPaths,
-                   bool exists = true,
-                   CEType ce = -1.0);
 
-    const OptionsMapType& getOptionsMap() const;
+    ScanDefinition(ScanDefOptions options,
+                   opt::unordered_map<std::string, IndexDefinition> indexDefs,
+                   IndexPathSet nonMultiKeyPathSet,
+                   DistributionAndPaths distributionAndPaths,
+                   bool exists,
+                   CEType ce);
+
+    const ScanDefOptions& getOptionsMap() const;
 
     const DistributionAndPaths& getDistributionAndPaths() const;
 
@@ -129,7 +129,7 @@ public:
     CEType getCE() const;
 
 private:
-    OptionsMapType _options;
+    ScanDefOptions _options;
     DistributionAndPaths _distributionAndPaths;
 
     /**

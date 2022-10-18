@@ -32,6 +32,7 @@
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 
+
 namespace mongo::optimizer {
 
 using DisableInlineFn = std::function<bool(const ABT&)>;
@@ -79,6 +80,9 @@ public:
 
     // The tree is passed in as NON-const reference as we will be updating it.
     bool optimize(ABT& n);
+
+    // Provides constant folding interface.
+    static void constFold(ABT& n);
 
 private:
     struct EvalNodeHash {

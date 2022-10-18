@@ -29,26 +29,19 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/collection_statistics_impl.h"
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include "mongo/db/query/optimizer/metadata.h"
 
-namespace mongo::optimizer::cascades {
 
-class CEHistogramTransportImpl;
+namespace mongo::optimizer {
 
-class CEHistogramTransport : public CEInterface {
-public:
-    CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats,
-                         std::unique_ptr<CEInterface> fallbackCE);
-    ~CEHistogramTransport();
+ScanDefinition createScanDef(ScanDefOptions options,
+                             opt::unordered_map<std::string, IndexDefinition> indexDefs);
 
-    CEType deriveCE(const Metadata& metadata,
-                    const Memo& memo,
-                    const properties::LogicalProps& logicalProps,
-                    ABT::reference_type logicalNodeRef) const final;
+ScanDefinition createScanDef(ScanDefOptions options,
+                             opt::unordered_map<std::string, IndexDefinition> indexDefs,
+                             const ConstFoldFn& constFold,
+                             DistributionAndPaths distributionAndPaths,
+                             bool exists = true,
+                             CEType ce = -1.0);
 
-private:
-    std::unique_ptr<CEHistogramTransportImpl> _impl;
-};
-
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::optimizer

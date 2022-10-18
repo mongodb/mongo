@@ -32,6 +32,7 @@
 #include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/const_fold_interface.h"
 
 
 namespace mongo::optimizer {
@@ -108,7 +109,7 @@ public:
 
     bool getIsPerfOnly() const;
 
-    bool mayReturnNull() const;
+    bool mayReturnNull(const ConstFoldFn& constFold) const;
 
 private:
     // Bound, or output projection name.

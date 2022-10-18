@@ -29,26 +29,15 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/collection_statistics_impl.h"
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include "mongo/db/query/optimizer/node.h"
 
-namespace mongo::optimizer::cascades {
 
-class CEHistogramTransportImpl;
+namespace mongo::optimizer {
 
-class CEHistogramTransport : public CEInterface {
-public:
-    CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats,
-                         std::unique_ptr<CEInterface> fallbackCE);
-    ~CEHistogramTransport();
+/**
+ * Used to extract variable references from a node.
+ */
+using VariableNameSetType = opt::unordered_set<std::string>;
+VariableNameSetType collectVariableReferences(const ABT& n);
 
-    CEType deriveCE(const Metadata& metadata,
-                    const Memo& memo,
-                    const properties::LogicalProps& logicalProps,
-                    ABT::reference_type logicalNodeRef) const final;
-
-private:
-    std::unique_ptr<CEHistogramTransportImpl> _impl;
-};
-
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::optimizer

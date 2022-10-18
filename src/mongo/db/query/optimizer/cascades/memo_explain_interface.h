@@ -29,26 +29,27 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/collection_statistics_impl.h"
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include "mongo/db/query/optimizer/cascades/memo_defs.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+
 
 namespace mongo::optimizer::cascades {
 
-class CEHistogramTransportImpl;
-
-class CEHistogramTransport : public CEInterface {
+/**
+ * This is an interface which is used to isolate the dependence of the Explain on the Memo itself.
+ */
+class MemoExplainInterface {
 public:
-    CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats,
-                         std::unique_ptr<CEInterface> fallbackCE);
-    ~CEHistogramTransport();
+    virtual size_t getGroupCount() const = 0;
 
-    CEType deriveCE(const Metadata& metadata,
-                    const Memo& memo,
-                    const properties::LogicalProps& logicalProps,
-                    ABT::reference_type logicalNodeRef) const final;
+    virtual const properties::LogicalProps& getLogicalProps(GroupIdType groupId) const = 0;
 
-private:
-    std::unique_ptr<CEHistogramTransportImpl> _impl;
+    virtual const ABTVector& getLogicalNodes(GroupIdType groupId) const = 0;
+
+    virtual const PhysNodeVector& getPhysicalNodes(GroupIdType groupId) const = 0;
+
+    virtual const std::vector<LogicalRewriteType>& getRules(GroupIdType groupId) const = 0;
 };
 
 }  // namespace mongo::optimizer::cascades

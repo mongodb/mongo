@@ -33,7 +33,6 @@
 #include "mongo/db/query/ce/collection_statistics_impl.h"
 #include "mongo/db/query/ce/histogram_estimation.h"
 
-#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
@@ -85,9 +84,10 @@ std::string serializePath(const optimizer::ABT& path) {
 
 class CEHistogramTransportImpl {
 public:
-    CEHistogramTransportImpl(std::shared_ptr<ce::CollectionStatistics> stats)
-        : _heuristicCE(),
-          _stats(stats),
+    CEHistogramTransportImpl(std::shared_ptr<ce::CollectionStatistics> stats,
+                             std::unique_ptr<CEInterface> fallbackCE)
+        : _stats(stats),
+          _fallbackCE(std::move(fallbackCE)),
           _arrayOnlyInterval(*defaultConvertPathToInterval(make<PathArr>())) {}
 
     ~CEHistogramTransportImpl() {}
@@ -154,13 +154,14 @@ public:
                 continue;
             }
 
-            // Fallback to heuristic if no histogram.
+            // Fallback if there is no histogram.
             auto histogram = _stats->getHistogram(serializedPath);
             if (!histogram) {
                 // For now, because of the structure of SargableNode and the implementation of
-                // HeuristicCE, we can't combine heuristic & histogram estimates. In this case,
-                // default to Heuristic if we don't have a histogram for any of the predicates.
-                return _heuristicCE.deriveCE(metadata, memo, logicalProps, n.ref());
+                // the fallback (currently HeuristicCE), we can't combine heuristic & histogram
+                // estimates. In this case, default to Heuristic if we don't have a histogram for
+                // any of the predicates.
+                return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
             }
 
             // Add this path to the map. If this is not a 'PathArr' interval, add it to the vector
@@ -232,7 +233,7 @@ public:
     }
 
     /**
-     * Other ABT types default to heuristic CE.
+     * Use fallback for other ABT types.
      */
     template <typename T, typename... Ts>
     CEType transport(const ABT& n,
@@ -242,22 +243,23 @@ public:
                      const LogicalProps& logicalProps,
                      Ts&&...) {
         if (canBeLogicalNode<T>()) {
-            return _heuristicCE.deriveCE(metadata, memo, logicalProps, n.ref());
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
         }
         return 0.0;
     }
 
 private:
-    HeuristicCE _heuristicCE;
     std::shared_ptr<ce::CollectionStatistics> _stats;
+    std::unique_ptr<CEInterface> _fallbackCE;
 
     // This is a special interval indicating that we expect to use $elemMatch semantics when
     // estimating the current path.
     const IntervalReqExpr::Node _arrayOnlyInterval;
 };
 
-CEHistogramTransport::CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats)
-    : _impl(std::make_unique<CEHistogramTransportImpl>(stats)) {}
+CEHistogramTransport::CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats,
+                                           std::unique_ptr<CEInterface> fallbackCE)
+    : _impl(std::make_unique<CEHistogramTransportImpl>(stats, std::move(fallbackCE))) {}
 
 CEHistogramTransport::~CEHistogramTransport() {}
 

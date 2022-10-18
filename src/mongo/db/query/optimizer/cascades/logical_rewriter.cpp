@@ -30,6 +30,9 @@
 #include "mongo/db/query/optimizer/cascades/logical_rewriter.h"
 
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/utils/reftracker_utils.h"
+
 
 namespace mongo::optimizer::cascades {
 
@@ -83,6 +86,7 @@ LogicalRewriter::LogicalRewriter(const Metadata& metadata,
                                  const DebugInfo& debugInfo,
                                  const QueryHints& hints,
                                  const PathToIntervalFn& pathToInterval,
+                                 const ConstFoldFn& constFold,
                                  const LogicalPropsInterface& logicalPropsDerivation,
                                  const CEInterface& ceDerivation)
     : _activeRewriteSet(std::move(rewriteSet)),
@@ -93,6 +97,7 @@ LogicalRewriter::LogicalRewriter(const Metadata& metadata,
       _debugInfo(debugInfo),
       _hints(hints),
       _pathToInterval(pathToInterval),
+      _constFold(constFold),
       _logicalPropsDerivation(logicalPropsDerivation),
       _ceDerivation(ceDerivation) {
     initializeRewrites();
@@ -144,7 +149,7 @@ std::pair<GroupIdType, NodeIdSet> LogicalRewriter::addNode(const ABT& node,
         }
 
         for (const auto [type, priority] : _activeRewriteSet) {
-            auto& groupQueue = _memo.getGroup(nodeMemoId._groupId)._logicalRewriteQueue;
+            auto& groupQueue = _memo.getLogicalRewriteQueue(nodeMemoId._groupId);
             groupQueue.push(std::make_unique<LogicalRewriteEntry>(priority, type, nodeMemoId));
 
             _groupsPending.insert(nodeMemoId._groupId);
@@ -207,7 +212,7 @@ public:
     }
 
     const properties::LogicalProps& getAboveLogicalProps() const {
-        return getMemo().getGroup(_aboveNodeId._groupId)._logicalProperties;
+        return getMemo().getLogicalProps(_aboveNodeId._groupId);
     }
 
     bool hasSubstituted() const {
@@ -224,6 +229,10 @@ public:
 
     const auto& getPathToInterval() const {
         return _rewriter._pathToInterval;
+    }
+
+    const auto& getConstFold() const {
+        return _rewriter._constFold;
     }
 
 private:
@@ -583,8 +592,8 @@ static boost::optional<ABT> mergeSargableNodes(
     }
 
     const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
-    bool hasEmptyInterval =
-        simplifyPartialSchemaReqPaths(scanProjName, nonMultiKeyPaths, mergedReqs);
+    bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
+        scanProjName, nonMultiKeyPaths, mergedReqs, ctx.getConstFold());
     if (hasEmptyInterval) {
         return createEmptyValueScanNode(ctx);
     }
@@ -600,7 +609,8 @@ static boost::optional<ABT> mergeSargableNodes(
                                                     mergedReqs,
                                                     scanDef,
                                                     ctx.getHints()._fastIndexNullHandling,
-                                                    hasEmptyInterval);
+                                                    hasEmptyInterval,
+                                                    ctx.getConstFold());
     if (hasEmptyInterval) {
         return createEmptyValueScanNode(ctx);
     }
@@ -709,7 +719,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
 
     const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
     bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
-        scanProjName, scanDef.getNonMultiKeyPathSet(), conversion->_reqMap);
+        scanProjName, scanDef.getNonMultiKeyPathSet(), conversion->_reqMap, ctx.getConstFold());
     if (hasEmptyInterval) {
         addEmptyValueScanNode(ctx);
         return;
@@ -724,7 +734,8 @@ static void convertFilterToSargableNode(ABT::reference_type node,
                                                     conversion->_reqMap,
                                                     scanDef,
                                                     ctx.getHints()._fastIndexNullHandling,
-                                                    hasEmptyInterval);
+                                                    hasEmptyInterval,
+                                                    ctx.getConstFold());
 
     if (hasEmptyInterval) {
         addEmptyValueScanNode(ctx);
@@ -893,7 +904,8 @@ struct SubstituteConvert<EvaluationNode> {
                                                         conversion->_reqMap,
                                                         scanDef,
                                                         ctx.getHints()._fastIndexNullHandling,
-                                                        hasEmptyInterval);
+                                                        hasEmptyInterval,
+                                                        ctx.getConstFold());
 
         if (hasEmptyInterval) {
             addEmptyValueScanNode(ctx);
@@ -1043,7 +1055,7 @@ struct ExploreConvert<SargableNode> {
         const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(props);
         const GroupIdType scanGroupId = indexingAvailability.getScanGroupId();
         if (sargableNode.getChild().cast<MemoLogicalDelegatorNode>()->getGroupId() != scanGroupId ||
-            !ctx.getMemo().getGroup(scanGroupId)._logicalNodes.at(0).is<ScanNode>()) {
+            !ctx.getMemo().getLogicalNodes(scanGroupId).front().is<ScanNode>()) {
             // We are not sitting above a ScanNode.
             lowerSargableNode(sargableNode, ctx);
             return;
@@ -1098,7 +1110,7 @@ struct ExploreConvert<SargableNode> {
                 // an output binding.
                 mayReturnNull.reserve(reqMap.size());
                 for (const auto& [key, req] : reqMap) {
-                    mayReturnNull.push_back(req.mayReturnNull());
+                    mayReturnNull.push_back(req.mayReturnNull(ctx.getConstFold()));
                 }
             }
         }
@@ -1141,7 +1153,8 @@ struct ExploreConvert<SargableNode> {
                                                                 splitResult._leftReqs,
                                                                 scanDef,
                                                                 fastIndexNullHandling,
-                                                                hasEmptyLeftInterval);
+                                                                hasEmptyLeftInterval,
+                                                                ctx.getConstFold());
             if (isIndex && leftCandidateIndexes.empty()) {
                 // Reject rewrite.
                 continue;
@@ -1153,7 +1166,8 @@ struct ExploreConvert<SargableNode> {
                                                                  splitResult._rightReqs,
                                                                  scanDef,
                                                                  fastIndexNullHandling,
-                                                                 hasEmptyRightInterval);
+                                                                 hasEmptyRightInterval,
+                                                                 ctx.getConstFold());
             if (isIndex && rightCandidateIndexes.empty()) {
                 // With empty candidate map, reject only if we cannot implement as Seek.
                 continue;
@@ -1420,7 +1434,7 @@ bool LogicalRewriter::rewriteToFixPoint() {
 }
 
 void LogicalRewriter::rewriteGroup(const GroupIdType groupId) {
-    auto& queue = _memo.getGroup(groupId)._logicalRewriteQueue;
+    auto& queue = _memo.getLogicalRewriteQueue(groupId);
     while (!queue.empty()) {
         LogicalRewriteEntry rewriteEntry = std::move(*queue.top());
         // TODO: check if rewriteEntry is different than previous (remove duplicates).
@@ -1445,7 +1459,7 @@ void LogicalRewriter::bindAboveBelow(const MemoLogicalNodeId nodeMemoId,
                                               .template cast<MemoLogicalDelegatorNode>()
                                               ->getGroupId();
 
-        for (size_t i = 0; i < _memo.getGroup(targetGroupId)._logicalNodes.size(); i++) {
+        for (size_t i = 0; i < _memo.getLogicalNodes(targetGroupId).size(); i++) {
             const MemoLogicalNodeId targetNodeId{targetGroupId, i};
             auto targetNode = _memo.getNode(targetNodeId);
             if (targetNode.is<BelowType>()) {

@@ -29,6 +29,9 @@
 
 #include "mongo/db/pipeline/abt/utils.h"
 
+#include "mongo/db/exec/sbe/values/bson.h"
+
+
 namespace mongo::optimizer {
 
 template <bool isConjunction, typename... Args>

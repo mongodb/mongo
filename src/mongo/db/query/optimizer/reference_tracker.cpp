@@ -29,8 +29,8 @@
 
 #include <iostream>
 
-#include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
+
 
 namespace mongo::optimizer {
 
@@ -266,7 +266,8 @@ private:
 };
 
 struct Collector {
-    explicit Collector(const cascades::Memo* memo) : _memo(memo) {}
+    explicit Collector(const cascades::MemoGroupBinderInterface* memoInterface)
+        : _memoInterface(memoInterface) {}
 
     template <typename T, typename... Ts>
     CollectedInfo transport(const ABT&, const T& op, Ts&&... ts) {
@@ -397,12 +398,12 @@ struct Collector {
                             const MemoLogicalDelegatorNode& memoLogicalDelegatorNode) {
         CollectedInfo result{};
 
-        tassert(6624029, "Uninitialized memo", _memo);
+        tassert(6624029, "Uninitialized memo interface", _memoInterface);
+        const auto& binder =
+            _memoInterface->getBinderForGroup(memoLogicalDelegatorNode.getGroupId());
 
-        auto& group = _memo->getGroup(memoLogicalDelegatorNode.getGroupId());
-
-        auto& projectionNames = group.binder().names();
-        auto& projections = group.binder().exprs();
+        auto& projectionNames = binder.names();
+        auto& projections = binder.exprs();
         for (size_t i = 0; i < projectionNames.size(); i++) {
             result.defs[projectionNames.at(i)] = Definition{n.ref(), projections[i].ref()};
         }
@@ -622,23 +623,24 @@ struct Collector {
     }
 
 private:
-    const cascades::Memo* _memo;
+    const cascades::MemoGroupBinderInterface* _memoInterface;
 };
 
-VariableEnvironment VariableEnvironment::build(const ABT& root, const cascades::Memo* memo) {
-    Collector c(memo);
+VariableEnvironment VariableEnvironment::build(
+    const ABT& root, const cascades::MemoGroupBinderInterface* memoInterface) {
+    Collector c(memoInterface);
     auto info = std::make_unique<CollectedInfo>(c.collect(root));
 
-    return VariableEnvironment{std::move(info), memo};
+    return VariableEnvironment{std::move(info), memoInterface};
 }
 
 void VariableEnvironment::rebuild(const ABT& root) {
-    _info = std::make_unique<CollectedInfo>(Collector{_memo}.collect(root));
+    _info = std::make_unique<CollectedInfo>(Collector{_memoInterface}.collect(root));
 }
 
 VariableEnvironment::VariableEnvironment(std::unique_ptr<CollectedInfo> info,
-                                         const cascades::Memo* memo)
-    : _info(std::move(info)), _memo(memo) {}
+                                         const cascades::MemoGroupBinderInterface* memoInterface)
+    : _info(std::move(info)), _memoInterface(memoInterface) {}
 
 VariableEnvironment::~VariableEnvironment() {}
 
