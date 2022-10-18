@@ -281,8 +281,7 @@ SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
     getMoreRequest.options.fireAndForget = true;
 
     return AsyncTry([executor, getMoreRequest, cancellationSource] {
-               return executor->scheduleRemoteCommand(std::move(getMoreRequest),
-                                                      cancellationSource.token());
+               return executor->scheduleRemoteCommand(getMoreRequest, cancellationSource.token());
            })
         .until([](auto&&) { return false; })
         .withDelayBetweenIterations(Milliseconds(kBackupCursorKeepAliveIntervalMillis))

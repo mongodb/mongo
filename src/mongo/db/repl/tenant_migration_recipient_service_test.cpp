@@ -453,6 +453,19 @@ protected:
         return &_clkSource;
     }
 
+    TenantMigrationRecipientDocument createInitialStateDocument(const UUID& migrationId,
+                                                                MigrationProtocolEnum protocol) {
+        TenantMigrationRecipientDocument initialStateDocument(
+            migrationId,
+            "donor-rs/localhost:12345",
+            "tenantA",
+            kDefaultStartMigrationTimestamp,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+        initialStateDocument.setProtocol(protocol);
+        initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+        return initialStateDocument;
+    }
+
 private:
     ClockSourceMock _clkSource;
 
@@ -3841,6 +3854,51 @@ TEST_F(TenantMigrationRecipientServiceTest,
     ASSERT_EQ(stateDoc.getNumRestartsDueToDonorConnectionFailure(), 0);
     ASSERT_EQ(stateDoc.getNumRestartsDueToRecipientFailure(), 0);
     checkStateDocPersisted(opCtx.get(), instance.get());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientServiceSkipsMarkingExternalKeysAsGarbageCollectableIfAlreadyMarked) {
+
+    auto beforeMarkingForGarbageCollectionFp =
+        globalFailPointRegistry().find("fpAfterReceivingRecipientForgetMigration");
+    auto initialTimesEntered = beforeMarkingForGarbageCollectionFp->setMode(FailPoint::alwaysOn,
+                                                                            0,
+                                                                            BSON("action"
+                                                                                 << "hang"));
+
+    auto markingExternalKeysGarbageCollectionFp = globalFailPointRegistry().find(
+        "pauseTenantMigrationBeforeMarkingExternalKeysGarbageCollectable");
+    auto markingExternalKeysInitialTimesEntered =
+        markingExternalKeysGarbageCollectionFp->setMode(FailPoint::alwaysOn,
+                                                        0,
+                                                        BSON("action"
+                                                             << "hang"));
+
+    const UUID migrationUUID = UUID::gen();
+    auto opCtx = makeOperationContext();
+    auto initialStateDocument =
+        createInitialStateDocument(migrationUUID, MigrationProtocolEnum::kMultitenantMigrations);
+    initialStateDocument.setExpireAt(opCtx->getServiceContext()->getFastClockSource()->now());
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+    ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
+
+    // When reaching this step it means we have passed the logic to mark external keys for garbage
+    // collection.
+    beforeMarkingForGarbageCollectionFp->waitForTimesEntered(initialTimesEntered + 1);
+    beforeMarkingForGarbageCollectionFp->setMode(FailPoint::off);
+
+    // We never reached that logic therefore the time entered should remain the same.
+    ASSERT_EQ(markingExternalKeysGarbageCollectionFp->setMode(FailPoint::off),
+              markingExternalKeysInitialTimesEntered);
+
+    // Wait for task completion.
+    ASSERT_EQ(ErrorCodes::TenantMigrationForgotten,
+              instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 #endif

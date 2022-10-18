@@ -2992,6 +2992,13 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             return _receivedRecipientForgetMigrationPromise.getFuture();
         })
         .then([this, self = shared_from_this(), token] {
+            auto expireAt = [&]() {
+                stdx::lock_guard<Latch> lg(_mutex);
+                return _stateDoc.getExpireAt();
+            }();
+            if (expireAt) {
+                return ExecutorFuture(**_scopedExecutor);
+            }
             // Note marking the keys as garbage collectable is not atomic with marking the
             // state document garbage collectable, so an interleaved failover can lead the
             // keys to be deleted before the state document has an expiration date. This is
