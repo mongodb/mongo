@@ -931,6 +931,9 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
     invariant(_settings.usingReplSets());
     invariant(!ReplSettings::shouldRecoverFromOplogAsStandalone());
 
+    // Initialize the cached pointer to the oplog collection.
+    acquireOplogCollectionForLogging(opCtx);
+
     _storage->initializeStorageControlsForReplication(opCtx->getServiceContext());
 
     // We are expected to be able to transition out of the kConfigStartingUp state by the end
@@ -944,9 +947,6 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
             _topCoord->setStorageEngineSupportsReadCommitted(
                 _externalState->isReadCommittedSupportedByStorageEngine(opCtx));
         }
-
-        // Initialize the cached pointer to the oplog collection.
-        acquireOplogCollectionForLogging(opCtx);
 
         _replExecutor->startup();
 
