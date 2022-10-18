@@ -50,9 +50,8 @@ namespace {
  * found.
  */
 boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
-    OperationContext* opCtx,
     const boost::intrusive_ptr<ExpressionContext> pExpCtx,
-    const repl::OplogEntry oplogEntry,
+    const repl::OplogEntry& oplogEntry,
     boost::optional<repl::DurableReplOperation> innerOp = boost::none) {
     invariant(!innerOp ||
               (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps));
@@ -63,7 +62,7 @@ boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
 
     // Extract the UUID from the collection information. We should always have a valid uuid here.
     auto imageCollUUID = invariantStatusOK(UUID::parse(localImageCollInfo["uuid"]));
-    const auto& readConcernBson = repl::ReadConcernArgs::get(opCtx).toBSON();
+    const auto& readConcernBson = repl::ReadConcernArgs::get(pExpCtx->opCtx).toBSON();
     auto imageDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
         pExpCtx,
         NamespaceString::kConfigImagesNamespace,
@@ -208,11 +207,11 @@ DocumentSource::GetNextResult DocumentSourceFindAndModifyImageLookup::doGetNext(
     uassert(5806001,
             str::stream() << kStageName << " cannot be executed from mongos",
             !pExpCtx->inMongos);
-    if (_stashedFindAndModifyDoc) {
-        // Return the stashed findAndModify document. This indicates that the previous document
+    if (_stashedDownconvertedDoc) {
+        // Return the stashed downconverted document. This indicates that the previous document
         // returned was a forged noop image document.
-        auto doc = *_stashedFindAndModifyDoc;
-        _stashedFindAndModifyDoc = boost::none;
+        auto doc = *_stashedDownconvertedDoc;
+        _stashedDownconvertedDoc = boost::none;
         return doc;
     }
 
@@ -220,17 +219,14 @@ DocumentSource::GetNextResult DocumentSourceFindAndModifyImageLookup::doGetNext(
     if (!input.isAdvanced()) {
         return input;
     }
-    auto doc = input.releaseDocument();
-    if (auto imageEntry = _forgeNoopImageDoc(doc, pExpCtx->opCtx)) {
-        return std::move(*imageEntry);
-    }
-    return doc;
+
+    auto inputDoc = input.releaseDocument();
+    return _downConvertIfNeedsRetryImage(std::move(inputDoc));
 }
 
-boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImageDoc(
-    Document inputDoc, OperationContext* opCtx) {
+Document DocumentSourceFindAndModifyImageLookup::_downConvertIfNeedsRetryImage(Document inputDoc) {
     // If '_includeCommitTransactionTimestamp' is true, strip any commit transaction timestamp field
-    // from the input doc to avoid hitting an unknown field error when parsing the input doc into an
+    // from the inputDoc to avoid hitting an unknown field error when parsing the inputDoc into an
     // oplog entry below. Store the commit timestamp so it can be attached to the forged image doc
     // later, if there is one.
     const auto [inputOplogBson,
@@ -248,7 +244,7 @@ boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImag
                 str::stream() << "'" << CommitTransactionOplogObject::kCommitTimestampFieldName
                               << "' field is not a BSON Timestamp",
                 commitTxnTs.getType() == BSONType::bsonTimestamp);
-        MutableDocument mutableInputDoc(inputDoc);
+        MutableDocument mutableInputDoc{inputDoc};
         mutableInputDoc.remove(CommitTransactionOplogObject::kCommitTimestampFieldName);
         return {mutableInputDoc.freeze().toBson(), commitTxnTs.getTimestamp()};
     }();
@@ -259,19 +255,19 @@ boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImag
 
     if (!sessionId || !txnNumber) {
         // This oplog entry cannot have a retry image.
-        return boost::none;
+        return inputDoc;
     }
 
     if (inputOplogEntry.isCrudOpType() && inputOplogEntry.getNeedsRetryImage()) {
-        // This is a CRUD oplog entry for a retryable write and it has a retry image.
-        if (const auto forgedNoopOplogEntry =
-                forgeNoopImageOplogEntry(opCtx, pExpCtx, inputOplogEntry)) {
+        // Strip the needsRetryImage field if set, even if we don't forge a noop image oplog entry
+        // to ensure we don't erroneously generate config.image_collection entries on the recipient
+        // for tenant migrations.
+        MutableDocument downConvertedDoc{inputDoc};
+        downConvertedDoc.remove(repl::OplogEntryBase::kNeedsRetryImageFieldName);
+
+        if (const auto forgedNoopOplogEntry = forgeNoopImageOplogEntry(pExpCtx, inputOplogEntry)) {
             const auto imageType = inputOplogEntry.getNeedsRetryImage();
             const auto imageOpTime = forgedNoopOplogEntry->getOpTime();
-
-            // Downcovert the document for this CRUD oplog entry, and then stash it.
-            MutableDocument downConvertedDoc{inputDoc};
-            downConvertedDoc.remove(repl::OplogEntryBase::kNeedsRetryImageFieldName);
             downConvertedDoc.setField(
                 imageType == repl::RetryImageEnum::kPreImage
                     ? repl::OplogEntry::kPreImageOpTimeFieldName
@@ -279,62 +275,76 @@ boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImag
                 Value{Document{
                     {repl::OpTime::kTimestampFieldName.toString(), imageOpTime.getTimestamp()},
                     {repl::OpTime::kTermFieldName.toString(), imageOpTime.getTerm()}}});
-            _stashedFindAndModifyDoc = downConvertedDoc.freeze();
-
+            _stashedDownconvertedDoc = downConvertedDoc.freeze();
             return Document{forgedNoopOplogEntry->getEntry().toBSON()};
         }
-        return boost::none;
-    } else if (inputOplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
-               isInternalSessionForRetryableWrite(*sessionId)) {
+
+        return downConvertedDoc.freeze();
+    }
+
+    if (inputOplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
+        isInternalSessionForRetryableWrite(*sessionId)) {
         // This is an applyOps oplog entry for a retryable internal transaction. Unpack its
-        // operations to see if it has a retry image.
+        // operations to see if it has a retry image. Only one findAndModify operation is
+        // allowed in a given retryable transaction.
         const auto applyOpsCmdObj = inputOplogEntry.getOperationToApply();
         const auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(applyOpsCmdObj);
         auto operationDocs = applyOpsInfo.getOperations();
 
         for (size_t i = 0; i < operationDocs.size(); i++) {
             auto op = repl::DurableReplOperation::parse(
-                IDLParserContext{"DocumentSourceFindAndModifyImageLookup::_forgeNoopImageDoc"},
+                IDLParserContext{
+                    "DocumentSourceFindAndModifyImageLookup::_downConvertIfNeedsRetryImage"},
                 operationDocs[i]);
 
-            if (const auto imageType = op.getNeedsRetryImage()) {
-                // This operation has a retry image.
-                if (const auto forgedNoopOplogEntry =
-                        forgeNoopImageOplogEntry(opCtx, pExpCtx, inputOplogEntry, op)) {
-                    const auto imageOpTime = forgedNoopOplogEntry->getOpTime();
-
-                    // Downcovert the document for this applyOps oplog entry by downcoverting this
-                    // operation, and then stash it.
-                    op.setNeedsRetryImage(boost::none);
-                    if (imageType == repl::RetryImageEnum::kPreImage) {
-                        op.setPreImageOpTime(imageOpTime);
-                    } else if (imageType == repl::RetryImageEnum::kPostImage) {
-                        op.setPostImageOpTime(imageOpTime);
-                    } else {
-                        MONGO_UNREACHABLE;
-                    }
-                    operationDocs[i] = op.toBSON();
-                    const auto downCovertedApplyOpsCmdObj = applyOpsCmdObj.addFields(
-                        BSON(repl::ApplyOpsCommandInfo::kOperationsFieldName << operationDocs));
-                    MutableDocument downConvertedDoc(inputDoc);
-                    downConvertedDoc.setField(repl::OplogEntry::kObjectFieldName,
-                                              Value{downCovertedApplyOpsCmdObj});
-                    _stashedFindAndModifyDoc = Document(downConvertedDoc.freeze());
-
-                    MutableDocument forgedNoopDoc{
-                        Document{forgedNoopOplogEntry->getEntry().toBSON()}};
-                    if (commitTxnTs) {
-                        forgedNoopDoc.setField(
-                            CommitTransactionOplogObject::kCommitTimestampFieldName,
-                            Value{*commitTxnTs});
-                    }
-                    return forgedNoopDoc.freeze();
-                }
-                return boost::none;
+            const auto imageType = op.getNeedsRetryImage();
+            if (!imageType) {
+                continue;
             }
+
+            const auto forgedNoopOplogEntry =
+                forgeNoopImageOplogEntry(pExpCtx, inputOplogEntry, op);
+
+            // Downcovert the document for this applyOps oplog entry by downcoverting this
+            // operation. We strip the needsRetryImage field, even if we don't forge a noop image
+            // oplog entry to ensure we don't erroneously generate config.image_collection entries
+            // on the recipient for tenant migrations.
+            op.setNeedsRetryImage(boost::none);
+            if (forgedNoopOplogEntry) {
+                if (imageType == repl::RetryImageEnum::kPreImage) {
+                    op.setPreImageOpTime(forgedNoopOplogEntry->getOpTime());
+                } else if (imageType == repl::RetryImageEnum::kPostImage) {
+                    op.setPostImageOpTime(forgedNoopOplogEntry->getOpTime());
+                } else {
+                    MONGO_UNREACHABLE;
+                }
+            }
+
+            operationDocs[i] = op.toBSON();
+
+            const auto downCovertedApplyOpsCmdObj = applyOpsCmdObj.addFields(
+                BSON(repl::ApplyOpsCommandInfo::kOperationsFieldName << operationDocs));
+
+            MutableDocument downConvertedDoc(inputDoc);
+            downConvertedDoc.setField(repl::OplogEntry::kObjectFieldName,
+                                      Value{downCovertedApplyOpsCmdObj});
+
+            if (!forgedNoopOplogEntry) {
+                return downConvertedDoc.freeze();
+            }
+
+            _stashedDownconvertedDoc = downConvertedDoc.freeze();
+
+            MutableDocument forgedNoopDoc{Document(forgedNoopOplogEntry->getEntry().toBSON())};
+            if (commitTxnTs) {
+                forgedNoopDoc.setField(CommitTransactionOplogObject::kCommitTimestampFieldName,
+                                       Value{*commitTxnTs});
+            }
+
+            return forgedNoopDoc.freeze();
         }
     }
 
-    return boost::none;
+    return inputDoc;
 }
 }  // namespace mongo

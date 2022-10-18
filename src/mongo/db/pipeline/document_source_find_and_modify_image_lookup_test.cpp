@@ -163,19 +163,19 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocMissing
     sessionInfo.setTxnNumber(1);
     const auto stmtId = 1;
     const auto opTime = repl::OpTime(Timestamp(2, 1), 1);
-    const auto oplogEntryBson = makeOplogEntry(opTime,
-                                               repl::OpTypeEnum::kUpdate,
-                                               NamespaceString("test.foo"),
-                                               UUID::gen(),
-                                               BSON("a" << 1),
-                                               sessionInfo,
-                                               {stmtId},
-                                               boost::none /* preImageOpTime */,
-                                               boost::none /* postImageOpTime */,
-                                               repl::RetryImageEnum::kPreImage)
-                                    .getEntry()
-                                    .toBSON();
-    auto mock = DocumentSourceMock::createForTest(Document(oplogEntryBson), getExpCtx());
+    const auto oplogEntryDoc = Document(makeOplogEntry(opTime,
+                                                       repl::OpTypeEnum::kUpdate,
+                                                       NamespaceString("test.foo"),
+                                                       UUID::gen(),
+                                                       BSON("a" << 1),
+                                                       sessionInfo,
+                                                       {stmtId},
+                                                       boost::none /* preImageOpTime */,
+                                                       boost::none /* postImageOpTime */,
+                                                       repl::RetryImageEnum::kPreImage)
+                                            .getEntry()
+                                            .toBSON());
+    auto mock = DocumentSourceMock::createForTest(oplogEntryDoc, getExpCtx());
     imageLookup->setSource(mock.get());
 
     // Mock out the foreign collection.
@@ -184,8 +184,11 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocMissing
 
     auto next = imageLookup->getNext();
     ASSERT_TRUE(next.isAdvanced());
-    Document expected = Document(oplogEntryBson);
-    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+    // The needsRetryImage field should have been stripped even though we are not forging an image
+    // entry.
+    MutableDocument expected{oplogEntryDoc};
+    expected.remove(repl::OplogEntryBase::kNeedsRetryImageFieldName);
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected.freeze());
 
     ASSERT_TRUE(imageLookup->getNext().isEOF());
     ASSERT_TRUE(imageLookup->getNext().isEOF());
@@ -201,19 +204,19 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
     const auto stmtId = 1;
     const auto ts = Timestamp(2, 1);
     const auto opTime = repl::OpTime(ts, 1);
-    const auto oplogEntryBson = makeOplogEntry(opTime,
-                                               repl::OpTypeEnum::kUpdate,
-                                               NamespaceString("test.foo"),
-                                               UUID::gen(),
-                                               BSON("a" << 1),
-                                               sessionInfo,
-                                               {stmtId},
-                                               boost::none /* preImageOpTime */,
-                                               boost::none /* postImageOpTime */,
-                                               repl::RetryImageEnum::kPreImage)
-                                    .getEntry()
-                                    .toBSON();
-    auto mock = DocumentSourceMock::createForTest(Document(oplogEntryBson), getExpCtx());
+    const auto oplogEntryDoc = Document(makeOplogEntry(opTime,
+                                                       repl::OpTypeEnum::kUpdate,
+                                                       NamespaceString("test.foo"),
+                                                       UUID::gen(),
+                                                       BSON("a" << 1),
+                                                       sessionInfo,
+                                                       {stmtId},
+                                                       boost::none /* preImageOpTime */,
+                                                       boost::none /* postImageOpTime */,
+                                                       repl::RetryImageEnum::kPreImage)
+                                            .getEntry()
+                                            .toBSON());
+    auto mock = DocumentSourceMock::createForTest(oplogEntryDoc, getExpCtx());
     imageLookup->setSource(mock.get());
 
     // Create an 'ImageEntry' with a higher 'txnNumber'.
@@ -230,8 +233,11 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
 
     auto next = imageLookup->getNext();
     ASSERT_TRUE(next.isAdvanced());
-    Document expected = Document(oplogEntryBson);
-    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+    // The needsRetryImage field should have been stripped even though we are not forging an image
+    // entry.
+    MutableDocument expected{oplogEntryDoc};
+    expected.remove(repl::OplogEntryBase::kNeedsRetryImageFieldName);
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected.freeze());
 
     ASSERT_TRUE(imageLookup->getNext().isEOF());
     ASSERT_TRUE(imageLookup->getNext().isEOF());
@@ -435,6 +441,87 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         ASSERT_TRUE(imageLookup->getNext().isEOF());
         ASSERT_TRUE(imageLookup->getNext().isEOF());
     }
+}
+TEST_F(FindAndModifyImageLookupTest,
+       ShouldNotForgeImageEntryWhenMatchingImageDocIsNotFoundApplyOpsOp) {
+    auto imageLookup = DocumentSourceFindAndModifyImageLookup::create(
+        getExpCtx(), true /* includeCommitTransactionTimestamp */);
+    const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+    const auto txnNum = 1LL;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(txnNum);
+    const auto stmtId = 1;
+    const auto applyOpsTs = Timestamp(2, 1);
+    const auto applyOpsOpTime = repl::OpTime(applyOpsTs, 1);
+    const auto commitTxnTs = Timestamp(3, 1);
+    const auto commitTxnTsFieldName = CommitTransactionOplogObject::kCommitTimestampFieldName;
+    const auto nss = NamespaceString("test.foo");
+    const auto uuid = UUID::gen();
+
+    // Define an applyOps oplog entry containing a findAndModify/update operation entry with
+    // the 'needsRetryImage' field set.
+    auto insertOp = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 0 << "a" << 0), BSON("_id" << 0));
+    auto updateOp = repl::MutableOplogEntry::makeUpdateOperation(
+        nss, uuid, BSON("$set" << BSON("a" << 1)), BSON("_id" << 1));
+    updateOp.setStatementIds({{stmtId}});
+    updateOp.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
+    BSONObjBuilder applyOpsBuilder;
+    applyOpsBuilder.append("applyOps", BSON_ARRAY(insertOp.toBSON() << updateOp.toBSON()));
+    auto oplogEntryUUID = UUID::gen();
+    auto oplogEntryBson = makeOplogEntry(applyOpsOpTime,
+                                         repl::OpTypeEnum::kCommand,
+                                         {},
+                                         oplogEntryUUID,
+                                         applyOpsBuilder.obj(),
+                                         sessionInfo,
+                                         {})
+                              .getEntry()
+                              .toBSON()
+                              .addFields(BSON(commitTxnTsFieldName << commitTxnTs));
+
+    auto mock = DocumentSourceMock::createForTest(Document(oplogEntryBson), getExpCtx());
+    imageLookup->setSource(mock.get());
+
+    // Mock out the foreign collection.
+    getExpCtx()->mongoProcessInterface =
+        std::make_unique<MockMongoInterface>(std::vector<Document>{Document{}});
+
+    // The next doc should be the doc for original applyOps oplog entry but the
+    // findAndModify/update operation entry should have 'needsRetryImage' field removed.
+    auto next = imageLookup->getNext();
+    const auto downConvertedOplogEntryBson = next.releaseDocument().toBson();
+
+    auto updateOpWithoutNeedsRetryImage = repl::MutableOplogEntry::makeUpdateOperation(
+        nss, uuid, BSON("$set" << BSON("a" << 1)), BSON("_id" << 1));
+    updateOpWithoutNeedsRetryImage.setStatementIds({{stmtId}});
+    BSONObjBuilder applyOpsWithoutNeedsRetryImageBuilder;
+    applyOpsWithoutNeedsRetryImageBuilder.append(
+        "applyOps", BSON_ARRAY(insertOp.toBSON() << updateOpWithoutNeedsRetryImage.toBSON()));
+    auto expectedOplogEntryBson = makeOplogEntry(applyOpsOpTime,
+                                                 repl::OpTypeEnum::kCommand,
+                                                 {},
+                                                 oplogEntryUUID,
+                                                 applyOpsWithoutNeedsRetryImageBuilder.obj(),
+                                                 sessionInfo,
+                                                 {})
+                                      .getEntry()
+                                      .toBSON()
+                                      .addFields(BSON(commitTxnTsFieldName << commitTxnTs));
+
+    ASSERT_BSONOBJ_EQ(expectedOplogEntryBson, downConvertedOplogEntryBson);
+
+    auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(
+        downConvertedOplogEntryBson.getObjectField(repl::OplogEntry::kObjectFieldName));
+    auto operationDocs = applyOpsInfo.getOperations();
+    ASSERT_EQ(operationDocs.size(), 2U);
+
+    ASSERT_BSONOBJ_EQ(operationDocs[0], insertOp.toBSON());
+
+    ASSERT_TRUE(imageLookup->getNext().isEOF());
+    ASSERT_TRUE(imageLookup->getNext().isEOF());
+    ASSERT_TRUE(imageLookup->getNext().isEOF());
 }
 }  // namespace
 }  // namespace mongo
