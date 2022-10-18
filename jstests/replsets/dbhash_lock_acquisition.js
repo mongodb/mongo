@@ -82,7 +82,7 @@ threadDBHash.start();
 
 assert.soon(() => {
     const ops = db.currentOp({"command.dbHash": 1, waitingForLock: true}).inprog;
-    if (ops.length === 0) {
+    if (ops.length === 0 || !ops[0].locks.hasOwnProperty("Collection")) {
         return false;
     }
     assert.eq(ops[0].locks, {
