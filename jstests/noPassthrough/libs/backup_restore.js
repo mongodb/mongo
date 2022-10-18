@@ -314,7 +314,8 @@ var BackupRestoreTest = function(options) {
             // resmoke.py may exit cleanly on SIGINT returning 130, or uncleanly in which case
             // stopMongoProgramByPid returns -SIGINT.
             assert(exitCode == 130 || exitCode == -kSIGINT,
-                   'expected resmoke.py to exit due to being interrupted');
+                   'expected resmoke.py to exit due to being interrupted, but exited with code: ' +
+                       exitCode);
         }
 
         // Make sure the databases are not in a drop-pending state. This can happen if we
