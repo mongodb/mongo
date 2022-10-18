@@ -41,7 +41,7 @@
 #include <vector>
 
 #include "mongo/base/init.h"
-#include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_crypto_predicate.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
