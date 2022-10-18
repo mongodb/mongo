@@ -104,7 +104,6 @@ private:
     TickSource::Tick _startProcessingTime{0};
     int admissions{0};
     LockMode _lockMode = LockMode::MODE_NONE;
-    // TODO SERVER-68933: Don't default _priority to kNormal.
     boost::optional<Priority> _priority{Priority::kNormal};
 };
 
