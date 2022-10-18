@@ -83,3 +83,7 @@ feature_flags:
                   config data and user data.  It is a shard server, and the config server."
     cpp_varname: feature_flags::gCatalogShard
     default: false
+  featureFlagConcurrencyInChunkMigration:
+    description: "Feature flag for enabling concurrency within a chunk migration"
+    cpp_varname: feature_flags::gConcurrencyInChunkMigration
+    default: false
