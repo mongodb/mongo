@@ -286,7 +286,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
             BSONObjBuilder temp;
             storageSize += collection->getRecordStore()->storageSize(opCtx, &temp);
 
-            indexes += collection->getIndexCatalog()->numIndexesTotal(opCtx);
+            indexes += collection->getIndexCatalog()->numIndexesTotal();
             indexSize += collection->getIndexSize(opCtx);
 
             if (includeFreeStorage) {
@@ -427,7 +427,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     // Make sure no indexes builds are in progress.
     // Use massert() to be consistent with IndexCatalog::dropAllIndexes().
-    auto numIndexesInProgress = collection->getIndexCatalog()->numIndexesInProgress(opCtx);
+    auto numIndexesInProgress = collection->getIndexCatalog()->numIndexesInProgress();
     massert(ErrorCodes::BackgroundOperationInProgressForNamespace,
             str::stream() << "cannot drop collection " << nss << " (" << uuid << ") when "
                           << numIndexesInProgress << " index builds in progress.",

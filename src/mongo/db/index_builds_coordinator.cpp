@@ -3029,7 +3029,7 @@ int IndexBuildsCoordinator::getNumIndexesTotal(OperationContext* opCtx,
     auto indexCatalog = collection->getIndexCatalog();
     invariant(indexCatalog, str::stream() << "Collection is missing index catalog: " << nss);
 
-    return indexCatalog->numIndexesTotal(opCtx);
+    return indexCatalog->numIndexesTotal();
 }
 
 std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(

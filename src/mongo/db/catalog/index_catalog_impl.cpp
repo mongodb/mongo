@@ -434,7 +434,7 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
 
     LOGV2_ERROR(20365,
                 "Internal Index Catalog state",
-                "numIndexesTotal"_attr = numIndexesTotal(opCtx),
+                "numIndexesTotal"_attr = numIndexesTotal(),
                 "numIndexesInCollectionCatalogEntry"_attr = numIndexesInCollectionCatalogEntry,
                 "numReadyIndexes"_attr = _readyIndexes.size(),
                 "numBuildingIndexes"_attr = _buildingIndexes.size(),
@@ -1195,7 +1195,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
         }
     }
 
-    if (numIndexesTotal(opCtx) >= kMaxNumIndexesAllowed) {
+    if (numIndexesTotal() >= kMaxNumIndexesAllowed) {
         string s = str::stream() << "add index fails, too many indexes for " << collection->ns()
                                  << " key:" << key;
         LOGV2(20354,
@@ -1265,7 +1265,7 @@ void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
                 didExclude = true;
             }
         }
-        invariant(seen == numIndexesTotal(opCtx));
+        invariant(seen == numIndexesTotal());
     }
 
     for (size_t i = 0; i < indexNamesToDrop.size(); i++) {
@@ -1293,11 +1293,11 @@ void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
     long long numIndexesInCollectionCatalogEntry = collection->getTotalIndexCount();
 
     if (!didExclude) {
-        if (numIndexesTotal(opCtx) || numIndexesInCollectionCatalogEntry || _readyIndexes.size()) {
+        if (numIndexesTotal() || numIndexesInCollectionCatalogEntry || _readyIndexes.size()) {
             _logInternalState(
                 opCtx, collection, numIndexesInCollectionCatalogEntry, indexNamesToDrop);
         }
-        fassert(17327, numIndexesTotal(opCtx) == 0);
+        fassert(17327, numIndexesTotal() == 0);
         fassert(17328, numIndexesInCollectionCatalogEntry == 0);
         fassert(17337, _readyIndexes.size() == 0);
     }
@@ -1531,17 +1531,16 @@ bool IndexCatalogImpl::haveAnyIndexesInProgress() const {
     return _buildingIndexes.size() > 0;
 }
 
-int IndexCatalogImpl::numIndexesTotal(OperationContext* opCtx) const {
+int IndexCatalogImpl::numIndexesTotal() const {
     return _readyIndexes.size() + _buildingIndexes.size() + _frozenIndexes.size();
 }
 
-int IndexCatalogImpl::numIndexesReady(OperationContext* opCtx) const {
-    std::vector<const IndexDescriptor*> itIndexes;
-    auto ii = getIndexIterator(opCtx, InclusionPolicy::kReady);
-    while (ii->more()) {
-        itIndexes.push_back(ii->next()->descriptor());
-    }
-    return itIndexes.size();
+int IndexCatalogImpl::numIndexesReady() const {
+    return _readyIndexes.size();
+}
+
+int IndexCatalogImpl::numIndexesInProgress() const {
+    return _buildingIndexes.size();
 }
 
 bool IndexCatalogImpl::haveIdIndex(OperationContext* opCtx) const {

@@ -234,11 +234,11 @@ public:
 
     virtual bool haveAnyIndexesInProgress() const = 0;
 
-    virtual int numIndexesTotal(OperationContext* opCtx) const = 0;
+    virtual int numIndexesTotal() const = 0;
 
-    virtual int numIndexesReady(OperationContext* opCtx) const = 0;
+    virtual int numIndexesReady() const = 0;
 
-    virtual int numIndexesInProgress(OperationContext* opCtx) const = 0;
+    virtual int numIndexesInProgress() const = 0;
 
     virtual bool haveIdIndex(OperationContext* opCtx) const = 0;
 

@@ -216,7 +216,7 @@ void cappedTruncateAfter(OperationContext* opCtx,
                          bool inclusive) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
     invariant(collection->isCapped());
-    invariant(collection->getIndexCatalog()->numIndexesInProgress(opCtx) == 0);
+    invariant(collection->getIndexCatalog()->numIndexesInProgress() == 0);
 
     collection->getRecordStore()->cappedTruncateAfter(
         opCtx, end, inclusive, [&](OperationContext* opCtx, const RecordId& loc, RecordData data) {

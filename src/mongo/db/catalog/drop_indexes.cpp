@@ -425,7 +425,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
     }
 
     DropIndexesReply reply;
-    reply.setNIndexesWas((*collection)->getIndexCatalog()->numIndexesTotal(opCtx));
+    reply.setNIndexesWas((*collection)->getIndexCatalog()->numIndexesTotal());
 
     const bool isWildcard =
         stdx::holds_alternative<std::string>(index) && stdx::get<std::string>(index) == "*";
@@ -550,7 +550,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         invariant(isWildcard);
         invariant(indexNames.size() == 1);
         invariant(indexNames.front() == "*");
-        invariant((*collection)->getIndexCatalog()->numIndexesInProgress(opCtx) == 0);
+        invariant((*collection)->getIndexCatalog()->numIndexesInProgress() == 0);
     }
 
     writeConflictRetry(

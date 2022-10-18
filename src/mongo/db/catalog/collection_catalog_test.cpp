@@ -1048,7 +1048,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollection) {
     std::shared_ptr<Collection> coll =
         CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(coll);
-    ASSERT_EQ(0, coll->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+    ASSERT_EQ(0, coll->getIndexCatalog()->numIndexesTotal());
 
     // Verify that the CollectionCatalog returns the latest collection with the index present. This
     // has to be done in an alternative client as we already have an open snapshot from an earlier
@@ -1059,7 +1059,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollection) {
     auto latestColl = CollectionCatalog::get(newOpCtx.get())
                           ->lookupCollectionByNamespaceForRead(newOpCtx.get(), nss);
     ASSERT(latestColl);
-    ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesTotal(newOpCtx.get()));
+    ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesTotal());
 
     // Ensure the idents are shared between the collection instances.
     ASSERT_NE(coll, latestColl);
@@ -1096,7 +1096,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithIndex) {
     std::shared_ptr<Collection> coll =
         CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(coll);
-    ASSERT_EQ(1, coll->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+    ASSERT_EQ(1, coll->getIndexCatalog()->numIndexesTotal());
 
     // Verify that the CollectionCatalog returns the latest collection. This has to be done in an
     // alternative client as we already have an open snapshot from an earlier point-in-time above.
@@ -1106,7 +1106,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithIndex) {
     auto latestColl = CollectionCatalog::get(newOpCtx.get())
                           ->lookupCollectionByNamespaceForRead(newOpCtx.get(), nss);
     ASSERT(latestColl);
-    ASSERT_EQ(2, latestColl->getIndexCatalog()->numIndexesTotal(newOpCtx.get()));
+    ASSERT_EQ(2, latestColl->getIndexCatalog()->numIndexesTotal());
 
     // Ensure the idents are shared between the collection and index instances.
     ASSERT_NE(coll, latestColl);
@@ -1502,7 +1502,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
             CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createIndexTs);
         ASSERT(openedColl);
         ASSERT_EQ(openedColl->getSharedIdent(), coll->getSharedIdent());
-        ASSERT_EQ(2, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+        ASSERT_EQ(2, openedColl->getIndexCatalog()->numIndexesTotal());
 
         // All idents are marked as in use and none should be removed.
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
@@ -1518,7 +1518,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
             CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, dropXIndexTs);
         ASSERT(openedColl);
         ASSERT_EQ(openedColl->getSharedIdent(), coll->getSharedIdent());
-        ASSERT_EQ(1, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+        ASSERT_EQ(1, openedColl->getIndexCatalog()->numIndexesTotal());
 
         std::vector<std::string> indexNames;
         openedColl->getAllIndexes(&indexNames);
@@ -1541,7 +1541,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
                 ->openCollection(opCtx.get(), nss, createCollectionTs);
         ASSERT(openedColl);
         ASSERT_EQ(openedColl->getSharedIdent(), coll->getSharedIdent());
-        ASSERT_EQ(0, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+        ASSERT_EQ(0, openedColl->getIndexCatalog()->numIndexesTotal());
     }
 
     {
@@ -1615,7 +1615,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
         std::shared_ptr<Collection> openedColl =
             CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createIndexTs);
         ASSERT(openedColl);
-        ASSERT_EQ(2, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+        ASSERT_EQ(2, openedColl->getIndexCatalog()->numIndexesTotal());
 
         // All idents are marked as in use and none should be removed.
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
@@ -1630,7 +1630,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
         std::shared_ptr<Collection> openedColl =
             CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, dropXIndexTs);
         ASSERT(openedColl);
-        ASSERT_EQ(1, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+        ASSERT_EQ(1, openedColl->getIndexCatalog()->numIndexesTotal());
 
         std::vector<std::string> indexNames;
         openedColl->getAllIndexes(&indexNames);
@@ -1651,7 +1651,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
             CollectionCatalog::get(opCtx.get())
                 ->openCollection(opCtx.get(), nss, createCollectionTs);
         ASSERT(openedColl);
-        ASSERT_EQ(0, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+        ASSERT_EQ(0, openedColl->getIndexCatalog()->numIndexesTotal());
     }
 
     {

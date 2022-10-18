@@ -234,7 +234,7 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         return Status::OK();
     }
     const NamespaceStringOrUUID dbAndUUID{coll->ns().dbName(), coll->uuid()};
-    const int numIndexes = coll->getIndexCatalog()->numIndexesTotal(opCtx);
+    const int numIndexes = coll->getIndexCatalog()->numIndexesTotal();
 
     while (true) {
         // Save a copy of the namespace before yielding our locks.
@@ -286,7 +286,7 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
     // nss as a view while refreshing.
     CollectionShardingState::get(opCtx, resolvedNss)->checkShardVersionOrThrow(opCtx);
 
-    invariant(coll->getIndexCatalog()->numIndexesInProgress(opCtx) == 0);
+    invariant(coll->getIndexCatalog()->numIndexesInProgress() == 0);
 
     status = dropFn(optionalAutoDb->getDb(), resolvedNss);
     if (!status.isOK()) {
@@ -331,7 +331,7 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
 
     WriteUnitOfWork wunit(opCtx);
 
-    int numIndexes = coll->getIndexCatalog()->numIndexesTotal(opCtx);
+    int numIndexes = coll->getIndexCatalog()->numIndexesTotal();
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     status =
         systemCollectionMode == DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops

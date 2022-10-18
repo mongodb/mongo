@@ -149,7 +149,7 @@ int _createIndexOnEmptyCollection(OperationContext* opCtx, NamespaceString nss, 
             .getStatus());
     wunit.commit();
 
-    return indexCatalog->numIndexesReady(opCtx);
+    return indexCatalog->numIndexesReady();
 }
 
 /**
@@ -616,7 +616,7 @@ void _testDestroyUncommitedCollectionBulkLoader(
     // IndexCatalog::numIndexesTotal() includes unfinished indexes. We need to ensure that
     // the bulk loader drops the unfinished indexes.
     auto collIdxCat = coll->getIndexCatalog();
-    ASSERT_EQUALS(0, collIdxCat->numIndexesTotal(opCtx));
+    ASSERT_EQUALS(0, collIdxCat->numIndexesTotal());
 }
 
 TEST_F(StorageInterfaceImplTest, DestroyingUncommittedCollectionBulkLoaderDropsIndexes) {

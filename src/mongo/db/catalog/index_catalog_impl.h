@@ -82,11 +82,9 @@ public:
 
     bool haveAnyIndexes() const override;
     bool haveAnyIndexesInProgress() const override;
-    int numIndexesTotal(OperationContext* opCtx) const override;
-    int numIndexesReady(OperationContext* opCtx) const override;
-    int numIndexesInProgress(OperationContext* opCtx) const {
-        return numIndexesTotal(opCtx) - numIndexesReady(opCtx) - _frozenIndexes.size();
-    }
+    int numIndexesTotal() const override;
+    int numIndexesReady() const override;
+    int numIndexesInProgress() const override;
 
     /**
      * this is in "alive" until the Collection goes away

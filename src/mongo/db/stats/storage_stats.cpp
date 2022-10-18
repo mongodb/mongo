@@ -162,7 +162,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     BSONObjBuilder indexDetails;
     std::vector<std::string> indexBuilds;
 
-    auto numIndexes = indexCatalog->numIndexesTotal(opCtx);
+    auto numIndexes = indexCatalog->numIndexesTotal();
     if (collection->isClustered() && !collection->ns().isTimeseriesBucketsCollection()) {
         // There is an implicit 'clustered' index on a clustered collection. Increment the total
         // index count to reflect that.

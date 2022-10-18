@@ -83,12 +83,12 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         dbtests::WriteContextForTests ctx(&opCtx, _nss.ns());
 
-        int numFinishedIndexesStart = indexCatalog(&opCtx)->numIndexesReady(&opCtx);
+        int numFinishedIndexesStart = indexCatalog(&opCtx)->numIndexesReady();
 
         dbtests::createIndex(&opCtx, _nss.ns(), BSON("x" << 1)).transitional_ignore();
         dbtests::createIndex(&opCtx, _nss.ns(), BSON("y" << 1)).transitional_ignore();
 
-        ASSERT_TRUE(indexCatalog(&opCtx)->numIndexesReady(&opCtx) == numFinishedIndexesStart + 2);
+        ASSERT_TRUE(indexCatalog(&opCtx)->numIndexesReady() == numFinishedIndexesStart + 2);
 
         auto ii =
             indexCatalog(&opCtx)->getIndexIterator(&opCtx, IndexCatalog::InclusionPolicy::kReady);
@@ -107,7 +107,7 @@ public:
             }
         }
 
-        ASSERT_TRUE(indexesIterated == indexCatalog(&opCtx)->numIndexesReady(&opCtx));
+        ASSERT_TRUE(indexesIterated == indexCatalog(&opCtx)->numIndexesReady());
         ASSERT_TRUE(foundIndex);
     }
 };

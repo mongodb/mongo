@@ -1304,7 +1304,7 @@ uint64_t CollectionImpl::getIndexFreeStorageBytes(OperationContext* const opCtx)
  */
 Status CollectionImpl::truncate(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
-    invariant(_indexCatalog->numIndexesInProgress(opCtx) == 0);
+    invariant(_indexCatalog->numIndexesInProgress() == 0);
 
     // 1) store index specs
     std::vector<BSONObj> indexSpecs;

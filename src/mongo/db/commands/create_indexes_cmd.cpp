@@ -310,7 +310,7 @@ bool indexesAlreadyExist(OperationContext* opCtx,
         return false;
     }
 
-    auto numIndexes = collection->getIndexCatalog()->numIndexesTotal(opCtx);
+    auto numIndexes = collection->getIndexCatalog()->numIndexesTotal();
     reply->setNumIndexesBefore(numIndexes);
     reply->setNumIndexesAfter(numIndexes);
     reply->setNote(kAllIndexesAlreadyExist);

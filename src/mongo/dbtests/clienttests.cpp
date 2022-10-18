@@ -129,19 +129,19 @@ public:
         const bool includeBuildUUIDs = false;
         const int options = 0;
 
-        ASSERT_EQUALS(1, indexCatalog()->numIndexesReady(&opCtx));
+        ASSERT_EQUALS(1, indexCatalog()->numIndexesReady());
         // _id index
         ASSERT_EQUALS(1U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_EQUALS(ErrorCodes::DuplicateKey,
                       dbtests::createIndex(&opCtx, ns(), BSON("y" << 1), true));
 
-        ASSERT_EQUALS(1, indexCatalog()->numIndexesReady(&opCtx));
+        ASSERT_EQUALS(1, indexCatalog()->numIndexesReady());
         ASSERT_EQUALS(1U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1), true));
 
-        ASSERT_EQUALS(2, indexCatalog()->numIndexesReady(&opCtx));
+        ASSERT_EQUALS(2, indexCatalog()->numIndexesReady());
         ASSERT_EQUALS(2U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
     }
 };
