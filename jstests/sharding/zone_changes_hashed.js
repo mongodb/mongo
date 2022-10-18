@@ -1,10 +1,5 @@
 /**
  * Test that chunks and documents are moved correctly after zone changes.
- *
- * * @tags: [
- *   # TODO SERVER-67813: Review "requires_fcv_61" tags when data size aware balancing lands in v6.0
- *   requires_fcv_61,
- *  ]
  */
 (function() {
 'use strict';
