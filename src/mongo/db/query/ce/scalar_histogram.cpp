@@ -57,6 +57,12 @@ std::string Bucket::toString() const {
     return os.str();
 }
 
+std::string Bucket::dump() const {
+    std::ostringstream os;
+    os << _equalFreq << ", " << _rangeFreq << ", " << _ndv;
+    return os.str();
+}
+
 ScalarHistogram::ScalarHistogram() : ScalarHistogram({}, {}) {}
 
 ScalarHistogram::ScalarHistogram(const StatsHistogram& histogram) {
@@ -129,6 +135,16 @@ std::string ScalarHistogram::plot() const {
     }
     os << maxLine << "\n";
 
+    return os.str();
+}
+
+std::string ScalarHistogram::dump() const {
+    std::ostringstream os;
+    os << "Histogram:\n{";
+    for (size_t i = 0; i < _buckets.size(); i++) {
+        os << "{" << _bounds.getAt(i) << ", " << _buckets.at(i).dump() << "},\n";
+    }
+    os << "}";
     return os.str();
 }
 

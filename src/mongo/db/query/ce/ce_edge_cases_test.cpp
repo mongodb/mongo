@@ -30,6 +30,7 @@
 #include "mongo/db/query/ce/array_histogram.h"
 #include "mongo/db/query/ce/ce_test_utils.h"
 #include "mongo/db/query/ce/histogram_estimation.h"
+#include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/unittest/unittest.h"
 
@@ -139,7 +140,6 @@ TEST(EstimatorTest, OneBucketTwoIntValuesHistogram2) {
     ASSERT_EQ(0.0, estimateIntValCard(hist, 1000, EstimationType::kGreater));
 }
 
-
 TEST(EstimatorTest, TwoBucketsIntHistogram) {
     // Data set of 10 values in the range [1, 100].
     std::vector<BucketData> data{{1, 1.0, 0.0, 0.0}, {100, 3.0, 26.0, 8.0}};
@@ -233,10 +233,11 @@ TEST(EstimatorTest, OneBucketStrHistogram) {
 
     std::tie(tag, value) = value::makeNewString(""_sd);
     expectedCard = estimate(hist, tag, value, EstimationType::kEqual).card;
-    ASSERT_EQ(3.0, expectedCard);
+    ASSERT_EQ(kMinCard, expectedCard);
     expectedCard = estimate(hist, tag, value, EstimationType::kLess).card;
-    ASSERT_EQ(10.5, expectedCard);
-    // Can we do better? Figure out that the query value is the smallest in its data type.
+    ASSERT_EQ(0.0, expectedCard);
+    expectedCard = estimate(hist, tag, value, EstimationType::kGreaterOrEqual).card;
+    ASSERT_EQ(30.0, expectedCard);
 
     // Estimates for a value larger than the upper bound.
     std::tie(tag, value) = value::makeNewString("z"_sd);
@@ -502,6 +503,230 @@ TEST(EstimatorTest, TwoBucketsObjectIdHistogram) {
     ASSERT_EQ(100.0, expectedCard);
     expectedCard = estimate(hist, tag, value, EstimationType::kGreater).card;
     ASSERT_EQ(0.0, expectedCard);
+}
+
+TEST(EstimatorTest, TwoExclusiveBucketsMixedHistogram) {
+    // Data set of mixed data types: 3 integers and 5 strings.
+    std::vector<BucketData> data{{1, 3.0, 0.0, 0.0}, {"abc", 5.0, 0.0, 0.0}};
+    const ScalarHistogram hist = createHistogram(data);
+    const ArrayHistogram arrHist(
+        hist, TypeCounts{{value::TypeTags::NumberInt64, 3}, {value::TypeTags::StringSmall, 5}});
+
+    const auto [tagLowDbl, valLowDbl] =
+        std::make_pair(value::TypeTags::NumberDouble,
+                       value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN()));
+
+    // (NaN, 1).
+    double expectedCard = estimateCardRange(arrHist,
+                                            false /* lowInclusive */,
+                                            tagLowDbl,
+                                            valLowDbl,
+                                            false /* highInclusive */,
+                                            value::TypeTags::NumberInt32,
+                                            value::bitcastFrom<int64_t>(1),
+                                            true /* includeScalar */);
+    ASSERT_APPROX_EQUAL(0.0, expectedCard, 0.1);
+
+    // (NaN, 5).
+    expectedCard = estimateCardRange(arrHist,
+                                     false /* lowInclusive */,
+                                     tagLowDbl,
+                                     valLowDbl,
+                                     false /* highInclusive */,
+                                     value::TypeTags::NumberInt32,
+                                     value::bitcastFrom<int64_t>(5),
+                                     true /* includeScalar */);
+    ASSERT_APPROX_EQUAL(3.0, expectedCard, 0.1);
+
+    const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
+    value::ValueGuard vgLowStr(tagLowStr, valLowStr);
+    auto [tag, value] = value::makeNewString("a"_sd);
+    value::ValueGuard vg(tag, value);
+
+    // [0, "").
+    expectedCard = estimateCardRange(arrHist,
+                                     true /* lowInclusive */,
+                                     value::TypeTags::NumberInt32,
+                                     value::bitcastFrom<int64_t>(0),
+                                     false /* highInclusive */,
+                                     tagLowStr,
+                                     valLowStr,
+                                     true /* includeScalar */);
+    ASSERT_APPROX_EQUAL(3.0, expectedCard, 0.1);
+
+    // ["", "a"].
+    expectedCard = estimateCardRange(arrHist,
+                                     true /* lowInclusive */,
+                                     tagLowStr,
+                                     valLowStr,
+                                     true /* highInclusive */,
+                                     tag,
+                                     value,
+                                     true /* includeScalar */);
+
+    ASSERT_APPROX_EQUAL(0.0, expectedCard, 0.1);
+
+    std::tie(tag, value) = value::makeNewString("xyz"_sd);
+    // ["", "xyz"].
+    expectedCard = estimateCardRange(arrHist,
+                                     true /* lowInclusive */,
+                                     tagLowStr,
+                                     valLowStr,
+                                     true /* highInclusive */,
+                                     tag,
+                                     value,
+                                     true /* includeScalar */);
+
+    ASSERT_APPROX_EQUAL(5.0, expectedCard, 0.1);
+}
+
+TEST(EstimatorTest, TwoBucketsMixedHistogram) {
+    // Data set of mixed data types: 20 integers and 80 strings.
+    // Histogram with one bucket per data type.
+    std::vector<BucketData> data{{100, 3.0, 17.0, 9.0}, {"pqr", 5.0, 75.0, 25.0}};
+    const ScalarHistogram hist = createHistogram(data);
+    const ArrayHistogram arrHist(
+        hist, TypeCounts{{value::TypeTags::NumberInt64, 20}, {value::TypeTags::StringSmall, 80}});
+
+    ASSERT_EQ(100.0, getTotals(hist).card);
+
+    // Estimates with the bucket bounds.
+    ASSERT_EQ(3.0, estimateIntValCard(hist, 100, EstimationType::kEqual));
+    ASSERT_EQ(17.0, estimateIntValCard(hist, 100, EstimationType::kLess));
+    ASSERT_EQ(80.0, estimateIntValCard(hist, 100, EstimationType::kGreater));
+
+    auto [tag, value] = value::makeNewString("pqr"_sd);
+    value::ValueGuard vg(tag, value);
+    double expectedCard = estimate(hist, tag, value, EstimationType::kEqual).card;
+    ASSERT_EQ(5.0, expectedCard);
+    expectedCard = estimate(hist, tag, value, EstimationType::kLess).card;
+    ASSERT_EQ(95.0, expectedCard);
+    expectedCard = estimate(hist, tag, value, EstimationType::kGreater).card;
+    ASSERT_EQ(0.0, expectedCard);
+
+    // Estimates for a value smaller than the first bucket bound.
+    ASSERT_APPROX_EQUAL(1.9, estimateIntValCard(hist, 50, EstimationType::kEqual), 0.1);
+    ASSERT_APPROX_EQUAL(6.6, estimateIntValCard(hist, 50, EstimationType::kLess), 0.1);
+    ASSERT_APPROX_EQUAL(8.5, estimateIntValCard(hist, 50, EstimationType::kLessOrEqual), 0.1);
+    ASSERT_APPROX_EQUAL(91.5, estimateIntValCard(hist, 50, EstimationType::kGreater), 0.1);
+    ASSERT_APPROX_EQUAL(93.4, estimateIntValCard(hist, 50, EstimationType::kGreaterOrEqual), 0.1);
+
+    // Estimates for a value between bucket bounds.
+    ASSERT_EQ(0.0, estimateIntValCard(hist, 105, EstimationType::kEqual));
+
+    std::tie(tag, value) = value::makeNewString("a"_sd);
+    expectedCard = estimate(hist, tag, value, EstimationType::kEqual).card;
+    ASSERT_APPROX_EQUAL(3.0, expectedCard, 0.1);
+    expectedCard = estimate(hist, tag, value, EstimationType::kLess).card;
+    ASSERT_APPROX_EQUAL(54.5, expectedCard, 0.1);
+    expectedCard = estimate(hist, tag, value, EstimationType::kLessOrEqual).card;
+    ASSERT_APPROX_EQUAL(57.5, expectedCard, 0.1);
+    expectedCard = estimate(hist, tag, value, EstimationType::kGreater).card;
+    ASSERT_APPROX_EQUAL(42.5, expectedCard, 0.1);
+    expectedCard = estimate(hist, tag, value, EstimationType::kGreaterOrEqual).card;
+    ASSERT_APPROX_EQUAL(45.5, expectedCard, 0.1);
+
+    // Range estimates, including min/max values per data type.
+    const auto [tagLowDbl, valLowDbl] =
+        std::make_pair(value::TypeTags::NumberDouble,
+                       value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN()));
+    const auto [tagHighInt, valHighInt] =
+        std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1000000));
+
+    // [NaN, 25].
+    expectedCard = estimateCardRange(arrHist,
+                                     true /* lowInclusive */,
+                                     tagLowDbl,
+                                     valLowDbl,
+                                     true /* highInclusive */,
+                                     value::TypeTags::NumberInt32,
+                                     value::bitcastFrom<int64_t>(25),
+                                     true /* includeScalar */);
+    ASSERT_APPROX_EQUAL(8.49, expectedCard, 0.1);
+
+    // [25, 1000000].
+    expectedCard = estimateCardRange(arrHist,
+                                     true /* lowInclusive */,
+                                     value::TypeTags::NumberInt32,
+                                     value::bitcastFrom<int64_t>(25),
+                                     true /* highInclusive */,
+                                     tagHighInt,
+                                     valHighInt,
+                                     true /* includeScalar */);
+    ASSERT_APPROX_EQUAL(13.38, expectedCard, 0.1);
+
+    // [NaN, 1000000].
+    expectedCard = estimateCardRange(arrHist,
+                                     true /* lowInclusive */,
+                                     tagLowDbl,
+                                     valLowDbl,
+                                     true /* highInclusive */,
+                                     tagHighInt,
+                                     valHighInt,
+                                     true /* includeScalar */);
+    ASSERT_APPROX_EQUAL(19.99, expectedCard, 0.1);
+
+    const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
+    value::ValueGuard vgLowStr(tagLowStr, valLowStr);
+
+    // [NaN, "").
+    expectedCard = estimateCardRange(arrHist,
+                                     true /* lowInclusive */,
+                                     tagLowDbl,
+                                     valLowDbl,
+                                     false /* highInclusive */,
+                                     tagLowStr,
+                                     valLowStr,
+                                     true /* includeScalar */);
+    ASSERT_APPROX_EQUAL(19.99, expectedCard, 0.1);
+
+    // [25, "").
+    expectedCard = estimateCardRange(arrHist,
+                                     true /* lowInclusive */,
+                                     value::TypeTags::NumberInt32,
+                                     value::bitcastFrom<int64_t>(25),
+                                     false /* highInclusive */,
+                                     tagLowStr,
+                                     valLowStr,
+                                     true /* includeScalar */);
+    ASSERT_APPROX_EQUAL(13.39, expectedCard, 0.1);
+
+    // ["", "a"].
+    expectedCard = estimateCardRange(arrHist,
+                                     true /* lowInclusive */,
+                                     tagLowStr,
+                                     valLowStr,
+                                     true /* highInclusive */,
+                                     tag,
+                                     value,
+                                     true /* includeScalar */);
+
+    ASSERT_APPROX_EQUAL(37.49, expectedCard, 0.1);
+
+    // ["", {}).
+    auto [tagObj, valObj] = value::makeNewObject();
+    value::ValueGuard vgObj(tagObj, valObj);
+    expectedCard = estimateCardRange(arrHist,
+                                     true /* lowInclusive */,
+                                     tagLowStr,
+                                     valLowStr,
+                                     false /* highInclusive */,
+                                     tagObj,
+                                     valObj,
+                                     true /* includeScalar */);
+    ASSERT_APPROX_EQUAL(79.99, expectedCard, 0.1);
+
+    // ["a", {}).
+    expectedCard = estimateCardRange(arrHist,
+                                     true /* lowInclusive */,
+                                     tag,
+                                     value,
+                                     false /* highInclusive */,
+                                     tagObj,
+                                     valObj,
+                                     true /* includeScalar */);
+
+    ASSERT_APPROX_EQUAL(45.5, expectedCard, 0.1);
 }
 
 }  // namespace

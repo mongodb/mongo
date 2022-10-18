@@ -51,6 +51,8 @@ struct Bucket {
            double cumulativeNDV);
 
     std::string toString() const;
+    // Help function to dump the bucket content as needed by histogram creation in the unit tests.
+    std::string dump() const;
 
     // Frequency of the bound value itself.
     double _equalFreq;
@@ -79,8 +81,12 @@ public:
     ScalarHistogram(const StatsHistogram& histogram);
     ScalarHistogram(sbe::value::Array bounds, std::vector<Bucket> buckets);
 
+    // Print a human-readable representation of a histogram.
     std::string toString() const;
     std::string plot() const;
+    // Help function to dump the content of the histogram as needed by the manual histogram creation
+    // in the unit tests (without cummulative frequency and NDV).
+    std::string dump() const;
 
     const sbe::value::Array& getBounds() const;
     const std::vector<Bucket>& getBuckets() const;

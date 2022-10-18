@@ -84,10 +84,9 @@ IntDistribution::IntDistribution(MixedDistributionDescriptor distrDescriptor,
 }
 
 void IntDistribution::init(DatasetDescriptorNew* parentDesc, std::mt19937_64& gen) {
-    mongo::stdx::unordered_set<int> tmpIntSet;
+    std::set<int> tmpIntSet;
     std::uniform_int_distribution<int> uniformIntDist{_minInt, _maxInt};
 
-    tmpIntSet.reserve(_ndv);
     if (_ndv == static_cast<size_t>(std::abs(_maxInt - _minInt))) {
         // This is a dense set of all ints in the range.
         for (int i = _minInt; i <= _maxInt; ++i) {

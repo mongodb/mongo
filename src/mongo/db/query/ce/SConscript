@@ -229,6 +229,18 @@ env.CppUnitTest(
         'maxdiff_histogram_test.cpp',
     ],
     LIBDEPS=[
+        'ce_test_utils',
+        'query_stats_test_utils',
+    ],
+)
+
+env.CppUnitTest(
+    target="ce_generated_histograms_test",
+    source=[
+        "ce_generated_histograms_test.cpp",
+    ],
+    LIBDEPS=[
+        'ce_test_utils',
         'query_stats_test_utils',
     ],
 )

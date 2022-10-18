@@ -361,8 +361,12 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
     }};
     const ScalarHistogram uniqueHist = createHistogram(uniqueData);
 
-    const ArrayHistogram arrHist(
-        scalarHist, TypeCounts{}, uniqueHist, minHist, maxHist, TypeCounts{});
+    const ArrayHistogram arrHist(scalarHist,
+                                 TypeCounts{{value::TypeTags::Array, 100}},
+                                 uniqueHist,
+                                 minHist,
+                                 maxHist,
+                                 TypeCounts{});
 
     // Query in the middle of the domain: estimate from ArrayUnique histogram.
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
@@ -459,8 +463,13 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
     }};
     const ScalarHistogram uniqueHist = createHistogram(uniqueData);
 
-    const ArrayHistogram arrHist(
-        scalarHist, TypeCounts{}, uniqueHist, minHist, maxHist, TypeCounts{});
+    TypeCounts typeCounts{{value::TypeTags::NumberInt64, 106}, {value::TypeTags::Array, 94}};
+    const ArrayHistogram arrHist(scalarHist,
+                                 typeCounts,
+                                 uniqueHist,
+                                 minHist,
+                                 maxHist,
+                                 TypeCounts{{value::TypeTags::NumberInt64, 375}});
 
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
     value::Value lowVal = 500;

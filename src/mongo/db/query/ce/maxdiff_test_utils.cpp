@@ -34,34 +34,6 @@
 
 namespace mongo::ce {
 
-ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
-    sbe::value::Array array;
-    for (const auto& item : data) {
-        const auto [tag, val] = makeInt64Value(item._v);
-        array.push_back(tag, val);
-    }
-
-    value::Array bounds;
-    std::vector<Bucket> buckets;
-
-    double cumulativeFreq = 0.0;
-    double cumulativeNDV = 0.0;
-
-    for (size_t i = 0; i < data.size(); i++) {
-        const auto [tag, val] = array.getAt(i);
-        bounds.push_back(tag, val);
-
-        const auto& item = data.at(i);
-        cumulativeFreq += item._equalFreq + item._rangeFreq;
-        cumulativeNDV += item._ndv + 1.0;
-        buckets.emplace_back(
-            item._equalFreq, item._rangeFreq, cumulativeFreq, item._ndv, cumulativeNDV);
-    }
-
-    return {std::move(bounds), std::move(buckets)};
-}
-
-
 static std::vector<std::string> convertToJSON(const std::vector<SBEValue>& input) {
     std::vector<std::string> result;
 

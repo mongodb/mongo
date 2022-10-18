@@ -43,18 +43,6 @@ namespace mongo::ce {
 
 class ArrayHistogram;
 
-struct BucketData {
-    int _v;
-    double _equalFreq;
-    double _rangeFreq;
-    double _ndv;
-};
-
-/**
-    Convert an array of bucket data into a histogram
- */
-ScalarHistogram createHistogram(const std::vector<BucketData>& data);
-
 /**
     Given a list of SBE values and a query, create a collection containing the data,
     and count the results from the supplied query.

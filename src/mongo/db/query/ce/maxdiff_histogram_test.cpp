@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/array_histogram.h"
+#include "mongo/db/query/ce/ce_test_utils.h"
 #include "mongo/db/query/ce/histogram_estimation.h"
 #include "mongo/db/query/ce/max_diff.h"
 #include "mongo/db/query/ce/maxdiff_test_utils.h"

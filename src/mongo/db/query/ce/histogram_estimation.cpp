@@ -29,8 +29,10 @@
 
 #include "mongo/db/query/ce/histogram_estimation.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/ce/value_utils.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/utils/ce_math.h"
 
 namespace mongo::ce {
 using namespace sbe;
@@ -69,6 +71,17 @@ EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
     if (!sameTypeBracket(tag, boundTag)) {
         if (type == EstimationType::kEqual) {
             return {0.0, 0.0};
+        } else {
+            return {resultCard, resultNDV};
+        }
+    }
+
+    // If the value is minimal for its type, return minimal valid cardinality.
+    auto&& [minConstant, inclusive] = getMinMaxBoundForType(true /*isMin*/, tag);
+    auto [minTag, minVal] = minConstant->cast<mongo::optimizer::Constant>()->get();
+    if (compareValues(minTag, minVal, tag, val) == 0) {
+        if (type == EstimationType::kEqual) {
+            return {kMinCard, 1.0};
         } else {
             return {resultCard, resultNDV};
         }
@@ -298,7 +311,10 @@ double estimateCardRange(const ArrayHistogram& ah,
             const auto arrayMaxEst = estRange(ah.getArrayMax());
             const auto arrayUniqueEst = estRange(ah.getArrayUnique());
 
-            const double totalArrayCount = getTotals(ah.getArrayMin()).card;
+            // ToDo: try using ah.getArrayCount() - ah.getEmptyArrayCount();
+            // when the number of empty arrays is provided by the statistics.
+            const double totalArrayCount = ah.getArrayCount();
+
             uassert(
                 6715101, "Array histograms should contain at least one array", totalArrayCount > 0);
             switch (estimationAlgo) {
