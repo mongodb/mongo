@@ -259,11 +259,8 @@ public:
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             opCtx);
 
-        // TODO SERVER-68550: call applyOps with DatabaseName object instead of db string.
         auto applyOpsStatus = CommandHelpers::appendCommandStatusNoThrow(
-            result,
-            repl::applyOps(
-                opCtx, dbName.toStringWithTenantId(), cmdObj, oplogApplicationMode, &result));
+            result, repl::applyOps(opCtx, dbName, cmdObj, oplogApplicationMode, &result));
 
         return applyOpsStatus;
     }

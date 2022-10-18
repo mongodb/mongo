@@ -3095,7 +3095,7 @@ TEST_F(AtomicApplyOpsOutputsTest, InsertInNestedApplyOpsReturnsSuccess) {
                                  << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
     auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
 
-    ASSERT_OK(repl::applyOps(opCtx, _nss.db().toString(), cmdObj, mode, &resultBuilder));
+    ASSERT_OK(repl::applyOps(opCtx, _nss.dbName(), cmdObj, mode, &resultBuilder));
 
     // Retrieve the oplog entries, implicitly asserting that there's exactly one entry in the whole
     // oplog.
@@ -3132,7 +3132,7 @@ TEST_F(AtomicApplyOpsOutputsTest, AtomicApplyOpsWithNoOpsReturnsSuccess) {
     auto mode = repl::OplogApplication::Mode::kApplyOpsCmd;
     BSONObjBuilder resultBuilder;
     auto cmdObj = BSON("applyOps" << BSONArray());
-    ASSERT_OK(repl::applyOps(opCtx, _nss.db().toString(), cmdObj, mode, &resultBuilder));
+    ASSERT_OK(repl::applyOps(opCtx, _nss.dbName(), cmdObj, mode, &resultBuilder));
 
     // Retrieve the oplog entries, implicitly asserting that there's exactly no entry in the whole
     // oplog.
@@ -3158,7 +3158,7 @@ TEST_F(AtomicApplyOpsOutputsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWith
     auto const cmdObj = BSON("applyOps" << BSON_ARRAY(insertOp));
 
     BSONObjBuilder resultBuilder;
-    ASSERT_OK(repl::applyOps(opCtx, _nss.db().toString(), cmdObj, mode, &resultBuilder));
+    ASSERT_OK(repl::applyOps(opCtx, _nss.dbName(), cmdObj, mode, &resultBuilder));
 
     // Retrieve the oplog entries, implicitly asserting that there's exactly one entry in the whole
     // oplog.
@@ -3198,7 +3198,7 @@ TEST_F(AtomicApplyOpsOutputsTest, AtomicApplyOpsInsertWithoutUuidIntoCollectionW
     auto const cmdObj = BSON("applyOps" << BSON_ARRAY(insertOp));
 
     BSONObjBuilder resultBuilder;
-    ASSERT_OK(repl::applyOps(opCtx, _nss.db().toString(), cmdObj, mode, &resultBuilder));
+    ASSERT_OK(repl::applyOps(opCtx, _nss.dbName(), cmdObj, mode, &resultBuilder));
 
     // Retrieve the oplog entries, implicitly asserting that there's exactly one entry in the whole
     // oplog.

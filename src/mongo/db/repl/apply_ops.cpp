@@ -66,6 +66,7 @@ MONGO_FAIL_POINT_DEFINE(applyOpsPauseBetweenOperations);
 
 Status _applyOps(OperationContext* opCtx,
                  const ApplyOpsCommandInfo& info,
+                 const DatabaseName& dbName,
                  repl::OplogApplication::Mode oplogApplicationMode,
                  BSONObjBuilder* result,
                  int* numApplied,
@@ -86,7 +87,8 @@ Status _applyOps(OperationContext* opCtx,
         if (*opType == 'n')
             continue;
 
-        const NamespaceString nss(opObj["ns"].String());
+        const NamespaceString nss(
+            NamespaceStringUtil::deserialize(dbName.tenantId(), opObj["ns"].String()));
 
         // Need to check this here, or OldClientContext may fail an invariant.
         if (*opType != 'c' && !nss.isValid())
@@ -124,7 +126,12 @@ Status _applyOps(OperationContext* opCtx,
 
             // Reject malformed or over-specified operations in an atomic applyOps.
             try {
-                ReplOperation::parse(IDLParserContext("applyOps"), opObj);
+                boost::optional<TenantId> tid;
+                if (opObj.hasElement("tid"))
+                    tid = TenantId::parseFromBSON(opObj["tid"]);
+
+                ReplOperation::parse(IDLParserContext("applyOps", false /* apiStrict */, tid),
+                                     opObj);
             } catch (...) {
                 uasserted(ErrorCodes::AtomicityFailure,
                           str::stream() << "cannot apply a malformed or over-specified operation "
@@ -280,14 +287,14 @@ Status applyApplyOpsOplogEntry(OperationContext* opCtx,
     invariant(!entry.shouldPrepare());
     BSONObjBuilder resultWeDontCareAbout;
     return applyOps(opCtx,
-                    entry.getNss().db().toString(),
+                    entry.getNss().dbName(),
                     entry.getObject(),
                     oplogApplicationMode,
                     &resultWeDontCareAbout);
 }
 
 Status applyOps(OperationContext* opCtx,
-                const std::string& dbName,
+                const DatabaseName& dbName,
                 const BSONObj& applyOpCmd,
                 repl::OplogApplication::Mode oplogApplicationMode,
                 BSONObjBuilder* result) {
@@ -306,16 +313,14 @@ Status applyOps(OperationContext* opCtx,
     // There's one case where we are allowed to take the database lock instead of the global lock --
     // only CRUD ops and non-atomic mode.
     if (info.areOpsCrudOnly() && !info.getAllowAtomic()) {
-        // TODO SERVER-62880 Once the dbName is of type DatabaseName, pass it directly to the DBlock
-        DatabaseName databaseName(boost::none, dbName);
-        dbWriteLock.emplace(opCtx, databaseName, MODE_IX);
+        dbWriteLock.emplace(opCtx, dbName, MODE_IX);
     } else {
         globalWriteLock.emplace(opCtx);
     }
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool userInitiatedWritesAndNotPrimary =
-        opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
+    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+        !replCoord->canAcceptWritesForDatabase(opCtx, dbName.toStringWithTenantId());
 
     if (userInitiatedWritesAndNotPrimary)
         return Status(ErrorCodes::NotWritablePrimary,
@@ -324,7 +329,7 @@ Status applyOps(OperationContext* opCtx,
     LOGV2_DEBUG(5854600,
                 2,
                 "applyOps command",
-                "dbName"_attr = redact(dbName),
+                "dbName"_attr = redact(dbName.toStringWithTenantId()),
                 "cmd"_attr = redact(applyOpCmd));
 
     if (!info.isAtomic()) {
@@ -345,14 +350,14 @@ Status applyOps(OperationContext* opCtx,
                     info.getOperations().size() == 1);
             globalWriteLock.reset();
         }
-        return _applyOps(opCtx, info, oplogApplicationMode, result, &numApplied, nullptr);
+        return _applyOps(opCtx, info, dbName, oplogApplicationMode, result, &numApplied, nullptr);
     }
 
     // Perform write ops atomically
     invariant(globalWriteLock);
 
     try {
-        writeConflictRetry(opCtx, "applyOps", dbName, [&] {
+        writeConflictRetry(opCtx, "applyOps", dbName.toString(), [&] {
             BSONObjBuilder intermediateResult;
             std::unique_ptr<BSONArrayBuilder> opsBuilder;
 
@@ -366,15 +371,21 @@ Status applyOps(OperationContext* opCtx,
 
             WriteUnitOfWork wunit(opCtx, true /*groupOplogEntries*/);
             numApplied = 0;
-            uassertStatusOK(_applyOps(
-                opCtx, info, oplogApplicationMode, &intermediateResult, &numApplied, nullptr));
+            uassertStatusOK(_applyOps(opCtx,
+                                      info,
+                                      dbName,
+                                      oplogApplicationMode,
+                                      &intermediateResult,
+                                      &numApplied,
+                                      nullptr));
             wunit.commit();
             result->appendElements(intermediateResult.obj());
         });
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::AtomicityFailure) {
             // Retry in non-atomic mode.
-            return _applyOps(opCtx, info, oplogApplicationMode, result, &numApplied, nullptr);
+            return _applyOps(
+                opCtx, info, dbName, oplogApplicationMode, result, &numApplied, nullptr);
         }
         BSONArrayBuilder ab;
         ++numApplied;

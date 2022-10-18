@@ -402,6 +402,28 @@ function runTest(featureFlagRequireTenantId) {
             testDb.runCommand({dropIndexes: kCollName, index: ["indexC"], '$tenant': kTenant}));
     }
 
+    // Test the applyOps command
+    {
+        if (featureFlagRequireTenantId) {
+            assert.commandWorked(testDb.runCommand({
+                applyOps: [
+                    {"op": "i", "ns": testColl.getFullName(), "tid": kTenant, "o": {_id: 5, x: 17}}
+                ],
+                '$tenant': kTenant
+            }));
+        } else {
+            const ns = kTenant + '_' + testColl.getFullName();
+            assert.commandWorked(testDb.runCommand(
+                {applyOps: [{"op": "i", "ns": ns, "o": {_id: 5, x: 17}}], '$tenant': kTenant}));
+        }
+
+        // Check applyOp inserted the document.
+        const findRes = assert.commandWorked(
+            testDb.runCommand({find: kCollName, filter: {_id: 5}, '$tenant': kTenant}));
+        assert.eq(1, findRes.cursor.firstBatch.length);
+        assert.eq(17, findRes.cursor.firstBatch[0].x);
+    }
+
     rst.stopSet();
 }
 

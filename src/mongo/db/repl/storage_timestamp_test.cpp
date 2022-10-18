@@ -441,7 +441,7 @@ public:
         return durableCatalog->getMetaData(_opCtx, catalogId);
     }
 
-    StatusWith<BSONObj> doAtomicApplyOps(const std::string& dbName,
+    StatusWith<BSONObj> doAtomicApplyOps(const DatabaseName& dbName,
                                          const std::list<BSONObj>& applyOpsList) {
         OneOffRead oor(_opCtx, Timestamp::min());
 
@@ -459,7 +459,7 @@ public:
     }
 
     // Creates a dummy command operation to persuade `applyOps` to be non-atomic.
-    StatusWith<BSONObj> doNonAtomicApplyOps(const std::string& dbName,
+    StatusWith<BSONObj> doNonAtomicApplyOps(const DatabaseName& dbName,
                                             const std::list<BSONObj>& applyOpsList) {
         OneOffRead oor(_opCtx, Timestamp::min());
 
@@ -842,7 +842,7 @@ TEST_F(StorageTimestampTest, SecondaryInsertTimes) {
         BSONObjBuilder result;
         ASSERT_OK(applyOps(
             _opCtx,
-            nss.db().toString(),
+            nss.dbName(),
             BSON("applyOps" << BSON_ARRAY(
                      BSON("ts" << firstInsertTime.addTicks(idx).asTimestamp() << "t" << 1LL << "v"
                                << 2 << "op"
@@ -957,7 +957,7 @@ TEST_F(StorageTimestampTest, SecondaryDeleteTimes) {
     const LogicalTime startDeleteTime = _clock->tickClusterTime(docsToInsert);
     for (std::int32_t num = 0; num < docsToInsert; ++num) {
         ASSERT_OK(doNonAtomicApplyOps(
-                      nss.db().toString(),
+                      nss.dbName(),
                       {BSON("ts" << startDeleteTime.addTicks(num).asTimestamp() << "t" << 0LL << "v"
                                  << 2 << "op"
                                  << "d"
@@ -1030,7 +1030,7 @@ TEST_F(StorageTimestampTest, SecondaryUpdateTimes) {
     for (std::size_t idx = 0; idx < updates.size(); ++idx) {
         ASSERT_OK(
             doNonAtomicApplyOps(
-                nss.db().toString(),
+                nss.dbName(),
                 {BSON("ts" << firstUpdateTime.addTicks(idx).asTimestamp() << "t" << 0LL << "v" << 2
                            << "op"
                            << "u"
@@ -1067,7 +1067,7 @@ TEST_F(StorageTimestampTest, SecondaryInsertToUpsert) {
     // turned into an upsert. The goal document does not contain `field: 0`.
     BSONObjBuilder resultBuilder;
     auto result = unittest::assertGet(doNonAtomicApplyOps(
-        nss.db().toString(),
+        nss.dbName(),
         {BSON("ts" << insertTime.asTimestamp() << "t" << 1LL << "op"
                    << "i"
                    << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid() << "wall"
@@ -1111,7 +1111,7 @@ TEST_F(StorageTimestampTest, SecondaryAtomicApplyOps) {
     // Reserve a timestamp before the inserts should happen.
     const LogicalTime preInsertTimestamp = _clock->tickClusterTime(1);
     auto swResult =
-        doAtomicApplyOps(nss.db().toString(),
+        doAtomicApplyOps(nss.dbName(),
                          {BSON("op"
                                << "i"
                                << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
@@ -1160,7 +1160,7 @@ TEST_F(StorageTimestampTest, SecondaryAtomicApplyOpsWCEToNonAtomic) {
 
     const LogicalTime preInsertTimestamp = _clock->tickClusterTime(1);
     auto swResult =
-        doAtomicApplyOps(nss.db().toString(),
+        doAtomicApplyOps(nss.dbName(),
                          {BSON("op"
                                << "i"
                                << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
@@ -1204,7 +1204,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollection) {
 
     BSONObjBuilder resultBuilder;
     auto swResult = doNonAtomicApplyOps(
-        nss.db().toString(),
+        nss.dbName(),
         {
             BSON("ts" << _presentTs << "t" << 1LL << "op"
                       << "c"
@@ -1239,7 +1239,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateTwoCollections) {
 
     BSONObjBuilder resultBuilder;
     auto swResult = doNonAtomicApplyOps(
-        dbName,
+        DatabaseName(dbName),
         {
             BSON("ts" << _presentTs << "t" << 1LL << "op"
                       << "c"
@@ -1296,7 +1296,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
 
         BSONObjBuilder resultBuilder;
         auto swResult = doNonAtomicApplyOps(
-            dbName,
+            DatabaseName(dbName),
             {
                 BSON("ts" << _presentTs << "t" << 1LL << "op"
                           << "i"
@@ -1353,7 +1353,7 @@ TEST_F(StorageTimestampTest, PrimaryCreateCollectionInApplyOps) {
 
     BSONObjBuilder resultBuilder;
     auto swResult = doNonAtomicApplyOps(
-        nss.db().toString(),
+        nss.dbName(),
         {
             BSON("ts" << _presentTs << "t" << 1LL << "op"
                       << "c"

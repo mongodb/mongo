@@ -55,7 +55,7 @@ namespace repl {
  * For oplog application, the optime of the oplog entry will be given as the "optime" argument.
  */
 Status applyOps(OperationContext* opCtx,
-                const std::string& dbName,
+                const DatabaseName& dbName,
                 const BSONObj& applyOpCmd,
                 repl::OplogApplication::Mode oplogApplicationMode,
                 BSONObjBuilder* result);
