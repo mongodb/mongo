@@ -957,6 +957,16 @@ tasks:
           test_control: "ssb_column_store_index"
           test_control_params: |
             {scale: 5}
+  - name: column_store_tpch_10_denormalized
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "column_store_tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: denormalized}
 
 # TODO PERF-3094: Remove these charts_events tasks.
   - name: column_store_index_charts_events_1G
@@ -1318,6 +1328,7 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
+      - name: column_store_tpch_10_denormalized
       - name: column_store_index_charts_events_1G
       - name: ssb_column_store_comparison
 
