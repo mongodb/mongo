@@ -311,6 +311,10 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
                     "buildUUID"_attr = buildUUID);
         return TryAbortResult::kRetry;
     }
+    if (_indexBuildState.isAborted()) {
+        // Returns if a concurrent operation already aborts the index build.
+        return TryAbortResult::kAlreadyAborted;
+    }
     if (_waitForNextAction->getFuture().isReady()) {
         const auto nextAction = _waitForNextAction->getFuture().get(opCtx);
         invariant(nextAction == IndexBuildAction::kSinglePhaseCommit ||
