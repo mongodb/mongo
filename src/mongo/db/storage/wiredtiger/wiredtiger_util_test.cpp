@@ -442,6 +442,10 @@ TEST(WiredTigerUtilTest, ParseCompactMessages) {
 TEST(WiredTigerUtilTest, GenerateVerboseConfiguration) {
     // Perform each test in their own limited scope in order to establish different
     // severity levels.
+
+    // TODO SERVER-70651 Re-enable this test.
+    return;
+
     {
         // Set the WiredTiger Checkpoint LOGV2 component severity to the Log level.
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
