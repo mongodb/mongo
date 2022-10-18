@@ -70,6 +70,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/deleted_buckets.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
@@ -963,8 +964,14 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
     shardObserveAboutToDelete(opCtx, nss, doc);
 
     if (nss.isTimeseriesBucketsCollection()) {
-        auto& bucketCatalog = BucketCatalog::get(opCtx);
-        bucketCatalog.clear(doc["_id"].OID());
+        if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            auto& deletedBuckets = timeseries::DeletedBuckets::get(opCtx);
+            deletedBuckets.emplace(doc["_id"].OID());
+        } else {
+            auto& bucketCatalog = BucketCatalog::get(opCtx);
+            bucketCatalog.clear(doc["_id"].OID());
+        }
     }
 }
 
@@ -1117,9 +1124,10 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     } else if (nss.isTimeseriesBucketsCollection() &&
                feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
                    serverGlobalParams.featureCompatibility)) {
-        invariant(args.deletedDoc);
         auto& bucketCatalog = BucketCatalog::get(opCtx);
-        bucketCatalog.clear(args.deletedDoc->getField("_id").OID());
+        auto& deletedBuckets = timeseries::DeletedBuckets::get(opCtx);
+        deletedBuckets.for_each_once(
+            [&bucketCatalog](const OID& oid) { bucketCatalog.clear(oid); });
     }
 }
 

@@ -24,6 +24,7 @@ env.Library(
     source=[
         'bucket_catalog.cpp',
         'bucket_catalog_helpers.cpp',
+        'deleted_buckets.cpp',
         'flat_bson.cpp',
     ],
     LIBDEPS_PRIVATE=[
