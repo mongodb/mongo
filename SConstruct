@@ -5744,8 +5744,10 @@ env.AddPackageNameAlias(
     name="mh-debugsymbols",
 )
 
+env['RPATH_ESCAPED_DOLLAR_ORIGIN'] = '\\$$$$ORIGIN'
 
-def rpath_generator(env, source, target, for_signature):
+
+def prefix_libdir_rpath_generator(env, source, target, for_signature):
     # If the PREFIX_LIBDIR has an absolute path, we will use that directly as
     # RPATH because that indicates the final install destination of the libraries.
     prefix_libdir = env.subst('$PREFIX_LIBDIR')
@@ -5757,19 +5759,18 @@ def rpath_generator(env, source, target, for_signature):
     lib_rel = os.path.relpath(prefix_libdir, env.subst('$PREFIX_BINDIR'))
 
     if env['PLATFORM'] == 'posix':\
-        return [env.Literal(f"\\$$ORIGIN/{lib_rel}")]
+        return f"$RPATH_ESCAPED_DOLLAR_ORIGIN/{lib_rel}"
 
     if env['PLATFORM'] == 'darwin':
-        return [
-            f"@loader_path/{lib_rel}",
-        ]
+        return f"@loader_path/{lib_rel}"
 
 
-env['RPATH_GENERATOR'] = rpath_generator
+if get_option('link-model').startswith('dynamic'):
+    env['PREFIX_LIBDIR_RPATH_GENERATOR'] = prefix_libdir_rpath_generator
 
 if env['PLATFORM'] == 'posix':
     env.AppendUnique(
-        RPATH='$RPATH_GENERATOR',
+        RPATH=['$PREFIX_LIBDIR_RPATH_GENERATOR'],
         LINKFLAGS=[
             # Most systems *require* -z,origin to make origin work, but android
             # blows up at runtime if it finds DF_ORIGIN_1 in DT_FLAGS_1.
@@ -5789,12 +5790,12 @@ elif env['PLATFORM'] == 'darwin':
     # so we setup RPATH and LINKFLAGS ourselves.
     env['RPATHPREFIX'] = '-Wl,-rpath,'
     env['RPATHSUFFIX'] = ''
-    env['RPATH'] = '$RPATH_GENERATOR'
     env.AppendUnique(
         LINKFLAGS="${_concat(RPATHPREFIX, RPATH, RPATHSUFFIX, __env__)}",
         SHLINKFLAGS=[
             "-Wl,-install_name,@rpath/${TARGET.file}",
         ],
+        RPATH=['$PREFIX_LIBDIR_RPATH_GENERATOR'],
     )
 
 env.Default(env.Alias("install-default"))
