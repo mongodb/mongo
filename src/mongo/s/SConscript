@@ -218,6 +218,7 @@ env.Library(
         'shard_id.cpp',
         'shard_invalidated_for_targeting_exception.cpp',
         'sharding_ddl_50_upgrade_downgrade.idl',
+        'sharding_feature_flags.idl',
         'stale_exception.cpp',
         'type_collection_timeseries_fields.idl',
         'would_change_owning_shard_exception.cpp',
