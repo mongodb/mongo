@@ -107,6 +107,8 @@ public:
     static std::pair<sbe::value::TypeTags, sbe::value::Value> explainMemoBSON(
         const cascades::Memo& memo);
 
+    static BSONObj explainMemoBSONObj(const cascades::Memo& memo);
+
     static std::string explainPartialSchemaReqMap(const PartialSchemaRequirements& reqMap);
 
     static std::string explainInterval(const IntervalRequirement& interval);

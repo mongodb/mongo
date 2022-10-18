@@ -352,6 +352,17 @@ TEST(PhysRewriter, GroupBy1) {
     phaseManager.optimize(optimized);
     ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
+    // Assert we have specific CE details at certain nodes.
+    std::vector<std::string> cePaths = {"Memo.0.physicalNodes.0.nodeInfo.node.ce",
+                                        "Memo.1.physicalNodes.0.nodeInfo.node.ce",
+                                        "Memo.3.physicalNodes.0.nodeInfo.node.ce",
+                                        "Memo.4.physicalNodes.0.nodeInfo.node.ce"};
+    BSONObj bsonMemo = ExplainGenerator::explainMemoBSONObj(phaseManager.getMemo());
+    for (const auto& cePath : cePaths) {
+        BSONElement ce = dotted_path_support::extractElementAtPath(bsonMemo, cePath);
+        ASSERT(!ce.eoo());
+    }
+
     // Projection "pb1" is unused and we do not generate an aggregation expression for it.
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1295,6 +1306,18 @@ TEST(PhysRewriter, FilterIndexing4) {
     phaseManager.getHints()._disableHashJoinRIDIntersect = true;
     phaseManager.optimize(optimized);
     ASSERT_BETWEEN(60, 75, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // Assert the correct CEs for each node in group 1. Group 1 contains residual predicates.
+    std::vector<std::pair<std::string, double>> pathAndCEs = {
+        {"Memo.1.physicalNodes.1.nodeInfo.node.ce", 143.6810174757394},
+        {"Memo.1.physicalNodes.1.nodeInfo.node.child.ce", 189.57056733575502},
+        {"Memo.1.physicalNodes.1.nodeInfo.node.child.child.ce", 330.00000000000006},
+        {"Memo.1.physicalNodes.1.nodeInfo.node.child.child.child.ce", 330.00000000000006}};
+    const BSONObj explain = ExplainGenerator::explainMemoBSONObj(phaseManager.getMemo());
+    for (const auto& pathAndCE : pathAndCEs) {
+        BSONElement el = dotted_path_support::extractElementAtPath(explain, pathAndCE.first);
+        ASSERT_EQ(el.Double(), pathAndCE.second);
+    }
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"

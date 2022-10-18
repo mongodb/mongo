@@ -86,6 +86,9 @@ struct PhysNodeInfo {
 
     // Rule that triggered the creation of this node.
     PhysicalRewriteType _rule;
+
+    // Node-specific cardinality estimates, for explain.
+    NodeCEMap _nodeCEMap;
 };
 
 struct PhysOptimizationResult {

@@ -175,7 +175,8 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
     tassert(6678300,
             "Retaining node with uninitialized rewrite rule",
             rule != cascades::PhysicalRewriteType::Uninitialized);
-    PhysNodeInfo candidateNodeInfo{std::move(*node), cost, nodeCost, nodeCostAndCE._ce, rule};
+    PhysNodeInfo candidateNodeInfo{
+        std::move(*node), cost, nodeCost, nodeCostAndCE._ce, rule, std::move(nodeCEMap)};
     const bool keepRejectedPlans = _hints._keepRejectedPlans;
     if (improvement) {
         if (keepRejectedPlans && bestResult._nodeInfo) {
