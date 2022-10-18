@@ -35,6 +35,7 @@ imports:
 structs:
   clusterQueryWithoutShardKeyResponse: 
     description: "The response for the '_clusterQueryWithoutShardKeyFind' command."
+    is_command_reply: true
     fields:
       targetDoc:
         description: >-
@@ -48,7 +49,11 @@ structs:
         optional: true
   clusterWriteWithoutShardKeyResponse: 
     description: "The response for the '_clusterWriteWithoutShardKeyFind' command."
-  
+    is_command_reply: true
+    fields:
+      response:
+        description: "Response of the write command."
+        type: object
 commands:
   _clusterQueryWithoutShardKey:
     command_name: _clusterQueryWithoutShardKey
@@ -70,7 +75,7 @@ commands:
     command_name: _clusterWriteWithoutShardKey
     cpp_name: ClusterWriteWithoutShardKey
     description: >- 
-      "An internal command used to target target an update/delete/findAndModify command to a 
+      "An internal command used to target an update/delete/findAndModify command to a 
       specific shard using a shardId."
     namespace: ignored
     api_version: ""
@@ -82,3 +87,6 @@ commands:
       shardId:
         description: "The shard id of the target shard for the write."
         type: shard_id
+      targetDocId:
+        description: "The _id value of the target document"
+        type: object

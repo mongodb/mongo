@@ -30,14 +30,56 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
+#include "mongo/s/write_ops/batch_write_op.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 namespace {
+
+const BSONObj _createCmdObj(const BSONObj& writeCmd,
+                            const StringData& commandName,
+                            const BSONObj& targetDocId,
+                            const NamespaceString& nss) {
+    // Drop collation and writeConcern as
+    // targeting by _id uses default collation and writeConcern cannot be specified for
+    // commands run in internal transactions. This object will be used to construct the command
+    // request used by clusterWriteWithoutShardKey.
+    BSONObjBuilder writeCmdObjBuilder(
+        writeCmd.removeFields(std::set<std::string>{"collation", "writeConcern"}));
+    writeCmdObjBuilder.appendElementsUnique(BSON("$db" << nss.dbName().toString()));
+    auto writeCmdObj = writeCmdObjBuilder.obj();
+
+    // Parse original write command and set _id as query filter for new command object.
+    if (commandName == "update") {
+        auto parsedUpdateRequest = write_ops::UpdateCommandRequest::parse(
+            IDLParserContext("_clusterWriteWithoutShardKey"), writeCmdObj);
+        parsedUpdateRequest.getUpdates().front().setQ(targetDocId);
+        return parsedUpdateRequest.toBSON(BSONObj());
+    } else if (commandName == "delete") {
+        auto parsedDeleteRequest = write_ops::DeleteCommandRequest::parse(
+            IDLParserContext("_clusterWriteWithoutShardKey"), writeCmdObj);
+        parsedDeleteRequest.getDeletes().front().setQ(targetDocId);
+        return parsedDeleteRequest.toBSON(BSONObj());
+    } else if (commandName == "findandmodify" || commandName == "findAndModify") {
+        auto parsedFindAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
+            IDLParserContext("_clusterWriteWithoutShardKey"), writeCmdObj);
+        parsedFindAndModifyRequest.setQuery(targetDocId);
+        return parsedFindAndModifyRequest.toBSON(BSONObj());
+    } else {
+        uasserted(ErrorCodes::InvalidOptions,
+                  "_clusterWriteWithoutShardKey only supports update, delete, and "
+                  "findAndModify commands.");
+    }
+}
 
 class ClusterWriteWithoutShardKeyCmd : public TypedCommand<ClusterWriteWithoutShardKeyCmd> {
 public:
@@ -50,14 +92,50 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    "_clusterQueryWithoutShardKey can only be run on Mongos",
+                    "_clusterWriteWithoutShardKey can only be run on Mongos",
                     isMongos());
 
+            uassert(ErrorCodes::IllegalOperation,
+                    "_clusterWriteWithoutShardKey must be run in a transaction.",
+                    opCtx->inMultiDocumentTransaction());
+
+            const auto writeCmd = request().getWriteCmd();
+            const auto shardId = request().getShardId();
             LOGV2(6962400,
                   "Running write phase for a write without a shard key.",
-                  "clientWriteRequest"_attr = request().getWriteCmd(),
-                  "shardId"_attr = request().getShardId());
-            return {};
+                  "clientWriteRequest"_attr = writeCmd,
+                  "shardId"_attr = shardId);
+
+            const NamespaceString nss(
+                CommandHelpers::parseNsCollectionRequired(ns().dbName(), writeCmd));
+            const auto targetDocId = request().getTargetDocId();
+            const auto commandName = writeCmd.firstElementFieldNameStringData();
+
+            const BSONObj cmdObj = _createCmdObj(writeCmd, commandName, targetDocId, nss);
+
+            const auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+            uassert(ErrorCodes::InvalidOptions,
+                    "_clusterWriteWithoutShardKey can only be run against sharded collections.",
+                    cm.isSharded());
+
+            ChunkVersion placementVersion = cm.getVersion(shardId);
+            auto versionedCmdObj = appendShardVersion(
+                cmdObj,
+                ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)));
+
+            AsyncRequestsSender::Request arsRequest(shardId, versionedCmdObj);
+            std::vector<AsyncRequestsSender::Request> arsRequestVector({arsRequest});
+
+            MultiStatementTransactionRequestsSender ars(
+                opCtx,
+                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                request().getDbName().toString(),
+                std::move(arsRequestVector),
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                Shard::RetryPolicy::kNoRetry);
+
+            auto response = uassertStatusOK(ars.next().swResponse);
+            return Response(response.data);
         }
 
     private:
@@ -88,10 +166,6 @@ public:
 
     bool allowedInTransactions() const final {
         return true;
-    }
-
-    ReadWriteType getReadWriteType() const final {
-        return Command::ReadWriteType::kWrite;
     }
 };
 

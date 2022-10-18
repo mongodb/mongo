@@ -261,7 +261,7 @@ var authCommandsLib = {
         },
         {
           testname: "_clusterWriteWithoutShardKey",
-          command: {_clusterWriteWithoutShardKey: 1, writeCmd: {}, shardId: ""},
+          command: {_clusterWriteWithoutShardKey: 1, writeCmd: {}, shardId: "", targetDocId: {}},
           skipUnlessSharded: true,
           skipTest: (conn) => {
               return !TestData.setParameters.featureFlagUpdateOneWithoutShardKey;
