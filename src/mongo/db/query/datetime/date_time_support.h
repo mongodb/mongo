@@ -386,7 +386,7 @@ private:
     }
 
     // null if this TimeZone represents the default UTC time zone, or a UTC-offset time zone
-    _timelib_tzinfo* _tzInfo;
+    _timelib_tzinfo* _tzInfo{nullptr};
 
     // represents the UTC offset in seconds if _tzInfo is null and it is not 0
     Seconds _utcOffset{0};
