@@ -1196,6 +1196,26 @@ private:
     MatchExpressionVisitorContext* _context;
 };
 
+std::tuple<std::unique_ptr<sbe::EExpression>, bool, bool, bool> _generateInExprInternal(
+    StageBuilderState& state, const InMatchExpression* expr) {
+    bool exprIsParameterized = static_cast<bool>(expr->getInputParamId());
+
+    // If there's an "inputParamId" in this expr meaning this expr got parameterized, we can
+    // register a SlotId for it and use the slot directly. Note we don't auto-parameterize
+    // $in if it contains null, regexes, or nested arrays or objects.
+    if (exprIsParameterized) {
+        auto equalities = makeVariable(state.registerInputParamSlot(*expr->getInputParamId()));
+        return std::make_tuple(std::move(equalities), false, false, false);
+    }
+
+    auto&& [arrSetTag, arrSetVal, hasArray, hasObject, hasNull] =
+        convertInExpressionEqualities(expr);
+    sbe::value::ValueGuard arrSetGuard{arrSetTag, arrSetVal};
+    auto equalities = sbe::makeE<sbe::EConstant>(arrSetTag, arrSetVal);
+    arrSetGuard.reset();
+    return std::make_tuple(std::move(equalities), hasArray, hasObject, hasNull);
+}
+
 /**
  * A match expression post-visitor which does all the job to translate the match expression tree
  * into an SBE plan stage sub-tree.
@@ -1426,22 +1446,8 @@ public:
     void visit(const InMatchExpression* expr) final {
         bool exprIsParameterized = static_cast<bool>(expr->getInputParamId());
 
-        auto [equalities, hasArray, hasNull] = [&] {
-            // If there's an "inputParamId" in this expr meaning this expr got parameterized, we can
-            // register a SlotId for it and use the slot directly. Note we don't auto-parameterize
-            // $in if it contains null, regexes, or nested arrays.
-            if (exprIsParameterized) {
-                auto equalities =
-                    makeVariable(_context->state.registerInputParamSlot(*expr->getInputParamId()));
-                return std::make_tuple(std::move(equalities), false, false);
-            }
-
-            auto&& [arrSetTag, arrSetVal, hasArray, hasNull] = convertInExpressionEqualities(expr);
-            sbe::value::ValueGuard arrSetGuard{arrSetTag, arrSetVal};
-            auto equalities = sbe::makeE<sbe::EConstant>(arrSetTag, arrSetVal);
-            arrSetGuard.reset();
-            return std::make_tuple(std::move(equalities), hasArray, hasNull);
-        }();
+        auto [equalities, hasArray, hasObject, hasNull] =
+            _generateInExprInternal(_context->state, expr);
 
         auto equalitiesExpr = std::move(equalities);
 
@@ -1923,7 +1929,7 @@ EvalStage generateIndexFilter(StageBuilderState& state,
     return std::move(resultStage);
 }
 
-std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool> convertInExpressionEqualities(
+std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool, bool> convertInExpressionEqualities(
     const InMatchExpression* expr) {
     auto& equalities = expr->getEqualities();
     auto [arrSetTag, arrSetVal] = sbe::value::makeNewArraySet();
@@ -1932,6 +1938,7 @@ std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool> convertInExpress
     auto arrSet = sbe::value::getArraySetView(arrSetVal);
 
     auto hasArray = false;
+    auto hasObject = false;
     auto hasNull = false;
     if (equalities.size()) {
         arrSet->reserve(equalities.size());
@@ -1943,6 +1950,7 @@ std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool> convertInExpress
 
             hasNull |= tagView == sbe::value::TypeTags::Null;
             hasArray |= sbe::value::isArray(tagView);
+            hasObject |= sbe::value::isObject(tagView);
 
             // An ArraySet assumes ownership of it's values so we have to make a copy here.
             auto [tag, val] = sbe::value::copyValue(tagView, valView);
@@ -1951,7 +1959,7 @@ std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool> convertInExpress
     }
 
     arrSetGuard.reset();
-    return {arrSetTag, arrSetVal, hasArray, hasNull};
+    return {arrSetTag, arrSetVal, hasArray, hasObject, hasNull};
 }
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
@@ -2067,6 +2075,18 @@ EvalExpr generateComparisonExpr(StageBuilderState& state,
 
     return makeFillEmptyFalse(
         makeBinaryOp(binaryOp, var.clone(), std::move(valExpr), state.data->env));
+}
+
+EvalExpr generateInExpr(StageBuilderState& state,
+                        const InMatchExpression* expr,
+                        const sbe::EVariable& var) {
+    tassert(6988283,
+            "'generateInExpr' supports only parameterized queries or the ones without regexes.",
+            static_cast<bool>(expr->getInputParamId()) || !expr->hasRegex());
+
+    auto [equalities, hasArray, hasObject, hasNull] = _generateInExprInternal(state, expr);
+
+    return makeIsMember(var.clone(), std::move(equalities), state.data->env);
 }
 
 EvalExpr generateBitTestExpr(StageBuilderState& state,

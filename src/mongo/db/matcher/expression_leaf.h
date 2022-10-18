@@ -721,6 +721,18 @@ public:
         return _hasEmptyArray;
     }
 
+    bool hasEmptyObject() const {
+        return _hasEmptyObject;
+    }
+
+    bool hasNonEmptyArrayOrObject() const {
+        return _hasNonEmptyArrayOrObject;
+    }
+
+    bool hasNonScalarOrNonEmptyValues() const {
+        return hasNonEmptyArrayOrObject() || hasNull() || hasRegex();
+    }
+
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }
@@ -745,6 +757,12 @@ private:
 
     // Whether or not '_equalities' has an empty array element in it.
     bool _hasEmptyArray = false;
+
+    // Whether or not '_equalities' has an empty object element in it.
+    bool _hasEmptyObject = false;
+
+    // Whether or not '_equalities' has a non-empty array or object element in it.
+    bool _hasNonEmptyArrayOrObject = false;
 
     // Collator used to construct '_eltCmp';
     const CollatorInterface* _collator = nullptr;

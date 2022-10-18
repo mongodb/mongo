@@ -545,8 +545,11 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
         }
 
         case MatchExpression::MATCH_IN: {
-            // (TODO SERVER-68743) need expr translation to enable pushing down $in
-            return me->shallowClone();
+            auto sub = checked_cast<const InMatchExpression*>(me);
+            if (sub->hasNonScalarOrNonEmptyValues()) {
+                return me->shallowClone();
+            }
+            return tryAddExpr(sub->path(), me, out);
         }
 
         case MatchExpression::TYPE_OPERATOR: {

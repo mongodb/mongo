@@ -92,15 +92,16 @@ public:
         // contains any regexes.
         tassert(6279503, "Unexpected parameter marker for $in with regexes", !expr->hasRegex());
 
-        auto&& [arrSetTag, arrSetVal, hasArray, hasNull] =
+        auto&& [arrSetTag, arrSetVal, hasArray, hasObject, hasNull] =
             stage_builder::convertInExpressionEqualities(expr);
         bindParam(*inputParam, true /*owned*/, arrSetTag, arrSetVal);
 
-        // Auto-parameterization should not kick in if the $in's list of equalities includes either
-        // any arrays or any nulls. Asserted after bind to avoid leaking memory allocated in
+        // Auto-parameterization should not kick in if the $in's list of equalities includes any
+        // arrays, objects or null values. Asserted after bind to avoid leaking memory allocated in
         // 'stage_builder::convertInExpressionEqualities()'.
-        tassert(6279504, "Should not auto-parameterize $in with an array value", !hasArray);
-        tassert(6279505, "Should not auto-parameterize $in with a null value", !hasNull);
+        tassert(6988502, "Should not auto-parameterize $in with an array value", !hasArray);
+        tassert(6988503, "Should not auto-parameterize $in with a null value", !hasNull);
+        tassert(6988504, "Should not auto-parameterize $in with an object value", !hasObject);
     }
 
     void visit(const ModMatchExpression* expr) final {

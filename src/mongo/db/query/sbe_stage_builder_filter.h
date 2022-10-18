@@ -81,12 +81,13 @@ EvalStage generateIndexFilter(StageBuilderState& state,
  * Converts the list of equalities inside the given $in expression ('expr') into an SBE array, which
  * is returned as a (typeTag, value) pair. The caller owns the resulting value.
  *
- * The returned tuple also includes two booleans, in this order:
+ * The returned tuple also includes three booleans, in this order:
  *  - 'hasArray': True if at least one of the values inside the $in equality list is an array.
+ *  - 'hasObject': True if at least one of the values inside the $in equality list is an object.
  *  - 'hasNull': True if at least one of the values inside the $in equality list is a literal null
  * value.
  */
-std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool> convertInExpressionEqualities(
+std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool, bool> convertInExpressionEqualities(
     const InMatchExpression* expr);
 
 /**
@@ -105,6 +106,9 @@ EvalExpr generateComparisonExpr(StageBuilderState& state,
                                 const ComparisonMatchExpression* expr,
                                 sbe::EPrimBinary::Op binaryOp,
                                 const sbe::EVariable& var);
+EvalExpr generateInExpr(StageBuilderState& state,
+                        const InMatchExpression* expr,
+                        const sbe::EVariable& var);
 EvalExpr generateBitTestExpr(StageBuilderState& state,
                              const BitTestMatchExpression* expr,
                              const sbe::BitTestBehavior& bitOp,

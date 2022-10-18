@@ -784,7 +784,11 @@ EvalExpr generatePerColumnFilterExpr(StageBuilderState& state,
                                           sbe::EPrimBinary::greaterEq,
                                           inputVar);
         case MatchExpression::MATCH_IN: {
-            uasserted(6733602, "(TODO SERVER-68743) need expr translation to enable $in");
+            auto expr = checked_cast<const InMatchExpression*>(me);
+            tassert(6988583,
+                    "Push-down of non-scalar values in $in is not supported.",
+                    !expr->hasNonScalarOrNonEmptyValues());
+            return generateInExpr(state, expr, inputVar);
         }
         case MatchExpression::TYPE_OPERATOR: {
             uasserted(6733603, "(TODO SERVER-68743) need expr translation to enable $type");

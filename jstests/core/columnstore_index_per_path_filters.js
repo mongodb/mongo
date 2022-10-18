@@ -32,6 +32,7 @@ function runPerPathFiltersTest({docs, query, projection, expected, testDescripti
     assert(resultsEq(actual, expected),
            `actual=${tojson(actual)}, expected=${tojson(expected)}${errMsg}`);
 }
+
 // Sanity check that without filters, the cursors on other columns are advanced correctly.
 (function testPerPathFilters_SingleColumn_NoFilters() {
     const docs = [
@@ -489,6 +490,187 @@ function runPerPathFiltersTest({docs, query, projection, expected, testDescripti
     assert(resultsEq(actual, expected),
            `actual=${tojson(actual)}, expected=${tojson(expected)}${errMsg}`);
 })();
+
+function testInExpr(test) {
+    const errMsg = "SupportedMatchExpressions: $in";
+    let expected = test.expected;
+    let explain = test.actual.explain();
+    try {
+        let actual = test.actual.toArray();
+        assert(
+            resultsEq(actual, expected),
+            `actual=${tojson(actual)}, expected=${tojson(expected)}${errMsg}: ${tojson(explain)}`);
+        if (test.expectedError) {
+            assert(false,
+                   `actualError=nothing, expectedError=${test.expectedError} - ${errMsg}: ` +
+                       tojson(explain));
+        }
+    } catch (e) {
+        if (test.expectedError) {
+            assert.eq(e.code,
+                      test.expectedError.code,
+                      `actualError=${e.errmsg}, expectedError=${test.expectedError} - ${errMsg}` +
+                          tojson(explain));
+            return;
+        } else {
+            throw e;
+        }
+    }
+}
+
+(function testPerPathFilters_SupportedMatchExpressions_In() {
+    const docs = [
+        {_id: 0, x: {y: 0}},
+        {_id: 1, x: {y: {z: 1}}},
+        {_id: 2, x: {y: null}},
+        {_id: 3, x: {y: []}},
+        {_id: 4, x: [{no_y: 2}, {y: 3}]},
+        {_id: 5, x: [{no_y: 4}, {y: {z: 5}}]},
+        {_id: 6, x: [[{y: 6}, 7], {y: {}}]},
+        {_id: 7, x: [8, {y: [{z: 9}]}]},
+        {_id: 8, x: {y: {$minKey: 1}}},
+        {_id: 9, x: {y: {$maxKey: 1}}},
+        {_id: 10, x: [{y: [{$minKey: 1}, {$maxKey: 1}]}, {y: [null, {z: 1}]}]},
+        {_id: 11, x: [{y: [15, null]}, {y: [{}, []]}, {y: [[{y: 11}, 12], {y: 16}]}]},
+
+        // For the documents below "x.y" doesn't exist
+        {_id: 101, x: {no_y: 10}},
+        {_id: 102, x: [[{y: 11}, 12], 13]},
+    ];
+
+    coll_filters.drop();
+    coll_filters.insert(docs);
+    assert.commandWorked(coll_filters.createIndex({"$**": "columnstore"}));
+
+    testInExpr({
+        actual: coll_filters.find(
+            {"x.y": {$in: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]}}, {_id: 1}),
+        expected: [{_id: 0}, {_id: 4}, {_id: 11}]
+    });
+
+    testInExpr(
+        {actual: coll_filters.find({"x.y": {$in: [0, 1, 2]}}, {_id: 1}), expected: [{_id: 0}]});
+
+    testInExpr({actual: coll_filters.find({"x.y": {$in: [54, 55, 56]}}, {_id: 1}), expected: []});
+
+    testInExpr({
+        actual: coll_filters.find({"x.y": {$in: [0, 3, []]}}, {_id: 1}),
+        expected: [{_id: 0}, {_id: 3}, {_id: 4}, {_id: 11}]
+    });
+
+    testInExpr({
+        actual: coll_filters.find({"x.y": {$in: [0, 3, {}]}}, {_id: 1}),
+        expected: [{_id: 0}, {_id: 4}, {_id: 6}, {_id: 11}]
+    });
+
+    // The following tests below are converted into equality (instead of $in) before execution
+    testInExpr({
+        actual: coll_filters.find({"x.y": {$in: [[]]}}, {_id: 1}),
+        expected: [{_id: 3}, {_id: 11}]
+    });
+
+    testInExpr({
+        actual: coll_filters.find({"x.y": {$in: [{}]}}, {_id: 1}),
+        expected: [{_id: 6}, {_id: 11}]
+    });
+})();
+
+// "Unsupported" in the following test means that the '$in' filter does not get pushed down into
+// the stage but will be processed as a residual predicate after the (unconditional) column scan.
+(function testPerPathFilters_UnsupportedMatchExpressions_In() {
+    const docs = [
+        {_id: 0, x: {y: 0}},
+        {_id: 1, x: {y: {z: 1}}},
+        {_id: 2, x: {y: null}},
+        {_id: 3, x: {y: []}},
+        {_id: 4, x: [{no_y: 2}, {y: 3}]},
+        {_id: 5, x: [{no_y: 4}, {y: {z: 5}}]},
+        {_id: 6, x: [[{y: 6}, 7], {y: {}}]},
+        {_id: 7, x: [8, {y: [{z: 9}]}]},
+        {_id: 8, x: {y: {$minKey: 1}}},
+        {_id: 9, x: {y: {$maxKey: 1}}},
+        {_id: 10, x: [{y: [{$minKey: 1}, {$maxKey: 1}]}, {y: [null, {z: 14}]}]},
+        {_id: 11, x: [{y: [15, null]}, {y: [{}, []]}, {y: [[{y: 11}, 12], {y: 16}]}]},
+
+        // For the documents below "x.y" doesn't exist
+        {_id: 101, x: {no_y: 10}},
+        {_id: 102, x: [[{y: 11}, 12], 13]},
+    ];
+
+    coll_filters.drop();
+    coll_filters.insert(docs);
+    assert.commandWorked(coll_filters.createIndex({"$**": "columnstore"}));
+
+    // This test is converted into equality (instead of $in) before execution
+    testInExpr({
+        actual: coll_filters.find({"x.y": {$in: [null]}}, {_id: 1}),
+        expected: [{_id: 2}, {_id: 4}, {_id: 5}, {_id: 10}, {_id: 11}, {_id: 101}]
+    });
+
+    // $in in this test doesn't get pushed down, as it contains a null value.
+    testInExpr({
+        actual: coll_filters.find({"x.y": {$in: [0, 3, null]}}, {_id: 1}),
+        expected: [{_id: 0}, {_id: 2}, {_id: 4}, {_id: 5}, {_id: 10}, {_id: 11}, {_id: 101}]
+    });
+
+    // $in in this test doesn't get pushed down, as it contains objects.
+    testInExpr({
+        actual: coll_filters.find({"x.y": {$in: [{z: 1}, {z: 5}, {z: 9}, {z: 14}]}}, {_id: 1}),
+        expected: [{_id: 1}, {_id: 5}, {_id: 7}, {_id: 10}]
+    });
+
+    // $in in this test doesn't get pushed down, as it contains an array.
+    testInExpr({
+        actual: coll_filters.find({"x": {$in: [1, [{y: 11}, 12]]}}, {_id: 1}),
+        expected: [{_id: 102}]
+    });
+})();
+
+(function testPlanCacheWithEq() {
+    const coll = db.equals_object_columstore_plan_cache;
+    coll.drop();
+
+    assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
+    assert.commandWorked(coll.insert({a: 1}));
+    assert.commandWorked(coll.insert({a: {b: 1}}));
+
+    const shapeQ1 = {query: {a: 1}, projection: {_id: 0, a: 1}};
+    // Create a plan cache entry for a query that can use the columnstore index. Run it twice to
+    // make sure that the plan cache entry is active.
+    for (let i = 0; i < 2; ++i) {
+        assert.eq([shapeQ1.query], coll.find(shapeQ1.query, shapeQ1.projection).toArray());
+    }
+
+    const shapeQ2 = {query: {a: {b: 1}}, projection: {_id: 0, a: 1}};
+    // Now run a query that is ineligible to use the columnstore index because it has an
+    // equality-to-object predicate. It should not reuse the plan cache entry.
+    for (let i = 0; i < 2; ++i) {
+        assert.eq([shapeQ2.query], coll.find(shapeQ2.query, shapeQ2.projection).toArray());
+    }
+}());
+
+(function testPlanCacheWithIn() {
+    const coll = db.in_object_columstore_plan_cache;
+    coll.drop();
+
+    assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
+    assert.commandWorked(coll.insert({a: 1}));
+    assert.commandWorked(coll.insert({a: {b: 1}}));
+
+    const shapeQ1 = {query: {a: {$in: [1, 2, 3]}}, projection: {_id: 0, a: 1}};
+    // Create a plan cache entry for a query that can use the columnstore index. Run it twice to
+    // make sure that the plan cache entry is active.
+    for (let i = 0; i < 2; ++i) {
+        assert.eq([{a: 1}], coll.find(shapeQ1.query, shapeQ1.projection).toArray());
+    }
+
+    const shapeQ2 = {query: {a: {$in: [{b: 1}, {b: 2}, {b: 3}]}}, projection: {_id: 0, a: 1}};
+    // Now run a query that is ineligible to use the columnstore index because it has an
+    // object in its $in-list. It should not reuse the plan cache entry.
+    for (let i = 0; i < 2; ++i) {
+        assert.eq([{a: {b: 1}}], coll.find(shapeQ2.query, shapeQ2.projection).toArray());
+    }
+}());
 
 // Check translation of other MQL match expressions.
 (function testPerPathFilters_SupportedMatchExpressions_Oddballs() {

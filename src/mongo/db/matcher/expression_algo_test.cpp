@@ -1970,6 +1970,96 @@ TEST(SplitMatchExpressionForColumns, DoesNotSupportExistsFalse) {
     assertMatchesEqual(existsPredicate, residual);
 }
 
+// $in constraints are similar to equality. Most of them should work, exceptions broken out in the
+// next test.
+TEST(SplitMatchExpressionForColumns, SupportsSomeInPredicates) {
+    {
+        ParsedMatchExpression emptyIn("{albatross: {$in: []}}");
+        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(emptyIn.get());
+        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+        ASSERT(splitUp.contains("albatross"));
+        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
+            << splitUp.at("albatross")->toString();
+        ASSERT(residual == nullptr);
+    }
+    {
+        ParsedMatchExpression singleElementIn("{albatross: {$in: [4]}}");
+        auto&& [splitUp, residual] =
+            expression::splitMatchExpressionForColumns(singleElementIn.get());
+        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+        ASSERT(splitUp.contains("albatross"));
+        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
+            << splitUp.at("albatross")->toString();
+        ASSERT(residual == nullptr);
+    }
+    {
+        ParsedMatchExpression multiElementIn("{albatross: {$in: [4, 5, 9]}}");
+        auto&& [splitUp, residual] =
+            expression::splitMatchExpressionForColumns(multiElementIn.get());
+        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+        ASSERT(splitUp.contains("albatross"));
+        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
+            << splitUp.at("albatross")->toString();
+        ASSERT(residual == nullptr);
+    }
+    {
+        ParsedMatchExpression inWithEmptyArray("{albatross: {$in: [[]]}}");
+        auto&& [splitUp, residual] =
+            expression::splitMatchExpressionForColumns(inWithEmptyArray.get());
+        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+        ASSERT(splitUp.contains("albatross"));
+        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
+            << splitUp.at("albatross")->toString();
+        ASSERT(residual == nullptr);
+    }
+    {
+        ParsedMatchExpression inWithEmptyObject("{albatross: {$in: [{}]}}");
+        auto&& [splitUp, residual] =
+            expression::splitMatchExpressionForColumns(inWithEmptyObject.get());
+        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+        ASSERT(splitUp.contains("albatross"));
+        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
+            << splitUp.at("albatross")->toString();
+        ASSERT(residual == nullptr);
+    }
+
+    {
+        ParsedMatchExpression mixedTypeIn("{albatross: {$in: [4, {}, [], 'string']}}");
+        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(mixedTypeIn.get());
+        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+        ASSERT(splitUp.contains("albatross"));
+        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
+            << splitUp.at("albatross")->toString();
+        ASSERT(residual == nullptr);
+    }
+}
+
+TEST(SplitMatchExpressionForColumns, DoesNotSupportSomeInPredicates) {
+    {
+        ParsedMatchExpression regexIn("{albatross: {$in: [/regex/]}}");
+        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(regexIn.get());
+        ASSERT_EQ(splitUp.size(), 0) << splitUp.size();
+        ASSERT(residual != nullptr);
+        ASSERT(residual->matchType() == MatchExpression::MATCH_IN) << residual->toString();
+    }
+
+    {
+        ParsedMatchExpression nonEmptyObj("{albatross: {$in: [{a: 1}]}}");
+        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(nonEmptyObj.get());
+        ASSERT_EQ(splitUp.size(), 0) << splitUp.size();
+        ASSERT(residual != nullptr);
+        ASSERT(residual->matchType() == MatchExpression::MATCH_IN) << residual->toString();
+    }
+
+    {
+        ParsedMatchExpression nonEmptyArr("{albatross: {$in: [[1, 2]]}}");
+        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(nonEmptyArr.get());
+        ASSERT_EQ(splitUp.size(), 0) << splitUp.size();
+        ASSERT(residual != nullptr);
+        ASSERT(residual->matchType() == MatchExpression::MATCH_IN) << residual->toString();
+    }
+}
+
 // We can't support compound types, just like for equality.
 TEST(SplitMatchExpressionForColumns, DoesNotSupportCertainInEdgeCases) {
     {
