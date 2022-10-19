@@ -1158,7 +1158,7 @@ __wt_cursor_largest_key(WT_CURSOR *cursor)
     CURSOR_API_CALL(cursor, session, largest_key, CUR2BT(cbt));
 
     if (WT_CURSOR_BOUNDS_SET(cursor))
-        WT_ERR_MSG(session, EINVAL, "cursor largest key is not compatible with bounded cursors");
+        WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with cursor largest key");
 
     WT_ERR(__wt_scr_alloc(session, 0, &key));
 
@@ -1223,10 +1223,10 @@ __wt_cursor_bound(WT_CURSOR *cursor, const char *config)
     CURSOR_API_CALL(cursor, session, bound, NULL);
 
     if (CUR2BT(cursor)->type == BTREE_COL_FIX)
-        WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with fixed column store.");
+        WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with fixed column store");
 
     if (F_ISSET(cursor, WT_CURSTD_PREFIX_SEARCH))
-        WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with prefix search.");
+        WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with prefix search");
 
     if (config == NULL || config[0] == '\0')
         WT_ERR_MSG(session, EINVAL, "an empty config is not valid when setting or clearing bounds");
