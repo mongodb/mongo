@@ -70,9 +70,7 @@ public:
     private:
         friend class DatabaseShardingState;
 
-        ScopedDatabaseShardingState(OperationContext* opCtx,
-                                    const DatabaseName& dbName,
-                                    LockMode mode);
+        ScopedDatabaseShardingState(Lock::ResourceLock lock, DatabaseShardingState* dss);
 
         Lock::ResourceLock _lock;
         DatabaseShardingState* _dss;

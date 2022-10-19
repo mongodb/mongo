@@ -49,13 +49,21 @@ public:
 
     DatabaseShardingStateMap() {}
 
-    DatabaseShardingState* getOrCreate(const DatabaseName& dbName) {
+    struct DSSAndLock {
+        DSSAndLock(const DatabaseName& dbName)
+            : dssMutex("DSSMutex::" + dbName.db()),
+              dss(std::make_unique<DatabaseShardingState>(dbName)) {}
+
+        const Lock::ResourceMutex dssMutex;
+        std::unique_ptr<DatabaseShardingState> dss;
+    };
+
+    DSSAndLock* getOrCreate(const DatabaseName& dbName) {
         stdx::lock_guard<Latch> lg(_mutex);
 
         auto it = _databases.find(dbName);
         if (it == _databases.end()) {
-            auto inserted =
-                _databases.try_emplace(dbName, std::make_unique<DatabaseShardingState>(dbName));
+            auto inserted = _databases.try_emplace(dbName, std::make_unique<DSSAndLock>(dbName));
             invariant(inserted.second);
             it = std::move(inserted.first);
         }
@@ -66,7 +74,9 @@ public:
 private:
     Mutex _mutex = MONGO_MAKE_LATCH("DatabaseShardingStateMap::_mutex");
 
-    using DatabasesMap = stdx::unordered_map<DatabaseName, std::unique_ptr<DatabaseShardingState>>;
+    // Entries of the _databases map must never be deleted or replaced. This is to guarantee that a
+    // 'dbName' is always associated to the same 'ResourceMutex'.
+    using DatabasesMap = stdx::unordered_map<DatabaseName, std::unique_ptr<DSSAndLock>>;
     DatabasesMap _databases;
 };
 
@@ -76,9 +86,9 @@ const ServiceContext::Decoration<DatabaseShardingStateMap> DatabaseShardingState
 }  // namespace
 
 DatabaseShardingState::ScopedDatabaseShardingState::ScopedDatabaseShardingState(
-    OperationContext* opCtx, const DatabaseName& dbName, LockMode mode)
-    : _lock(opCtx->lockState(), ResourceId(RESOURCE_MUTEX, dbName), mode),
-      _dss(DatabaseShardingStateMap::get(opCtx->getServiceContext()).getOrCreate(dbName)) {}
+    Lock::ResourceLock lock, DatabaseShardingState* dss)
+    : _lock(std::move(lock)), _dss(dss) {}
+
 
 DatabaseShardingState::ScopedDatabaseShardingState::ScopedDatabaseShardingState(
     ScopedDatabaseShardingState&& other)
@@ -99,8 +109,17 @@ DatabaseShardingState::ScopedDatabaseShardingState DatabaseShardingState::assert
 
 DatabaseShardingState::ScopedDatabaseShardingState DatabaseShardingState::acquire(
     OperationContext* opCtx, const DatabaseName& dbName, DSSAcquisitionMode mode) {
-    return ScopedDatabaseShardingState(
-        opCtx, dbName, mode == DSSAcquisitionMode::kShared ? MODE_IS : MODE_X);
+    DatabaseShardingStateMap::DSSAndLock* dssAndLock =
+        DatabaseShardingStateMap::get(opCtx->getServiceContext()).getOrCreate(dbName);
+
+    // First lock the RESOURCE_MUTEX associated to this dbName to guarantee stability of the
+    // DatabaseShardingState pointer. After that, it is safe to get and store the
+    // DatabaseShadingState*, as long as the RESOURCE_MUTEX is kept locked.
+    Lock::ResourceLock lock(opCtx->lockState(),
+                            dssAndLock->dssMutex.getRid(),
+                            mode == DSSAcquisitionMode::kShared ? MODE_IS : MODE_X);
+
+    return ScopedDatabaseShardingState(std::move(lock), dssAndLock->dss.get());
 }
 
 void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
