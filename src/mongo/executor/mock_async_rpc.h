@@ -29,25 +29,25 @@
 
 #include <deque>
 
-#include "mongo/executor/remote_command_runner.h"
-#include "mongo/executor/remote_command_runner_error_info.h"
-#include "mongo/executor/remote_command_targeter.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_error_info.h"
+#include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/producer_consumer_queue.h"
 
-namespace mongo::executor::remote_command_runner {
+namespace mongo::async_rpc {
 
 /**
- * This header provides two mock implementations of the remote_command_runner::doRequest API. In
- * unit tests, swap out the RemoteCommandRunner decoration on the ServiceContext with an instance
+ * This header provides two mock implementations of the async_rpc::sendCommand API. In
+ * unit tests, swap out the AsyncRPCRunner decoration on the ServiceContext with an instance
  * of one of these mocks to inject your own behavior and check invariants.
  *
  *  See the header comments for each mock for details.
  */
 
 /**
- * The SyncMockRemoteCommandRunner's representation of a RPC request. Exposed to users of the mock
+ * The SyncMockAsyncRPCRunner's representation of a RPC request. Exposed to users of the mock
  * via the onCommand/getNextRequest APIs, which can be used to examine what requests have been
  * scheduled on the mock and to schedule responsess to them.
  */
@@ -81,23 +81,23 @@ private:
 };
 
 /**
- * The SyncMockRemoteCommandRunner is a mock implementation that can be interacted with in a
+ * The SyncMockAsyncRPCRunner is a mock implementation that can be interacted with in a
  * synchronous/ blocking manner. It allows you to:
  *      -> Synchronously introspect onto what requests have been scheduled.
  *      -> Synchronously respond to those requests.
  *      -> Wait (blocking) for a request to be scheduled and respond to it.
  * See the member funtions below for details.
  */
-class SyncMockRemoteCommandRunner : public detail::RemoteCommandRunner {
+class SyncMockAsyncRPCRunner : public detail::AsyncRPCRunner {
 public:
     /**
      * Mock implementation of the core functionality of the RCR. Records the provided request, and
      * notifies waiters that a new request has been scheduled.
      */
-    ExecutorFuture<detail::RemoteCommandInternalResponse> _doRequest(
+    ExecutorFuture<detail::AsyncRPCInternalResponse> _sendCommand(
         StringData dbName,
         BSONObj cmdBSON,
-        RemoteCommandHostTargeter* targeter,
+        Targeter* targeter,
         OperationContext* opCtx,
         std::shared_ptr<TaskExecutor> exec,
         CancellationToken token) final {
@@ -105,8 +105,7 @@ public:
         return targeter->resolve(token)
             .thenRunOn(exec)
             .onError([](Status s) -> StatusWith<std::vector<HostAndPort>> {
-                return Status{RemoteCommandExecutionErrorInfo(s),
-                              "Remote command execution failed"};
+                return Status{AsyncRPCErrorInfo(s), "Remote command execution failed"};
             })
             .then([=, f = std::move(f), p = std::move(p)](auto&& targets) mutable {
                 stdx::lock_guard lg{_m};
@@ -114,13 +113,14 @@ public:
                 _hasRequestsCV.notify_one();
                 return std::move(f).then([targetUsed = targets[0]](StatusWith<BSONObj> resp) {
                     if (!resp.isOK()) {
-                        uassertStatusOK(Status{RemoteCommandExecutionErrorInfo(resp.getStatus()),
+                        uassertStatusOK(Status{AsyncRPCErrorInfo(resp.getStatus()),
                                                "Remote command execution failed"});
                     }
-                    Status maybeError(detail::makeErrorIfNeeded(
-                        RemoteCommandOnAnyResponse(targetUsed, resp.getValue(), Microseconds(1))));
+                    Status maybeError(
+                        detail::makeErrorIfNeeded(executor::RemoteCommandOnAnyResponse(
+                            targetUsed, resp.getValue(), Microseconds(1))));
                     uassertStatusOK(maybeError);
-                    return detail::RemoteCommandInternalResponse{resp.getValue(), targetUsed};
+                    return detail::AsyncRPCInternalResponse{resp.getValue(), targetUsed};
                 });
             });
     }
@@ -164,7 +164,7 @@ private:
 };
 
 /**
- * The AsyncMockRemoteCommandRunner allows you to asynchrously register expectations about what
+ * The AsyncMockAsyncRPCRunner allows you to asynchrously register expectations about what
  * requests will be registered; you can:
  *  -> Create an 'expectation' that a request will be scheduled some time in the future,
  *     asynchronously.
@@ -174,12 +174,12 @@ private:
  *  -> Examine if any unexpected requests were received and, if so, what they were.
  * See the member funtions below for details.
  */
-class AsyncMockRemoteCommandRunner : public detail::RemoteCommandRunner {
+class AsyncMockAsyncRPCRunner : public detail::AsyncRPCRunner {
 public:
     struct Request {
         BSONObj toBSON() const {
             BSONObjBuilder bob;
-            BSONObjBuilder subBob(bob.subobjStart("AsyncMockRemoteCommandRunner::Request"));
+            BSONObjBuilder subBob(bob.subobjStart("AsyncMockAsyncRPCRunner::Request"));
             subBob.append("dbName: ", dbName);
             subBob.append("command: ", cmdBSON);
             subBob.append("target: ", target.toString());
@@ -201,10 +201,10 @@ public:
      * that all requests are expected can use the hadUnexpectedRequests/unexpectedRequests member
      * functions to inspect that state.
      */
-    ExecutorFuture<detail::RemoteCommandInternalResponse> _doRequest(
+    ExecutorFuture<detail::AsyncRPCInternalResponse> _sendCommand(
         StringData dbName,
         BSONObj cmdBSON,
-        RemoteCommandHostTargeter* targeter,
+        Targeter* targeter,
         OperationContext* opCtx,
         std::shared_ptr<TaskExecutor> exec,
         CancellationToken token) final {
@@ -222,21 +222,21 @@ public:
                     // response.
                     _unexpectedRequests.push_back(req);
                     uassertStatusOK(
-                        Status{RemoteCommandExecutionErrorInfo(Status(
-                                   ErrorCodes::InternalErrorNotSupported, "Unexpected request")),
+                        Status{AsyncRPCErrorInfo(Status(ErrorCodes::InternalErrorNotSupported,
+                                                        "Unexpected request")),
                                "Remote command execution failed"});
                 }
                 auto ans = expectation->response;
                 expectation->promise.emplaceValue();
                 expectation->met = true;
                 if (!ans.isOK()) {
-                    uassertStatusOK(Status{RemoteCommandExecutionErrorInfo(ans.getStatus()),
+                    uassertStatusOK(Status{AsyncRPCErrorInfo(ans.getStatus()),
                                            "Remote command execution failed"});
                 }
-                Status maybeError(detail::makeErrorIfNeeded(
-                    RemoteCommandOnAnyResponse(targets[0], ans.getValue(), Microseconds(1))));
+                Status maybeError(detail::makeErrorIfNeeded(executor::RemoteCommandOnAnyResponse(
+                    targets[0], ans.getValue(), Microseconds(1))));
                 uassertStatusOK(maybeError);
-                return detail::RemoteCommandInternalResponse{ans.getValue(), targets[0]};
+                return detail::AsyncRPCInternalResponse{ans.getValue(), targets[0]};
             });
     }
 
@@ -335,12 +335,12 @@ private:
     Mutex _m;
 };
 
-std::ostream& operator<<(std::ostream& s, const AsyncMockRemoteCommandRunner::Request& o) {
+std::ostream& operator<<(std::ostream& s, const AsyncMockAsyncRPCRunner::Request& o) {
     return s << o.toBSON();
 }
 
-std::ostream& operator<<(std::ostream& s, const AsyncMockRemoteCommandRunner::Expectation& o) {
+std::ostream& operator<<(std::ostream& s, const AsyncMockAsyncRPCRunner::Expectation& o) {
     return s << o.name;
 }
 
-}  // namespace mongo::executor::remote_command_runner
+}  // namespace mongo::async_rpc

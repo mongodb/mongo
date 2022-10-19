@@ -348,7 +348,7 @@ if wiredtiger:
     env.CppUnitTest(
         target='client_test',
         source=[
-            'async_remote_command_targeter_test.cpp',
+            'async_remote_command_targeter_adapter_test.cpp',
             'authenticate_test.cpp',
             'connection_string_test.cpp',
             'dbclient_cursor_test.cpp',

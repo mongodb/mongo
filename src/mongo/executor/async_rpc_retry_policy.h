@@ -36,12 +36,10 @@
 #include "mongo/util/time_support.h"
 #include <string>
 
-namespace mongo {
-namespace executor {
-namespace remote_command_runner {
-
-class RemoteCommandRetryPolicy {
+namespace mongo::async_rpc {
+class RetryPolicy {
 public:
+    virtual ~RetryPolicy() = default;
     /**
      * Records any necessary retry metadata and returns true if a command should be retried based on
      * the policy conditions and input status.
@@ -49,16 +47,15 @@ public:
     virtual bool recordAndEvaluateRetry(Status s) = 0;
 
     /**
-     * Retry scheduler should wait this long in between retrying remote commands.
+     * After each decision to retry the remote command, this function
+     * is called to obtain how long to wait before that retry is attempted.
      */
     virtual Milliseconds getNextRetryDelay() = 0;
 
     virtual BSONObj toBSON() const = 0;
-
-    virtual ~RemoteCommandRetryPolicy() = default;
 };
 
-class RemoteCommandNoRetryPolicy : public RemoteCommandRetryPolicy {
+class NeverRetryPolicy : public RetryPolicy {
 public:
     bool recordAndEvaluateRetry(Status s) override final {
         return false;
@@ -70,9 +67,7 @@ public:
 
     BSONObj toBSON() const override final {
         return BSON("retryPolicyType"
-                    << "NoRetryPolicy");
+                    << "NeverRetryPolicy");
     }
 };
-}  // namespace remote_command_runner
-}  // namespace executor
-}  // namespace mongo
+}  // namespace mongo::async_rpc

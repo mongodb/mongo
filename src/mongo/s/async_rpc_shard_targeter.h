@@ -29,37 +29,66 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/executor/remote_command_targeter.h"
-#include "mongo/util/cancellation.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/executor/async_rpc_targeter.h"
+#include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/future.h"
+#include "mongo/util/out_of_line_executor.h"
 #include <memory>
+#include <vector>
+
 
 namespace mongo {
-namespace remote_command_runner {
+namespace async_rpc {
 
-class AsyncRemoteCommandTargeter
-    : public executor::remote_command_runner::RemoteCommandHostTargeter {
+class ShardIdTargeter : public Targeter {
 public:
-    AsyncRemoteCommandTargeter(ReadPreferenceSetting readPref,
-                               std::shared_ptr<RemoteCommandTargeter> targeter)
-        : _readPref(readPref), _targeter(targeter) {}
+    ShardIdTargeter(ShardId shardId,
+                    OperationContext* opCtx,
+                    ReadPreferenceSetting readPref,
+                    ExecutorPtr executor)
+        : _shardId(shardId), _opCtx(opCtx), _readPref(readPref), _executor(executor){};
 
     SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
-        return _targeter->findHosts(_readPref, t);
+        return getShard()
+            .thenRunOn(_executor)
+            .then([this, t](std::shared_ptr<Shard> shard) {
+                _shardFromLastResolve = shard;
+                return shard->getTargeter()->findHosts(_readPref, t);
+            })
+            .semi();
     }
 
-    SemiFuture<void> onRemoteCommandError(HostAndPort remoteHost,
-                                          Status remoteCommandStatus) override final {
-        _targeter->updateHostWithStatus(remoteHost, remoteCommandStatus);
+    /**
+     * Update underlying shard targeter's view of topology on error.
+     */
+    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override final {
+        invariant(_shardFromLastResolve,
+                  "Cannot propagate a remote command error to a ShardTargeter before calling "
+                  "resolve and obtaining a shard.");
+        _shardFromLastResolve->updateReplSetMonitor(h, s);
         return SemiFuture<void>::makeReady();
     }
 
+    SemiFuture<std::shared_ptr<Shard>> getShard() {
+        return Grid::get(_opCtx)->shardRegistry()->getShard(_executor, _shardId);
+    }
+
 private:
+    ShardId _shardId;
+    OperationContext* _opCtx;
     ReadPreferenceSetting _readPref;
-    std::shared_ptr<RemoteCommandTargeter> _targeter;
+    ExecutorPtr _executor;
+    std::shared_ptr<Shard> _shardFromLastResolve;
 };
 
-}  // namespace remote_command_runner
+}  // namespace async_rpc
 }  // namespace mongo

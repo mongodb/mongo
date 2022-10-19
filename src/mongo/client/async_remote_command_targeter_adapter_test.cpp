@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/client/async_remote_command_targeter.h"
-
+#include "mongo/client/async_remote_command_targeter_adapter.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
@@ -40,10 +39,10 @@
 #include <vector>
 
 namespace mongo {
-namespace remote_command_runner {
+namespace async_rpc {
 namespace {
 
-class AsyncRemoteCommandTargeterTest : public unittest::Test {
+class AsyncRemoteCommandTargeterAdapterTest : public unittest::Test {
 public:
     const std::vector<HostAndPort> kHosts{HostAndPort("FakeHost1", 12345),
                                           HostAndPort("FakeHost2", 12345)};
@@ -69,11 +68,11 @@ private:
 };
 
 /**
- * AsyncRemoteCommandTargeter resolves to the correct underlying HostAndPort.
+ * AsyncRemoteCommandTargeterAdapter resolves to the correct underlying HostAndPort.
  */
-TEST_F(AsyncRemoteCommandTargeterTest, TargeterResolvesCorrectly) {
+TEST_F(AsyncRemoteCommandTargeterAdapterTest, TargeterResolvesCorrectly) {
     ReadPreferenceSetting readPref;
-    auto targeter = AsyncRemoteCommandTargeter(readPref, getTargeter());
+    auto targeter = AsyncRemoteCommandTargeterAdapter(readPref, getTargeter());
 
     auto resolveFuture = targeter.resolve(CancellationToken::uncancelable());
 
@@ -84,9 +83,10 @@ TEST_F(AsyncRemoteCommandTargeterTest, TargeterResolvesCorrectly) {
  * When onRemoteCommandError is called, the targeter updates its view of the underlying topology
  * correctly.
  */
-TEST_F(AsyncRemoteCommandTargeterTest, OnRemoteErrorUpdatesTopology) {
+TEST_F(AsyncRemoteCommandTargeterAdapterTest, OnRemoteErrorUpdatesTopology) {
     ReadPreferenceSetting readPref;
-    AsyncRemoteCommandTargeter targeter = AsyncRemoteCommandTargeter(readPref, getTargeter());
+    AsyncRemoteCommandTargeterAdapter targeter =
+        AsyncRemoteCommandTargeterAdapter(readPref, getTargeter());
 
     [[maybe_unused]] auto commandErrorResponse = targeter.onRemoteCommandError(
         kHosts[0], Status(ErrorCodes::NotPrimaryNoSecondaryOk, "mock"));
@@ -102,9 +102,10 @@ TEST_F(AsyncRemoteCommandTargeterTest, OnRemoteErrorUpdatesTopology) {
  * When onRemoteCommandError is called, the targeter updates its view of the underlying topology
  * correctly and the resolver receives those changes.
  */
-TEST_F(AsyncRemoteCommandTargeterTest, OnRemoteErrorUpdatesTopologyAndResolver) {
+TEST_F(AsyncRemoteCommandTargeterAdapterTest, OnRemoteErrorUpdatesTopologyAndResolver) {
     ReadPreferenceSetting readPref;
-    AsyncRemoteCommandTargeter targeter = AsyncRemoteCommandTargeter(readPref, getTargeter());
+    AsyncRemoteCommandTargeterAdapter targeter =
+        AsyncRemoteCommandTargeterAdapter(readPref, getTargeter());
 
     // Mark down a host and ensure that it has been noted as marked down.
     [[maybe_unused]] auto commandErrorResponse = targeter.onRemoteCommandError(
@@ -124,5 +125,5 @@ TEST_F(AsyncRemoteCommandTargeterTest, OnRemoteErrorUpdatesTopologyAndResolver) 
 }
 
 }  // namespace
-}  // namespace remote_command_runner
+}  // namespace async_rpc
 }  // namespace mongo

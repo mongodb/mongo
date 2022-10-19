@@ -494,7 +494,7 @@ error_codes:
 
     - {code: 381, name: ReshardingCoordinatorServiceConflictingOperationInProgress, extra: ReshardingCoordinatorServiceConflictingOperationInProgressInfo, categories: [InternalOnly]}
 
-    - {code: 382, name: RemoteCommandExecutionError, extra: RemoteCommandExecutionErrorInfo, categories: [InternalOnly]}
+    - {code: 382, name: RemoteCommandExecutionError, extra: AsyncRPCErrorInfo, categories: [InternalOnly]}
 
     - {code: 383, name: CollectionIsEmptyLocally, categories: [InternalOnly]}
 

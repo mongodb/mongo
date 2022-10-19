@@ -41,14 +41,13 @@
 #include <vector>
 
 namespace mongo {
-namespace executor {
-namespace remote_command_runner {
+namespace async_rpc {
 
-class RemoteCommandHostTargeter {
+class Targeter {
 public:
-    RemoteCommandHostTargeter() = default;
+    Targeter() = default;
 
-    virtual ~RemoteCommandHostTargeter() = default;
+    virtual ~Targeter() = default;
 
     /*
      * Returns a collection of possible Hosts on which the command may run based on the specific
@@ -57,16 +56,16 @@ public:
     virtual SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) = 0;
 
     /*
-     * Informs the RemoteHostTargeter that an error happened when trying to run a command on a
+     * Informs the Targeter that an error happened when trying to run a command on a
      * HostAndPort. Allows the targeter to update its view of the cluster's topology if network
      * or shutdown errors are received.
      */
     virtual SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) = 0;
 };
 
-class RemoteCommandLocalHostTargeter : public RemoteCommandHostTargeter {
+class LocalHostTargeter : public Targeter {
 public:
-    RemoteCommandLocalHostTargeter() = default;
+    LocalHostTargeter() = default;
 
     SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
         HostAndPort h = HostAndPort("localhost", serverGlobalParams.port);
@@ -81,12 +80,12 @@ public:
 };
 
 /**
- * Basic RemoteCommandHostTargeter that wraps a single HostAndPort. Use when you need to make a call
- * to the doRequest function but already know what HostAndPort to target.
+ * Basic Targeter that wraps a single HostAndPort. Use when you need to make a call
+ * to the sendCommand function but already know what HostAndPort to target.
  */
-class RemoteCommandFixedTargeter : public RemoteCommandHostTargeter {
+class FixedTargeter : public Targeter {
 public:
-    RemoteCommandFixedTargeter(HostAndPort host) : _host(host){};
+    FixedTargeter(HostAndPort host) : _host(host){};
 
     SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
         std::vector<HostAndPort> hostList{_host};
@@ -102,6 +101,5 @@ private:
     HostAndPort _host;
 };
 
-}  // namespace remote_command_runner
-}  // namespace executor
+}  // namespace async_rpc
 }  // namespace mongo

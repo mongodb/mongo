@@ -35,10 +35,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_error_info.h"
+#include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/executor/remote_command_runner.h"
-#include "mongo/executor/remote_command_runner_error_info.h"
-#include "mongo/executor/remote_command_targeter.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/hedge_options_util.h"
@@ -53,8 +53,7 @@
 #include <vector>
 
 namespace mongo {
-namespace executor {
-namespace remote_command_runner {
+namespace async_rpc {
 
 namespace {
 // Only hedge commands that cannot trigger writes.
@@ -111,8 +110,8 @@ Future<SingleResponse> whenAnyThat(std::vector<ExecutorFuture<SingleResponse>>&&
 }  // namespace
 
 /**
- * doHedgedRequest is a hedged version of the doRequest function. It asynchronously executes a
- * hedged request by sending commands to multiple targets through doRequest and then returns a
+ * sendHedgedCommand is a hedged version of the sendCommand function. It asynchronously executes a
+ * hedged request by sending commands to multiple targets through sendCommand and then returns a
  * SemiFuture with the first result to become ready.
  *
  * In order to hedge, the command must be eligible for hedging, the hedgingMode server parameter
@@ -121,15 +120,14 @@ Future<SingleResponse> whenAnyThat(std::vector<ExecutorFuture<SingleResponse>>&&
  * vector provided by resolve.
  */
 template <typename CommandType>
-SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doHedgedRequest(
+SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     CommandType cmd,
     OperationContext* opCtx,
-    std::unique_ptr<RemoteCommandHostTargeter> targeter,
+    std::unique_ptr<Targeter> targeter,
     std::shared_ptr<executor::TaskExecutor> exec,
     CancellationToken token,
-    std::shared_ptr<RemoteCommandRetryPolicy> retryPolicy =
-        std::make_shared<RemoteCommandNoRetryPolicy>()) {
-    using SingleResponse = RemoteCommandRunnerResponse<typename CommandType::Reply>;
+    std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>()) {
+    using SingleResponse = AsyncRPCResponse<typename CommandType::Reply>;
 
     // Set up cancellation token to cancel remaining hedged operations.
     CancellationSource hedgeCancellationToken{token};
@@ -146,15 +144,14 @@ SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doHedgedReq
 
                 std::vector<ExecutorFuture<SingleResponse>> requests;
                 for (size_t i = 0; i < hedgeCount; i++) {
-                    std::unique_ptr<RemoteCommandHostTargeter> t =
-                        std::make_unique<RemoteCommandFixedTargeter>(targets[i]);
+                    std::unique_ptr<Targeter> t = std::make_unique<FixedTargeter>(targets[i]);
                     requests.emplace_back(
-                        doRequest(cmd, opCtx, std::move(t), exec, hedgeCancellationToken.token())
+                        sendCommand(cmd, opCtx, std::move(t), exec, hedgeCancellationToken.token())
                             .thenRunOn(exec));
                 }
 
                 /**
-                 * When whenAnyThat is used in doHedgedRequest, the shouldAccept function
+                 * When whenAnyThat is used in sendHedgedCommand, the shouldAccept function
                  * always accepts the future with index 0, which we treat as the
                  * "authoritative" request. This is the codepath followed when we are not
                  * hedging or there is only 1 target provided.
@@ -174,7 +171,7 @@ SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doHedgedReq
                         invariant(commandStatus.code() == ErrorCodes::RemoteCommandExecutionError,
                                   commandStatus.toString());
                         boost::optional<Status> remoteErr;
-                        auto extraInfo = commandStatus.extraInfo<RemoteCommandExecutionErrorInfo>();
+                        auto extraInfo = commandStatus.extraInfo<AsyncRPCErrorInfo>();
                         if (extraInfo->isRemote()) {
                             remoteErr = extraInfo->asRemote().getRemoteCommandResult();
                         }
@@ -200,6 +197,5 @@ SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doHedgedReq
         .semi();
 }
 
-}  // namespace remote_command_runner
-}  // namespace executor
+}  // namespace async_rpc
 }  // namespace mongo

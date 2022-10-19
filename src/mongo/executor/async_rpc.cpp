@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/executor/remote_command_runner.h"
+#include "mongo/executor/async_rpc.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/util/assert_util.h"
@@ -35,60 +35,58 @@
 #include "mongo/util/net/hostandport.h"
 #include <vector>
 
-namespace mongo::executor::remote_command_runner {
+namespace mongo::async_rpc {
 namespace detail {
 namespace {
-const auto getRCRImpl = ServiceContext::declareDecoration<std::unique_ptr<RemoteCommandRunner>>();
+const auto getRCRImpl = ServiceContext::declareDecoration<std::unique_ptr<AsyncRPCRunner>>();
 }  // namespace
 
-class RemoteCommandRunnerImpl : public RemoteCommandRunner {
+class AsyncRPCRunnerImpl : public AsyncRPCRunner {
 public:
     /**
      * Executes the BSON command asynchronously on the given target.
      *
      * Do not call directly - this is not part of the public API.
      */
-    ExecutorFuture<RemoteCommandInternalResponse> _doRequest(StringData dbName,
-                                                             BSONObj cmdBSON,
-                                                             RemoteCommandHostTargeter* targeter,
-                                                             OperationContext* opCtx,
-                                                             std::shared_ptr<TaskExecutor> exec,
-                                                             CancellationToken token) final {
+    ExecutorFuture<AsyncRPCInternalResponse> _sendCommand(StringData dbName,
+                                                          BSONObj cmdBSON,
+                                                          Targeter* targeter,
+                                                          OperationContext* opCtx,
+                                                          std::shared_ptr<TaskExecutor> exec,
+                                                          CancellationToken token) final {
         return targeter->resolve(token)
             .thenRunOn(exec)
             .then([dbName, cmdBSON, opCtx, exec = std::move(exec), token](
                       std::vector<HostAndPort> targets) {
                 uassert(ErrorCodes::HostNotFound, "No hosts availables", targets.size() != 0);
 
-                RemoteCommandRequestOnAny executorRequest(
+                executor::RemoteCommandRequestOnAny executorRequest(
                     targets, dbName.toString(), cmdBSON, rpc::makeEmptyMetadata(), opCtx);
                 return exec->scheduleRemoteCommandOnAny(executorRequest, token);
             })
             .onError([](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {
                 // If there was a scheduling error or other local error before the
                 // command was accepted by the executor.
-                return Status{RemoteCommandExecutionErrorInfo(s),
-                              "Remote command execution failed"};
+                return Status{AsyncRPCErrorInfo(s), "Remote command execution failed"};
             })
             .then([](TaskExecutor::ResponseOnAnyStatus r) {
                 auto s = makeErrorIfNeeded(r);
                 uassertStatusOK(s);
-                return RemoteCommandInternalResponse{r.data, r.target.get()};
+                return AsyncRPCInternalResponse{r.data, r.target.get()};
             });
     }
 };
 
 const auto implRegisterer = ServiceContext::ConstructorActionRegisterer{
     "RemoteCommmandRunner",
-    [](ServiceContext* ctx) { getRCRImpl(ctx) = std::make_unique<RemoteCommandRunnerImpl>(); }};
+    [](ServiceContext* ctx) { getRCRImpl(ctx) = std::make_unique<AsyncRPCRunnerImpl>(); }};
 
-RemoteCommandRunner* RemoteCommandRunner::get(ServiceContext* svcCtx) {
+AsyncRPCRunner* AsyncRPCRunner::get(ServiceContext* svcCtx) {
     return getRCRImpl(svcCtx).get();
 }
 
-void RemoteCommandRunner::set(ServiceContext* svcCtx,
-                              std::unique_ptr<RemoteCommandRunner> theRunner) {
+void AsyncRPCRunner::set(ServiceContext* svcCtx, std::unique_ptr<AsyncRPCRunner> theRunner) {
     getRCRImpl(svcCtx) = std::move(theRunner);
 }
 }  // namespace detail
-}  // namespace mongo::executor::remote_command_runner
+}  // namespace mongo::async_rpc

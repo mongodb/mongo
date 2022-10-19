@@ -32,10 +32,10 @@
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_retry_policy.h"
+#include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/network_test_env.h"
-#include "mongo/executor/remote_command_retry_policy.h"
-#include "mongo/executor/remote_command_runner.h"
-#include "mongo/executor/remote_command_targeter.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -46,9 +46,14 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 
-namespace mongo::executor::remote_command_runner {
+namespace mongo::async_rpc {
+using executor::NetworkInterface;
+using executor::NetworkInterfaceMock;
+using executor::NetworkTestEnv;
+using executor::ThreadPoolMock;
+using executor::ThreadPoolTaskExecutor;
 
-class RemoteCommandTestRetryPolicy : public RemoteCommandRetryPolicy {
+class TestRetryPolicy : public RetryPolicy {
 public:
     bool recordAndEvaluateRetry(Status s) override final {
         if (_numRetriesPerformed == _maxRetries) {
@@ -59,11 +64,13 @@ public:
     }
 
     Milliseconds getNextRetryDelay() override final {
-        return _retryDelay;
+        auto&& out = _retryDelays.front();
+        _retryDelays.pop_front();
+        return out;
     }
 
-    void setRetryDelay(Milliseconds retryDelay) {
-        _retryDelay = retryDelay;
+    void pushRetryDelay(Milliseconds retryDelay) {
+        _retryDelays.push_back(retryDelay);
     }
 
     BSONObj toBSON() const override final {
@@ -81,10 +88,10 @@ public:
 
 private:
     int _numRetriesPerformed, _maxRetries = 0;
-    Milliseconds _retryDelay = Milliseconds(100);
+    std::deque<Milliseconds> _retryDelays;
 };
 
-class RemoteCommandRunnerTestFixture : public LockerNoopServiceContextTest {
+class AsyncRPCTestFixture : public LockerNoopServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
@@ -140,14 +147,14 @@ public:
         return _net.get();
     }
 
-    void scheduleRequestAndAdvanceClockForRetry(
-        std::shared_ptr<RemoteCommandRetryPolicy> retryPolicy,
-        NetworkTestEnv::OnCommandFunction onCommandFunc) {
+    void scheduleRequestAndAdvanceClockForRetry(std::shared_ptr<RetryPolicy> retryPolicy,
+                                                NetworkTestEnv::OnCommandFunction onCommandFunc,
+                                                Milliseconds advanceBy) {
         auto net = getNetworkInterfaceMock();
         onCommand(onCommandFunc);
         {
             executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-            net->advanceTime(net->now() + retryPolicy->getNextRetryDelay());
+            net->advanceTime(net->now() + advanceBy);
         }
     }
 
@@ -159,4 +166,4 @@ private:
     std::shared_ptr<TaskExecutor> _executor;
     std::shared_ptr<NetworkInterfaceMock> _net;
 };
-}  // namespace mongo::executor::remote_command_runner
+}  // namespace mongo::async_rpc

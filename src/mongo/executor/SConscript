@@ -246,9 +246,9 @@ env.Library(
 )
 
 env.Library(
-    target='remote_command_runner_error_info',
+    target='async_rpc_error_info',
     source=[
-        'remote_command_runner_error_info.cpp',
+        'async_rpc_error_info.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -256,16 +256,16 @@ env.Library(
 )
 
 env.Library(
-    target='remote_command_runner',
+    target='async_rpc',
     source=[
-        'remote_command_runner.cpp',
+        'async_rpc.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/rpc/command_status',
+        'async_rpc_error_info',
         'remote_command',
-        'remote_command_runner_error_info',
         'task_executor_interface',
     ],
 )
@@ -321,16 +321,16 @@ env.Library(
 env.CppUnitTest(
     target='executor_test',
     source=[
+        'async_rpc_test.cpp',
         'cancelable_executor_test.cpp',
         'connection_pool_test.cpp',
         'connection_pool_test_fixture.cpp',
-        'hedged_remote_command_runner_test.cpp',
+        'hedged_async_rpc_test.cpp',
+        'mock_async_rpc_test.cpp',
         'mock_network_fixture_test.cpp',
-        'mock_remote_command_runner_test.cpp',
         'network_interface_mock_test.cpp',
         'network_interface_mock_test_fixture.cpp',
         'network_interface_tl_test.cpp',
-        'remote_command_runner_test.cpp',
         'scoped_task_executor_test.cpp',
         'task_executor_cursor_test.cpp',
         'thread_pool_task_executor_test.cpp',
@@ -341,12 +341,12 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/repl/hello_command',
         '$BUILD_DIR/mongo/s/mongos_server_parameters',
+        'async_rpc',
         'connection_pool_executor',
         'egress_tag_closer_manager',
         'network_interface_mock',
         'network_interface_tl',
         'network_test_env',
-        'remote_command_runner',
         'scoped_task_executor',
         'task_executor_cursor',
         'thread_pool_task_executor',

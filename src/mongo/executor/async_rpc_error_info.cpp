@@ -28,23 +28,23 @@
  */
 
 
-#include "mongo/executor/remote_command_runner_error_info.h"
+#include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
 namespace {
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(RemoteCommandExecutionErrorInfo);
+MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(AsyncRPCErrorInfo);
 
 }  // namespace
 
 // NOTE: parse() and serialize() will be removed altogether as part of SERVER-69634.
-std::shared_ptr<const ErrorExtraInfo> RemoteCommandExecutionErrorInfo::parse(const BSONObj& obj) {
-    return std::make_shared<RemoteCommandExecutionErrorInfo>(
+std::shared_ptr<const ErrorExtraInfo> AsyncRPCErrorInfo::parse(const BSONObj& obj) {
+    return std::make_shared<AsyncRPCErrorInfo>(
         Status(ErrorCodes::BadValue, "RemoteCommandExectionError illegally parsed from bson"));
 }
 
-void RemoteCommandExecutionErrorInfo::serialize(BSONObjBuilder* bob) const {}
+void AsyncRPCErrorInfo::serialize(BSONObjBuilder* bob) const {}
 
 }  // namespace mongo

@@ -31,13 +31,13 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/repl/hello_gen.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_error_info.h"
+#include "mongo/executor/async_rpc_retry_policy.h"
+#include "mongo/executor/async_rpc_targeter.h"
+#include "mongo/executor/async_rpc_test_fixture.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/executor/remote_command_retry_policy.h"
-#include "mongo/executor/remote_command_runner.h"
-#include "mongo/executor/remote_command_runner_error_info.h"
-#include "mongo/executor/remote_command_runner_test_fixture.h"
-#include "mongo/executor/remote_command_targeter.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -51,21 +51,19 @@
 #include <memory>
 
 namespace mongo {
-namespace executor {
-namespace remote_command_runner {
+namespace async_rpc {
 namespace {
 /*
  * Mock a successful network response to hello command.
  */
-TEST_F(RemoteCommandRunnerTestFixture, SuccessfulHello) {
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<RemoteCommandLocalHostTargeter>();
+TEST_F(AsyncRPCTestFixture, SuccessfulHello) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
     auto opCtxHolder = makeOperationContext();
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture = doRequest(
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture = sendCommand(
         helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
@@ -74,38 +72,38 @@ TEST_F(RemoteCommandRunnerTestFixture, SuccessfulHello) {
         return helloReply.toBSON();
     });
 
-    RemoteCommandRunnerResponse res = resultFuture.get();
+    AsyncRPCResponse res = resultFuture.get();
 
     ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
     ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), res.targetUsed);
 }
 
 /*
- * Tests that 'doRequest' will appropriately retry multiple times under the conditions defined by
+ * Tests that 'sendCommand' will appropriately retry multiple times under the conditions defined by
  * the retry policy.
  */
-TEST_F(RemoteCommandRunnerTestFixture, RetryOnSuccessfulHelloAdditionalAttempts) {
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<RemoteCommandLocalHostTargeter>();
+TEST_F(AsyncRPCTestFixture, RetryOnSuccessfulHelloAdditionalAttempts) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
     // Define a retry policy that simply decides to always retry a command three additional times.
-    std::shared_ptr<RemoteCommandTestRetryPolicy> testPolicy =
-        std::make_shared<RemoteCommandTestRetryPolicy>();
+    std::shared_ptr<TestRetryPolicy> testPolicy = std::make_shared<TestRetryPolicy>();
     const auto maxNumRetries = 3;
     const auto retryDelay = Milliseconds(100);
     testPolicy->setMaxNumRetries(maxNumRetries);
-    testPolicy->setRetryDelay(retryDelay);
+    testPolicy->pushRetryDelay(retryDelay);
+    testPolicy->pushRetryDelay(retryDelay);
+    testPolicy->pushRetryDelay(retryDelay);
 
     auto opCtxHolder = makeOperationContext();
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
-        doRequest(helloCmd,
-                  opCtxHolder.get(),
-                  std::move(targeter),
-                  getExecutorPtr(),
-                  _cancellationToken,
-                  testPolicy);
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
+        sendCommand(helloCmd,
+                    opCtxHolder.get(),
+                    std::move(targeter),
+                    getExecutorPtr(),
+                    _cancellationToken,
+                    testPolicy);
 
     const auto onCommandFunc = [&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -115,9 +113,9 @@ TEST_F(RemoteCommandRunnerTestFixture, RetryOnSuccessfulHelloAdditionalAttempts)
     // Schedule 1 request as the initial attempt, and then three following retries to satisfy the
     // condition for the runner to stop retrying.
     for (auto i = 0; i <= maxNumRetries; i++) {
-        scheduleRequestAndAdvanceClockForRetry(testPolicy, onCommandFunc);
+        scheduleRequestAndAdvanceClockForRetry(testPolicy, onCommandFunc, retryDelay);
     }
-    RemoteCommandRunnerResponse res = resultFuture.get();
+    AsyncRPCResponse res = resultFuture.get();
 
     ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
     ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), res.targetUsed);
@@ -125,27 +123,75 @@ TEST_F(RemoteCommandRunnerTestFixture, RetryOnSuccessfulHelloAdditionalAttempts)
 }
 
 /*
- * Tests that 'doRequest' will not retry when the retry policy indicates accordingly.
+ * Tests that 'sendCommand' will appropriately retry multiple times under the conditions defined by
+ * the retry policy, with a dynmically changing wait-time between retries.
  */
-TEST_F(RemoteCommandRunnerTestFixture, DoNotRetryOnErrorAccordingToPolicy) {
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<RemoteCommandLocalHostTargeter>();
+TEST_F(AsyncRPCTestFixture, DynamicDelayBetweenRetries) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
-    std::shared_ptr<RemoteCommandTestRetryPolicy> testPolicy =
-        std::make_shared<RemoteCommandTestRetryPolicy>();
+    // Define a retry policy that simply decides to always retry a command three additional times.
+    std::shared_ptr<TestRetryPolicy> testPolicy = std::make_shared<TestRetryPolicy>();
+    const auto maxNumRetries = 3;
+    const std::array<Milliseconds, maxNumRetries> retryDelays{
+        Milliseconds(100), Milliseconds(50), Milliseconds(10)};
+    testPolicy->setMaxNumRetries(maxNumRetries);
+    testPolicy->pushRetryDelay(retryDelays[0]);
+    testPolicy->pushRetryDelay(retryDelays[1]);
+    testPolicy->pushRetryDelay(retryDelays[2]);
+
+    auto opCtxHolder = makeOperationContext();
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
+        sendCommand(helloCmd,
+                    opCtxHolder.get(),
+                    std::move(targeter),
+                    getExecutorPtr(),
+                    _cancellationToken,
+                    testPolicy);
+
+    const auto onCommandFunc = [&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
+        return helloReply.toBSON();
+    };
+
+    // Schedule 1 response to the initial attempt, and then two for the following retries.
+    // Advance the clock appropriately based on each retry delay.
+    for (auto i = 0; i < maxNumRetries; i++) {
+        scheduleRequestAndAdvanceClockForRetry(testPolicy, onCommandFunc, retryDelays[i]);
+    }
+    // Schedule a response to the final retry. No need to advance clock since no more
+    // retries should be attemped after this third one.
+    onCommand(onCommandFunc);
+
+    AsyncRPCResponse res = resultFuture.get();
+
+    ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
+    ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), res.targetUsed);
+    ASSERT_EQ(maxNumRetries, testPolicy->getNumRetriesPerformed());
+}
+
+/*
+ * Tests that 'sendCommand' will not retry when the retry policy indicates accordingly.
+ */
+TEST_F(AsyncRPCTestFixture, DoNotRetryOnErrorAccordingToPolicy) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+    std::shared_ptr<TestRetryPolicy> testPolicy = std::make_shared<TestRetryPolicy>();
     const auto zeroRetries = 0;
     testPolicy->setMaxNumRetries(zeroRetries);
 
     auto opCtxHolder = makeOperationContext();
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
-        doRequest(helloCmd,
-                  opCtxHolder.get(),
-                  std::move(targeter),
-                  getExecutorPtr(),
-                  _cancellationToken,
-                  testPolicy);
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
+        sendCommand(helloCmd,
+                    opCtxHolder.get(),
+                    std::move(targeter),
+                    getExecutorPtr(),
+                    _cancellationToken,
+                    testPolicy);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -163,14 +209,13 @@ TEST_F(RemoteCommandRunnerTestFixture, DoNotRetryOnErrorAccordingToPolicy) {
 /*
  * Mock error on local host side.
  */
-TEST_F(RemoteCommandRunnerTestFixture, LocalError) {
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<RemoteCommandLocalHostTargeter>();
+TEST_F(AsyncRPCTestFixture, LocalError) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
     auto opCtxHolder = makeOperationContext();
-    auto resultFuture = doRequest(
+    auto resultFuture = sendCommand(
         helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
@@ -184,7 +229,7 @@ TEST_F(RemoteCommandRunnerTestFixture, LocalError) {
     // The error returned by our API should always be RemoteCommandExecutionError
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
     // Make sure we can extract the extra error info
-    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
     ASSERT(extraInfo);
     // Make sure the extra info indicates the error was local, and that the
     // local error (which is just a Status) has the correct code.
@@ -195,14 +240,13 @@ TEST_F(RemoteCommandRunnerTestFixture, LocalError) {
 /*
  * Mock error on remote host.
  */
-TEST_F(RemoteCommandRunnerTestFixture, RemoteError) {
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<RemoteCommandLocalHostTargeter>();
+TEST_F(AsyncRPCTestFixture, RemoteError) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
     auto opCtxHolder = makeOperationContext();
-    auto resultFuture = doRequest(
+    auto resultFuture = sendCommand(
         helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
@@ -214,7 +258,7 @@ TEST_F(RemoteCommandRunnerTestFixture, RemoteError) {
     auto error = resultFuture.getNoThrow().getStatus();
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
 
-    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
     ASSERT(extraInfo);
 
     ASSERT(extraInfo->isRemote());
@@ -226,21 +270,20 @@ TEST_F(RemoteCommandRunnerTestFixture, RemoteError) {
     ASSERT_EQ(remoteError.getRemoteCommandFirstWriteError(), Status::OK());
 }
 
-TEST_F(RemoteCommandRunnerTestFixture, SuccessfulFind) {
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<RemoteCommandLocalHostTargeter>();
+TEST_F(AsyncRPCTestFixture, SuccessfulFind) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     auto opCtxHolder = makeOperationContext();
     DatabaseName testDbName = DatabaseName("testdb", boost::none);
     NamespaceString nss(testDbName);
 
     FindCommandRequest findCmd(nss);
-    auto resultFuture = doRequest(
+    auto resultFuture = sendCommand(
         findCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
         // The BSON documents in this cursor response are created here.
-        // When the remote_command_runner parses the response, it participates
+        // When async_rpc::sendCommand parses the response, it participates
         // in ownership of the underlying data, so it will participate in
         // owning the data in the cursor response.
         return CursorResponse(nss, 0LL, {BSON("x" << 1)})
@@ -255,9 +298,8 @@ TEST_F(RemoteCommandRunnerTestFixture, SuccessfulFind) {
 /*
  * Mock write concern error on remote host.
  */
-TEST_F(RemoteCommandRunnerTestFixture, WriteConcernError) {
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<RemoteCommandLocalHostTargeter>();
+TEST_F(AsyncRPCTestFixture, WriteConcernError) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
@@ -267,7 +309,7 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteConcernError) {
         BSON("ok" << 1 << "writeConcernError" << writeConcernError);
 
     auto opCtxHolder = makeOperationContext();
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture = doRequest(
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture = sendCommand(
         helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
@@ -279,7 +321,7 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteConcernError) {
     auto error = resultFuture.getNoThrow().getStatus();
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
 
-    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
     ASSERT(extraInfo);
 
     ASSERT(extraInfo->isRemote());
@@ -295,9 +337,8 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteConcernError) {
 /*
  * Mock write error on remote host.
  */
-TEST_F(RemoteCommandRunnerTestFixture, WriteError) {
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<RemoteCommandLocalHostTargeter>();
+TEST_F(AsyncRPCTestFixture, WriteError) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
@@ -307,7 +348,7 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteError) {
                                            << "Document failed validation");
     const BSONObj resWithWriteError = BSON("ok" << 1 << "writeErrors" << BSON_ARRAY(writeError));
     auto opCtxHolder = makeOperationContext();
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture = doRequest(
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture = sendCommand(
         helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
@@ -319,7 +360,7 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteError) {
     auto error = resultFuture.getNoThrow().getStatus();
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
 
-    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
     ASSERT(extraInfo);
 
     ASSERT(extraInfo->isRemote());
@@ -337,20 +378,19 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteError) {
 // Ensure that the RCR correctly returns RemoteCommandExecutionError when the executor
 // is shutdown mid-remote-invocation, and that the executor shutdown error is contained
 // in the error's ExtraInfo.
-TEST_F(RemoteCommandRunnerTestFixture, ExecutorShutdown) {
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<RemoteCommandLocalHostTargeter>();
+TEST_F(AsyncRPCTestFixture, ExecutorShutdown) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
     auto opCtxHolder = makeOperationContext();
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture = doRequest(
+    auto resultFuture = sendCommand(
         helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
     getExecutorPtr()->shutdown();
     auto error = resultFuture.getNoThrow().getStatus();
     // The error returned by our API should always be RemoteCommandExecutionError
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
     // Make sure we can extract the extra error info
-    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
     ASSERT(extraInfo);
     // Make sure the extra info indicates the error was local, and that the
     // local error (which is just a Status) has the correct code.
@@ -361,8 +401,8 @@ TEST_F(RemoteCommandRunnerTestFixture, ExecutorShutdown) {
 /*
  * Basic Targeter that returns the host that invoked it.
  */
-TEST_F(RemoteCommandRunnerTestFixture, LocalTargeter) {
-    RemoteCommandLocalHostTargeter t;
+TEST_F(AsyncRPCTestFixture, LocalTargeter) {
+    LocalHostTargeter t;
     auto targetFuture = t.resolve(_cancellationToken);
     auto target = targetFuture.get();
 
@@ -373,8 +413,8 @@ TEST_F(RemoteCommandRunnerTestFixture, LocalTargeter) {
 /*
  * Basic Targeter that wraps a single HostAndPort.
  */
-TEST_F(RemoteCommandRunnerTestFixture, HostAndPortTargeter) {
-    RemoteCommandFixedTargeter t{HostAndPort("FakeHost1", 12345)};
+TEST_F(AsyncRPCTestFixture, HostAndPortTargeter) {
+    FixedTargeter t{HostAndPort("FakeHost1", 12345)};
     auto targetFuture = t.resolve(_cancellationToken);
     auto target = targetFuture.get();
 
@@ -385,22 +425,21 @@ TEST_F(RemoteCommandRunnerTestFixture, HostAndPortTargeter) {
 /*
  * Basic RetryPolicy that never retries.
  */
-TEST_F(RemoteCommandRunnerTestFixture, NoRetry) {
-    RemoteCommandNoRetryPolicy p;
+TEST_F(AsyncRPCTestFixture, NoRetry) {
+    NeverRetryPolicy p;
 
     ASSERT_FALSE(p.recordAndEvaluateRetry(Status(ErrorCodes::BadValue, "mock")));
     ASSERT_EQUALS(p.getNextRetryDelay(), Milliseconds::zero());
 }
 
 // TODO SERVER-69634: Remove this test.
-TEST_F(RemoteCommandRunnerTestFixture, ParseAndSeralizeNoop) {
-    std::unique_ptr<RemoteCommandHostTargeter> targeter =
-        std::make_unique<RemoteCommandLocalHostTargeter>();
+TEST_F(AsyncRPCTestFixture, ParseAndSeralizeNoop) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
     auto opCtxHolder = makeOperationContext();
-    auto resultFuture = doRequest(
+    auto resultFuture = sendCommand(
         helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
@@ -409,7 +448,7 @@ TEST_F(RemoteCommandRunnerTestFixture, ParseAndSeralizeNoop) {
         return Status(ErrorCodes::NetworkTimeout, "mock");
     });
 
-    // Check that RemoteCommandExecutionErrorInfo::serialize() works safely (when converting a
+    // Check that AsyncRPCErrorInfo::serialize() works safely (when converting a
     // Status to string), instead of crashing the server.
     try {
         auto error = resultFuture.get();
@@ -418,19 +457,17 @@ TEST_F(RemoteCommandRunnerTestFixture, ParseAndSeralizeNoop) {
         ASSERT_FALSE(ex.toString().empty());
     }
 
-    // Check that RemoteCommandExecutionErrorInfo::parse() safely creates a dummy ErrorExtraInfo
+    // Check that AsyncRPCErrorInfo::parse() safely creates a dummy ErrorExtraInfo
     // (when a Status is constructed), instead of crashing the server.
     const auto status = Status(ErrorCodes::RemoteCommandExecutionError, "", fromjson("{foo: 123}"));
     ASSERT_EQ(status, ErrorCodes::RemoteCommandExecutionError);
     ASSERT(status.extraInfo());
-    ASSERT(status.extraInfo<RemoteCommandExecutionErrorInfo>());
-    ASSERT_EQ(status.extraInfo<RemoteCommandExecutionErrorInfo>()->asLocal(), ErrorCodes::BadValue);
-    ASSERT_STRING_CONTAINS(
-        status.extraInfo<RemoteCommandExecutionErrorInfo>()->asLocal().toString(),
-        "RemoteCommandExectionError illegally parsed from bson");
+    ASSERT(status.extraInfo<AsyncRPCErrorInfo>());
+    ASSERT_EQ(status.extraInfo<AsyncRPCErrorInfo>()->asLocal(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(status.extraInfo<AsyncRPCErrorInfo>()->asLocal().toString(),
+                           "RemoteCommandExectionError illegally parsed from bson");
 }
 
 }  // namespace
-}  // namespace remote_command_runner
-}  // namespace executor
+}  // namespace async_rpc
 }  // namespace mongo

@@ -26,40 +26,40 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/executor/mock_remote_command_runner.h"
+#include "mongo/executor/mock_async_rpc.h"
 
 #include <memory>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/executor/remote_command_runner.h"
-#include "mongo/executor/remote_command_runner_test_fixture.h"
-#include "mongo/executor/remote_command_targeter.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_targeter.h"
+#include "mongo/executor/async_rpc_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/debugger.h"
 #include "mongo/util/optional_util.h"
 
-namespace mongo::executor::remote_command_runner {
+namespace mongo::async_rpc {
 namespace {
 
 /**
  * This test fixture is used to test the functionality of the mocks, rather than test any facilities
- * or usage of the RemoteCommandRunner implementation.
+ * or usage of the AsyncRPCRunner implementation.
  */
 template <typename MockType>
-class MockRemoteCommandRunnerTestFixture : public RemoteCommandRunnerTestFixture {
+class MockAsyncRPCRunnerTestFixture : public AsyncRPCTestFixture {
 public:
     void setUp() override {
-        RemoteCommandRunnerTestFixture::setUp();
+        AsyncRPCTestFixture::setUp();
         auto uniqueMock = std::make_unique<MockType>();
         _mock = uniqueMock.get();
-        detail::RemoteCommandRunner::set(getServiceContext(), std::move(uniqueMock));
+        detail::AsyncRPCRunner::set(getServiceContext(), std::move(uniqueMock));
     }
 
     void tearDown() override {
-        detail::RemoteCommandRunner::set(getServiceContext(), nullptr);
-        RemoteCommandRunnerTestFixture::tearDown();
+        detail::AsyncRPCRunner::set(getServiceContext(), nullptr);
+        AsyncRPCTestFixture::tearDown();
     }
 
     MockType& getMockRunner() {
@@ -67,21 +67,20 @@ public:
     }
 
 
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> sendHelloCommandToHostAndPort(
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> sendHelloCommandToHostAndPort(
         HostAndPort target,
-        std::shared_ptr<RemoteCommandRetryPolicy> retryPolicy =
-            std::make_shared<RemoteCommandNoRetryPolicy>()) {
+        std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>()) {
         HelloCommand hello;
         initializeCommand(hello);
-        return doRequest(hello,
-                         _opCtx.get(),
-                         std::make_unique<RemoteCommandFixedTargeter>(target),
-                         getExecutorPtr(),
-                         _cancellationToken,
-                         retryPolicy);
+        return sendCommand(hello,
+                           _opCtx.get(),
+                           std::make_unique<FixedTargeter>(target),
+                           getExecutorPtr(),
+                           _cancellationToken,
+                           retryPolicy);
     }
 
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> sendHelloCommandToLocalHost() {
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> sendHelloCommandToLocalHost() {
         return sendHelloCommandToHostAndPort({"localhost", serverGlobalParams.port});
     }
 
@@ -90,14 +89,12 @@ private:
     ServiceContext::UniqueOperationContext _opCtx = makeOperationContext();
 };
 
-using SyncMockRemoteCommandRunnerTestFixture =
-    MockRemoteCommandRunnerTestFixture<SyncMockRemoteCommandRunner>;
-using AsyncMockRemoteCommandRunnerTestFixture =
-    MockRemoteCommandRunnerTestFixture<AsyncMockRemoteCommandRunner>;
+using SyncMockAsyncRPCRunnerTestFixture = MockAsyncRPCRunnerTestFixture<SyncMockAsyncRPCRunner>;
+using AsyncMockAsyncRPCRunnerTestFixture = MockAsyncRPCRunnerTestFixture<AsyncMockAsyncRPCRunner>;
 
 // A simple test showing that an arbitrary mock result can be set for a command scheduled through
-// the RemoteCommandRunner.
-TEST_F(SyncMockRemoteCommandRunnerTestFixture, RemoteSuccess) {
+// the AsyncRPCRunner.
+TEST_F(SyncMockAsyncRPCRunnerTestFixture, RemoteSuccess) {
     auto responseFuture = sendHelloCommandToLocalHost();
 
     HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
@@ -115,7 +112,7 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, RemoteSuccess) {
     ASSERT_BSONOBJ_EQ(actualResult.response.toBSON(), helloReply.toBSON());
 }
 
-TEST_F(SyncMockRemoteCommandRunnerTestFixture, RemoteError) {
+TEST_F(SyncMockAsyncRPCRunnerTestFixture, RemoteError) {
     StringData exampleErrMsg{"example error message"};
     auto exampleErrCode = ErrorCodes::ShutdownInProgress;
     ErrorReply errorReply;
@@ -131,7 +128,7 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, RemoteError) {
 
     auto check = [&](const DBException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::RemoteCommandExecutionError) << ex.toString();
-        auto extraInfo = ex.extraInfo<RemoteCommandExecutionErrorInfo>();
+        auto extraInfo = ex.extraInfo<AsyncRPCErrorInfo>();
         ASSERT(extraInfo);
 
         ASSERT(extraInfo->isRemote());
@@ -143,7 +140,7 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, RemoteError) {
     ASSERT_THROWS_WITH_CHECK(responseFuture.get(), DBException, check);
 }
 
-TEST_F(SyncMockRemoteCommandRunnerTestFixture, LocalError) {
+TEST_F(SyncMockAsyncRPCRunnerTestFixture, LocalError) {
     auto responseFuture = sendHelloCommandToLocalHost();
     auto& request = getMockRunner().getNextRequest();
     ASSERT_FALSE(responseFuture.isReady());
@@ -153,7 +150,7 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, LocalError) {
     // The error returned by our API should always be RemoteCommandExecutionError.
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
     // Make sure we can extract the extra error info.
-    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
     ASSERT(extraInfo);
     // Make sure the extra info indicates the error was local, and that the
     // local error (which is just a Status) is the one we provided.
@@ -161,7 +158,7 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, LocalError) {
     ASSERT_EQ(extraInfo->asLocal(), exampleLocalErr);
 }
 
-TEST_F(SyncMockRemoteCommandRunnerTestFixture, MultipleResponses) {
+TEST_F(SyncMockAsyncRPCRunnerTestFixture, MultipleResponses) {
     auto responseOneFut = sendHelloCommandToLocalHost();
     ASSERT_FALSE(responseOneFut.isReady());
     auto& request = getMockRunner().getNextRequest();
@@ -185,13 +182,13 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, MultipleResponses) {
     requestTwo.respondWith(exampleLocalErr);
     auto error = responseTwoFut.getNoThrow().getStatus();
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
-    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
     ASSERT(extraInfo);
     ASSERT(extraInfo->isLocal());
     ASSERT_EQ(extraInfo->asLocal(), exampleLocalErr);
 }
 
-TEST_F(SyncMockRemoteCommandRunnerTestFixture, OnCommand) {
+TEST_F(SyncMockAsyncRPCRunnerTestFixture, OnCommand) {
     auto responseFut = sendHelloCommandToLocalHost();
 
     HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
@@ -209,12 +206,12 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, OnCommand) {
     ASSERT_BSONOBJ_EQ(responseFut.get().response.toBSON(), helloReply.toBSON());
 }
 
-TEST_F(SyncMockRemoteCommandRunnerTestFixture, SyncMockRemoteCommandRunnerWithRetryPolicy) {
-    const auto retryPolicy = std::make_shared<RemoteCommandTestRetryPolicy>();
+TEST_F(SyncMockAsyncRPCRunnerTestFixture, SyncMockAsyncRPCRunnerWithRetryPolicy) {
+    const auto retryPolicy = std::make_shared<TestRetryPolicy>();
     const auto maxNumRetries = 1;
     const auto retryDelay = Milliseconds(100);
     retryPolicy->setMaxNumRetries(maxNumRetries);
-    retryPolicy->setRetryDelay(retryDelay);
+    retryPolicy->pushRetryDelay(retryDelay);
     auto responseFut =
         sendHelloCommandToHostAndPort({"localhost", serverGlobalParams.port}, retryPolicy);
 
@@ -233,7 +230,7 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, SyncMockRemoteCommandRunnerWithRe
     auto net = getNetworkInterfaceMock();
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-        net->advanceTime(net->now() + retryPolicy->getNextRetryDelay());
+        net->advanceTime(net->now() + retryDelay);
     }
 
     getMockRunner().onCommand([&](const RequestInfo& ri) {
@@ -248,10 +245,10 @@ TEST_F(SyncMockRemoteCommandRunnerTestFixture, SyncMockRemoteCommandRunnerWithRe
 // that a request will eventually be scheduled with the mock before a request
 // actually arrives. Then, once the request is scheduled, we are asynchronously
 // notified of the request and can schedule a response to it.
-TEST_F(AsyncMockRemoteCommandRunnerTestFixture, Expectation) {
+TEST_F(AsyncMockAsyncRPCRunnerTestFixture, Expectation) {
     // We expect that some code will use the runner to send a hello
     // to localhost on "testdb".
-    auto matcher = [](const AsyncMockRemoteCommandRunner::Request& req) {
+    auto matcher = [](const AsyncMockAsyncRPCRunner::Request& req) {
         bool isHello = req.cmdBSON.firstElementFieldName() == "hello"_sd;
         bool isRightTarget = req.target == HostAndPort("localhost", serverGlobalParams.port);
         return isHello && isRightTarget;
@@ -274,10 +271,10 @@ TEST_F(AsyncMockRemoteCommandRunnerTestFixture, Expectation) {
     ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), reply.targetUsed);
 }
 
-TEST_F(AsyncMockRemoteCommandRunnerTestFixture, AsyncMockRemoteCommandRunnerWithRetryPolicy) {
+TEST_F(AsyncMockAsyncRPCRunnerTestFixture, AsyncMockAsyncRPCRunnerWithRetryPolicy) {
     // We expect that some code will use the runner to send a hello
     // to localhost on "testdb".
-    auto matcher = [](const AsyncMockRemoteCommandRunner::Request& req) {
+    auto matcher = [](const AsyncMockAsyncRPCRunner::Request& req) {
         bool isHello = req.cmdBSON.firstElementFieldName() == "hello"_sd;
         bool isRightTarget = req.target == HostAndPort("localhost", serverGlobalParams.port);
         return isHello && isRightTarget;
@@ -297,11 +294,11 @@ TEST_F(AsyncMockRemoteCommandRunnerTestFixture, AsyncMockRemoteCommandRunnerWith
     ASSERT_FALSE(firstExpectation.isReady());
     ASSERT_FALSE(secondExpectation.isReady());
 
-    const auto retryPolicy = std::make_shared<RemoteCommandTestRetryPolicy>();
+    const auto retryPolicy = std::make_shared<TestRetryPolicy>();
     const auto maxNumRetries = 1;
     const auto retryDelay = Milliseconds(100);
     retryPolicy->setMaxNumRetries(maxNumRetries);
-    retryPolicy->setRetryDelay(retryDelay);
+    retryPolicy->pushRetryDelay(retryDelay);
     // Allow a request to be scheduled on the mock.
     auto response =
         sendHelloCommandToHostAndPort({"localhost", serverGlobalParams.port}, retryPolicy);
@@ -314,7 +311,7 @@ TEST_F(AsyncMockRemoteCommandRunnerTestFixture, AsyncMockRemoteCommandRunnerWith
     auto net = getNetworkInterfaceMock();
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-        net->advanceTime(net->now() + retryPolicy->getNextRetryDelay());
+        net->advanceTime(net->now() + retryDelay);
     }
     auto reply = response.get();
     // The second expectation should be met.
@@ -328,18 +325,18 @@ TEST_F(AsyncMockRemoteCommandRunnerTestFixture, AsyncMockRemoteCommandRunnerWith
 // schedules the requests that match them and their responses out-of-order.
 // Demonstrates how we can register expectations on the mock for events in an
 // unordered way.
-TEST_F(AsyncMockRemoteCommandRunnerTestFixture, SeveralExpectations) {
+TEST_F(AsyncMockAsyncRPCRunnerTestFixture, SeveralExpectations) {
     HostAndPort targetOne("FakeHost1", 12345);
     HostAndPort targetTwo("FakeHost2", 12345);
     HostAndPort targetThree("FakeHost3", 12345);
 
-    auto matcherOne = [&](const AsyncMockRemoteCommandRunner::Request& req) {
+    auto matcherOne = [&](const AsyncMockAsyncRPCRunner::Request& req) {
         return (req.cmdBSON.firstElementFieldName() == "hello"_sd) && (req.target == targetOne);
     };
-    auto matcherTwo = [&](const AsyncMockRemoteCommandRunner::Request& req) {
+    auto matcherTwo = [&](const AsyncMockAsyncRPCRunner::Request& req) {
         return (req.cmdBSON.firstElementFieldName() == "hello"_sd) && (req.target == targetTwo);
     };
-    auto matcherThree = [&](const AsyncMockRemoteCommandRunner::Request& req) {
+    auto matcherThree = [&](const AsyncMockAsyncRPCRunner::Request& req) {
         return (req.cmdBSON.firstElementFieldName() == "hello"_sd) && (req.target == targetThree);
     };
 
@@ -363,7 +360,7 @@ TEST_F(AsyncMockRemoteCommandRunnerTestFixture, SeveralExpectations) {
     e2.get();
     ASSERT_FALSE(e1.isReady());
     // Make sure the correct responses were sent.
-    auto assertResponseMatches = [&](RemoteCommandRunnerResponse<HelloCommandReply> reply,
+    auto assertResponseMatches = [&](AsyncRPCResponse<HelloCommandReply> reply,
                                      const HostAndPort& correctTarget) {
         ASSERT_EQ(correctTarget, reply.targetUsed);
         ASSERT_BSONOBJ_EQ(reply.response.toBSON(), helloReply.toBSON());
@@ -377,12 +374,9 @@ TEST_F(AsyncMockRemoteCommandRunnerTestFixture, SeveralExpectations) {
     e1.get();
 }
 
-TEST_F(AsyncMockRemoteCommandRunnerTestFixture, UnexpectedRequests) {
+TEST_F(AsyncMockAsyncRPCRunnerTestFixture, UnexpectedRequests) {
     auto responseFut = sendHelloCommandToLocalHost();
-    ASSERT_EQ(responseFut.getNoThrow()
-                  .getStatus()
-                  .extraInfo<RemoteCommandExecutionErrorInfo>()
-                  ->asLocal(),
+    ASSERT_EQ(responseFut.getNoThrow().getStatus().extraInfo<AsyncRPCErrorInfo>()->asLocal(),
               Status(ErrorCodes::InternalErrorNotSupported, "Unexpected request"));
     ASSERT(getMockRunner().hadUnexpectedRequests());
     auto unexpectedRequests = getMockRunner().getUnexpectedRequests();
@@ -401,9 +395,9 @@ TEST_F(AsyncMockRemoteCommandRunnerTestFixture, UnexpectedRequests) {
     // (This is a live example, feel free to uncomment and try it).
 }
 
-TEST_F(AsyncMockRemoteCommandRunnerTestFixture, UnmetExpectations) {
+TEST_F(AsyncMockAsyncRPCRunnerTestFixture, UnmetExpectations) {
     HostAndPort theTarget("FakeHost1", 12345);
-    auto matcher = [&](const AsyncMockRemoteCommandRunner::Request& req) {
+    auto matcher = [&](const AsyncMockAsyncRPCRunner::Request& req) {
         return (req.cmdBSON.firstElementFieldName() == "hello"_sd) && (req.target == theTarget);
     };
     HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
@@ -424,4 +418,4 @@ TEST_F(AsyncMockRemoteCommandRunnerTestFixture, UnmetExpectations) {
     // (This is a live example, feel free to uncomment and try it).
 }
 }  // namespace
-}  // namespace mongo::executor::remote_command_runner
+}  // namespace mongo::async_rpc

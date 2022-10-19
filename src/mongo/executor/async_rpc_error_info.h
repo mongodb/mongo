@@ -45,7 +45,7 @@ enum class CommandErrorProvenance { kLocal, kRemote };
  * Contains information to augment the 'RemoteCommandExecutionError' error code. In particular, this
  * class holds the provenance and data of the underlying error(s).
  */
-class RemoteCommandExecutionErrorInfo final : public ErrorExtraInfo {
+class AsyncRPCErrorInfo final : public ErrorExtraInfo {
 public:
     /**
      * Nested class used to describe remote errors.
@@ -106,7 +106,7 @@ public:
      * Construct the relevant extra info from the RemoteCommandResponse provided by the TaskExecutor
      * used to invoke the remote command.
      */
-    explicit RemoteCommandExecutionErrorInfo(executor::RemoteCommandOnAnyResponse rcr)
+    explicit AsyncRPCErrorInfo(executor::RemoteCommandOnAnyResponse rcr)
         : _error{RemoteError(rcr.data)} {
         if (!rcr.status.isOK()) {
             _prov = CommandErrorProvenance::kLocal;
@@ -120,8 +120,7 @@ public:
      * Construct the relevant extra info from an error status - used if a remote command invokation
      * attempt fails before it reaches the TaskExecutor level.
      */
-    explicit RemoteCommandExecutionErrorInfo(Status s)
-        : _prov{CommandErrorProvenance::kLocal}, _error{s} {}
+    explicit AsyncRPCErrorInfo(Status s) : _prov{CommandErrorProvenance::kLocal}, _error{s} {}
 
     bool isLocal() const {
         return _prov == CommandErrorProvenance::kLocal;
