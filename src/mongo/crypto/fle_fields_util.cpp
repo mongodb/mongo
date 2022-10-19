@@ -146,6 +146,13 @@ void validateIDLFLE2RangeFindSpec(const FLE2RangeFindSpec* placeholder) {
     auto min = edgesInfo.getIndexMin().getElement();
     auto max = edgesInfo.getIndexMax().getElement();
     uassert(6901304, "Range min and range max must be the same type.", min.type() == max.type());
+
+    if (edgesInfo.getPrecision().has_value()) {
+        uassert(6967102,
+                "Precision can only be set if type is floating point",
+                min.type() == BSONType::NumberDecimal || min.type() == BSONType::NumberDouble);
+    }
+
     auto lb = edgesInfo.getLowerBound().getElement();
     auto ub = edgesInfo.getUpperBound().getElement();
     validateQueryBounds(min.type(), lb, ub);

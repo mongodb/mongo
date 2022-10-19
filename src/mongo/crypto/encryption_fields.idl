@@ -93,6 +93,14 @@ structs:
                 optional: true
                 stability: unstable
                 validator: { gte: 1, lte: 4 }
+            precision:
+                description: >-
+                    Defines the number of digits after the decimal point for floating point numbers.
+                    Only applicable to floating point numbers and for queryType range.
+                type: safeInt
+                optional: true
+                stability: unstable
+                validator: { gte: 0 }
 
     EncryptedField:
         description: "Information about encrypted fields"

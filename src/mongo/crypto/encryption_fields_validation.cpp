@@ -77,7 +77,7 @@ Value coerceValueToRangeIndexTypes(Value val, BSONType fieldType) {
 }
 
 
-void validateRangeIndex(BSONType fieldType, const QueryTypeConfig& query) {
+void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query) {
     uassert(6775201,
             str::stream() << "Type '" << typeName(fieldType)
                           << "' is not a supported range indexed type",
@@ -90,18 +90,31 @@ void validateRangeIndex(BSONType fieldType, const QueryTypeConfig& query) {
             "The field 'sparsity' must be between 1 and 4",
             query.getSparsity().value() >= 1 && query.getSparsity().value() <= 4);
 
+
     switch (fieldType) {
         case NumberDouble:
-        case NumberDecimal:
-            uassert(7006601,
-                    "The field 'min' on floating point field is invalid for range index over "
-                    "double/decimal fields.",
-                    !query.getMin().has_value());
-            uassert(7006602,
-                    "The field 'max' on floating point field is invalid for range index over "
-                    "double/decimal fields.",
-                    !query.getMax().has_value());
-            break;
+        case NumberDecimal: {
+            if (!((query.getMin().has_value() == query.getMax().has_value()) &&
+                  (query.getMin().has_value() == query.getPrecision().has_value()))) {
+                uasserted(6967100,
+                          str::stream() << "Precision, min, and max must all be specified "
+                                        << "together for floating point fields");
+            }
+
+            if (!query.getMin().has_value()) {
+                if (fieldType == NumberDouble) {
+                    query.setMin(mongo::Value(std::numeric_limits<double>::min()));
+                    query.setMax(mongo::Value(std::numeric_limits<double>::max()));
+                } else {
+                    query.setMin(mongo::Value(Decimal128::kLargestNegative));
+                    query.setMax(mongo::Value(Decimal128::kLargestPositive));
+                }
+            }
+        }
+            // We want to perform the same validation after sanitizing floating
+            // point parameters, so we call FMT_FALLTHROUGH here.
+
+            FMT_FALLTHROUGH;
         case NumberInt:
         case NumberLong:
         case Date: {

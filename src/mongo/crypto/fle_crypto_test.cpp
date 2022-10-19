@@ -731,16 +731,16 @@ std::vector<char> generatePlaceholder(
             upperDoc = BSON("ub" << 1234567890123456789LL);
             break;
         case BSONType::NumberDouble:
-            lowerDoc = BSON("lb" << std::numeric_limits<double>::min());
-            upperDoc = BSON("ub" << std::numeric_limits<double>::max());
+            lowerDoc = BSON("lb" << 0.0);
+            upperDoc = BSON("ub" << 1234567890123456789.0);
             break;
         case BSONType::Date:
             lowerDoc = BSON("lb" << Date_t::fromMillisSinceEpoch(0));
             upperDoc = BSON("ub" << Date_t::fromMillisSinceEpoch(1234567890123456789LL));
             break;
         case BSONType::NumberDecimal:
-            lowerDoc = BSON("lb" << Decimal128::kLargestNegative);
-            upperDoc = BSON("ub" << Decimal128::kLargestPositive);
+            lowerDoc = BSON("lb" << Decimal128(0));
+            upperDoc = BSON("ub" << Decimal128(1234567890123456789LL));
             break;
         default:
             LOGV2_WARNING(6775520,

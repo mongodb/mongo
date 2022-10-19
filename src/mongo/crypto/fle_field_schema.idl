@@ -389,6 +389,10 @@ structs:
           ubIncluded:
             description: "Indicates if the upper bound should be included in the range."
             type: bool
+          precision:
+            description: "Determines the number of digits after the decimal point for floating point values"
+            type: safeInt
+            optional: true
           indexMin:
             description: "Minimum value for the encrypted index that this query is using."
             type: encrypted_numeric_element
@@ -436,3 +440,7 @@ structs:
             type: encrypted_numeric_element
             optional: true
             cpp_name: maxBound
+          precision:
+            description: "Determines the number of digits after the decimal point for floating point values"
+            type: safeInt
+            optional: true
