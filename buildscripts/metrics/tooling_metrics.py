@@ -1,24 +1,15 @@
 import dataclasses
-from datetime import datetime
+import datetime
 import logging
-from os.path import exists
-import socket
+import os
 import asyncio
+from typing import Optional
 from git import Repo
 import pymongo
 
+from buildscripts.metrics.metrics_datatypes import ToolingMetrics
+
 logger = logging.getLogger('tooling_metrics_collection')
-
-
-@dataclasses.dataclass
-class ToolingMetrics:
-    """Class to store tooling metrics."""
-
-    command: str
-    utc_starttime: datetime
-    utc_endtime: datetime
-    ip_address: str = socket.gethostbyname(socket.gethostname())
-
 
 INTERNAL_TOOLING_METRICS_HOSTNAME = "mongodb+srv://dev-metrics-pl-0.kewhj.mongodb.net"
 INTERNAL_TOOLING_METRICS_USERNAME = "internal_tooling_user"
@@ -39,12 +30,15 @@ EXPECTED_TOOLCHAIN_LOCATION = "/opt/mongodbtoolchain"
 
 def _toolchain_exists() -> bool:
     """Check if the internal MongoDB toolchain exists."""
-    return exists(EXPECTED_TOOLCHAIN_LOCATION)
+    return os.path.exists(EXPECTED_TOOLCHAIN_LOCATION)
 
 
-def _git_user_exists() -> bool:
+def _git_user_exists() -> Optional[str]:
     """Check if a git user email exists."""
-    return Repo('.').config_reader().get_value("user", "email", None)
+    try:
+        return Repo('.').config_reader().get_value("user", "email", None)
+    except Exception:  # pylint: disable=broad-except
+        return None
 
 
 def _is_virtual_workstation() -> bool:
@@ -58,17 +52,17 @@ async def _save_metrics(metrics: ToolingMetrics) -> None:
     client.metrics.tooling_metrics.insert_one(dataclasses.asdict(metrics))
 
 
-def save_tooling_metrics(metrics: ToolingMetrics) -> None:
+def save_tooling_metrics(utc_starttime: datetime) -> None:
     """Persist tooling metrics data to MongoDB Internal Atlas Cluster."""
-    if not _is_virtual_workstation():
-        return
     try:
-        asyncio.run(asyncio.wait_for(_save_metrics(metrics), timeout=1.0))
+        if not _is_virtual_workstation():
+            return
+        asyncio.run(asyncio.wait_for(_save_metrics(ToolingMetrics(utc_starttime)), timeout=1.0))
     except asyncio.TimeoutError as exc:
         logger.warning(
-            "%s\nTimeout: Could not save tooling metrics data to MongoDB Atlas Cluster.\nIf this message persists, please reach out to #server-development-platform",
+            "%s\nTimeout: Tooling metrics collection is not available -- this is a non-issue.\nIf this message persists, feel free to reach out to #server-development-platform",
             exc)
     except Exception as exc:  # pylint: disable=broad-except
         logger.warning(
-            "%s\nUnexpected: Could not save tooling metrics data to MongoDB Atlas Cluster.\nIf this message persists, please reach out to #server-development-platform",
+            "%s\nUnexpected: Tooling metrics collection is not available -- this is a non-issue.\nIf this message persists, feel free to reach out to #server-development-platform",
             exc)

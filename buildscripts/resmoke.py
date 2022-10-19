@@ -11,4 +11,10 @@ if __name__ == "__main__" and __package__ is None:
 # pylint: disable=wrong-import-position
 import buildscripts.resmokelib.cli as cli
 
-cli.main(sys.argv)
+
+def entrypoint():
+    cli.main(sys.argv)
+
+
+if __name__ == "__main__":
+    entrypoint()

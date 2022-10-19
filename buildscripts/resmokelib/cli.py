@@ -1,8 +1,10 @@
 """Command-line entry-point into resmoke."""
 
+from datetime import datetime
 import time
 import os
 import psutil
+from buildscripts.metrics.tooling_metrics import ToolingMetrics, save_tooling_metrics
 from buildscripts.resmokelib import parser
 
 
@@ -23,4 +25,7 @@ def main(argv):
         "For example: resmoke.py run -h\n"
         "Note: bisect and setup-multiversion subcommands have been moved to db-contrib-tool (https://github.com/10gen/db-contrib-tool#readme).\n"
     )
-    subcommand.execute()
+    try:
+        subcommand.execute()
+    finally:
+        save_tooling_metrics(datetime.utcfromtimestamp(__start_time))
