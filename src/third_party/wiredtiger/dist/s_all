@@ -91,7 +91,7 @@ run "python test_tag.py"
 # The s_mentions script requires bash.
 run "./s_mentions" "--warning-only"
 if command -v evergreen > /dev/null; then
-	run "evergreen validate ../test/evergreen.yml"
+	run "evergreen validate -p wiredtiger ../test/evergreen.yml"
 fi
 
 COMMANDS="

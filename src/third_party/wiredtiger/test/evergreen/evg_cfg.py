@@ -4,19 +4,12 @@
 This program provides an CLI interface to check and generate Evergreen configuration.
 """
 
+import argparse
 import os
-import sys
 import re
 import subprocess
+import sys
 
-try:
-    import docopt
-except Exception as e:
-    modules = "docopt"
-    print("ERROR [%s]: %s" % (sys.argv[0], e))
-    print("Use pip to install the required library:")
-    print("  pip install %s" % modules)
-    sys.exit(0)
 
 TEST_TYPES = ('make_check', 'csuite')
 EVG_CFG_FILE = "test/evergreen.yml"
@@ -47,12 +40,9 @@ Usage:
   {progname} generate [-t <test_type>] [-v]
   {progname} (-h | --help)
 
-Options:
-  -h --help     Show this screen.
-  -t TEST_TYPE  The type of test to be checked/generated.
-  -v            Enable verbose logging.
-  check         Check if any missing tests that should be added into Evergreen configuration.
-  generate      Generate Evergreen configuration for missing tests.
+actions:
+  check     Check if any missing tests that should be added into Evergreen configuration.
+  generate  Generate Evergreen configuration for missing tests.
 """.format(progname=PROGNAME)
 
 verbose = False
@@ -145,7 +135,7 @@ def get_make_check_dirs():
 
     # Search keyword in CMakeLists.txt to identify directories that involve test configuration.
     # Need to use subprocess 'shell=True' to get the expected shell command output.
-    cmd = "find . -name CMakeLists.txt -exec grep -H -e '\(add_test\|define_c_test|define_test_variants\)' {} \; | cut -d: -f1 | cut -c3- | uniq"
+    cmd = "find . -not -path './releases/*' -name CMakeLists.txt -exec grep -H -e '\(add_test\|define_c_test|define_test_variants\)' {} \; | cut -d: -f1 | cut -c3- | uniq"
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
     mkfiles_with_tests = p.stdout.readlines()
 
@@ -316,21 +306,23 @@ def evg_cfg(action, test_type):
 
 if __name__ == '__main__':
 
-    args = docopt.docopt(USAGE, version=DESCRIPTION)
+    parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
+    parser.add_argument("action", help="Action to perform")
+    parser.add_argument("-t", metavar="TEST_TYPE",
+                        help="The test type to be checked or generated", default="all")
+    parser.add_argument("-v", "--verbose", help="Enable verbose logging", action="store_true")
 
-    verbose = args['-v']
-    debug('\nargs:%s' % args)
+    # Print help if no argument is provided
+    if len(sys.argv) == 1:
+        parser.print_help()
+        parser.exit()
 
-    action = None
-    if args['check']:
-        action = 'check'
-    elif args['generate']:
-        action = 'generate'
-    assert action in ('check', 'generate')
+    args = parser.parse_args()
+    verbose = args.verbose
 
-    test_type = args.get('-t', None)
-    # If test type is not provided, assuming 'all' types need to be checked
-    if test_type is None:
-        test_type = 'all'
+    actions = ('check', 'generate')
 
-    evg_cfg(action, test_type)
+    if args.action not in actions:
+        sys.exit("ERROR: Invalid action - " + args.action)
+
+    evg_cfg(args.action, args.t)

@@ -12,6 +12,7 @@ __wt_bulk_insert_fix
 __wt_bulk_insert_row
 __wt_bulk_insert_var
 __wt_config_getone
+__wt_crc32c_le
 __wt_curhs_open
 __wt_cursor_get_raw_value
 __wt_debug_addr
@@ -34,6 +35,7 @@ __wt_stat_join_aggregate
 __wt_stat_join_clear_all
 __wt_stream_set_no_buffer
 __wt_try_readlock
+populate_thread
 wiredtiger_calc_modify
 wiredtiger_config_parser_open
 wiredtiger_config_validate
