@@ -29,15 +29,24 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 namespace {
@@ -113,7 +122,51 @@ public:
               _dbName(request.getValidatedTenantId(), request.getDatabase()),
               _aggregationRequest(std::move(aggregationRequest)),
               _liteParsedPipeline(_aggregationRequest),
-              _privileges(std::move(privileges)) {}
+              _privileges(std::move(privileges)) {
+            auto externalDataSources = _aggregationRequest.getExternalDataSources();
+            uassert(7039000,
+                    "$_externalDataSources is available only when enableComputeMode=true",
+                    computeModeEnabled == externalDataSources.has_value());
+
+            if (!externalDataSources) {
+                return;
+            }
+            uassert(7039002,
+                    "Expected one or more external data source but got 0",
+                    externalDataSources->size() > 0);
+
+            for (auto&& option : *externalDataSources) {
+                uassert(7039001,
+                        "Expected one or more urls for an external data source but got 0",
+                        option.getDataSources().size() > 0);
+            }
+
+            auto findCollNameInExternalDataSourceOption = [&](const StringData& collName) {
+                return std::find_if(externalDataSources->begin(),
+                                    externalDataSources->end(),
+                                    [&](const ExternalDataSourceOption& externalDataSourceOption) {
+                                        return externalDataSourceOption.getCollName() == collName;
+                                    });
+            };
+
+            auto externalDataSourcesIter =
+                findCollNameInExternalDataSourceOption(_aggregationRequest.getNamespace().coll());
+            uassert(7039003,
+                    "Source namespace must be an external data source",
+                    externalDataSourcesIter != externalDataSources->end());
+            _usedExternalDataSources.emplace_back(_aggregationRequest.getNamespace(),
+                                                  externalDataSourcesIter->getDataSources());
+
+            for (auto&& involvedNamespace : _liteParsedPipeline.getInvolvedNamespaces()) {
+                externalDataSourcesIter =
+                    findCollNameInExternalDataSourceOption(involvedNamespace.coll());
+                uassert(7039004,
+                        "Involved namespace must be an external data source",
+                        externalDataSourcesIter != externalDataSources->end());
+                _usedExternalDataSources.emplace_back(involvedNamespace,
+                                                      externalDataSourcesIter->getDataSources());
+            }
+        }
 
     private:
         bool supportsWriteConcern() const override {
@@ -145,6 +198,11 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             CommandHelpers::handleMarkKillOnClientDisconnect(
                 opCtx, !Pipeline::aggHasWriteStage(_request.body));
+
+            // TODO SERVER-69687 Create a virtual collection per each used external data source.
+            for (auto&& [collName, dataSources] : _usedExternalDataSources) {
+                VirtualCollectionOptions vopts(dataSources);
+            }
 
             uassertStatusOK(runAggregate(opCtx,
                                          _aggregationRequest.getNamespace(),
@@ -190,6 +248,8 @@ public:
         AggregateCommandRequest _aggregationRequest;
         const LiteParsedPipeline _liteParsedPipeline;
         const PrivilegeVector _privileges;
+        std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>
+            _usedExternalDataSources;
     };
 
     std::string help() const override {

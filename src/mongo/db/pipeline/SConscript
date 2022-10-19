@@ -65,6 +65,7 @@ env.Library(
     source=[
         'aggregation_request_helper.cpp',
         'aggregate_command.idl',
+        'external_data_source_option.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',

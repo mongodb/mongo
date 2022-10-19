@@ -35,38 +35,35 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 /**
- * Storage type for external data source.
- */
-enum class StorageType : std::int32_t {
-    pipe,
-};
-
-/**
- * File type for external data source.
- */
-enum class FileType : std::int32_t {
-    bson,
-};
-
-/**
  * Metadata for external data source.
  */
 struct ExternalDataSourceMetadata {
+#ifndef _WIN32
     static constexpr auto kDefaultFileUrlPrefix = "file:///tmp/"_sd;
+#else
+    static constexpr auto kDefaultFileUrlPrefix = "file:////./pipe/"_sd;
+#endif
 
-    ExternalDataSourceMetadata(StringData url, StorageType storageType, FileType fileType)
+    ExternalDataSourceMetadata(StringData url, StorageTypeEnum storageType, FileTypeEnum fileType)
         : url(url), storageType(storageType), fileType(fileType) {
         using namespace fmt::literals;
         uassert(6968500,
                 "File url must start with {}"_format(kDefaultFileUrlPrefix),
                 url.startsWith(kDefaultFileUrlPrefix));
-        uassert(6968501, "Storage type must be 'pipe'", storageType == StorageType::pipe);
-        uassert(6968502, "File type must be 'bson'", fileType == FileType::bson);
+        uassert(6968501, "Storage type must be 'pipe'", storageType == StorageTypeEnum::pipe);
+        uassert(6968502, "File type must be 'bson'", fileType == FileTypeEnum::bson);
     }
+
+    ExternalDataSourceMetadata(const ExternalDataSourceInfo& dataSourceInfo)
+        : ExternalDataSourceMetadata(dataSourceInfo.getUrl(),
+                                     dataSourceInfo.getStorageType(),
+                                     dataSourceInfo.getFileType()) {}
 
     /**
      * Url for an external data source
@@ -76,12 +73,12 @@ struct ExternalDataSourceMetadata {
     /**
      * Storage type for an external data source
      */
-    StorageType storageType;
+    StorageTypeEnum storageType;
 
     /**
      * File type for an external data source
      */
-    FileType fileType;
+    FileTypeEnum fileType;
 };
 
 /**
@@ -89,8 +86,13 @@ struct ExternalDataSourceMetadata {
  */
 struct VirtualCollectionOptions {
     VirtualCollectionOptions() : dataSources() {}
-    VirtualCollectionOptions(std::vector<mongo::ExternalDataSourceMetadata> dataSources)
-        : dataSources(dataSources) {}
+    VirtualCollectionOptions(std::vector<ExternalDataSourceMetadata> dataSources)
+        : dataSources(std::move(dataSources)) {}
+    VirtualCollectionOptions(const std::vector<ExternalDataSourceInfo>& options) {
+        for (auto&& dataSource : options) {
+            dataSources.emplace_back(dataSource);
+        }
+    }
 
     /**
      * Specification for external data sources.
