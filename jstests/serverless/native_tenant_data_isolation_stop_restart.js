@@ -7,15 +7,22 @@
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
 
 function runTest(featureFlagRequireTenantId) {
-    let mongod = MongoRunner.runMongod({
-        auth: '',
-        setParameter: {
-            multitenancySupport: true,
-            featureFlagMongoStore: true,
-            featureFlagRequireTenantID: featureFlagRequireTenantId
+    const rst = new ReplSetTest({
+        nodes: 3,
+        nodeOptions: {
+            auth: '',
+            setParameter: {
+                multitenancySupport: true,
+                featureFlagMongoStore: true,
+                featureFlagRequireTenantID: featureFlagRequireTenantId
+            }
         }
     });
-    let adminDb = mongod.getDB('admin');
+    rst.startSet({keyFile: 'jstests/libs/key1'});
+    rst.initiate();
+
+    let primary = rst.getPrimary();
+    let adminDb = primary.getDB('admin');
 
     // Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
     assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
@@ -23,7 +30,7 @@ function runTest(featureFlagRequireTenantId) {
 
     {
         const kTenant = ObjectId();
-        let testDb = mongod.getDB('myDb0');
+        let testDb = primary.getDB('myDb0');
 
         // Create a collection by inserting a document to it.
         assert.commandWorked(testDb.runCommand(
@@ -42,22 +49,14 @@ function runTest(featureFlagRequireTenantId) {
         assert.commandWorked(testDb.runCommand(
             {"create": "view1", "viewOn": "myColl0", pipeline: [], '$tenant': kTenant}));
 
-        // Stop the mongod and restart it.
-        MongoRunner.stopMongod(mongod);
-        mongod = MongoRunner.runMongod({
-            restart: mongod,
-            noCleanData: true,
-            auth: '',
-            setParameter: {
-                multitenancySupport: true,
-                featureFlagMongoStore: true,
-                featureFlagRequireTenantID: featureFlagRequireTenantId
-            }
-        });
+        // Stop the rs and restart it.
+        rst.stopSet(null /* signal */, true /* forRestart */, {noCleanData: true});
+        rst.startSet({restart: true});
+        primary = rst.getPrimary();
 
-        adminDb = mongod.getDB('admin');
+        adminDb = primary.getDB('admin');
         assert(adminDb.auth('admin', 'pwd'));
-        testDb = mongod.getDB('myDb0');
+        testDb = primary.getDB('myDb0');
 
         // Assert we see 3 collections in the tenant's db 'myDb0' - the original collection we
         // created, the view on it, and the system.views collection.
@@ -83,12 +82,12 @@ function runTest(featureFlagRequireTenantId) {
         // Check that we will cannot run findAndModify on the doc when the tenantId is passed as the
         // prefix.
         fad = assert.commandWorked(
-            mongod.getDB(kTenant + '_myDb0')
+            primary.getDB(kTenant + '_myDb0')
                 .runCommand({findAndModify: "myColl0", query: {b: 1}, update: {$inc: {b: 10}}}));
         assert.eq(null, fad.value);
     }
 
-    MongoRunner.stopMongod(mongod);
+    rst.stopSet();
 }
 runTest(true);
 runTest(false);

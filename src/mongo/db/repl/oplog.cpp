@@ -1053,7 +1053,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           if (!opCtx->writesAreReplicated()) {
               opTime = entry.getOpTime();
           }
-          return renameCollectionForApplyOps(opCtx, entry.getUuid(), entry.getObject(), opTime);
+          return renameCollectionForApplyOps(
+              opCtx, entry.getUuid(), entry.getTid(), entry.getObject(), opTime);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::NamespaceExists}}},
     {"importCollection",

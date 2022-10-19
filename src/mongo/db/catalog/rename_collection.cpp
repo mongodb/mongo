@@ -909,6 +909,7 @@ Status renameCollection(OperationContext* opCtx,
 
 Status renameCollectionForApplyOps(OperationContext* opCtx,
                                    const boost::optional<UUID>& uuidToRename,
+                                   const boost::optional<TenantId>& tid,
                                    const BSONObj& cmd,
                                    const repl::OpTime& renameOpTime) {
 
@@ -919,29 +920,11 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
             "renameCollection() cannot accept a rename optime when writes are replicated.");
     }
 
-    const auto tenantIdElt = cmd["tid"];
     const auto sourceNsElt = cmd["renameCollection"];
     const auto targetNsElt = cmd["to"];
 
-    if (!tenantIdElt.eoo())
-        uassert(ErrorCodes::TypeMismatch,
-                "'tid' must be of type OID",
-                tenantIdElt.type() == BSONType::jstOID);
-    uassert(ErrorCodes::TypeMismatch,
-            "'renameCollection' must be of type String",
-            sourceNsElt.type() == BSONType::String);
-    uassert(ErrorCodes::TypeMismatch,
-            "'to' must be of type String",
-            targetNsElt.type() == BSONType::String);
-
-    boost::optional<TenantId> tenantId = tenantIdElt.eoo()
-        ? boost::none
-        : boost::optional<TenantId>{TenantId::parseFromBSON(tenantIdElt)};
-
-    NamespaceString sourceNss{
-        NamespaceStringUtil::deserialize(tenantId, sourceNsElt.valueStringData())};
-    NamespaceString targetNss{
-        NamespaceStringUtil::deserialize(tenantId, targetNsElt.valueStringData())};
+    NamespaceString sourceNss{NamespaceStringUtil::deserialize(tid, sourceNsElt.valueStringData())};
+    NamespaceString targetNss{NamespaceStringUtil::deserialize(tid, targetNsElt.valueStringData())};
 
     // TODO: not needed once we are no longer parsing for prefixed tenantIds
     uassert(ErrorCodes::IllegalOperation,

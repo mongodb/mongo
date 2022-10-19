@@ -76,6 +76,7 @@ Status renameCollection(OperationContext* opCtx,
  */
 Status renameCollectionForApplyOps(OperationContext* opCtx,
                                    const boost::optional<UUID>& uuidToRename,
+                                   const boost::optional<TenantId>& tid,
                                    const BSONObj& cmd,
                                    const repl::OpTime& renameOpTime);
 

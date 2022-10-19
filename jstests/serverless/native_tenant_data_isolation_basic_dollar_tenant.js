@@ -6,9 +6,8 @@
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
 
 function runTest(featureFlagRequireTenantId) {
-    // TODO SERVER-69726 Make this replica set have multiple nodes.
     const rst = new ReplSetTest({
-        nodes: 1,
+        nodes: 3,
         nodeOptions: {
             auth: '',
             setParameter: {
