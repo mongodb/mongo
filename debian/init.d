@@ -248,7 +248,7 @@ case "$1" in
 
         log_daemon_msg "Checking status of $DESC" "$NAME"
         if running ;  then
-            log_successs_msg "running"
+            log_success_msg "running"
             log_end_msg 0
         else
             log_failure_msg "apparently not running"
