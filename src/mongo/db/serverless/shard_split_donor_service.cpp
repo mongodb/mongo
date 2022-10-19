@@ -83,29 +83,6 @@ void checkForTokenInterrupt(const CancellationToken& token) {
     uassert(ErrorCodes::CallbackCanceled, "Donor service interrupted", !token.isCanceled());
 }
 
-void insertTenantAccessBlocker(WithLock lk,
-                               OperationContext* opCtx,
-                               ShardSplitDonorDocument donorStateDoc) {
-    auto optionalTenants = donorStateDoc.getTenantIds();
-    invariant(optionalTenants);
-
-    for (const auto& tenantId : optionalTenants.value()) {
-        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
-                                                                        donorStateDoc.getId());
-
-        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(tenantId, mtab);
-
-        // If the wuow fails, we need to remove the access blockers we just added. This ensures we
-        // leave things in a valid state and are able to retry the operation.
-        opCtx->recoveryUnit()->onRollback([opCtx, donorStateDoc, tenant = tenantId.toString()] {
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .remove(tenant, TenantMigrationAccessBlocker::BlockerType::kDonor);
-        });
-    }
-}
-
-const std::string kTTLIndexName = "ShardSplitDonorTTLIndex";
-
 }  // namespace
 
 namespace detail {
@@ -911,15 +888,14 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                            // Start blocking writes before getting an oplog slot to guarantee no
                            // writes to the tenant's data can commit with a timestamp after the
                            // block timestamp.
-                           for (const auto& tenantId : *tenantIds) {
-                               auto mtab = tenant_migration_access_blocker::
-                                   getTenantMigrationDonorAccessBlocker(_serviceContext, tenantId);
-                               invariant(mtab);
-                               mtab->startBlockingWrites();
+                           auto mtab =
+                               tenant_migration_access_blocker::getDonorAccessBlockerForMigration(
+                                   _serviceContext, uuid);
+                           invariant(mtab);
+                           mtab->startBlockingWrites();
 
-                               opCtx->recoveryUnit()->onRollback(
-                                   [mtab] { mtab->rollBackStartBlocking(); });
-                           }
+                           opCtx->recoveryUnit()->onRollback(
+                               [mtab] { mtab->rollBackStartBlocking(); });
                        }
 
                        // Reserve an opTime for the write.

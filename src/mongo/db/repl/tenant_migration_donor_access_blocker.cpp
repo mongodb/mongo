@@ -228,9 +228,7 @@ Status TenantMigrationDonorAccessBlocker::checkIfCanBuildIndex() {
 void TenantMigrationDonorAccessBlocker::startBlockingWrites() {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    LOGV2(5093800,
-          "Tenant migration starting to block writes",
-          "migrationId"_attr = getMigrationId());
+    LOGV2(5093800, "Starting to block writes", "migrationId"_attr = getMigrationId());
 
     invariant(!_blockTimestamp);
     invariant(!_commitOpTime);
@@ -243,7 +241,7 @@ void TenantMigrationDonorAccessBlocker::startBlockingReadsAfter(const Timestamp&
     stdx::lock_guard<Latch> lg(_mutex);
 
     LOGV2(5093801,
-          "Tenant migration starting to block reads after blockTimestamp",
+          "Starting to block reads after blockTimestamp",
           "migrationId"_attr = getMigrationId(),
           "blockTimestamp"_attr = blockTimestamp);
 
@@ -299,7 +297,7 @@ void TenantMigrationDonorAccessBlocker::setCommitOpTime(OperationContext* opCtx,
     }
 
     LOGV2(5107300,
-          "Tenant migration starting to wait for commit OpTime to be majority-committed",
+          "Starting to wait for commit OpTime to be majority-committed",
           "migrationId"_attr = getMigrationId(),
           "commitOpTime"_attr = opTime);
 
@@ -328,7 +326,7 @@ void TenantMigrationDonorAccessBlocker::setAbortOpTime(OperationContext* opCtx,
     }
 
     LOGV2(5107301,
-          "Tenant migration starting to wait for abort OpTime to be majority-committed",
+          "Starting to wait for abort OpTime to be majority-committed",
           "migrationId"_attr = getMigrationId(),
           "abortOpTime"_attr = opTime);
 
@@ -375,7 +373,7 @@ void TenantMigrationDonorAccessBlocker::_onMajorityCommitCommitOpTime(
 
     lk.unlock();
     LOGV2(5093803,
-          "Tenant migration finished waiting for commit OpTime to be majority-committed",
+          "Finished waiting for commit OpTime to be majority-committed",
           "migrationId"_attr = getMigrationId());
 }
 
@@ -389,7 +387,7 @@ void TenantMigrationDonorAccessBlocker::_onMajorityCommitAbortOpTime(stdx::uniqu
 
     lk.unlock();
     LOGV2(5093805,
-          "Tenant migration finished waiting for abort OpTime to be majority-committed",
+          "Finished waiting for abort OpTime to be majority-committed",
           "migrationId"_attr = getMigrationId());
 }
 

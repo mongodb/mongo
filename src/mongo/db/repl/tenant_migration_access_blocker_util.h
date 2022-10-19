@@ -40,6 +40,9 @@ namespace mongo {
 
 namespace tenant_migration_access_blocker {
 
+std::shared_ptr<TenantMigrationDonorAccessBlocker> getDonorAccessBlockerForMigration(
+    ServiceContext* serviceContext, const UUID& migrationId);
+
 std::shared_ptr<TenantMigrationDonorAccessBlocker> getTenantMigrationDonorAccessBlocker(
     ServiceContext* serviceContext, StringData tenantId);
 

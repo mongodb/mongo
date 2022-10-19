@@ -107,6 +107,13 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
     _tenantMigrationAccessBlockers.emplace(tenantId, mtabPair);
 }
 
+void TenantMigrationAccessBlockerRegistry::add(const std::vector<StringData>& tenantIds,
+                                               std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
+    for (auto&& tenantId : tenantIds) {
+        add(tenantId, mtab);
+    }
+}
+
 void TenantMigrationAccessBlockerRegistry::add(std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
     LOGV2_DEBUG(6114102, 1, "Adding donor access blocker for all tenants");
     stdx::lock_guard<Latch> lg(_mutex);
@@ -259,6 +266,24 @@ TenantMigrationAccessBlockerRegistry::_getAllTenantDonorAccessBlocker(WithLock) 
 
     return checked_pointer_cast<TenantMigrationDonorAccessBlocker>(
         it->second.getDonorAccessBlocker());
+}
+
+std::shared_ptr<TenantMigrationAccessBlocker>
+TenantMigrationAccessBlockerRegistry::getAccessBlockerForMigration(
+    const UUID& migrationId, TenantMigrationAccessBlocker::BlockerType type) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    auto mtab =
+        std::find_if(_tenantMigrationAccessBlockers.begin(),
+                     _tenantMigrationAccessBlockers.end(),
+                     [type, migrationId](const auto& pair) {
+                         return pair.second.getAccessBlocker(type)->getMigrationId() == migrationId;
+                     });
+
+    if (mtab == _tenantMigrationAccessBlockers.end()) {
+        return nullptr;
+    }
+
+    return mtab->second.getAccessBlocker(type);
 }
 
 std::shared_ptr<TenantMigrationDonorAccessBlocker>

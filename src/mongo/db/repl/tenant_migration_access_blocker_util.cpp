@@ -66,6 +66,14 @@ namespace {
 using MtabType = TenantMigrationAccessBlocker::BlockerType;
 }  // namespace
 
+std::shared_ptr<TenantMigrationDonorAccessBlocker> getDonorAccessBlockerForMigration(
+    ServiceContext* serviceContext, const UUID& migrationId) {
+    return checked_pointer_cast<TenantMigrationDonorAccessBlocker>(
+        TenantMigrationAccessBlockerRegistry::get(serviceContext)
+            .getAccessBlockerForMigration(migrationId,
+                                          TenantMigrationAccessBlocker::BlockerType::kDonor));
+}
+
 std::shared_ptr<TenantMigrationDonorAccessBlocker> getTenantMigrationDonorAccessBlocker(
     ServiceContext* const serviceContext, StringData tenantId) {
     return checked_pointer_cast<TenantMigrationDonorAccessBlocker>(

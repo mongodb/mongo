@@ -112,6 +112,12 @@ public:
     void add(StringData tenantId, std::shared_ptr<TenantMigrationAccessBlocker> mtab);
 
     /**
+     * Add one access blocker and associate it with many tenant ids.
+     */
+    void add(const std::vector<StringData>& tenantIds,
+             std::shared_ptr<TenantMigrationAccessBlocker> mtab);
+
+    /**
      * Adds an entry for mtab that will block all tenants.
      */
     void add(std::shared_ptr<TenantMigrationAccessBlocker> mtab);
@@ -137,6 +143,13 @@ public:
      * 'dbName'.
      */
     boost::optional<DonorRecipientAccessBlockerPair> getAccessBlockersForDbName(StringData dbName);
+
+
+    /**
+     * Returns the access blocker associated with a migration, if it exists.
+     */
+    std::shared_ptr<TenantMigrationAccessBlocker> getAccessBlockerForMigration(
+        const UUID& migrationId, TenantMigrationAccessBlocker::BlockerType type);
 
     /**
      * Iterates through each of the TenantMigrationAccessBlockers and
