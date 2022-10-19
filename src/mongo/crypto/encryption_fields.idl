@@ -29,6 +29,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/exec/document_value/value.h"
+        - "mongo/crypto/encryption_fields_validation.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -96,6 +97,7 @@ structs:
     EncryptedField:
         description: "Information about encrypted fields"
         strict: true
+        cpp_validator_func: "validateEncryptedField"
         fields:
             keyId:
                 description: "UUID of key in key vault to use for encryption"
@@ -121,6 +123,7 @@ structs:
     EncryptedFieldConfig:
         description: "Information about encrypted fields and state collections"
         strict: true
+        cpp_validator_func: "validateEncryptedFieldConfig"
         fields:
             escCollection:
                 description: "Encrypted State Collection name, defaults to <collection>.esc"

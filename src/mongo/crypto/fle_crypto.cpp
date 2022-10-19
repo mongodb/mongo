@@ -632,9 +632,7 @@ public:
 
     static FLE2InsertUpdatePayload serializeInsertUpdatePayloadForRange(FLEIndexKeyAndId indexKey,
                                                                         FLEUserKeyAndId userKey,
-                                                                        BSONElement element,
-                                                                        BSONElement lowerBound,
-                                                                        BSONElement upperBound,
+                                                                        FLE2RangeInsertSpec spec,
                                                                         uint8_t sparsity,
                                                                         uint64_t contentionFactor);
 };
@@ -700,56 +698,88 @@ FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayload(FLEIndexK
 }
 
 
-std::unique_ptr<Edges> getEdges(BSONElement element,
-                                BSONElement minBound,
-                                BSONElement maxBound,
-                                int sparsity) {
+std::unique_ptr<Edges> getEdges(FLE2RangeInsertSpec spec, int sparsity) {
+    auto element = spec.getValue().getElement();
+    auto minBound = spec.getMinBound().map([](IDLAnyType m) { return m.getElement(); });
+    auto maxBound = spec.getMaxBound().map([](IDLAnyType m) { return m.getElement(); });
+
     switch (element.type()) {
         case BSONType::NumberInt:
-            uassert(6775501, "min bound must be integer", minBound.type() == BSONType::NumberInt);
-            uassert(6775502, "max bound must be integer", maxBound.type() == BSONType::NumberInt);
-            return getEdgesInt32(element.Int(), minBound.Int(), maxBound.Int(), sparsity);
+            uassert(6775501,
+                    "min bound must be integer",
+                    !minBound.has_value() || minBound->type() == BSONType::NumberInt);
+            uassert(6775502,
+                    "max bound must be integer",
+                    !maxBound.has_value() || maxBound->type() == BSONType::NumberInt);
+            return getEdgesInt32(element.Int(),
+                                 minBound.map([](BSONElement m) { return m.Int(); }),
+                                 maxBound.map([](BSONElement m) { return m.Int(); }),
+                                 sparsity);
 
         case BSONType::NumberLong:
-            uassert(6775503, "min bound must be long int", minBound.type() == BSONType::NumberLong);
-            uassert(6775504, "max bound must be long int", maxBound.type() == BSONType::NumberLong);
-            return getEdgesInt64(element.Long(), minBound.Long(), maxBound.Long(), sparsity);
+            uassert(6775503,
+                    "min bound must be long int",
+                    !minBound.has_value() || minBound->type() == BSONType::NumberLong);
+            uassert(6775504,
+                    "max bound must be long int",
+                    !maxBound.has_value() || maxBound->type() == BSONType::NumberLong);
+            return getEdgesInt64(element.Long(),
+                                 minBound.map([](BSONElement m) { return int64_t(m.Long()); }),
+                                 maxBound.map([](BSONElement m) { return int64_t(m.Long()); }),
+                                 sparsity);
 
         case BSONType::Date:
-            uassert(6775505, "min bound must be date", minBound.type() == BSONType::Date);
-            uassert(6775506, "max bound must be date", maxBound.type() == BSONType::Date);
+            uassert(6775505,
+                    "min bound must be date",
+                    !minBound.has_value() || minBound->type() == BSONType::Date);
+            uassert(6775506,
+                    "max bound must be date",
+                    !maxBound.has_value() || maxBound->type() == BSONType::Date);
             return getEdgesInt64(element.Date().asInt64(),
-                                 minBound.Date().asInt64(),
-                                 maxBound.Date().asInt64(),
+                                 minBound.map([](BSONElement m) { return m.Date().asInt64(); }),
+                                 maxBound.map([](BSONElement m) { return m.Date().asInt64(); }),
                                  sparsity);
 
         case BSONType::NumberDouble:
-            uassert(6775507, "min bound must be double", minBound.type() == BSONType::NumberDouble);
-            uassert(6775508, "max bound must be double", maxBound.type() == BSONType::NumberDouble);
+            uassert(6775507,
+                    "min bound must be double",
+                    !minBound.has_value() || minBound->type() == BSONType::NumberDouble);
+            uassert(6775508,
+                    "max bound must be double",
+                    !maxBound.has_value() || maxBound->type() == BSONType::NumberDouble);
             // TODO - SERVER-69667 remove
             uassert(7006610,
                     "unexpected min bound",
-                    minBound.numberDouble() == std::numeric_limits<double>::min());
+                    !minBound.has_value() ||
+                        minBound->numberDouble() == std::numeric_limits<double>::min());
             uassert(7006611,
                     "unexpected max bound",
-                    maxBound.numberDouble() == std::numeric_limits<double>::max());
-            return getEdgesDouble(element.Double(), minBound.Double(), maxBound.Double(), sparsity);
+                    !maxBound.has_value() ||
+                        maxBound->numberDouble() == std::numeric_limits<double>::max());
+            return getEdgesDouble(element.Double(),
+                                  minBound.map([](BSONElement m) { return m.Double(); }),
+                                  maxBound.map([](BSONElement m) { return m.Double(); }),
+                                  sparsity);
 
         case BSONType::NumberDecimal:
-            uassert(
-                6775509, "min bound must be decimal", minBound.type() == BSONType::NumberDecimal);
-            uassert(
-                6775510, "max bound must be decimal", maxBound.type() == BSONType::NumberDecimal);
+            uassert(6775509,
+                    "min bound must be decimal",
+                    !minBound.has_value() || minBound->type() == BSONType::NumberDecimal);
+            uassert(6775510,
+                    "max bound must be decimal",
+                    !maxBound.has_value() || maxBound->type() == BSONType::NumberDecimal);
             // TODO - SERVER-69667 remove
             uassert(7006612,
                     "unexpected min bound",
-                    minBound.numberDecimal() == Decimal128::kLargestNegative);
+                    !minBound.has_value() ||
+                        minBound->numberDecimal() == Decimal128::kLargestNegative);
             uassert(7006613,
                     "unexpected max bound",
-                    maxBound.numberDecimal() == Decimal128::kLargestPositive);
+                    !maxBound.has_value() ||
+                        maxBound->numberDecimal() == Decimal128::kLargestPositive);
             return getEdgesDecimal128(element.numberDecimal(),
-                                      minBound.numberDecimal(),
-                                      maxBound.numberDecimal(),
+                                      minBound.map([](BSONElement m) { return m.numberDecimal(); }),
+                                      maxBound.map([](BSONElement m) { return m.numberDecimal(); }),
                                       sparsity);
 
         default:
@@ -757,16 +787,14 @@ std::unique_ptr<Edges> getEdges(BSONElement element,
     }
 }
 
-std::vector<EdgeTokenSet> getEdgeTokenSet(BSONElement element,
-                                          BSONElement minBound,
-                                          BSONElement maxBound,
+std::vector<EdgeTokenSet> getEdgeTokenSet(FLE2RangeInsertSpec spec,
                                           int sparsity,
                                           uint64_t contentionFactor,
                                           const EDCToken& edcToken,
                                           const ESCToken& escToken,
                                           const ECCToken& eccToken,
                                           const ECOCToken& ecocToken) {
-    const auto edges = getEdges(element, minBound, maxBound, sparsity);
+    const auto edges = getEdges(std::move(spec), sparsity);
     const auto edgesList = edges->get();
 
     std::vector<EdgeTokenSet> tokens;
@@ -816,11 +844,10 @@ std::vector<EdgeTokenSet> getEdgeTokenSet(BSONElement element,
 FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayloadForRange(
     FLEIndexKeyAndId indexKey,
     FLEUserKeyAndId userKey,
-    BSONElement element,
-    BSONElement minBound,
-    BSONElement maxBound,
+    FLE2RangeInsertSpec spec,
     uint8_t sparsity,
     uint64_t contentionFactor) {
+    auto element = spec.getValue().getElement();
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
     auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
@@ -868,15 +895,8 @@ FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayloadForRange(
 
     iupayload.setIndexKeyId(indexKey.keyId);
 
-    auto edgeTokenSet = getEdgeTokenSet(element,
-                                        minBound,
-                                        maxBound,
-                                        sparsity,
-                                        contentionFactor,
-                                        edcToken,
-                                        escToken,
-                                        eccToken,
-                                        ecocToken);
+    auto edgeTokenSet =
+        getEdgeTokenSet(spec, sparsity, contentionFactor, edcToken, escToken, eccToken, ecocToken);
 
     if (!edgeTokenSet.empty()) {
         iupayload.setEdgeTokenSet(edgeTokenSet);
@@ -1124,9 +1144,7 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                 auto iupayload = EDCClientPayload::serializeInsertUpdatePayloadForRange(
                     indexKey,
                     userKey,
-                    rangeInsertSpec.getValue().getElement(),
-                    rangeInsertSpec.getMinBound().getElement(),
-                    rangeInsertSpec.getMaxBound().getElement(),
+                    rangeInsertSpec,
                     ep.getSparsity().value(),  // Enforced as non-optional in this case in IDL
                     contentionFactor(ep));
 

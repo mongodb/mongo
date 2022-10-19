@@ -79,11 +79,15 @@ env.Library(
     target="encrypted_field_config",
     source=[
         "encryption_fields.idl",
+        "encryption_fields_validation.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/value_idl',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/common',
     ],
 )
 

@@ -65,6 +65,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -478,10 +479,10 @@ BSONObj generateFLE2RangeInsertSpec(BSONElement value) {
     spec.setValue(value);
 
     auto lowerDoc = BSON("lb" << 0);
-    spec.setMinBound(lowerDoc.firstElement());
+    spec.setMinBound(boost::optional<IDLAnyType>(lowerDoc.firstElement()));
     auto upperDoc = BSON("ub" << 15);
 
-    spec.setMaxBound(upperDoc.firstElement());
+    spec.setMaxBound(boost::optional<IDLAnyType>(upperDoc.firstElement()));
     auto specDoc = BSON("s" << spec.toBSON());
 
     return specDoc;
@@ -872,6 +873,7 @@ TEST_F(FleCrudTest, InsertAndDeleteOne) {
 
 // Insert and delete one document
 TEST_F(FleCrudTest, InsertAndDeleteOneRange) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
     auto doc = BSON("encrypted" << 5);
     auto element = doc.firstElement();
 
@@ -979,6 +981,7 @@ TEST_F(FleCrudTest, UpdateOne) {
 }
 
 TEST_F(FleCrudTest, UpdateOneRange) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
     auto doc = BSON("encrypted" << 5);
     auto element = doc.firstElement();
 
@@ -1063,6 +1066,7 @@ TEST_F(FleCrudTest, UpdateOneReplace) {
 }
 
 TEST_F(FleCrudTest, UpdateOneReplaceRange) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
     auto doc = BSON("encrypted" << 5);
     auto element = doc.firstElement();
 
@@ -1178,6 +1182,7 @@ TEST_F(FleCrudTest, FindAndModify_UpdateOne) {
 
 // Update one document via findAndModify
 TEST_F(FleCrudTest, FindAndModify_UpdateOneRange) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
 
     auto firstDoc = BSON("encrypted" << 5);
 

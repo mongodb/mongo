@@ -751,9 +751,14 @@ std::vector<char> generatePlaceholder(
             upperDoc = BSON("ub" << 1234567);
             break;
     }
-    insertSpec.setMinBound(lowerDoc.firstElement());
-    insertSpec.setMaxBound(upperDoc.firstElement());
     insertSpec.setValue(value);
+    if (value.type() == BSONType::NumberDouble || value.type() == BSONType::NumberDecimal) {
+        insertSpec.setMinBound(boost::none);
+        insertSpec.setMaxBound(boost::none);
+    } else {
+        insertSpec.setMinBound(boost::optional<IDLAnyType>(lowerDoc.firstElement()));
+        insertSpec.setMaxBound(boost::optional<IDLAnyType>(upperDoc.firstElement()));
+    }
     auto specDoc = BSON("s" << insertSpec.toBSON());
 
     FLE2RangeFindSpecEdgesInfo edgesInfo;

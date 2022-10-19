@@ -649,21 +649,33 @@ TEST(FLECollectionOptions, Range_AllowedTypes) {
     // TODO: SERVER-67760 remove feature flag
     RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2Range", true);
 
-    for (const auto& type : std::vector<std::string>{"int", "long"}) {
-        ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
+    ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
         encryptedFields: {
             "fields": [
                 {
                     "path": "firstName",
                     "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
-                    "bsonType": ")" << type << R"(",
+                    "bsonType": "int",
                     "queries": {"queryType": "range", "sparsity" : 1, min : 1, max : 2}
                 }
             ]
         }
     }})"))
-                      .getStatus());
-    }
+                  .getStatus());
+
+    ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "long",
+                    "queries": {"queryType": "range", "sparsity" : 1, min : {$numberLong: "1"}, max : {$numberLong: "2"}}
+                }
+            ]
+        }
+    }})"))
+                  .getStatus());
 
     for (const auto& type : std::vector<std::string>{"double", "decimal"}) {
         ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
@@ -828,23 +840,37 @@ TEST(FLECollectionOptions, Range_MinMax) {
     // TODO: SERVER-67760 remove feature flag
     RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2Range", true);
 
-    std::vector<std::pair<std::string, int>> typesWithMinMax{
-        {"int", 6775208},
-        {"long", 6775209},
-    };
 
-    for (auto const& tc : typesWithMinMax) {
+    {
         auto doc = BSON("encryptedFields"
-                        << BSON("fields" << BSON_ARRAY(BSON(
-                                    "path"
-                                    << "firstName"
-                                    << "keyId" << UUID::gen() << "bsonType" << tc.first << "queries"
-                                    << BSON("queryType"
-                                            << "range"
-                                            << "sparsity" << 1 << "min" << 2 << "max" << 1)))));
+                        << BSON("fields" << BSON_ARRAY(BSON("path"
+                                                            << "firstName"
+                                                            << "keyId" << UUID::gen() << "bsonType"
+                                                            << "int"
+                                                            << "queries"
+                                                            << BSON("queryType"
+                                                                    << "range"
+                                                                    << "sparsity" << 1 << "min" << 2
+                                                                    << "max" << 1)))));
 
-        ASSERT_STATUS_CODE(tc.second, CollectionOptions::parse(doc));
+        ASSERT_STATUS_CODE(6720005, CollectionOptions::parse(doc));
     }
+
+    {
+        auto doc = BSON("encryptedFields"
+                        << BSON("fields" << BSON_ARRAY(BSON("path"
+                                                            << "firstName"
+                                                            << "keyId" << UUID::gen() << "bsonType"
+                                                            << "long"
+                                                            << "queries"
+                                                            << BSON("queryType"
+                                                                    << "range"
+                                                                    << "sparsity" << 1 << "min"
+                                                                    << 2LL << "max" << 1LL)))));
+
+        ASSERT_STATUS_CODE(6720005, CollectionOptions::parse(doc));
+    }
+
 
     std::vector<std::pair<std::string, int>> typesWithoutMinMax{
         {"double", 7006601},
@@ -879,7 +905,61 @@ TEST(FLECollectionOptions, Range_MinMax) {
                                                                 << "sparsity" << 1 << "min" << end
                                                                 << "max" << start)))));
 
-    ASSERT_STATUS_CODE(6775213, CollectionOptions::parse(doc));
+    ASSERT_STATUS_CODE(6720005, CollectionOptions::parse(doc));
+}
+
+TEST(FLECollectionOptions, Range_BoundTypeMismatch) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2Range", true);
+    ASSERT_STATUS_CODE(7018200, CollectionOptions::parse(fromjson(str::stream() << R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "range", "sparsity" : 1, min: {"$numberLong": "12344"}, max: {"$numberLong": "123440"}}
+                }
+            ]
+        }
+    }})")));
+
+    ASSERT_STATUS_CODE(7018200, CollectionOptions::parse(fromjson(str::stream() << R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "long",
+                    "queries": {"queryType": "range", "sparsity" : 1, min: 1, max: 2}
+                }
+            ]
+        }
+    }})")));
+
+    ASSERT_STATUS_CODE(7018201, CollectionOptions::parse(fromjson(str::stream() << R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "long",
+                    "queries": {"queryType": "range", "sparsity" : 1, min: {$numberLong: "1"}, max: 2}
+                }
+            ]
+        }
+    }})")));
+    ASSERT_STATUS_CODE(7018201, CollectionOptions::parse(fromjson(str::stream() << R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "range", "sparsity" : 1, min: 1, max: {"$numberLong": "123440"}}
+                }
+            ]
+        }
+    }})")));
 }
 
 }  // namespace mongo

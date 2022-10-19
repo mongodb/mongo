@@ -304,10 +304,8 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             }
 
             try {
-                collectionOptions.encryptedFieldConfig =
-                    collection_options_validation::processAndValidateEncryptedFields(
-                        EncryptedFieldConfig::parse(IDLParserContext{"CollectionOptions::parse"},
-                                                    e.Obj()));
+                collectionOptions.encryptedFieldConfig = EncryptedFieldConfig::parse(
+                    IDLParserContext{"CollectionOptions::parse"}, e.Obj());
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }

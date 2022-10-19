@@ -412,8 +412,10 @@ structs:
           min:
             description: "Queryable Encryption min bound for range"
             type: encrypted_numeric_element
+            optional: true
             cpp_name: minBound
           max:
             description: "Queryable Encryption max bound for range"
             type: encrypted_numeric_element
+            optional: true
             cpp_name: maxBound

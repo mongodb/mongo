@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,11 +29,27 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
 
-namespace mongo::collection_options_validation {
-Status validateStorageEngineOptions(const BSONObj& storageEngine);
+namespace mongo {
+class EncryptedField;
+class EncryptedFieldConfig;
 
-}  // namespace mongo::collection_options_validation
+/*
+ * Value: Value to attempt to coerce to field's type.
+ * BSONType: Type of the field being queryed against.
+ * StringData: A string parameter to support more informative error messages (currently expected
+ * to only be either "bounds" (min and max parameters) or "literal", with "literal" being the
+ * default)
+ *
+ * First, checks that the Value's type is supported on a range index. Then, the Value is
+ * coerced if applicable:
+ * - Int32 value and Int64 field --> coerce value to Int64
+ * - Double value Decimal 128 field --> coerce value to Decimal 128
+ */
+Value coerceValueToRangeIndexTypes(Value val, BSONType fieldType);
+
+void validateEncryptedField(const EncryptedField* field);
+void validateEncryptedFieldConfig(const EncryptedFieldConfig* config);
+}  // namespace mongo
