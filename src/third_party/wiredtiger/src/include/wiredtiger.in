@@ -1687,6 +1687,9 @@ struct __wt_session {
 	 * @config{dump_pages, Display the contents of in-memory pages as they are verified\, using
 	 * the application's message handler\, intended for debugging., a boolean flag; default \c
 	 * false.}
+	 * @config{read_corrupt, A mode that allows verify to continue reading after encountering a
+	 * checksum error.  It will skip past the corrupt block and continue with the verification
+	 * process., a boolean flag; default \c false.}
 	 * @config{stable_timestamp, Ensure that no data has a start timestamp after the stable
 	 * timestamp\, to be run after rollback_to_stable., a boolean flag; default \c false.}
 	 * @config{strict, Treat any verification problem as an error; by default\, verify will

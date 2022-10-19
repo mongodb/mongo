@@ -70,6 +70,15 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(i, self.nentries)
         cursor.close()
 
+    def count_file_contains(self, filename, content):
+        count = 0
+        with open(filename) as f:
+            for line in f:
+                if content in line:
+                    count += 1
+            f.close()
+        return count
+
     def open_and_position(self, tablename, pct):
         """
         Open the file for the table, position it at a 4K page
@@ -144,8 +153,44 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn = self.setUpConnectionOpen(".")
         self.session = self.setUpSessionOpen(self.conn)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.verify('table:' + self.tablename, None),
+            lambda: self.session.verify('table:' + self.tablename, "read_corrupt"),
             "/WT_SESSION.verify/")
+        self.assertEqual(self.count_file_contains("stderr.txt",
+            "calculated block checksum doesn't match expected checksum"), 1)
+
+    def test_verify_api_read_corrupt_pages(self):
+        """
+        Test verify via API, on a table that is purposely corrupted in
+        multiple places. A verify operation with read_corrupt on should
+        result in multiple checksum errors being logged.
+        """
+        params = 'key_format=S,value_format=S'
+        self.session.create('table:' + self.tablename, params)
+        self.populate(self.tablename)
+        with self.open_and_position(self.tablename, 25) as f:
+            for i in range(0, 100):
+                f.write(b'\x01\xff\x80')
+        with self.open_and_position(self.tablename, 50) as f:
+            for i in range(0, 100):
+                f.write(b'\x01\xff\x80')
+        with self.open_and_position(self.tablename, 75) as f:
+            for i in range(0, 100):
+                f.write(b'\x01\xff\x80')
+
+        # open_and_position closed the session/connection, reopen them now.
+        self.conn = self.setUpConnectionOpen(".")
+        self.session = self.setUpSessionOpen(self.conn)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.verify('table:' + self.tablename, "read_corrupt"),
+            "/WT_SESSION.verify/")
+
+        # It is expected that more than one checksum error is logged given
+        # that we have corrupted the table in multiple locations, but we may
+        # not necessarily detect all three corruptions - e.g. we won't detect
+        # a corruption if we overwrite free space or overwrite a page that is
+        # a child of another page that we overwrite.
+        self.assertGreater(self.count_file_contains("stderr.txt",
+            "calculated block checksum doesn't match expected checksum"), 1)
 
     def test_verify_process_75pct_null(self):
         """
@@ -158,9 +203,11 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         with self.open_and_position(self.tablename, 75) as f:
             for i in range(0, 4096):
                 f.write(struct.pack('B', 0))
-        self.runWt(["verify", "table:" + self.tablename],
+        self.runWt(["verify", "-c", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
+        self.assertEqual(self.count_file_contains("verifyerr.out",
+            "calculated block checksum doesn't match expected checksum"), 1)
 
     def test_verify_process_25pct_junk(self):
         """
@@ -173,9 +220,42 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         with self.open_and_position(self.tablename, 25) as f:
             for i in range(0, 100):
                 f.write(b'\x01\xff\x80')
-        self.runWt(["verify", "table:" + self.tablename],
+        self.runWt(["verify", "-c", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
+        self.assertEqual(self.count_file_contains("verifyerr.out",
+            "calculated block checksum doesn't match expected checksum"), 1)
+
+    def test_verify_process_read_corrupt_pages(self):
+        """
+        Test verify in a 'wt' process on a table that is purposely corrupted
+        in multiple places. A verify operation with read_corrupt on should
+        result in multiple checksum errors being logged.
+        """
+        params = 'key_format=S,value_format=S'
+        self.session.create('table:' + self.tablename, params)
+        self.populate(self.tablename)
+        with self.open_and_position(self.tablename, 25) as f:
+            for i in range(0, 100):
+                f.write(b'\x01\xff\x80')
+        with self.open_and_position(self.tablename, 75) as f:
+            for i in range(0, 100):
+                f.write(b'\x01\xff\x80')
+        with self.open_and_position(self.tablename, 80) as f:
+            for i in range(0, 100):
+                f.write(b'\x01\xff\x80')
+        self.runWt(["verify", "-c", "table:" + self.tablename],
+            errfilename="verifyerr.out", failure=True)
+
+        self.check_non_empty_file("verifyerr.out")
+
+        # It is expected that more than one checksum error is logged given
+        # that we have corrupted the table in multiple locations, but we may
+        # not necessarily detect all three corruptions - e.g. we won't detect
+        # a corruption if we overwrite free space or overwrite a page that is
+        # a child of another page that we overwrite.
+        self.assertGreater(self.count_file_contains("verifyerr.out",
+            "calculated block checksum doesn't match expected checksum"), 1)
 
     def test_verify_process_truncated(self):
         """
