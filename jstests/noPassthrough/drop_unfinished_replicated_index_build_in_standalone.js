@@ -38,7 +38,8 @@ const createIdx1 = IndexBuildTest.startIndexBuild(primary, primaryColl1.getFullN
 const createIdx2 = IndexBuildTest.startIndexBuild(primary, primaryColl2.getFullName(), {a: 1});
 
 // Waiting for secondary to start the index builds
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
+IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName1);
+IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName2);
 
 jsTestLog("Shutting down secondary");
 rst.stop(secondary);
