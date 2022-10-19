@@ -586,7 +586,7 @@ format()
 	# This script is typically left running until a failure is hit. To avoid filling up the
 	# disk, we should avoid keeping recordings from successful runs.
 	if [[ ! -z $live_record_binary ]]; then
-		live_record_binary="$live_record_binary --save-on=error"
+		live_record_binary="$live_record_binary --save-on error"
 	fi
 
 	cmd="$live_record_binary $format_binary -c "$config" -h "$dir" $trace $args quiet=1"
