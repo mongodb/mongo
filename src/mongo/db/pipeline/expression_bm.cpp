@@ -68,7 +68,6 @@ class ClassicExpressionBenchmarkFixture : public ExpressionBenchmarkFixture {
     }
 };
 
-BENCHMARK_EXPRESSIONS_CLASSIC_ONLY(ClassicExpressionBenchmarkFixture)
 BENCHMARK_EXPRESSIONS(ClassicExpressionBenchmarkFixture)
 
 }  // namespace

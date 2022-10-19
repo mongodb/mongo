@@ -103,12 +103,11 @@ TEST_F(PlanSizeTest, Branch) {
 }
 
 TEST_F(PlanSizeTest, BsonScan) {
-    auto stage = makeS<BSONScanStage>(nullptr,
-                                      nullptr,
+    auto stage = makeS<BSONScanStage>(std::vector<BSONObj>{},
                                       generateSlotId(),
+                                      kEmptyPlanNodeId,
                                       std::vector<std::string>{2},
-                                      mockSV(),
-                                      kEmptyPlanNodeId);
+                                      mockSV());
     assertPlanSize(*stage);
 }
 

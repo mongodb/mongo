@@ -29,6 +29,7 @@
 
 #include <benchmark/benchmark.h>
 
+#include "mongo/db/exec/sbe/stages/bson_scan.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/pipeline/expression_bm_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -42,6 +43,12 @@
 
 namespace mongo {
 namespace {
+template <typename T>
+std::string debugPrint(const T* sbeElement) {
+    return sbeElement ? sbe::DebugPrinter{}.print(sbeElement->debugPrint()) : nullptr;
+}
+
+const NamespaceString kNss{"test.bm"};
 
 class SbeExpressionBenchmarkFixture : public ExpressionBenchmarkFixture {
 public:
@@ -61,23 +68,37 @@ public:
     void benchmarkExpression(BSONObj expressionSpec,
                              benchmark::State& benchmarkState,
                              const std::vector<Document>& documents) override final {
-        std::vector<BSONObj> bsonDocuments = convertToBson(documents);
         QueryTestServiceContext serviceContext;
+        auto opCtx = serviceContext.makeOperationContext();
+        auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), kNss);
+        auto expression =
+            Expression::parseExpression(expCtx.get(), expressionSpec, expCtx->variablesParseState);
 
-        auto opContext = serviceContext.makeOperationContext();
-        auto exprContext = make_intrusive<ExpressionContextForTest>(opContext.get(), _nss);
-        auto expression = Expression::parseExpression(
-            exprContext.get(), expressionSpec, exprContext->variablesParseState);
-
-        if (!exprContext->sbeCompatible) {
+        if (!expCtx->sbeCompatible) {
             benchmarkState.SkipWithError("expression is not supported by SBE");
             return;
         }
 
         expression = expression->optimize();
 
+        LOGV2_DEBUG(6979800,
+                    1,
+                    "running sbe expression benchmark on expression",
+                    "expression"_attr = expression->serialize(/*explain = */ true).toString());
+
+        // This stage makes it possible to execute the benchmark in cases when
+        // stage_builder::generateExpression adds more stages.
+        // There is 10 ns overhead for using PlanStage instead of executing
+        // expressions directly.
+        // It can be removed when stage_builder::generateExpressions
+        // always return EExpression.
+        stage_builder::EvalStage bsonScanStage(
+            std::make_unique<sbe::BSONScanStage>(
+                convertToBson(documents), boost::make_optional(_inputSlotId), kEmptyPlanNodeId),
+            {_inputSlotId});
+
         stage_builder::StageBuilderState state{
-            opContext.get(),
+            opCtx.get(),
             &_planStageData,
             _variables,
             &_slotIdGenerator,
@@ -86,37 +107,39 @@ public:
             false /* needsMerge */,
             false /* allowDiskUse */
         };
-
         auto [evalExpr, evalStage] =
             stage_builder::generateExpression(state,
                                               expression.get(),
-                                              stage_builder::EvalStage{},
+                                              std::move(bsonScanStage),
                                               boost::make_optional(_inputSlotId),
                                               kEmptyPlanNodeId);
-        tassert(6979800, "Unexpected: EvalStage.stage is not null", evalStage.stageIsNull());
+
+        auto stage = evalStage.extractStage(kEmptyPlanNodeId);
+        LOGV2_DEBUG(6979801,
+                    1,
+                    "sbe expression benchmark PlanStage",
+                    "stage"_attr = debugPrint(stage.get()));
 
         auto expr = evalExpr.extractExpr();
-        auto compiledExpr = expr->compile(_planStageData.ctx);
+        LOGV2_DEBUG(6979802,
+                    1,
+                    "sbe expression benchmark EExpression",
+                    "expression"_attr = debugPrint(expr.get()));
+
+        stage->attachToOperationContext(opCtx.get());
+        stage->prepare(_planStageData.ctx);
+
+        _planStageData.ctx.root = stage.get();
+        sbe::vm::CodeFragment code = expr->compileDirect(_planStageData.ctx);
         sbe::vm::ByteCode vm;
-
-        LOGV2_DEBUG(
-            6979802,
-            1,
-            "running sbe expression benchmark on expression {expression}, sbe representation {sbe}",
-            "expression"_attr = expression->serialize(/*explain = */ true).toString(),
-            "sbe"_attr = sbe::DebugPrinter{}.print(expr->debugPrint()));
-
+        stage->open(/*reopen =*/false);
         for (auto keepRunning : benchmarkState) {
-            for (const auto& document : bsonDocuments) {
-                _inputSlotAccessor->reset(false,
-                                          sbe::value::TypeTags::bsonObject,
-                                          sbe::value::bitcastFrom<const char*>(document.objdata()));
-                auto [owned, tag, val] = vm.run(compiledExpr.get());
-                if (owned) {
-                    sbe::value::releaseValue(tag, val);
-                }
+            for (auto st = stage->getNext(); st == sbe::PlanState::ADVANCED;
+                 st = stage->getNext()) {
+                executeExpr(vm, &code);
             }
             benchmark::ClobberMemory();
+            stage->open(/*reopen = */ true);
         }
     }
 
@@ -131,7 +154,12 @@ private:
         return result;
     }
 
-    NamespaceString _nss{"test.bm"};
+    void executeExpr(sbe::vm::ByteCode& vm, const sbe::vm::CodeFragment* compiledExpr) const {
+        auto [owned, tag, val] = vm.run(compiledExpr);
+        if (owned) {
+            sbe::value::releaseValue(tag, val);
+        }
+    }
 
     stage_builder::PlanStageData _planStageData;
     Variables _variables;

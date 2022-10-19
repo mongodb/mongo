@@ -171,58 +171,42 @@ private:
     PseudoRandom random;
 };
 
-/**
- * SERVER-70260: When fixed, the benchmarks in this macro should be merged alphabetically into the
- * BENCHMARK_EXPRESSIONS() macro below and the current macro deleted. Please preserve the groupings
- * (separated by blank lines between groups), which are based on the BM names' prefixes {Array,
- * Conditional}.
- *
- * Macro to register benchmark expressions that crash under the test framework in SBE.
- *   Fixture: class name of the implementing child class for Classic engine.
- */
-#define BENCHMARK_EXPRESSIONS_CLASSIC_ONLY(Fixture)                            \
-                                                                               \
-    BENCHMARK_F(Fixture, ArrayArrayElemAt0)(benchmark::State & state) {        \
-        benchmarkArrayArrayElemAt0(state);                                     \
-    }                                                                          \
-    BENCHMARK_F(Fixture, ArrayArrayElemAtLast)(benchmark::State & state) {     \
-        benchmarkArrayArrayElemAtLast(state);                                  \
-    }                                                                          \
-    BENCHMARK_F(Fixture, ArrayFilter0)(benchmark::State & state) {             \
-        benchmarkArrayFilter0(state);                                          \
-    }                                                                          \
-    BENCHMARK_F(Fixture, ArrayFilter10)(benchmark::State & state) {            \
-        benchmarkArrayFilter10(state);                                         \
-    }                                                                          \
-                                                                               \
-    BENCHMARK_F(Fixture, ConditionalCond)(benchmark::State & state) {          \
-        benchmarkConditionalCond(state);                                       \
-    }                                                                          \
-    BENCHMARK_F(Fixture, ConditionalIfNullFalse)(benchmark::State & state) {   \
-        benchmarkConditionalIfNullFalse(state);                                \
-    }                                                                          \
-    BENCHMARK_F(Fixture, ConditionalIfNullTrue)(benchmark::State & state) {    \
-        benchmarkConditionalIfNullTrue(state);                                 \
-    }                                                                          \
-    BENCHMARK_F(Fixture, ConditionalSwitchCase0)(benchmark::State & state) {   \
-        benchmarkConditionalSwitchCase0(state);                                \
-    }                                                                          \
-    BENCHMARK_F(Fixture, ConditionalSwitchCase1)(benchmark::State & state) {   \
-        benchmarkConditionalSwitchCase1(state);                                \
-    }                                                                          \
-    BENCHMARK_F(Fixture, ConditionalSwitchDefault)(benchmark::State & state) { \
-        benchmarkConditionalSwitchDefault(state);                              \
-    }
-
-/**
- * Macro to register benchmark expressions for both Classic and SBE engines.
- *   Fixture: class name of the implementing child class for current engine.
- */
 #define BENCHMARK_EXPRESSIONS(Fixture)                                          \
-                                                                                \
     BENCHMARK_F(Fixture, NoOp)                                                  \
     (benchmark::State & state) {                                                \
         noOpBenchmark(state);                                                   \
+    }                                                                           \
+                                                                                \
+    BENCHMARK_F(Fixture, ArrayArrayElemAt0)(benchmark::State & state) {         \
+        benchmarkArrayArrayElemAt0(state);                                      \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ArrayArrayElemAtLast)(benchmark::State & state) {      \
+        benchmarkArrayArrayElemAtLast(state);                                   \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ArrayFilter0)(benchmark::State & state) {              \
+        benchmarkArrayFilter0(state);                                           \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ArrayFilter10)(benchmark::State & state) {             \
+        benchmarkArrayFilter10(state);                                          \
+    }                                                                           \
+                                                                                \
+    BENCHMARK_F(Fixture, ConditionalCond)(benchmark::State & state) {           \
+        benchmarkConditionalCond(state);                                        \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ConditionalIfNullFalse)(benchmark::State & state) {    \
+        benchmarkConditionalIfNullFalse(state);                                 \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ConditionalIfNullTrue)(benchmark::State & state) {     \
+        benchmarkConditionalIfNullTrue(state);                                  \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ConditionalSwitchCase0)(benchmark::State & state) {    \
+        benchmarkConditionalSwitchCase0(state);                                 \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ConditionalSwitchCase1)(benchmark::State & state) {    \
+        benchmarkConditionalSwitchCase1(state);                                 \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ConditionalSwitchDefault)(benchmark::State & state) {  \
+        benchmarkConditionalSwitchDefault(state);                               \
     }                                                                           \
                                                                                 \
     BENCHMARK_F(Fixture, ArrayInFound0)(benchmark::State & state) {             \

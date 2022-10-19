@@ -440,6 +440,7 @@ env.Benchmark(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe_stages",
         "$BUILD_DIR/mongo/db/pipeline/expression_bm_fixture",
         "$BUILD_DIR/mongo/db/query_exec",
         "query_test_service_context",
