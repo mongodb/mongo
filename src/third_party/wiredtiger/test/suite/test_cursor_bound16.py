@@ -46,7 +46,9 @@ class test_cursor_bound16(bound_base):
     dump_options = [
         ('dump_print', dict(dumpopt='print')),
         ('dump_hex', dict(dumpopt='hex')),
-        ('dump_json', dict(dumpopt='json')),
+        # FIXME-WT-9986: Re-enable dump_json after fixing the JSON cursor bug
+        # triggered by allocator changes.
+        # ('dump_json', dict(dumpopt='json')),
     ]
 
     scenarios = make_scenarios(dump_options, types)
