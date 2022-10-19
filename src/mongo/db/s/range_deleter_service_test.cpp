@@ -602,7 +602,6 @@ TEST_F(RangeDeleterServiceTest, TotalNumOfRegisteredTasks) {
 }
 
 TEST_F(RangeDeleterServiceTest, RegisterTaskWithDisableResumableRangeDeleterFlagEnabled) {
-
     RAIIServerParameterControllerForTest enableFeatureFlag{"disableResumableRangeDeleter", true};
 
     auto rds = RangeDeleterService::get(opCtx);
@@ -617,7 +616,6 @@ TEST_F(RangeDeleterServiceTest, RegisterTaskWithDisableResumableRangeDeleterFlag
 
 TEST_F(RangeDeleterServiceTest,
        GetOverlappingRangeDeletionsFutureWithDisableResumableRangeDeleterFlagEnabled) {
-
     auto rds = RangeDeleterService::get(opCtx);
     auto taskWithOngoingQueries = rangeDeletionTask0ForCollA;
     auto completionFuture =
@@ -877,6 +875,28 @@ TEST_F(RangeDeleterServiceTest, RegisterPendingTaskAndMarkItNonPending) {
         .get(opCtx);
 
     ASSERT(completionFuture.isReady());
+}
+
+TEST_F(RangeDeleterServiceTest, WaitForOngoingQueriesInvalidatedOnStepDown) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    auto taskWithOngoingQueries =
+        createRangeDeletionTaskWithOngoingQueries(uuidCollA, BSON("a" << 0), BSON("a" << 10));
+
+    auto completionFuture = rds->registerTask(taskWithOngoingQueries->getTask(),
+                                              taskWithOngoingQueries->getOngoingQueriesFuture());
+
+    // Manually trigger disabling of the service
+    rds->onStepDown();
+    ON_BLOCK_EXIT([&] {
+        rds->onStepUpComplete(opCtx, 0L);  // Re-enable the service
+    });
+
+    try {
+        completionFuture.get(opCtx);
+    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+        // Future must have been set to an interruption error because the service was disabled
+    }
 }
 
 }  // namespace mongo
