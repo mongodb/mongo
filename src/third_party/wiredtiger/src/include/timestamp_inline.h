@@ -76,6 +76,7 @@
         (dest)->durable_start_ts = (source)->durable_start_ts; \
         (dest)->start_ts = (source)->start_ts;                 \
         (dest)->start_txn = (source)->start_txn;               \
+        (dest)->prepare = (source)->prepare;                   \
     } while (0)
 
 /* Copy the stop values of a time window from another time window. */
@@ -84,6 +85,7 @@
         (dest)->durable_stop_ts = (source)->durable_stop_ts; \
         (dest)->stop_ts = (source)->stop_ts;                 \
         (dest)->stop_txn = (source)->stop_txn;               \
+        (dest)->prepare = (source)->prepare;                 \
     } while (0)
 
 /*

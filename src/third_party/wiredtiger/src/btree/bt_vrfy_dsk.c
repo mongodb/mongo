@@ -509,7 +509,7 @@ __verify_dsk_row_int(WT_VERIFY_INFO *vi)
             current->size = unpack->size;
             break;
         case WT_CELL_KEY_OVFL:
-            WT_ERR(__wt_dsk_cell_data_ref(vi->session, vi->dsk->type, unpack, current));
+            WT_ERR(__wt_dsk_cell_data_ref_addr(vi->session, vi->dsk->type, unpack, current));
             break;
         default:
             /* Not a key -- continue with the next cell. */
@@ -662,7 +662,7 @@ __verify_dsk_row_leaf(WT_VERIFY_INFO *vi)
         case WT_CELL_KEY:
             break;
         case WT_CELL_KEY_OVFL:
-            WT_ERR(__wt_dsk_cell_data_ref(vi->session, vi->dsk->type, unpack, current));
+            WT_ERR(__wt_dsk_cell_data_ref_kv(vi->session, vi->dsk->type, unpack, current));
             goto key_compare;
         default:
             /* Not a key -- continue with the next cell. */

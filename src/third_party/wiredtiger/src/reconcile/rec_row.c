@@ -955,7 +955,7 @@ slow:
              * have to build the key now because we are about to promote it.
              */
             if (key_onpage_ovfl) {
-                WT_ERR(__wt_dsk_cell_data_ref(session, WT_PAGE_ROW_LEAF, kpack, r->cur));
+                WT_ERR(__wt_dsk_cell_data_ref_kv(session, WT_PAGE_ROW_LEAF, kpack, r->cur));
                 WT_NOT_READ(key_onpage_ovfl, false);
             }
 

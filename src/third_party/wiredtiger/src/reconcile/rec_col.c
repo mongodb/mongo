@@ -1312,7 +1312,7 @@ __wt_rec_col_var(
          * where the new value happens (?) to match a Huffman- encoded value in a previous or next
          * record.
          */
-        WT_ERR(__wt_dsk_cell_data_ref(session, WT_PAGE_COL_VAR, vpack, orig));
+        WT_ERR(__wt_dsk_cell_data_ref_kv(session, WT_PAGE_COL_VAR, vpack, orig));
 
 record_loop:
         /*
@@ -1400,7 +1400,7 @@ record_loop:
                      * Original is an overflow item; we used it for a key and now we need another
                      * copy; read it into memory.
                      */
-                    WT_ERR(__wt_dsk_cell_data_ref(session, WT_PAGE_COL_VAR, vpack, orig));
+                    WT_ERR(__wt_dsk_cell_data_ref_kv(session, WT_PAGE_COL_VAR, vpack, orig));
 
                     ovfl_state = OVFL_IGNORE;
                 /* FALLTHROUGH */

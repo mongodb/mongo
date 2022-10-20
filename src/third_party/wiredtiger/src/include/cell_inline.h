@@ -1235,6 +1235,11 @@ __cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
             return (0);
         break;
     case WT_CELL_VALUE_OVFL:
+        /*
+         * Encourage checkpoint to race with reading the onpage value. If we have an overflow item,
+         * it may be removed by checkpoint concurrently.
+         */
+        __wt_timing_stress(session, WT_TIMING_STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE, NULL);
         WT_RET(__wt_ovfl_read(session, page, unpack, store, &decoded));
         if (decoded)
             return (0);
@@ -1250,34 +1255,44 @@ __cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
 }
 
 /*
- * __wt_dsk_cell_data_ref --
- *     Set a buffer to reference the data from an unpacked cell. There are two versions because of
- *     WT_CELL_VALUE_OVFL_RM type cells. When an overflow item is deleted, its backing blocks are
- *     removed; if there are still running transactions that might need to see the overflow item, we
- *     cache a copy of the item and reset the item's cell to WT_CELL_VALUE_OVFL_RM. If we find a
- *     WT_CELL_VALUE_OVFL_RM cell when reading an overflow item, we use the page reference to look
- *     aside into the cache. So, calling the "dsk" version of the function declares the cell cannot
- *     be of type WT_CELL_VALUE_OVFL_RM, and calling the "page" version means it might be.
+ * __wt_dsk_cell_data_ref_addr --
+ *     Set a buffer to reference the data from an unpacked address cell.
  */
 static inline int
-__wt_dsk_cell_data_ref(WT_SESSION_IMPL *session, int page_type, void *unpack_arg, WT_ITEM *store)
+__wt_dsk_cell_data_ref_addr(
+  WT_SESSION_IMPL *session, int page_type, WT_CELL_UNPACK_ADDR *unpack, WT_ITEM *store)
 {
-    WT_CELL_UNPACK_COMMON *unpack;
-
-    unpack = (WT_CELL_UNPACK_COMMON *)unpack_arg;
-
-    WT_ASSERT(session, __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
-    return (__cell_data_ref(session, NULL, page_type, unpack, store));
+    return (__cell_data_ref(session, NULL, page_type, (WT_CELL_UNPACK_COMMON *)unpack, store));
 }
 
 /*
- * __wt_page_cell_data_ref --
- *     Set a buffer to reference the data from an unpacked cell.
+ * __wt_dsk_cell_data_ref_kv --
+ *     Set a buffer to reference the data from an unpacked key value cell. There are two versions
+ *     because of WT_CELL_VALUE_OVFL_RM type cells. When an overflow item is deleted, its backing
+ *     blocks are removed; if there are still running transactions that might need to see the
+ *     overflow item, we cache a copy of the item and reset the item's cell to
+ *     WT_CELL_VALUE_OVFL_RM. If we find a WT_CELL_VALUE_OVFL_RM cell when reading an overflow item,
+ *     we use the page reference to look aside into the cache. So, calling the "dsk" version of the
+ *     function declares the cell cannot be of type WT_CELL_VALUE_OVFL_RM, and calling the "page"
+ *     version means it might be.
  */
 static inline int
-__wt_page_cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, void *unpack_arg, WT_ITEM *store)
+__wt_dsk_cell_data_ref_kv(
+  WT_SESSION_IMPL *session, int page_type, WT_CELL_UNPACK_KV *unpack, WT_ITEM *store)
 {
-    return (__cell_data_ref(session, page, page->type, (WT_CELL_UNPACK_COMMON *)unpack_arg, store));
+    WT_ASSERT(session, __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
+    return (__cell_data_ref(session, NULL, page_type, (WT_CELL_UNPACK_COMMON *)unpack, store));
+}
+
+/*
+ * __wt_page_cell_data_ref_kv --
+ *     Set a buffer to reference the data from an unpacked key value cell.
+ */
+static inline int
+__wt_page_cell_data_ref_kv(
+  WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_KV *unpack, WT_ITEM *store)
+{
+    return (__cell_data_ref(session, page, page->type, (WT_CELL_UNPACK_COMMON *)unpack, store));
 }
 
 /*

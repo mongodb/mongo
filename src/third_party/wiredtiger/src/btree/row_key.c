@@ -184,7 +184,7 @@ overflow_retry:
                     __wt_readunlock(session, &btree->ovfl_lock);
                     goto overflow_retry;
                 }
-                ret = __wt_dsk_cell_data_ref(session, WT_PAGE_ROW_LEAF, unpack, keyb);
+                ret = __wt_dsk_cell_data_ref_kv(session, WT_PAGE_ROW_LEAF, unpack, keyb);
                 __wt_readunlock(session, &btree->ovfl_lock);
                 WT_RET(ret);
                 break;
@@ -220,7 +220,7 @@ overflow_retry:
              *
              * The key doesn't need to be instantiated, just return.
              */
-            WT_RET(__wt_dsk_cell_data_ref(session, WT_PAGE_ROW_LEAF, unpack, keyb));
+            WT_RET(__wt_dsk_cell_data_ref_kv(session, WT_PAGE_ROW_LEAF, unpack, keyb));
             if (slot_offset == 0)
                 return (0);
             goto switch_and_jump;

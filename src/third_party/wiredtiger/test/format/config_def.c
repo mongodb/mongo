@@ -287,6 +287,9 @@ CONFIG configuration_list[] = {
   {"stress.hs_sweep", "stress history store sweep",
     C_BOOL, 2, 0, 0, V_GLOBAL_STRESS_HS_SWEEP},
 
+  {"stress.sleep_before_read_overflow_onpage", "stress onpage overflow read race with checkpoint",
+    C_BOOL, 2, 0, 0, V_GLOBAL_STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE},
+
   {"stress.split_1", "stress splits (#1)",
     C_BOOL, 2, 0, 0, V_GLOBAL_STRESS_SPLIT_1},
 

@@ -386,8 +386,19 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
       __wt_key_string(session, key->data, key->size, S2BT(session)->key_format, key_string));
 
     WT_ERR(__wt_scr_alloc(session, 0, &full_value));
-    WT_ERR(__wt_page_cell_data_ref(session, page, unpack, full_value));
-    WT_ERR(__wt_buf_set(session, full_value, full_value->data, full_value->size));
+    WT_ERR(__wt_page_cell_data_ref_kv(session, page, unpack, full_value));
+    /*
+     * We can read overflow removed value if checkpoint has run before rollback to stable. In this
+     * case, we have already appended the on page value to the update chain. At this point, we have
+     * visited the update chain and decided the value is not stable. In addition, checkpoint must
+     * have moved this value to the history store as a full value. Therefore, we can safely ignore
+     * the on page value if it is overflow removed.
+     */
+    if (__wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM)
+        ret = 0;
+    else
+        WT_ERR(__wt_buf_set(session, full_value, full_value->data, full_value->size));
+
     newer_hs_durable_ts = unpack->tw.durable_start_ts;
 
     __wt_txn_pinned_timestamp(session, &pinned_ts);
@@ -755,7 +766,7 @@ __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, u
              * standard update.
              */
             WT_RET(__wt_scr_alloc(session, 0, &tmp));
-            if ((ret = __wt_page_cell_data_ref(session, page, vpack, tmp)) == 0)
+            if ((ret = __wt_page_cell_data_ref_kv(session, page, vpack, tmp)) == 0)
                 ret = __wt_upd_alloc(session, tmp, WT_UPDATE_STANDARD, &upd, NULL);
             __wt_scr_free(session, &tmp);
             WT_RET(ret);

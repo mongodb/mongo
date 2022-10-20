@@ -175,7 +175,13 @@ __rec_append_orig_value(
     /* We need the original on-page value for some reader: get a copy. */
     if (!tombstone_globally_visible) {
         WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-        WT_ERR(__wt_page_cell_data_ref(session, page, unpack, tmp));
+        WT_ERR(__wt_page_cell_data_ref_kv(session, page, unpack, tmp));
+        /*
+         * We should never see an overflow removed value because we haven't freed the overflow
+         * blocks.
+         */
+        WT_ASSERT(session,
+          unpack->cell == NULL || __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
         WT_ERR(__wt_upd_alloc(session, tmp, WT_UPDATE_STANDARD, &append, &size));
         total_size += size;
         append->txnid = unpack->tw.start_txn;

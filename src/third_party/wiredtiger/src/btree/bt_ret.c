@@ -187,22 +187,37 @@ __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw)
 }
 
 /*
+ * __read_page_cell_data_ref_kv --
+ *     Helper function to copy the time window and set a buffer to reference the data from an
+ *     unpacked key value cell. Return WT_RESTART if the cell is an overflow removed value.
+ */
+static inline int
+__read_page_cell_data_ref_kv(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_KV *unpack,
+  WT_ITEM *buf, WT_TIME_WINDOW *tw)
+{
+    if (tw != NULL)
+        WT_TIME_WINDOW_COPY(tw, &unpack->tw);
+    WT_RET(__wt_page_cell_data_ref_kv(session, page, unpack, buf));
+    if (unpack->cell != NULL && __wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM) {
+        WT_STAT_CONN_DATA_INCR(session, txn_read_overflow_remove);
+        return (WT_RESTART);
+    }
+    return (0);
+}
+
+/*
  * __wt_value_return_buf --
- *     Change a buffer to reference an internal original-page return value.
+ *     Change a buffer to reference an internal original-page return value. If we see an overflow
+ *     removed cell, we have raced with checkpoint freeing the overflow cell. Return restart for the
+ *     caller to retry the read.
  */
 int
-__wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_WINDOW *tw
-#ifdef HAVE_DIAGNOSTIC
-  ,
-  bool *is_ovfl_rm
-#endif
-)
+__wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_WINDOW *tw)
 {
     WT_BTREE *btree;
     WT_CELL *cell;
     WT_CELL_UNPACK_KV unpack;
     WT_CURSOR *cursor;
-    WT_DECL_RET;
     WT_PAGE *page;
     WT_ROW *rip;
     WT_SESSION_IMPL *session;
@@ -231,27 +246,13 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
 
         /* Take the value from the original page cell. */
         __wt_row_leaf_value_cell(session, page, rip, &unpack);
-        if (tw != NULL)
-            WT_TIME_WINDOW_COPY(tw, &unpack.tw);
-        ret = __wt_page_cell_data_ref(session, page, &unpack, buf);
-#ifdef HAVE_DIAGNOSTIC
-        if (ret == 0 && unpack.cell != NULL && is_ovfl_rm != NULL)
-            *is_ovfl_rm = __wt_cell_type_raw(unpack.cell) == WT_CELL_VALUE_OVFL_RM;
-#endif
-        return (ret);
+        return (__read_page_cell_data_ref_kv(session, page, &unpack, buf, tw));
 
     case WT_PAGE_COL_VAR:
         /* Take the value from the original page cell. */
         cell = WT_COL_PTR(page, &page->pg_var[cbt->slot]);
         __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
-        if (tw != NULL)
-            WT_TIME_WINDOW_COPY(tw, &unpack.tw);
-        ret = __wt_page_cell_data_ref(session, page, &unpack, buf);
-#ifdef HAVE_DIAGNOSTIC
-        if (ret == 0 && unpack.cell != NULL && is_ovfl_rm != NULL)
-            *is_ovfl_rm = __wt_cell_type_raw(unpack.cell) == WT_CELL_VALUE_OVFL_RM;
-#endif
-        return (ret);
+        return (__read_page_cell_data_ref_kv(session, page, &unpack, buf, tw));
 
     case WT_PAGE_COL_FIX:
         /* Take the value from the original page. */
