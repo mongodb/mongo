@@ -718,6 +718,9 @@ struct DoubleBound {
     static DoubleBound plusInfinity() {
         return DoubleBound(std::numeric_limits<double>::infinity(), false);
     }
+    static DoubleBound plusInfinityInclusive() {
+        return DoubleBound(std::numeric_limits<double>::infinity(), true);
+    }
     std::string printLowerBound() const {
         return str::stream() << (inclusive ? "[" : "(") << bound;
     }
@@ -3082,7 +3085,7 @@ public:
     }
     void visit(const ExpressionHyperbolicArcCosine* expr) final {
         generateTrigonometricExpressionWithBounds(
-            "acosh", DoubleBound(1.0, true), DoubleBound::plusInfinity());
+            "acosh", DoubleBound(1.0, true), DoubleBound::plusInfinityInclusive());
     }
     void visit(const ExpressionHyperbolicArcSine* expr) final {
         generateTrigonometricExpression("asinh");
@@ -3529,7 +3532,8 @@ private:
      */
     void generateTrigonometricExpressionBinary(StringData exprName) {
         _context->ensureArity(2);
-
+        auto x = _context->popExpr();
+        auto y = _context->popExpr();
         auto genericTrignomentricExpr = makeLocalBind(
             _context->state.frameIdGenerator,
             [&](sbe::EVariable lhs, sbe::EVariable rhs) {
@@ -3548,8 +3552,8 @@ private:
                                            str::stream() << "$" << exprName
                                                          << " supports only numeric types"));
             },
-            _context->popExpr(),
-            _context->popExpr());
+            std::move(y),
+            std::move(x));
         _context->pushExpr(std::move(genericTrignomentricExpr));
     }
 
@@ -3590,13 +3594,17 @@ private:
                                        str::stream() << "$" << exprName.toString()
                                                      << " supports only numeric types"),
                 sbe::makeE<sbe::EIf>(
-                    std::move(checkBounds),
-                    makeFunction(exprName.toString(), inputRef.clone()),
-                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{4995503},
-                                           str::stream() << "Cannot apply $" << exprName.toString()
-                                                         << ", value must be in "
-                                                         << lowerBound.printLowerBound() << ", "
-                                                         << upperBound.printUpperBound()))));
+                    // return NaN when NaN is the input.
+                    generateNaNCheck(inputRef),
+                    inputRef.clone(),
+                    sbe::makeE<sbe::EIf>(
+                        std::move(checkBounds),
+                        makeFunction(exprName.toString(), inputRef.clone()),
+                        sbe::makeE<sbe::EFail>(
+                            ErrorCodes::Error{4995503},
+                            str::stream() << "Cannot apply $" << exprName.toString()
+                                          << ", value must be in " << lowerBound.printLowerBound()
+                                          << ", " << upperBound.printUpperBound())))));
 
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(binds), std::move(genericTrignomentricExpr)));
