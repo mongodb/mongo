@@ -470,7 +470,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
                 WT_ERR(__wt_buf_set(session, full_value, hs_value->data, hs_value->size));
             }
         } else
-            __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_3,
+            __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
               "history store update more recent than on-disk update with time window: %s and type: "
               "%" PRIu8,
               __wt_time_window_to_string(hs_tw, tw_string), type);
@@ -522,7 +522,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
          */
         if (__rollback_txn_visible_id(session, hs_tw->start_txn) &&
           hs_tw->durable_start_ts <= rollback_timestamp) {
-            __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_2,
+            __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
               "history store update valid with time window: %s, type: %" PRIu8
               " and stable timestamp: %s",
               __wt_time_window_to_string(hs_tw, tw_string), type,
@@ -634,8 +634,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
     } else {
         WT_ERR(__wt_upd_alloc_tombstone(session, &upd, NULL));
         WT_STAT_CONN_DATA_INCR(session, txn_rts_keys_removed);
-        __wt_verbose_level_multi(
-          session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_5, "%s", "key removed");
+        __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session), "%s", "key removed");
     }
 
     if (rip != NULL)
@@ -1246,7 +1245,7 @@ __rollback_abort_updates(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
     }
 
     WT_STAT_CONN_INCR(session, txn_rts_pages_visited);
-    __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_4,
+    __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
       "%p: page rolled back when page is modified: %s", (void *)ref,
       __wt_page_is_modified(page) ? "true" : "false");
 

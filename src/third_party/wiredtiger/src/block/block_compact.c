@@ -42,7 +42,7 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
     __wt_block_configure_first_fit(block, false);
 
     /* Dump the results of the compaction pass. */
-    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG_1)) {
+    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG)) {
         __wt_spin_lock(session, &block->live_lock);
         __block_dump_file_stat(session, block, false);
         __wt_spin_unlock(session, &block->live_lock);
@@ -77,7 +77,7 @@ __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block, u_int *ms
     struct timespec cur_time;
     uint64_t time_diff;
 
-    if (!WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT_PROGRESS, WT_VERBOSE_DEBUG_1))
+    if (!WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT_PROGRESS, WT_VERBOSE_DEBUG))
         return;
 
     __wt_epoch(session, &cur_time);
@@ -121,7 +121,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
     __wt_spin_lock(session, &block->live_lock);
 
     /* Dump the current state of the file. */
-    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG_1))
+    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG))
         __block_dump_file_stat(session, block, true);
 
     /* Sum the available bytes in the initial 80% and 90% of the file. */

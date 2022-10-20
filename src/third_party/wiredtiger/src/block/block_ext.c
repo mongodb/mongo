@@ -1353,7 +1353,7 @@ __block_extlist_dump(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, 
     if (block->verify_layout)
         level = WT_VERBOSE_NOTICE;
     else
-        level = WT_VERBOSE_DEBUG_1;
+        level = WT_VERBOSE_DEBUG;
     __wt_verbose_level(session, WT_VERB_BLOCK, level,
       "%s extent list %s, %" PRIu32 " entries, %s bytes", tag, el->name, el->entries,
       __wt_buf_set_size(session, el->bytes, true, t1));
