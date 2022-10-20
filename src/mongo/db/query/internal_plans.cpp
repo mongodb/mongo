@@ -123,7 +123,8 @@ CollectionScanParams createCollectionScanParams(
     const boost::optional<RecordId>& resumeAfterRecordId,
     boost::optional<RecordIdBound> minRecord,
     boost::optional<RecordIdBound> maxRecord,
-    CollectionScanParams::ScanBoundInclusion boundInclusion) {
+    CollectionScanParams::ScanBoundInclusion boundInclusion,
+    bool shouldReturnEofOnFilterMismatch) {
     const auto& collection = *coll;
     invariant(collection);
 
@@ -139,6 +140,7 @@ CollectionScanParams createCollectionScanParams(
         params.direction = CollectionScanParams::BACKWARD;
     }
     params.boundInclusion = boundInclusion;
+    params.shouldReturnEofOnFilterMismatch = shouldReturnEofOnFilterMismatch;
     return params;
 }
 }  // namespace
@@ -151,7 +153,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     const boost::optional<RecordId>& resumeAfterRecordId,
     boost::optional<RecordIdBound> minRecord,
     boost::optional<RecordIdBound> maxRecord,
-    CollectionScanParams::ScanBoundInclusion boundInclusion) {
+    CollectionScanParams::ScanBoundInclusion boundInclusion,
+    bool shouldReturnEofOnFilterMismatch) {
     const auto& collection = *coll;
     invariant(collection);
 
@@ -167,7 +170,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
                                                      resumeAfterRecordId,
                                                      minRecord,
                                                      maxRecord,
-                                                     boundInclusion);
+                                                     boundInclusion,
+                                                     shouldReturnEofOnFilterMismatch);
 
     auto cs = _collectionScan(expCtx, ws.get(), &collection, collScanParams);
 
@@ -218,11 +222,19 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     boost::optional<RecordIdBound> minRecord,
     boost::optional<RecordIdBound> maxRecord,
     CollectionScanParams::ScanBoundInclusion boundInclusion,
-    std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams) {
+    std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
+    const MatchExpression* filter,
+    bool shouldReturnEofOnFilterMismatch) {
     const auto& collection = *coll;
     invariant(collection);
-    auto ws = std::make_unique<WorkingSet>();
+    if (shouldReturnEofOnFilterMismatch) {
+        tassert(7010801,
+                "MatchExpression filter must be provided when 'shouldReturnEofOnFilterMismatch' is "
+                "set to true ",
+                filter);
+    }
 
+    auto ws = std::make_unique<WorkingSet>();
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
 
@@ -237,9 +249,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                      boost::none /* resumeAfterId */,
                                                      minRecord,
                                                      maxRecord,
-                                                     boundInclusion);
+                                                     boundInclusion,
+                                                     shouldReturnEofOnFilterMismatch);
 
-    auto root = _collectionScan(expCtx, ws.get(), &collection, collScanParams);
+    auto root = _collectionScan(expCtx, ws.get(), &collection, collScanParams, filter);
 
     if (batchedDeleteParams) {
         root = std::make_unique<BatchedDeleteStage>(expCtx.get(),
@@ -464,12 +477,13 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WorkingSet* ws,
     const CollectionPtr* coll,
-    const CollectionScanParams& params) {
+    const CollectionScanParams& params,
+    const MatchExpression* filter) {
 
     const auto& collection = *coll;
     invariant(collection);
 
-    return std::make_unique<CollectionScan>(expCtx.get(), collection, params, ws, nullptr);
+    return std::make_unique<CollectionScan>(expCtx.get(), collection, params, ws, filter);
 }
 
 std::unique_ptr<PlanStage> InternalPlanner::_indexScan(

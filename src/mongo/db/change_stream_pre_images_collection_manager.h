@@ -39,25 +39,7 @@
 
 namespace mongo {
 namespace change_stream_pre_image_helpers {
-
-/**
- * Specifies attributes that determines if the pre-image has been expired or not.
- */
-struct PreImageAttributes {
-    mongo::UUID collectionUUID;
-    Timestamp ts;
-    Date_t operationTime;
-
-    /**
-     * Determines if the pre-image is considered expired based on the expiration parameter being
-     * set.
-     */
-    bool isExpiredPreImage(const boost::optional<Date_t>& preImageExpirationTime,
-                           const Timestamp& earliestOplogEntryTimestamp);
-};
-
 boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime);
-
 }  // namespace change_stream_pre_image_helpers
 
 /**

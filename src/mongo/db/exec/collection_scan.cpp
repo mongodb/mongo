@@ -413,16 +413,24 @@ PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
     // In the future, we could change seekNear() to always return a record after minRecord in the
     // direction of the scan. However, tailable scans depend on the current behavior in order to
     // mark their position for resuming the tailable scan later on.
-    if (!beforeStartOfRange(_params, *member) && Filter::passes(member, _filter)) {
-        if (_params.stopApplyingFilterAfterFirstMatch) {
-            _filter = nullptr;
-        }
-        *out = memberID;
-        return PlanStage::ADVANCED;
-    } else {
+    if (beforeStartOfRange(_params, *member)) {
         _workingSet->free(memberID);
         return PlanStage::NEED_TIME;
     }
+
+    if (!Filter::passes(member, _filter)) {
+        _workingSet->free(memberID);
+        if (_params.shouldReturnEofOnFilterMismatch) {
+            _commonStats.isEOF = true;
+            return PlanStage::IS_EOF;
+        }
+        return PlanStage::NEED_TIME;
+    }
+    if (_params.stopApplyingFilterAfterFirstMatch) {
+        _filter = nullptr;
+    }
+    *out = memberID;
+    return PlanStage::ADVANCED;
 }
 
 bool CollectionScan::isEOF() {

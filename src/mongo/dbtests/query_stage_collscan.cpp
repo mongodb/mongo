@@ -335,6 +335,38 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanBasicBackwardWithMatch) {
     ASSERT_EQUALS(25, countResults(CollectionScanParams::BACKWARD, obj));
 }
 
+TEST_F(QueryStageCollectionScanTest,
+       QueryTestCollscanStopsScanningOnFilterFailureInClusteredCollectionIfSpecified) {
+    auto ns = NamespaceString("a.b");
+    auto collDeleter = createClusteredCollection(ns, false /* prePopulate */);
+    for (int i = 1; i <= numObj(); ++i) {
+        insertDocument(ns, BSON("_id" << i << "foo" << i));
+    }
+
+    AutoGetCollectionForRead autoColl(&_opCtx, ns);
+    const CollectionPtr& coll = autoColl.getCollection();
+    ASSERT(coll->isClustered());
+
+    // Configure the threshold and the expected number of scanned documents.
+    const int threshold = numObj() / 2;
+    const int expectedNumberOfScannedDocuments = threshold + 1;
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.shouldReturnEofOnFilterMismatch = true;
+    WorkingSet ws;
+    LTEMatchExpression filter{"foo"_sd, Value(threshold)};
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, &filter);
+
+    // Scan all matching documents.
+    WorkingSetID id = WorkingSet::INVALID_ID;
+    while (!scan->isEOF()) {
+        scan->work(&id);
+    }
+    auto collScanStats = static_cast<const CollectionScanStats*>(scan->getSpecificStats());
+    ASSERT_EQUALS(expectedNumberOfScannedDocuments, collScanStats->docsTested);
+}
+
 // Get objects in the order we inserted them.
 TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
     AutoGetCollectionForReadCommand collection(&_opCtx, nss);
