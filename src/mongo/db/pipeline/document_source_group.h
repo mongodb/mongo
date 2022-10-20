@@ -323,6 +323,8 @@ private:
     // Only used when '_spilled' is true.
     std::unique_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
 
+    // Tracks the size of the spill file.
+    std::unique_ptr<SorterFileStats> _spillStats = nullptr;
     std::pair<Value, Value> _firstPartOfNextGroup;
 
     bool _sbeCompatible;

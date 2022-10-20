@@ -351,6 +351,7 @@ public:
         ASSERT_EQ(sorterFileStats.opened.load(), 2);
         ASSERT_EQ(sorterFileStats.closed.load(), 2);
         ASSERT_LTE(sorterTracker.bytesSpilled.load(), currentFileSize);
+        ASSERT_LTE(sorterFileStats.bytesSpilled(), currentFileSize);
 
         ASSERT(boost::filesystem::is_empty(tempDir.path()));
     }
