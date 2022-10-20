@@ -1173,9 +1173,9 @@ struct ParsedFindRangePayload {
 
     Fle2RangeOperator firstOp;
     boost::optional<Fle2RangeOperator> secondOp;
-    std::int32_t payloadId;
+    std::int32_t payloadId{};
 
-    std::int64_t maxCounter;
+    std::int64_t maxCounter{};
 
     explicit ParsedFindRangePayload(BSONElement fleFindRangePayload);
     explicit ParsedFindRangePayload(const Value& fleFindRangePayload);
