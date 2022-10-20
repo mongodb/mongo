@@ -16,7 +16,7 @@ const replSet = new ReplSetTest({
     nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}},
     settings: {
         // Prevent the primary from stepping down when we temporarily shut down the secondary.
-        electionTimeoutMillis: 60000
+        electionTimeoutMillis: 120000
     }
 });
 replSet.startSet();
