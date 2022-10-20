@@ -422,9 +422,58 @@ static void populateAdditionalScanDefs(
     }
 }
 
-void validateCommandOptions(const CollectionPtr& collection,
+// Enforce that unsupported command options don't run through Bonsai. Note these checks are already
+// present in the Bonsai fallback mechansim, but those checks are skipped when Bonsai is forced.
+// This function prevents us from accidently forcing Bonsai with an unsupported option.
+void validateFindCommandOptions(const FindCommandRequest& req) {
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "$_requestResumeToken unsupported in CQF",
+            !req.getRequestResumeToken());
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "allowPartialResults unsupported in CQF",
+            !req.getAllowPartialResults());
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "allowSpeculativeMajorityRead unsupported in CQF",
+            !req.getAllowSpeculativeMajorityRead());
+    uassert(
+        ErrorCodes::InternalErrorNotSupported, "awaitData unsupported in CQF", !req.getAwaitData());
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "collation unsupported in CQF",
+            req.getCollation().isEmpty() ||
+                SimpleBSONObjComparator::kInstance.evaluate(req.getCollation() ==
+                                                            CollationSpec::kSimpleSpec));
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "let unsupported in CQF",
+            !req.getLet() || req.getLet()->isEmpty());
+    uassert(
+        ErrorCodes::InternalErrorNotSupported, "min unsupported in CQF", req.getMin().isEmpty());
+    uassert(
+        ErrorCodes::InternalErrorNotSupported, "max unsupported in CQF", req.getMax().isEmpty());
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "noCursorTimeout unsupported in CQF",
+            !req.getNoCursorTimeout());
+    uassert(
+        ErrorCodes::InternalErrorNotSupported, "readOnce unsupported in CQF", !req.getReadOnce());
+    uassert(
+        ErrorCodes::InternalErrorNotSupported, "returnKey unsupported in CQF", !req.getReturnKey());
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "runtimeConstants unsupported in CQF",
+            !req.getLegacyRuntimeConstants());
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "showRecordId unsupported in CQF",
+            !req.getShowRecordId());
+    uassert(
+        ErrorCodes::InternalErrorNotSupported, "tailable unsupported in CQF", !req.getTailable());
+    uassert(ErrorCodes::InternalErrorNotSupported, "term unsupported in CQF", !req.getTerm());
+}
+
+void validateCommandOptions(const CanonicalQuery* query,
+                            const CollectionPtr& collection,
                             const boost::optional<BSONObj>& indexHint,
                             const stdx::unordered_set<NamespaceString>& involvedCollections) {
+    if (query) {
+        validateFindCommandOptions(query->getFindCommandRequest());
+    }
     if (indexHint && !involvedCollections.empty()) {
         uasserted(6624256,
                   "For now we can apply hints only for queries involving a single collection");
@@ -600,7 +649,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
         involvedCollections = pipeline->getInvolvedCollections();
     }
 
-    validateCommandOptions(collection, indexHint, involvedCollections);
+    validateCommandOptions(canonicalQuery.get(), collection, indexHint, involvedCollections);
 
     auto curOp = CurOp::get(opCtx);
     curOp->debug().cqfUsed = true;

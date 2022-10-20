@@ -964,6 +964,20 @@ Status runAggregate(OperationContext* opCtx,
             uassert(6624344,
                     "Exchanging is not supported in the Cascades optimizer",
                     !request.getExchange().has_value());
+            uassert(ErrorCodes::InternalErrorNotSupported,
+                    "let unsupported in CQF",
+                    !request.getLet() || request.getLet()->isEmpty());
+            uassert(ErrorCodes::InternalErrorNotSupported,
+                    "runtimeConstants unsupported in CQF",
+                    !request.getLegacyRuntimeConstants());
+            uassert(ErrorCodes::InternalErrorNotSupported,
+                    "$_requestReshardingResumeToken in CQF",
+                    !request.getRequestReshardingResumeToken());
+            uassert(ErrorCodes::InternalErrorNotSupported,
+                    "collation unsupported in CQF",
+                    !request.getCollation() || request.getCollation()->isEmpty() ||
+                        SimpleBSONObjComparator::kInstance.evaluate(*request.getCollation() ==
+                                                                    CollationSpec::kSimpleSpec));
 
             auto timeBegin = Date_t::now();
             execs.emplace_back(getSBEExecutorViaCascadesOptimizer(opCtx,

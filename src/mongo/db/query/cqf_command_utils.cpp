@@ -601,7 +601,7 @@ bool isEligibleCommon(const RequestType& request,
         }
     };
     bool unsupportedCmdOption = noneOrDefaultEmpty(request.getHint()) ||
-        noneOrDefaultEmpty(request.getCollation()) || request.getLet() ||
+        noneOrDefaultEmpty(request.getCollation()) || noneOrDefaultEmpty(request.getLet()) ||
         request.getLegacyRuntimeConstants();
 
     bool unsupportedIndexType = [&]() {
@@ -691,8 +691,7 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
     }
 
     bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection) &&
-        !request.getUnwrappedReadPref() && !request.getRequestReshardingResumeToken().has_value() &&
-        !request.getExchange();
+        !request.getRequestReshardingResumeToken().has_value() && !request.getExchange();
 
     // Early return to avoid unnecessary work of walking the input pipeline.
     if (!commandOptionsEligible) {
@@ -732,7 +731,10 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
     bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection) &&
         request.getSort().isEmpty() && request.getMin().isEmpty() && request.getMax().isEmpty() &&
         !request.getReturnKey() && !request.getSingleBatch() && !request.getTailable() &&
-        !request.getSkip() && !request.getLimit() && !request.getNoCursorTimeout();
+        !request.getSkip() && !request.getLimit() && !request.getNoCursorTimeout() &&
+        !request.getRequestResumeToken() && !request.getAllowPartialResults() &&
+        !request.getAllowSpeculativeMajorityRead() && !request.getAwaitData() &&
+        !request.getReadOnce() && !request.getShowRecordId() && !request.getTerm();
 
     // Early return to avoid unnecessary work of walking the input expression.
     if (!commandOptionsEligible) {

@@ -36,44 +36,42 @@ function assertSupportedByBonsaiFully(cmd) {
     assert.commandWorked(db.runCommand(cmd));
 }
 
-function assertNotSupportedByBonsai(cmd, testOnly) {
+function assertNotSupportedByBonsai(cmd, testOnly, database = db) {
     // An unsupported stage should not use the new optimizer.
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
-    const defaultExplain = assert.commandWorked(db.runCommand({explain: cmd}));
+        database.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+    const defaultExplain = assert.commandWorked(database.runCommand({explain: cmd}));
     assert(!usedBonsaiOptimizer(defaultExplain), tojson(defaultExplain));
 
     // Non-explain should also work and use the fallback mechanism, but we cannnot verify exactly
     // this without looking at the logs.
-    assert.commandWorked(db.runCommand(cmd));
+    assert.commandWorked(database.runCommand(cmd));
 
     // Force the bonsai optimizer and expect the query to either fail if unsupported, or pass if
     // marked as "test only".
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
+        database.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
     if (testOnly) {
-        const explain = assert.commandWorked(db.runCommand({explain: cmd}));
+        const explain = assert.commandWorked(database.runCommand({explain: cmd}));
         assert(usedBonsaiOptimizer(explain), tojson(explain));
     } else {
-        assert.commandFailedWithCode(db.runCommand(cmd), ErrorCodes.InternalErrorNotSupported);
+        assert.commandFailedWithCode(database.runCommand(cmd),
+                                     ErrorCodes.InternalErrorNotSupported);
     }
 
     // Forcing the classic engine should not use Bonsai.
     {
-        assert.commandWorked(db.adminCommand(
+        assert.commandWorked(database.adminCommand(
             {setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
-        const explain = assert.commandWorked(db.runCommand({explain: cmd}));
+        const explain = assert.commandWorked(database.runCommand({explain: cmd}));
         assert(!usedBonsaiOptimizer(explain), tojson(explain));
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+            database.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
     }
 }
 
 // Sanity check we use bonsai for supported cases.
 assertSupportedByBonsaiFully({find: coll.getName()});
-
-// Sort in find() is not supported by bonsai generally - test only supported.
-assertNotSupportedByBonsai({find: coll.getName(), sort: {x: 1}}, true);
 
 // Unsupported aggregation stage.
 assertNotSupportedByBonsai(
@@ -127,9 +125,6 @@ assertNotSupportedByBonsai({
 },
                            true);
 
-// Sort on a find() is not supported.
-assertNotSupportedByBonsai({find: coll.getName(), filter: {}, sort: {a: 1}}, true);
-
 // Numeric path components are not supported, either in a match expression or projection.
 assertNotSupportedByBonsai({find: coll.getName(), filter: {'a.0': 5}});
 assertNotSupportedByBonsai({find: coll.getName(), filter: {'a.0.b': 5}});
@@ -141,14 +136,111 @@ assertNotSupportedByBonsai({find: coll.getName(), filter: {$or: [{'a.0': 5}, {a:
 assertNotSupportedByBonsai({find: coll.getName(), filter: {$or: [{a: 5}, {a: {$mod: [4, 0]}}]}});
 
 // Unsupported command options.
-assertNotSupportedByBonsai({find: coll.getName(), filter: {}, collation: {locale: "fr_CA"}}, true);
+
+// $_requestResumeToken
+assertNotSupportedByBonsai({
+    find: coll.getName(),
+    filter: {},
+    hint: {$natural: 1},
+    batchSize: 1,
+    $_requestResumeToken: true
+},
+                           false);
+// $_requestReshardingResumeToken
+assertNotSupportedByBonsai({
+    aggregate: db.getSiblingDB("local").oplog.rs.getName(),
+    pipeline: [],
+    cursor: {},
+    $_requestReshardingResumeToken: true
+},
+                           false,
+                           db.getSiblingDB("local"));
+// $_resumeAfter
+assertNotSupportedByBonsai({
+    find: coll.getName(),
+    filter: {},
+    hint: {$natural: 1},
+    batchSize: 1,
+    $_requestResumeToken: true,
+    $_resumeAfter: {$recordId: NumberLong("50")},
+},
+                           false);
+// allowPartialResults
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, allowPartialResults: true}, false);
+// allowSpeculativeMajorityRead
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, allowSpeculativeMajorityRead: true},
+                           false);
+// awaitData
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, tailable: true, awaitData: true},
+                           false);
+// collation
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, collation: {locale: "fr_CA"}}, false);
 assertNotSupportedByBonsai({
     aggregate: coll.getName(),
     pipeline: [{$match: {$alwaysFalse: 1}}],
     collation: {locale: "fr_CA"},
     cursor: {}
 },
-                           true);
+                           false);
+// let
+assertNotSupportedByBonsai({find: coll.getName(), projection: {foo: "$$val"}, let : {val: 1}},
+                           false);
+assertNotSupportedByBonsai(
+    {aggregate: coll.getName(), pipeline: [{$match: {a: "$$val"}}], let : {val: 1}, cursor: {}},
+    false);
+// limit
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, limit: 1}, true);
+assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [{$limit: 1}], cursor: {}}, true);
+// min/max
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, min: {a: 5}}, false);
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, max: {a: 5}}, false);
+// noCursorTimeout
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, noCursorTimeout: true}, false);
+// readOnce
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, readOnce: true}, false);
+// returnKey
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, returnKey: true}, false);
+// runtimeConstants
+const rtc = {
+    localNow: new Date(),
+    clusterTime: new Timestamp(0, 0),
+};
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, runtimeConstants: rtc}, false);
+assertNotSupportedByBonsai(
+    {aggregate: coll.getName(), pipeline: [], cursor: {}, runtimeConstants: rtc}, false);
+// showRecordId
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, showRecordId: true}, false);
+// singleBatch
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, singleBatch: true}, true);
+// skip
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, skip: 1}, true);
+// sort
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, sort: {a: 1}}, true);
+// tailable
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, tailable: true}, false);
+// term
+(function() {
+// Testing the `term` parameter requires a replica set.
+const rst = new ReplSetTest({
+    nodes: 1,
+    nodeOptions: {
+        setParameter: {
+            "featureFlagCommonQueryFramework": true,
+            "failpoint.enableExplainInBonsai": tojson({mode: "alwaysOn"}),
+        }
+    }
+});
+rst.startSet();
+rst.initiate();
+const connRS = rst.getPrimary();
+const dbRS = connRS.getDB("test");
+const collRS = dbRS["termColl"];
+collRS.drop();
+assert.commandWorked(collRS.insert({a: 1}));
+assert.eq(collRS.find().itcount(), 1);
+assertNotSupportedByBonsai({find: collRS.getName(), filter: {}, term: NumberLong(1)}, false, dbRS);
+rst.stopSet();
+})();
 
 // Unsupported index type.
 assert.commandWorked(coll.createIndex({a: 1}, {sparse: true}));
