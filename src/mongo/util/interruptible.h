@@ -572,7 +572,15 @@ class Interruptible::NotInterruptible final : public Interruptible {
             return stdx::cv_status::no_timeout;
         }
 
-        return cv.wait_until(m, deadline.toSystemTimePoint());
+        try {
+            // If the system clock's time_point's compiler-dependent resolution is higher than
+            // Date_t's milliseconds, it's possible for the conversion from Date_t to time_point
+            // to overflow and trigger an exception. We catch that here to maintain the noexcept
+            // contract.
+            return cv.wait_until(m, deadline.toSystemTimePoint());
+        } catch (const ExceptionFor<ErrorCodes::DurationOverflow>& ex) {
+            return ex.toStatus();
+        }
     }
 
     Date_t getDeadline() const override {

@@ -320,27 +320,36 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
         deadline = std::min(deadline, getDeadline());
     }
 
-    const auto waitStatus = [&] {
-        if (Date_t::max() == deadline) {
-            Waitable::wait(_baton.get(), getServiceContext()->getPreciseClockSource(), cv, m);
-            return stdx::cv_status::no_timeout;
-        }
-        return getServiceContext()->getPreciseClockSource()->waitForConditionUntil(
-            cv, m, deadline, _baton.get());
-    }();
+    try {
+        const auto waitStatus = [&] {
+            if (Date_t::max() == deadline) {
+                Waitable::wait(_baton.get(), getServiceContext()->getPreciseClockSource(), cv, m);
+                return stdx::cv_status::no_timeout;
+            }
+            return getServiceContext()->getPreciseClockSource()->waitForConditionUntil(
+                cv, m, deadline, _baton.get());
+        }();
 
-    if (opHasDeadline && waitStatus == stdx::cv_status::timeout && deadline == getDeadline()) {
-        // It's possible that the system clock used in stdx::condition_variable::wait_until
-        // is slightly ahead of the FastClock used in checkForInterrupt. In this case,
-        // we treat the operation as though it has exceeded its time limit, just as if the
-        // FastClock and system clock had agreed.
-        if (!_hasArtificialDeadline) {
-            interruptible_detail::doWithoutLock(m, [&] { markKilled(_timeoutError); });
+        if (opHasDeadline && waitStatus == stdx::cv_status::timeout && deadline == getDeadline()) {
+            // It's possible that the system clock used in stdx::condition_variable::wait_until
+            // is slightly ahead of the FastClock used in checkForInterrupt. In this case,
+            // we treat the operation as though it has exceeded its time limit, just as if the
+            // FastClock and system clock had agreed.
+            if (!_hasArtificialDeadline) {
+                interruptible_detail::doWithoutLock(m, [&] { markKilled(_timeoutError); });
+            }
+            return Status(_timeoutError, "operation exceeded time limit");
         }
-        return Status(_timeoutError, "operation exceeded time limit");
+
+        return waitStatus;
+    } catch (const ExceptionFor<ErrorCodes::DurationOverflow>& ex) {
+        // Inside waitForConditionUntil() is a conversion from deadline's Date_t type to the system
+        // clock's time_point type. If the time_point's compiler-dependent resolution is higher
+        // than Date_t's milliseconds, it's possible for the conversion from Date_t to time_point
+        // to overflow and trigger an exception. We catch that here to maintain the noexcept
+        // contract.
+        return ex.toStatus();
     }
-
-    return waitStatus;
 }
 
 void OperationContext::markKilled(ErrorCodes::Error killCode) {
