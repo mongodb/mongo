@@ -50,6 +50,8 @@
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
@@ -3899,6 +3901,139 @@ TEST_F(TenantMigrationRecipientServiceTest,
     ASSERT_EQ(ErrorCodes::TenantMigrationForgotten,
               instance->getDataSyncCompletionFuture().getNoThrow().code());
     ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       RecipientDeletesExistingStateDocMarkedForGarbageCollection) {
+    FailPointEnableBlock createIndexesFailpointBlock("skipCreatingIndexDuringRebuildService");
+    stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+    auto beforeDeleteFp = globalFailPointRegistry().find(
+        "pauseTenantMigrationRecipientInstanceBeforeDeletingOldStateDoc");
+    auto initialTimesEntered = beforeDeleteFp->setMode(FailPoint::alwaysOn);
+    auto opCtx = makeOperationContext();
+
+    // Insert a state doc to simulate running a migration with an existing state doc NOT marked for
+    // garbage collection.
+    const std::string kTenantId = "tenantA";
+    const std::string kConnectionString = "donor-rs/localhost:12345";
+    const UUID existingMigrationId = UUID::gen();
+    TenantMigrationRecipientDocument previousStateDoc(
+        existingMigrationId,
+        kConnectionString,
+        kTenantId,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    previousStateDoc.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
+    previousStateDoc.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    // Starting a migration where the state is not 'kUninitialized' indicates that we are restarting
+    // from failover.
+    previousStateDoc.setState(TenantMigrationRecipientStateEnum::kStarted);
+    // Set the 'expireAt' field to indicate the migration is garbage collectable.
+    previousStateDoc.setExpireAt(opCtx->getServiceContext()->getFastClockSource()->now());
+
+    // Insert existing state document for the same tenant but different migration id.
+    uassertStatusOK(
+        tenantMigrationRecipientEntryHelpers::insertStateDoc(opCtx.get(), previousStateDoc));
+
+    // Create the tenant access blockers for the stateDoc with the associated tenantId and
+    // migrationId.
+    auto recipientMtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
+        opCtx->getServiceContext(), existingMigrationId);
+    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+        .add(kTenantId, recipientMtab);
+
+    const UUID migrationUUID = UUID::gen();
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        kConnectionString,
+        kTenantId,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+    initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+    ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
+
+    // We block and wait right before the service deletes the previous state document.
+    beforeDeleteFp->waitForTimesEntered(initialTimesEntered + 1);
+
+    // Delete state doc while we are expecting to delete it ourselves.
+    auto deleted = uassertStatusOK(
+        tenantMigrationRecipientEntryHelpers::deleteStateDocIfMarkedAsGarbageCollectable(
+            opCtx.get(), kTenantId));
+
+    // Successfully deletes the old state document before the service deletes it itself.
+    ASSERT_TRUE(deleted);
+
+    beforeDeleteFp->setMode(FailPoint::off);
+
+    // Wait for task completion. We should not get an error since the state doc was already deleted.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, RecipientFailsDueToOperationConflict) {
+    FailPointEnableBlock createIndexesFailpointBlock("skipCreatingIndexDuringRebuildService");
+    stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+
+    // Insert a state doc to simulate running a migration with an existing state doc NOT marked for
+    // garbage collection.
+    const std::string kTenantId = "tenantA";
+    const std::string kConnectionString = "donor-rs/localhost:12345";
+    const UUID existingMigrationId = UUID::gen();
+    TenantMigrationRecipientDocument previousStateDoc(
+        existingMigrationId,
+        kConnectionString,
+        kTenantId,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    previousStateDoc.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
+    previousStateDoc.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    // Starting a migration where the state is not 'kUninitialized' indicates that we are restarting
+    // from failover.
+    previousStateDoc.setState(TenantMigrationRecipientStateEnum::kStarted);
+
+    auto opCtx = makeOperationContext();
+
+    // Insert existing state document for the same tenant but different migration id
+    uassertStatusOK(
+        tenantMigrationRecipientEntryHelpers::insertStateDoc(opCtx.get(), previousStateDoc));
+
+    // Create the tenant access blockers for the stateDoc with the associated tenantId and
+    // migrationId.
+    auto recipientMtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
+        opCtx->getServiceContext(), existingMigrationId);
+    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+        .add(kTenantId, recipientMtab);
+
+    const UUID migrationUUID = UUID::gen();
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        kConnectionString,
+        kTenantId,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+    initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+    ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
+
+    // Since the previous state doc did not have expireAt set we will assert with
+    // ConflictingOperationInProgress.
+    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
+              instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_EQ(instance->getForgetMigrationDurableFuture().getNoThrow(),
+              ErrorCodes::ConflictingOperationInProgress);
 }
 
 #endif
