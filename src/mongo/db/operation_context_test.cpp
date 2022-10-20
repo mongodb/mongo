@@ -1063,16 +1063,19 @@ TEST_F(ThreadedOperationDeadlineTests, SleepForWithExpiredForDoesNotBlock) {
 }
 
 TEST(OperationContextTest, TestWaitForConditionOrInterruptUntilAPI) {
-    // `waitForConditionOrInterruptUntil` can have three outcomes:
+    // `waitForConditionOrInterruptUntil` can have four outcomes:
     //
     // 1) The condition is satisfied before any timeouts.
     // 2) The explicit `deadline` function argument is triggered.
     // 3) The operation context implicitly times out, or is interrupted from a killOp command or
     //    shutdown, etc.
+    // 4) The deadline supplied may overflow the conversion to the system clock's resolution, from
+    //    milliseconds to nanoseconds. This will not cancel the opCtx.
     //
     // Case (1) must return true.
     // Case (2) must return false.
-    // Case (3) must throw a DBException.
+    // Case (3) must throw a MaxTimeMSExpired DBException.
+    // Case (4) must throw a DurationOverflow DBException.
     //
     // Case (1) is the hardest to test. The condition variable must be notified by a second thread
     // when the client is waiting on it. Case (1) is also the least in need of having the API
@@ -1099,6 +1102,16 @@ TEST(OperationContextTest, TestWaitForConditionOrInterruptUntilAPI) {
         DBException,
         ErrorCodes::MaxTimeMSExpired);
     ASSERT_TRUE(opCtx->getCancellationToken().isCanceled());
+
+    // Case (4). Expect an error of 'DurationOverflow'.
+    auto secondClient = serviceCtx->makeClient("OperationContextTest");
+    auto secondOpCtx = secondClient->makeOperationContext();
+    deadline = Date_t::max() - Milliseconds(1);
+    ASSERT_THROWS_CODE(
+        secondOpCtx->waitForConditionOrInterruptUntil(cv, lk, deadline, [] { return false; }),
+        DBException,
+        ErrorCodes::DurationOverflow);
+    ASSERT_FALSE(secondOpCtx->getCancellationToken().isCanceled());
 }
 
 TEST(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {
