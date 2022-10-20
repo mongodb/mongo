@@ -119,16 +119,17 @@ void removeExpiredDocuments(Client* client) {
             // to remove.
             auto purgingJobMetadata =
                 ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
-                    opCtx.get(),
-                    &*changeCollection,
-                    currentWallTime - Seconds(*expiredAfterSeconds));
+                    opCtx.get(), &*changeCollection);
             if (!purgingJobMetadata) {
                 continue;
             }
 
             removedCount +=
                 ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocuments(
-                    opCtx.get(), &*changeCollection, purgingJobMetadata->maxRecordIdBound);
+                    opCtx.get(),
+                    &*changeCollection,
+                    purgingJobMetadata->maxRecordIdBound,
+                    currentWallTime - Seconds(*expiredAfterSeconds));
             changeCollectionManager.getPurgingJobStats().scannedCollections.fetchAndAddRelaxed(1);
             maxStartWallTime =
                 std::max(maxStartWallTime, purgingJobMetadata->firstDocWallTimeMillis);

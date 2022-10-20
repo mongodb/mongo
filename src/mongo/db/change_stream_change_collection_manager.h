@@ -43,7 +43,7 @@ struct ChangeCollectionPurgingJobMetadata {
     // The wall time in milliseconds of the first document of the change collection.
     long long firstDocWallTimeMillis;
 
-    // The maximum record id beyond which the change collection documents will be not deleted.
+    // Current maximum record id present in the change collection.
     RecordIdBound maxRecordIdBound;
 };
 
@@ -157,31 +157,22 @@ public:
     }
 
     /**
-     * Forward-scans the given change collection to return the wall time of the first document as
-     * well as recordId of the last, non-terminal document having the wall time less than the
-     * 'expirationTime'. Returns 'boost::none' if the collection is empty, or there are no expired
-     * documents, or the collection contains a single expired document.
-     */
-
-    /**
-     * Forward scans the provided change collection and returns its metadata that will be used by
-     * the purging job to perform deletion on it. The method returns 'boost::none' if either the
-     * collection is empty, or there are no expired documents, or the collection contains a single
-     * expired document.
+     * Scans the provided change collection and returns its metadata that will be used by the
+     * purging job to perform deletion on it. The method returns 'boost::none' if the collection is
+     * empty.
      */
     static boost::optional<ChangeCollectionPurgingJobMetadata>
     getChangeCollectionPurgingJobMetadata(OperationContext* opCtx,
-                                          const CollectionPtr* changeCollection,
-                                          const Date_t& expirationTime);
+                                          const CollectionPtr* changeCollection);
 
-    /**
-     * Removes expired documents from the change collection for the provided 'tenantId'. A document
-     * whose retention time is less than the 'expirationTime' is deleted.
-     * Returns wall time of the first document as well as number of documents deleted.
+    /** Removes documents from a change collection whose wall time is less than the
+     * 'expirationTime'. Returns the number of documents deleted. The 'maxRecordIdBound' is the
+     * maximum record id bound that will not be included in the collection scan.
      */
     static size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
                                                           const CollectionPtr* changeCollection,
-                                                          const RecordIdBound& maxRecordIdBound);
+                                                          RecordIdBound maxRecordIdBound,
+                                                          Date_t expirationTime);
 
 private:
     // Change collections purging job stats.

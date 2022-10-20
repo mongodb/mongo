@@ -123,7 +123,7 @@ protected:
 
     size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
                                                    boost::optional<TenantId> tenantId,
-                                                   const Date_t& expirationTime) {
+                                                   Date_t expirationTime) {
         // Acquire intent-exclusive lock on the change collection. Early exit if the collection
         // doesn't exist.
         const auto changeCollection =
@@ -132,10 +132,10 @@ protected:
         // Get the 'maxRecordIdBound' and perform the removal of the expired documents.
         const auto maxRecordIdBound =
             ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
-                opCtx, &*changeCollection, expirationTime)
+                opCtx, &*changeCollection)
                 ->maxRecordIdBound;
         return ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocuments(
-            opCtx, &*changeCollection, maxRecordIdBound);
+            opCtx, &*changeCollection, maxRecordIdBound, expirationTime);
     }
 
     const TenantId _tenantId;
@@ -160,8 +160,8 @@ TEST_F(ChangeCollectionExpiredChangeRemoverTest, VerifyLastExpiredDocument) {
         auto doc = BSON("_id" << i);
         insertDocumentToChangeCollection(opCtx, _tenantId, doc);
 
-        // Store the last expired document and it's wallTime.
-        if (i == 50) {
+        // Store the last document and it's wallTime.
+        if (i == 99) {
             lastExpiredDocument = doc;
             expirationTime = now();
         }
@@ -174,7 +174,7 @@ TEST_F(ChangeCollectionExpiredChangeRemoverTest, VerifyLastExpiredDocument) {
 
     auto maxExpiredRecordId =
         ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
-            opCtx, &*changeCollection, expirationTime)
+            opCtx, &*changeCollection)
             ->maxRecordIdBound;
 
     // Get the document found at 'maxExpiredRecordId' and test it against 'lastExpiredDocument'.
