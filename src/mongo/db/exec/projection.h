@@ -147,9 +147,8 @@ private:
 };
 
 /**
- * This class is used when we expect an object and the following rules are met: the projection
- * consists only of inclusions e.g. '{field: 1}', it has no $meta projections, it is not a returnKey
- * projection and it has no dotted fields.
+ * This class is used when we expect an object and the following rules are met: it has no $meta
+ * projections, it is not a returnKey projection and it has no dotted fields.
  */
 class ProjectionStageSimple final : public ProjectionStage {
 public:
@@ -169,8 +168,8 @@ public:
 private:
     void transform(WorkingSetMember* member) const final;
 
-    // Has the field names present in the simple projection.
-    stdx::unordered_set<std::string> _includedFields;
+    const projection_ast::ProjectType _projectType;
+    FieldSet _fields;
 };
 
 }  // namespace mongo

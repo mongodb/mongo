@@ -421,6 +421,7 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(const CanonicalQuery& query
     // its generic nature. We will attempt to avoid that for some "fast paths" first.
     // All fast paths can only apply to "simple" projections - see the implementation for details.
     if (projection.isSimple()) {
+        const bool isInclusionOnly = projection.isInclusionOnly();
         // First fast path: We have a COLUMN_SCAN providing the data, there are no computed
         // expressions, and the requested fields are provided exactly. For 'simple' projections
         // which must have only top-level fields, A COLUMN_SCAN can provide data in a format safe to
@@ -428,7 +429,7 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(const CanonicalQuery& query
         // outputting exactly the set of fields that the user required. This may not be the case all
         // the time if say we needed an extra field for a sort or for shard filtering.
         const auto* columnScan = treeSourceIsColumnScan(solnRoot.get());
-        if (columnScan &&
+        if (columnScan && isInclusionOnly &&
             columnScan->outputFields.size() == projection.getRequiredFields().size() &&
             // TODO SERVER-64258 once filtering is supported we should be able to have meaningful
             // support for matched but not output fields. Until then, any match fields are treated
@@ -449,15 +450,18 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(const CanonicalQuery& query
                 addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
                 *query.root(),
                 projection);
-        } else if (auto coveredKeyObj = produceCoveredKeyObj(solnRoot.get());
-                   !coveredKeyObj.isEmpty()) {
-            // Final fast path: ProjectionNodeCovered for plans with an index scan that the
-            // projection can cover.
-            return std::make_unique<ProjectionNodeCovered>(
-                addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
-                *query.root(),
-                projection,
-                std::move(coveredKeyObj));
+        }
+        if (isInclusionOnly) {
+            auto coveredKeyObj = produceCoveredKeyObj(solnRoot.get());
+            if (!coveredKeyObj.isEmpty()) {
+                // Final fast path: ProjectionNodeCovered for plans with an index scan that the
+                // projection can cover.
+                return std::make_unique<ProjectionNodeCovered>(
+                    addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
+                    *query.root(),
+                    projection,
+                    std::move(coveredKeyObj));
+            }
         }
     }
 

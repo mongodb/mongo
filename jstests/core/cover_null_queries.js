@@ -3,7 +3,7 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   requires_non_retryable_writes,
- *   requires_fcv_52
+ *   requires_fcv_62,
  * ]
  */
 (function() {
@@ -201,7 +201,7 @@ validateFindCmdOutputAndPlan({
     filter: {a: null},
     projection: {a: 0, b: 0},
     expectedOutput: [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_DEFAULT": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 
 // Verify find({a: null}, {_id: 1, b: 1}) is not covered by an index so we still have a FETCH stage.

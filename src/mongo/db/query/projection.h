@@ -48,8 +48,10 @@ struct ProjectionDependencies {
     bool hasExpressions = false;
     bool containsElemMatch = false;
 
-    // Which fields are necessary to perform the projection, or boost::none if all are required.
-    boost::optional<OrderedPathSet> requiredFields;
+    // If inclusion projection, contains field paths that are necessary to perform the projection,
+    // or boost::none if all are required. If exclusion projection, contains field paths that are
+    // explicitly excluded.
+    boost::optional<OrderedPathSet> paths;
 
     bool hasDottedPath = false;
 
@@ -97,7 +99,12 @@ public:
      */
     const OrderedPathSet& getRequiredFields() const {
         invariant(_type == ProjectType::kInclusion);
-        return *_deps.requiredFields;
+        return *_deps.paths;
+    }
+
+    const OrderedPathSet& getExcludedPaths() const {
+        invariant(_type == ProjectType::kExclusion);
+        return *_deps.paths;
     }
 
     const QueryMetadataBitSet& metadataDeps() const {
@@ -112,13 +119,13 @@ public:
     bool isFieldRetainedExactly(StringData path) const;
 
     /**
-     * A projection is considered "simple" if it doesn't require the full document, operates only
-     * on top-level fields, has no positional projection or expressions, and doesn't require
-     * metadata.
+     * A projection is considered "simple" if it operates only on top-level fields,
+     * has no positional projection or expressions, and doesn't require metadata.
+     * Both exclusion and inclusion projections can be simple.
      */
     bool isSimple() const {
         return !_deps.hasDottedPath && !_deps.requiresMatchDetails &&
-            !_deps.metadataRequested.any() && !_deps.requiresDocument && !_deps.hasExpressions;
+            !_deps.metadataRequested.any() && !_deps.hasExpressions;
     }
 
     /**

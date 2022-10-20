@@ -1739,12 +1739,22 @@ SlotBasedStageBuilder::buildProjectionSimple(const QuerySolutionNode* root,
 
     const auto childResult = outputs.get(kResult);
 
+    sbe::MakeBsonObjStage::FieldBehavior behaviour;
+    const OrderedPathSet* fields;
+    if (pn->proj.type() == projection_ast::ProjectType::kInclusion) {
+        behaviour = sbe::MakeBsonObjStage::FieldBehavior::keep;
+        fields = &pn->proj.getRequiredFields();
+    } else {
+        behaviour = sbe::MakeBsonObjStage::FieldBehavior::drop;
+        fields = &pn->proj.getExcludedPaths();
+    }
+
     outputs.set(kResult, _slotIdGenerator.generate());
     inputStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(inputStage),
                                                    outputs.get(kResult),
                                                    childResult,
-                                                   sbe::MakeBsonObjStage::FieldBehavior::keep,
-                                                   pn->proj.getRequiredFields(),
+                                                   behaviour,
+                                                   *fields,
                                                    OrderedPathSet{},
                                                    sbe::value::SlotVector{},
                                                    true,

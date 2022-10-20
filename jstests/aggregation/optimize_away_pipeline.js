@@ -690,13 +690,11 @@ projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
 assert.neq(null, projStage, explain);
 assertTransformByShape({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
 
-// Test that an exclusion projection at the front of the pipeline is not pushed down, if there no
+// Test that an exclusion projection at the front of the pipeline is pushed down if there is no
 // finite dependency set.
 pipeline = [{$project: {x: 0}}];
-assertPipelineUsesAggregation({pipeline: pipeline, expectedStages: ["COLLSCAN"]});
-explain = coll.explain().aggregate(pipeline);
-assert(!planHasStage(db, explain, "PROJECTION_SIMPLE"), explain);
-assert(!planHasStage(db, explain, "PROJECTION_DEFAULT"), explain);
+assertPipelineDoesNotUseAggregation(
+    {pipeline: pipeline, expectedStages: ["PROJECTION_SIMPLE", "COLLSCAN"]});
 
 // Test that a computed projection at the front of the pipeline is pushed down, even if there's no
 // finite dependency set.

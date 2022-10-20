@@ -2,6 +2,10 @@
 // changes.
 //
 // This is designed as a regression test for SERVER-37791.
+// @tags: [
+//   do_not_wrap_aggregations_in_facets,
+//   requires_fcv_62,
+// ]
 (function() {
 "use strict";
 
@@ -13,13 +17,14 @@ assert.commandWorked(coll.insert({_id: 2, c: 1}));
 assert.commandWorked(coll.insert({_id: 3, y: 1, z: 1}));
 
 // We expect $addFields to retain the position of pre-existing fields, and then append new fields in
-// the order that they are specified in the query. This rule should not be impacted by the presence
-// of a preceding exclusion projection.
+// the order that they are specified in the query. This rule should not be impacted by exclusion
+// projection on non-existent fields. However, depending on projection implementation, excluding a
+// field that already exists can affect $addFields behaviour: an excluded field can be put in
+// the original place or appended to the end of the document.
 assert.eq(
     [
         {_id: 1, x: 3, y: 4, b: 5, c: 6, a: 7},
-        // Here "c" retains the position that it had prior to being excluded.
-        {_id: 2, c: 6, x: 3, y: 4, b: 5, a: 7},
+        {_id: 2, x: 3, y: 4, b: 5, c: 6, a: 7},
         {_id: 3, y: 4, z: 1, x: 3, b: 5, c: 6, a: 7}
     ],
     coll.aggregate([

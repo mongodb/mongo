@@ -47,6 +47,7 @@
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/multi_iterator.h"
 #include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sample_from_timeseries_bucket.h"
 #include "mongo/db/exec/shard_filter.h"
@@ -408,6 +409,48 @@ std::pair<DocumentSourceSample*, DocumentSourceInternalUnpackBucket*> extractSam
     }
 
     return std::pair{sampleStage, unpackStage};
+}
+
+bool areSortFieldsModifiedByEventProjection(const SortPattern& sortPattern,
+                                            const DocumentSource::GetModPathsReturn& modPaths) {
+    return std::any_of(sortPattern.begin(), sortPattern.end(), [&](const auto& sortPatternPart) {
+        const auto& fieldPath = sortPatternPart.fieldPath;
+        return !fieldPath || modPaths.canModify(*fieldPath);
+    });
+}
+
+bool areSortFieldsModifiedByBucketProjection(const SortPattern& sortPattern,
+                                             const DocumentSource::GetModPathsReturn& modPaths) {
+    // The time field maps to control.min.[time], control.max.[time], or
+    // _id, and $_internalUnpackBucket assumes that all of those fields are
+    // preserved. (We never push down a stage that would overwrite them.)
+
+    // Each field [meta].a.b.c maps to 'meta.a.b.c'.
+    auto rename = [&](const FieldPath& eventField) -> FieldPath {
+        if (eventField.getPathLength() == 1)
+            return timeseries::kBucketMetaFieldName;
+        return FieldPath{timeseries::kBucketMetaFieldName}.concat(eventField.tail());
+    };
+
+    return std::any_of(sortPattern.begin(),
+                       // Skip the last field, which is time: only check the meta fields
+                       std::prev(sortPattern.end()),
+                       [&](const auto& sortPatternPart) {
+                           auto bucketFieldPath = rename(*sortPatternPart.fieldPath);
+                           return modPaths.canModify(bucketFieldPath);
+                       });
+}
+
+bool areSortFieldsModifiedByProjection(bool seenUnpack,
+                                       const SortPattern& sortPattern,
+                                       const DocumentSource::GetModPathsReturn& modPaths) {
+    if (seenUnpack) {
+        // This stage operates on events: check the event-level field names.
+        return areSortFieldsModifiedByEventProjection(sortPattern, modPaths);
+    } else {
+        // This stage operates on buckets: check the bucket-level field names.
+        return areSortFieldsModifiedByBucketProjection(sortPattern, modPaths);
+    }
 }
 
 std::tuple<DocumentSourceInternalUnpackBucket*, DocumentSourceSort*> findUnpackThenSort(
@@ -862,16 +905,21 @@ SkipThenLimit extractSkipAndLimitForPushdown(Pipeline* pipeline) {
  *       as is.
  *    2. If there is no inclusion projection at the front of the pipeline, but there is a finite
  *       dependency set, a projection representing this dependency set will be pushed down.
- *    3. Otherwise, an empty projection is returned and no projection push down will happen.
+ *    3. If there is an exclusion projection at the front of the pipeline, it will be pushed down.
+ *    4. Otherwise, an empty projection is returned and no projection push down will happen.
  *
  * If 'allowExpressions' is true, the returned projection may include expressions (which can only
  * happen in case 1). If 'allowExpressions' is false and the projection we find has expressions,
  * then we fall through to case 2 and attempt to push down a pure-inclusion projection based on its
  * dependencies.
+ *
+ * If 'timeseriesBoundedSortOptimization' is true, an exclusion projection won't be pushed down,
+ * because it breaks PlanExecutorImpl analysis required to enable this optimization.
  */
 auto buildProjectionForPushdown(const DepsTracker& deps,
                                 Pipeline* pipeline,
-                                bool allowExpressions) {
+                                bool allowExpressions,
+                                bool timeseriesBoundedSortOptimization) {
     auto&& sources = pipeline->getSources();
 
     // Short-circuit if the pipeline is empty: there is no projection and nothing to push down.
@@ -879,30 +927,49 @@ auto buildProjectionForPushdown(const DepsTracker& deps,
         return BSONObj();
     }
 
-    if (const auto projStage =
-            exact_pointer_cast<DocumentSourceSingleDocumentTransformation*>(sources.front().get());
-        projStage) {
-        if (projStage->getType() == TransformerInterface::TransformerType::kInclusionProjection) {
-            auto projObj =
-                projStage->getTransformer().serializeTransformation(boost::none).toBson();
-            auto projAst =
-                projection_ast::parseAndAnalyze(projStage->getContext(),
-                                                projObj,
-                                                ProjectionPolicies::aggregateProjectionPolicies());
-            if (!projAst.hasExpressions() || allowExpressions) {
-                // If there is an inclusion projection at the front of the pipeline, we have case 1.
-                sources.pop_front();
-                return projObj;
-            }
+    const auto projStage =
+        exact_pointer_cast<DocumentSourceSingleDocumentTransformation*>(sources.front().get());
+    const auto getProjectionObj = [&]() {
+        return projStage->getTransformer().serializeTransformation(boost::none).toBson();
+    };
+    const auto parseProjection = [&](const BSONObj& projObj) {
+        return projection_ast::parseAndAnalyze(
+            projStage->getContext(), projObj, ProjectionPolicies::aggregateProjectionPolicies());
+    };
+
+    // If there is an inclusion projection at the front of the pipeline, we have case 1.
+    if (projStage &&
+        projStage->getType() == TransformerInterface::TransformerType::kInclusionProjection) {
+        auto projObj = getProjectionObj();
+        if (allowExpressions || !parseProjection(projObj).hasExpressions()) {
+            sources.pop_front();
+            return projObj;
         }
     }
 
-    // Depending of whether there is a finite dependency set, either return a projection
-    // representing this dependency set, or an empty BSON, meaning no projection push down will
-    // happen. This covers cases 2 and 3.
-    if (deps.getNeedsAnyMetadata())
-        return BSONObj();
-    return deps.toProjectionWithoutMetadata();
+    // If there is a finite dependency set, return a projection representing this dependency set.
+    // This is case 2.
+    if (!deps.getNeedsAnyMetadata()) {
+        BSONObj depsProjObj = deps.toProjectionWithoutMetadata();
+        if (!depsProjObj.isEmpty()) {
+            return depsProjObj;
+        }
+    }
+
+    // If there is an exclusion projection at the front of the pipeline, we have case 3.
+    if (projStage &&
+        projStage->getType() == TransformerInterface::TransformerType::kExclusionProjection &&
+        // TODO SERVER-70655: Remove this check and argument when it is no longer needed.
+        !timeseriesBoundedSortOptimization) {
+        auto projObj = getProjectionObj();
+        if (allowExpressions || !parseProjection(projObj).hasExpressions()) {
+            sources.pop_front();
+            return projObj;
+        }
+    }
+
+    // Case 4: no projection to push down
+    return BSONObj();
 }
 }  // namespace
 
@@ -1209,11 +1276,13 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
     // If this is a query on a time-series collection then it may be eligible for a post-planning
     // sort optimization. We check eligibility and perform the rewrite here.
     auto [unpack, sort] = findUnpackThenSort(pipeline->_sources);
-    QueryPlannerParams plannerOpts;
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+    const bool timeseriesBoundedSortOptimization =
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         feature_flags::gFeatureFlagBucketUnpackWithSort.isEnabled(
             serverGlobalParams.featureCompatibility) &&
-        unpack && sort) {
+        unpack && sort;
+    QueryPlannerParams plannerOpts;
+    if (timeseriesBoundedSortOptimization) {
         plannerOpts.traversalPreference = createTimeSeriesTraversalPreference(unpack, sort);
     }
 
@@ -1231,14 +1300,12 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
                                                 aggRequest,
                                                 Pipeline::kAllowedMatcherFeatures,
                                                 &shouldProduceEmptyDocs,
+                                                timeseriesBoundedSortOptimization,
                                                 std::move(plannerOpts)));
 
     // If this is a query on a time-series collection then it may be eligible for a post-planning
     // sort optimization. We check eligibility and perform the rewrite here.
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gFeatureFlagBucketUnpackWithSort.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
-        unpack && sort) {
+    if (timeseriesBoundedSortOptimization) {
         auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
         if (execImpl) {
             // Get source stage
@@ -1330,45 +1397,8 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
                                    dynamic_cast<const DocumentSourceSingleDocumentTransformation*>(
                                        iter->get())) {
                         auto modPaths = projection->getModifiedPaths();
-
-                        // Check to see if the sort paths are modified.
-                        if (seenUnpack) {
-                            // This stage operates on events: check the event-level field names.
-                            for (auto sortIter = sortPattern.begin();
-                                 !badStage && sortIter != sortPattern.end();
-                                 ++sortIter) {
-
-                                auto fieldPath = sortIter->fieldPath;
-                                // If they are then escape the loop & don't optimize.
-                                if (!fieldPath || modPaths.canModify(*fieldPath)) {
-                                    badStage = true;
-                                }
-                            }
-                        } else {
-                            // This stage operates on buckets: check the bucket-level field names.
-
-                            // The time field maps to control.min.[time], control.max.[time], or
-                            // _id, and $_internalUnpackBucket assumes that all of those fields are
-                            // preserved. (We never push down a stage that would overwrite them.)
-
-                            // Each field [meta].a.b.c maps to 'meta.a.b.c'.
-                            auto rename = [&](const FieldPath& eventField) -> FieldPath {
-                                if (eventField.getPathLength() == 1)
-                                    return timeseries::kBucketMetaFieldName;
-                                return FieldPath{timeseries::kBucketMetaFieldName}.concat(
-                                    eventField.tail());
-                            };
-
-                            for (auto sortIter = sortPattern.begin(),
-                                      // Skip the last field, which is time: only check the meta
-                                      // fields.
-                                 end = std::prev(sortPattern.end());
-                                 !badStage && sortIter != end;
-                                 ++sortIter) {
-                                auto bucketFieldPath = rename(*sortIter->fieldPath);
-                                if (modPaths.canModify(bucketFieldPath))
-                                    badStage = true;
-                            }
+                        if (areSortFieldsModifiedByProjection(seenUnpack, sortPattern, modPaths)) {
+                            badStage = true;
                         }
                     } else {
                         badStage = true;
@@ -1529,7 +1559,8 @@ PipelineD::buildInnerQueryExecutorGeoNear(const MultipleCollectionAccessor& coll
                         SkipThenLimit{boost::none, boost::none},
                         aggRequest,
                         Pipeline::kGeoNearMatcherFeatures,
-                        &shouldProduceEmptyDocs));
+                        &shouldProduceEmptyDocs,
+                        false /* timeseriesBoundedSortOptimization */));
 
     auto attachExecutorCallback = [distanceField = geoNearStage->getDistanceField(),
                                    locationField = geoNearStage->getLocationField(),
@@ -1564,6 +1595,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     const AggregateCommandRequest* aggRequest,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     bool* hasNoRequirements,
+    bool timeseriesBoundedSortOptimization,
     QueryPlannerParams plannerOpts) {
     invariant(hasNoRequirements);
 
@@ -1635,7 +1667,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         // documents that the sort/skip/limit would have filtered out. (The sort stage can be a
         // top-k sort, which both sorts and limits.)
         bool allowExpressions = !sortStage && !skipThenLimit.getSkip() && !skipThenLimit.getLimit();
-        projObj = buildProjectionForPushdown(deps, pipeline, allowExpressions);
+        projObj = buildProjectionForPushdown(
+            deps, pipeline, allowExpressions, timeseriesBoundedSortOptimization);
         plannerOpts.options |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
 

@@ -220,7 +220,7 @@ ProjectionStageCovered::ProjectionStageCovered(ExpressionContext* expCtx,
                                                const BSONObj& coveredKeyObj)
     : ProjectionStage{expCtx, projObj, ws, std::move(child), "PROJECTION_COVERED"},
       _coveredKeyObj{coveredKeyObj} {
-    invariant(projection->isSimple());
+    invariant(projection->isSimple() && projection->isInclusionOnly());
 
     // If we're pulling data out of one index we can pre-compute the indices of the fields
     // in the key that we pull data from and avoid looking up the field name each time.
@@ -273,10 +273,14 @@ ProjectionStageSimple::ProjectionStageSimple(ExpressionContext* expCtx,
                                              const projection_ast::Projection* projection,
                                              WorkingSet* ws,
                                              std::unique_ptr<PlanStage> child)
-    : ProjectionStage{expCtx, projObj, ws, std::move(child), "PROJECTION_SIMPLE"} {
+    : ProjectionStage{expCtx, projObj, ws, std::move(child), "PROJECTION_SIMPLE"},
+      _projectType(projection->type()) {
     invariant(projection->isSimple());
-    _includedFields = {projection->getRequiredFields().begin(),
-                       projection->getRequiredFields().end()};
+    if (_projectType == projection_ast::ProjectType::kInclusion) {
+        _fields = {projection->getRequiredFields().begin(), projection->getRequiredFields().end()};
+    } else {
+        _fields = {projection->getExcludedPaths().begin(), projection->getExcludedPaths().end()};
+    }
 }
 
 void ProjectionStageSimple::transform(WorkingSetMember* member) const {
@@ -285,17 +289,28 @@ void ProjectionStageSimple::transform(WorkingSetMember* member) const {
     // If we got here because of SIMPLE_DOC the planner shouldn't have messed up.
     invariant(member->hasObj());
 
-    // Apply the SIMPLE_DOC projection.
-    // Look at every field in the source document and see if we're including it.
+    // Apply the SIMPLE_DOC projection: look at every top level field in the source document and
+    // see if we should keep it.
     auto objToProject = member->doc.value().toBson();
-    auto nFieldsNeeded = _includedFields.size();
-    for (auto&& elt : objToProject) {
-        auto fieldName{elt.fieldNameStringData()};
-        absl::string_view fieldNameKey{fieldName.rawData(), fieldName.size()};
-        if (auto fieldIt = _includedFields.find(fieldNameKey); _includedFields.end() != fieldIt) {
-            bob.append(elt);
-            if (--nFieldsNeeded == 0) {
-                break;
+    auto nFieldsLeft = _fields.size();
+
+    if (_projectType == projection_ast::ProjectType::kInclusion) {
+        for (auto&& elt : objToProject) {
+            auto fieldName{elt.fieldNameStringData()};
+            if (_fields.count(fieldName) > 0) {
+                bob.append(elt);
+                if (--nFieldsLeft == 0) {
+                    break;
+                }
+            }
+        }
+    } else {
+        for (auto&& elt : objToProject) {
+            auto fieldName{elt.fieldNameStringData()};
+            if (nFieldsLeft == 0 || _fields.count(fieldName) == 0) {
+                bob.append(elt);
+            } else {
+                --nFieldsLeft;
             }
         }
     }

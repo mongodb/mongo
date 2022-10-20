@@ -46,9 +46,14 @@ namespace {
  */
 struct DepsAnalysisData {
     DepsTracker fieldDependencyTracker;
+    OrderedPathSet excludedPaths;
 
-    void addRequiredField(const std::string& fieldName) {
-        fieldDependencyTracker.fields.insert(fieldName);
+    void addRequiredField(std::string fieldName) {
+        fieldDependencyTracker.fields.insert(std::move(fieldName));
+    }
+
+    void addExcludedPath(std::string path) {
+        excludedPaths.insert(std::move(path));
     }
 
     OrderedPathSet requiredFields() const {
@@ -172,6 +177,8 @@ public:
         // For inclusions, we depend on the field.
         if (node->value()) {
             addFullPathAsDependency();
+        } else {
+            _context->data().addExcludedPath(_context->fullPath().fullPath());
         }
     }
 
@@ -206,10 +213,11 @@ auto analyzeProjection(const ProjectionPathASTNode* root, ProjectType type) {
     const auto& tracker = userData.fieldDependencyTracker;
 
     if (type == ProjectType::kInclusion) {
-        deps.requiredFields = userData.requiredFields();
+        deps.paths = userData.requiredFields();
     } else {
         invariant(type == ProjectType::kExclusion);
         deps.requiresDocument = true;
+        deps.paths = std::move(userData.excludedPaths);
     }
 
     deps.metadataRequested = tracker.metadataDeps();
