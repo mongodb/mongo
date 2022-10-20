@@ -132,6 +132,12 @@ database_operation::checkpoint_operation(thread_worker *tc)
 
     while (tc->running()) {
         tc->sleep();
+        /*
+         * This may seem like noise but it can prevent the test being killed by the evergreen
+         * timeout.
+         */
+        logger::log_msg(LOG_INFO,
+          type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} taking a checkpoint.");
         testutil_check(tc->session->checkpoint(tc->session.get(), nullptr));
     }
 }
