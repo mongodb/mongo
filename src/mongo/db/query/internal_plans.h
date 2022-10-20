@@ -83,7 +83,8 @@ public:
         boost::optional<RecordIdBound> minRecord = boost::none,
         boost::optional<RecordIdBound> maxRecord = boost::none,
         CollectionScanParams::ScanBoundInclusion boundInclusion =
-            CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords);
+            CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
+        bool shouldReturnEofOnFilterMismatch = false);
 
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> collectionScan(
         OperationContext* opCtx,
@@ -104,7 +105,9 @@ public:
         boost::optional<RecordIdBound> maxRecord = boost::none,
         CollectionScanParams::ScanBoundInclusion boundInclusion =
             CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
-        boost::optional<std::unique_ptr<BatchedDeleteStageBatchParams>> batchParams = boost::none);
+        std::unique_ptr<BatchedDeleteStageBatchParams> batchedDeleteParams = nullptr,
+        const MatchExpression* filter = nullptr,
+        bool shouldReturnEofOnFilterMismatch = false);
 
     /**
      * Returns an index scan.  Caller owns returned pointer.
@@ -197,7 +200,8 @@ private:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         WorkingSet* ws,
         const CollectionPtr* collection,
-        const CollectionScanParams& params);
+        const CollectionScanParams& params,
+        const MatchExpression* filter = nullptr);
 
     /**
      * Returns a plan stage that is either an index scan or an index scan with a fetch stage.

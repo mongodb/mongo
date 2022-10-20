@@ -111,6 +111,10 @@ struct CollectionScanParams {
 
     // Whether or not to wait for oplog visibility on oplog collection scans.
     bool shouldWaitForOplogVisibility = false;
+
+    // Whether or not to return EOF and stop further scanning once MatchExpression evaluates to
+    // false. Can only be set to true if the MatchExpression is present.
+    bool shouldReturnEofOnFilterMismatch = false;
 };
 
 }  // namespace mongo
