@@ -421,6 +421,10 @@ public:
         return false;
     }
 
+    bool isPartOfAuthHandshake() const final {
+        return true;
+    }
+
 } cmdAuthenticate;
 
 }  // namespace

@@ -20,6 +20,23 @@ env.Library(
 )
 
 env.Library(
+    target='session_auth_metrics',
+    source=[
+        'session_auth_metrics.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/util/clock_sources',
+        'transport_layer_common',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/server_feature_flags',
+    ],
+)
+
+env.Library(
     target='transport_layer_mock',
     source=[
         'transport_layer_mock.cpp',
@@ -136,8 +153,9 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/traffic_recorder',
-        '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
+        'message_compressor',
+        'session_auth_metrics',
     ],
 )
 

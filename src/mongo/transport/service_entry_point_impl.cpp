@@ -58,6 +58,7 @@
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/session_auth_metrics.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
@@ -292,6 +293,9 @@ void ServiceEntryPointImpl::configureServiceExecutorContext(ServiceContext::Uniq
 
 void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     invariant(session);
+
+    transport::SessionAuthMetrics::get(*session).onSessionStarted(_svcCtx->getFastClockSource());
+
     // Setup the restriction environment on the Session, if the Session has local/remote Sockaddrs
     const auto& remoteAddr = session->remoteAddr();
     const auto& localAddr = session->localAddr();

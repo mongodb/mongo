@@ -422,6 +422,13 @@ public:
         return false;
     }
 
+    /**
+     * Returns true if this command is part of the auth handshake conversation.
+     */
+    virtual bool isPartOfAuthHandshake() const {
+        return false;
+    }
+
     /*
      * Returns the list of API versions that include this command.
      */

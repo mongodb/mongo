@@ -51,6 +51,7 @@
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
@@ -102,6 +103,7 @@
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/session_auth_metrics.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
@@ -746,6 +748,9 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                       "Error loading read and write concern defaults at startup",
                       "error"_attr = redact(ex));
     }
+
+    CommandInvocationHooks::set(serviceContext,
+                                std::make_unique<transport::SessionAuthMetricsCommandHooks>());
 
     startMongoSFTDC();
 

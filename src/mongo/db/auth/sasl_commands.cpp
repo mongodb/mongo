@@ -96,6 +96,10 @@ public:
     bool requiresAuth() const override {
         return false;
     }
+
+    bool isPartOfAuthHandshake() const final {
+        return true;
+    }
 } cmdSaslStart;
 
 class CmdSaslContinue : public SaslContinueCmdVersion1Gen<CmdSaslContinue> {
@@ -129,6 +133,10 @@ public:
 
     bool requiresAuth() const final {
         return false;
+    }
+
+    bool isPartOfAuthHandshake() const final {
+        return true;
     }
 } cmdSaslContinue;
 

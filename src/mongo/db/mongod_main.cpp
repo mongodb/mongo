@@ -201,6 +201,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/session_auth_metrics.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
@@ -318,13 +319,40 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(Ini
 
 void initializeCommandHooks(ServiceContext* serviceContext) {
     class MongodCommandInvocationHooks final : public CommandInvocationHooks {
-        void onBeforeRun(OperationContext*, const OpMsgRequest&, CommandInvocation*) {}
+    public:
+        void onBeforeRun(OperationContext* opCtx,
+                         const OpMsgRequest& request,
+                         CommandInvocation* invocation) override {
+            _nextHook.onBeforeRun(opCtx, request, invocation);
+        }
 
-        void onAfterRun(OperationContext* opCtx, const OpMsgRequest&, CommandInvocation*) {
+        void onBeforeAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
+                              CommandInvocation* invocation) override {
+            _nextHook.onBeforeAsyncRun(rec, invocation);
+        }
+
+        void onAfterRun(OperationContext* opCtx,
+                        const OpMsgRequest& request,
+                        CommandInvocation* invocation) override {
+            _nextHook.onAfterRun(opCtx, request, invocation);
+            _onAfterRunImpl(opCtx);
+        }
+
+        void onAfterAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
+                             CommandInvocation* invocation) override {
+            _nextHook.onAfterAsyncRun(rec, invocation);
+            _onAfterRunImpl(rec->getOpCtx());
+        }
+
+    private:
+        void _onAfterRunImpl(OperationContext* opCtx) const {
             MirrorMaestro::tryMirrorRequest(opCtx);
             MirrorMaestro::onReceiveMirroredRead(opCtx);
         }
+
+        transport::SessionAuthMetricsCommandHooks _nextHook{};
     };
+
     CommandInvocationHooks::set(serviceContext, std::make_unique<MongodCommandInvocationHooks>());
 }
 

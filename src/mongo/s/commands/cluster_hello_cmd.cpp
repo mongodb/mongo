@@ -114,6 +114,10 @@ public:
         return false;
     }
 
+    bool isPartOfAuthHandshake() const final {
+        return true;
+    }
+
     bool runWithReplyBuilder(OperationContext* opCtx,
                              const DatabaseName& dbName,
                              const BSONObj& cmdObj,
