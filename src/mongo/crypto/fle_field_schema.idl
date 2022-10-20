@@ -91,6 +91,15 @@ enums:
             kInsert: 1
             kFind: 2
 
+    Fle2RangeOperator:
+      description: "Enum representing valid range operators that an encrypted payload can be under."
+      type: int
+      values:
+        kGt: 1
+        kGte: 2
+        kLt: 3
+        kLte: 4
+
 types:
   encrypted_numeric_element:
     bson_serialization_type:
@@ -317,10 +326,14 @@ structs:
             description: "Id of payload - must be paired with another payload"
             type: safeInt
             optional: false
-          operatorType:
-            description: "One of gt, lt, gte, lte"
-            type: string
+          firstOperator:
+            description: "First query operator for which this payload was generated."
+            type: Fle2RangeOperator
             optional: false
+          secondOperator:
+            description: "Second query operator for which this payload was generated. Only populated for two-sided ranges."
+            type: Fle2RangeOperator
+            optional: true
 
     EncryptionInformation:
         description: "Implements Encryption Information which includes the schema for Queryable Encryption that is consumed by query_analysis, queries and write_ops"
@@ -396,10 +409,14 @@ structs:
             description: "Id of payload - must be paired with another payload"
             type: safeInt
             optional: false
-          operatorType:
-            description: "One of gt, lt, gte, lte"
-            type: string
+          firstOperator:
+            description: "First query operator for which this payload was generated."
+            type: Fle2RangeOperator
             optional: false
+          secondOperator:
+            description: "Second query operator for which this payload was generated. Only populated for two-sided ranges."
+            type: Fle2RangeOperator
+            optional: true
 
     FLE2RangeInsertSpec:
         description: "Range insert specification that is encoded inside of a FLE2EncryptionPlaceholder."

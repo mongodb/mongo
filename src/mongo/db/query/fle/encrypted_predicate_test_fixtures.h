@@ -100,6 +100,14 @@ public:
                           static_cast<MatchExpression*>(expected.get())->serialize());
     }
 
+    template <typename T>
+    void assertRewriteForOp(const EncryptedPredicate& pred,
+                            BSONElement rhs,
+                            std::vector<PrfBlock> allTags) {
+        auto inputExpr = T("age", rhs);
+        assertRewriteToTags(pred, &inputExpr, toBSONArray(std::move(allTags)));
+    }
+
 protected:
     MockServerRewrite _mock{};
     ExpressionContextForTest _expCtx;

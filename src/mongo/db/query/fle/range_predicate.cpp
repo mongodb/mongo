@@ -34,6 +34,7 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tags.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression.h"
@@ -44,6 +45,12 @@ namespace mongo::fle {
 REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(BETWEEN,
                                                      RangePredicate,
                                                      gFeatureFlagFLE2Range);
+
+REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(GT, RangePredicate, gFeatureFlagFLE2Range);
+REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(GTE, RangePredicate, gFeatureFlagFLE2Range);
+REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(LT, RangePredicate, gFeatureFlagFLE2Range);
+REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(LTE, RangePredicate, gFeatureFlagFLE2Range);
+
 REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionBetween,
                                                    RangePredicate,
                                                    gFeatureFlagFLE2Range);
@@ -51,7 +58,8 @@ REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionBetween,
 std::vector<PrfBlock> RangePredicate::generateTags(BSONValue payload) const {
     auto parsedPayload = parseFindPayload<ParsedFindRangePayload>(payload);
     std::vector<PrfBlock> tags;
-    for (auto& edge : parsedPayload.edges) {
+    tassert(7030500, "Must generate tags from a non-stub payload.", !parsedPayload.isStub());
+    for (auto& edge : parsedPayload.edges.value()) {
         auto tagsForEdge = readTags(*_rewriter->getEscReader(),
                                     *_rewriter->getEccReader(),
                                     edge.esc,
@@ -67,6 +75,18 @@ std::vector<PrfBlock> RangePredicate::generateTags(BSONValue payload) const {
 
 std::unique_ptr<MatchExpression> RangePredicate::rewriteToTagDisjunction(
     MatchExpression* expr) const {
+    if (auto compExpr = dynamic_cast<ComparisonMatchExpression*>(expr)) {
+        auto payload = compExpr->getData();
+        if (!isPayload(payload)) {
+            return nullptr;
+        }
+        // If this is a stub expression, replace expression with $alwaysTrue.
+        if (isStub(payload)) {
+            return std::make_unique<AlwaysTrueMatchExpression>();
+        }
+        return makeTagDisjunction(toBSONArray(generateTags(payload)));
+    }
+
     tassert(6720900,
             "Range rewrite should only be called with $between operator.",
             expr->matchType() == MatchExpression::BETWEEN);
@@ -113,11 +133,14 @@ std::unique_ptr<ExpressionInternalFLEBetween> RangePredicate::fleBetweenFromPayl
 
 std::unique_ptr<ExpressionInternalFLEBetween> RangePredicate::fleBetweenFromPayload(
     boost::intrusive_ptr<Expression> fieldpath, ParsedFindRangePayload payload) const {
+    tassert(7030501,
+            "$internalFleBetween can only be generated from a non-stub payload.",
+            !payload.isStub());
     auto cm = payload.maxCounter;
     ServerDataEncryptionLevel1Token serverToken = std::move(payload.serverToken);
     std::vector<ConstDataRange> edcTokens;
-    std::transform(std::make_move_iterator(payload.edges.begin()),
-                   std::make_move_iterator(payload.edges.end()),
+    std::transform(std::make_move_iterator(payload.edges.value().begin()),
+                   std::make_move_iterator(payload.edges.value().end()),
                    std::back_inserter(edcTokens),
                    [](FLEFindEdgeTokenSet&& edge) { return edge.edc.toCDR(); });
 
@@ -128,8 +151,21 @@ std::unique_ptr<ExpressionInternalFLEBetween> RangePredicate::fleBetweenFromPayl
 
 std::unique_ptr<MatchExpression> RangePredicate::rewriteToRuntimeComparison(
     MatchExpression* expr) const {
-    auto between = static_cast<BetweenMatchExpression*>(expr);
-    auto ffp = between->rhs();
+    BSONElement ffp;
+    if (auto compExpr = dynamic_cast<ComparisonMatchExpression*>(expr)) {
+        auto payload = compExpr->getData();
+        if (!isPayload(payload)) {
+            return nullptr;
+        }
+        // If this is a stub expression, replace expression with $alwaysTrue.
+        if (isStub(payload)) {
+            return std::make_unique<AlwaysTrueMatchExpression>();
+        }
+        ffp = payload;
+    } else {
+        auto between = static_cast<BetweenMatchExpression*>(expr);
+        ffp = between->rhs();
+    }
 
     if (!isPayload(ffp)) {
         return nullptr;

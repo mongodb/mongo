@@ -50,6 +50,11 @@ protected:
         MatchExpression* expr) const override;
     std::unique_ptr<Expression> rewriteToRuntimeComparison(Expression* expr) const override;
 
+    virtual bool isStub(BSONElement elt) const {
+        auto parsedPayload = parseFindPayload<ParsedFindRangePayload>(elt);
+        return parsedPayload.isStub();
+    }
+
 private:
     EncryptedBinDataType encryptedBinDataType() const override {
         return EncryptedBinDataType::kFLE2FindRangePayload;

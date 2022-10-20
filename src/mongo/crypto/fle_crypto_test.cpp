@@ -773,8 +773,9 @@ std::vector<char> generatePlaceholder(
 
     findSpec.setEdgesInfo(edgesInfo);
 
-    // TODO: change in SERVER-70305
-    findSpec.setOperatorType(StringData("gt"));
+    // TODO: SERVER-70302 update query analysis to generate payloads in gt/lt pairs.
+    findSpec.setFirstOperator(Fle2RangeOperator::kGt);
+
     findSpec.setPayloadId(1234);
 
     auto findDoc = BSON("s" << findSpec.toBSON());
@@ -2598,8 +2599,8 @@ void assertMinCoverResult(A lb,
     FLE2RangeFindSpec spec;
     spec.setEdgesInfo(edgesInfo);
 
-    // TODO: change in SERVER-70305
-    spec.setOperatorType(StringData("gt"));
+    // TODO: SERVER-70302 update query analysis to generate payloads in gt/lt pairs.
+    spec.setFirstOperator(Fle2RangeOperator::kGt);
     spec.setPayloadId(1234);
 
     auto result = getMinCover(spec, sparsity);
@@ -3530,8 +3531,8 @@ DEATH_TEST_REGEX(MinCoverInterfaceTest, Error_MinMaxTypeMismatch, "Tripwire asse
     FLE2RangeFindSpec spec;
     spec.setEdgesInfo(edgesInfo);
 
-    // TODO: change in SERVER-70305
-    spec.setOperatorType(StringData("gt"));
+    // TODO: SERVER-70302 update query analysis to generate payloads in gt/lt pairs.
+    spec.setFirstOperator(Fle2RangeOperator::kGt);
     spec.setPayloadId(1234);
 
 

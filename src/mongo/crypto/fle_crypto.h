@@ -583,7 +583,8 @@ public:
     static FLE2FindRangePayload serializeFindRangePayload(FLEIndexKeyAndId indexKey,
                                                           FLEUserKeyAndId userKey,
                                                           const std::vector<std::string>& edges,
-                                                          uint64_t maxContentionFactor);
+                                                          uint64_t maxContentionFactor,
+                                                          const FLE2RangeFindSpec& spec);
 
     /**
      * Generates a client-side payload that is sent to the server.
@@ -1167,10 +1168,11 @@ struct FLEFindEdgeTokenSet {
 };
 
 struct ParsedFindRangePayload {
-    std::vector<FLEFindEdgeTokenSet> edges;
+    boost::optional<std::vector<FLEFindEdgeTokenSet>> edges;
     ServerDataEncryptionLevel1Token serverToken;
 
-    std::string operatorType;
+    Fle2RangeOperator firstOp;
+    boost::optional<Fle2RangeOperator> secondOp;
     std::int32_t payloadId;
 
     std::int64_t maxCounter;
@@ -1178,6 +1180,10 @@ struct ParsedFindRangePayload {
     explicit ParsedFindRangePayload(BSONElement fleFindRangePayload);
     explicit ParsedFindRangePayload(const Value& fleFindRangePayload);
     explicit ParsedFindRangePayload(ConstDataRange cdr);
+
+    bool isStub() {
+        return !edges.has_value();
+    }
 };
 
 

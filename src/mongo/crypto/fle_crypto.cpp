@@ -1160,7 +1160,7 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                 auto edges = getMinCover(rangeFindSpec, ep.getSparsity().value());
 
                 auto findpayload = FLEClientCrypto::serializeFindRangePayload(
-                    indexKey, userKey, edges, ep.getMaxContentionCounter());
+                    indexKey, userKey, edges, ep.getMaxContentionCounter(), rangeFindSpec);
 
                 toEncryptedBinData(fieldNameToSerialize,
                                    EncryptedBinDataType::kFLE2FindRangePayload,
@@ -2228,7 +2228,8 @@ FLE2FindRangePayload FLEClientCrypto::serializeFindRangePayload(
     FLEIndexKeyAndId indexKey,
     FLEUserKeyAndId userKey,
     const std::vector<std::string>& edges,
-    uint64_t maxContentionFactor) {
+    uint64_t maxContentionFactor,
+    const FLE2RangeFindSpec& spec) {
     auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
     auto serverToken =
         FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey.key);
@@ -2265,7 +2266,8 @@ FLE2FindRangePayload FLEClientCrypto::serializeFindRangePayload(
     edgesInfo.setServerEncryptionToken(serverToken.toCDR());
 
     payload.setPayload(edgesInfo);
-    payload.setOperatorType(StringData("$gt"));  // TODO: Change for SERVER-70305
+    payload.setFirstOperator(spec.getFirstOperator());
+    payload.setSecondOperator(spec.getSecondOperator());
     payload.setPayloadId(1234);
 
     return payload;
@@ -3225,14 +3227,20 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
             encryptedType == EncryptedBinDataType::kFLE2FindRangePayload);
 
     auto payload = parseFromCDR<FLE2FindRangePayload>(subCdr);
+    payloadId = payload.getPayloadId();
+    firstOp = payload.getFirstOperator();
+    secondOp = payload.getSecondOperator();
 
     if (!payload.getPayload()) {
         return;
     }
 
-    auto& stub = payload.getPayload().get();
+    edges = std::vector<FLEFindEdgeTokenSet>();
+    auto& edgesRef = edges.value();
 
-    for (auto const& edge : stub.getEdges()) {
+    auto& info = payload.getPayload().value();
+
+    for (auto const& edge : info.getEdges()) {
 
         auto escToken =
             FLETokenFromCDR<FLETokenType::ESCDerivedFromDataToken>(edge.getEscDerivedToken());
@@ -3241,16 +3249,13 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
         auto edcToken =
             FLETokenFromCDR<FLETokenType::EDCDerivedFromDataToken>(edge.getEdcDerivedToken());
 
-        edges.push_back({edcToken, escToken, eccToken});
+        edgesRef.push_back({edcToken, escToken, eccToken});
     }
 
     serverToken = FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
-        stub.getServerEncryptionToken());
+        info.getServerEncryptionToken());
 
-    maxCounter = stub.getMaxCounter();
-
-    payloadId = payload.getPayloadId();
-    operatorType = payload.getOperatorType().toString();
+    maxCounter = info.getMaxCounter();
 }
 
 
