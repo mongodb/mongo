@@ -271,16 +271,22 @@ var authCommandsLib = {
                   runOnDb: adminDbName,
                   roles: {__system: 1},
                   privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                  // The command expects to be run within a transaction.
+                  expectFail: true
               },
               {
                   runOnDb: firstDbName,
                   roles: {__system: 1},
                   privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                  // The command expects to be run within a transaction.
+                  expectFail: true
               },
               {
                   runOnDb: secondDbName,
                   roles: {__system: 1},
                   privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                  // The command expects to be run within a transaction.
+                  expectFail: true
               }
           ]
         },
