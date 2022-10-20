@@ -270,24 +270,48 @@ Status CollectionBulkLoaderImpl::commit() {
             // Do not do inside a WriteUnitOfWork (required by dumpInsertsFromBulk).
             auto status = _idIndexBlock->dumpInsertsFromBulk(
                 _opCtx.get(), *_collection, [&](const RecordId& rid) {
-                    return writeConflictRetry(
+                    writeConflictRetry(
                         _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this, &rid] {
                             WriteUnitOfWork wunit(_opCtx.get());
-                            // If we were to delete the document after committing the index build,
-                            // it's possible that the storage engine unindexes a different record
-                            // with the same key, but different RecordId. By deleting the document
-                            // before committing the index build, the index removal code uses
-                            // 'dupsAllowed', which forces the storage engine to only unindex
-                            // records that match the same key and RecordId.
-                            _collection->deleteDocument(_opCtx.get(),
-                                                        kUninitializedStmtId,
-                                                        rid,
-                                                        nullptr /** OpDebug **/,
-                                                        false /* fromMigrate */,
-                                                        true /* noWarn */);
+
+                            auto doc = _collection->docFor(_opCtx.get(), rid);
+
+                            // Delete the document before committing the index. If we were to delete
+                            // the document after committing the index, it's possible that the we
+                            // may unindex a record with the same key but a different RecordId.
+                            _collection->getRecordStore()->deleteRecord(_opCtx.get(), rid);
+
+                            auto indexIt = _collection->getIndexCatalog()->getIndexIterator(
+                                _opCtx.get(), IndexCatalog::InclusionPolicy::kReady);
+                            while (auto entry = indexIt->next()) {
+                                if (entry->descriptor()->isIdIndex()) {
+                                    continue;
+                                }
+
+                                SharedBufferFragmentBuilder pooledBuilder{
+                                    KeyString::HeapBuilder::kHeapAllocatorDefaultBytes};
+
+                                InsertDeleteOptions options;
+                                options.dupsAllowed = !entry->descriptor()->unique();
+
+                                entry->accessMethod()->remove(
+                                    _opCtx.get(),
+                                    pooledBuilder,
+                                    *_collection,
+                                    doc.value(),
+                                    rid,
+                                    false /* logIfError */,
+                                    options,
+                                    nullptr /* numDeleted */,
+                                    // Initial sync can build an index over a collection with
+                                    // duplicates, so we need to check the RecordId of the docuemnt
+                                    // we are unindexing. See SERVER-17487 for more details.
+                                    CheckRecordId::On);
+                            }
+
                             wunit.commit();
-                            return Status::OK();
                         });
+                    return Status::OK();
                 });
             if (!status.isOK()) {
                 return status;

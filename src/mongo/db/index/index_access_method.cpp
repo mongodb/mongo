@@ -1243,12 +1243,8 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     // are allowed in unique indexes, WiredTiger does not do blind unindexing, and instead confirms
     // that the recordid matches the element we are removing.
     //
-    // We need to disable blind-deletes if 'checkRecordId' is explicitly set 'On', or for
-    // in-progress indexes, in order to force recordid-matching for unindex operations, since
-    // initial sync can build an index over a collection with duplicates. See SERVER-17487 for more
-    // details.
-    options.dupsAllowed = options.dupsAllowed || !_indexCatalogEntry->isReady(opCtx) ||
-        (checkRecordId == CheckRecordId::On);
+    // We need to disable blind-deletes if 'checkRecordId' is explicitly set 'On'.
+    options.dupsAllowed = options.dupsAllowed || checkRecordId == CheckRecordId::On;
 
     // Ensure that our snapshot is compatible with the index's minimum visibile snapshot.
     const auto minVisibleTimestamp = _indexCatalogEntry->getMinimumVisibleSnapshot();
