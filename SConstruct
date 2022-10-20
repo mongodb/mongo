@@ -2336,18 +2336,22 @@ libdeps.setup_environment(
     linting=get_option('libdeps-linting'),
 )
 
-# Both the abidw tool and the thin archive tool must be loaded after
-# libdeps, so that the scanners they inject can see the library
-# dependencies added by libdeps.
-if link_model.startswith("dynamic"):
+# The abilink/tapilink tools and the thin archive tool must be loaded
+# after libdeps, so that the scanners they inject can see the library
+# dependencies added by libdeps. Neither abilink nor tapilink can work
+# with the current Ninja generation because they rely on adding
+# ListActions to builders.
+if get_option('ninja') == 'disabled' and link_model.startswith("dynamic"):
     # Add in the abi linking tool if the user requested and it is
     # supported on this platform.
+    #
+    # TODO: Can we unify the `abilink` and `tapilink` tools?
     if env.get('ABIDW'):
         abilink = Tool('abilink')
         if abilink.exists(env):
             abilink(env)
 
-    if env.TargetOSIs('darwin') and env.get('TAPI'):
+    if env.get('TAPI'):
         tapilink = Tool('tapilink')
         if tapilink.exists(env):
             tapilink(env)
