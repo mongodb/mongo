@@ -1480,7 +1480,7 @@ __wt_txn_modify_block(
 
     if (rollback) {
         /* Dump information about the txn snapshot. */
-        if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_TRANSACTION, WT_VERBOSE_DEBUG)) {
+        if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_TRANSACTION, WT_VERBOSE_DEBUG_1)) {
             WT_ERR(__wt_scr_alloc(session, 1024, &buf));
             WT_ERR(__wt_buf_fmt(session, buf,
               "snapshot_min=%" PRIu64 ", snapshot_max=%" PRIu64 ", snapshot_count=%" PRIu32,
