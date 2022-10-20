@@ -42,7 +42,7 @@ except ImportError:
     import unittest
 
 from contextlib import contextmanager
-import errno, glob, os, re, shutil, sys, threading, time, traceback
+import errno, glob, os, re, shutil, sys, threading, time, traceback, types
 import wiredtiger, wtscenario, wthooks
 
 # Use as "with timeout(seconds): ....". Argument of 0 means no timeout,
@@ -207,6 +207,38 @@ class ExtensionList(list):
         if name and name != 'none':
             ext = '' if extarg == None else '=' + extarg
             self.append(dirname + '/' + name + ext)
+
+# Custom result class that will prefix the pid in text output (including if it's a child).
+# Only enabled when we are in verbose mode so we don't check that here.
+class PidAwareTextTestResult(unittest.TextTestResult):
+    _thread_prefix = threading.local()
+
+    def __init__(self, stream, descriptions, verbosity):
+        super(PidAwareTextTestResult, self).__init__(stream, descriptions, verbosity)
+        self._thread_prefix.value = "[pid:{}]: ".format(os.getpid())
+
+    def tags(self, new_tags, gone_tags):
+        # We attach the PID to the thread so we only need the new_tags.
+        for tag in new_tags:
+            if tag.startswith("pid:"):
+                pid = tag[len("pid:"):]
+                self._thread_prefix.value = "[pid:{}/{}]: ".format(os.getpid(), pid)
+
+    def startTest(self, test):
+        self.stream.write(self._thread_prefix.value)
+        super(PidAwareTextTestResult, self).startTest(test)
+
+    def getDescription(self, test):
+        return str(test.shortDescription())
+
+    def printErrorList(self, flavour, errors):
+        for test, err in errors:
+            self.stream.writeln(self.separator1)
+            self.stream.writeln("%s%s: %s" % (self._thread_prefix.value, 
+                flavour, self.getDescription(test)))
+            self.stream.writeln(self.separator2)
+            self.stream.writeln("%s%s" % (self._thread_prefix.value, err))
+            self.stream.flush()
 
 class WiredTigerTestCase(unittest.TestCase):
     _globalSetup = False
@@ -403,7 +435,7 @@ class WiredTigerTestCase(unittest.TestCase):
                     self.pr('rollback error, restarting test.')
                     self.tearDown(True)
                     if WiredTigerTestCase._verbose > 2:
-                        print("%{}: restarting after rollback error".format(self))
+                        print("[pid:{}]: {}: restarting after rollback error".format(os.getpid(), self))
                     self.setUp()
                     rollbacksAllowed -= 1
 
@@ -695,9 +727,9 @@ class WiredTigerTestCase(unittest.TestCase):
 
         elapsed = time.time() - self.starttime
         if elapsed > 0.001 and WiredTigerTestCase._verbose >= 2:
-            print("%s: %.2f seconds" % (str(self), elapsed))
+            print("[pid:{}]: {}: {:.2f} seconds".format(os.getpid(), str(self), elapsed))
         if (not passed) and (not self.skipped):
-            print("ERROR in " + str(self))
+            print("[pid:{}]: ERROR in {}".format(os.getpid(), str(self)))
             self.pr('FAIL')
             self.pr('preserving directory ' + self.testdir)
         if WiredTigerTestCase._verbose > 2:
@@ -948,7 +980,7 @@ class WiredTigerTestCase(unittest.TestCase):
 
     @staticmethod
     def prout(s):
-        os.write(WiredTigerTestCase._dupout, str.encode(s + '\n'))
+        os.write(WiredTigerTestCase._dupout, str.encode("[pid:{}]: {}\n".format(os.getpid(), s)))
 
     def pr(self, s):
         """
@@ -987,7 +1019,7 @@ class WiredTigerTestCase(unittest.TestCase):
     def tty(message):
         if WiredTigerTestCase._ttyDescriptor == None:
             WiredTigerTestCase._ttyDescriptor = open('/dev/tty', 'w')
-        WiredTigerTestCase._ttyDescriptor.write(message + '\n')
+        WiredTigerTestCase._ttyDescriptor.write("[pid:{}]: {}\n".format(os.getpid(), message))
 
     def ttyVerbose(self, level, message):
         WiredTigerTestCase.ttyVerbose(level, message)
@@ -1079,6 +1111,16 @@ def getseed():
 def getss_random_prefix():
     return WiredTigerTestCase._ss_random_prefix
 
+# We have to override the ThreadsafeForwardingResult implementation of tags so it gets set immediately
+# which allows us to set the pid of the process on our output stream to make debugging easier.
+def immediate_tags(self, new_tags, gone_tags):
+    self.result.tags(new_tags, gone_tags)
+
+def wrap_result_for_tags(thread_safe_result, thread_number):
+    # We use this technique to override the method instead of extending the class as it allows for less changes.
+    thread_safe_result.tags = types.MethodType(immediate_tags, thread_safe_result)
+    return thread_safe_result
+
 def runsuite(suite, parallel):
     suite_to_run = suite
     if parallel > 1:
@@ -1086,18 +1128,21 @@ def runsuite(suite, parallel):
         if not WiredTigerTestCase._globalSetup:
             WiredTigerTestCase.globalSetup()
         WiredTigerTestCase._concurrent = True
-        suite_to_run = ConcurrentTestSuite(suite, fork_for_tests(parallel))
+        suite_to_run = ConcurrentTestSuite(suite, fork_for_tests(parallel), wrap_result=wrap_result_for_tags)
     try:
         if WiredTigerTestCase._randomseed:
             WiredTigerTestCase.prout("Starting test suite with seedw={0} and seedz={1}. Rerun this test with -seed {0}.{1} to get the same randomness"
                 .format(str(WiredTigerTestCase._seeds[0]), str(WiredTigerTestCase._seeds[1])))
+        result_class = None
+        if WiredTigerTestCase._verbose > 1:
+            result_class = PidAwareTextTestResult
         result = unittest.TextTestRunner(
-            verbosity=WiredTigerTestCase._verbose).run(suite_to_run)
+            verbosity=WiredTigerTestCase._verbose, resultclass=result_class).run(suite_to_run)
         WiredTigerTestCase.finalReport()
         return result
     except BaseException as e:
         # This should not happen for regular test errors, unittest should catch everything
-        print('ERROR: running test: ', e)
+        print("[pid:{}]: ERROR: running test: {}".format(os.getpid(), e))
         raise e
 
 def run(name='__main__'):

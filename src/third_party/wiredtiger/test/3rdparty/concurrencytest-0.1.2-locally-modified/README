@@ -1,0 +1,4 @@
+We have modified concurrencytest.py from the original concurrencytest-0.1.2 to wait for the child processes
+preventing defunct processes and to prefix output with the running PID for debuggability.o
+
+Future changes such as updating concurrencytest must take this into account.
