@@ -159,7 +159,7 @@ private:
     struct SessionRuntimeInfo {
         SessionRuntimeInfo(LogicalSessionId lsid) : parentSession(std::move(lsid)) {
             // Can only create a SessionRuntimeInfo with a parent transaction session id.
-            invariant(isParentSessionId(lsid));
+            invariant(isParentSessionId(parentSession.getSessionId()));
         }
 
         Session* getSession(WithLock, const LogicalSessionId& lsid);
