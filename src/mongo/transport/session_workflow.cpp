@@ -69,7 +69,6 @@ namespace transport {
 namespace {
 MONGO_FAIL_POINT_DEFINE(doNotSetMoreToCome);
 MONGO_FAIL_POINT_DEFINE(beforeCompressingExhaustResponse);
-MONGO_FAIL_POINT_DEFINE(alwaysLogSlowSessionWorkflow);
 
 /**
  * Given a request and its already generated response, checks for exhaust flags. If exhaust is
@@ -155,8 +154,6 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
  * SessionWorkflow loop. The SessionWorkflow loop itself is expected to (1) construct this object
  * when timing should begin, and (2) call this object's `notifySplit` function at appropriate times
  * throughout the workflow.
- *
- * TODO(SERVER-69831): On destruction, dump stats as appropriate.
  */
 class SessionWorkflowMetrics {
     /**
@@ -237,7 +234,9 @@ public:
         _isFinalized = true;
         notifySplit(Done);
 
-        if (MONGO_unlikely(alwaysLogSlowSessionWorkflow.shouldFail())) {
+        auto activeTime = microsBetween(SourcedWork, SentResponse).value_or(Microseconds{0});
+        if (MONGO_unlikely(durationCount<Milliseconds>(activeTime) >=
+                           serverGlobalParams.slowMS.load())) {
             logSlowLoop();
         }
     }
