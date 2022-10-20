@@ -5586,6 +5586,14 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
+  name: native_tenant_data_isolation_jscore_passthrough_gen
+  tags: ["serverless"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
   name: clustered_collection_passthrough_gen
   tags: ["large", "clustered_collections"]
   commands:
