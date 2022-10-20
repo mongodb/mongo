@@ -88,7 +88,7 @@ var errMsg = '[BEFORE NOOP ROUND] Data on shard0 = ' + collSizeOnShard0BeforeNoo
     ' and data on shard 1 = ' + collSizeOnShard1BeforeNoopRounds +
     ' - chunks before noop round = ' + JSON.stringify(chunksBeforeNoopRound);
 assert.lte(collSizeOnShard0BeforeNoopRounds - collSizeOnShard1BeforeNoopRounds,
-           2 * maxChunkSizeMB,
+           3 * maxChunkSizeMB,
            errMsg);
 
 // Wait for some more rounds and then check the balancer is not wrongly moving around data
