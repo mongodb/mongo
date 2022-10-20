@@ -52,7 +52,8 @@ public:
                    ScalarHistogram arrayUnique,
                    ScalarHistogram arrayMin,
                    ScalarHistogram arrayMax,
-                   TypeCounts arrayTypeCounts);
+                   TypeCounts arrayTypeCounts,
+                   size_t emptyArrayCount);
 
     // ArrayHistogram is neither copy-constructible nor copy-assignable.
     ArrayHistogram(const ArrayHistogram&) = delete;
@@ -76,14 +77,19 @@ public:
     // The total number of arrays in the histogram's path including empty arrays.
     size_t getArrayCount() const;
     // The total number of empty arrays ( [] ) in the histogram's path.
-    size_t getEmptyArrayCount() const;
+    size_t getEmptyArrayCount() const {
+        return _emptyArrayCount;
+    }
 
 private:
     /* ScalarHistogram fields for all paths. */
 
     // Contains values which appeared originally as scalars on the path.
     ScalarHistogram _scalar;
+    // The number of values of each type inside all arrays.
     TypeCounts _typeCounts;
+    // The number of empty arrays - they are not accounted for in the histograms.
+    size_t _emptyArrayCount;
 
     /* ScalarHistogram fields for array paths (only initialized if arrays are present). */
 

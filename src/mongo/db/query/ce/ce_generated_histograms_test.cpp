@@ -221,8 +221,13 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
                           {value::TypeTags::Array, 293}};
     TypeCounts arrayTypeCounts{{value::TypeTags::NumberInt64, 874},
                                {value::TypeTags::StringSmall, 340}};
-    const ArrayHistogram arrHist(
-        scalarHist, typeCounts, uniqueHist, minHist, maxHist, arrayTypeCounts);
+    const ArrayHistogram arrHist(scalarHist,
+                                 typeCounts,
+                                 uniqueHist,
+                                 minHist,
+                                 maxHist,
+                                 arrayTypeCounts,
+                                 0 /* No empty arrays */);
 
     const auto [tagLowDbl, valLowDbl] =
         std::make_pair(value::TypeTags::NumberDouble,

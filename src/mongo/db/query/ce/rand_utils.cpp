@@ -349,7 +349,7 @@ std::vector<SBEValue> genRandomValueArray(size_t nElems,
     return randValues;
 }
 
-std::vector<SBEValue> nestArrays(const std::vector<SBEValue>& input) {
+std::vector<SBEValue> nestArrays(const std::vector<SBEValue>& input, size_t emptyArrayCount) {
     std::vector<SBEValue> result;
     auto [arrayTag, arrayVal] = value::makeNewArray();
 
@@ -369,6 +369,11 @@ std::vector<SBEValue> nestArrays(const std::vector<SBEValue>& input) {
                 std::tie(arrayTag, arrayVal) = value::makeNewArray();
             }
         }
+    }
+
+    for (size_t i = 0; i < emptyArrayCount; ++i) {
+        auto [emptyArrayTag, emptyArrayVal] = value::makeNewArray();
+        result.emplace_back(emptyArrayTag, emptyArrayVal);
     }
 
     // It's possible that the array still contains something. If it's empty,

@@ -159,8 +159,13 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysSmall10Buckets) {
     typeCounts.insert({value::TypeTags::Array, 1000});
     arrayTypeCounts.insert({value::TypeTags::NumberInt32, 3996});
 
-    const ArrayHistogram arrHist(
-        scalarHist, typeCounts, aUniqueHist, aMinHist, aMaxHist, arrayTypeCounts);
+    const ArrayHistogram arrHist(scalarHist,
+                                 typeCounts,
+                                 aUniqueHist,
+                                 aMinHist,
+                                 aMaxHist,
+                                 arrayTypeCounts,
+                                 0 /* emptyArrayCount */);
 
     std::vector<QuerySpec> querySet{{10, 20, 35.7, 93.0, 37.8, 39.0},
                                     {10, 60, 103.3, 240.0, 158.0, 196.0},
@@ -245,8 +250,13 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysLarge10Buckets) {
     typeCounts.insert({value::TypeTags::Array, 1000});
     arrayTypeCounts.insert({value::TypeTags::NumberInt32, 8940});
 
-    const ArrayHistogram arrHist(
-        scalarHist, typeCounts, aUniqueHist, aMinHist, aMaxHist, arrayTypeCounts);
+    const ArrayHistogram arrHist(scalarHist,
+                                 typeCounts,
+                                 aUniqueHist,
+                                 aMinHist,
+                                 aMaxHist,
+                                 arrayTypeCounts,
+                                 0 /* emptyArrayCount */);
 
     std::vector<QuerySpec> querySet{{10, 20, 13.7, 39.0, 9.7, 26.0},
                                     {10, 60, 41.6, 108.0, 55.7, 101.0},

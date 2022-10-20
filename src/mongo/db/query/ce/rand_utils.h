@@ -186,6 +186,6 @@ std::vector<SBEValue> genRandomValueArray(size_t nElems,
 
     Values contained in the result will be drawn from the input vector.
  */
-std::vector<SBEValue> nestArrays(const std::vector<SBEValue>& input);
+std::vector<SBEValue> nestArrays(const std::vector<SBEValue>& input, size_t emptyArrayCount);
 
 }  // namespace mongo::ce

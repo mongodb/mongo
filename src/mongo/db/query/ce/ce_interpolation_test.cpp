@@ -366,7 +366,8 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
                                  uniqueHist,
                                  minHist,
                                  maxHist,
-                                 TypeCounts{});
+                                 TypeCounts{},
+                                 0);
 
     // Query in the middle of the domain: estimate from ArrayUnique histogram.
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
@@ -469,7 +470,8 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
                                  uniqueHist,
                                  minHist,
                                  maxHist,
-                                 TypeCounts{{value::TypeTags::NumberInt64, 375}});
+                                 TypeCounts{{value::TypeTags::NumberInt64, 375}},
+                                 0);
 
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
     value::Value lowVal = 500;

@@ -191,7 +191,7 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
     constexpr size_t nBuckets = 10;
 
     auto rawData = genFixedValueArray(nElems, 1.0, 0.0);
-    auto arrayData = nestArrays(rawData);
+    auto arrayData = nestArrays(rawData, 0 /* No empty arrays */);
 
     ArrayHistogram estimator = createArrayEstimator(arrayData, nBuckets);
 
@@ -248,6 +248,21 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         ASSERT_EQ(2, actualCard);
         ASSERT_APPROX_EQUAL(3.15479, estimatedCard, kTolerance);
     }
+}
+
+TEST_F(HistogramTest, MaxDiffEmptyArrays) {
+    constexpr size_t nElems = 21;
+    constexpr size_t nBuckets = 5;
+    constexpr size_t emptyArrayCount = 3;
+
+    auto rawData = genFixedValueArray(nElems, 1.0, 0.0);
+    auto arrayData = nestArrays(rawData, emptyArrayCount);
+    std::cout << "Generated " << nElems << " arrayData:\n"
+              << printValueArray(arrayData) << "\n"
+              << std::flush;
+
+    ArrayHistogram arrayHist = createArrayEstimator(arrayData, nBuckets);
+    ASSERT_EQ(arrayHist.getEmptyArrayCount(), emptyArrayCount);
 }
 
 }  // namespace

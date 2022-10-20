@@ -40,9 +40,11 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                ScalarHistogram arrayUnique,
                                ScalarHistogram arrayMin,
                                ScalarHistogram arrayMax,
-                               TypeCounts arrayTypeCounts)
+                               TypeCounts arrayTypeCounts,
+                               size_t emptyArrayCount)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
+      _emptyArrayCount(emptyArrayCount),
       _arrayUnique(std::move(arrayUnique)),
       _arrayMin(std::move(arrayMin)),
       _arrayMax(std::move(arrayMax)),
@@ -55,6 +57,7 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
 ArrayHistogram::ArrayHistogram(ScalarHistogram scalar, TypeCounts typeCounts)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
+      _emptyArrayCount(0),
       _arrayUnique(boost::none),
       _arrayMin(boost::none),
       _arrayMax(boost::none),
@@ -132,19 +135,6 @@ size_t ArrayHistogram::getArrayCount() const {
         size_t arrayCount = findArray->second;
         uassert(6979503, "Histogram with array data must have at least one array.", arrayCount > 0);
         return arrayCount;
-    }
-    return 0;
-}
-
-size_t ArrayHistogram::getEmptyArrayCount() const {
-    if (isArray()) {
-        size_t nonEmptyArrayCount = _arrayMin->empty() ? 0 : _arrayMin->getCardinality();
-        size_t totalArrCount = getArrayCount();
-        uassert(6979502,
-                "The number of empty arrays is < the total number of arrays.",
-                totalArrCount >= nonEmptyArrayCount);
-        size_t emptyArrCount = totalArrCount - nonEmptyArrayCount;
-        return emptyArrCount;
     }
     return 0;
 }

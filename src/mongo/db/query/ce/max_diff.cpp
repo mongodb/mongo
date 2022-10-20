@@ -237,6 +237,7 @@ ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size
     std::vector<SBEValue> arrayUniqueData;
     std::map<value::TypeTags, size_t> typeCounts;
     std::map<value::TypeTags, size_t> arrayTypeCounts;
+    size_t emptyArrayCount = 0;
 
     for (const auto& v : arrayData) {
         auto tagCount = typeCounts.insert({v.getTag(), 1});
@@ -249,7 +250,13 @@ ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size
         if (v.getTag() == value::TypeTags::Array) {
             std::vector<SBEValue> arrayElements;
             value::Array* arr = value::getArrayView(v.getValue());
-            for (size_t i = 0; i < arr->size(); i++) {
+            size_t arrSize = arr->size();
+            if (arrSize == 0) {
+                ++emptyArrayCount;
+                continue;
+            }
+
+            for (size_t i = 0; i < arrSize; i++) {
                 const auto [tag, val] = arr->getAt(i);
                 auto arrTagCount = arrayTypeCounts.insert({tag, 1});
                 if (!arrTagCount.second) {
@@ -319,7 +326,8 @@ ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size
             std::move(arrayUniqueHist),
             std::move(arrayMinHist),
             std::move(arrayMaxHist),
-            std::move(arrayTypeCounts)};
+            std::move(arrayTypeCounts),
+            emptyArrayCount};
 }
 
 }  // namespace mongo::ce
