@@ -244,7 +244,7 @@ public:
                     firstBatch.append(obj);
                 }
                 firstBatch.setPartialResultsReturned(partialResultsReturned);
-                firstBatch.done(cursorId, cq->ns());
+                firstBatch.done(cursorId, cq->nss());
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 result->reset();
 

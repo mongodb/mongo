@@ -672,7 +672,7 @@ public:
                 curOp->debug().cursorExhausted = true;
             }
 
-            nextBatch.done(respondWithId, nss.ns());
+            nextBatch.done(respondWithId, nss);
 
             // Increment this metric once we have generated a response and we know it will return
             // documents.
@@ -771,14 +771,15 @@ public:
             }
 
             if (getTestCommandsEnabled()) {
-                validateResult(reply);
+                validateResult(reply, nss.tenantId());
             }
         }
 
-        void validateResult(rpc::ReplyBuilderInterface* reply) {
+        void validateResult(rpc::ReplyBuilderInterface* reply, boost::optional<TenantId> tenantId) {
             auto ret = reply->getBodyBuilder().asTempObj();
-            CursorGetMoreReply::parse(IDLParserContext{"CursorGetMoreReply"},
-                                      ret.removeField("ok"));
+            CursorGetMoreReply::parse(
+                IDLParserContext{"CursorGetMoreReply", false /* apiStrict */, tenantId},
+                ret.removeField("ok"));
         }
 
         const GetMoreCommandRequest _cmd;

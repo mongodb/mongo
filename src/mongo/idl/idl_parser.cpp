@@ -297,7 +297,10 @@ void IDLParserContext::appendGenericCommandArguments(const BSONObj& commandPasst
 }
 
 const boost::optional<TenantId>& IDLParserContext::getTenantId() const {
-    return _tenantId;
+    if (_predecessor == nullptr)
+        return _tenantId;
+
+    return _predecessor->getTenantId();
 }
 
 std::vector<StringData> transformVector(const std::vector<std::string>& input) {

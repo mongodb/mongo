@@ -222,9 +222,10 @@ TailableModeEnum getTailableMode(const FindCommandRequest& findCommand) {
         tailableModeFromBools(findCommand.getTailable(), findCommand.getAwaitData()));
 }
 
-void validateCursorResponse(const BSONObj& outputAsBson) {
+void validateCursorResponse(const BSONObj& outputAsBson, boost::optional<TenantId> tenantId) {
     if (getTestCommandsEnabled()) {
-        CursorInitialReply::parse(IDLParserContext("CursorInitialReply"), outputAsBson);
+        CursorInitialReply::parse(
+            IDLParserContext("CursorInitialReply", false /* apiStrict */, tenantId), outputAsBson);
     }
 }
 

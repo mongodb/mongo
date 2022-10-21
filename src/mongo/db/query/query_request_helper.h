@@ -138,7 +138,7 @@ TailableModeEnum getTailableMode(const FindCommandRequest& findCommand);
 /**
  * Asserts whether the cursor response adhere to the format defined in IDL.
  */
-void validateCursorResponse(const BSONObj& outputAsBson);
+void validateCursorResponse(const BSONObj& outputAsBson, boost::optional<TenantId> tenantId);
 
 /**
  * Updates the projection object with a $meta projection for the showRecordId option.

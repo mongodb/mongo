@@ -371,7 +371,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     CurOp::get(opCtx)->debug().cursorExhausted = (clusterCursorId == 0);
     CurOp::get(opCtx)->debug().nreturned = responseBuilder.numDocs();
 
-    responseBuilder.done(clusterCursorId, requestedNss.ns());
+    responseBuilder.done(clusterCursorId, requestedNss);
 
     auto bodyBuilder = replyBuilder.getBodyBuilder();
     CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);

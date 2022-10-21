@@ -270,7 +270,7 @@ BSONObj extractCollation(const BSONObj& cmdObj);
 bool appendEmptyResultSet(OperationContext* opCtx,
                           BSONObjBuilder& result,
                           Status status,
-                          const std::string& ns);
+                          const NamespaceString& ns);
 
 /**
  * Returns the shards that would be targeted for the given query according to the given routing

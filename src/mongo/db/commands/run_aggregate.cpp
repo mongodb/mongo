@@ -150,7 +150,7 @@ bool handleCursorCommand(OperationContext* opCtx,
 
             BSONObjBuilder cursorResult;
             appendCursorResponseObject(cursors[idx]->cursorid(),
-                                       nsForCursor.ns(),
+                                       nsForCursor,
                                        BSONArray(),
                                        cursors[idx]->getExecutor()->getExecutorType(),
                                        &cursorResult);
@@ -284,7 +284,7 @@ bool handleCursorCommand(OperationContext* opCtx,
     }
 
     const CursorId cursorId = cursor ? cursor->cursorid() : 0LL;
-    responseBuilder.done(cursorId, nsForCursor.ns());
+    responseBuilder.done(cursorId, nsForCursor);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);

@@ -69,6 +69,9 @@ function runTest(featureFlagRequireTenantId) {
 
         tokenConn._setSecurityToken(securityToken);
 
+        // Logout the root user to avoid multiple authentication.
+        tokenConn.getDB("admin").logout();
+
         // Create a collection for the tenant kTenant and then insert into it.
         assert.commandWorked(tokenDB.createCollection(kCollName));
         assert.commandWorked(
@@ -83,9 +86,13 @@ function runTest(featureFlagRequireTenantId) {
             const findRes = assert.commandWorked(
                 tokenDB.runCommand({find: kCollName, filter: {a: 1}, batchSize: 1}));
             assert(arrayEq([{_id: 0, a: 1, b: 1}], findRes.cursor.firstBatch), tojson(findRes));
+            checkNsSerializedCorrectly(
+                featureFlagRequireTenantId, kTenant, kDbName, kCollName, findRes.cursor.ns);
 
-            assert.commandWorked(
+            const getMoreRes = assert.commandWorked(
                 tokenDB.runCommand({getMore: findRes.cursor.id, collection: kCollName}));
+            checkNsSerializedCorrectly(
+                featureFlagRequireTenantId, kTenant, kDbName, kCollName, getMoreRes.cursor.ns);
         }
 
         // Test the aggregate command.
@@ -93,6 +100,8 @@ function runTest(featureFlagRequireTenantId) {
             const aggRes = assert.commandWorked(tokenDB.runCommand(
                 {aggregate: kCollName, pipeline: [{$match: {a: 1}}], cursor: {}}));
             assert(arrayEq([{_id: 0, a: 1, b: 1}], aggRes.cursor.firstBatch), tojson(aggRes));
+            checkNsSerializedCorrectly(
+                featureFlagRequireTenantId, kTenant, kDbName, kCollName, aggRes.cursor.ns);
         }
 
         // Find and modify the document.
@@ -311,7 +320,8 @@ function runTest(featureFlagRequireTenantId) {
         const fromName = kDbName + '.' + kCollName;
         const toName = fromName + "_renamed";
         assert.commandFailedWithCode(
-            adminDb.runCommand({renameCollection: fromName, to: toName, dropTarget: true}),
+            tokenConn.getDB("admin").runCommand(
+                {renameCollection: fromName, to: toName, dropTarget: true}),
             ErrorCodes.NamespaceNotFound);
 
         assert.commandFailedWithCode(tokenDB2.runCommand({listIndexes: kCollName}),

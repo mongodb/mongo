@@ -34,6 +34,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -68,7 +69,7 @@ CursorResponseBuilder::CursorResponseBuilder(rpc::ReplyBuilderInterface* replyBu
                                                                            : kBatchField));
 }
 
-void CursorResponseBuilder::done(CursorId cursorId, StringData cursorNamespace) {
+void CursorResponseBuilder::done(CursorId cursorId, const NamespaceString& cursorNamespace) {
     invariant(_active);
 
     _batch.reset();
@@ -84,7 +85,7 @@ void CursorResponseBuilder::done(CursorId cursorId, StringData cursorNamespace) 
     }
 
     _cursorObject->append(kIdField, cursorId);
-    _cursorObject->append(kNsField, cursorNamespace);
+    _cursorObject->append(kNsField, NamespaceStringUtil::serialize(cursorNamespace));
     if (_options.atClusterTime) {
         _cursorObject->append(kAtClusterTimeField, _options.atClusterTime->asTimestamp());
     }
@@ -105,13 +106,13 @@ void CursorResponseBuilder::abandon() {
 }
 
 void appendCursorResponseObject(long long cursorId,
-                                StringData cursorNamespace,
+                                const NamespaceString& cursorNamespace,
                                 BSONArray firstBatch,
                                 boost::optional<StringData> cursorType,
                                 BSONObjBuilder* builder) {
     BSONObjBuilder cursorObj(builder->subobjStart(kCursorField));
     cursorObj.append(kIdField, cursorId);
-    cursorObj.append(kNsField, cursorNamespace);
+    cursorObj.append(kNsField, NamespaceStringUtil::serialize(cursorNamespace));
     cursorObj.append(kBatchFieldInitial, firstBatch);
     if (cursorType) {
         cursorObj.append(kTypeField, cursorType.value());

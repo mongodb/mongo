@@ -273,7 +273,7 @@ TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResults
     CursorResponseBuilder crb(&builder, options);
     crb.append(testDoc);
     crb.setPartialResultsReturned(true);
-    crb.done(CursorId(123), "db.coll");
+    crb.done(CursorId(123), NamespaceString(boost::none, "db.coll"));
 
     // Confirm that the resulting BSONObj response matches the expected body.
     auto msg = builder.done();

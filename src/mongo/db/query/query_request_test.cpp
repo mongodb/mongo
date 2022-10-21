@@ -1525,15 +1525,18 @@ TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseFalseSucceeds) {
 TEST(QueryRequestHelperTest, ValidateResponseMissingFields) {
     BSONObjBuilder builder;
     ASSERT_THROWS_CODE(
-        query_request_helper::validateCursorResponse(builder.asTempObj()), DBException, 6253507);
+        query_request_helper::validateCursorResponse(builder.asTempObj(), boost::none),
+        DBException,
+        6253507);
 }
 
 TEST(QueryRequestHelperTest, ValidateResponseWrongDataType) {
     BSONObjBuilder builder;
     builder.append("cursor", 1);
-    ASSERT_THROWS_CODE(query_request_helper::validateCursorResponse(builder.asTempObj()),
-                       DBException,
-                       ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(
+        query_request_helper::validateCursorResponse(builder.asTempObj(), boost::none),
+        DBException,
+        ErrorCodes::TypeMismatch);
 }
 
 TEST(QueryRequestHelperTest, ParsedCursorRemainsValidAfterBSONDestroyed) {

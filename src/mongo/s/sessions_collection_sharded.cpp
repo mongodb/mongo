@@ -196,7 +196,7 @@ LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
         for (const auto& obj : batch) {
             firstBatch.append(obj);
         }
-        firstBatch.done(cursorId, NamespaceString::kLogicalSessionsNamespace.ns());
+        firstBatch.done(cursorId, NamespaceString::kLogicalSessionsNamespace);
 
         return replyBuilder.releaseBody();
     };

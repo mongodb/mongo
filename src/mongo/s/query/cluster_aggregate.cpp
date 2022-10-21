@@ -166,7 +166,7 @@ void appendEmptyResultSetWithStatus(OperationContext* opCtx,
     if (status == ErrorCodes::ShardNotFound) {
         status = {ErrorCodes::NamespaceNotFound, status.reason()};
     }
-    appendEmptyResultSet(opCtx, *result, status, nss.ns());
+    appendEmptyResultSet(opCtx, *result, status, nss);
 }
 
 void updateHostsTargetedMetrics(OperationContext* opCtx,

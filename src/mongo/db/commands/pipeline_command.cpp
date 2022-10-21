@@ -215,7 +215,9 @@ public:
             // The aggregate command's response is unstable when 'explain' or 'exchange' fields are
             // set.
             if (!_aggregationRequest.getExplain() && !_aggregationRequest.getExchange()) {
-                query_request_helper::validateCursorResponse(reply->getBodyBuilder().asTempObj());
+                query_request_helper::validateCursorResponse(
+                    reply->getBodyBuilder().asTempObj(),
+                    _aggregationRequest.getNamespace().tenantId());
             }
         }
 

@@ -237,7 +237,7 @@ public:
         auto dbInfoStatus =
             Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName.toStringWithTenantId());
         if (!dbInfoStatus.isOK()) {
-            appendEmptyResultSet(opCtx, output, dbInfoStatus.getStatus(), nss.ns());
+            appendEmptyResultSet(opCtx, output, dbInfoStatus.getStatus(), nss);
             return true;
         }
 

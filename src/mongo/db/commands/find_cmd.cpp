@@ -597,8 +597,7 @@ public:
                 const CursorId cursorId = 0;
                 endQueryOp(opCtx, collection, *exec, numResults, cursorId);
                 auto bodyBuilder = result->getBodyBuilder();
-                appendCursorResponseObject(
-                    cursorId, nss.ns(), BSONArray(), boost::none, &bodyBuilder);
+                appendCursorResponseObject(cursorId, nss, BSONArray(), boost::none, &bodyBuilder);
                 return;
             }
 
@@ -719,13 +718,14 @@ public:
             }
 
             // Generate the response object to send to the client.
-            firstBatch.done(cursorId, nss.ns());
+            firstBatch.done(cursorId, nss);
 
             // Increment this metric once we have generated a response and we know it will return
             // documents.
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementDocUnitsReturned(nss.ns(), docUnitsReturned);
-            query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj());
+            query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj(),
+                                                         nss.tenantId());
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {
