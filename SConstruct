@@ -1390,6 +1390,13 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    PathVariable(
+        'VALIDATE_ENV_SCRIPT',
+        help='''Path of a python script to validate the mongo workspace for common issues.
+        An example script is located at buildscripts/validate_env.py
+        ''', default=None, validator=PathVariable.PathIsFile))
+
+env_vars.Add(
     'WINDOWS_OPENSSL_BIN',
     help='Sets the path to the openssl binaries for packaging',
     default='c:/openssl/bin',
@@ -1629,6 +1636,38 @@ else:
     except ValueError as e:
         env.FatalError(f"Error setting VERBOSE variable: {e}")
 env.AddMethod(lambda env: env['VERBOSE'], 'Verbose')
+
+
+def CheckDevEnv(context):
+    context.Message('Checking if dev env is valid... ')
+    context.sconf.cached = 0
+    if env.get('VALIDATE_ENV_SCRIPT'):
+        proc = subprocess.run(
+            [sys.executable, env.File('$VALIDATE_ENV_SCRIPT').get_path()], capture_output=True,
+            text=True)
+        context.Log(proc.stdout)
+        context.Log(proc.stderr)
+        context.sconf.lastTarget = Value(proc.stdout + proc.stderr)
+        result = proc.returncode == 0
+        context.Result(result)
+        if env.Verbose():
+            print(proc.stdout)
+    else:
+        context.Result("skipped")
+        result = True
+    return result
+
+
+devenv_check = Configure(
+    env,
+    help=False,
+    custom_tests={
+        'CheckDevEnv': CheckDevEnv,
+    },
+)
+if not devenv_check.CheckDevEnv():
+    env.ConfError(f"Failed to validate dev env:\n{devenv_check.lastTarget.get_contents().decode()}")
+devenv_check.Finish()
 
 # Normalize the ICECC_DEBUG option
 try:
