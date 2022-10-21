@@ -59,7 +59,7 @@ Mutex _validationMutex;
 // Holds the set of full `databaseName.collectionName` namespace strings in progress. Validation
 // commands register themselves in this data structure so that subsequent commands on the same
 // namespace will wait rather than run in parallel.
-std::set<std::string> _validationsInProgress;
+std::set<NamespaceString> _validationsInProgress;
 
 // This is waited upon if there is found to already be a validation command running on the targeted
 // namespace, as _validationsInProgress would indicate. This is signaled when a validation command
@@ -112,6 +112,10 @@ public:
 
     bool maintenanceOk() const override {
         return false;
+    }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
@@ -223,7 +227,7 @@ public:
             stdx::unique_lock<Latch> lock(_validationMutex);
             try {
                 opCtx->waitForConditionOrInterrupt(_validationNotifier, lock, [&] {
-                    return _validationsInProgress.find(nss.ns()) == _validationsInProgress.end();
+                    return _validationsInProgress.find(nss) == _validationsInProgress.end();
                 });
             } catch (AssertionException& e) {
                 CommandHelpers::appendCommandStatusNoThrow(
@@ -233,12 +237,12 @@ public:
                 return false;
             }
 
-            _validationsInProgress.insert(nss.ns());
+            _validationsInProgress.insert(nss);
         }
 
         ON_BLOCK_EXIT([&] {
             stdx::lock_guard<Latch> lock(_validationMutex);
-            _validationsInProgress.erase(nss.ns());
+            _validationsInProgress.erase(nss);
             _validationNotifier.notify_all();
         });
 

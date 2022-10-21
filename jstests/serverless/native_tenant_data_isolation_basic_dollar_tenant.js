@@ -423,6 +423,13 @@ function runTest(featureFlagRequireTenantId) {
         assert.eq(17, findRes.cursor.firstBatch[0].x);
     }
 
+    // Test the validate command.
+    {
+        const validateRes =
+            assert.commandWorked(testDb.runCommand({validate: kCollName, '$tenant': kTenant}));
+        assert(validateRes.valid);
+    }
+
     rst.stopSet();
 }
 

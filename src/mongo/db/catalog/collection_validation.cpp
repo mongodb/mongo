@@ -474,7 +474,7 @@ Status validate(OperationContext* opCtx,
     uassertStatusOK(replCoord->checkCanServeReadsFor(
         opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
-    output->append("ns", validateState.nss().ns());
+    output->append("ns", NamespaceStringUtil::serialize(validateState.nss()));
 
     validateState.uuid().appendToBuilder(output, "uuid");
 

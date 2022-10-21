@@ -5,6 +5,20 @@
 
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
 
+function checkNsSerializedCorrectly(
+    featureFlagRequireTenantId, kTenant, kDbName, kCollectionName, nsField) {
+    if (featureFlagRequireTenantId) {
+        // This case represents the upgraded state where we will not include the tenantId as the
+        // db prefix.
+        const nss = kDbName + "." + kCollectionName;
+        assert.eq(nsField, nss);
+    } else {
+        // This case represents the downgraded state where we will continue to prefix namespaces.
+        const prefixedDb = kTenant + "_" + kDbName;
+        assert.eq(nsField, prefixedDb + "." + kCollectionName);
+    }
+}
+
 function runTest(featureFlagRequireTenantId) {
     const rst = new ReplSetTest({
         nodes: 3,
@@ -245,6 +259,14 @@ function runTest(featureFlagRequireTenantId) {
             assert(arrayEq([{key: {"_id": 1}, name: "_id_"}],
                            getIndexesKeyAndName(res.cursor.firstBatch)));
         }
+
+        // Test the validate command.
+        {
+            const validateRes = assert.commandWorked(tokenDB.runCommand({validate: kCollName}));
+            assert(validateRes.valid);
+            checkNsSerializedCorrectly(
+                featureFlagRequireTenantId, kTenant, kDbName, kCollName, validateRes.ns);
+        }
     }
 
     // Test commands using a security token for a different tenant and check that this tenant cannot
@@ -297,6 +319,9 @@ function runTest(featureFlagRequireTenantId) {
         assert.commandFailedWithCode(
             tokenDB2.runCommand({dropIndexes: kCollName, index: ["indexA", "indexB"]}),
             ErrorCodes.NamespaceNotFound);
+
+        assert.commandFailedWithCode(tokenDB2.runCommand({validate: kCollName}),
+                                     ErrorCodes.NamespaceNotFound);
 
         // ListDatabases with securityToken of kOtherTenant cannot access databases created by
         // kTenant.

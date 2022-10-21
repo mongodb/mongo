@@ -70,10 +70,10 @@ ValidateState::ValidateState(OperationContext* opCtx,
         // being validated.
         _noPBWM.emplace(opCtx->lockState());
 
-        _databaseLock.emplace(opCtx, _nss.db(), MODE_IS);
+        _databaseLock.emplace(opCtx, _nss.dbName(), MODE_IS);
         _collectionLock.emplace(opCtx, _nss, MODE_IS);
     } else {
-        _databaseLock.emplace(opCtx, _nss.db(), MODE_IX);
+        _databaseLock.emplace(opCtx, _nss.dbName(), MODE_IX);
         _collectionLock.emplace(opCtx, _nss, MODE_X);
     }
 
@@ -351,7 +351,7 @@ void ValidateState::_relockDatabaseAndCollection(OperationContext* opCtx) {
         << "Interrupted due to: database drop: " << _nss.db()
         << " while validating collection: " << _nss << " (" << *_uuid << ")";
 
-    _databaseLock.emplace(opCtx, _nss.db(), MODE_IS);
+    _databaseLock.emplace(opCtx, _nss.dbName(), MODE_IS);
     _database = DatabaseHolder::get(opCtx)->getDb(opCtx, _nss.dbName());
     uassert(ErrorCodes::Interrupted, dbErrMsg, _database);
     uassert(ErrorCodes::Interrupted, dbErrMsg, !_database->isDropPending(opCtx));
@@ -360,7 +360,7 @@ void ValidateState::_relockDatabaseAndCollection(OperationContext* opCtx) {
                                            << " (" << *_uuid << ") while validating the collection";
 
     try {
-        NamespaceStringOrUUID nssOrUUID(std::string(_nss.db()), *_uuid);
+        NamespaceStringOrUUID nssOrUUID(_nss.dbName(), *_uuid);
         _collectionLock.emplace(opCtx, nssOrUUID, MODE_IS);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         uasserted(ErrorCodes::Interrupted, collErrMsg);
