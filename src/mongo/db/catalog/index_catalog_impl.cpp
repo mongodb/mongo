@@ -267,10 +267,22 @@ Status IndexCatalogImpl::_init(OperationContext* opCtx,
             // Note that TTL deletion is supported on capped clustered collections via bounded
             // collection scan, which does not use an index.
             if (!collection->isCapped()) {
-                TTLCollectionCache::get(opCtx->getServiceContext())
-                    .registerTTLInfo(
-                        collection->uuid(),
-                        TTLCollectionCache::Info{indexName, hasInvalidExpireAfterSeconds});
+                if (opCtx->lockState()->inAWriteUnitOfWork()) {
+                    opCtx->recoveryUnit()->onCommit(
+                        [svcCtx = opCtx->getServiceContext(),
+                         uuid = collection->uuid(),
+                         indexName,
+                         hasInvalidExpireAfterSeconds](auto commitTime) {
+                            TTLCollectionCache::get(svcCtx).registerTTLInfo(
+                                uuid,
+                                TTLCollectionCache::Info{indexName, hasInvalidExpireAfterSeconds});
+                        });
+                } else {
+                    TTLCollectionCache::get(opCtx->getServiceContext())
+                        .registerTTLInfo(
+                            collection->uuid(),
+                            TTLCollectionCache::Info{indexName, hasInvalidExpireAfterSeconds});
+                }
             }
         }
 
