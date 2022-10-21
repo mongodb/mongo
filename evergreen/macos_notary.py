@@ -72,7 +72,7 @@ for archive in archives:
     for line in iter(p.stdout.readline, b''):
         print(f'macnotary: {line.decode("utf-8").strip()}')
 
-    # TODO: BUILD-14595 remove timeout when codesign doesn't frequently hang on macos hosts
+    # TODO: BUILD-16161 (previously BUILD-14595) remove timeout when codesign doesn't frequently hang on macos hosts
     timeout = 3600
     timed_out = False
     try:
