@@ -194,6 +194,10 @@ Lastly, a `setFromString` method must always be provided with the following sign
 Status {name}::setFromString(StringData value, const boost::optional<TenantId>& tenantId);
 ```
 
+Note that by default, server parameters are not tenant aware and thus will always have `boost::none`
+provided as `tenantId`, unless defined as cluster server parameters (discussed
+[below](#cluster-server-parameters)).
+
 Each server parameter encountered will produce a block of code to run at process startup similar to 
 the following:
 ```cpp
@@ -274,6 +278,14 @@ during runtime.
 the current version of the cluster server parameter.
 * `reset()` must be implemented and should update the cluster server parameter back to its default
 value.  
+
+All cluster server parameters are tenant-aware, meaning that on serverless clusters, each tenant has
+an isolated set of parameters. The `setClusterParameter` and `getClusterParameter` commands will pass
+the `tenantId` on the command request to the `ServerParameter`'s methods. On dedicated
+(non-serverless) clusters, `boost::none` will be passed. IDL-defined cluster server parameters will
+handle the passed-in `tenantId` automatically and store separate parameter values per-tenant.
+Specialized server parameters will have to take care to correctly handle the passed-in `tenantId` and
+to enforce tenant isolation.
 
 See [server_parameter_specialized_test.idl][specialized-cluster-server-param-test-idl] and 
 [server_parameter_specialized_test.h][specialized-cluster-server-param-test-data] for examples.
