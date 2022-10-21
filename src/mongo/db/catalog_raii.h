@@ -126,8 +126,14 @@ struct OptionsBase {
         return std::move(*static_cast<T*>(this));
     }
 
+    T expectedUUID(boost::optional<UUID> expectedUUID) {
+        _expectedUUID = expectedUUID;
+        return std::move(*static_cast<T*>(this));
+    }
+
     ViewMode _viewMode = ViewMode::kViewsForbidden;
     Date_t _deadline = Date_t::max();
+    boost::optional<UUID> _expectedUUID;
 };
 
 struct Options : OptionsBase<Options> {};

@@ -620,20 +620,12 @@ EmplaceAutoGetCollectionForRead::EmplaceAutoGetCollectionForRead(
     AutoGetCollection::Options options)
     : _opCtx(opCtx),
       _nsOrUUID(nsOrUUID),
-      _viewMode(options._viewMode),
-      _deadline(options._deadline),
-      _secondaryNssOrUUIDs(std::move(options._secondaryNssOrUUIDs)) {
-    // Multi-document transactions need MODE_IX locks, otherwise MODE_IS.
-    _collectionLockMode = getLockModeForQuery(opCtx, nsOrUUID.nss());
-}
+      // Multi-document transactions need MODE_IX locks, otherwise MODE_IS.
+      _collectionLockMode(getLockModeForQuery(opCtx, nsOrUUID.nss())),
+      _options(std::move(options)) {}
 
 void EmplaceAutoGetCollectionForRead::emplace(boost::optional<AutoGetCollection>& autoColl) const {
-    autoColl.emplace(
-        _opCtx,
-        _nsOrUUID,
-        _collectionLockMode,
-        AutoGetCollection::Options{}.viewMode(_viewMode).deadline(_deadline).secondaryNssOrUUIDs(
-            _secondaryNssOrUUIDs));
+    autoColl.emplace(_opCtx, _nsOrUUID, _collectionLockMode, _options);
 }
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
@@ -658,14 +650,12 @@ AutoGetCollectionForReadLockFree::EmplaceHelper::EmplaceHelper(
     OperationContext* opCtx,
     CollectionCatalogStasher& catalogStasher,
     const NamespaceStringOrUUID& nsOrUUID,
-    auto_get_collection::ViewMode viewMode,
-    Date_t deadline,
+    AutoGetCollectionLockFree::Options options,
     bool isLockFreeReadSubOperation)
     : _opCtx(opCtx),
       _catalogStasher(catalogStasher),
       _nsOrUUID(nsOrUUID),
-      _viewMode(viewMode),
-      _deadline(deadline),
+      _options(std::move(options)),
       _isLockFreeReadSubOperation(isLockFreeReadSubOperation) {}
 
 void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
@@ -718,7 +708,7 @@ void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
                     // behavior for the primary collection.
                 });
         },
-        AutoGetCollectionLockFree::Options{}.viewMode(_viewMode).deadline(_deadline));
+        _options);
 }
 
 AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
@@ -734,12 +724,14 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     invariant(supportsLockFreeRead(opCtx) &&
               (!opCtx->recoveryUnit()->isActive() || isLockFreeReadSubOperation));
 
-    auto& viewMode = options._viewMode;
-    auto& deadline = options._deadline;
-    auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
-
-    EmplaceHelper emplaceFunc(
-        opCtx, _catalogStash, nsOrUUID, viewMode, deadline, isLockFreeReadSubOperation);
+    EmplaceHelper emplaceFunc(opCtx,
+                              _catalogStash,
+                              nsOrUUID,
+                              AutoGetCollectionLockFree::Options{}
+                                  .viewMode(options._viewMode)
+                                  .deadline(options._deadline)
+                                  .expectedUUID(options._expectedUUID),
+                              isLockFreeReadSubOperation);
     acquireCollectionAndConsistentSnapshot(
         opCtx,
         /* isLockFreeReadSubOperation */
@@ -759,7 +751,7 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         [this](bool isAnySecondaryNamespaceAViewOrSharded) {
             _secondaryNssIsAViewOrSharded = isAnySecondaryNamespaceAViewOrSharded;
         },
-        secondaryNssOrUUIDs);
+        options._secondaryNssOrUUIDs);
 }
 
 AutoGetCollectionForReadMaybeLockFree::AutoGetCollectionForReadMaybeLockFree(
@@ -808,26 +800,19 @@ bool AutoGetCollectionForReadMaybeLockFree::isAnySecondaryNamespaceAViewOrSharde
 
 template <typename AutoGetCollectionForReadType>
 AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
-    AutoGetCollectionForReadCommandBase(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& nsOrUUID,
-        auto_get_collection::ViewMode viewMode,
-        Date_t deadline,
-        AutoStatsTracker::LogMode logMode,
-        const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs)
-    : _autoCollForRead(
-          opCtx,
-          nsOrUUID,
-          AutoGetCollection::Options{}.viewMode(viewMode).deadline(deadline).secondaryNssOrUUIDs(
-              secondaryNssOrUUIDs)),
+    AutoGetCollectionForReadCommandBase(OperationContext* opCtx,
+                                        const NamespaceStringOrUUID& nsOrUUID,
+                                        AutoGetCollection::Options options,
+                                        AutoStatsTracker::LogMode logMode)
+    : _autoCollForRead(opCtx, nsOrUUID, options),
       _statsTracker(opCtx,
                     _autoCollForRead.getNss(),
                     Top::LockType::ReadLocked,
                     logMode,
                     CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(
                         _autoCollForRead.getNss().dbName()),
-                    deadline,
-                    secondaryNssOrUUIDs) {
+                    options._deadline,
+                    options._secondaryNssOrUUIDs) {
 
     hangBeforeAutoGetShardVersionCheck.executeIf(
         [&](auto&) { hangBeforeAutoGetShardVersionCheck.pauseWhileSet(opCtx); },
@@ -846,12 +831,9 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
 AutoGetCollectionForReadCommandLockFree::AutoGetCollectionForReadCommandLockFree(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
-    auto_get_collection::ViewMode viewMode,
-    Date_t deadline,
-    AutoStatsTracker::LogMode logMode,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {
-    _autoCollForReadCommandBase.emplace(
-        opCtx, nsOrUUID, viewMode, deadline, logMode, secondaryNssOrUUIDs);
+    AutoGetCollection::Options options,
+    AutoStatsTracker::LogMode logMode) {
+    _autoCollForReadCommandBase.emplace(opCtx, nsOrUUID, options, logMode);
     auto receivedShardVersion =
         OperationShardingState::get(opCtx).getShardVersion(_autoCollForReadCommandBase->getNss());
 
@@ -875,8 +857,7 @@ AutoGetCollectionForReadCommandLockFree::AutoGetCollectionForReadCommandLockFree
         //
         // It's possible for there to be no SV for the namespace in the command request. That's OK
         // because shard versioning isn't needed in that case. See SERVER-63009 for more details.
-        _autoCollForReadCommandBase.emplace(
-            opCtx, nsOrUUID, viewMode, deadline, logMode, secondaryNssOrUUIDs);
+        _autoCollForReadCommandBase.emplace(opCtx, nsOrUUID, options, logMode);
         receivedShardVersion = OperationShardingState::get(opCtx).getShardVersion(
             _autoCollForReadCommandBase->getNss());
     }
@@ -916,14 +897,12 @@ OldClientContext::OldClientContext(OperationContext* opCtx,
 AutoGetCollectionForReadCommandMaybeLockFree::AutoGetCollectionForReadCommandMaybeLockFree(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
-    auto_get_collection::ViewMode viewMode,
-    Date_t deadline,
-    AutoStatsTracker::LogMode logMode,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {
+    AutoGetCollection::Options options,
+    AutoStatsTracker::LogMode logMode) {
     if (supportsLockFreeRead(opCtx)) {
-        _autoGetLockFree.emplace(opCtx, nsOrUUID, viewMode, deadline, logMode, secondaryNssOrUUIDs);
+        _autoGetLockFree.emplace(opCtx, nsOrUUID, std::move(options), logMode);
     } else {
-        _autoGet.emplace(opCtx, nsOrUUID, viewMode, deadline, logMode, secondaryNssOrUUIDs);
+        _autoGet.emplace(opCtx, nsOrUUID, std::move(options), logMode);
     }
 }
 

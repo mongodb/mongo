@@ -848,6 +848,7 @@ env.Library(
     source=[
         'catalog_raii.cpp',
         'catalog/catalog_helper.cpp',
+        'catalog/collection_uuid_mismatch.cpp',
         'db_raii.cpp',
     ],
     LIBDEPS=[
@@ -861,6 +862,7 @@ env.Library(
         'views/views',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
         'curop',
         'multitenancy',

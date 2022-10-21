@@ -137,12 +137,13 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 {
-                    AutoGetCollection coll{opCtx,
-                                           nss(),
-                                           MODE_IS,
-                                           AutoGetCollection::Options{}.viewMode(
-                                               auto_get_collection::ViewMode::kViewsPermitted)};
-                    checkCollectionUUIDMismatch(opCtx, nss(), *coll, _doc.getCollectionUUID());
+                    AutoGetCollection coll{
+                        opCtx,
+                        nss(),
+                        MODE_IS,
+                        AutoGetCollection::Options{}
+                            .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
+                            .expectedUUID(_doc.getCollectionUUID())};
                 }
 
                 const auto cmOld = uassertStatusOK(

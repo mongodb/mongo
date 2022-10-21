@@ -251,10 +251,9 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
         AutoGetCollectionForReadCommandMaybeLockFree collLock(
             opCtx,
             systemViewsNamespaces.front(),
-            auto_get_collection::ViewMode::kViewsForbidden,
-            Date_t::max(),
-            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-            {++systemViewsNamespaces.cbegin(), systemViewsNamespaces.cend()});
+            AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                {++systemViewsNamespaces.cbegin(), systemViewsNamespaces.cend()}),
+            AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
 
         // If the primary collection is not available, it means the information from parsing
         // _mdb_catalog is no longer valid. Therefore, we restart this process from the top.
@@ -434,10 +433,8 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
 
     autoColl.emplace(expCtx->opCtx,
                      nsOrUUID,
-                     auto_get_collection::ViewMode::kViewsForbidden,
-                     Date_t::max(),
-                     AutoStatsTracker::LogMode::kUpdateTop,
-                     secondaryNamespaces);
+                     AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNamespaces),
+                     AutoStatsTracker::LogMode::kUpdateTop);
 
     MultipleCollectionAccessor holder{expCtx->opCtx,
                                       &autoColl->getCollection(),

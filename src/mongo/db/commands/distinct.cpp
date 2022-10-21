@@ -151,9 +151,10 @@ public:
         // Acquire locks. The RAII object is optional, because in the case of a view, the locks
         // need to be released.
         boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-        ctx.emplace(opCtx,
-                    CommandHelpers::parseNsCollectionRequired(dbName, cmdObj),
-                    auto_get_collection::ViewMode::kViewsPermitted);
+        ctx.emplace(
+            opCtx,
+            CommandHelpers::parseNsCollectionRequired(dbName, cmdObj),
+            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
         const auto nss = ctx->getNss();
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
@@ -205,9 +206,10 @@ public:
         // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
         // of a view, the locks need to be released.
         boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-        ctx.emplace(opCtx,
-                    CommandHelpers::parseNsOrUUID(dbName, cmdObj),
-                    auto_get_collection::ViewMode::kViewsPermitted);
+        ctx.emplace(
+            opCtx,
+            CommandHelpers::parseNsOrUUID(dbName, cmdObj),
+            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
         const auto& nss = ctx->getNss();
 
         if (!ctx->getView()) {

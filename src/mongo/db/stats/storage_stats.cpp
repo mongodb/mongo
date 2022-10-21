@@ -79,10 +79,10 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 
     boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> autoColl;
     try {
-        autoColl.emplace(opCtx,
-                         collNss,
-                         auto_get_collection::ViewMode::kViewsForbidden,
-                         waitForLock ? Date_t::max() : Date_t::now());
+        autoColl.emplace(
+            opCtx,
+            collNss,
+            AutoGetCollection::Options{}.deadline(waitForLock ? Date_t::max() : Date_t::now()));
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>& ex) {
         return failed(ex);
     } catch (const ExceptionFor<ErrorCodes::MaxTimeMSExpired>& ex) {

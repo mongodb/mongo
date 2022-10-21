@@ -288,7 +288,8 @@ public:
             boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
             ctx.emplace(opCtx,
                         CommandHelpers::parseNsCollectionRequired(_dbName, _request.body),
-                        auto_get_collection::ViewMode::kViewsPermitted);
+                        AutoGetCollection::Options{}.viewMode(
+                            auto_get_collection::ViewMode::kViewsPermitted));
             const auto nss = ctx->getNss();
 
             // Going forward this operation must never ignore interrupt signals while waiting for
@@ -473,7 +474,9 @@ public:
             boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
             ctx.emplace(opCtx,
                         CommandHelpers::parseNsOrUUID(_dbName, _request.body),
-                        auto_get_collection::ViewMode::kViewsPermitted);
+                        AutoGetCollection::Options{}
+                            .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
+                            .expectedUUID(findCommand->getCollectionUUID()));
             const auto& nss = ctx->getNss();
 
             // Going forward this operation must never ignore interrupt signals while waiting for
@@ -489,9 +492,6 @@ public:
                     str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid().value()
                                   << " specified in query request not found",
                     ctx || !findCommand->getNamespaceOrUUID().uuid());
-
-            checkCollectionUUIDMismatch(
-                opCtx, nss, ctx->getCollection(), findCommand->getCollectionUUID());
 
             // Set the namespace if a collection was found, as opposed to nothing or a view.
             if (ctx) {

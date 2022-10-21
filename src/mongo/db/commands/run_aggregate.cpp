@@ -705,12 +705,11 @@ Status runAggregate(OperationContext* opCtx,
     InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
 
     auto initContext = [&](auto_get_collection::ViewMode m) -> void {
-        ctx.emplace(opCtx,
-                    nss,
-                    m,
-                    Date_t::max(),
-                    AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                    secondaryExecNssList);
+        ctx.emplace(
+            opCtx,
+            nss,
+            AutoGetCollection::Options{}.viewMode(m).secondaryNssOrUUIDs(secondaryExecNssList),
+            AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
         collections = MultipleCollectionAccessor(opCtx,
                                                  &ctx->getCollection(),
                                                  ctx->getNss(),

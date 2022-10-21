@@ -449,11 +449,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             collection.emplace(
                 opCtx,
                 wholeOp.getNamespace(),
-                fixLockModeForSystemDotViewsChanges(wholeOp.getNamespace(), MODE_IX));
-            checkCollectionUUIDMismatch(opCtx,
-                                        wholeOp.getNamespace(),
-                                        collection->getCollection(),
-                                        wholeOp.getCollectionUUID());
+                fixLockModeForSystemDotViewsChanges(wholeOp.getNamespace(), MODE_IX),
+                AutoGetCollection::Options{}.expectedUUID(wholeOp.getCollectionUUID()));
             if (*collection) {
                 break;
             }
@@ -791,8 +788,10 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     boost::optional<AutoGetCollection> collection;
     while (true) {
-        collection.emplace(opCtx, ns, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
-        checkCollectionUUIDMismatch(opCtx, ns, collection->getCollection(), opCollectionUUID);
+        collection.emplace(opCtx,
+                           ns,
+                           fixLockModeForSystemDotViewsChanges(ns, MODE_IX),
+                           AutoGetCollection::Options{}.expectedUUID(opCollectionUUID));
         if (*collection) {
             break;
         }
@@ -1165,7 +1164,10 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
     }
 
-    AutoGetCollection collection(opCtx, ns, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
+    AutoGetCollection collection(opCtx,
+                                 ns,
+                                 fixLockModeForSystemDotViewsChanges(ns, MODE_IX),
+                                 AutoGetCollection::Options{}.expectedUUID(opCollectionUUID));
 
     DeleteStageParams::DocumentCounter documentCounter = nullptr;
 
@@ -1200,8 +1202,6 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         documentCounter =
             timeseries::numMeasurementsForBucketCounter(timeseriesOptions->getTimeField());
     }
-
-    checkCollectionUUIDMismatch(opCtx, ns, collection.getCollection(), opCollectionUUID);
 
     ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());

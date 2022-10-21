@@ -513,7 +513,6 @@ env.Library(
         'coll_mod.cpp',
         'collection_catalog_helper.cpp',
         'collection_compact.cpp',
-        'collection_uuid_mismatch.cpp',
         'create_collection.cpp',
         'drop_collection.cpp',
         'drop_database.cpp',

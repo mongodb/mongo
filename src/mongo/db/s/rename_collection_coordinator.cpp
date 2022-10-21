@@ -147,13 +147,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                 (!_doc.getExpectedSourceUUID() && !_doc.getExpectedTargetUUID()));
 
                     {
-                        AutoGetCollection coll{opCtx,
-                                               fromNss,
-                                               MODE_IS,
-                                               AutoGetCollection::Options{}.viewMode(
-                                                   auto_get_collection::ViewMode::kViewsPermitted)};
-                        checkCollectionUUIDMismatch(
-                            opCtx, fromNss, *coll, _doc.getExpectedSourceUUID());
+                        AutoGetCollection coll{
+                            opCtx,
+                            fromNss,
+                            MODE_IS,
+                            AutoGetCollection::Options{}
+                                .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
+                                .expectedUUID(_doc.getExpectedSourceUUID())};
 
                         uassert(ErrorCodes::IllegalOperation,
                                 "Cannot rename an encrypted collection",
@@ -231,9 +231,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         opCtx, fromNss, toNss, _doc.getDropTarget(), executor);
 
                     {
-                        AutoGetCollection coll{opCtx, toNss, MODE_IS};
-                        checkCollectionUUIDMismatch(
-                            opCtx, toNss, *coll, _doc.getExpectedTargetUUID());
+                        AutoGetCollection coll{opCtx,
+                                               toNss,
+                                               MODE_IS,
+                                               AutoGetCollection::Options{}.expectedUUID(
+                                                   _doc.getExpectedTargetUUID())};
                         uassert(ErrorCodes::IllegalOperation,
                                 "Cannot rename to an existing encrypted collection",
                                 !coll || !coll->getCollectionOptions().encryptedFieldConfig ||

@@ -826,9 +826,11 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
 TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters(
     OperationContext* opCtx) {
     auto performCheckOnCollectionUUID = [this, opCtx](const NamespaceString& resolvedNss) {
-        AutoGetCollection coll{opCtx, resolvedNss, MODE_IS};
-        checkCollectionUUIDMismatch(
-            opCtx, resolvedNss, coll.getCollection(), _request.getCollectionUUID());
+        AutoGetCollection coll{
+            opCtx,
+            resolvedNss,
+            MODE_IS,
+            AutoGetCollection::Options{}.expectedUUID(_request.getCollectionUUID())};
     };
 
     auto bucketsNs = originalNss().makeTimeseriesBucketsNamespace();

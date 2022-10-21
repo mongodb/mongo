@@ -500,11 +500,12 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
         }
 
         bool indexExists = writeConflictRetry(opCtx, "createCollectionWithIndexes", ns.ns(), [&] {
-            AutoGetCollection collection(opCtx, ns, MODE_IX);
+            AutoGetCollection collection(
+                opCtx,
+                ns,
+                MODE_IX,
+                AutoGetCollection::Options{}.expectedUUID(cmd.getCollectionUUID()));
             CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
-
-            checkCollectionUUIDMismatch(
-                opCtx, ns, collection.getCollection(), cmd.getCollectionUUID());
 
             // Before potentially taking an exclusive collection lock, check if all indexes already
             // exist while holding an intent lock.

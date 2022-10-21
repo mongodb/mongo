@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -272,6 +273,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     // Check that the collections are all safe to use.
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
     _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
+    checkCollectionUUIDMismatch(opCtx, _resolvedNss, _coll, options._expectedUUID);
     verifyDbAndCollection(opCtx, modeColl, nsOrUUID, _resolvedNss, _coll, _autoDb->getDb());
     for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
         auto secondaryResolvedNss =
@@ -308,26 +310,32 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     const auto receivedShardVersion{
         OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
 
-    if ((_view = catalog->lookupView(opCtx, _resolvedNss))) {
-        uassert(ErrorCodes::CommandNotSupportedOnView,
-                str::stream() << "Taking " << _resolvedNss.ns()
-                              << " lock for timeseries is not allowed",
-                viewMode == auto_get_collection::ViewMode::kViewsPermitted || !_view->timeseries());
+    if (!options._expectedUUID) {
+        // We only need to look up a view if an expected collection UUID was not provided. If this
+        // namespace were a view, the collection UUID mismatch check would have failed above.
+        if ((_view = catalog->lookupView(opCtx, _resolvedNss))) {
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    str::stream() << "Taking " << _resolvedNss.ns()
+                                  << " lock for timeseries is not allowed",
+                    viewMode == auto_get_collection::ViewMode::kViewsPermitted ||
+                        !_view->timeseries());
 
-        uassert(ErrorCodes::CommandNotSupportedOnView,
-                str::stream() << "Namespace " << _resolvedNss.ns()
-                              << " is a view, not a collection",
-                viewMode == auto_get_collection::ViewMode::kViewsPermitted);
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    str::stream() << "Namespace " << _resolvedNss.ns()
+                                  << " is a view, not a collection",
+                    viewMode == auto_get_collection::ViewMode::kViewsPermitted);
 
-        uassert(StaleConfigInfo(_resolvedNss,
-                                *receivedShardVersion,
-                                ShardVersion::UNSHARDED() /* wantedVersion */,
-                                ShardingState::get(opCtx)->shardId()),
-                str::stream() << "Namespace " << _resolvedNss << " is a view therefore the shard "
-                              << "version attached to the request must be unset or UNSHARDED",
-                !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED());
+            uassert(StaleConfigInfo(_resolvedNss,
+                                    *receivedShardVersion,
+                                    ShardVersion::UNSHARDED() /* wantedVersion */,
+                                    ShardingState::get(opCtx)->shardId()),
+                    str::stream() << "Namespace " << _resolvedNss
+                                  << " is a view therefore the shard "
+                                  << "version attached to the request must be unset or UNSHARDED",
+                    !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED());
 
-        return;
+            return;
+        }
     }
 
     // There is neither a collection nor a view for the namespace, so if we reached to this point
@@ -418,6 +426,8 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     // dbVersion of this node or the caller gets updated quickly in case either is stale.
     catalog_helper::assertMatchingDbVersion(opCtx, _resolvedNss.db());
 
+    checkCollectionUUIDMismatch(opCtx, _resolvedNss, _collectionPtr, options._expectedUUID);
+
     hangBeforeAutoGetCollectionLockFreeShardedStateAccess.executeIf(
         [&](auto&) { hangBeforeAutoGetCollectionLockFreeShardedStateAccess.pauseWhileSet(opCtx); },
         [&](const BSONObj& data) {
@@ -440,6 +450,7 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
         return;
     }
 
+    invariant(!options._expectedUUID);
     _view = catalog->lookupView(opCtx, _resolvedNss);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Taking " << _resolvedNss.ns()

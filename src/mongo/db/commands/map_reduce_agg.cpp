@@ -69,7 +69,9 @@ auto makeExpressionContext(OperationContext* opCtx,
     // AutoGetCollectionForReadCommand will throw if the sharding version for this connection is
     // out of date.
     AutoGetCollectionForReadCommandMaybeLockFree ctx(
-        opCtx, parsedMr.getNamespace(), auto_get_collection::ViewMode::kViewsPermitted);
+        opCtx,
+        parsedMr.getNamespace(),
+        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "mapReduce on a view is not supported",
             !ctx.getView());

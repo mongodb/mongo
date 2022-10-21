@@ -150,10 +150,8 @@ public:
 private:
     OperationContext* _opCtx;
     const NamespaceStringOrUUID& _nsOrUUID;
-    auto_get_collection::ViewMode _viewMode;
-    Date_t _deadline;
     LockMode _collectionLockMode;
-    const std::vector<NamespaceStringOrUUID> _secondaryNssOrUUIDs;
+    AutoGetCollection::Options _options;
 };
 
 /**
@@ -246,8 +244,7 @@ private:
         EmplaceHelper(OperationContext* opCtx,
                       CollectionCatalogStasher& catalogStasher,
                       const NamespaceStringOrUUID& nsOrUUID,
-                      auto_get_collection::ViewMode viewMode,
-                      Date_t deadline,
+                      AutoGetCollectionLockFree::Options options,
                       bool isLockFreeReadSubOperation);
 
         void emplace(boost::optional<AutoGetCollectionLockFree>& autoColl) const;
@@ -256,8 +253,7 @@ private:
         OperationContext* _opCtx;
         CollectionCatalogStasher& _catalogStasher;
         const NamespaceStringOrUUID& _nsOrUUID;
-        auto_get_collection::ViewMode _viewMode;
-        Date_t _deadline;
+        AutoGetCollectionLockFree::Options _options;
 
         // Set to true if the lock helper using this EmplaceHelper is nested under another lock-free
         // helper.
@@ -321,10 +317,8 @@ public:
     AutoGetCollectionForReadCommandBase(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        auto_get_collection::ViewMode viewMode = auto_get_collection::ViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max(),
-        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-        const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});
+        AutoGetCollection::Options options = {},
+        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
 
     explicit operator bool() const {
         return static_cast<bool>(getCollection());
@@ -369,12 +363,9 @@ public:
     AutoGetCollectionForReadCommand(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        auto_get_collection::ViewMode viewMode = auto_get_collection::ViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max(),
-        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-        const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {})
-        : AutoGetCollectionForReadCommandBase(
-              opCtx, nsOrUUID, viewMode, deadline, logMode, secondaryNssOrUUIDs) {}
+        AutoGetCollection::Options options = {},
+        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp)
+        : AutoGetCollectionForReadCommandBase(opCtx, nsOrUUID, std::move(options), logMode) {}
 };
 
 /**
@@ -385,10 +376,8 @@ public:
     AutoGetCollectionForReadCommandLockFree(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        auto_get_collection::ViewMode viewMode = auto_get_collection::ViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max(),
-        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-        const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});
+        AutoGetCollection::Options options = {},
+        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
 
     explicit operator bool() const {
         return static_cast<bool>(getCollection());
@@ -433,10 +422,8 @@ public:
     AutoGetCollectionForReadCommandMaybeLockFree(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        auto_get_collection::ViewMode viewMode = auto_get_collection::ViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max(),
-        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-        const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});
+        AutoGetCollection::Options options = {},
+        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
 
     /**
      * Passthrough function to either _autoGet or _autoGetLockFree.

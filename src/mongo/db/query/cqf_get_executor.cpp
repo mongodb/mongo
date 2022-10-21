@@ -378,8 +378,7 @@ static void populateAdditionalScanDefs(
     for (const auto& involvedNss : involvedCollections) {
         // TODO SERVER-70304 Allow queries over views and reconsider locking strategy for
         // multi-collection queries.
-        AutoGetCollectionForReadCommandMaybeLockFree ctx(
-            opCtx, involvedNss, auto_get_collection::ViewMode::kViewsForbidden);
+        AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, involvedNss);
         const CollectionPtr& collection = ctx ? ctx.getCollection() : CollectionPtr::null;
         const bool collectionExists = collection != nullptr;
         const std::string uuidStr =

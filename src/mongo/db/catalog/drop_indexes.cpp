@@ -397,9 +397,9 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
     // We only need to hold an intent lock to send abort signals to the active index builder(s) we
     // intend to abort.
     boost::optional<AutoGetCollection> collection;
-    collection.emplace(opCtx, nss, MODE_IX);
+    collection.emplace(
+        opCtx, nss, MODE_IX, AutoGetCollection::Options{}.expectedUUID(expectedUUID));
 
-    checkCollectionUUIDMismatch(opCtx, nss, collection->getCollection(), expectedUUID);
     uassertStatusOK(checkView(opCtx, nss, collection->getCollection()));
 
     const UUID collectionUUID = (*collection)->uuid();
