@@ -61,6 +61,7 @@ assert.commandWorked(s.s0.adminCommand({shardCollection: coll.getFullName(), key
 assert.eq(2, coll.getIndexes().length);
 
 // make sure balancing happens
+s.startBalancer();
 s.awaitBalance(coll.getName(), db.getName());
 
 // Make sure our initial balance cleanup doesn't interfere with later migrations.

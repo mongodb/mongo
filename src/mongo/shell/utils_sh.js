@@ -351,6 +351,12 @@ sh.awaitCollectionBalance = function(coll, timeout, interval) {
                 }, 'Timed out waiting for orphans counter to be 0', timeout, interval);
                 sh.enableBalancing(coll);
 
+                // (SERVER-70602) Wait for some balancing rounds to avoid balancerCollectionStatus
+                // reporting balancerCompliant too early
+                for (let i = 0; i < 3; ++i) {
+                    sh.awaitBalancerRound(timeout, interval);
+                }
+
                 return assert.commandWorked(sh._adminCommand({balancerCollectionStatus: ns}, true))
                     .balancerCompliant;
             },
