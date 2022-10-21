@@ -164,8 +164,7 @@ if deb
     # account shells
     its('shell') {
       if ((os[:name] == 'debian' and os[:release].split('.')[0] >= '10') or
-          (os[:name] == 'ubuntu' and os[:release] == '18.04') or
-          (os[:name] == 'ubuntu' and os[:release] == '20.04'))
+          (os[:name] == 'ubuntu' and os[:release] >= '18.04'))
         should eq '/usr/sbin/nologin'
       else
         should eq '/bin/false'

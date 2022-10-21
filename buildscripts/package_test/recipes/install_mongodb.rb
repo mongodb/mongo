@@ -53,7 +53,7 @@ if platform_family? 'debian'
 
   # the ubuntu image does not have some dependencies installed by default
   # and it is required for the install_compass script
-  if node['platform'] == 'ubuntu' and node['platform_version'] == '20.04'
+  if node['platform'] == 'ubuntu' and node['platform_version'] >= '20.04'
     execute 'install dependencies ubuntu 20.04' do
       command 'apt-get install -y python3 libsasl2-modules-gssapi-mit'
       live_stream true

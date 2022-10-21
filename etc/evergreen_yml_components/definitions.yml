@@ -305,6 +305,7 @@ variables:
   - enterprise-ubuntu1804-arm64
   - enterprise-ubuntu2004-arm64
   - enterprise-ubuntu2004-64
+  - enterprise-ubuntu2204-64
   - enterprise-windows
   - enterprise-windows-debug-unoptimized
   - enterprise-windows-inmem
@@ -327,6 +328,7 @@ variables:
   - enterprise-rhel-82-arm64
   - enterprise-amazon2-arm64
   - enterprise-ubuntu1804-64
+  - enterprise-ubuntu2204-64
   - enterprise-windows
   - enterprise-windows-required
 
@@ -361,6 +363,7 @@ variables:
   - ubuntu1804-arm64
   - ubuntu2004-arm64
   - ubuntu2004
+  - ubuntu2204
   - enterprise-ubuntu1804-64
   - enterprise-ubuntu1804-arm64
   - enterprise-ubuntu2004-arm64
