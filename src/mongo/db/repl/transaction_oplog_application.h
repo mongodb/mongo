@@ -51,11 +51,6 @@ Status applyAbortTransaction(OperationContext* opCtx,
                              repl::OplogApplication::Mode mode);
 
 /**
- * Helper used to get previous oplog entry from the same transaction.
- */
-repl::OplogEntry getPreviousOplogEntry(OperationContext* opCtx, const repl::OplogEntry& entry);
-
-/**
  * Follow an oplog chain and copy the operations to destination.  Operations will be copied in
  * forward oplog order (increasing optimes).
  */
