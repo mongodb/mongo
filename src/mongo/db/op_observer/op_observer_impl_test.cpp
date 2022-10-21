@@ -2651,7 +2651,14 @@ public:
 
 protected:
     // The maximum numbers of documents that can be deleted in a batch. Assumes _id of integer type.
-    static const int maxDocsInBatch = 203669;
+    // This limit should be chosen such that the total size of delete operations stays under the
+    // BSON 16 MB limit.
+    // In practice, the number of delete operations is controlled by the server parameters
+    // batchedDeletesTargetStagedDocBytes and batchedDeletesTargetBatchDocs, which have much
+    // lower defaults.
+    // See maxNumberOfBatchedOperationsInSingleOplogEntry and
+    // maxSizeOfBatchedOperationsInSingleOplogEntryBytes.
+    static const int maxDeleteOpsInBatch = 202000;
     const NamespaceString _nss{boost::none, "test", "coll"};
     const NamespaceString _nssWithTid{TenantId(OID::gen()), "test", "coll"};
 };
@@ -2994,9 +3001,9 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
     WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
 
-    // Delete BatchedWriteOutputsTest::maxDocsInBatch documents in a single batch, which is the
+    // Delete BatchedWriteOutputsTest::maxDeleteOpsInBatch documents in a single batch, which is the
     // maximum number of docs that can be batched while staying within 16MB of applyOps.
-    for (int docId = 0; docId < BatchedWriteOutputsTest::maxDocsInBatch; docId++) {
+    for (int docId = 0; docId < BatchedWriteOutputsTest::maxDeleteOpsInBatch; docId++) {
         // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
         // of setting of `documentKey` on the delete for sharding purposes.
         // `OpObserverImpl::onDelete` asserts its existence.
@@ -3019,8 +3026,8 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
     std::vector<repl::OplogEntry> innerEntries;
     repl::ApplyOps::extractOperationsTo(
         lastOplogEntryParsed, lastOplogEntryParsed.getEntry().toBSON(), &innerEntries);
-    ASSERT(innerEntries.size() == BatchedWriteOutputsTest::maxDocsInBatch);
-    for (int opIdx = 0; opIdx < BatchedWriteOutputsTest::maxDocsInBatch; opIdx++) {
+    ASSERT(innerEntries.size() == BatchedWriteOutputsTest::maxDeleteOpsInBatch);
+    for (int opIdx = 0; opIdx < BatchedWriteOutputsTest::maxDeleteOpsInBatch; opIdx++) {
         BSONObj o = BSON("_id" << opIdx);
         const auto innerEntry = innerEntries[opIdx];
         ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
@@ -3041,9 +3048,12 @@ TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
     WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
 
-    // Attempt to delete more than BatchedWriteOutputsTest::maxDocsInBatch documents in a single
-    // batch, which fails as it can't generate an applyOps entry larger than 16MB.
-    for (int docId = 0; docId < BatchedWriteOutputsTest::maxDocsInBatch + 1; docId++) {
+    // Attempt to delete more documents than allowed in a single applyOps batch because it
+    // the generated entry exceeds the limit of 16MB for an applyOps entry.
+    int approximateDifferenceBetweenBSONObjMaxUserAndInternalSize = 2000;
+    for (int docId = 0; docId < BatchedWriteOutputsTest::maxDeleteOpsInBatch +
+             approximateDifferenceBetweenBSONObjMaxUserAndInternalSize + 1;
+         docId++) {
         // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
         // of setting of `documentKey` on the delete for sharding purposes.
         // `OpObserverImpl::onDelete` asserts its existence.
@@ -3053,7 +3063,11 @@ TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
             opCtx, autoColl->ns(), autoColl->uuid(), kUninitializedStmtId, args);
     }
 
-    ASSERT_THROWS_CODE(wuow.commit(), DBException, ErrorCodes::Error::TransactionTooLarge);
+    // This test used to rely on the BSONObjBuilder in packTransactionStatementsForApplyOps()
+    // to throw a TransactionTooLarge exception when it is unable to build a BSONObj with the
+    // delete operations. Now, we check the limit earlier in OpObserver::onBatchedWriteCommit()
+    // using the results from TransactionOperations::getApplyOpsInfo().
+    ASSERT_THROWS_CODE(wuow.commit(), DBException, ErrorCodes::TransactionTooLarge);
 
     // The getNOplogEntries call below asserts that the oplog is empty.
     getNOplogEntries(opCtx, 0);

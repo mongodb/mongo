@@ -37,16 +37,17 @@ namespace {
 
 /**
  * Returns operations that can fit into an "applyOps" entry. The returned operations are
- * serialized to BSON. The operations are given by range ['operationsBegin',
- * 'operationsEnd').
- * Multi-document transactions follow the following constraints for fitting the operations: (1) the
- * resulting "applyOps" entry shouldn't exceed the 16MB limit, unless only one operation is
- * allocated to it; (2) the number of operations is not larger than the maximum number of
- * transaction statements allowed in one entry as defined by
- * 'gMaxNumberOfTransactionOperationsInSingleOplogEntry'. Batched writes (WUOWs that pack writes
- * into a single applyOps outside of a multi-doc transaction) are exempt from the constraints above.
- * If the operations cannot be packed into a single applyOps that's within the BSON size limit
- * (16MB), the batched write will fail with TransactionTooLarge.
+ * serialized to BSON. The operations are given by range ['operationsBegin', 'operationsEnd').
+ * - Multi-document transactions follow the following constraints for fitting the operations:
+ *    (1) the resulting "applyOps" entry shouldn't exceed the 16MB limit, unless only one operation
+ *          is allocated to it;
+ *    (2) the number of operations is not larger than the maximum number of transaction statements
+ *          allowed in one entry as defined by
+ *          'gMaxNumberOfTransactionOperationsInSingleOplogEntry'.
+ * - Batched writes (WUOWs that pack writes into a single applyOps outside of a multi-doc
+ *    transaction) are exempt from the constraints above, but instead are subject to one:
+ *    (1) If the operations cannot be packed into a single applyOps that's within the BSON size
+ *         limit (16MB), the batched write will fail with TransactionTooLarge.
  */
 std::vector<BSONObj> packOperationsIntoApplyOps(
     std::vector<repl::ReplOperation>::const_iterator operationsBegin,
@@ -71,11 +72,7 @@ std::vector<BSONObj> packOperationsIntoApplyOps(
                 break;
             }
         }
-        // If neither 'oplogEntryCountLimit' nor 'oplogEntrySizeLimitBytes' is provided,
-        // this is a batched write, so we don't break the batch into multiple applyOps. It is the
-        // responsibility of the caller to generate a batch that fits within a single applyOps.
-        // If the batch doesn't fit within an applyOps, we throw a TransactionTooLarge later
-        // on when serializing to BSON.
+
         auto serializedOperation = operation.toBSON();
         totalOperationsSize += static_cast<std::size_t>(serializedOperation.objsize());
 

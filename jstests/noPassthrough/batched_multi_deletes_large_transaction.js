@@ -6,6 +6,7 @@
  * handled by the primary.
  *
  * @tags: [
+ *     requires_fcv_62,
  *     requires_replication,
  * ]
  */
@@ -14,7 +15,7 @@
 
 const rst = new ReplSetTest({
     nodes: [
-        {},
+        {setParameter: {maxNumberOfBatchedOperationsInSingleOplogEntry: 2}},
         {rsConfig: {votes: 0, priority: 0}},
     ]
 });
@@ -32,26 +33,13 @@ assert.commandWorked(coll.insert(docIds.map((x) => {
 
 // Set up server to split deletes over multiple oplog entries
 // such that each oplog entry contains two delete operations.
-const result = assert.commandWorked(coll.remove({}));
+// TODO(SERVER-70572): Update this assertion once multi-oplog batched operations are supported.
+const result = assert.commandFailedWithCode(coll.remove({}),
+                                            ErrorCodes.TransactionTooLarge,
+                                            'batched writes must generate a single applyOps entry');
 jsTestLog('delete result: ' + tojson(result));
-assert.eq(result.nRemoved, docIds.length);
-assert.eq(coll.countDocuments({}), 0);
-
-// Check oplog entries.
-const entries =
-    rst.findOplog(primary, {ns: 'admin.$cmd', 'o.applyOps.0.ns': coll.getFullName()}).toArray();
-jsTestLog('applyOps oplog entries: ' + tojson(entries));
-assert.eq(entries.length, 1);
-let entry = entries[0];
-assert.eq(entry.ns, 'admin.$cmd', tojson(entry));
-assert(entry.o.hasOwnProperty('applyOps'), tojson(entry));
-assert.eq(entry.o.applyOps.length, 4, tojson(entry));
-entry.o.applyOps.forEach((op) => {
-    assert.eq(op.op, 'd', tojson(op));
-    assert.eq(op.ns, coll.getFullName(), tojson(op));
-    const idVal = op.o._id;
-    assert.neq(docIds.indexOf(idVal), -1, tojson(op));
-});
+assert.eq(result.nRemoved, 0);
+assert.eq(coll.countDocuments({}), docIds.length);
 
 rst.stopSet();
 })();

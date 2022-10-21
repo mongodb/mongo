@@ -115,6 +115,28 @@ server_parameters:
         cpp_vartype: bool
         default: false
 
+    maxNumberOfBatchedOperationsInSingleOplogEntry:
+        description: >-
+            Maximum number of operations to pack into a single oplog entry, when multi-oplog
+            format for batched writes is in use. See batchedDeletesTargetBatchDocs and
+            maxNumberOfTransactionOperationsInSingleOplogEntry.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gMaxNumberOfBatchedOperationsInSingleOplogEntry
+        default: 2147483647  # INT_MAX
+        validator: { gte: 1 }
+
+    maxSizeOfBatchedOperationsInSingleOplogEntryBytes:
+        description: >-
+            Maximum size (bytes) of operations to pack into a single oplog entry, when multi-oplog
+            format for batched writes is in use.
+            See batchedDeletesTargetStagedDocBytes and BSONObjMaxUserSize.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gMaxSizeOfBatchedOperationsInSingleOplogEntryBytes
+        default: 16777216  # 16 MB
+        validator: { gte: 1 }
+
 feature_flags:
     featureFlagClusteredIndexes:
         description: "When enabled, support non time-series collections with clustered indexes"

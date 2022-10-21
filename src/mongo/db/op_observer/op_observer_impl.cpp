@@ -69,6 +69,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/timeseries/deleted_buckets.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
@@ -1563,6 +1564,24 @@ std::size_t getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes() {
 }
 
 /**
+ * Returns maximum number of operations to pack into a single oplog entry,
+ * when multi-oplog format for batched writes is in use.
+ */
+std::size_t getMaxNumberOfBatchedOperationsInSingleOplogEntry() {
+    // IDL validation defined for this startup parameter ensures that we have a positive number.
+    return static_cast<std::size_t>(gMaxNumberOfBatchedOperationsInSingleOplogEntry);
+}
+
+/**
+ * Returns maximum size (bytes) of operations to pack into a single oplog entry,
+ * when multi-oplog format for batched writes is in use.
+ */
+std::size_t getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes() {
+    // IDL validation defined for this startup parameter ensures that we have a positive number.
+    return static_cast<std::size_t>(gMaxSizeOfBatchedOperationsInSingleOplogEntryBytes);
+}
+
+/**
  * Writes change stream pre-images for transaction 'operations'. The 'applyOpsOperationAssignment'
  * contains a representation of "applyOps" entries to be written for the transaction. The
  * 'operationTime' is wall clock time of the operations used for the pre-image documents.
@@ -2051,13 +2070,21 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
 
     // Serialize batched statements to BSON and determine their assignment to "applyOps"
     // entries.
+    // By providing limits on operation count and size, this makes the processing of batched writes
+    // more consistent with our treatment of multi-doc transactions.
     const auto applyOpsOplogSlotAndOperationAssignment =
         batchedOps->getApplyOpsInfo(oplogSlots,
                                     /*prepare=*/false,
-                                    /*oplogEntryCountLimit=*/boost::none,
-                                    /*oplogEntrySizeLimitBytes=*/boost::none);
+                                    getMaxNumberOfBatchedOperationsInSingleOplogEntry(),
+                                    getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes());
 
-    tassert(6501800,
+    // TODO(SERVER-70572): Remove this restriction once multi-oplog batched writes are supported.
+    // Before SERVER-70765, we relied on packTransactionStatementsForApplyOps() to check if the
+    // batch of operations could fit in a single applyOps entry. Now, we pass the size limit to
+    // TransactionOperations::getApplyOpsInfo() and are now able to return an error earlier.
+    // Previously, this used to be a tripwire assertion (tassert). This is now a uassert to be
+    // consistent with packTransactionStatementsForApplyOps().
+    uassert(ErrorCodes::TransactionTooLarge,
             "batched writes must generate a single applyOps entry",
             applyOpsOplogSlotAndOperationAssignment.applyOpsEntries.size() == 1);
 
