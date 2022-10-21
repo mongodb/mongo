@@ -32,16 +32,15 @@ if (!TimeseriesTest.bucketUnpackWithSortEnabled(db.getMongo())) {
 const timeFieldName = "t";
 
 // Create unindexed collection
-const coll = db.timeseries_internal_bounded_sort;
+const coll = db.timeseries_internal_bounded_sort_extended_range;
 const buckets = db['system.buckets.' + coll.getName()];
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: 't'}}));
 
 // Create collection indexed on time
-const collIndexed = db.timeseries_internal_bounded_sort_with_index;
+const collIndexed = db.timeseries_internal_bounded_sort_extended_range_with_index;
 const bucketsIndexed = db['system.buckets.' + collIndexed.getName()];
 collIndexed.drop();
-
 assert.commandWorked(db.createCollection(collIndexed.getName(), {timeseries: {timeField: 't'}}));
 assert.commandWorked(collIndexed.createIndex({'t': 1}));
 
