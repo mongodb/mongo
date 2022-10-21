@@ -48,14 +48,8 @@ public:
     AtomicWord<long long> opened;
     AtomicWord<long long> closed;
 
-    long long bytesSpilled() const {
-        return _bytesSpilled;
-    }
-
 private:
     SorterTracker* _sorterTracker;
-
-    long long _bytesSpilled = 0;
 };
 
 class SorterStats {

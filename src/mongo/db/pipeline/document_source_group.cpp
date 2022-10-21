@@ -152,6 +152,7 @@ bool DocumentSourceGroup::shouldSpillWithAttemptToSaveMemory() {
                 "Exceeded memory limit for $group, but didn't allow external sort."
                 " Pass allowDiskUse:true to opt in.",
                 _memoryTracker._allowDiskUse);
+        _memoryTracker.resetCurrent();
         return true;
     }
     return false;
@@ -340,9 +341,6 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
             Value(static_cast<long long>(_stats.totalOutputDataSizeBytes));
         out["usedDisk"] = Value(_stats.spills > 0);
         out["spills"] = Value(static_cast<long long>(_stats.spills));
-        out["spillFileSizeBytes"] = Value(static_cast<long long>(_stats.spillFileSizeBytes));
-        out["numBytesSpilledEstimate"] =
-            Value(static_cast<long long>(_stats.numBytesSpilledEstimate));
     }
 
     return Value(out.freezeToValue());
@@ -709,7 +707,6 @@ MONGO_COMPILER_NOINLINE DocumentSource::GetNextResult DocumentSourceGroup::initi
 
 shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
     _stats.spills++;
-    _stats.numBytesSpilledEstimate += _memoryTracker.currentMemoryBytes();
 
     vector<const GroupsMap::value_type*> ptrs;  // using pointers to speed sorting
     ptrs.reserve(_groups->size());
@@ -721,12 +718,8 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
 
     // Initialize '_file' in a lazy manner only when it is needed.
     if (!_file) {
-        // Only track stats about spilling when running in execution level explain.
-        if (pExpCtx->explain && *pExpCtx->explain >= ExplainOptions::Verbosity::kExecStats) {
-            _spillStats = std::make_unique<SorterFileStats>(nullptr /* sorterTracker */);
-        }
-        _file = std::make_shared<Sorter<Value, Value>::File>(
-            pExpCtx->tempDir + "/" + nextFileName(), _spillStats.get());
+        _file =
+            std::make_shared<Sorter<Value, Value>::File>(pExpCtx->tempDir + "/" + nextFileName());
     }
     SortedFileWriter<Value, Value> writer(SortOptions().TempDir(pExpCtx->tempDir), _file);
     switch (_accumulatedFields.size()) {  // same as ptrs[i]->second.size() for all i.
@@ -759,15 +752,13 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
     metricsCollector.incrementSorterSpills(1);
 
     _groups->clear();
-
-    // Zero out the current per-accumulation statement memory consumption, as well as the
-    // current memory consumption, as the memory has been freed by spilling.
-    _memoryTracker.resetCurrent();
+    // Zero out the current per-accumulation statement memory consumption, as the memory has been
+    // freed by spilling.
+    for (const auto& accum : _accumulatedFields) {
+        _memoryTracker.set(accum.fieldName, 0);
+    }
 
     Sorter<Value, Value>::Iterator* iteratorPtr = writer.done();
-    if (_spillStats) {
-        _stats.spillFileSizeBytes = _spillStats->bytesSpilled();
-    }
     return shared_ptr<Sorter<Value, Value>::Iterator>(iteratorPtr);
 }
 
