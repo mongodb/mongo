@@ -34,7 +34,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/catalog/type_mongos.h"
 
@@ -65,7 +64,7 @@ QueryAnalysisCoordinator* QueryAnalysisCoordinator::get(ServiceContext* serviceC
 bool QueryAnalysisCoordinator::shouldRegisterReplicaSetAwareService() const {
     // This is invoked when the Register above is constructed which is before FCV is set so we need
     // to ignore FCV when checking if the feature flag is enabled.
-    return analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabledAndIgnoreFCV() &&
+    return analyze_shard_key::isFeatureFlagEnabledIgnoreFCV() &&
         serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
 }
 

@@ -43,9 +43,9 @@ enums:
       kUnknown: "unknown"
 
 structs:
-  percentileMetrics:
+  PercentileMetrics:
     description: "The percentile metrics for a set of non-negative integers."
-    strict: true
+    strict: false
     fields:
       p99:
         type: long
@@ -63,8 +63,9 @@ structs:
         type: long
         validator: { gte: 0 }
 
-  keyCharacteristicsMetrics:
+  KeyCharacteristicsMetrics:
     description: "The metrics about the characteristics of a shard key."
+    strict: false
     fields:
       numDocs:
         type: long
@@ -81,7 +82,7 @@ structs:
         validator: { gte: 0 }
         optional: true
       frequency:
-        type: percentileMetrics
+        type: PercentileMetrics
         description: "The percentile metrics for the number of documents for each distinct shard key
                       value."
         optional: true
@@ -100,13 +101,13 @@ structs:
     strict: false
     inline_chained_structs: true
     chained_structs:
-      keyCharacteristicsMetrics: keyCharacteristics
+      KeyCharacteristicsMetrics: keyCharacteristics
 
 commands:
   analyzeShardKey:
     description: "The command for calculating metrics for evaluating a shard key for a collection."
     command_name: analyzeShardKey
-    strict: true
+    strict: false
     namespace: type
     api_version: ""
     type: namespacestring

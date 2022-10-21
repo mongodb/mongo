@@ -27,23 +27,24 @@
 #
 
 global:
-    cpp_namespace: "mongo"
+  cpp_namespace: "mongo"
 
 imports:
-    - "mongo/db/basic_types.idl"
-    - "mongo/s/configure_query_analyzer_cmd.idl"
+  - "mongo/db/basic_types.idl"
+  - "mongo/s/analyze_shard_key_common.idl"
 
 structs:
-    QueryAnalyzerDocument:
-        description: "Represents settings for query sampling for one collection."
-        fields:
-            _id:
-                type: uuid
-                description: "The UUID of the collection being sampled."
-                cpp_name: collectionUuid
-            ns:
-                type: namespacestring 
-                description: "The namespace of the collectiong being sampled."
-        inline_chained_structs: true
-        chained_structs:
-            queryAnalyzerConfiguration: configuration
+  QueryAnalyzerDocument:
+    description: "Represents a document storing the query analyzer configuration for a collection
+                  as configured via the configureQueryAnalyzer command."
+    fields:
+      _id:
+        type: uuid
+        description: "The UUID of the collection."
+        cpp_name: collectionUuid
+      ns:
+        type: namespacestring
+        description: "The namespace of the collection."
+    inline_chained_structs: true
+    chained_structs:
+      QueryAnalyzerConfiguration: configuration

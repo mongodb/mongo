@@ -132,15 +132,26 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='analyze_shard_key_common',
+    source=[
+        'analyze_shard_key_common.idl',
+        'analyze_shard_key_documents.idl',
+        'analyze_shard_key_feature_flag.idl',
+        'analyze_shard_key_server_parameters.idl',
+        'analyze_shard_key_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/namespace_string_util',
+    ],
+)
+
 # Sharding code needed by both mongos and mongod.
 env.Library(
     target='common_s',
     source=[
         'analyze_shard_key_cmd.idl',
-        'analyze_shard_key_common.idl',
-        'analyze_shard_key_documents.idl',
-        'analyze_shard_key_feature_flag.idl',
-        'analyze_shard_key_server_parameters.idl',
         'cannot_implicitly_create_collection_info.cpp',
         'catalog/mongo_version_range.cpp',
         'catalog/type_changelog.cpp',
@@ -219,6 +230,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/rpc/message',
+        'analyze_shard_key_common',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',

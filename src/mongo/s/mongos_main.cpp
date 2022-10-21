@@ -73,7 +73,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_factory.h"
@@ -314,8 +313,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             lsc->joinOnShutDown();
         }
 
-        if (analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+        if (analyze_shard_key::isFeatureFlagEnabled()) {
             LOGV2_OPTIONS(
                 6973901, {LogComponent::kDefault}, "Shutting down the QueryAnalysisSampler");
             analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
@@ -795,8 +793,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         return ExitCode::processHealthCheck;
     }
 
-    if (analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (analyze_shard_key::isFeatureFlagEnabled()) {
         LOGV2_OPTIONS(6973900, {LogComponent::kDefault}, "Starting the QueryAnalysisSampler");
         analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onStartup();
     }

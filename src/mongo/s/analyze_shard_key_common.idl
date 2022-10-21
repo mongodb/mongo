@@ -32,9 +32,32 @@ global:
 imports:
   - "mongo/db/basic_types.idl"
 
+enums:
+  QueryAnalyzerMode:
+    description: "The query analysis mode for a collection."
+    type: string
+    values:
+      kFull: "full"
+      kOff: "off"
+
 structs:
+  QueryAnalyzerConfiguration:
+    description: "The query analyzer configuration for a collection as configured via the
+                  configureQueryAnalyzer command."
+    strict: false
+    fields:
+      mode:
+        type: QueryAnalyzerMode
+        description: "The query analyzer mode."
+      sampleRate:
+        type: double
+        description: "The maximum number of queries to sample per second, in total across the
+                      cluster (not per mongos or mongod)."
+        optional: true
+
   CollectionQueryAnalyzerConfiguration:
-    description: "The query analyzer configuration for a collection."
+    description: "The query analyzer configuration for a collection as returned by the
+                  _refreshQueryAnalyzerConfiguration command."
     fields:
       ns:
           type: namespacestring

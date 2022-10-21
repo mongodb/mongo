@@ -33,7 +33,6 @@
 
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
@@ -61,8 +60,7 @@ QueryAnalysisSampler& QueryAnalysisSampler::get(OperationContext* opCtx) {
 }
 
 QueryAnalysisSampler& QueryAnalysisSampler::get(ServiceContext* serviceContext) {
-    invariant(analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabled(
-                  serverGlobalParams.featureCompatibility),
+    invariant(analyze_shard_key::isFeatureFlagEnabled(),
               "Only support analyzing queries when the feature flag is enabled");
     invariant(isMongos(), "Only support analyzing queries on a sharded cluster");
     return getQueryAnalysisSampler(serviceContext);

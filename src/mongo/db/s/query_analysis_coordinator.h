@@ -33,6 +33,7 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
+#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
