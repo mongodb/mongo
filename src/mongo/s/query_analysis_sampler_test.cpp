@@ -143,6 +143,7 @@ public:
             std::make_unique<SharedClockSourceAdapter>(_mockClock));
     }
 
+protected:
     void advanceTime(Milliseconds millis) {
         _mockClock->advance(millis);
     }
@@ -151,12 +152,11 @@ public:
         return _mockClock->now();
     }
 
-private:
-    const std::shared_ptr<ClockSourceMock> _mockClock = std::make_shared<ClockSourceMock>();
-
-protected:
     const NamespaceString nss{"testDb", "testColl"};
     const UUID collUuid = UUID::gen();
+
+private:
+    const std::shared_ptr<ClockSourceMock> _mockClock = std::make_shared<ClockSourceMock>();
 };
 
 DEATH_TEST_F(QueryAnalysisSamplerRateLimiterTest, CannotUseZeroRate, "invariant") {
@@ -472,6 +472,7 @@ public:
         setMongos(_originalIsMongos);
     }
 
+protected:
     void advanceTime(Milliseconds millis) {
         _mockClock->advance(millis);
     }
@@ -526,12 +527,6 @@ public:
         ASSERT_EQ(rateLimiters.size(), configurations.size());
     }
 
-private:
-    const std::shared_ptr<ClockSourceMock> _mockClock = std::make_shared<ClockSourceMock>();
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey", true};
-    bool _originalIsMongos;
-
-protected:
     const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
 
     const NamespaceString nss0{"testDb", "testColl0"};
@@ -541,6 +536,11 @@ protected:
     const UUID collUuid0 = UUID::gen();
     const UUID collUuid1 = UUID::gen();
     const UUID collUuid2 = UUID::gen();
+
+private:
+    const std::shared_ptr<ClockSourceMock> _mockClock = std::make_shared<ClockSourceMock>();
+    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey", true};
+    bool _originalIsMongos;
 };
 
 DEATH_TEST_F(QueryAnalysisSamplerTest, CannotGetIfFeatureFlagNotEnabled, "invariant") {

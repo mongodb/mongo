@@ -59,6 +59,7 @@ public:
         opObserverRegistry->addObserver(std::make_unique<QueryAnalysisOpObserver>());
     }
 
+protected:
     void advanceTime(Seconds secs) {
         _mockClock->advance(secs);
     }
@@ -83,7 +84,7 @@ public:
     }
 
     void assertContainsConfiguration(
-        const std::map<UUID, CollectionQueryAnalyzerConfiguration>& configurations,
+        const QueryAnalysisCoordinator::CollectionQueryAnalyzerConfigurationMap& configurations,
         QueryAnalyzerDocument analyzerDoc) {
         auto it = configurations.find(analyzerDoc.getCollectionUuid());
         ASSERT(it != configurations.end());
@@ -142,7 +143,6 @@ public:
         }
     }
 
-protected:
     const NamespaceString nss0{"testDb", "testColl0"};
     const NamespaceString nss1{"testDb", "testColl1"};
     const NamespaceString nss2{"testDb", "testColl2"};
