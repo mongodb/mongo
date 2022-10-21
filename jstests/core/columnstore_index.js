@@ -3,6 +3,14 @@
  * @tags: [
  *   # Uses $indexStats which is not supported inside a transaction.
  *   does_not_support_transactions,
+ *
+ *   # The test relies on '$indexStats' seeing an earlier read
+ *   # operation. So both the $indexStats and the read operation need to be
+ *   # sent to the same node.
+ *   does_not_support_repeated_reads,
+ *   does_not_support_stepdowns,
+ *   assumes_read_preference_unchanged,
+ *
  *   # column store indexes are still under a feature flag and require full sbe
  *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
@@ -17,7 +25,10 @@ load("jstests/libs/analyze_plan.js");
 const coll = db.columnstore_index;
 coll.drop();
 
-assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
+const csIdx = {
+    "$**": "columnstore"
+};
+assert.commandWorked(coll.createIndex(csIdx));
 
 // Test that we can indeed insert and index documents.
 assert.commandWorked(coll.insert({_id: 0, x: 1, y: 1}));
@@ -35,12 +46,29 @@ coll.drop();
 // Test building index after there is already data - should enable using a bulk builder.
 const allDocs = [{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 1}, {_id: 3, a: 3, b: 1}];
 assert.commandWorked(coll.insert(allDocs));
-assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
+assert.commandWorked(coll.createIndex(csIdx));
 
-// Test returning index stats. TODO SERVER-65980 assert that we get something sensible
-assert.doesNotThrow(() => coll.aggregate([{$indexStats: {}}]));
-// Test returning collection stats. TODO SERVER-65980 assert that we get something sensible
-assert.doesNotThrow(() => coll.aggregate([{$collStats: {}}]));
+let getCSIUsageCount = function(collection) {
+    const csi =
+        collection
+            .aggregate([{$indexStats: {}}, {$match: {$expr: {$eq: ["$key", {$literal: csIdx}]}}}])
+            .toArray();
+    assert.eq(csi.length, 1);
+    return csi[0].accesses.ops;
+};
+
+// Test index stats have sensible usage count values for column store indexes.
+var usageCount = 0;
+assert.eq(getCSIUsageCount(coll), usageCount);
+const res = coll.aggregate([{"$project": {"a": 1, _id: 0}}, {"$match": {a: 1}}]);
+assert.eq(res.itcount(), 1);
+usageCount++;
+assert.eq(getCSIUsageCount(coll), usageCount);
+
+// Test collStats have sensible values for column store indexes
+const cs = coll.aggregate([{$collStats: {storageStats: {}}}]).next();
+assert.eq(cs.storageStats.indexDetails["$**_columnstore"].type, "file");
+assert.gt(cs.storageStats.indexSizes["$**_columnstore"], 0);
 
 // Test running validate.
 assert.commandWorked(coll.validate());

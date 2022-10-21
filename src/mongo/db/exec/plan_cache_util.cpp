@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/plan_cache_util.h"
-
-#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -159,6 +154,11 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
             case STAGE_IXSCAN: {
                 auto ixn = static_cast<const IndexScanNode*>(node);
                 debugInfo.mainStats.indexesUsed.push_back(ixn->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_COLUMN_SCAN: {
+                auto cisn = static_cast<const ColumnIndexScanNode*>(node);
+                debugInfo.mainStats.indexesUsed.push_back(cisn->indexEntry.identifier.catalogName);
                 break;
             }
             case STAGE_TEXT_MATCH: {
