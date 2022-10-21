@@ -280,15 +280,16 @@ void deleteKey(OperationContext* opCtx,
 
     // For now _id is unique, so we assume only one entry can be returned.
     BSONObj deletedObj;
-    planExecutor->getNext(&deletedObj, nullptr);
+    auto execState = planExecutor->getNext(&deletedObj, nullptr);
 
-    // Return error if no document has been found (deletedObj is empty) or if the associated
-    // "key" does not match the key provided as parameter.
+    // Return error if no document has been found or if the associated "key" does not match the key
+    // provided as parameter.
     uassert(ErrorCodes::KeyNotFound,
             str::stream() << "Global index container with UUID " << container->uuid()
                           << " does not contain specified entry. key:" << key
                           << ", docKey:" << docKey,
-            deletedObj.woCompare(buildIndexEntry(key, docKey)) == 0);
+            execState == PlanExecutor::ExecState::ADVANCED &&
+                deletedObj.woCompare(buildIndexEntry(key, docKey)) == 0);
 
     fassert(6924202, planExecutor->isEOF());
 }
