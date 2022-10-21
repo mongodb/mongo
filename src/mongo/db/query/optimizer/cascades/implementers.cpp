@@ -79,11 +79,6 @@ public:
             return;
         }
 
-        const auto& requiredProjections =
-            getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
-        const ProjectionName& ridProjName = _ridProjections.at(node.getScanDefName());
-        const bool needsRID = requiredProjections.find(ridProjName).second;
-
         const auto& indexReq = getPropertyConst<IndexingRequirement>(_physProps);
         const IndexReqTarget indexReqTarget = indexReq.getIndexReqTarget();
         switch (indexReqTarget) {
@@ -121,12 +116,19 @@ public:
             return;
         }
 
+        const auto& requiredProjections =
+            getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
+        const ProjectionName& ridProjName = _ridProjections.at(node.getScanDefName());
+
         FieldProjectionMap fieldProjectionMap;
         for (const ProjectionName& required : requiredProjections.getVector()) {
             if (required == node.getProjectionName()) {
                 fieldProjectionMap._rootProjection = node.getProjectionName();
+            } else if (required == ridProjName) {
+                fieldProjectionMap._ridProjection = ridProjName;
             } else {
-                // Regular scan node can satisfy only using its root projection (not fields).
+                // Regular scan node can satisfy only using its root or rid projections (not
+                // fields).
                 return;
             }
         }
@@ -150,9 +152,6 @@ public:
                                      {},
                                      std::move(nodeCEMap));
         } else {
-            if (needsRID) {
-                fieldProjectionMap._ridProjection = ridProjName;
-            }
             ABT physicalScan = make<PhysicalScanNode>(
                 std::move(fieldProjectionMap), node.getScanDefName(), canUseParallelScan);
             optimizeChild<PhysicalScanNode, PhysicalRewriteType::PhysicalScan>(

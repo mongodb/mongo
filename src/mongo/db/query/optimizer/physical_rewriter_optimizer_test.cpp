@@ -5066,6 +5066,54 @@ TEST(PhysRewriter, RequireRID) {
         optimized);
 }
 
+TEST(PhysRewriter, RequireRID1) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("scan_0", "c1");
+
+    // Non-sargable filter node.
+    ABT filterNode = make<FilterNode>(Constant::boolean(true), std::move(scanNode));
+
+    ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"scan_0"}},
+                                  std::move(filterNode));
+
+    PrefixId prefixId;
+    OptPhaseManager phaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        true /*requireRID*/,
+        {{{"c1", createScanDef({}, {})}}},
+        std::make_unique<HeuristicCE>(),
+        std::make_unique<DefaultCosting>(),
+        {} /*pathToInterval*/,
+        ConstEval::constFold,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
+    ASSERT_EQ(3, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       rid_0\n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   Const [true]\n"
+        "PhysicalScan [{'<rid>': rid_0, '<root>': scan_0}, c1]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
+        "            Source []\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        optimized);
+}
+
 TEST(PhysRewriter, UnionRewrite) {
     using namespace properties;
 
