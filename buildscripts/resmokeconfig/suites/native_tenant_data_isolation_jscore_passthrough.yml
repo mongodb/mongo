@@ -1,0 +1,31 @@
+test_kind: js_test
+
+selector:
+  roots:
+  # TODO SERVER-70545: Pass through more jscore tests "jstests/core/**/*.js" and add hooks for test.
+  # Currently, the test suite is only used for verify the override implemented by inject_security_token.js.
+  - jstests/core/basic8.js
+  - jstests/core/count.js
+
+executor:
+  archive:
+    tests: true
+  config:
+    shell_options:
+      eval: |
+        load('jstests/libs/override_methods/inject_security_token.js');
+  fixture:
+    class: ReplicaSetFixture
+    num_nodes: 3
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        multitenancySupport: true
+        featureFlagMongoStore: true
+        # TODO SERVER-70740: remove featureFlagRequireTenantID from the parameters and have the
+        # inject_security_token override to be able to test both tenant-prefixed request and non-tenant-prefixed request.
+        # Currently, we only test non-tenant-prefixed request and enable the featureFlagRequireTenantID
+        # to have mongod return non-tenant-prefixed response too.
+        featureFlagRequireTenantID: true
+        logComponentVerbosity:
+          command: 3
