@@ -37,6 +37,8 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -66,8 +68,63 @@ bool inRecoveryMode(OperationContext* opCtx) {
 }  // namespace recoverable_critical_section_util
 
 namespace {
+const StringData kGlobalIndexesFieldName = "globalIndexes"_sd;
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
+
+AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* opCtx) {
+    auto expCtx = make_intrusive<ExpressionContext>(
+        opCtx, nullptr, NamespaceString::kShardCollectionCatalogNamespace);
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    resolvedNamespaces[NamespaceString::kShardCollectionCatalogNamespace.coll()] = {
+        NamespaceString::kShardCollectionCatalogNamespace, std::vector<BSONObj>()};
+    resolvedNamespaces[NamespaceString::kShardIndexCatalogNamespace.coll()] = {
+        NamespaceString::kShardIndexCatalogNamespace, std::vector<BSONObj>()};
+    expCtx->setResolvedNamespaces(resolvedNamespaces);
+
+    using Doc = Document;
+    using Arr = std::vector<Value>;
+
+    Pipeline::SourceContainer stages;
+
+    // 1. Match all entries in config.shard.collections with indexVersion.
+    // {
+    //      $match: {
+    //          indexVersion: {
+    //              $exists: true
+    //          }
+    //      }
+    // }
+    stages.emplace_back(DocumentSourceMatch::create(
+        Doc{{CollectionType::kIndexVersionFieldName, Doc{{"$exists", true}}}}.toBson(), expCtx));
+
+    // 2. Retrieve config.shard.indexes entries with the same uuid as the one from the
+    // config.shard.collections document.
+    //
+    // The $lookup stage gets the config.shard.indexes documents and puts them in a field called
+    // "globalIndexes" in the document produced during stage 1.
+    //
+    // {
+    //      $lookup: {
+    //          from: "shard.indexes",
+    //          as: "globalIndexes",
+    //          localField: "uuid",
+    //          foreignField: "collectionUUID"
+    //      }
+    // }
+    const Doc lookupPipeline{{"from", NamespaceString::kShardIndexCatalogNamespace.coll()},
+                             {"as", kGlobalIndexesFieldName},
+                             {"localField", CollectionType::kUuidFieldName},
+                             {"foreignField", IndexCatalogType::kCollectionUUIDFieldName}};
+
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(
+        Doc{{"$lookup", lookupPipeline}}.toBson().firstElement(), expCtx));
+
+    auto pipeline = Pipeline::create(std::move(stages), expCtx);
+    auto serializedPipeline = pipeline->serializeToBson();
+    return AggregateCommandRequest(NamespaceString::kShardCollectionCatalogNamespace,
+                                   std::move(serializedPipeline));
 }
+}  // namespace
 
 ShardingRecoveryService* ShardingRecoveryService::get(ServiceContext* serviceContext) {
     return &serviceDecorator(serviceContext);
@@ -440,31 +497,26 @@ void ShardingRecoveryService::recoverIndexesCatalog(OperationContext* opCtx) {
                         "namespace"_attr = collName);
         }
     }
-
     DBDirectClient client(opCtx);
-    stdx::unordered_map<std::string, Timestamp> indexVersions;
-    FindCommandRequest findRequest{NamespaceString::kShardCollectionCatalogNamespace};
-    findRequest.setProjection(
-        BSON(CollectionType::kNssFieldName << 1 << CollectionType::kIndexVersionFieldName << 1));
-    // Map the indexes that are on disk to memory with the appropiate indexVersion.
-    client.find(std::move(findRequest), [&opCtx, &indexVersions](const BSONObj& coll) {
-        auto nss = coll[CollectionType::kNssFieldName].str();
-        auto indexVersion = coll[CollectionType::kIndexVersionFieldName].timestamp();
-        indexVersions.emplace(nss, indexVersion);
-    });
+    auto aggRequest = makeCollectionsAndIndexesAggregation(opCtx);
 
-    FindCommandRequest findIndexesRequest{NamespaceString::kShardIndexCatalogNamespace};
-    client.find(std::move(findIndexesRequest), [&opCtx, &indexVersions](const BSONObj& coll) {
-        auto indexEntry =
-            IndexCatalogType::parse(IDLParserContext("recoverIndexesCatalogContext"), coll);
-        auto nss =
-            CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, indexEntry.getCollectionUUID());
-        invariant(indexVersions.contains(nss->ns()));
-        AutoGetCollection collLock(opCtx, *nss, MODE_X);
-        CollectionShardingRuntime::get(opCtx, collLock->ns())
-            ->addIndex(opCtx, indexEntry, indexVersions[collLock->ns().toString()]);
-    });
+    auto cursor = uassertStatusOKWithContext(
+        DBClientCursor::fromAggregationRequest(
+            &client, aggRequest, true /* secondaryOk */, true /* useExhaust */),
+        "Failed to establish a cursor for aggregation");
 
+
+    while (cursor->more()) {
+        auto doc = cursor->nextSafe();
+        auto nss = NamespaceString(doc[CollectionType::kNssFieldName].String());
+        auto indexVersion = doc[CollectionType::kIndexVersionFieldName].timestamp();
+        for (const auto& idx : doc[kGlobalIndexesFieldName].Array()) {
+            auto indexEntry = IndexCatalogType::parse(
+                IDLParserContext("recoverIndexesCatalogContext"), idx.Obj());
+            AutoGetCollection collLock(opCtx, nss, MODE_X);
+            CollectionShardingRuntime::get(opCtx, nss)->addIndex(opCtx, indexEntry, indexVersion);
+        }
+    }
     LOGV2_DEBUG(6686502, 2, "Recovered all index versions");
 }
 
