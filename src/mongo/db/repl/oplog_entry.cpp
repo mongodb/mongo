@@ -508,8 +508,15 @@ bool DurableOplogEntry::isSingleOplogEntryTransactionWithCommand() const {
     // entries with commands at the beginning.
     for (BSONElement e : applyOps.Array()) {
         auto ns = e.Obj().getField("ns");
-        if (!ns.eoo() && NamespaceString(ns.String()).isCommand()) {
-            return true;
+        if (!ns.eoo()) {
+            auto tid = e.Obj().getField("tid");
+            auto tenantId = tid.eoo()
+                ? boost::none
+                : boost::make_optional<TenantId>(TenantId::parseFromBSON(tid));
+
+            if (NamespaceStringUtil::deserialize(tenantId, ns.String()).isCommand()) {
+                return true;
+            }
         }
     }
     return false;
