@@ -1358,6 +1358,16 @@ env.Library(
 )
 
 env.Library(
+    target='shard_filterer',
+    source=[
+        'exec/shard_filterer_impl.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        's/sharding_api_d',
+    ],
+)
+
+env.Library(
     target='query_exec',
     source=[
         'clientcursor.cpp',
@@ -1396,7 +1406,6 @@ env.Library(
         'exec/return_key.cpp',
         'exec/sample_from_timeseries_bucket.cpp',
         'exec/shard_filter.cpp',
-        'exec/shard_filterer_impl.cpp',
         'exec/skip.cpp',
         'exec/sort.cpp',
         'exec/sort_key_generator.cpp',
@@ -1498,6 +1507,7 @@ env.Library(
         'repl/repl_coordinator_interface',
         's/sharding_api_d',
         'session/logical_session_cache',
+        'shard_filterer',
         'shard_role',
         'shared_request_handling',
         'stats/latency_server_stats',
