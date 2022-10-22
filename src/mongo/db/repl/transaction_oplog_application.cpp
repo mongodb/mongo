@@ -136,10 +136,10 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
 
     auto ops = readTransactionOperationsFromOplogChain(opCtx, entry, {});
 
-    const auto dbName = entry.getNss().dbName();
+    const auto dbName = entry.getNss().db().toString();
     Status status = Status::OK();
 
-    writeConflictRetry(opCtx, "replaying prepared transaction", dbName.db(), [&] {
+    writeConflictRetry(opCtx, "replaying prepared transaction", dbName, [&] {
         WriteUnitOfWork wunit(opCtx);
 
         // we might replay a prepared transaction behind oldest timestamp.
