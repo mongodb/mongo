@@ -570,8 +570,16 @@ logv2::LogSeverity getWTLOGV2SeverityLevel(const BSONObj& obj) {
             return logv2::LogSeverity::Info();
         case WT_VERBOSE_INFO:
             return logv2::LogSeverity::Log();
-        case WT_VERBOSE_DEBUG:
+        case WT_VERBOSE_DEBUG_1:
             return logv2::LogSeverity::Debug(1);
+        case WT_VERBOSE_DEBUG_2:
+            return logv2::LogSeverity::Debug(2);
+        case WT_VERBOSE_DEBUG_3:
+            return logv2::LogSeverity::Debug(3);
+        case WT_VERBOSE_DEBUG_4:
+            return logv2::LogSeverity::Debug(4);
+        case WT_VERBOSE_DEBUG_5:
+            return logv2::LogSeverity::Debug(5);
         default:
             return logv2::LogSeverity::Log();
     }
@@ -1156,10 +1164,24 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
         cfg << ",";
 
         int level;
-        if (severity.toInt() >= logv2::LogSeverity::Debug(2).toInt())
-            level = WT_VERBOSE_DEBUG;
-        else
-            level = WT_VERBOSE_INFO;
+        // Deliberately skip WT_VERBOSE_DEBUG_1, as it's a bit too noisy.
+        switch (severity.toInt()) {
+            case logv2::LogSeverity::Debug(2).toInt():
+                level = WT_VERBOSE_DEBUG_2;
+                break;
+            case logv2::LogSeverity::Debug(3).toInt():
+                level = WT_VERBOSE_DEBUG_3;
+                break;
+            case logv2::LogSeverity::Debug(4).toInt():
+                level = WT_VERBOSE_DEBUG_4;
+                break;
+            case logv2::LogSeverity::Debug(5).toInt():
+                level = WT_VERBOSE_DEBUG_5;
+                break;
+            default:
+                level = WT_VERBOSE_INFO;
+                break;
+        }
 
         cfg << componentStr << ":" << level;
     }

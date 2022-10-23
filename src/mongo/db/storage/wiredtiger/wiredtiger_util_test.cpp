@@ -443,9 +443,6 @@ TEST(WiredTigerUtilTest, GenerateVerboseConfiguration) {
     // Perform each test in their own limited scope in order to establish different
     // severity levels.
 
-    // TODO SERVER-70651 Re-enable this test.
-    return;
-
     {
         // Set the WiredTiger Checkpoint LOGV2 component severity to the Log level.
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
@@ -463,7 +460,7 @@ TEST(WiredTigerUtilTest, GenerateVerboseConfiguration) {
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
             logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Debug(2)};
         std::string config = WiredTigerUtil::generateWTVerboseConfiguration();
-        ASSERT_TRUE(config.find("checkpoint:1") != std::string::npos);
+        ASSERT_TRUE(config.find("checkpoint:2") != std::string::npos);
         ASSERT_TRUE(config.find("checkpoint:0") == std::string::npos);
     }
 }

@@ -548,9 +548,6 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
     // Perform each test in their own limited scope in order to establish different
     // severity levels.
 
-    // TODO SERVER-70651 Re-enable this test.
-    return;
-
     {
         auto opCtxRaii = _makeOperationContext();
         // Set the WiredTiger Checkpoint LOGV2 component severity to the Log level.
@@ -569,7 +566,7 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
         bool foundWTCheckpointMessage = false;
         for (auto&& bson : getCapturedBSONFormatLogMessages()) {
             if (bson["c"].String() == "WTCHKPT" &&
-                bson["attr"]["message"]["verbose_level"].String() == "DEBUG" &&
+                bson["attr"]["message"]["verbose_level"].String() == "DEBUG_1" &&
                 bson["attr"]["message"]["category"].String() == "WT_VERB_CHECKPOINT") {
                 foundWTCheckpointMessage = true;
             }
@@ -594,7 +591,7 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
         bool foundWTCheckpointMessage = false;
         for (auto&& bson : getCapturedBSONFormatLogMessages()) {
             if (bson["c"].String() == "WTCHKPT" &&
-                bson["attr"]["message"]["verbose_level"].String() == "DEBUG" &&
+                bson["attr"]["message"]["verbose_level"].String() == "DEBUG_1" &&
                 bson["attr"]["message"]["category"].String() == "WT_VERB_CHECKPOINT") {
                 foundWTCheckpointMessage = true;
             }
