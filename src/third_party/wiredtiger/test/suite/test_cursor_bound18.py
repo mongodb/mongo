@@ -69,11 +69,11 @@ class test_cursor_bound18(bound_base):
     def test_bound_api(self):
         cursor = self.create_session_and_cursor()                                                                                                                                                                                                                                        
 
-        # Test default bound api with column groups.
+        # Test bound api: Test default bound api with column groups.
         self.assertEqual(self.set_bounds(cursor, 40, "lower"), 0) 
         self.assertEqual(self.set_bounds(cursor, 90, "upper"), 0)
 
-        # Test that original bounds persist even if setting one bound fails. 
+        # Test bound api: Test that original bounds persist even if setting one bound fails. 
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 30, "upper"), '/Invalid argument/')
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 95, "lower"), '/Invalid argument/')
 
@@ -89,7 +89,7 @@ class test_cursor_bound18(bound_base):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 80, "lower"), '/Invalid argument/')
         self.cursor_traversal_bound(cursor, 50, 70, None)
 
-        #Test successful setting of both bounds.
+        # Test bound api: Test successful setting of both bounds.
         self.assertEqual(self.set_bounds(cursor, 50, "lower"), 0) 
         self.assertEqual(self.set_bounds(cursor, 70, "upper"), 0) 
         self.cursor_traversal_bound(cursor, 50, 70, None)

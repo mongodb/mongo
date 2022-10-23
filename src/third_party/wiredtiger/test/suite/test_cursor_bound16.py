@@ -85,13 +85,13 @@ class test_cursor_bound16(bound_base):
         dumpcurs = self.session.open_cursor(self.uri + self.file_name,
                                                 None, dumpopt)
 
-        # Set bounds at lower key 30 and upper key at 50.
+        # Test bound api: Set bounds at lower key 30 and upper key at 50.
         self.set_bounds(dumpcurs, self.gen_dump_key(30), "lower")
         self.set_bounds(dumpcurs, self.gen_dump_key(50), "upper")
         self.cursor_traversal_bound(dumpcurs, self.gen_dump_key(30), self.gen_dump_key(50), True, 21)
         self.cursor_traversal_bound(dumpcurs, self.gen_dump_key(30), self.gen_dump_key(50), False, 21)
         
-        # Test basic search near scenarios.
+        # Test bound api: Test basic search near scenarios.
         dumpcurs.set_key(self.gen_dump_key(20))
         self.assertEqual(dumpcurs.search_near(), 1)
         self.assertEqual(dumpcurs.get_key(), self.gen_dump_key(30))
@@ -104,7 +104,7 @@ class test_cursor_bound16(bound_base):
         self.assertEqual(dumpcurs.search_near(), -1)
         self.assertEqual(dumpcurs.get_key(), self.gen_dump_key(50))
 
-        # Test basic search scenarios.
+        # Test bound api: Test basic search scenarios.
         dumpcurs.set_key(self.gen_dump_key(20))
         self.assertEqual(dumpcurs.search(), wiredtiger.WT_NOTFOUND)
 
@@ -114,12 +114,12 @@ class test_cursor_bound16(bound_base):
         dumpcurs.set_key(self.gen_dump_key(60))
         self.assertEqual(dumpcurs.search(), wiredtiger.WT_NOTFOUND)
 
-        # Test that cursor resets the bounds.
+        # Test bound api: Test that cursor resets the bounds.
         self.assertEqual(dumpcurs.reset(), 0)
         self.cursor_traversal_bound(dumpcurs, self.start_key, self.end_key, True, 60)
         self.cursor_traversal_bound(dumpcurs, self.start_key, self.end_key, False, 60)
 
-        # Test that cursor action clear works and clears the bounds.
+        # Test bound api: Test that cursor action clear works and clears the bounds.
         self.set_bounds(dumpcurs, self.gen_dump_key(30), "lower")
         self.set_bounds(dumpcurs, self.gen_dump_key(50), "upper")
         self.assertEqual(dumpcurs.bound("action=clear"), 0)

@@ -86,7 +86,7 @@ class test_cursor_bound15(bound_base):
         cursor3 = self.session.open_cursor(uri)
         cursor3.reset()
 
-        # Test with only lower bound set.
+        # Test bound api:  Test with only lower bound set.
         self.assertEqual(self.set_bounds(cursor3, "aab", "lower"), 0) 
         cursor3.set_key("ab")
         self.assertEqual(cursor3.search_near(), -1)
@@ -111,7 +111,7 @@ class test_cursor_bound15(bound_base):
         self.assertEqual(cursor3.get_key(), self.check_key("aaa"))
         cursor3.reset()
 
-        # Test with only upper bound set.
+        # Test bound api: Test with only upper bound set.
         self.assertEqual(self.set_bounds(cursor3, "aac", "upper", True), 0) 
         cursor3.set_key("aad")
         self.assertEqual(cursor3.search_near(), -1)
@@ -130,7 +130,7 @@ class test_cursor_bound15(bound_base):
         self.assertEqual(cursor3.get_key(), self.check_key("aaa"))
         cursor3.reset()
 
-        # Test with both bounds set.
+        # Test bound api: Test with both bounds set.
         self.assertEqual(self.set_bounds(cursor3, "aaa", "lower"), 0) 
         self.assertEqual(self.set_bounds(cursor3, "aad", "upper"), 0) 
         cursor3.set_key("aae")
@@ -152,7 +152,7 @@ class test_cursor_bound15(bound_base):
         self.assertEqual(cursor3.get_key(), self.check_key("aac"))
         cursor3.reset()
 
-        # Test with prefix bounds set.
+        # Test bound api: Test with prefix bounds set.
         # Search near for aaza, with prefix bounds aaa should return the closest visible key: aaz.
         set_prefix_bound(self, cursor3, "aaz")
         self.session.breakpoint()
@@ -161,7 +161,7 @@ class test_cursor_bound15(bound_base):
         self.assertEqual(cursor3.get_key(), self.check_key("aaz"))
         cursor3.reset()
 
-        # Search near for ab, with prefix bounds "aaa" should return the closest visible key: aaa.
+        # Test bound api: Search near for ab, with prefix bounds "aaa" should return the closest visible key: aaa.
         set_prefix_bound(self, cursor3, "aaa")
         self.session.breakpoint()
         cursor3.set_key("ab")
@@ -169,7 +169,7 @@ class test_cursor_bound15(bound_base):
         self.assertEqual(cursor3.get_key(), self.check_key("aaa"))
         cursor3.reset()
 
-        # Search near for aac, should return the closest visible key: aac.
+        # Test bound api: Search near for aac, should return the closest visible key: aac.
         set_prefix_bound(self, cursor3, "a")
         self.session.breakpoint()
         cursor3.set_key("aac")
@@ -177,7 +177,7 @@ class test_cursor_bound15(bound_base):
         self.assertEqual(cursor3.get_key(), self.check_key("aac"))
         cursor3.reset()
 
-        # Search near for aa, should return the closest visible key: aaa.
+        # Test bound api: Search near for aa, should return the closest visible key: aaa.
         set_prefix_bound(self, cursor3, "aaa")
         self.session.breakpoint()
         cursor3.set_key("aa")

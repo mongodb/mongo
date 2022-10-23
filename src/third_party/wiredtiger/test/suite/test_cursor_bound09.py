@@ -73,7 +73,7 @@ class test_cursor_bound09(bound_base):
     # Test ignore prepare.
     def test_cursor_bound_prepared(self):
 
-        # Scenario 1: Prepare conflict on search, search_near and next with key set in middle of bounds.
+        # Test bound api: Prepare conflict on search, search_near and next with key set in middle of bounds.
         cursor = self.create_session_and_cursor()
         session2 = self.conn.open_session()
         
@@ -109,7 +109,7 @@ class test_cursor_bound09(bound_base):
                     raise e
         session2.rollback_transaction()    
 
-        # Scenario 2: Prepare conflict on search, search_near and next with key set on the bounds.
+        # Test bound api: Prepare conflict on search, search_near and next with key set on the bounds.
         if (self.ignore_prepare):
             session2.begin_transaction('ignore_prepare=true')
         else:
@@ -137,7 +137,7 @@ class test_cursor_bound09(bound_base):
                     raise e
         session2.rollback_transaction()
 
-        # Scenario 3: Prepare conflict with prev. Validate keys that aren't in prepared range.
+        # Test bound api: Prepare conflict with prev. Validate keys that aren't in prepared range.
         if (self.ignore_prepare):
             session2.begin_transaction('ignore_prepare=true')
         else:
@@ -163,7 +163,7 @@ class test_cursor_bound09(bound_base):
                     raise (e)
         session2.rollback_transaction()
 
-        # Scenario 4: Prepare conflict with search_near out of the bounds.
+        # Test bound api:: Prepare conflict with search_near out of the bounds.
         self.session.rollback_transaction()
 
         # Prepare keys 29-30
@@ -193,7 +193,7 @@ class test_cursor_bound09(bound_base):
                 raise e
         session2.rollback_transaction() 
 
-        # Scenario 4: Prepare conflict with next with non-inclusive bounds.
+        # Test bound api:Prepare conflict with next with non-inclusive bounds.
         if (self.ignore_prepare):
             session2.begin_transaction('ignore_prepare=true')
         else:

@@ -161,4 +161,42 @@ that may not be modified or freed by the application.  If a longer scope
 is required, the application must make a copy of the memory before the
 cursor is re-used, closed or reset.
 
- */
+@section cursor_bound Apply bounds to the cursor
+
+A cursor may have a set of bounds applied to it, this restricts the key range
+that the cursor operates within.
+
+Suppose we have a table with keys \c A to \c Z. We can restrict the cursor to only operate over
+keys \c L->Q. If the cursor walks past key \c Q, the cursor will enter an unpositioned state having
+walked off the "end" of the table from its perspective. Additionally should the cursor perform a
+search_near, it will only search within the key range of \c L->Q.  This can provide an application with a
+performance boost when operating within tables that have a large number of deleted or invisible records.
+This is because the key comparison with the bound occurs before we determine if the value associated
+with the key is visible or not. The cursor can have a lower bound set or an upper bound set, or both.
+
+@snippet ex_cursor.c cursor bound
+
+Both or either one of the lower and upper bounds can be set, if a bound is not set then the usual start or end of the file applies.
+Given our previous example had we set a lower bound of \c L and no upper bound then our key range would be \c L->Z. When setting the bounds,
+the relevant bound is set prior with \c cursor->set_key. This key does not have to exist or be visible in order for bounds setting to succeed.
+
+Cursor operations next, prev, search, search near, modify, insert, update, and remove support bounds. When performing a traversal such as
+\c cursor->next or \c cursor->prev, the cursor will only return keys that are within the bounds that have been set. For example, calling \c cursor->next
+on an unpositioned range bounded cursor will position it on the lower bound rather than the start of the key range.
+
+If search is called on a key that's not within bounds, this will result in returning a \c WT_NOTFOUND. Calling \c cursor->search_near with a key outside the range
+will always return a key within the range unless no keys are present. \c cursor->search_near can benefit from range bounded cursors, once the cursor
+traverses outside of the bounded range the \c search_near logic can early exit reducing the overall number of keys visited.
+
+Clearing the bounds can be done through resetting the cursor with \c cursor->reset or by passing a clear config to the bounds API call.
+This will unconditionally clear both bounds.
+
+Bounds API is supported with row-store and variable length column store. Bounds API is not supported with fixed length column store.
+
+The bounds API supports these cursor types:
+- File cursor
+- Table cursor
+- Datastore cursor
+- Dump cursor
+
+*/

@@ -371,6 +371,31 @@ how many references to closed data handles are freed, we may continue our walk. 
 usually strike a good balance between not having a lot of overhead for sweeps, and keeping up with
 the need to free up shared resources.
 
+@section arch_cursor_bound Range bounded cursors
+
+Range bounded cursors provide a mechanism for optimizing cursor operations in collections with a large number
+of invisible records. When traversing records the record's key is compared with the bounds set on the cursor and
+the traversal will exit with \c WT_NOTFOUND regardless of whether the value associated with the cursor is visible.
+
+The lower and upper bound in a cursor is represented as a \c WT_ITEM. The implementation applies bounds through the function
+\c __wt_cursor_bound which takes the cursor and a config string as arguments. The config string specifies whether the operation is clearing
+or setting the bound, and if a "set" is in progress, whether the bound is a lower or upper bound. There are four flags that can be set
+when applying bounds: \c WT_CURSTD_BOUND_LOWER, \c WT_CURSTD_BOUND_LOWER_INCLUSIVE, \c WT_CURSTD_BOUND_UPPER, and \c WT_CURSTD_BOUND_UPPER_INCLUSIVE.
+When calling \c __wt_cursor_bound with valid bounds, the respective bound flag is set and the key held on the cursor is copied into the relevant bound buffer.
+When a bounds is set, a copy of the bounds key is made and is kept by the cursor.  Thus the memory used for the key when making the \c cursor->bound call
+does not need to be retained by the application. Clearing a cursor's bounds can be done via resetting the cursor or calling bound with the "clear" config
+which will free both bounds buffers.
+
+When calling \c cursor->next and \c cursor->prev on an unpositioned cursor, WiredTiger guarantees that the cursor will start walking from either the start or end of the file respectively.
+The range bounded cursor logic continues to uphold this guarantee. Doing so requires additional logic to place the cursor at the start or end of the range. In \c cursor->next and \c cursor->prev,
+the cursor gets positioned with the function \c __wt_btcur_bounds_position. This attempts to position the cursor on the appropriate bound for the direction of traversal (e.g. lower bound for next).
+If the bound exists, the cursor will be positioned on the bound, if not it could be positioned on the closest valid record (meaning within the bounded range), or the record just outside of the range.
+In the case it's positioned just outside the range, this is still acceptable as it will be marked as "needing walk", and the following traversal (whether next or
+prev) will continue, returning a record within range at completion.
+
+In \c cursor->search_near, \c __btcur_bounds_search_near_reposition is initially called. This function checks whether the given key to be searched for is within
+the bounded range. If not, the key to be searched for will be updated to be the nearest bound.
+
 @section arch_cursor_debug_copy Debug copy
 
 When cursors are positioned, their data may point to data in the btree or data allocated in the cursor.

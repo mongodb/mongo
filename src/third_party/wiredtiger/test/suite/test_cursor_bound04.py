@@ -33,8 +33,8 @@ from wtbound import bound_base
 # test_cursor_bound04.py
 # Test the next() and prev() calls in the cursor bound API. There are two scenarios that are
 # tested in this python test.
-#   2. Test combination scenarios of using next() and prev() together.
-#   3. Test clearing bounds and special scenarios of the cursor API usage.
+#   1. Test combination scenarios of using next() and prev() together.
+#   2. Test clearing bounds and special scenarios of the cursor API usage.
 class test_cursor_bound04(bound_base):
     file_name = 'test_cursor_bound04'
 
@@ -75,7 +75,7 @@ class test_cursor_bound04(bound_base):
         key = cursor.get_key()
         self.assertEqual(key, self.check_key(self.start_key))
         cursor.reset()
-
+        
         # Test bound api: Test lower bound setting with positioned cursor.
         self.set_bounds(cursor, 45, "lower")
         self.assertEqual(cursor.next(), 0)
@@ -167,7 +167,7 @@ class test_cursor_bound04(bound_base):
     def test_bound_combination_scenario(self):
         cursor = self.create_session_and_cursor()
 
-        # Test that basic cases of setting lower bound and performing combination of next() and
+        # Test basic cases of setting lower bound and performing combination of next() and
         # prev() calls.
         self.set_bounds(cursor, 45, "lower")
         self.assertEqual(cursor.next(), 0)
@@ -181,7 +181,7 @@ class test_cursor_bound04(bound_base):
         self.assertEqual(key, self.check_key(45))
         self.assertEqual(cursor.prev(), wiredtiger.WT_NOTFOUND)
 
-        # Test that basic cases of setting upper bound and performing combination of next() and
+        # Test basic cases of setting upper bound and performing combination of next() and
         # prev() calls.
         self.set_bounds(cursor, 60, "upper")
         self.assertEqual(cursor.prev(), 0)

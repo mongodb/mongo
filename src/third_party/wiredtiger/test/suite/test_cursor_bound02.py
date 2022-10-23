@@ -33,7 +33,7 @@ from wtbound import bound_base
 # test_cursor_bound02.py
 #    Test that setting bounds of different key formats works in the cursor bound API. Make
 # sure that WiredTiger complains when the upper and lower bounds overlap and that clearing the 
-# bounds through the bound API and reset calls work appriopately.
+# bounds through the bound API and reset calls work appropriately.
 class test_cursor_bound02(bound_base):
     file_name = 'test_cursor_bound02'
 
@@ -85,10 +85,10 @@ class test_cursor_bound02(bound_base):
         cursor.set_key(self.gen_key(90))
         self.assertEqual(self.set_bounds(cursor, 90, "upper"), 0)
 
-        # Test bound API: Upper bound < lower bound.
+        # Test bound API: setting upper bound < lower bound is invalid.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 30, "upper"), '/Invalid argument/')
 
-        # Test bound API: Lower bound > upper bound.
+        # Test bound API: setting lower bound > upper bound is invalid.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 95, "lower"), '/Invalid argument/')
 
         # Test bound API: Test setting lower bound to 20, which would succeed setting upper
@@ -116,7 +116,7 @@ class test_cursor_bound02(bound_base):
         self.assertEqual(self.set_bounds(cursor, 90, "upper"), 0)
         cursor.insert()
 
-        # Test bound API: that if lower bound is equal to the upper bound, that both bounds needs to
+        # Test bound API: Test that if lower bound is equal to the upper bound, both bounds needs to
         # have inclusive configured. 
         cursor.bound("action=clear")
         self.assertEqual(self.set_bounds(cursor, 50, "lower", True), 0)
@@ -124,7 +124,7 @@ class test_cursor_bound02(bound_base):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: cursor.bound("bound=lower,inclusive=false"), '/Invalid argument/')
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: cursor.bound("bound=upper,inclusive=false"), '/Invalid argument/')
         
-        # Test bound API: Test that only setting one of the bound inclusive config to true, should
+        # Test bound API: Test that setting only one of the bound inclusive configs to true should
         # fail too.
         cursor.bound("action=clear")
         self.assertEqual(self.set_bounds(cursor, 50, "lower", False), 0)
@@ -175,7 +175,7 @@ class test_cursor_bound02(bound_base):
         self.assertEqual(self.set_bounds(cursor, 90, "lower"), 0)
         self.assertEqual(self.set_bounds(cursor, 99, "upper"), 0)
 
-        # Test bound API: Make sure that a clear and reset works sequentially.
+        # Test bound API: Make sure that clear and reset works regardless of the order its called.
         cursor.reset()
         self.assertEqual(cursor.bound("action=clear"), 0)
 
