@@ -199,7 +199,6 @@ testutil_parse_single_opt(TEST_OPTS *opts, int ch)
     case 'W': /* Number of writer threads */
         opts->n_write_threads = (uint64_t)atoll(__wt_optarg);
         break;
-    case '?':
     default:
         return (1);
     }

@@ -87,29 +87,29 @@ typedef struct {
 #define UNUSED_OPTS 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 static TEST_DRIVER driver[] = {
   {{"parse_opts", "-b", "builddir", "-T", "21", NULL},
-    {NULL, NULL, {0}, NULL, (char *)"builddir", NULL, 0, NULL, NULL, false, false, false, false, 0,
-      0, 21, UNUSED_OPTS},
+    {NULL, NULL, {0}, NULL, (char *)"builddir", NULL, TABLE_NOT_SET, NULL, NULL, false, false,
+      false, false, 0, 0, 21, UNUSED_OPTS},
     {NULL, 0, 0, 0}},
 
   {{"parse_opts", "-bbuilddir", "-T21", NULL},
-    {NULL, NULL, {0}, NULL, (char *)"builddir", NULL, 0, NULL, NULL, false, false, false, false, 0,
-      0, 21, UNUSED_OPTS},
+    {NULL, NULL, {0}, NULL, (char *)"builddir", NULL, TABLE_NOT_SET, NULL, NULL, false, false,
+      false, false, 0, 0, 21, UNUSED_OPTS},
     {NULL, 0, 0, 0}},
 
   /* If -PT is used, the tiered_storage source is set to dir_store, even if -Po is not used. */
   {{"parse_opts", "-v", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"dir_store", 0, NULL, NULL, false, false, true, true, 0,
-      0, 0, UNUSED_OPTS},
+    {NULL, NULL, {0}, NULL, NULL, (char *)"dir_store", TABLE_NOT_SET, NULL, NULL, false, false,
+      true, true, 0, 0, 0, UNUSED_OPTS},
     {NULL, 0, 0, 0}},
 
   {{"parse_opts", "-v", "-Po", "my_store", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", 0, NULL, NULL, false, false, true, true, 0, 0,
-      0, UNUSED_OPTS},
+    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
+      true, 0, 0, 0, UNUSED_OPTS},
     {NULL, 0, 0, 0}},
 
   {{"parse_opts", "-vPomy_store", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", 0, NULL, NULL, false, false, true, true, 0, 0,
-      0, UNUSED_OPTS},
+    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
+      true, 0, 0, 0, UNUSED_OPTS},
     {NULL, 0, 0, 0}},
 
   /*
@@ -117,28 +117,28 @@ static TEST_DRIVER driver[] = {
    * "parse_single_opt" to indicate to use the extended parsing idiom.
    */
   {{"parse_single_opt", "-vd", "-Pomy_store", "-c", "string_opt", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", 0, NULL, NULL, false, false, true, true, 0, 0,
-      0, UNUSED_OPTS},
+    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
+      true, 0, 0, 0, UNUSED_OPTS},
     {(char *)"string_opt", true, false, 0}},
 
   {{"parse_single_opt", "-dv", "-Pomy_store", "-cstring_opt", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", 0, NULL, NULL, false, false, true, true, 0, 0,
-      0, UNUSED_OPTS},
+    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
+      true, 0, 0, 0, UNUSED_OPTS},
     {(char *)"string_opt", true, false, 0}},
 
   {{"parse_single_opt", "-ev", "-cstring_opt", "-Pomy_store", "-PT", "-f", "22", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", 0, NULL, NULL, false, false, true, true, 0, 0,
-      0, UNUSED_OPTS},
+    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
+      true, 0, 0, 0, UNUSED_OPTS},
     {(char *)"string_opt", false, true, 22}},
 
   {{"parse_single_opt", "-evd", "-Pomy_store", "-PT", "-f22", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", 0, NULL, NULL, false, false, true, true, 0, 0,
-      0, UNUSED_OPTS},
+    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
+      true, 0, 0, 0, UNUSED_OPTS},
     {NULL, true, true, 22}},
 
   {{"parse_single_opt", "-v", "-Pomy_store", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", 0, NULL, NULL, false, false, true, true, 0, 0,
-      0, UNUSED_OPTS},
+    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
+      true, 0, 0, 0, UNUSED_OPTS},
     {NULL, false, false, 0}},
 };
 
