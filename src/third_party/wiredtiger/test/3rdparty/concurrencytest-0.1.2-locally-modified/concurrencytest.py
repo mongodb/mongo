@@ -53,7 +53,12 @@ def wait_for_children(pids):
             # As Windows doesn't support -1 for all children, loop through each child pid explicitly.
             for child_pid in pids:
                 pid, exit_status = os.waitpid(child_pid, os.WNOHANG)
-                exit_code = os.waitstatus_to_exitcode(exit_status)
+                exit_code = exit_status
+                if "waitstatus_to_exitcode" in dir(os):
+                    # This is only supported from Python 3.9 which is what our automated tests use.
+                    # Without it, the results are harder to understand.
+                    # See https://docs.python.org/3/library/os.html#os.waitstatus_to_exitcode
+                    exit_code = os.waitstatus_to_exitcode(exit_status)
                 if exit_code != 0:
                     pids.remove(pid)
                     if exit_code > 0:
