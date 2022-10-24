@@ -42,13 +42,30 @@ using namespace mongo::ce;
 constexpr SelectivityType kInvalidSel = -1.0;
 
 constexpr SelectivityType kDefaultFilterSel = 0.1;
-constexpr SelectivityType kDefaultTraverseSelectivity = 0.1;
+
+// The selectivities used in the piece-wise function for open-range intervals.
+// Note that we assume a smaller input cardinality will result in a less selective range.
+constexpr SelectivityType kSmallCardOpenRangeSel = 0.70;
+constexpr SelectivityType kMediumCardOpenRangeSel = 0.45;
+constexpr SelectivityType kLargeCardOpenRangeSel = 0.33;
+
+// The selectivities used in the piece-wise function for closed-range intervals.
+// Note that we assume a smaller input cardinality will result in a less selective range.
+constexpr SelectivityType kSmallCardClosedRangeSel = 0.50;
+constexpr SelectivityType kMediumCardClosedRangeSel = 0.33;
+constexpr SelectivityType kLargeCardClosedRangeSel = 0.20;
 
 // Global and Local selectivity should multiply to the Complete selectivity.
 constexpr SelectivityType kDefaultCompleteGroupSel = 0.01;
 constexpr SelectivityType kDefaultLocalGroupSel = 0.02;
 constexpr SelectivityType kDefaultGlobalGroupSel = 0.5;
 
+// The following constants are the steps used in the piece-wise functions that select selectivies
+// based on input cardinality.
+constexpr CEType kSmallLimit = 20.0;
+constexpr CEType kMediumLimit = 100.0;
+
+// Assumed average number of elements in an array.
 constexpr CEType kDefaultAverageArraySize = 10.0;
 
 /**
@@ -73,12 +90,12 @@ SelectivityType equalitySel(const CEType inputCard) {
  */
 SelectivityType closedRangeSel(const CEType inputCard) {
     SelectivityType sel = kInvalidSel;
-    if (inputCard < 20.0) {
-        sel = 0.50;
-    } else if (inputCard < 100.0) {
-        sel = 0.33;
+    if (inputCard < kSmallLimit) {
+        sel = kSmallCardClosedRangeSel;
+    } else if (inputCard < kMediumLimit) {
+        sel = kMediumCardClosedRangeSel;
     } else {
-        sel = 0.20;
+        sel = kLargeCardClosedRangeSel;
     }
     return sel;
 }
@@ -90,12 +107,12 @@ SelectivityType closedRangeSel(const CEType inputCard) {
  */
 SelectivityType openRangeSel(const CEType inputCard) {
     SelectivityType sel = kInvalidSel;
-    if (inputCard < 20.0) {
-        sel = 0.70;
-    } else if (inputCard < 100.0) {
-        sel = 0.45;
+    if (inputCard < kSmallLimit) {
+        sel = kSmallCardOpenRangeSel;
+    } else if (inputCard < kMediumLimit) {
+        sel = kMediumCardOpenRangeSel;
     } else {
-        sel = 0.33;
+        sel = kLargeCardOpenRangeSel;
     }
     return sel;
 }
@@ -262,21 +279,12 @@ public:
     EvalFilterSelectivityResult transport(const PathTraverse& node,
                                           CEType /*inputCard*/,
                                           EvalFilterSelectivityResult childResult) {
-        // We only want to decrease selectivity when we see the first traverse in a path expression.
-        if (!_hasTraverse) {
-            childResult.selectivity =
-                std::min(childResult.selectivity + kDefaultTraverseSelectivity, 1.0);
-        }
-
-        _hasTraverse = true;
         return childResult;
     }
 
     EvalFilterSelectivityResult transport(const PathCompare& node,
                                           CEType inputCard,
                                           EvalFilterSelectivityResult /*childResult*/) {
-        _hasTraverse = false;
-
         // Note that the result will be ignored if this operation is part of an interval.
         const SelectivityType sel = operationSel(node.op(), inputCard);
         return {{}, &node, sel};
@@ -286,8 +294,6 @@ public:
                                           CEType inputCard,
                                           EvalFilterSelectivityResult leftChildResult,
                                           EvalFilterSelectivityResult rightChildResult) {
-        _hasTraverse = false;
-
         const bool isInterval = leftChildResult.compare && rightChildResult.compare &&
             leftChildResult.path == rightChildResult.path;
 
@@ -302,8 +308,6 @@ public:
                                           CEType /*inputCard*/,
                                           EvalFilterSelectivityResult leftChildResult,
                                           EvalFilterSelectivityResult rightChildResult) {
-        _hasTraverse = false;
-
         const SelectivityType sel =
             disjunctionSel(leftChildResult.selectivity, rightChildResult.selectivity);
 
@@ -333,7 +337,6 @@ public:
 
     template <typename T, typename... Ts>
     EvalFilterSelectivityResult transport(const T& /*node*/, Ts&&...) {
-        _hasTraverse = false;
         return {{}, nullptr, kDefaultFilterSel};
     }
 
@@ -357,8 +360,6 @@ private:
         // once.
         return left + right - left * right;
     }
-
-    bool _hasTraverse = false;
 };
 
 class CEHeuristicTransport {

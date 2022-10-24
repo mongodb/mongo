@@ -441,7 +441,7 @@ TEST(CEHistogramTest, TestHistogramOnNestedPaths) {
 
     // TODO SERVER-68596: this doesn't generate a SargableNode. When it does, it should return 0.0.
     // Currently, this estimate falls back to heuristic CE.
-    ASSERT_MATCH_CE(t, "{\"a.histogram.path\": {$elemMatch: {$eq: 42}}}", 6.21);
+    ASSERT_MATCH_CE(t, "{\"a.histogram.path\": {$elemMatch: {$eq: 42}}}", 0.707107);
 }
 
 TEST(CEHistogramTest, TestArrayHistogramOnAtomicPredicates) {

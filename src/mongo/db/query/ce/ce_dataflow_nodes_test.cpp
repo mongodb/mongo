@@ -175,27 +175,27 @@ TEST(CEDataflowTest, EstimateLimitSkipNode) {
     ASSERT_CE(t, "[{$limit: 1}, {$match: {a: 1}}, {$skip: 1}]", 0.0);
     ASSERT_CE(t, "[{$limit: 1}, {$match: {a: 1}}, {$skip: 50}]", 0.0);
 
-    // Input card to $match: 50. $match selectivity here is sqrt(50)/50 + 0.1 for traverse.
-    ASSERT_CE(t, "[{$limit: 50}, {$match: {a: 1}}, {$skip: 1}]", 11.0711);
+    // Input card to $match: 50. $match selectivity here is sqrt(50)/50.
+    ASSERT_CE(t, "[{$limit: 50}, {$match: {a: 1}}, {$skip: 1}]", 6.07107);
     ASSERT_CE(t, "[{$limit: 50}, {$match: {a: 1}}, {$skip: 50}]", 0.0);
     ASSERT_CE(t, "[{$limit: 50}, {$match: {a: 1}}, {$skip: 1000}]", 0.0);
 
     // Input card to $match is kCollCard. However, our estimate is larger than matchCard because we
     // have a FilterNode that does not get converted to a SargableNode in this case. The $match
-    // selectivity here is sqrt(1000)/1000 + 0.1 for traverse.
-    ASSERT_CE(t, "[{$limit: 1000}, {$match: {a: 1}}, {$skip: 1}]", 130.623);
-    ASSERT_CE(t, "[{$limit: 1000}, {$match: {a: 1}}, {$skip: 50}]", 81.623);
+    // selectivity here is sqrt(1000)/1000.
+    ASSERT_CE(t, "[{$limit: 1000}, {$match: {a: 1}}, {$skip: 1}]", 30.6228);
+    ASSERT_CE(t, "[{$limit: 1000}, {$match: {a: 1}}, {$skip: 20}]", 11.6228);
     ASSERT_CE(t, "[{$limit: 1000}, {$match: {a: 1}}, {$skip: 1000}]", 0.0);
 
-    // Input card to $match: 999. $match selectivity here is sqrt(999)/999 + 0.1 for traverse.
+    // Input card to $match: 999. $match selectivity here is sqrt(999)/999.
     ASSERT_CE(t, "[{$skip: 1}, {$match: {a: 1}}, {$limit: 1}]", 1.0);
-    ASSERT_CE(t, "[{$skip: 1}, {$match: {a: 1}}, {$limit: 50}]", 50.0);
-    ASSERT_CE(t, "[{$skip: 1}, {$match: {a: 1}}, {$limit: 1000}]", 131.507);
+    ASSERT_CE(t, "[{$skip: 1}, {$match: {a: 1}}, {$limit: 20}]", 20.0);
+    ASSERT_CE(t, "[{$skip: 1}, {$match: {a: 1}}, {$limit: 1000}]", 31.607);
 
-    // Input card to $match: 950. $match selectivity here is sqrt(950)/950 + 0.1 for traverse.
+    // Input card to $match: 950. $match selectivity here is sqrt(950)/950.
     ASSERT_CE(t, "[{$skip: 50}, {$match: {a: 1}}, {$limit: 1}]", 1.0);
-    ASSERT_CE(t, "[{$skip: 50}, {$match: {a: 1}}, {$limit: 50}]", 50.0);
-    ASSERT_CE(t, "[{$skip: 50}, {$match: {a: 1}}, {$limit: 1000}]", 125.822);
+    ASSERT_CE(t, "[{$skip: 50}, {$match: {a: 1}}, {$limit: 20}]", 20.0);
+    ASSERT_CE(t, "[{$skip: 50}, {$match: {a: 1}}, {$limit: 1000}]", 30.8221);
 
     // Input card to $match is 0.0.
     ASSERT_CE(t, "[{$skip: 1000}, {$match: {a: 1}}, {$limit: 50}]", 0.0);
