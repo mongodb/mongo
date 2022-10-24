@@ -31,29 +31,28 @@ if [[ "${machine}" = "Cygwin" ]]; then
 
         echo -e "\n=> Setting _NT_SYMBOL_PATH environment variable for debuggers to pick up the symbols."
         DBG_ARCHIVE_PARENT=$(readlink -f /cygdrive/z/data/mci/artifacts-*dist_test_debug)
-        DBG_ARCHIVE=$(readlink -f ${DBG_ARCHIVE_PARENT}/debugsymbols-mongodb*zip)
+        DBG_ARCHIVE=$(readlink -f ${DBG_ARCHIVE_PARENT}/debugsymbols-*.zip)
         DBG_ARCHIVE_TARGET_PARENT="${DBG_ARCHIVE_PARENT}/extracted_symbols"
         DBG_ARCHIVE_TARGET="${DBG_ARCHIVE_TARGET_PARENT}/dist-test/bin"
         echo "Symbols Dir: [${DBG_ARCHIVE_TARGET}]"
 
         echo -e "\n=> Extracting Symbol files."
         set -x;
-        mkdir ${DBG_ARCHIVE_TARGET_PARENT}
-        unzip -n ${sym_dir} -d ${DBG_ARCHIVE_TARGET}
+        mkdir -p ${DBG_ARCHIVE_TARGET_PARENT}
+        unzip -n ${DBG_ARCHIVE} -d ${DBG_ARCHIVE_TARGET_PARENT}
         setx _NT_SYMBOL_PATH "${DBG_ARCHIVE_TARGET};srv*;"
         { set +x; } 2>/dev/null
 
         echo -e "\n=> Extracting Core Dump to Desktop."
-        COREDUMP_ARCHIVE_PARENT=$(readlink -f /cygdrive/z/data/mci/artifacts-* | grep -v dist_test)
-        COREDUMP_ARCHIVE=$(readlink -f ${COREDUMP_ARCHIVE_PARENT}/mongo-coredumps*tgz)
+        COREDUMP_ARCHIVE=$(readlink -f /cygdrive/z/data/mci/artifacts-*/mongo-coredumps*.tgz 2>/dev/null)
+        COREDUMP_ARCHIVE_PARENT=$(dirname ${COREDUMP_ARCHIVE})
         COREDUMP_ARCHIVE_TARGET="${COREDUMP_ARCHIVE_PARENT}/extracted_dump"
         set -x;
-        mkdir ${COREDUMP_ARCHIVE_TARGET}
+        mkdir -p ${COREDUMP_ARCHIVE_TARGET}
         tar -xzvf ${COREDUMP_ARCHIVE} -C ${COREDUMP_ARCHIVE_TARGET}
         cp -r ${COREDUMP_ARCHIVE_TARGET}/* ${desktop_dir}
         { set +x; } 2>/dev/null
         echo "Copied to Desktop."
-
     } &> ${out_dir}
 
     cp ${out_dir} ${desktop_dir}
@@ -98,7 +97,7 @@ fi' >> .bash_profile
 
     # Make a directory on the larger EBS volume. Soft-link it under the home directory. The smaller home
     # volume can have trouble particularly with coredumps from sharded timeouts.
-    mkdir /data/debug
+    mkdir -p /data/debug
     ln -s /data/debug .
     cd debug
 
