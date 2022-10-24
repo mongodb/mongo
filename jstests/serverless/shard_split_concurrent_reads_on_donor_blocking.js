@@ -65,7 +65,9 @@ const tenantId = "tenantId";
 const test = new ShardSplitTest({
     recipientTagName: "recipientTag",
     recipientSetName: "recipientSet",
-    quickGarbageCollection: true
+    quickGarbageCollection: true,
+    // Increase timeout because blocking in the critical section contributes to operation latency.
+    nodeOptions: {setParameter: {shardSplitTimeoutMS: 100000}}
 });
 test.addRecipientNodes();
 

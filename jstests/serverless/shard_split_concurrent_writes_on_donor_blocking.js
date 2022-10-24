@@ -29,7 +29,9 @@ const tenantMigrationTest = new ShardSplitTest({
     recipientSetName,
     quickGarbageCollection: true,
     allowStaleReadsOnDonor: true,
-    initiateWithShortElectionTimeout: true
+    initiateWithShortElectionTimeout: true,
+    // Increase timeout because blocking in the critical section contributes to operation latency.
+    nodeOptions: {setParameter: {shardSplitTimeoutMS: 100000}}
 });
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();

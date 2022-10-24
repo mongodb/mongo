@@ -1039,8 +1039,7 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
     ON_BLOCK_EXIT([&] {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_abortSource) {
-            // Cancel source to ensure all child threads (RSM monitor, etc)
-            // terminate.
+            // Cancel source to ensure all child threads (RSM monitor, etc) terminate.
             _abortSource->cancel();
         }
     });
@@ -1049,6 +1048,11 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
         stdx::lock_guard<Latch> lg(_mutex);
         if (isAbortedDocumentPersistent(lg, _stateDoc)) {
             // The document is already in aborted state. No need to write it.
+            LOGV2(8423376,
+                  "Shard split already aborted.",
+                  "id"_attr = _migrationId,
+                  "abortReason"_attr = _abortReason.value());
+
             return ExecutorFuture(**executor,
                                   DurableState{ShardSplitDonorStateEnum::kAborted, _abortReason});
         }

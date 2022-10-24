@@ -221,6 +221,8 @@ executor:
               blockTimeMS: 250
         shardSplitGarbageCollectionDelayMS: 1
         ttlMonitorSleepSecs: 1
+        # Unclean shutdown may cause blockTimestamp catch up to be very long
+        shardSplitTimeoutMS: 60000
       auth: ''
       keyFile: *keyFile
     num_nodes_per_replica_set: 3

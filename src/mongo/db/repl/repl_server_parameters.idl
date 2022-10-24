@@ -533,14 +533,13 @@ server_parameters:
         validator:
             gte: 1
 
-
     shardSplitTimeoutMS:
         description: >-
             Period of time, in milliseconds, after which a shard split should be interrupted.
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<int>
         cpp_varname: shardSplitTimeoutMS
-        default: 3600000
+        default: 10000
         validator:
             gte: 1
 
@@ -720,4 +719,4 @@ feature_flags:
                      allow kDowngradingFromLatestToLastLTS -> kUpgrading -> kUpgraded path.
         cpp_varname: feature_flags::gDowngradingToUpgrading
         default: false
-        
+
