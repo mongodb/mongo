@@ -7810,17 +7810,19 @@ tasks:
     vars:
       suite: query_golden_cqf
 
-- name: vpc_connectivity
+- name: publish_metrics
+  patchable: false
   commands:
   - *f_expansions_write
   - func: "do non-compile setup"
+  - *configure_evergreen_api_credentials
   - command: subprocess.exec
     type: test
     params:
       binary: bash
       args:
       - "src/evergreen/run_python_script.sh"
-      - "evergreen/vpc_connectivity.py"
+      - "evergreen/publish_metrics.py"
 
 #######################################
 #             Task Groups             #

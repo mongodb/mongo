@@ -822,7 +822,7 @@ buildvariants:
   - ubuntu1804-small
   stepback: false
   tasks:
-  - name: vpc_connectivity
+  - name: publish_metrics
 
 ###########################################
 #         Windows buildvariants           #

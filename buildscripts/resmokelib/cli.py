@@ -4,7 +4,7 @@ from datetime import datetime
 import time
 import os
 import psutil
-from buildscripts.metrics.tooling_metrics import ToolingMetrics, save_tooling_metrics
+from buildscripts.metrics.tooling_metrics import save_tooling_metrics
 from buildscripts.resmokelib import parser
 
 
