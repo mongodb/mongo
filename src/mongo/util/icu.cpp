@@ -41,6 +41,7 @@
 #include <unicode/utypes.h>
 #include <vector>
 
+#include "mongo/base/init.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -183,6 +184,16 @@ StatusWith<std::string> icuX509DNPrep(StringData str) try {
     return USPrep(USPREP_RFC4518_LDAP).prepare(UString::fromUTF8(str), USPREP_DEFAULT).toUTF8();
 } catch (const DBException& e) {
     return e.toStatus();
+}
+
+/**
+ * ICU has a subtle undefined behavior race condition in the USPrep cache code. While unlikely to
+ * cause a problem, we can mitigate by causing the caches to be initialized at startup time.
+ */
+MONGO_INITIALIZER_GENERAL(LoadIcuPrep, ("LoadICUData"), ("default"))(InitializerContext*) {
+    // Force ICU to load its caches by calling each function.
+    invariant(icuSaslPrep("a"_sd).isOK());
+    invariant(icuX509DNPrep("a"_sd).isOK());
 }
 
 }  // namespace mongo
