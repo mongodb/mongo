@@ -699,7 +699,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
                 !it->first._projectionName.empty());
         uassert(6624112,
                 "Filter partial schema requirement cannot bind.",
-                !it->second.hasBoundProjectionName());
+                !it->second.getBoundProjectionName());
         if (isIntervalReqFullyOpenDNF(it->second.getIntervals())) {
             it = conversion->_reqMap.erase(it);
         } else {
@@ -970,12 +970,13 @@ static SplitRequirementsResult splitRequirements(
 
     const auto addRequirement = [](PartialSchemaRequirements& reqMap,
                                    PartialSchemaKey key,
-                                   ProjectionName projName,
+                                   boost::optional<ProjectionName> boundProjectionName,
                                    IntervalReqExpr::Node intervals) {
         // We always strip out the perf-only flag.
         reqMap.emplace(key,
-                       PartialSchemaRequirement{
-                           std::move(projName), std::move(intervals), false /*isPerfOnly*/});
+                       PartialSchemaRequirement{std::move(boundProjectionName),
+                                                std::move(intervals),
+                                                false /*isPerfOnly*/});
     };
 
     size_t index = 0;
@@ -991,7 +992,8 @@ static SplitRequirementsResult splitRequirements(
                     addRequirement(leftReqs, key, req.getBoundProjectionName(), req.getIntervals());
                 } else {
                     // Insert a requirement on the right side too, left side is non-binding.
-                    addRequirement(leftReqs, key, "" /*boundProjectionName*/, req.getIntervals());
+                    addRequirement(
+                        leftReqs, key, boost::none /*boundProjectionName*/, req.getIntervals());
                     addRequirement(
                         rightReqs, key, req.getBoundProjectionName(), req.getIntervals());
                 }
@@ -1004,7 +1006,8 @@ static SplitRequirementsResult splitRequirements(
                 // we remove the output binding for the left side, and return the value from the
                 // right (seek) side.
                 if (!fullyOpenInterval) {
-                    addRequirement(leftReqs, key, "" /*boundProjectionName*/, req.getIntervals());
+                    addRequirement(
+                        leftReqs, key, boost::none /*boundProjectionName*/, req.getIntervals());
                     addedToLeft = true;
                 }
                 addRequirement(rightReqs,

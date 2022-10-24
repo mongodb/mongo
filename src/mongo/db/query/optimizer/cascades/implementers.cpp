@@ -453,10 +453,9 @@ public:
             }
 
             for (const auto& entry : reqMap) {
-                if (entry.second.hasBoundProjectionName()) {
+                if (const auto& boundProjName = entry.second.getBoundProjectionName()) {
                     // Project field only if it required.
-                    const ProjectionName& projectionName = entry.second.getBoundProjectionName();
-                    projectionsLeftToSatisfy.erase(projectionName);
+                    projectionsLeftToSatisfy.erase(*boundProjName);
                 }
             }
             if (!projectionsLeftToSatisfy.getVector().empty()) {

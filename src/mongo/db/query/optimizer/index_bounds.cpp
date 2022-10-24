@@ -120,15 +120,18 @@ bool isIntervalReqFullyOpenDNF(const IntervalReqExpr::Node& n) {
     return false;
 }
 
-PartialSchemaRequirement::PartialSchemaRequirement(ProjectionName boundProjectionName,
-                                                   IntervalReqExpr::Node intervals,
-                                                   const bool isPerfOnly)
+PartialSchemaRequirement::PartialSchemaRequirement(
+    boost::optional<ProjectionName> boundProjectionName,
+    IntervalReqExpr::Node intervals,
+    const bool isPerfOnly)
     : _boundProjectionName(std::move(boundProjectionName)),
       _intervals(std::move(intervals)),
       _isPerfOnly(isPerfOnly) {
     tassert(6624154,
             "Cannot have perf only requirement which also binds",
-            !_isPerfOnly || !hasBoundProjectionName());
+            !_isPerfOnly || !_boundProjectionName);
+    tassert(
+        6624155, "Empty projection name", !_boundProjectionName || !_boundProjectionName->empty());
 }
 
 bool PartialSchemaRequirement::operator==(const PartialSchemaRequirement& other) const {
@@ -136,11 +139,7 @@ bool PartialSchemaRequirement::operator==(const PartialSchemaRequirement& other)
         _isPerfOnly == other._isPerfOnly;
 }
 
-bool PartialSchemaRequirement::hasBoundProjectionName() const {
-    return !_boundProjectionName.empty();
-}
-
-const ProjectionName& PartialSchemaRequirement::getBoundProjectionName() const {
+const boost::optional<ProjectionName>& PartialSchemaRequirement::getBoundProjectionName() const {
     return _boundProjectionName;
 }
 
@@ -153,7 +152,7 @@ bool PartialSchemaRequirement::getIsPerfOnly() const {
 }
 
 bool PartialSchemaRequirement::mayReturnNull(const ConstFoldFn& constFold) const {
-    return hasBoundProjectionName() && checkMaybeHasNull(getIntervals(), constFold);
+    return _boundProjectionName && checkMaybeHasNull(getIntervals(), constFold);
 };
 
 /**

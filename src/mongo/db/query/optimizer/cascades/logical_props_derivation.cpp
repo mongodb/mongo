@@ -76,8 +76,8 @@ static void populateDistributionPaths(const PartialSchemaRequirements& req,
                 if (it == req.cend()) {
                     break;
                 }
-                if (it->second.hasBoundProjectionName()) {
-                    distributionProjections.push_back(it->second.getBoundProjectionName());
+                if (const auto& boundProjName = it->second.getBoundProjectionName()) {
+                    distributionProjections.push_back(*boundProjName);
                 }
             }
 

@@ -1088,10 +1088,8 @@ public:
             ExplainPrinter pathPrinter = generate(key._path);
             local.fieldName("path").separator("'").printSingleLevel(pathPrinter).separator("', ");
 
-            if (req.hasBoundProjectionName()) {
-                local.fieldName("boundProjection")
-                    .print(req.getBoundProjectionName())
-                    .separator(", ");
+            if (const auto& boundProjName = req.getBoundProjectionName()) {
+                local.fieldName("boundProjection").print(*boundProjName).separator(", ");
             }
 
             local.fieldName("intervals");
@@ -1118,10 +1116,8 @@ public:
             ExplainPrinter pathPrinter = generate(key._path);
             local.fieldName("path").separator("'").printSingleLevel(pathPrinter).separator("', ");
 
-            if (req.hasBoundProjectionName()) {
-                local.fieldName("boundProjection")
-                    .print(req.getBoundProjectionName())
-                    .separator(", ");
+            if (const auto& boundProjName = req.getBoundProjectionName()) {
+                local.fieldName("boundProjection").print(*boundProjName).separator(", ");
             }
 
             local.fieldName("intervals");

@@ -96,14 +96,13 @@ bool isIntervalReqFullyOpenDNF(const IntervalReqExpr::Node& n);
 
 class PartialSchemaRequirement {
 public:
-    PartialSchemaRequirement(ProjectionName boundProjectionName,
+    PartialSchemaRequirement(boost::optional<ProjectionName> boundProjectionName,
                              IntervalReqExpr::Node intervals,
                              bool isPerfOnly);
 
     bool operator==(const PartialSchemaRequirement& other) const;
 
-    bool hasBoundProjectionName() const;
-    const ProjectionName& getBoundProjectionName() const;
+    const boost::optional<ProjectionName>& getBoundProjectionName() const;
 
     const IntervalReqExpr::Node& getIntervals() const;
 
@@ -113,7 +112,7 @@ public:
 
 private:
     // Bound, or output projection name.
-    ProjectionName _boundProjectionName;
+    boost::optional<ProjectionName> _boundProjectionName;
 
     IntervalReqExpr::Node _intervals;
 

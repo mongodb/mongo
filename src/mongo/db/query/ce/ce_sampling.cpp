@@ -75,12 +75,11 @@ public:
         ABT result = childResult;
         // Retain only output bindings without applying filters.
         for (const auto& [key, req] : node.getReqMap()) {
-            if (req.hasBoundProjectionName()) {
+            if (const auto& boundProjName = req.getBoundProjectionName()) {
                 lowerPartialSchemaRequirement(
                     key,
-                    PartialSchemaRequirement{req.getBoundProjectionName(),
-                                             IntervalReqExpr::makeSingularDNF(),
-                                             req.getIsPerfOnly()},
+                    PartialSchemaRequirement{
+                        boundProjName, IntervalReqExpr::makeSingularDNF(), req.getIsPerfOnly()},
                     result,
                     _phaseManager.getPathToInterval());
             }
@@ -170,12 +169,13 @@ public:
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
                 ABT lowered = extracted;
                 // Lower requirement without an output binding.
-                lowerPartialSchemaRequirement(key,
-                                              PartialSchemaRequirement{"" /*boundProjectionName*/,
-                                                                       req.getIntervals(),
-                                                                       req.getIsPerfOnly()},
-                                              lowered,
-                                              _phaseManager.getPathToInterval());
+                lowerPartialSchemaRequirement(
+                    key,
+                    PartialSchemaRequirement{boost::none /*boundProjectionName*/,
+                                             req.getIntervals(),
+                                             req.getIsPerfOnly()},
+                    lowered,
+                    _phaseManager.getPathToInterval());
                 uassert(6624243, "Expected a filter node", lowered.is<FilterNode>());
                 result =
                     estimateFilterCE(metadata, memo, logicalProps, n, std::move(lowered), result);

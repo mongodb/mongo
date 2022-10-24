@@ -333,7 +333,7 @@ public:
         if (leftKey._projectionName != rightKey._projectionName) {
             return {};
         }
-        if (leftReq.hasBoundProjectionName() || rightReq.hasBoundProjectionName()) {
+        if (leftReq.getBoundProjectionName() || rightReq.getBoundProjectionName()) {
             return {};
         }
 
@@ -434,8 +434,9 @@ public:
                 {true /*inclusive*/, Constant::null()}, {true /*inclusive*/, Constant::null()}});
             return {{PartialSchemaRequirements{
                 {PartialSchemaKey{"" /*projectionName*/, make<PathIdentity>()},
-                 PartialSchemaRequirement{
-                     "" /*boundProjectionName*/, std::move(intervalExpr), false /*isPerfOnly*/}}}}};
+                 PartialSchemaRequirement{boost::none /*boundProjectionName*/,
+                                          std::move(intervalExpr),
+                                          false /*isPerfOnly*/}}}}};
         }
 
         return handleComposition<false /*isMultiplicative*/>(std::move(leftResult),
@@ -531,8 +532,9 @@ public:
 
         return {{PartialSchemaRequirements{
             {PartialSchemaKey{"" /*projectionName*/, make<PathIdentity>()},
-             PartialSchemaRequirement{
-                 "" /*boundProjectionName*/, std::move(*unionedInterval), false /*isPerfOnly*/}}}}};
+             PartialSchemaRequirement{boost::none /*boundProjectionName*/,
+                                      std::move(*unionedInterval),
+                                      false /*isPerfOnly*/}}}}};
     }
 
     ResultType transport(const ABT& n, const PathCompare& pathCompare, ResultType inputResult) {
@@ -580,13 +582,14 @@ public:
             {lowBoundInclusive, std::move(lowBound)}, {highBoundInclusive, std::move(highBound)}});
         return {{PartialSchemaRequirements{
             {PartialSchemaKey{"" /*projectionName*/, make<PathIdentity>()},
-             PartialSchemaRequirement{
-                 "" /*boundProjectionName*/, std::move(intervalExpr), false /*isPerfOnly*/}}}}};
+             PartialSchemaRequirement{boost::none /*boundProjectionName*/,
+                                      std::move(intervalExpr),
+                                      false /*isPerfOnly*/}}}}};
     }
 
     ResultType transport(const ABT& n, const PathIdentity& pathIdentity) {
         return {{PartialSchemaRequirements{{{"" /*projectionName*/, n},
-                                            {"" /*boundProjectionName*/,
+                                            {boost::none /*boundProjectionName*/,
                                              IntervalReqExpr::makeSingularDNF(),
                                              false /*isPerfOnly*/}}}}};
     }
@@ -611,7 +614,7 @@ public:
             if (auto conversion = _pathToInterval(n); conversion) {
                 return {{PartialSchemaRequirements{
                     {PartialSchemaKey{"" /*projectionName*/, make<PathIdentity>()},
-                     PartialSchemaRequirement{"" /*boundProjectionName*/,
+                     PartialSchemaRequirement{boost::none /*boundProjectionName*/,
                                               std::move(*conversion),
                                               false /*isPerfOnly*/}}}}};
             }
@@ -797,13 +800,13 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
             if (updateToNonMultiKey && prevEntry->first == newKey) {
                 auto& prevReq = prevEntry->second;
 
-                ProjectionName resultBoundProjName;
+                boost::optional<ProjectionName> resultBoundProjName;
                 auto resultIntervals = prevReq.getIntervals();
-                if (req.hasBoundProjectionName()) {
+                if (const auto& boundProjName = req.getBoundProjectionName()) {
                     tassert(6624168,
                             "Should not be seeing more than one bound projection per key",
-                            !prevReq.hasBoundProjectionName());
-                    resultBoundProjName = req.getBoundProjectionName();
+                            !prevReq.getBoundProjectionName());
+                    resultBoundProjName = boundProjName;
                 } else {
                     resultBoundProjName = prevReq.getBoundProjectionName();
                 }
@@ -864,7 +867,6 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
 
         const bool pathIsId = key._path.is<PathIdentity>();
         const bool pathHasTraverse = !pathIsId && checkPathContainsTraverse(key._path);
-        const bool reqHasBoundProj = req.hasBoundProjectionName();
         {
             bool first = true;
             bool success = false;
@@ -890,13 +892,13 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
                 }
 
                 if (success) {
-                    ProjectionName resultBoundProjName = existingReq.getBoundProjectionName();
-                    if (reqHasBoundProj) {
-                        if (resultBoundProjName.empty()) {
-                            resultBoundProjName = req.getBoundProjectionName();
+                    boost::optional<ProjectionName> resultBoundProjName =
+                        existingReq.getBoundProjectionName();
+                    if (const auto& boundProjName = req.getBoundProjectionName()) {
+                        if (resultBoundProjName) {
+                            projectionRenames.emplace(*boundProjName, *resultBoundProjName);
                         } else {
-                            projectionRenames.emplace(req.getBoundProjectionName(),
-                                                      resultBoundProjName);
+                            resultBoundProjName = boundProjName;
                         }
                     }
                     existingReq = {std::move(resultBoundProjName),
@@ -917,15 +919,17 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
             }
         }
 
+        const bool reqHasBoundProj = req.getBoundProjectionName().has_value();
         for (auto it = reqMap.cbegin(); it != reqMap.cend();) {
             const auto& [existingKey, existingReq] = *it;
+
             uassert(6624150,
                     "Existing key referring to new requirement.",
                     !reqHasBoundProj ||
-                        existingKey._projectionName != req.getBoundProjectionName());
+                        existingKey._projectionName != *req.getBoundProjectionName());
 
-            if (existingReq.hasBoundProjectionName() &&
-                key._projectionName == existingReq.getBoundProjectionName()) {
+            if (const auto& boundProjName = existingReq.getBoundProjectionName();
+                boundProjName && key._projectionName == *boundProjName) {
                 // The new key is referring to a projection the existing requirement binds.
                 if (reqHasBoundProj) {
                     return false;
@@ -1061,12 +1065,11 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
             unsatisfiedKeys.erase(indexKey);
             entry._intervalPrefixSize++;
 
-            if (req.hasBoundProjectionName()) {
+            if (const auto& boundProjName = req.getBoundProjectionName()) {
                 // Include bounds projection into index spec.
-                const bool inserted =
-                    fieldProjMap._fieldProjections
-                        .emplace(encodeIndexKeyName(indexField), req.getBoundProjectionName())
-                        .second;
+                const bool inserted = fieldProjMap._fieldProjections
+                                          .emplace(encodeIndexKeyName(indexField), *boundProjName)
+                                          .second;
                 invariant(inserted);
             }
 
@@ -1163,9 +1166,10 @@ boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
             // Extract a new requirements path with removed simple paths.
             // For example if we have a key Get "a" Traverse Compare = 0 we leave only
             // Traverse Compare 0.
-            if (pathGet->getPath().is<PathIdentity>() && req.hasBoundProjectionName()) {
+            if (const auto& boundProjName = req.getBoundProjectionName();
+                boundProjName && pathGet->getPath().is<PathIdentity>()) {
                 const auto [it, insertedInFPM] =
-                    fieldProjMap._fieldProjections.emplace(fieldName, req.getBoundProjectionName());
+                    fieldProjMap._fieldProjections.emplace(fieldName, *boundProjName);
 
                 if (!insertedInFPM) {
                     residualReqs.emplace_back(PartialSchemaKey{it->second, make<PathIdentity>()},
@@ -1175,8 +1179,10 @@ boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
                                               entryIndex);
                 } else if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
                     residualReqs.emplace_back(
-                        PartialSchemaKey{req.getBoundProjectionName(), make<PathIdentity>()},
-                        PartialSchemaRequirement{"", req.getIntervals(), false /*isPerfOnly*/},
+                        PartialSchemaKey{*boundProjName, make<PathIdentity>()},
+                        PartialSchemaRequirement{boost::none /*boundProjectionName*/,
+                                                 req.getIntervals(),
+                                                 false /*isPerfOnly*/},
                         entryIndex);
                 }
             } else {
@@ -1321,8 +1327,6 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
                                    ABT& node,
                                    const PathToIntervalFn& pathToInterval,
                                    const std::function<void(const ABT& node)>& visitor) {
-    const bool hasBoundProjName = req.hasBoundProjectionName();
-
     ABT path = make<PathIdentity>();
     if (pathToInterval) {
         // If we have a path converter, attempt to convert bounds back into a path element.
@@ -1336,21 +1340,20 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
         }
     }
     if (path.is<PathIdentity>()) {
-        PartialSchemaReqLowerTransport transport(hasBoundProjName);
+        PartialSchemaReqLowerTransport transport(req.getBoundProjectionName().has_value());
         path = transport.lower(req.getIntervals());
     }
     const bool pathIsId = path.is<PathIdentity>();
 
-    if (hasBoundProjName) {
-        node = make<EvaluationNode>(req.getBoundProjectionName(),
+    if (const auto& boundProjName = req.getBoundProjectionName()) {
+        node = make<EvaluationNode>(*boundProjName,
                                     make<EvalPath>(key._path, make<Variable>(key._projectionName)),
                                     std::move(node));
         visitor(node);
 
         if (!pathIsId) {
             node = make<FilterNode>(
-                make<EvalFilter>(std::move(path), make<Variable>(req.getBoundProjectionName())),
-                std::move(node));
+                make<EvalFilter>(std::move(path), make<Variable>(*boundProjName)), std::move(node));
             visitor(node);
         }
     } else {
@@ -1404,7 +1407,7 @@ void sortResidualRequirements(ResidualRequirementsWithCE& residualReq) {
         const auto& entry = residualReq.at(index);
 
         size_t multiplier = 0;
-        if (entry._req.hasBoundProjectionName()) {
+        if (entry._req.getBoundProjectionName()) {
             multiplier++;
         }
         if (!isIntervalReqFullyOpenDNF(entry._req.getIntervals())) {
@@ -1442,8 +1445,8 @@ void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& r
     for (auto it = residualReqs.begin(); it != residualReqs.end();) {
         auto& [key, req, ce] = *it;
 
-        if (req.hasBoundProjectionName() &&
-            !requiredProjections.find(req.getBoundProjectionName()).second) {
+        if (const auto& boundProjName = req.getBoundProjectionName();
+            boundProjName && !requiredProjections.find(*boundProjName).second) {
             if (isIntervalReqFullyOpenDNF(req.getIntervals())) {
                 residualReqs.erase(it++);
                 continue;
@@ -1452,8 +1455,9 @@ void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& r
                 tassert(6624163,
                         "Should not be seeing a perf-only predicate as residual",
                         !req.getIsPerfOnly());
-                req = {
-                    "" /*boundProjectionName*/, std::move(req.getIntervals()), req.getIsPerfOnly()};
+                req = {boost::none /*boundProjectionName*/,
+                       std::move(req.getIntervals()),
+                       req.getIsPerfOnly()};
             }
         }
 

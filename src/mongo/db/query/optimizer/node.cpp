@@ -341,8 +341,8 @@ bool RIDIntersectNode::hasRightIntervals() const {
 static ProjectionNameVector createSargableBindings(const PartialSchemaRequirements& reqMap) {
     ProjectionNameVector result;
     for (const auto& entry : reqMap) {
-        if (entry.second.hasBoundProjectionName()) {
-            result.push_back(entry.second.getBoundProjectionName());
+        if (const auto& boundProjName = entry.second.getBoundProjectionName()) {
+            result.push_back(*boundProjName);
         }
     }
     return result;
@@ -377,10 +377,7 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
     // Assert merged map does not contain duplicate bound projections.
     ProjectionNameSet boundsProjectionNameSet;
     for (const auto& [key, req] : _reqMap) {
-        const bool reqHasBoundProj = req.hasBoundProjectionName();
-        if (reqHasBoundProj) {
-            const ProjectionName& projName = req.getBoundProjectionName();
-
+        if (const auto& boundProjName = req.getBoundProjectionName()) {
             tassert(6624094,
                     "SargableNode has a multikey requirement with a non-trivial interval which "
                     "also binds",
@@ -389,9 +386,10 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
             tassert(
                 6624095, "SargableNode has a perf only binding requirement", !req.getIsPerfOnly());
 
-            const bool inserted = boundsProjectionNameSet.insert(projName).second;
+            const bool inserted = boundsProjectionNameSet.insert(*boundProjName).second;
             tassert(6624087,
-                    str::stream() << "SargableNode has duplicate bound projection: " << projName,
+                    str::stream() << "SargableNode has duplicate bound projection: "
+                                  << *boundProjName,
                     inserted);
         }
     }
