@@ -82,7 +82,14 @@ void QueryAnalysisSampler::onStartup() {
         "QueryAnalysisConfigurationsRefresher",
         [this](Client* client) {
             auto opCtx = client->makeOperationContext();
-            _refreshConfigurations(opCtx.get());
+            try {
+                _refreshConfigurations(opCtx.get());
+            } catch (DBException& ex) {
+                LOGV2(7012500,
+                      "Failed to refresh query analysis configurations, will try again at the next "
+                      "interval",
+                      "error"_attr = redact(ex));
+            }
         },
         Seconds(gQueryAnalysisSamplerConfigurationRefreshSecs));
     _periodicConfigurationsRefresher =
