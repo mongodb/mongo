@@ -187,7 +187,7 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
 
         if (cm.isSharded()) {
             const auto placementVersion = cm.getVersion(shardId);
-            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none))
+            ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none))
                 .serialize(ShardVersion::kShardVersionField, &cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
             ShardVersion::UNSHARDED().serialize(ShardVersion::kShardVersionField, &cmdBuilder);

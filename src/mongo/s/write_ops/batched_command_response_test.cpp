@@ -70,13 +70,12 @@ TEST(BatchedCommandResponseTest, Basic) {
 TEST(BatchedCommandResponseTest, StaleConfigInfo) {
     OID epoch = OID::gen();
 
-    StaleConfigInfo staleInfo(
-        NamespaceString("TestDB.TestColl"),
-        ShardVersion(ChunkVersion({epoch, Timestamp(100, 0)}, {1, 0}),
-                     CollectionIndexes({epoch, Timestamp(100, 0)}, boost::none)),
-        ShardVersion(ChunkVersion({epoch, Timestamp(100, 0)}, {2, 0}),
-                     CollectionIndexes({epoch, Timestamp(100, 0)}, boost::none)),
-        ShardId("TestShard"));
+    StaleConfigInfo staleInfo(NamespaceString("TestDB.TestColl"),
+                              ShardVersion(ChunkVersion({epoch, Timestamp(100, 0)}, {1, 0}),
+                                           boost::optional<CollectionIndexes>(boost::none)),
+                              ShardVersion(ChunkVersion({epoch, Timestamp(100, 0)}, {2, 0}),
+                                           boost::optional<CollectionIndexes>(boost::none)),
+                              ShardId("TestShard"));
     BSONObjBuilder builder(BSON("index" << 0 << "code" << ErrorCodes::StaleConfig << "errmsg"
                                         << "StaleConfig error"));
     staleInfo.serialize(&builder);
@@ -160,7 +159,8 @@ TEST(BatchedCommandResponseTest, TooManyBigErrors) {
 
 TEST(BatchedCommandResponseTest, CompatibilityFromWriteErrorToBatchCommandResponse) {
     CollectionGeneration gen(OID::gen(), Timestamp(2, 0));
-    ShardVersion versionReceived(ChunkVersion(gen, {1, 0}), CollectionIndexes(gen, boost::none));
+    ShardVersion versionReceived(ChunkVersion(gen, {1, 0}),
+                                 boost::optional<CollectionIndexes>(boost::none));
 
     write_ops::UpdateCommandReply reply;
     reply.getWriteCommandReplyBase().setN(1);

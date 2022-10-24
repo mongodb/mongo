@@ -334,7 +334,7 @@ std::vector<BSONObj> ValidationBehaviorsRefineShardKey::loadIndexes(
         nss.db().toString(),
         appendShardVersion(
             BSON("listIndexes" << nss.coll()),
-            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none))),
+            ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none))),
         Milliseconds(-1));
     if (indexesRes.getStatus().code() != ErrorCodes::NamespaceNotFound) {
         return uassertStatusOK(indexesRes).docs;
@@ -351,7 +351,7 @@ void ValidationBehaviorsRefineShardKey::verifyUsefulNonMultiKeyIndex(
         "admin",
         appendShardVersion(
             BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
-            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none))),
+            ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none))),
         Shard::RetryPolicy::kIdempotent));
     if (checkShardingIndexRes.commandStatus == ErrorCodes::UnknownError) {
         // CheckShardingIndex returns UnknownError if a compatible shard key index cannot be found,

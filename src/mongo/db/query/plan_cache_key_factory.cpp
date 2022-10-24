@@ -136,7 +136,8 @@ sbe::PlanCacheKeyCollectionState computeCollectionState(OperationContext* opCtx,
             OperationShardingState::get(opCtx).getShardVersion(collection->ns())};
         if (shardVersion) {
             keyShardingEpoch =
-                sbe::PlanCacheKeyShardingEpoch{shardVersion->epoch(), shardVersion->getTimestamp()};
+                sbe::PlanCacheKeyShardingEpoch{shardVersion->placementVersion().epoch(),
+                                               shardVersion->placementVersion().getTimestamp()};
         }
     }
     return {collection->uuid(),

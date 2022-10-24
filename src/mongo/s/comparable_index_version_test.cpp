@@ -34,25 +34,24 @@ namespace mongo {
 namespace {
 
 TEST(ComparableIndexVersionTest, VersionsEqual) {
-    const auto epoch = OID::gen();
-    const Timestamp timestamp(1, 1);
-    const CollectionIndexes v1({epoch, timestamp}, Timestamp(1, 0));
-    const CollectionIndexes v2({epoch, timestamp}, Timestamp(1, 0));
+    const auto uuid = UUID::gen();
+    const CollectionIndexes v1(uuid, Timestamp(1, 0));
+    const CollectionIndexes v2(uuid, Timestamp(1, 0));
     const auto version1 = ComparableIndexVersion::makeComparableIndexVersion(v1);
     const auto version2 = ComparableIndexVersion::makeComparableIndexVersion(v2);
     ASSERT(version1 == version2);
 }
 
 TEST(ComparableIndexVersionTest, VersionsEqualAfterCopy) {
-    const CollectionIndexes indexVersion({OID::gen(), Timestamp(1, 1)}, Timestamp(1, 0));
+    const CollectionIndexes indexVersion(UUID::gen(), Timestamp(1, 0));
     const auto version1 = ComparableIndexVersion::makeComparableIndexVersion(indexVersion);
     const auto version2 = version1;
     ASSERT(version1 == version2);
 }
 
 TEST(ComparableIndexVersionTest, CompareDifferentGenerations) {
-    const CollectionIndexes v1({OID::gen(), Timestamp(1)}, Timestamp(2, 0));
-    const CollectionIndexes v2({OID::gen(), Timestamp(2)}, Timestamp(1, 0));
+    const CollectionIndexes v1(UUID::gen(), Timestamp(2, 0));
+    const CollectionIndexes v2(UUID::gen(), Timestamp(1, 0));
     const auto version1 = ComparableIndexVersion::makeComparableIndexVersion(v1);
     const auto version2 = ComparableIndexVersion::makeComparableIndexVersion(v2);
     ASSERT(version2 != version1);
@@ -60,21 +59,11 @@ TEST(ComparableIndexVersionTest, CompareDifferentGenerations) {
     ASSERT_FALSE(version2 < version1);
 }
 
-TEST(ComparableIndexVersionTest, CompareDifferentVersionsGenerationsIgnoreSequenceNumber) {
-    const auto version1 = ComparableIndexVersion::makeComparableIndexVersion(
-        CollectionIndexes({OID::gen(), Timestamp(2)}, Timestamp(2, 0)));
-    const auto version2 = ComparableIndexVersion::makeComparableIndexVersion(
-        CollectionIndexes({OID::gen(), Timestamp(1)}, Timestamp(2, 0)));
-    ASSERT(version1 != version2);
-    ASSERT(version1 > version2);
-    ASSERT_FALSE(version1 < version2);
-}
-
-TEST(ComparableIndexVersionTest, VersionGreaterSameTimestamps) {
-    const CollectionGeneration gen{OID::gen(), Timestamp(1, 1)};
-    const CollectionIndexes v1(gen, Timestamp(1, 0));
-    const CollectionIndexes v2(gen, Timestamp(1, 2));
-    const CollectionIndexes v3(gen, Timestamp(2, 0));
+TEST(ComparableIndexVersionTest, VersionGreaterSameUUID) {
+    const auto uuid = UUID::gen();
+    const CollectionIndexes v1(uuid, Timestamp(1, 0));
+    const CollectionIndexes v2(uuid, Timestamp(1, 2));
+    const CollectionIndexes v3(uuid, Timestamp(2, 0));
     const auto version1 = ComparableIndexVersion::makeComparableIndexVersion(v1);
     const auto version2 = ComparableIndexVersion::makeComparableIndexVersion(v2);
     const auto version3 = ComparableIndexVersion::makeComparableIndexVersion(v3);
@@ -86,11 +75,11 @@ TEST(ComparableIndexVersionTest, VersionGreaterSameTimestamps) {
     ASSERT_FALSE(version3 < version2);
 }
 
-TEST(ComparableIndexVersionTest, VersionLessSameTimestamps) {
-    const CollectionGeneration gen{OID::gen(), Timestamp(1, 1)};
-    const CollectionIndexes v1(gen, Timestamp(1, 0));
-    const CollectionIndexes v2(gen, Timestamp(1, 2));
-    const CollectionIndexes v3(gen, Timestamp(2, 0));
+TEST(ComparableIndexVersionTest, VersionLessSameUUID) {
+    const auto uuid = UUID::gen();
+    const CollectionIndexes v1(uuid, Timestamp(1, 0));
+    const CollectionIndexes v2(uuid, Timestamp(1, 2));
+    const CollectionIndexes v3(uuid, Timestamp(2, 0));
     const auto version1 = ComparableIndexVersion::makeComparableIndexVersion(v1);
     const auto version2 = ComparableIndexVersion::makeComparableIndexVersion(v2);
     const auto version3 = ComparableIndexVersion::makeComparableIndexVersion(v3);
@@ -110,7 +99,7 @@ TEST(ComparableIndexVersionTest, DefaultConstructedVersionsAreEqual) {
 }
 
 TEST(ComparableIndexVersionTest, DefaultConstructedVersionIsAlwaysLessThanWithIndexesVersion) {
-    const CollectionIndexes indexVersion({OID::gen(), Timestamp(1, 1)}, Timestamp(1, 0));
+    const CollectionIndexes indexVersion(UUID::gen(), Timestamp(1, 0));
     const ComparableIndexVersion defaultVersion{};
     const auto withIndexesVersion =
         ComparableIndexVersion::makeComparableIndexVersion(indexVersion);
@@ -120,62 +109,31 @@ TEST(ComparableIndexVersionTest, DefaultConstructedVersionIsAlwaysLessThanWithIn
 }
 
 TEST(ComparableIndexVersionTest, DefaultConstructedVersionIsAlwaysLessThanNoIndexesVersion) {
-    const CollectionIndexes indexVersion({OID::gen(), Timestamp(1, 1)}, boost::none);
     const ComparableIndexVersion defaultVersion{};
-    const auto noIndexesVersion = ComparableIndexVersion::makeComparableIndexVersion(indexVersion);
+    const auto noIndexesVersion = ComparableIndexVersion::makeComparableIndexVersion(boost::none);
     ASSERT(defaultVersion != noIndexesVersion);
     ASSERT(defaultVersion < noIndexesVersion);
     ASSERT_FALSE(defaultVersion > noIndexesVersion);
 }
 
-TEST(ComparableIndexVersionTest, DefaultConstructedVersionIsAlwaysLessThanUnsharded) {
-    const ComparableIndexVersion defaultVersion{};
-    const auto version1 =
-        ComparableIndexVersion::makeComparableIndexVersion(CollectionIndexes::UNSHARDED());
-    ASSERT(defaultVersion != version1);
-    ASSERT(defaultVersion < version1);
-    ASSERT_FALSE(defaultVersion > version1);
-}
-
-TEST(ComparableIndexVersionTest, TwoNoIndexesVersionsAreTheSame) {
-    const CollectionGeneration gen{OID::gen(), Timestamp(1, 1)};
-    const CollectionIndexes v1(gen, boost::none);
-    const CollectionIndexes v2(gen, boost::none);
-    const auto noIndexesVersion1 = ComparableIndexVersion::makeComparableIndexVersion(v1);
-    const auto noIndexesVersion2 = ComparableIndexVersion::makeComparableIndexVersion(v2);
-    ASSERT(noIndexesVersion1 == noIndexesVersion2);
-    ASSERT_FALSE(noIndexesVersion1 < noIndexesVersion2);
-    ASSERT_FALSE(noIndexesVersion1 > noIndexesVersion2);
-}
-
-TEST(ComparableIndexVersionTest, NoIndexesGreaterThanUnshardedBySequenceNum) {
-    const CollectionIndexes indexVersion({OID::gen(), Timestamp(1)}, boost::none);
-    const auto unsharded =
-        ComparableIndexVersion::makeComparableIndexVersion(CollectionIndexes::UNSHARDED());
-    const auto noIndexesVersion = ComparableIndexVersion::makeComparableIndexVersion(indexVersion);
-    ASSERT(noIndexesVersion != unsharded);
-    ASSERT(noIndexesVersion > unsharded);
-}
-
-TEST(ComparableIndexVersionTest, UnshardedGreaterThanNoIndexesBySequenceNum) {
-    const CollectionIndexes indexVersion({OID::gen(), Timestamp(1)}, boost::none);
-    const auto noIndexesVersion = ComparableIndexVersion::makeComparableIndexVersion(indexVersion);
-    const auto unsharded =
-        ComparableIndexVersion::makeComparableIndexVersion(CollectionIndexes::UNSHARDED());
-    ASSERT(noIndexesVersion != unsharded);
-    ASSERT(unsharded > noIndexesVersion);
-}
+// TODO (SERVER-70195) Re-enable this test
+// TEST(ComparableIndexVersionTest, TwoNoIndexesVersionsAreTheSame) {
+//     const auto noIndexesVersion1 =
+//     ComparableIndexVersion::makeComparableIndexVersion(boost::none); const auto noIndexesVersion2
+//     = ComparableIndexVersion::makeComparableIndexVersion(boost::none); ASSERT(noIndexesVersion1
+//     == noIndexesVersion2); ASSERT_FALSE(noIndexesVersion1 < noIndexesVersion2);
+//     ASSERT_FALSE(noIndexesVersion1 > noIndexesVersion2);
+// }
 
 TEST(ComparableIndexVersionTest, NoIndexesGreaterThanDefault) {
-    const CollectionIndexes indexVersion({OID::gen(), Timestamp(1)}, boost::none);
-    const auto noIndexesVersion = ComparableIndexVersion::makeComparableIndexVersion(indexVersion);
+    const auto noIndexesVersion = ComparableIndexVersion::makeComparableIndexVersion(boost::none);
     const ComparableIndexVersion defaultVersion{};
     ASSERT(noIndexesVersion != defaultVersion);
     ASSERT(noIndexesVersion > defaultVersion);
 }
 
 TEST(ComparableIndexVersionTest, CompareForcedRefreshVersionVersusValidCollectionIndexes) {
-    const CollectionIndexes indexVersion({OID::gen(), Timestamp(1)}, Timestamp(100, 0));
+    const CollectionIndexes indexVersion(UUID::gen(), Timestamp(100, 0));
     const ComparableIndexVersion defaultVersionBeforeForce;
     const auto versionBeforeForce =
         ComparableIndexVersion::makeComparableIndexVersion(indexVersion);

@@ -556,13 +556,15 @@ void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
     auto collectionEntry = _collectionCache.peekLatestCached(nss);
 
     const auto newChunkVersion = wantedVersion
-        ? ComparableChunkVersion::makeComparableChunkVersion(*wantedVersion)
+        ? ComparableChunkVersion::makeComparableChunkVersion(wantedVersion->placementVersion())
         : ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh();
 
     const bool routingInfoTimeAdvanced = _collectionCache.advanceTimeInStore(nss, newChunkVersion);
 
+    // TODO(SERVER-70195): replace boost::none with wantedVersion->indexVersion() once the
+    // ComparableIndexVersion takes a timestamp and not a CollectionIndexes.
     const auto newIndexVersion = wantedVersion
-        ? ComparableIndexVersion::makeComparableIndexVersion(*wantedVersion)
+        ? ComparableIndexVersion::makeComparableIndexVersion(boost::none)
         : ComparableIndexVersion::makeComparableIndexVersionForForcedRefresh();
 
     _indexCache.advanceTimeInStore(nss, newIndexVersion);
@@ -919,9 +921,10 @@ CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
     const NamespaceString& nss,
     const ValueHandle& indexes,
     const ComparableIndexVersion& previousVersion) {
-    // This object will define the new time of the index info obtained by this refresh
-    auto newComparableVersion =
-        ComparableIndexVersion::makeComparableIndexVersion(CollectionIndexes::UNSHARDED());
+
+    // This object will define the new time of the routing info obtained by this refresh
+    ComparableIndexVersion newComparableVersion =
+        ComparableIndexVersion::makeComparableIndexVersion(boost::none);
 
     try {
         LOGV2_FOR_CATALOG_REFRESH(6686302,
@@ -941,7 +944,10 @@ CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
         auto collAndIndexes = Grid::get(opCtx)->catalogClient()->getCollectionAndGlobalIndexes(
             opCtx, nss, readConcern);
         const auto& coll = collAndIndexes.first;
-        newComparableVersion.setCollectionIndexes(coll.getIndexVersion());
+        newComparableVersion.setCollectionIndexes(
+            coll.getIndexVersion() ? boost::make_optional(CollectionIndexes(
+                                         coll.getUuid(), coll.getIndexVersion()->indexVersion()))
+                                   : boost::none);
         IndexCatalogTypeMap newIndexesMap;
         for (const auto& index : collAndIndexes.second) {
             newIndexesMap[index.getName()] = index;
@@ -954,7 +960,10 @@ CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
                                   "newVersion"_attr = newComparableVersion,
                                   "timeInStore"_attr = previousVersion);
         return LookupResult(
-            GlobalIndexesCache(coll.getIndexVersion().indexVersion(), std::move(newIndexesMap)),
+            GlobalIndexesCache(coll.getIndexVersion()
+                                   ? boost::make_optional(coll.getIndexVersion()->indexVersion())
+                                   : boost::none,
+                               std::move(newIndexesMap)),
             std::move(newComparableVersion));
     } catch (const DBException& ex) {
         LOGV2_FOR_CATALOG_REFRESH(6686304,

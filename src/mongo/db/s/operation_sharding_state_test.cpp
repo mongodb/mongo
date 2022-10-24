@@ -48,7 +48,7 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleDbVersion) {
 
 TEST_F(OperationShardingStateTest, ScopedSetShardRoleShardVersion) {
     CollectionGeneration gen(OID::gen(), Timestamp(1, 0));
-    ShardVersion shardVersion({gen, {1, 0}}, {gen, boost::none});
+    ShardVersion shardVersion({gen, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
     ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, shardVersion, boost::none);
 
     auto& oss = OperationShardingState::get(operationContext());
@@ -60,14 +60,14 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleChangeShardVersionSameNames
 
     {
         CollectionGeneration gen1(OID::gen(), Timestamp(10, 0));
-        ShardVersion shardVersion1({gen1, {1, 0}}, {gen1, boost::none});
+        ShardVersion shardVersion1({gen1, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
         ScopedSetShardRole scopedSetShardRole1(
             operationContext(), kNss, shardVersion1, boost::none);
         ASSERT_EQ(shardVersion1, *oss.getShardVersion(kNss));
     }
     {
         CollectionGeneration gen2(OID::gen(), Timestamp(20, 0));
-        ShardVersion shardVersion2({gen2, {1, 0}}, {gen2, boost::none});
+        ShardVersion shardVersion2({gen2, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
         ScopedSetShardRole scopedSetShardRole2(
             operationContext(), kNss, shardVersion2, boost::none);
         ASSERT_EQ(shardVersion2, *oss.getShardVersion(kNss));
@@ -77,8 +77,8 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleChangeShardVersionSameNames
 TEST_F(OperationShardingStateTest, ScopedSetShardRoleRecursiveShardVersionDifferentNamespaces) {
     CollectionGeneration gen1(OID::gen(), Timestamp(10, 0));
     CollectionGeneration gen2(OID::gen(), Timestamp(20, 0));
-    ShardVersion shardVersion1({gen1, {1, 0}}, {gen1, boost::none});
-    ShardVersion shardVersion2({gen2, {1, 0}}, {gen2, boost::none});
+    ShardVersion shardVersion1({gen1, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
+    ShardVersion shardVersion2({gen2, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
 
     ScopedSetShardRole scopedSetShardRole1(operationContext(), kNss, shardVersion1, boost::none);
     ScopedSetShardRole scopedSetShardRole2(

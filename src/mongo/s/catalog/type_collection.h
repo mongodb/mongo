@@ -175,14 +175,13 @@ public:
             CollectionTypeBase::setAllowMigrations(false);
     }
 
-    CollectionIndexes getIndexVersion() const {
-        return CollectionIndexes({getEpoch(), CollectionTypeBase::getTimestamp()},
-                                 CollectionTypeBase::getIndexVersion());
+    boost::optional<CollectionIndexes> getIndexVersion() const {
+        return CollectionTypeBase::getIndexVersion()
+            ? CollectionIndexes(getUuid(), *CollectionTypeBase::getIndexVersion())
+            : boost::optional<CollectionIndexes>(boost::none);
     }
 
     void setIndexVersion(CollectionIndexes indexVersion) {
-        setEpoch(indexVersion.epoch());
-        setTimestamp(indexVersion.getTimestamp());
         CollectionTypeBase::setIndexVersion(indexVersion.indexVersion());
     }
 

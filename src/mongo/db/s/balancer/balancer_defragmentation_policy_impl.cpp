@@ -66,7 +66,7 @@ ShardVersion getShardVersion(OperationContext* opCtx,
                              const NamespaceString& nss) {
     auto cm = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
     const auto placementVersion = cm.getVersion(shardId);
-    return ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none));
+    return ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none));
 }
 
 std::vector<ChunkType> getCollectionChunks(OperationContext* opCtx, const CollectionType& coll) {
@@ -226,7 +226,7 @@ public:
             } else if (!pendingActions.rangesToMerge.empty()) {
                 const auto& rangeToMerge = pendingActions.rangesToMerge.back();
                 nextAction = boost::optional<DefragmentationAction>(
-                    MergeInfo(shardId, _nss, _uuid, shardVersion, rangeToMerge));
+                    MergeInfo(shardId, _nss, _uuid, shardVersion.placementVersion(), rangeToMerge));
                 pendingActions.rangesToMerge.pop_back();
             }
             if (nextAction.has_value()) {
@@ -292,7 +292,7 @@ public:
                                       [&]() {
                                           ChunkType chunk(dataSizeAction.uuid,
                                                           dataSizeAction.chunkRange,
-                                                          dataSizeAction.version,
+                                                          dataSizeAction.version.placementVersion(),
                                                           dataSizeAction.shardId);
                                           auto catalogManager = ShardingCatalogManager::get(opCtx);
                                           catalogManager->setChunkEstimatedSize(
@@ -420,7 +420,7 @@ public:
         const auto& nextRequest = _outstandingMerges.back();
         auto version = getShardVersion(opCtx, nextRequest.getDestinationShard(), _nss);
         return boost::optional<DefragmentationAction>(
-            nextRequest.asMergeInfo(_uuid, _nss, version));
+            nextRequest.asMergeInfo(_uuid, _nss, version.placementVersion()));
     }
 
     boost::optional<MigrateInfo> popNextMigration(
@@ -461,7 +461,8 @@ public:
             usedShards->insert(targetSibling->shard);
             auto smallChunkVersion = getShardVersion(opCtx, nextSmallChunk->shard, _nss);
             _outstandingMigrations.emplace_back(nextSmallChunk, targetSibling);
-            return _outstandingMigrations.back().asMigrateInfo(_uuid, _nss, smallChunkVersion);
+            return _outstandingMigrations.back().asMigrateInfo(
+                _uuid, _nss, smallChunkVersion.placementVersion());
         }
 
         return boost::none;
@@ -1054,7 +1055,7 @@ public:
         auto shardVersion = getShardVersion(opCtx, shardId, _nss);
         const auto& rangeToMerge = unmergedRanges.back();
         boost::optional<DefragmentationAction> nextAction = boost::optional<DefragmentationAction>(
-            MergeInfo(shardId, _nss, _uuid, shardVersion, rangeToMerge));
+            MergeInfo(shardId, _nss, _uuid, shardVersion.placementVersion(), rangeToMerge));
         unmergedRanges.pop_back();
         ++_outstandingActions;
         if (unmergedRanges.empty()) {
@@ -1218,7 +1219,7 @@ public:
                 nextAction = boost::optional<DefragmentationAction>(
                     SplitInfoWithKeyPattern(shardId,
                                             _nss,
-                                            shardVersion,
+                                            shardVersion.placementVersion(),
                                             rangeToSplit.getMin(),
                                             rangeToSplit.getMax(),
                                             splitPoints,
@@ -1231,7 +1232,7 @@ public:
                     AutoSplitVectorInfo(shardId,
                                         _nss,
                                         _uuid,
-                                        shardVersion,
+                                        shardVersion.placementVersion(),
                                         _shardKey,
                                         rangeToAutoSplit.getMin(),
                                         rangeToAutoSplit.getMax(),

@@ -55,7 +55,7 @@ BSONObj makeVersionedCmdObj(const ChunkManager& cm,
         auto placementVersion = cm.getVersion(shardId);
         return appendShardVersion(
             unversionedCmdObj,
-            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)));
+            ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
     }
     auto versionedCmdObj = appendShardVersion(unversionedCmdObj, ShardVersion::UNSHARDED());
     return appendDbVersionIfPresent(versionedCmdObj, cm.dbVersion());

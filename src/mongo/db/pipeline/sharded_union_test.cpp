@@ -164,7 +164,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
         return createErrorCursorResponse(
             Status{StaleConfigInfo(kTestAggregateNss,
                                    ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                CollectionIndexes({epoch, timestamp}, boost::none)),
+                                                boost::optional<CollectionIndexes>(boost::none)),
                                    boost::none,
                                    ShardId{"0"}),
                    "Mock error: shard version mismatch"});
@@ -250,7 +250,7 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
         return createErrorCursorResponse(
             Status{StaleConfigInfo(kTestAggregateNss,
                                    ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                CollectionIndexes({epoch, timestamp}, boost::none)),
+                                                boost::optional<CollectionIndexes>(boost::none)),
                                    boost::none,
                                    ShardId{"0"}),
                    "Mock error: shard version mismatch"});
@@ -344,7 +344,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
         return createErrorCursorResponse(
             Status{StaleConfigInfo(kTestAggregateNss,
                                    ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                CollectionIndexes({epoch, timestamp}, boost::none)),
+                                                boost::optional<CollectionIndexes>(boost::none)),
                                    boost::none,
                                    ShardId{"0"}),
                    "Mock error: shard version mismatch"});
@@ -353,7 +353,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
         return createErrorCursorResponse(
             Status{StaleConfigInfo(kTestAggregateNss,
                                    ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                CollectionIndexes({epoch, timestamp}, boost::none)),
+                                                boost::optional<CollectionIndexes>(boost::none)),
                                    boost::none,
                                    ShardId{"0"}),
                    "Mock error: shard version mismatch"});

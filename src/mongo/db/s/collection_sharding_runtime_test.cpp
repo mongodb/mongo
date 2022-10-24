@@ -94,8 +94,7 @@ TEST_F(CollectionShardingRuntimeTest,
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kTestNss,
-        ShardVersion(metadata.getShardVersion(),
-                     CollectionIndexes(metadata.getShardVersion(), boost::none)),
+        ShardVersion(metadata.getShardVersion(), boost::optional<CollectionIndexes>(boost::none)),
         boost::none /* databaseVersion */};
     ASSERT_THROWS_CODE(csr.getCollectionDescription(opCtx), DBException, ErrorCodes::StaleConfig);
 }
@@ -117,8 +116,7 @@ TEST_F(CollectionShardingRuntimeTest,
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kTestNss,
-        ShardVersion(metadata.getShardVersion(),
-                     CollectionIndexes(metadata.getShardVersion(), boost::none)),
+        ShardVersion(metadata.getShardVersion(), boost::optional<CollectionIndexes>(boost::none)),
         boost::none /* databaseVersion */};
     ASSERT_TRUE(csr.getCollectionDescription(opCtx).isSharded());
 }
@@ -185,8 +183,7 @@ TEST_F(CollectionShardingRuntimeTest,
     ScopedSetShardRole scopedSetShardRole{
         opCtx,
         kTestNss,
-        ShardVersion(metadata.getShardVersion(),
-                     CollectionIndexes(metadata.getShardVersion(), boost::none)),
+        ShardVersion(metadata.getShardVersion(), boost::optional<CollectionIndexes>(boost::none)),
         boost::none /* databaseVersion */};
     ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 1);
 
@@ -232,8 +229,8 @@ TEST_F(CollectionShardingRuntimeTest, ReturnUnshardedMetadataInServerlessMode) {
         opCtx,
         NamespaceString::kLogicalSessionsNamespace,
         ShardVersion(ChunkVersion(gen, {1, 0}),
-                     CollectionIndexes(gen, boost::none)), /* shardVersion */
-        boost::none                                        /* databaseVersion */
+                     boost::optional<CollectionIndexes>(boost::none)), /* shardVersion */
+        boost::none                                                    /* databaseVersion */
     };
 
     CollectionShardingRuntime csrLogicalSession(

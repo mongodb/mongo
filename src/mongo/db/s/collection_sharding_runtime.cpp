@@ -114,7 +114,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
                                        supportNonVersionedOperations);
 
     if (!supportNonVersionedOperations) {
-        invariant(!ChunkVersion::isIgnoredVersion(*optReceivedShardVersion) ||
+        invariant(!ShardVersion::isIgnoredVersion(*optReceivedShardVersion) ||
                       !metadata->get().allowMigrations() || !metadata->get().isSharded(),
                   "For sharded collections getOwnershipFilter cannot be relied on without a valid "
                   "shard version");
@@ -426,11 +426,11 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     const auto& currentMetadata = optCurrentMetadata->get();
 
     const auto wantedPlacementVersion = currentMetadata.getShardVersion();
-    const auto wantedShardVersion = ShardVersion(
-        wantedPlacementVersion, CollectionIndexes(wantedPlacementVersion, boost::none));
-    const ChunkVersion receivedPlacementVersion = receivedShardVersion;
+    const auto wantedShardVersion =
+        ShardVersion(wantedPlacementVersion, boost::optional<CollectionIndexes>(boost::none));
+    const ChunkVersion receivedPlacementVersion = receivedShardVersion.placementVersion();
 
-    if (wantedShardVersion.isWriteCompatibleWith(receivedShardVersion) ||
+    if (wantedPlacementVersion.isWriteCompatibleWith(receivedPlacementVersion) ||
         receivedShardVersion == ShardVersion::IGNORED())
         return optCurrentMetadata;
 
@@ -439,7 +439,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     uassert(std::move(sci),
             str::stream() << "timestamp mismatch detected for " << _nss.ns(),
-            wantedShardVersion.isSameCollection(receivedShardVersion));
+            wantedPlacementVersion.isSameCollection(receivedPlacementVersion));
 
     if (!wantedPlacementVersion.isSet() && receivedPlacementVersion.isSet()) {
         uasserted(std::move(sci),
@@ -453,7 +453,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
                                 << "but the client expects unsharded collection");
     }
 
-    if (wantedShardVersion.majorVersion() != receivedShardVersion.majorVersion()) {
+    if (wantedPlacementVersion.majorVersion() != receivedPlacementVersion.majorVersion()) {
         // Could be > or < - wanted is > if this is the source of a migration, wanted < if this is
         // the target of a migration
         uasserted(std::move(sci), str::stream() << "version mismatch detected for " << _nss.ns());

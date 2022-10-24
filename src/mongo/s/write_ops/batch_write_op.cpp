@@ -940,13 +940,13 @@ bool EndpointComp::operator()(const ShardEndpoint* endpointA,
         return shardNameDiff < 0;
 
     if (endpointA->shardVersion && endpointB->shardVersion) {
-        const int epochDiff =
-            endpointA->shardVersion->epoch().compare(endpointB->shardVersion->epoch());
+        const int epochDiff = endpointA->shardVersion->placementVersion().epoch().compare(
+            endpointB->shardVersion->placementVersion().epoch());
         if (epochDiff)
             return epochDiff < 0;
 
-        const int shardVersionDiff =
-            endpointA->shardVersion->toLong() - endpointB->shardVersion->toLong();
+        const int shardVersionDiff = endpointA->shardVersion->placementVersion().toLong() -
+            endpointB->shardVersion->placementVersion().toLong();
         if (shardVersionDiff)
             return shardVersionDiff < 0;
     } else if (!endpointA->shardVersion && !endpointB->shardVersion) {

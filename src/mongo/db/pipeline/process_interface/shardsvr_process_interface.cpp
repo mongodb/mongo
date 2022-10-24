@@ -76,11 +76,8 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
 
     // Mark the cache entry routingInfo for the 'nss' and 'shardId' if the entry is staler than
     // 'targetCollectionVersion'.
-    const ShardVersion ignoreIndexVersion{
-        targetCollectionVersion,
-        CollectionIndexes{CollectionGeneration{targetCollectionVersion.epoch(),
-                                               targetCollectionVersion.getTimestamp()},
-                          boost::none}};
+    const ShardVersion ignoreIndexVersion{targetCollectionVersion,
+                                          boost::optional<CollectionIndexes>(boost::none)};
     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         nss, ignoreIndexVersion, shardId);
 

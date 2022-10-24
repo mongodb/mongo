@@ -126,7 +126,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                 nss,
                 ShardVersion::IGNORED() /* receivedVersion */,
                 ShardVersion(placementVersion,
-                             CollectionIndexes(placementVersion, boost::none)) /* wantedVersion */,
+                             boost::optional<CollectionIndexes>(boost::none)) /* wantedVersion */,
                 shardId),
             str::stream() << "Collection " << nss.ns() << " changed since split start",
             epoch == expectedEpoch &&

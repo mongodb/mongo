@@ -433,7 +433,7 @@ public:
             _runCommand(
                 opCtx,
                 shard->getId(),
-                ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)),
                 boost::none,
                 nss,
                 applyReadWriteConcern(opCtx, false, false, explainCmd),
@@ -512,7 +512,7 @@ public:
             _runCommand(
                 opCtx,
                 chunk.getShardId(),
-                ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)),
                 boost::none,
                 nss,
                 applyReadWriteConcern(opCtx, this, cmdObjForShard),

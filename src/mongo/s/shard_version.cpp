@@ -33,29 +33,19 @@
 
 namespace mongo {
 
-ShardVersion::ShardVersion(ChunkVersion chunkVersion, CollectionIndexes indexVersion)
-    : CollectionGeneration([&]() {
-          uassert(ErrorCodes::BadValue,
-                  "ChunkVersion and CollectionIndexes have different generations",
-                  chunkVersion.isSameCollection(indexVersion));
-          return CollectionGeneration(chunkVersion.epoch(), chunkVersion.getTimestamp());
-      }()),
-      ChunkVersion(chunkVersion),
-      CollectionIndexes(indexVersion) {}
-
 ShardVersion ShardVersion::parse(const BSONElement& element) {
     auto parsedVersion = ShardVersionBase::parse(IDLParserContext("ShardVersion"), element.Obj());
     auto version = parsedVersion.getVersion();
     return ShardVersion(ChunkVersion({parsedVersion.getEpoch(), parsedVersion.getTimestamp()},
                                      {version.getSecs(), version.getInc()}),
-                        CollectionIndexes({parsedVersion.getEpoch(), parsedVersion.getTimestamp()},
-                                          {parsedVersion.getIndexVersion()}));
+                        parsedVersion.getIndexVersion());
 }
 
 void ShardVersion::serialize(StringData field, BSONObjBuilder* builder) const {
     ShardVersionBase version;
-    version.setGeneration({_epoch, _timestamp});
-    version.setPlacement(Timestamp(majorVersion(), minorVersion()));
+    version.setGeneration({placementVersion().epoch(), placementVersion().getTimestamp()});
+    version.setPlacement(
+        Timestamp(placementVersion().majorVersion(), placementVersion().minorVersion()));
     CollectionIndexesBase indexVersion;
     indexVersion.setIndexVersion(_indexVersion);
     version.setIndex(indexVersion);
@@ -63,7 +53,7 @@ void ShardVersion::serialize(StringData field, BSONObjBuilder* builder) const {
 }
 
 std::string ShardVersion::toString() const {
-    return CollectionIndexes(*this).toString() + "||" + ChunkVersion(*this).toString();
+    return (_indexVersion ? _indexVersion->toString() : "") + "||" + placementVersion().toString();
 }
 
 }  // namespace mongo

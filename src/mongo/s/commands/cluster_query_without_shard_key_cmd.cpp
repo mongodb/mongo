@@ -156,7 +156,7 @@ public:
                     appendShardVersion(
                         cmdObj,
                         ShardVersion(placementVersion,
-                                     CollectionIndexes(placementVersion, boost::none))));
+                                     boost::optional<CollectionIndexes>(boost::none))));
             }
 
             MultiStatementTransactionRequestsSender ars(

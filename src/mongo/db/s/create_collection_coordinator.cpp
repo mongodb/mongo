@@ -687,7 +687,7 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
                 requestMatchesExistingCollection);
 
         CreateCollectionResponse response(
-            {routingInfo.getVersion(), CollectionIndexes(routingInfo.getVersion(), boost::none)});
+            {routingInfo.getVersion(), boost::optional<CollectionIndexes>(boost::none)});
         response.setCollectionUUID(routingInfo.getUUID());
         return response;
     }
@@ -741,7 +741,7 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
             requestMatchesExistingCollection);
 
     CreateCollectionResponse response(
-        {routingInfo.getVersion(), CollectionIndexes(routingInfo.getVersion(), boost::none)});
+        {routingInfo.getVersion(), boost::optional<CollectionIndexes>(boost::none)});
     response.setCollectionUUID(routingInfo.getUUID());
     return response;
 }
@@ -1278,7 +1278,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
           "initialCollectionVersion"_attr = _initialChunks->collVersion());
 
     auto result = CreateCollectionResponse(
-        {placementVersion, CollectionIndexes(placementVersion, boost::none)});
+        {placementVersion, boost::optional<CollectionIndexes>(boost::none)});
     result.setCollectionUUID(_collectionUUID);
     _result = std::move(result);
 

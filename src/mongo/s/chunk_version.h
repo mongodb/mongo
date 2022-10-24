@@ -122,7 +122,7 @@ protected:
  * 3. (n, 0), n > 0 - invalid configuration.
  * 4. (n, m), n > 0, m > 0 - normal sharded collection version.
  */
-class ChunkVersion : public virtual CollectionGeneration, public CollectionPlacement {
+class ChunkVersion : public CollectionGeneration, public CollectionPlacement {
 public:
     /**
      * The name for the chunk version information field, which ddl operations use to send only
@@ -147,11 +147,6 @@ public:
      */
     static ChunkVersion IGNORED() {
         return ChunkVersion(CollectionGeneration::IGNORED(), {0, 0});
-    }
-
-    static bool isIgnoredVersion(const ChunkVersion& version) {
-        return version.majorVersion() == 0 && version.minorVersion() == 0 &&
-            version.getTimestamp() == IGNORED().getTimestamp();
     }
 
     void incMajor() {

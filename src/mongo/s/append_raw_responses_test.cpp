@@ -198,7 +198,7 @@ protected:
             Timestamp timestamp{1, 0};
             return StaleConfigInfo(NamespaceString("Foo.Bar"),
                                    ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                CollectionIndexes({epoch, timestamp}, boost::none)),
+                                                boost::optional<CollectionIndexes>(boost::none)),
                                    boost::none,
                                    ShardId{"dummy"});
         }(),

@@ -68,7 +68,7 @@ AtomicWord<uint64_t> ComparableIndexVersion::_epochDisambiguatingSequenceNumSour
 AtomicWord<uint64_t> ComparableIndexVersion::_forcedRefreshSequenceNumSource{1ULL};
 
 ComparableIndexVersion ComparableIndexVersion::makeComparableIndexVersion(
-    const CollectionIndexes& version) {
+    const boost::optional<CollectionIndexes>& version) {
     return ComparableIndexVersion(_forcedRefreshSequenceNumSource.load(),
                                   version,
                                   _epochDisambiguatingSequenceNumSource.fetchAndAdd(1));
@@ -80,7 +80,8 @@ ComparableIndexVersion ComparableIndexVersion::makeComparableIndexVersionForForc
                                   _epochDisambiguatingSequenceNumSource.fetchAndAdd(1));
 }
 
-void ComparableIndexVersion::setCollectionIndexes(const CollectionIndexes& version) {
+void ComparableIndexVersion::setCollectionIndexes(
+    const boost::optional<CollectionIndexes>& version) {
     _indexVersion = version;
 }
 
@@ -136,14 +137,8 @@ bool ComparableIndexVersion::operator<(const ComparableIndexVersion& other) cons
                                                     // _epochDisambiguatingSequenceNum to see which
                                                     // one is more recent.
 
-    if (_indexVersion->getTimestamp() == other._indexVersion->getTimestamp()) {
-        if (!_indexVersion->isSet() && !other._indexVersion->isSet()) {
-            return false;
-        } else if (_indexVersion->isSet() && other._indexVersion->isSet()) {
-            return _indexVersion->indexVersion() < other._indexVersion->indexVersion();
-        }
-    } else if (_indexVersion->isSet() && other._indexVersion->isSet()) {
-        return _indexVersion->getTimestamp() < other._indexVersion->getTimestamp();
+    if (_indexVersion->uuid() == other._indexVersion->uuid()) {
+        return _indexVersion->indexVersion() < other._indexVersion->indexVersion();
     }
     return _epochDisambiguatingSequenceNum < other._epochDisambiguatingSequenceNum;
 }

@@ -398,7 +398,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     catalog->getCollectionRoutingInfoWithRefresh(opCtx, _request.getTo()));
                 _response = RenameCollectionResponse(
                     cm.isSharded() ? ShardVersion(cm.getVersion(),
-                                                  CollectionIndexes(cm.getVersion(), boost::none))
+                                                  boost::optional<CollectionIndexes>(boost::none))
                                    : ShardVersion::UNSHARDED());
 
                 ShardingLogging::get(opCtx)->logChange(

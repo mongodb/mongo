@@ -226,7 +226,7 @@ public:
     bool refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) const
         noexcept override {
         return onCollectionPlacementVersionMismatchNoExcept(
-                   opCtx, se.getNss(), ChunkVersion(se.getVersionReceived()))
+                   opCtx, se.getNss(), se.getVersionReceived().placementVersion())
             .isOK();
     }
 

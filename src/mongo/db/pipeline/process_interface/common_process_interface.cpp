@@ -199,7 +199,7 @@ boost::optional<ShardVersion> CommonProcessInterface::refreshAndGetCollectionVer
                                         ->getCollectionRoutingInfoWithRefresh(expCtx->opCtx, nss));
 
     return cm.isSharded() ? boost::make_optional(ShardVersion(
-                                cm.getVersion(), CollectionIndexes(cm.getVersion(), boost::none)))
+                                cm.getVersion(), boost::optional<CollectionIndexes>(boost::none)))
                           : boost::none;
 }
 

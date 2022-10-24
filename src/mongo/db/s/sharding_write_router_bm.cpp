@@ -152,7 +152,7 @@ std::unique_ptr<CatalogCacheMock> createCatalogCacheMock(OperationContext* opCtx
         opCtx,
         kNss,
         ShardVersion(placementVersion,
-                     CollectionIndexes(placementVersion, boost::none)) /* shardVersion */,
+                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */);
 
     // Configuring the filtering metadata such that calls to getCollectionDescription return what we

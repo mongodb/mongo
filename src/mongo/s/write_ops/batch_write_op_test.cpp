@@ -288,9 +288,9 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
         0,
         Status{StaleConfigInfo(nss,
                                ShardVersion(ChunkVersion({epoch, timestamp}, {101, 200}),
-                                            CollectionIndexes({epoch, timestamp}, boost::none)),
+                                            boost::optional<CollectionIndexes>(boost::none)),
                                ShardVersion(ChunkVersion({epoch, timestamp}, {105, 200}),
-                                            CollectionIndexes({epoch, timestamp}, boost::none)),
+                                            boost::optional<CollectionIndexes>(boost::none)),
                                ShardId("shard")),
                "mock stale error"}));
 

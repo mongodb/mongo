@@ -486,7 +486,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
             expCtx,
             std::move(fieldPaths),
             mergeSpec.getTargetCollectionVersion()
-                ? boost::make_optional((ChunkVersion)*mergeSpec.getTargetCollectionVersion())
+                ? boost::make_optional(mergeSpec.getTargetCollectionVersion()->placementVersion())
                 : boost::none,
             targetNss);
 
@@ -558,10 +558,10 @@ Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> 
         return mergeOnFields;
     }());
     spec.setTargetCollectionVersion(
-        _targetCollectionVersion ? boost::make_optional(ShardVersion(
-                                       *_targetCollectionVersion,
-                                       CollectionIndexes(*_targetCollectionVersion, boost::none)))
-                                 : boost::none);
+        _targetCollectionVersion
+            ? boost::make_optional(ShardVersion(*_targetCollectionVersion,
+                                                boost::optional<CollectionIndexes>(boost::none)))
+            : boost::none);
     return Value(Document{{getSourceName(), spec.toBSON()}});
 }
 

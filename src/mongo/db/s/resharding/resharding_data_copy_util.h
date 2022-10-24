@@ -170,7 +170,7 @@ auto withOneStaleConfigRetry(OperationContext* opCtx, Callable&& callable) {
         if (auto sce = ex.extraInfo<StaleConfigInfo>()) {
             const auto refreshed =
                 onCollectionPlacementVersionMismatchNoExcept(
-                    opCtx, sce->getNss(), ChunkVersion(sce->getVersionReceived()))
+                    opCtx, sce->getNss(), sce->getVersionReceived().placementVersion())
                     .isOK();
 
             if (refreshed) {

@@ -990,7 +990,7 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
                                                   cm.getShardKeyPattern(),
                                                   splitInfo.collectionVersion.epoch(),
                                                   splitInfo.collectionVersion.getTimestamp(),
-                                                  ShardVersion::IGNORED() /*shardVersion*/,
+                                                  ChunkVersion::IGNORED() /*chunkVersion*/,
                                                   ChunkRange(splitInfo.minKey, splitInfo.maxKey),
                                                   splitInfo.splitKeys);
         if (!splitStatus.isOK()) {

@@ -789,7 +789,7 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     if (cm) {
         ChunkVersion placementVersion = cm->getVersion(fromShardId);
         cmd = appendShardVersion(
-            cmd, ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)));
+            cmd, ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
     }
     if (afterClusterTime) {
         cmd = cmd.addFields(makeLocalReadConcernWithAfterClusterTime(*afterClusterTime));

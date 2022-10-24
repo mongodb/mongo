@@ -361,7 +361,7 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     // return instead of forcing another refresh.
     boost::optional<ShardVersion> targetVersion = refreshAndGetCollectionVersion(expCtx, outputNs);
     targetCollectionVersion =
-        targetVersion ? boost::make_optional((ChunkVersion)*targetVersion) : boost::none;
+        targetVersion ? boost::make_optional(targetVersion->placementVersion()) : boost::none;
 
     auto docKeyPaths = collectDocumentKeyFieldsActingAsRouter(expCtx->opCtx, outputNs);
     return {std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),

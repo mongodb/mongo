@@ -40,7 +40,7 @@ namespace mongo {
  * network requests and the shard versioning protocol.
  *
  */
-class ShardVersion : public ChunkVersion, public CollectionIndexes {
+class ShardVersion {
 public:
     /**
      * The name for the shard version information field, which shard-aware commands should include
@@ -48,21 +48,38 @@ public:
      */
     static constexpr StringData kShardVersionField = "shardVersion"_sd;
 
-    ShardVersion(ChunkVersion chunkVersion, CollectionIndexes indexVersion);
+    ShardVersion(ChunkVersion chunkVersion, boost::optional<CollectionIndexes> indexVersion)
+        : _chunkVersion(chunkVersion),
+          _indexVersion(indexVersion ? boost::make_optional(indexVersion->indexVersion())
+                                     : boost::none) {}
 
-    ShardVersion() : ShardVersion(ChunkVersion(), CollectionIndexes()) {}
+    ShardVersion() : _chunkVersion(ChunkVersion()), _indexVersion(boost::none) {}
 
     static ShardVersion IGNORED() {
-        return ShardVersion(ChunkVersion::IGNORED(), CollectionIndexes::IGNORED());
+        return ShardVersion(ChunkVersion::IGNORED(),
+                            boost::optional<CollectionIndexes>(boost::none));
     }
 
     static ShardVersion UNSHARDED() {
-        return ShardVersion(ChunkVersion::UNSHARDED(), CollectionIndexes::UNSHARDED());
+        return ShardVersion(ChunkVersion::UNSHARDED(),
+                            boost::optional<CollectionIndexes>(boost::none));
+    }
+
+    static bool isIgnoredVersion(const ShardVersion& version) {
+        return version == ShardVersion::IGNORED();
+    }
+
+    ChunkVersion placementVersion() const {
+        return _chunkVersion;
+    }
+
+    boost::optional<Timestamp> indexVersion() const {
+        return _indexVersion;
     }
 
     bool operator==(const ShardVersion& otherVersion) const {
-        return CollectionIndexes(*this) == CollectionIndexes(otherVersion) &&
-            ChunkVersion(*this) == ChunkVersion(otherVersion);
+        return _chunkVersion == otherVersion._chunkVersion &&
+            _indexVersion == otherVersion._indexVersion;
     }
 
     bool operator!=(const ShardVersion& otherVersion) const {
@@ -73,6 +90,21 @@ public:
     void serialize(StringData field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
+
+private:
+    ShardVersion(ChunkVersion chunkVersion, boost::optional<Timestamp> indexVersionTimestamp)
+        : _chunkVersion(chunkVersion), _indexVersion(indexVersionTimestamp) {}
+
+    ChunkVersion _chunkVersion;
+    boost::optional<Timestamp> _indexVersion;
 };
+
+inline std::ostream& operator<<(std::ostream& s, const ShardVersion& v) {
+    return s << v.toString();
+}
+
+inline StringBuilder& operator<<(StringBuilder& s, const ShardVersion& v) {
+    return s << v.toString();
+}
 
 }  // namespace mongo

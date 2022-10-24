@@ -182,7 +182,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
                 shardId,
                 appendShardVersion(cmdToSend,
                                    ShardVersion(placementVersion,
-                                                CollectionIndexes(placementVersion, boost::none))));
+                                                boost::optional<CollectionIndexes>(boost::none))));
         }
     }
 
@@ -709,7 +709,7 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId)),
                 appendShardVersion(cmdNoVersion,
                                    ShardVersion(placementVersion,
-                                                CollectionIndexes(placementVersion, boost::none)))};
+                                                boost::optional<CollectionIndexes>(boost::none)))};
         } else {
             // For an unsharded collection, the primary shard will have correct indexes. We attach
             // unsharded shard version to detect if the collection has become sharded.

@@ -152,7 +152,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
         operationContext(),
         kNss,
         ShardVersion(metadata.getShardVersion(),
-                     CollectionIndexes(metadata.getShardVersion(), boost::none)) /* shardVersion */,
+                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
     testFilterFn(css->getOwnershipFilter(
@@ -182,7 +182,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
         operationContext(),
         kNss,
         ShardVersion(metadata.getShardVersion(),
-                     CollectionIndexes(metadata.getShardVersion(), boost::none)) /* shardVersion */,
+                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
     testFilterFn(css->getOwnershipFilter(
@@ -220,7 +220,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
         operationContext(),
         kNss,
         ShardVersion(metadata.getShardVersion(),
-                     CollectionIndexes(metadata.getShardVersion(), boost::none)) /* shardVersion */,
+                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
     testFilterFn(css->getOwnershipFilter(

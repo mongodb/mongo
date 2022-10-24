@@ -198,7 +198,8 @@ protected:
         ReshardingEnv env(CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, kNss).value());
         env.destShard = kShardList[1].getName();
         CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
-        env.version = ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(gen, boost::none));
+        env.version = ShardVersion(ChunkVersion(gen, {1, 0}),
+                                   boost::optional<CollectionIndexes>(boost::none));
         env.tempNss =
             NamespaceString(kNss.db(),
                             fmt::format("{}{}",
@@ -217,8 +218,8 @@ protected:
         reshardingFields.setState(CoordinatorStateEnum::kPreparingToDonate);
 
         CollectionType coll(kNss,
-                            env.version.epoch(),
-                            env.version.getTimestamp(),
+                            env.version.placementVersion().epoch(),
+                            env.version.placementVersion().getTimestamp(),
                             Date_t::now(),
                             UUID::gen(),
                             BSON(kShardKey << 1));
@@ -229,13 +230,18 @@ protected:
         _mockCatalogCacheLoader->setCollectionRefreshValues(
             kNss,
             coll,
-            createChunks(
-                env.version.epoch(), env.sourceUuid, env.version.getTimestamp(), kShardKey),
+            createChunks(env.version.placementVersion().epoch(),
+                         env.sourceUuid,
+                         env.version.placementVersion().getTimestamp(),
+                         kShardKey),
             reshardingFields);
         _mockCatalogCacheLoader->setCollectionRefreshValues(
             env.tempNss,
             coll,
-            createChunks(env.version.epoch(), env.sourceUuid, env.version.getTimestamp(), "y"),
+            createChunks(env.version.placementVersion().epoch(),
+                         env.sourceUuid,
+                         env.version.placementVersion().getTimestamp(),
+                         "y"),
             boost::none);
 
         ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kNss.db(), boost::none));

@@ -80,7 +80,8 @@ public:
      * Each object created through this method will have a local sequence number greater than the
      * previously created ones.
      */
-    static ComparableIndexVersion makeComparableIndexVersion(const CollectionIndexes& version);
+    static ComparableIndexVersion makeComparableIndexVersion(
+        const boost::optional<CollectionIndexes>& version);
 
     /**
      * Creates a new instance which will artificially be greater than any previously created
@@ -139,7 +140,7 @@ private:
           _indexVersion(std::move(version)),
           _epochDisambiguatingSequenceNum(epochDisambiguatingSequenceNum) {}
 
-    void setCollectionIndexes(const CollectionIndexes& version);
+    void setCollectionIndexes(const boost::optional<CollectionIndexes>& version);
 
     uint64_t _forcedRefreshSequenceNum{0};
 

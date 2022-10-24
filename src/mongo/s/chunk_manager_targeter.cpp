@@ -618,7 +618,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
         const auto placementVersion = _cm.getVersion(shardId);
         endpoints.emplace_back(
             std::move(shardId),
-            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+            ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)),
             boost::none);
     }
 
@@ -635,7 +635,7 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::_targetShardKey(
         const auto placementVersion = _cm.getVersion(chunk.getShardId());
         return ShardEndpoint(
             chunk.getShardId(),
-            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+            ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)),
             boost::none);
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -656,7 +656,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetAllShards(
         const auto placementVersion = _cm.getVersion(shardId);
         endpoints.emplace_back(
             std::move(shardId),
-            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+            ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)),
             boost::none);
     }
 

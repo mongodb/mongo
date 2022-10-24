@@ -30,38 +30,28 @@
 #pragma once
 
 #include "mongo/s/chunk_version.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
 /**
  * Reflects the index information about a collection.
  */
-class CollectionIndexes : public virtual CollectionGeneration {
+class CollectionIndexes {
 public:
-    CollectionIndexes(CollectionGeneration generation, boost::optional<Timestamp> index)
-        : CollectionGeneration(generation), _indexVersion(index) {}
+    CollectionIndexes(UUID collectionUUID, Timestamp index)
+        : _uuid(collectionUUID), _indexVersion(index) {}
 
-    CollectionIndexes() : CollectionIndexes({OID(), Timestamp()}, boost::none) {}
-
-    static CollectionIndexes IGNORED() {
-        return CollectionIndexes(CollectionGeneration::IGNORED(), boost::none);
-    }
-
-    static CollectionIndexes UNSHARDED() {
-        return CollectionIndexes(CollectionGeneration::UNSHARDED(), boost::none);
-    }
-
-    boost::optional<Timestamp> indexVersion() const {
+    Timestamp indexVersion() const {
         return _indexVersion;
     }
 
-    bool isSet() const {
-        return getTimestamp() != Timestamp();
+    UUID uuid() const {
+        return _uuid;
     }
 
     bool operator==(const CollectionIndexes& otherVersion) const {
-        return otherVersion.getTimestamp() == getTimestamp() &&
-            otherVersion.indexVersion() == indexVersion();
+        return otherVersion.uuid() == uuid() && otherVersion.indexVersion() == indexVersion();
     }
 
     bool operator!=(const CollectionIndexes& otherVersion) const {
@@ -72,8 +62,17 @@ public:
 
     BSONObj toBSONForLogging() const;
 
-protected:
-    boost::optional<Timestamp> _indexVersion;
+private:
+    UUID _uuid;
+    Timestamp _indexVersion;
 };
+
+inline std::ostream& operator<<(std::ostream& s, const CollectionIndexes& v) {
+    return s << v.toString();
+}
+
+inline StringBuilder& operator<<(StringBuilder& s, const CollectionIndexes& v) {
+    return s << v.toString();
+}
 
 }  // namespace mongo

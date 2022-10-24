@@ -32,7 +32,7 @@
 namespace mongo {
 
 std::string CollectionIndexes::toString() const {
-    return _indexVersion ? _indexVersion->toString() : "";
+    return _uuid.toString() + "|" + _indexVersion.toString();
 }
 
 BSONObj CollectionIndexes::toBSONForLogging() const {

@@ -559,7 +559,7 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
                 cm.isUnique() == unique);
 
     CreateCollectionResponse response(
-        {cm.getVersion(), CollectionIndexes(cm.getVersion(), boost::none)});
+        {cm.getVersion(), boost::optional<CollectionIndexes>(boost::none)});
     response.setCollectionUUID(cm.getUUID());
     return response;
 }

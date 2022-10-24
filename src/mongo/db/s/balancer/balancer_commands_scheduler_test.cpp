@@ -306,7 +306,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
         kNss,
         chunk.getShard(),
         chunk.getRange(),
-        ShardVersion(chunk.getVersion(), CollectionIndexes(chunk.getVersion(), boost::none)),
+        ShardVersion(chunk.getVersion(), boost::optional<CollectionIndexes>(boost::none)),
         KeyPattern(BSON("x" << 1)),
         false /* issuedByRemoteUser */);
     auto swReceivedDataSize = futureResponse.getNoThrow();

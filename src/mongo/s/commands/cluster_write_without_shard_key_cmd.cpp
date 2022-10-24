@@ -121,7 +121,7 @@ public:
             ChunkVersion placementVersion = cm.getVersion(shardId);
             auto versionedCmdObj = appendShardVersion(
                 cmdObj,
-                ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)));
+                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
 
             AsyncRequestsSender::Request arsRequest(shardId, versionedCmdObj);
             std::vector<AsyncRequestsSender::Request> arsRequestVector({arsRequest});

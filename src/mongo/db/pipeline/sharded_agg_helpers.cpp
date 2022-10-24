@@ -209,7 +209,7 @@ std::vector<RemoteCursor> establishShardCursors(OperationContext* opCtx,
             ChunkVersion placementVersion = cm->getVersion(shardId);
             auto versionedCmdObj = appendShardVersion(
                 cmdObj,
-                ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)));
+                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
             requests.emplace_back(shardId, std::move(versionedCmdObj));
         }
     } else {
@@ -817,7 +817,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
             ChunkVersion placementVersion = cm.getVersion(shardId);
             return appendShardVersion(
                 aggregation_request_helper::serializeToCommandObj(request),
-                ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)));
+                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
         } else {
             // The collection is unsharded. Don't append shard version info when contacting the
             // config servers.

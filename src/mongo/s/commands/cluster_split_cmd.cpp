@@ -258,7 +258,7 @@ public:
                   chunk->getShardId(),
                   nss,
                   cm.getShardKeyPattern(),
-                  ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+                  ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)),
                   ChunkRange(chunk->getMin(), chunk->getMax()));
 
         LOGV2(22758,

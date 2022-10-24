@@ -32,30 +32,21 @@
 namespace mongo {
 namespace {
 
-TEST(ShardVersionTest, ConstructWithDifferentGenerationThrows) {
-    const CollectionGeneration gen1(OID::gen(), Timestamp(1, 2));
-    const CollectionGeneration gen2(OID::gen(), Timestamp(2, 1));
-    const ChunkVersion chunkVersion(gen1, {3, 4});
-    const CollectionIndexes collectionIndexes(gen2, {Timestamp(5, 6)});
-    ASSERT_THROWS_CODE(
-        ShardVersion(chunkVersion, collectionIndexes), DBException, ErrorCodes::BadValue);
-}
-
 TEST(ShardVersionTest, ConstructCorrectly) {
     const CollectionGeneration gen(OID::gen(), Timestamp(1, 2));
     const ChunkVersion chunkVersion(gen, {3, 4});
-    const CollectionIndexes collectionIndexes(gen, {Timestamp(5, 6)});
+    const CollectionIndexes collectionIndexes(UUID::gen(), Timestamp(5, 6));
     const ShardVersion shardVersion(chunkVersion, collectionIndexes);
-    ASSERT_EQ(shardVersion.getTimestamp(), Timestamp(1, 2));
-    ASSERT_EQ(shardVersion.majorVersion(), 3);
-    ASSERT_EQ(shardVersion.minorVersion(), 4);
+    ASSERT_EQ(shardVersion.placementVersion().getTimestamp(), Timestamp(1, 2));
+    ASSERT_EQ(shardVersion.placementVersion().majorVersion(), 3);
+    ASSERT_EQ(shardVersion.placementVersion().minorVersion(), 4);
     ASSERT_EQ(shardVersion.indexVersion(), Timestamp(5, 6));
 }
 
 TEST(ShardVersionTest, ToAndFromBSON) {
     const CollectionGeneration gen(OID::gen(), Timestamp(1, 2));
     const ChunkVersion chunkVersion(gen, {3, 4});
-    const CollectionIndexes collectionIndexes(gen, {Timestamp(5, 6)});
+    const CollectionIndexes collectionIndexes(UUID::gen(), Timestamp(5, 6));
     const ShardVersion shardVersion(chunkVersion, collectionIndexes);
 
     BSONObjBuilder builder;

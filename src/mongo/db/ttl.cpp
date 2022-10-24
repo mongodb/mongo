@@ -485,7 +485,8 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
                         opCtx,
                         *nss,
                         staleInfo->getVersionWanted()
-                            ? boost::make_optional(ChunkVersion(*staleInfo->getVersionWanted()))
+                            ? boost::make_optional(
+                                  staleInfo->getVersionWanted()->placementVersion())
                             : boost::none)
                         .ignore();
                 })
