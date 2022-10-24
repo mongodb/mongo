@@ -427,6 +427,8 @@ public:
 
 } cmdDatasize;
 
+Rarely _collStatsSampler;
+
 class CmdCollStats final : public BasicCommandWithRequestParser<CmdCollStats> {
 public:
     using Request = CollStatsCommand;
@@ -452,6 +454,11 @@ public:
                               const BSONObj& cmdObj,
                               const RequestParser& requestParser,
                               BSONObjBuilder& result) final {
+        if (_collStatsSampler.tick())
+            LOGV2_WARNING(7024600,
+                          "The collStats command is deprecated. For more information, see "
+                          "https://dochub.mongodb.org/core/collStats-deprecated");
+
         const auto& cmd = requestParser.request();
         const auto& nss = cmd.getNamespace();
 

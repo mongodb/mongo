@@ -45,6 +45,8 @@
 namespace mongo {
 namespace {
 
+Rarely _sampler;
+
 auto fieldIsAnyOf = [](StringData v, std::initializer_list<StringData> il) {
     auto ei = il.end();
     return std::find(il.begin(), ei, v) != ei;
@@ -199,6 +201,11 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        if (_sampler.tick())
+            LOGV2_WARNING(7024601,
+                          "The collStats command is deprecated. For more information, see "
+                          "https://dochub.mongodb.org/core/collStats-deprecated");
+
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
         const auto targeter = ChunkManagerTargeter(opCtx, nss);
