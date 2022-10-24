@@ -86,9 +86,6 @@ struct ParameterizedIndexScanSlots {
         // Holds the value whether the generic or optimized index scan should be used.
         sbe::value::SlotId isGenericScan;
 
-        // Holds the value of the initial 'startKey' for the generic index scan algorithm.
-        sbe::value::SlotId initialStartKey;
-
         // Holds the value of the IndexBounds used for the generic index scan algorithm.
         sbe::value::SlotId indexBounds;
 

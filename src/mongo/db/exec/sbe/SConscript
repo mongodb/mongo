@@ -71,7 +71,6 @@ sbeEnv.Library(
     source=[
         'stages/branch.cpp',
         'stages/bson_scan.cpp',
-        'stages/check_bounds.cpp',
         'stages/co_scan.cpp',
         'stages/exchange.cpp',
         'stages/hash_agg.cpp',

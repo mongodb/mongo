@@ -880,18 +880,18 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     auto foreignRecordIdSlot = slotIdGenerator.generate();
     auto indexKeySlot = slotIdGenerator.generate();
     auto snapshotIdSlot = slotIdGenerator.generate();
-    auto ixScanStage = makeS<IndexScanStage>(foreignCollUUID,
-                                             indexName,
-                                             true /* forward */,
-                                             indexKeySlot,
-                                             foreignRecordIdSlot,
-                                             snapshotIdSlot,
-                                             IndexKeysInclusionSet{} /* indexKeysToInclude */,
-                                             makeSV() /* vars */,
-                                             makeVariable(lowKeySlot),
-                                             makeVariable(highKeySlot),
-                                             yieldPolicy,
-                                             nodeId);
+    auto ixScanStage = makeS<SimpleIndexScanStage>(foreignCollUUID,
+                                                   indexName,
+                                                   true /* forward */,
+                                                   indexKeySlot,
+                                                   foreignRecordIdSlot,
+                                                   snapshotIdSlot,
+                                                   IndexKeysInclusionSet{} /* indexKeysToInclude */,
+                                                   makeSV() /* vars */,
+                                                   makeVariable(lowKeySlot),
+                                                   makeVariable(highKeySlot),
+                                                   yieldPolicy,
+                                                   nodeId);
 
     // Loop join the low key and high key generation with the index seek stage to produce the
     // foreign record id to seek.

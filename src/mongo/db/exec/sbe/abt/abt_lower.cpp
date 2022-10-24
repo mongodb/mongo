@@ -1033,18 +1033,18 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n, co
     // Unused.
     boost::optional<sbe::value::SlotId> resultSlot;
 
-    return sbe::makeS<sbe::IndexScanStage>(nss.uuid().value(),
-                                           indexDefName,
-                                           !indexSpec.isReverseOrder(),
-                                           resultSlot,
-                                           ridSlot,
-                                           boost::none,
-                                           indexKeysToInclude,
-                                           vars,
-                                           std::move(lowerBoundExpr),
-                                           std::move(upperBoundExpr),
-                                           nullptr /*yieldPolicy*/,
-                                           planNodeId);
+    return sbe::makeS<sbe::SimpleIndexScanStage>(nss.uuid().value(),
+                                                 indexDefName,
+                                                 !indexSpec.isReverseOrder(),
+                                                 resultSlot,
+                                                 ridSlot,
+                                                 boost::none,
+                                                 indexKeysToInclude,
+                                                 vars,
+                                                 std::move(lowerBoundExpr),
+                                                 std::move(upperBoundExpr),
+                                                 nullptr /*yieldPolicy*/,
+                                                 planNodeId);
 }
 
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SeekNode& n,

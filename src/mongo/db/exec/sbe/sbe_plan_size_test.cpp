@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/bson_scan.h"
-#include "mongo/db/exec/sbe/stages/check_bounds.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/exchange.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -111,14 +110,6 @@ TEST_F(PlanSizeTest, BsonScan) {
     assertPlanSize(*stage);
 }
 
-TEST_F(PlanSizeTest, CheckBounds) {
-    CheckBoundsParams params{
-        {IndexBounds()}, BSONObj{}, int{}, KeyString::Version{}, Ordering::allAscending()};
-    auto stage = makeS<CheckBoundsStage>(
-        mockS(), params, generateSlotId(), generateSlotId(), generateSlotId(), kEmptyPlanNodeId);
-    assertPlanSize(*stage);
-}
-
 TEST_F(PlanSizeTest, CoScan) {
     auto stage = makeS<CoScanStage>(kEmptyPlanNodeId);
     assertPlanSize(*stage);
@@ -159,20 +150,37 @@ TEST_F(PlanSizeTest, HashJoin) {
     assertPlanSize(*stage);
 }
 
-TEST_F(PlanSizeTest, IndexScan) {
+TEST_F(PlanSizeTest, SimpleIndexScanStage) {
     auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
-    auto stage = makeS<IndexScanStage>(collUuid,
-                                       StringData(),
-                                       true,
-                                       generateSlotId(),
-                                       generateSlotId(),
-                                       generateSlotId(),
-                                       IndexKeysInclusionSet(1),
-                                       mockSV(),
-                                       makeE<EVariable>(generateSlotId()),
-                                       makeE<EVariable>(generateSlotId()),
-                                       nullptr,
-                                       kEmptyPlanNodeId);
+    auto stage = makeS<SimpleIndexScanStage>(collUuid,
+                                             StringData(),
+                                             true,
+                                             generateSlotId(),
+                                             generateSlotId(),
+                                             generateSlotId(),
+                                             IndexKeysInclusionSet(1),
+                                             mockSV(),
+                                             makeE<EVariable>(generateSlotId()),
+                                             makeE<EVariable>(generateSlotId()),
+                                             nullptr,
+                                             kEmptyPlanNodeId);
+    assertPlanSize(*stage);
+}
+
+TEST_F(PlanSizeTest, GenericIndexScanStage) {
+    auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+    GenericIndexScanStageParams params{
+        makeE<EVariable>(generateSlotId()), {}, 1, KeyString::Version{0}, Ordering::allAscending()};
+    auto stage = makeS<GenericIndexScanStage>(collUuid,
+                                              StringData(),
+                                              std::move(params),
+                                              generateSlotId(),
+                                              generateSlotId(),
+                                              generateSlotId(),
+                                              IndexKeysInclusionSet(1),
+                                              mockSV(),
+                                              nullptr,
+                                              kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
 

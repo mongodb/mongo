@@ -39,14 +39,10 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo::sbe {
+
 /**
- * A stage that iterates the entries of a collection index, starting from a bound specified by the
- * value in 'seekKeyLow' and ending (via IS_EOF) with the 'seekKeyHigh' bound. (A null 'seekKeyHigh'
- * scans to the end of the index. Leaving both bounds as null scans the index from beginning to
- * end.)
- *
- * The input 'seekKeyLow' and 'seekKeyHigh' EExpressions get evaluated as part of the open
- * (or re-open) call.
+ * An abstract index scan stage class to share common code for 'SimpleIndexScanStage' and
+ * 'GenericIndexScanStage'.
  *
  * The "output" slots are
  *   - 'recordSlot': the "KeyString" representing the index entry,
@@ -60,65 +56,74 @@ namespace mongo::sbe {
  *
  * The 'forward' flag indicates the direction of the index scan, which can be either forwards or
  * backwards.
- *
- * Debug string representation:
- *
- *   ixscan recordSlot? recordIdSlot? snapshotIdSlot? [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
- *                      collectionUuid indexName forward
- *
- *   ixseek lowKey highKey recordSlot? recordIdSlot? snapshotIdSlot?
- *          [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
- *          collectionUuid indexName forward
  */
-class IndexScanStage final : public PlanStage {
+class IndexScanStageBase : public PlanStage {
 public:
-    IndexScanStage(UUID collUuid,
-                   StringData indexName,
-                   bool forward,
-                   boost::optional<value::SlotId> recordSlot,
-                   boost::optional<value::SlotId> recordIdSlot,
-                   boost::optional<value::SlotId> snapshotIdSlot,
-                   IndexKeysInclusionSet indexKeysToInclude,
-                   value::SlotVector vars,
-                   std::unique_ptr<EExpression> seekKeyLow,
-                   std::unique_ptr<EExpression> seekKeyHigh,
-                   PlanYieldPolicy* yieldPolicy,
-                   PlanNodeId planNodeId,
-                   bool participateInTrialRunTracking = true);
+    IndexScanStageBase(StringData stageType,
+                       UUID collUuid,
+                       StringData indexName,
+                       bool forward,
+                       boost::optional<value::SlotId> recordSlot,
+                       boost::optional<value::SlotId> recordIdSlot,
+                       boost::optional<value::SlotId> snapshotIdSlot,
+                       IndexKeysInclusionSet indexKeysToInclude,
+                       value::SlotVector vars,
+                       PlanYieldPolicy* yieldPolicy,
+                       PlanNodeId planNodeId,
+                       bool participateInTrialRunTracking = true);
 
-    std::unique_ptr<PlanStage> clone() const final;
-
-    void prepare(CompileCtx& ctx) final;
     value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final;
-    void open(bool reOpen) final;
     PlanState getNext() final;
     void close() final;
 
-    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const override;
     const SpecificStats* getSpecificStats() const final;
-    std::vector<DebugPrinter::Block> debugPrint() const final;
-    size_t estimateCompileTimeSize() const final;
     std::string getIndexName() const;
 
 protected:
-    void doSaveState(bool relinquishCursor) override;
-    void doRestoreState(bool relinquishCursor) override;
-    void doDetachFromOperationContext() override;
-    void doAttachToOperationContext(OperationContext* opCtx) override;
-    void doDetachFromTrialRunTracker() override;
-    TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
-        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
+    /**
+     * Keeps track of what this index scan is currently doing so that it can do the right thing on
+     * the next call to getNext().
+     */
+    enum class ScanState {
+        // Need to seek for next key.
+        kNeedSeek,
+        // Retrieving the next key.
+        kScanning,
+        // The index scan is finished.
+        kFinished
+    };
 
-private:
+    // Seeks and returns the first/next index KeyStringEntry or boost::none if no such key exists.
+    virtual boost::optional<KeyStringEntry> seek() = 0;
+    // Returns true if the 'key' is within the bounds and false otherwise. Implementations may set
+    // state internally to reflect whether the scan is done, or whether a new seek point should be
+    // used.
+    virtual bool validateKey(const boost::optional<KeyStringEntry>& key) = 0;
+
+    void doSaveState(bool relinquishCursor) override;
+    void doRestoreState(bool relinquishCursor) final;
+    void doDetachFromOperationContext() final;
+    void doAttachToOperationContext(OperationContext* opCtx) final;
+    void doDetachFromTrialRunTracker() final;
+    TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
+        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) final;
     /**
      * When this stage is re-opened after being closed, or during yield recovery, called to verify
      * that the index (and the index's collection) remain valid. If any validity check fails, throws
      * a UserException that terminates execution of the query.
      */
     void restoreCollectionAndIndex();
-
-    const KeyString::Value& getSeekKeyLow() const;
-    const KeyString::Value* getSeekKeyHigh() const;
+    // Bumps '_specificStats.numReads' and calls trackProgress() if '_tracker' is non-null.
+    void trackRead();
+    // Shares the common code for PlanStage::prepare() implementation.
+    void prepareImpl(CompileCtx& ctx);
+    // Shares the common code for PlanStage::open() implementation.
+    void openImpl(bool reOpen);
+    // Shares the common code for PlanStage::estimateCompileTimeSize() implementation.
+    size_t estimateCompileTimeSizeImpl() const;
+    // Shares the common code for PlanStage::debugPrint() implementation.
+    void debugPrintImpl(std::vector<DebugPrinter::Block>&) const;
 
     const UUID _collUuid;
     const std::string _indexName;
@@ -128,13 +133,6 @@ private:
     const boost::optional<value::SlotId> _snapshotIdSlot;
     const IndexKeysInclusionSet _indexKeysToInclude;
     const value::SlotVector _vars;
-
-    std::unique_ptr<EExpression> _seekKeyLow;
-    std::unique_ptr<EExpression> _seekKeyHigh;
-
-    // Carries the compiled bytecode for the above '_seekKeyLow' and '_seekKeyHigh'.
-    std::unique_ptr<vm::CodeFragment> _seekKeyLowCode;
-    std::unique_ptr<vm::CodeFragment> _seekKeyHighCode;
 
     vm::ByteCode _bytecode;
 
@@ -154,12 +152,6 @@ private:
     std::vector<value::OwnedValueAccessor> _accessors;
     value::SlotAccessorMap _accessorMap;
 
-    value::SlotAccessor* _seekKeyLowAccessor{nullptr};
-    value::SlotAccessor* _seekKeyHiAccessor{nullptr};
-
-    std::unique_ptr<value::OwnedValueAccessor> _seekKeyLowHolder;
-    std::unique_ptr<value::OwnedValueAccessor> _seekKeyHighHolder;
-
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
     std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
     boost::optional<Ordering> _ordering{boost::none};
@@ -170,11 +162,130 @@ private:
     BufBuilder _valuesBuffer;
 
     bool _open{false};
-    bool _firstGetNext{true};
+    ScanState _scanState = ScanState::kNeedSeek;
     IndexScanStats _specificStats;
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
     TrialRunTracker* _tracker{nullptr};
+};
+
+/**
+ * A stage that iterates the entries of a collection index, starting from a bound specified by the
+ * value in 'seekKeyLow' and ending (via IS_EOF) with the 'seekKeyHigh' bound. (A null 'seekKeyHigh'
+ * scans to the end of the index. Leaving both bounds as null scans the index from beginning to
+ * end.)
+ *
+ * The input 'seekKeyLow' and 'seekKeyHigh' EExpressions get evaluated as part of the open
+ * (or re-open) call. See 'IndexScanStageBase' above for additional information.
+ *
+ * Debug string representation:
+ *
+ *   ixscan recordSlot? recordIdSlot? snapshotIdSlot? [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
+ *                      collectionUuid indexName forward
+ *
+ *   ixseek lowKey highKey recordSlot? recordIdSlot? snapshotIdSlot?
+ *          [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
+ *          collectionUuid indexName forward
+ */
+class SimpleIndexScanStage final : public IndexScanStageBase {
+public:
+    SimpleIndexScanStage(UUID collUuid,
+                         StringData indexName,
+                         bool forward,
+                         boost::optional<value::SlotId> recordSlot,
+                         boost::optional<value::SlotId> recordIdSlot,
+                         boost::optional<value::SlotId> snapshotIdSlot,
+                         IndexKeysInclusionSet indexKeysToInclude,
+                         value::SlotVector vars,
+                         std::unique_ptr<EExpression> seekKeyLow,
+                         std::unique_ptr<EExpression> seekKeyHigh,
+                         PlanYieldPolicy* yieldPolicy,
+                         PlanNodeId planNodeId,
+                         bool participateInTrialRunTracking = true);
+
+    std::unique_ptr<PlanStage> clone() const override;
+
+    void prepare(CompileCtx& ctx) override;
+    void open(bool reOpen) override;
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const override;
+    std::vector<DebugPrinter::Block> debugPrint() const override;
+    size_t estimateCompileTimeSize() const override;
+
+protected:
+    void doSaveState(bool relinquishCursor) override;
+    boost::optional<KeyStringEntry> seek() override;
+    bool validateKey(const boost::optional<KeyStringEntry>& key) override;
+
+private:
+    const KeyString::Value& getSeekKeyLow() const;
+    const KeyString::Value* getSeekKeyHigh() const;
+
+    std::unique_ptr<EExpression> _seekKeyLow;
+    std::unique_ptr<EExpression> _seekKeyHigh;
+
+    // Carries the compiled bytecode for the above '_seekKeyLow' and '_seekKeyHigh'.
+    std::unique_ptr<vm::CodeFragment> _seekKeyLowCode;
+    std::unique_ptr<vm::CodeFragment> _seekKeyHighCode;
+
+    std::unique_ptr<value::OwnedValueAccessor> _seekKeyLowHolder;
+    std::unique_ptr<value::OwnedValueAccessor> _seekKeyHighHolder;
+};
+
+/**
+ * A stage that finds all keys of a collection index within the given 'IndexBounds'.
+ * The index bounds can't be easily resolved to a small set of intervals in advance to use
+ * 'SimpleIndexScanStage', thus this implements a runtime algorithm using the 'IndexBoundsChecker'
+ * to calculate a seek point and seek to the beginning of the next interval.
+ *
+ * The input 'params.indexBounds' EExpression gets evaluated as part of the open (or re-open) call.
+ *
+ * See comments for IndexScanStageBase above for more detail.
+ *
+ * Debug string representation:
+ *
+ *   ixscan_generic indexBounds recordSlot? recordIdSlot? snapshotIdSlot?
+ *                  [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
+ *                  collectionUuid indexName forward
+ */
+struct GenericIndexScanStageParams {
+    std::unique_ptr<EExpression> indexBounds;
+    const BSONObj keyPattern;
+    const int direction;
+    const KeyString::Version version;
+    const Ordering ord;
+};
+class GenericIndexScanStage final : public IndexScanStageBase {
+public:
+    GenericIndexScanStage(UUID collUuid,
+                          StringData indexName,
+                          GenericIndexScanStageParams params,
+                          boost::optional<value::SlotId> recordSlot,
+                          boost::optional<value::SlotId> recordIdSlot,
+                          boost::optional<value::SlotId> snapshotIdSlot,
+                          IndexKeysInclusionSet indexKeysToInclude,
+                          value::SlotVector vars,
+                          PlanYieldPolicy* yieldPolicy,
+                          PlanNodeId planNodeId,
+                          bool participateInTrialRunTracking = true);
+
+    std::unique_ptr<PlanStage> clone() const override;
+
+    void prepare(CompileCtx& ctx) override;
+    void open(bool reOpen) override;
+
+    std::vector<DebugPrinter::Block> debugPrint() const override;
+    size_t estimateCompileTimeSize() const override;
+
+protected:
+    boost::optional<KeyStringEntry> seek() override;
+    bool validateKey(const boost::optional<KeyStringEntry>& key) override;
+
+    const GenericIndexScanStageParams _params;
+
+    BufBuilder _keyBuffer;
+    IndexSeekPoint _seekPoint;
+    std::unique_ptr<vm::CodeFragment> _indexBoundsCode;
+    boost::optional<IndexBoundsChecker> _checker;
 };
 }  // namespace mongo::sbe
