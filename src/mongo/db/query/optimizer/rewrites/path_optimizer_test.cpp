@@ -1050,5 +1050,77 @@ TEST(Path, Lower10) {
     // Add some asserts on the shape of the tree or something.
 }
 
+TEST(Path, NoLambdaPathCompose) {
+    PrefixId prefixId;
+    auto tree = make<EvalFilter>(
+        make<PathGet>("a", make<PathIdentity>()),
+        make<EvalPath>(
+            make<PathLambda>(make<LambdaAbstraction>(
+                "x", make<BinaryOp>(Operations::Add, make<Variable>("x"), Constant::int64(1)))),
+            Constant::int64(9)));
+    auto env = VariableEnvironment::build(tree);
+
+    auto fusor = PathFusion(env);
+    fusor.optimize(tree);
+
+    ASSERT_EXPLAIN(
+        "EvalFilter []\n"
+        "  PathGet [a]\n"
+        "    PathIdentity []\n"
+        "  EvalPath []\n"
+        "    PathLambda []\n"
+        "      LambdaAbstraction [x]\n"
+        "        BinaryOp [Add]\n"
+        "          Variable [x]\n"
+        "          Const [1]\n"
+        "    Const [9]\n",
+        tree);
+}
+
+TEST(Path, NoDefaultSimplifyUnderFilter) {
+    PrefixId prefixId;
+    auto nonNothingCompare = make<PathCompare>(Operations::Gt, Constant::int64(70));
+    auto pathDefault = make<PathDefault>(Constant::emptyObject());
+
+    {
+        auto tree = make<EvalFilter>(make<PathComposeM>(nonNothingCompare, pathDefault),
+                                     make<Variable>("root"));
+        auto env = VariableEnvironment::build(tree);
+
+        auto fusor = PathFusion(env);
+        fusor.optimize(tree);
+
+        ASSERT_EXPLAIN(
+            "EvalFilter []\n"
+            "  PathComposeM []\n"
+            "    PathCompare [Gt]\n"
+            "      Const [70]\n"
+            "    PathDefault []\n"
+            "      Const [{}]\n"
+            "  Variable [root]\n",
+            tree);
+    }
+
+    {
+        auto tree = make<EvalFilter>(
+            make<PathComposeM>(std::move(pathDefault), std::move(nonNothingCompare)),
+            make<Variable>("root"));
+        auto env = VariableEnvironment::build(tree);
+
+        auto fusor = PathFusion(env);
+        fusor.optimize(tree);
+
+        ASSERT_EXPLAIN(
+            "EvalFilter []\n"
+            "  PathComposeM []\n"
+            "    PathDefault []\n"
+            "      Const [{}]\n"
+            "    PathCompare [Gt]\n"
+            "      Const [70]\n"
+            "  Variable [root]\n",
+            tree);
+    }
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

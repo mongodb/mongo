@@ -83,7 +83,7 @@ bool PathFusion::fuse(ABT& lhs, const ABT& rhs) {
         return true;
     }
 
-    if (rhs.is<PathLambda>()) {
+    if (rhs.is<PathLambda>() && _kindCtx.back() == Kind::project) {
         lhs = make<PathComposeM>(std::move(lhs), rhs);
         return true;
     }
@@ -274,15 +274,17 @@ void PathFusion::transport(ABT& n, const PathComposeM& path, ABT& p1, ABT& p2) {
 
     uassert(6624131, "info must be defined", p1InfoIt != _info.end() && p2InfoIt != _info.end());
 
-    if (p1.is<PathDefault>() && p2InfoIt->second.isNotNothing()) {
-        // Default * Const e -> e (provided we can prove e is not Nothing and we can do that only
-        // when e is Constant expression)
+    if (p1.is<PathDefault>() && p2InfoIt->second.isNotNothing() &&
+        _kindCtx.back() == Kind::project) {
+        // Default * Const e -> e (provided we can prove e is not Nothing and we can do that
+        // only when e is Constant expression)
         auto result = std::exchange(p2, make<Blackhole>());
         std::swap(n, result);
         _changed = true;
-    } else if (p2.is<PathDefault>() && p1InfoIt->second.isNotNothing()) {
-        // Const e * Default -> e (provided we can prove e is not Nothing and we can do that only
-        // when e is Constant expression)
+    } else if (p2.is<PathDefault>() && p1InfoIt->second.isNotNothing() &&
+               _kindCtx.back() == Kind::project) {
+        // Const e * Default -> e (provided we can prove e is not Nothing and we can do that
+        // only when e is Constant expression)
         auto result = std::exchange(p1, make<Blackhole>());
         std::swap(n, result);
         _changed = true;
