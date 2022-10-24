@@ -511,6 +511,14 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             ? resolveCollationForUserQueries(opCtx, nss(), _request.getCollation())
                             : _doc.getTranslatedRequestParams()->getCollation();
 
+                        if (_timeseriesNssResolvedByCommandHandler()) {
+                            // If the request is being re-attempted after a binary upgrade, the UUID
+                            // could have not been previously checked. Do it now.
+                            AutoGetCollection coll{opCtx, nss(), MODE_IS};
+                            checkCollectionUUIDMismatch(
+                                opCtx, nss(), coll.getCollection(), _request.getCollectionUUID());
+                        }
+
                         // Check if the collection was already sharded by a past request
                         if (auto createCollectionResponseOpt =
                                 sharding_ddl_util::checkIfCollectionAlreadySharded(
@@ -638,15 +646,31 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 boost::optional<CreateCollectionResponse>
 CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
     OperationContext* opCtx) {
-    // Perfom check in the translation phase if the request is coming from a C2C command; this will
-    // allow to honor the contract with mongosync (see SERVER-67885 for details)
+    // If the request is part of a C2C synchronisation, the check on the received UUID must be
+    // performed first to honor the contract with mongosync (see SERVER-67885 for details).
     if (_request.getCollectionUUID()) {
-        return boost::none;
+        if (AutoGetCollection stdColl{opCtx, originalNss(), MODE_IS};
+            stdColl || _timeseriesNssResolvedByCommandHandler()) {
+            checkCollectionUUIDMismatch(
+                opCtx, originalNss(), *stdColl, _request.getCollectionUUID());
+        } else {
+            // No standard collection is present on the local catalog, but the request is not yet
+            // translated; a timeseries version of the requested namespace may still match the
+            // requested UUID.
+            auto bucketsNamespace = originalNss().makeTimeseriesBucketsNamespace();
+            AutoGetCollection timeseriesColl{opCtx, bucketsNamespace, MODE_IS};
+            checkCollectionUUIDMismatch(
+                opCtx, originalNss(), *timeseriesColl, _request.getCollectionUUID());
+        }
     }
 
-    // Preliminary check is unsupported for DDL requests received by nodes running old FCVs.
     if (_timeseriesNssResolvedByCommandHandler()) {
-        return boost::none;
+        // It is OK to access information directly from the request object.
+        const auto shardKeyPattern = ShardKeyPattern(*_request.getShardKey()).toBSON();
+        const auto collation =
+            resolveCollationForUserQueries(opCtx, nss(), _request.getCollation());
+        return sharding_ddl_util::checkIfCollectionAlreadySharded(
+            opCtx, nss(), shardKeyPattern, collation, _request.getUnique().value_or(false));
     }
 
     // Check is there is a standard sharded collection that matches the original request parameters
