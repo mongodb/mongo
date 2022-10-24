@@ -400,92 +400,67 @@ private:
     const boost::optional<Date_t> _preImageExpirationTime;
 };
 
-void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTimeBasedExpiration) {
-    const auto startTime = Date_t::now();
-    ServiceContext::UniqueOperationContext opCtx;
-    try {
-        opCtx = client->makeOperationContext();
-
-        // Acquire intent-exclusive lock on the pre-images collection. Early exit if the collection
-        // doesn't exist.
-        // TODO SERVER-66642 Account for multitenancy.
-        AutoGetCollection autoColl(
-            opCtx.get(), NamespaceString::makePreImageCollectionNSS(boost::none), MODE_IX);
-        const auto& preImagesColl = autoColl.getCollection();
-        if (!preImagesColl) {
-            return;
-        }
-
-        // Do not run the job on secondaries.
-        if (!repl::ReplicationCoordinator::get(opCtx.get())
-                 ->canAcceptWritesForDatabase(opCtx.get(), NamespaceString::kAdminDb)) {
-            return;
-        }
-
-        // Get the timestamp of the earliest oplog entry.
-        const auto currentEarliestOplogEntryTs =
-            repl::StorageInterface::get(client->getServiceContext())
-                ->getEarliestOplogTimestamp(opCtx.get());
-
-        const bool isBatchedRemoval = gBatchedExpiredChangeStreamPreImageRemoval.load();
-        size_t numberOfRemovals = 0;
-
-        ChangeStreamExpiredPreImageIterator expiredPreImages(
-            opCtx.get(),
-            &preImagesColl,
-            currentEarliestOplogEntryTs,
-            change_stream_pre_image_helpers::getPreImageExpirationTime(
-                opCtx.get(), currentTimeForTimeBasedExpiration));
-
-        // TODO SERVER-66642 Account for multitenancy.
-        for (const auto& collectionRange : expiredPreImages) {
-            writeConflictRetry(
-                opCtx.get(),
-                "ChangeStreamExpiredPreImagesRemover",
-                NamespaceString::makePreImageCollectionNSS(boost::none).ns(),
-                [&] {
-                    auto params = std::make_unique<DeleteStageParams>();
-                    params->isMulti = true;
-
-                    std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams;
-                    if (isBatchedRemoval) {
-                        batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
-                    }
-
-                    auto exec = InternalPlanner::deleteWithCollectionScan(
-                        opCtx.get(),
-                        &preImagesColl,
-                        std::move(params),
-                        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                        InternalPlanner::Direction::FORWARD,
-                        RecordIdBound(collectionRange.first),
-                        RecordIdBound(collectionRange.second),
-                        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
-                        std::move(batchedDeleteParams));
-                    numberOfRemovals += exec->executeDelete();
-                });
-        }
-
-        if (numberOfRemovals > 0) {
-            LOGV2_DEBUG(5869104,
-                        3,
-                        "Periodic expired pre-images removal job finished executing",
-                        "numberOfRemovals"_attr = numberOfRemovals,
-                        "jobDuration"_attr = (Date_t::now() - startTime).toString());
-        }
-    } catch (const DBException& exception) {
-        Status interruptStatus = opCtx ? opCtx.get()->checkForInterruptNoAssert() : Status::OK();
-        if (!interruptStatus.isOK()) {
-            LOGV2_DEBUG(5869105,
-                        3,
-                        "Periodic expired pre-images removal job operation was interrupted",
-                        "errorCode"_attr = interruptStatus);
-        } else {
-            LOGV2_ERROR(5869106,
-                        "Periodic expired pre-images removal job failed",
-                        "reason"_attr = exception.reason());
-        }
+size_t deleteExpiredChangeStreamPreImages(OperationContext* opCtx,
+                                          Date_t currentTimeForTimeBasedExpiration) {
+    // Acquire intent-exclusive lock on the pre-images collection. Early exit if the collection
+    // doesn't exist.
+    // TODO SERVER-66642 Account for multitenancy.
+    AutoGetCollection autoColl(
+        opCtx, NamespaceString::makePreImageCollectionNSS(boost::none), MODE_IX);
+    const auto& preImagesColl = autoColl.getCollection();
+    if (!preImagesColl) {
+        return 0;
     }
+
+    // Do not run the job on secondaries.
+    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
+            opCtx, NamespaceString::kConfigDb)) {
+        return 0;
+    }
+
+    // Get the timestamp of the earliest oplog entry.
+    const auto currentEarliestOplogEntryTs =
+        repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
+
+    const bool isBatchedRemoval = gBatchedExpiredChangeStreamPreImageRemoval.load();
+    size_t numberOfRemovals = 0;
+
+    ChangeStreamExpiredPreImageIterator expiredPreImages(
+        opCtx,
+        &preImagesColl,
+        currentEarliestOplogEntryTs,
+        change_stream_pre_image_helpers::getPreImageExpirationTime(
+            opCtx, currentTimeForTimeBasedExpiration));
+
+    // TODO SERVER-66642 Account for multitenancy.
+    for (const auto& collectionRange : expiredPreImages) {
+        writeConflictRetry(
+            opCtx,
+            "ChangeStreamExpiredPreImagesRemover",
+            NamespaceString::makePreImageCollectionNSS(boost::none).ns(),
+            [&] {
+                auto params = std::make_unique<DeleteStageParams>();
+                params->isMulti = true;
+
+                std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams;
+                if (isBatchedRemoval) {
+                    batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
+                }
+
+                auto exec = InternalPlanner::deleteWithCollectionScan(
+                    opCtx,
+                    &preImagesColl,
+                    std::move(params),
+                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                    InternalPlanner::Direction::FORWARD,
+                    RecordIdBound(collectionRange.first),
+                    RecordIdBound(collectionRange.second),
+                    CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
+                    std::move(batchedDeleteParams));
+                numberOfRemovals += exec->executeDelete();
+            });
+    }
+    return numberOfRemovals;
 }
 }  // namespace
 
@@ -506,7 +481,34 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
             currentTimeForTimeBasedExpiration = currentTimeElem.Date();
         }
     });
-    deleteExpiredChangeStreamPreImages(client, currentTimeForTimeBasedExpiration);
+
+    const auto startTime = Date_t::now();
+    ServiceContext::UniqueOperationContext opCtx;
+    try {
+        opCtx = client->makeOperationContext();
+
+        auto numberOfRemovals =
+            deleteExpiredChangeStreamPreImages(opCtx.get(), currentTimeForTimeBasedExpiration);
+        if (numberOfRemovals > 0) {
+            LOGV2_DEBUG(5869104,
+                        3,
+                        "Periodic expired pre-images removal job finished executing",
+                        "numberOfRemovals"_attr = numberOfRemovals,
+                        "jobDuration"_attr = (Date_t::now() - startTime).toString());
+        }
+    } catch (const DBException& exception) {
+        Status interruptStatus = opCtx ? opCtx.get()->checkForInterruptNoAssert() : Status::OK();
+        if (!interruptStatus.isOK()) {
+            LOGV2_DEBUG(5869105,
+                        3,
+                        "Periodic expired pre-images removal job operation was interrupted",
+                        "errorCode"_attr = interruptStatus);
+        } else {
+            LOGV2_ERROR(5869106,
+                        "Periodic expired pre-images removal job failed",
+                        "reason"_attr = exception.reason());
+        }
+    }
 }
 
 }  // namespace mongo

@@ -73,5 +73,11 @@ boost::optional<TenantId> resolveTenantId(boost::optional<TenantId> tenantId);
  */
 TenantSet getConfigDbTenants(OperationContext* opCtx);
 
+/**
+ * Returns the 'expireAfterSeconds' value from the 'changeStreams' cluster-wide parameter for the
+ * given tenant.
+ */
+int64_t getExpireAfterSeconds(const TenantId& tenantId);
+
 }  // namespace change_stream_serverless_helpers
 }  // namespace mongo

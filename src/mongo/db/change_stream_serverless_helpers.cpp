@@ -32,6 +32,7 @@
 #include "mongo/db/change_stream_serverless_helpers.h"
 
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/change_streams_cluster_parameter_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/multitenancy_gen.h"
@@ -107,6 +108,19 @@ TenantSet getConfigDbTenants(OperationContext* opCtx) {
     }
 
     return tenantIds;
+}
+
+
+int64_t getExpireAfterSeconds(const TenantId& tenantId) {
+    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+    auto* changeStreamsParam =
+        clusterParameters->get<ClusterParameterWithStorage<ChangeStreamsClusterParameterStorage>>(
+            "changeStreams");
+
+    // TODO SERVER-69511 Pass 'tenantId' instead of 'boost::none'.
+    auto expireAfterSeconds = changeStreamsParam->getValue(boost::none).getExpireAfterSeconds();
+    invariant(expireAfterSeconds > 0);
+    return expireAfterSeconds;
 }
 
 }  // namespace change_stream_serverless_helpers

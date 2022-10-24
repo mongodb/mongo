@@ -66,17 +66,6 @@ change_stream_serverless_helpers::TenantSet getConfigDbTenants(OperationContext*
     return tenantIds;
 }
 
-boost::optional<int64_t> getExpireAfterSeconds(const TenantId& tenantId) {
-    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-    auto* changeStreamsParam =
-        clusterParameters->get<ClusterParameterWithStorage<ChangeStreamsClusterParameterStorage>>(
-            "changeStreams");
-
-    // TODO SERVER-69511 Pass 'tenantId' instead of 'boost::none'. Move this function to
-    // 'change_stream_serverless_helpers'.
-    return changeStreamsParam->getValue(boost::none).getExpireAfterSeconds();
-}
-
 void removeExpiredDocuments(Client* client) {
     hangBeforeRemovingExpiredChanges.pauseWhileSet();
 
@@ -99,8 +88,8 @@ void removeExpiredDocuments(Client* client) {
         auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx.get());
 
         for (const auto& tenantId : getConfigDbTenants(opCtx.get())) {
-            auto expiredAfterSeconds = getExpireAfterSeconds(tenantId);
-            invariant(expiredAfterSeconds);
+            auto expiredAfterSeconds =
+                change_stream_serverless_helpers::getExpireAfterSeconds(tenantId);
 
             // Acquire intent-exclusive lock on the change collection.
             AutoGetChangeCollection changeCollection{
@@ -129,7 +118,7 @@ void removeExpiredDocuments(Client* client) {
                     opCtx.get(),
                     &*changeCollection,
                     purgingJobMetadata->maxRecordIdBound,
-                    currentWallTime - Seconds(*expiredAfterSeconds));
+                    currentWallTime - Seconds(expiredAfterSeconds));
             changeCollectionManager.getPurgingJobStats().scannedCollections.fetchAndAddRelaxed(1);
             maxStartWallTime =
                 std::max(maxStartWallTime, purgingJobMetadata->firstDocWallTimeMillis);
