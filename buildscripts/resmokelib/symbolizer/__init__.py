@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import sys
 
-import structlog
+from typing import Optional
 
 from buildscripts import mongosymb
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
@@ -17,8 +17,6 @@ _HELP = """
 Symbolize a backtrace JSON file given an Evergreen Task ID.
 """
 
-LOGGER = structlog.get_logger(__name__)
-
 _MESSAGE = """TODO"""
 
 _COMMAND = "symbolize"
@@ -26,23 +24,17 @@ _COMMAND = "symbolize"
 DEFAULT_SYMBOLIZER_LOCATION = "/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
 
 
-def setup_logging(debug=False):
-    """Enable logging."""
-    log_level = logging.DEBUG if debug else logging.INFO
-    logging.basicConfig(
-        format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
-        level=log_level,
-        stream=sys.stdout,
-    )
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("github").setLevel(logging.WARNING)
-    structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
-
-
 class Symbolizer(Subcommand):
     """Interact with Symbolizer."""
 
-    def __init__(self, task_id, download_symbols_only, bin_name=None, all_args=None):
+    def __init__(
+            self,
+            task_id,
+            download_symbols_only,
+            bin_name=None,
+            all_args=None,
+            logger: Optional[logging.Logger] = None,
+    ):
         """Constructor."""
 
         self._validate_args(task_id, download_symbols_only, bin_name)
@@ -67,6 +59,26 @@ class Symbolizer(Subcommand):
             os.makedirs(src_parent_dir)
         except FileExistsError:
             pass
+
+        self.logger = logger or self.setup_logger()
+
+    @staticmethod
+    def setup_logger(debug=False) -> logging.Logger:
+        """
+        Setup logger.
+
+        :param debug: Whether to enable debugging or not.
+        :return: Logger instance.
+        """
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        logging.getLogger("github").setLevel(logging.WARNING)
+        log_level = logging.DEBUG if debug else logging.INFO
+        logger = logging.Logger("symbolizer", level=log_level)
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(
+            logging.Formatter(fmt="[%(asctime)s - %(name)s - %(levelname)s] %(message)s"))
+        logger.addHandler(handler)
+        return logger
 
     @staticmethod
     def _validate_args(task_id, download_symbols_only, bin_name):
@@ -143,28 +155,31 @@ class Symbolizer(Subcommand):
             os.rename(src_dir, self.dest_dir)
 
         except subprocess.CalledProcessError as err:
-            LOGGER.error(err.stdout)
-            LOGGER.error(err.stderr)
+            self.logger.error(err.stdout)
+            self.logger.error(err.stderr)
             raise
 
     def _setup_symbols(self):
         try:
             if os.path.isdir(self.dest_dir):
-                LOGGER.info(
+                self.logger.info(
                     "directory for build already exists, skipping fetching source and symbols")
                 return
 
-            LOGGER.info("Getting source from GitHub...")
+            self.logger.info("Getting source from GitHub...")
             self._get_source()
-            LOGGER.info("Downloading debug symbols and binaries, this may take a few minutes...")
+            self.logger.info(
+                "Downloading debug symbols and binaries, this may take a few minutes...")
             self._get_compile_artifacts()
-            LOGGER.info("Applying patch diff (if any)...")
+            self.logger.info("Applying patch diff (if any)...")
             self._patch_diff_by_id()
 
         except:
             if self.dest_dir is not None:
-                LOGGER.warning("Removing downloaded directory due to error",
-                               directory=self.dest_dir)
+                self.logger.warning(
+                    "Removing downloaded directory due to error, directory to be removed: %s",
+                    self.dest_dir,
+                )
                 shutil.rmtree(self.dest_dir)
             raise
 
@@ -198,7 +213,7 @@ class Symbolizer(Subcommand):
         else:
             self._setup_symbols()
             self._parse_mongosymb_args()
-            LOGGER.info("Invoking mongosymb...")
+            self.logger.info("Invoking mongosymb...")
             mongosymb.main(self.mongosym_args)
 
 
@@ -246,11 +261,14 @@ class SymbolizerPlugin(PluginInterface):
         if subcommand != _COMMAND:
             return None
 
-        setup_logging(parsed_args.debug)
-
         task_id = parsed_args.task_id
         binary_name = parsed_args.binary_name
         download_symbols_only = parsed_args.download_symbols_only
 
-        return Symbolizer(task_id, download_symbols_only=download_symbols_only,
-                          bin_name=binary_name, all_args=parsed_args)
+        return Symbolizer(
+            task_id,
+            download_symbols_only=download_symbols_only,
+            bin_name=binary_name,
+            all_args=parsed_args,
+            logger=Symbolizer.setup_logger(parsed_args.debug),
+        )
