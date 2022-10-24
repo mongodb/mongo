@@ -4096,6 +4096,8 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_per_shard_cursor_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
   name: disk_wiredtiger
