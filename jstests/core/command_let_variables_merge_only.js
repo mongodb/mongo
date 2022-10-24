@@ -5,6 +5,7 @@
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_causal_consistency,
+ *   uses_$out,
  * ]
  */
 (function() {
