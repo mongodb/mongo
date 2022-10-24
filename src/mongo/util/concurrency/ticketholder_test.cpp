@@ -436,9 +436,13 @@ TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
                           static_cast<int>(low2PriorityAdmission.ticket.has_value()) +
                           static_cast<int>(low3PriorityAdmission.ticket.has_value()),
                       1);
-            low1PriorityAdmission.ticket.reset();
-            low2PriorityAdmission.ticket.reset();
-            low3PriorityAdmission.ticket.reset();
+            if (low1PriorityAdmission.ticket.has_value()) {
+                low1PriorityAdmission.ticket.reset();
+            } else if (low2PriorityAdmission.ticket.has_value()) {
+                low2PriorityAdmission.ticket.reset();
+            } else {
+                low3PriorityAdmission.ticket.reset();
+            }
         };
 
         // Release the ticket.
