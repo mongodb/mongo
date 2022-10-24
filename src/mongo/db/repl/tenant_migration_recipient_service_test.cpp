@@ -3909,6 +3909,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
     stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
     auto beforeDeleteFp = globalFailPointRegistry().find(
         "pauseTenantMigrationRecipientInstanceBeforeDeletingOldStateDoc");
+    FailPointEnableBlock skipRebuildFp("PrimaryOnlyServiceSkipRebuildingInstances");
+
     auto initialTimesEntered = beforeDeleteFp->setMode(FailPoint::alwaysOn);
     auto opCtx = makeOperationContext();
 
@@ -3980,6 +3982,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 TEST_F(TenantMigrationRecipientServiceTest, RecipientFailsDueToOperationConflict) {
     FailPointEnableBlock createIndexesFailpointBlock("skipCreatingIndexDuringRebuildService");
     stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+    FailPointEnableBlock skipRebuildFp("PrimaryOnlyServiceSkipRebuildingInstances");
 
     // Insert a state doc to simulate running a migration with an existing state doc NOT marked for
     // garbage collection.
