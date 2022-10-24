@@ -52,6 +52,20 @@ env.Library(
 )
 
 env.Library(
+    target='cluster_server_parameter_common',
+    source=[
+        'cluster_server_parameter_common.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/list_databases_for_all_tenants_command',
+        '$BUILD_DIR/mongo/s/grid',
+    ],
+)
+
+env.Library(
     target='cluster_server_parameter_refresher',
     source=[
         'cluster_server_parameter_refresher.cpp',
@@ -62,12 +76,14 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/s/grid',
         'cluster_server_parameter',
+        'cluster_server_parameter_common',
     ],
 )
 
 env.CppUnitTest(
     target='cluster_server_parameter_test',
     source=[
+        'cluster_server_parameter_common_test.cpp',
         'cluster_server_parameter_initializer_test.cpp',
         'cluster_server_parameter_op_observer_test.cpp',
         'cluster_server_parameter_test_util.cpp',
@@ -83,9 +99,11 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/oplog_interface_local',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/util/signal_handlers',
         'cluster_server_parameter',
+        'cluster_server_parameter_common',
         'cluster_server_parameter_initializer',
         'cluster_server_parameter_op_observer',
     ],

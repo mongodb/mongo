@@ -32,32 +32,33 @@
 namespace mongo {
 namespace cluster_server_parameter_test_util {
 
-void upsert(BSONObj doc) {
+const TenantId ClusterServerParameterTestBase::kTenantId =
+    TenantId(OID("123456789012345678901234"_sd));
+
+void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId) {
     const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w"
                                                                    << "majority"));
 
     auto uniqueOpCtx = cc().makeOperationContext();
     auto* opCtx = uniqueOpCtx.get();
 
-    BSONObj res;
     DBDirectClient client(opCtx);
 
-    client.runCommand(
-        kConfigDB.toString(),
-        [&] {
-            write_ops::UpdateCommandRequest updateOp(NamespaceString::kClusterParametersNamespace);
-            updateOp.setUpdates({[&] {
-                write_ops::UpdateOpEntry entry;
-                entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
-                entry.setU(
-                    write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << doc)));
-                entry.setMulti(false);
-                entry.setUpsert(true);
-                return entry;
-            }()});
-            return updateOp.toBSON(kMajorityWriteConcern);
-        }(),
-        res);
+    auto opMsgRequest = OpMsgRequestBuilder::create(DatabaseName(tenantId, "config"), [&] {
+        write_ops::UpdateCommandRequest updateOp(
+            NamespaceString::makeClusterParametersNSS(tenantId));
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << doc)));
+            entry.setMulti(false);
+            entry.setUpsert(true);
+            return entry;
+        }()});
+        return updateOp.toBSON(kMajorityWriteConcern);
+    }());
+
+    auto res = client.runCommand(opMsgRequest)->getCommandReply();
 
     BatchedCommandResponse response;
     std::string errmsg;
@@ -69,24 +70,23 @@ void upsert(BSONObj doc) {
     uassert(ErrorCodes::OperationFailed, "No documents upserted", response.getN());
 }
 
-void remove() {
+void remove(const boost::optional<TenantId>& tenantId) {
     auto uniqueOpCtx = cc().makeOperationContext();
     auto* opCtx = uniqueOpCtx.get();
 
-    BSONObj res;
-    DBDirectClient(opCtx).runCommand(
-        kConfigDB.toString(),
-        [] {
-            write_ops::DeleteCommandRequest deleteOp(NamespaceString::kClusterParametersNamespace);
-            deleteOp.setDeletes({[] {
-                write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
-                entry.setMulti(true);
-                return entry;
-            }()});
-            return deleteOp.toBSON({});
-        }(),
-        res);
+    auto opMsgRequest = OpMsgRequestBuilder::create(DatabaseName(tenantId, "config"), [&] {
+        write_ops::DeleteCommandRequest deleteOp(
+            NamespaceString::makeClusterParametersNSS(tenantId));
+        deleteOp.setDeletes({[] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return deleteOp.toBSON({});
+    }());
+
+    auto res = DBDirectClient(opCtx).runCommand(opMsgRequest)->getCommandReply();
 
     BatchedCommandResponse response;
     std::string errmsg;

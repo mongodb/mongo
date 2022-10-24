@@ -31,6 +31,7 @@
 
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -49,6 +50,7 @@ const auto kNilCPT = LogicalTime::kUninitialized;
 class ClusterServerParameterTestBase : public ServiceContextMongoDTest {
 public:
     virtual void setUp() override {
+        gMultitenancySupport = true;
         // Set up mongod.
         ServiceContextMongoDTest::setUp();
 
@@ -71,9 +73,13 @@ public:
     }
 
     static constexpr auto kInitialIntValue = 123;
+    static constexpr auto kInitialTenantIntValue = 456;
     static constexpr auto kDefaultIntValue = 42;
     static constexpr auto kInitialStrValue = "initialState"_sd;
+    static constexpr auto kInitialTenantStrValue = "initialStateTenant"_sd;
     static constexpr auto kDefaultStrValue = ""_sd;
+
+    static const TenantId kTenantId;
 
 private:
     static repl::ReplSettings createReplSettings() {
@@ -84,8 +90,8 @@ private:
     }
 };
 
-void upsert(BSONObj doc);
-void remove();
+void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId = boost::none);
+void remove(const boost::optional<TenantId>& tenantId = boost::none);
 BSONObj makeClusterParametersDoc(const LogicalTime& cpTime, int intValue, StringData strValue);
 
 }  // namespace cluster_server_parameter_test_util

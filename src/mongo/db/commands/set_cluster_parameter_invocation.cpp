@@ -123,9 +123,8 @@ StatusWith<bool> ClusterParameterDBClientService::updateParameterOnDisk(
         BSON(WriteConcernOptions::kWriteConcernField << writeConcern.toBSON());
 
     try {
-        _dbClient.runCommand(
-            NamespaceString::makeClusterParametersNSS(tenantId).dbName().toStringWithTenantId(),
-            [&] {
+        auto opMsgRequest = OpMsgRequestBuilder::create(
+            NamespaceString::makeClusterParametersNSS(tenantId).dbName(), [&] {
                 write_ops::UpdateCommandRequest updateOp(
                     NamespaceString::makeClusterParametersNSS(tenantId));
                 updateOp.setUpdates({[&] {
@@ -138,8 +137,8 @@ StatusWith<bool> ClusterParameterDBClientService::updateParameterOnDisk(
                 }()});
 
                 return updateOp.toBSON(writeConcernObj);
-            }(),
-            res);
+            }());
+        res = _dbClient.runCommand(opMsgRequest)->getCommandReply();
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

@@ -19,7 +19,11 @@ function runTest(st, startupRefreshIntervalMS) {
     const errorMarginMS = 5000;
     const startupRefreshIntervalRelaxedMS = startupRefreshIntervalMS + errorMarginMS;
     checkLog.containsRelaxedJson(
-        conn, 6226403, {clusterParameterDocuments: []}, 1, startupRefreshIntervalRelaxedMS);
+        conn,
+        6226403,
+        {clusterParameterDocuments: [{"tenantId": "none", "updatedParameters": []}]},
+        1,
+        startupRefreshIntervalRelaxedMS);
 
     // Set a cluster parameter to a different value and then wait.
     assert.commandWorked(
@@ -29,7 +33,12 @@ function runTest(st, startupRefreshIntervalMS) {
     checkLog.containsRelaxedJson(
         conn,
         6226403,
-        {clusterParameterDocuments: [{_id: "testIntClusterParameter", intData: 2022}]},
+        {
+            clusterParameterDocuments: [{
+                "tenantId": "none",
+                "updatedParameters": [{_id: "testIntClusterParameter", intData: 2022}]
+            }]
+        },
         1,
         startupRefreshIntervalRelaxedMS);
 
@@ -40,7 +49,12 @@ function runTest(st, startupRefreshIntervalMS) {
     checkLog.containsRelaxedJson(
         conn,
         6226403,
-        {clusterParameterDocuments: [{_id: "testStrClusterParameter", strData: "welcome"}]},
+        {
+            clusterParameterDocuments: [{
+                "tenantId": "none",
+                "updatedParameters": [{_id: "testStrClusterParameter", strData: "welcome"}]
+            }]
+        },
         1,
         startupRefreshIntervalRelaxedMS);
 
@@ -56,7 +70,12 @@ function runTest(st, startupRefreshIntervalMS) {
     checkLog.containsRelaxedJson(
         conn,
         6226403,
-        {clusterParameterDocuments: [{_id: "testIntClusterParameter", intData: 2025}]},
+        {
+            clusterParameterDocuments: [{
+                "tenantId": "none",
+                "updatedParameters": [{_id: "testIntClusterParameter", intData: 2025}]
+            }]
+        },
         1,
         newRefreshIntervalRelaxedMS);
 
@@ -66,10 +85,13 @@ function runTest(st, startupRefreshIntervalMS) {
     checkLog.containsRelaxedJson(conn,
                                  6226403,
                                  {
-                                     clusterParameterDocuments: [
-                                         {_id: "testIntClusterParameter", intData: 2025},
-                                         {_id: "testStrClusterParameter", strData: "welcome"}
-                                     ]
+                                     clusterParameterDocuments: [{
+                                         "tenantId": "none",
+                                         updatedParameters: [
+                                             {_id: "testIntClusterParameter", intData: 2025},
+                                             {_id: "testStrClusterParameter", strData: "welcome"}
+                                         ]
+                                     }]
                                  },
                                  1,
                                  newRefreshIntervalRelaxedMS);
@@ -81,7 +103,12 @@ function runTest(st, startupRefreshIntervalMS) {
     checkLog.containsRelaxedJson(
         conn,
         6226403,
-        {clusterParameterDocuments: [{_id: "testStrClusterParameter", strData: "goodbye"}]},
+        {
+            clusterParameterDocuments: [{
+                "tenantId": "none",
+                "updatedParameters": [{_id: "testStrClusterParameter", strData: "goodbye"}]
+            }]
+        },
         1,
         startupRefreshIntervalRelaxedMS);
 
@@ -94,10 +121,13 @@ function runTest(st, startupRefreshIntervalMS) {
     checkLog.containsRelaxedJson(conn,
                                  6226403,
                                  {
-                                     clusterParameterDocuments: [
-                                         {_id: "testIntClusterParameter", intData: 2028},
-                                         {_id: "testBoolClusterParameter", boolData: true}
-                                     ]
+                                     clusterParameterDocuments: [{
+                                         "tenantId": "none",
+                                         "updatedParameters": [
+                                             {_id: "testIntClusterParameter", intData: 2028},
+                                             {_id: "testBoolClusterParameter", boolData: true}
+                                         ]
+                                     }]
                                  },
                                  1,
                                  startupRefreshIntervalRelaxedMS);
