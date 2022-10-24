@@ -36,7 +36,7 @@ commit_queue_aliases:
     task: "^(run_.*|compile_.*|lint_.*|validate_commit_message|test_api_version_compatibility|jsCore)$"
     variant_tags: []
     task_tags: []
-  - variant: "enterprise-ubuntu-dynamic-1804-clang-tidy-required"
+  - variant: "^(enterprise-ubuntu-dynamic-1804-clang-tidy-required|linux-x86-dynamic-compile-required)$"
     task: "clang_tidy"
     variant_tags: []
     task_tags: []

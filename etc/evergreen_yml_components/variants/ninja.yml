@@ -7,6 +7,7 @@ buildvariants:
   - enterprise
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
+    compile_variant: enterprise-windows-ninja
   tasks:
   - name: compile_ninja_next_TG
     distros:
@@ -25,6 +26,7 @@ buildvariants:
   expansions:
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_variant: macos-enterprise-ninja
   tasks:
   - name: compile_ninja_next_TG
   - name: compile_ninja_TG
@@ -41,6 +43,7 @@ buildvariants:
     compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo)
     repo_edition: enterprise
     has_packages: false
+    compile_variant: ubuntu1804-ninja-build-profiles
   tasks:
   - name: compile_ninja_default_profile_TG
     distros:

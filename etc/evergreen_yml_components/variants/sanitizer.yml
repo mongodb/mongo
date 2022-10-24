@@ -29,6 +29,7 @@ buildvariants:
     scons_cache_scope: shared
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
     separate_debug: off
+    compile_variant: rhel80-asan
   tasks:
     - name: compile_test_and_package_serial_TG
     - name: .aggfuzzer .common !.feature_flag_guarded
@@ -72,6 +73,7 @@ buildvariants:
     exec_timeout_secs: 14400 # 3 hour timeout
     separate_debug: off
     large_distro_name: rhel80-build
+    compile_variant: rhel80-debug-asan
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
   - name: .aggregation !.feature_flag_guarded
@@ -153,6 +155,7 @@ buildvariants:
     scons_cache_scope: shared
     separate_debug: off
     large_distro_name: rhel80-build
+    compile_variant: rhel80-debug-ubsan
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
   - name: .aggregation !.feature_flag_guarded

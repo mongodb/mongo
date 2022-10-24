@@ -73,14 +73,15 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
         for base_build_variant in expansions.burn_in_tag_buildvariants_list:
             build_variant = f"{base_build_variant}-required"
             try:
-                build = version.build_by_variant(build_variant)
+                build_id = version.build_variants_map[build_variant]
             except KeyError:
                 LOGGER.warning(
                     "It is likely nothing to burn_in, so burn_in_tags build variant"
                     " was not generated. Skipping...", build_variant=build_variant)
                 continue
 
-            task_list = build.get_tasks()
+            task_list = evg_api.tasks_by_build(build_id)
+
             for task in task_list:
                 if task.display_name == BURN_IN_TESTS:
                     LOGGER.info("Activating task", task_id=task.task_id,
@@ -88,8 +89,7 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
                     evg_api.configure_task(task.task_id, activated=True)
 
     else:
-        build = evg_api.build_by_id(expansions.build_id)
-        task_list = build.get_tasks()
+        task_list = evg_api.tasks_by_build(expansions.build_id)
         for task in task_list:
             if task.display_name == expansions.task:
                 LOGGER.info("Activating task", task_id=task.task_id, task_name=task.display_name)

@@ -1,0 +1,151 @@
+### Build variants for Evergreen compile task groups and static analysis tasks that are shared across 2 or more
+###   variants. These are placed in a standalone file to better track compile volume.
+
+variables:
+- &generic_linux_compile_params  # Essential set of compile parameters used for Linux dev variants.
+  run_on:
+  - rhel80-xlarge
+  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
+  tasks:
+  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- &generic_linux_compile_expansions  # The most commonly used compile expansions.
+  scons_cache_scope: shared
+  scons_cache_mode: all
+  has_packages: false
+
+
+buildvariants:
+
+- <<: *generic_linux_compile_params
+  name: &linux-x86-dynamic-compile-required linux-x86-dynamic-compile-required
+  display_name: "! Linux x86 Shared Library Compile & Static Analysis"
+  modules:
+    - enterprise
+  stepback: false
+  expansions:
+    <<: *generic_linux_compile_expansions
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
+    clang_tidy_toolchain: v3
+    compile_variant: *linux-x86-dynamic-compile-required
+  tasks:
+    - name: compile_test_and_package_parallel_unittest_stream_TG
+    - name: compile_test_and_package_parallel_core_stream_TG
+    - name: compile_test_and_package_parallel_dbtest_stream_TG
+    - name: generate_buildid_to_debug_symbols_mapping
+    - name: .lint
+    - name: server_discovery_and_monitoring_json_test_TG
+      distros:
+      - rhel80-large
+    - name: server_selection_json_test_TG
+      distros:
+      - rhel80-large
+    - name: libdeps_graph_linting_TG
+      distros:
+      - rhel80-large
+    - name: clang_tidy_TG
+      distros:
+      - rhel80-xxlarge
+    - name: .crypt
+    - name: .stitch
+    - name: crypt_build_debug_and_test
+    - name: .integration
+      distros:
+      - rhel80-medium
+
+- <<: *generic_linux_compile_params
+  name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required  # TODO: replace with Sanitizer.
+  display_name: "! Linux x86 Shared Library DEBUG Compile"
+  stepback: false
+  expansions: &linux_debug_compile_expansions
+    <<: *generic_linux_compile_expansions
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --enable-free-mon=on
+      --enable-http-client=on
+      --link-model=dynamic
+    num_scons_link_jobs_available: 0.99
+    compile_variant: *linux-x86-dynamic-debug-compile-required
+  tasks:
+  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .integration !.audit
+
+- <<: *generic_linux_compile_params
+  name: &linux-64-debug-wtdevelop-compile-required linux-64-debug-wtdevelop-compile-required
+  display_name: "~ Linux WiredTiger develop DEBUG Compile"
+  modules:
+  - wtdevelop
+  expansions:
+    <<: *linux_debug_compile_expansions
+    use_wt_develop: true
+    compile_variant: *linux-64-debug-wtdevelop-compile-required
+
+- <<: *generic_linux_compile_params
+  name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
+  display_name: "! Linux x86 Shared Library {A,UB}SAN Compile"
+  expansions:
+    <<: *generic_linux_compile_expansions
+    separate_debug: off
+    compile_flags: >-
+      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+      --dbg=on
+      --opt=on
+      --allocator=system
+      --sanitize=undefined,address
+      --ssl
+      --ocsp-stapling=off
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
+    compile_variant: *linux-debug-aubsan-compile-required
+
+- name: &windows-compile-required windows-compile-required
+  display_name: "! Windows Compile"
+  run_on:
+  - windows-vsCurrent-xlarge
+  modules:
+  - enterprise
+  expansions:
+    exe: ".exe"
+    ext: zip
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      msi
+      archive-mh
+      archive-mh-debug
+    content_type: application/zip
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8")
+      --win-version-min=win10
+    num_scons_link_jobs_available: 0.2
+    python: '/cygdrive/c/python/python37/python.exe'
+    scons_cache_scope: shared
+    compile_variant: *windows-compile-required
+  tasks:
+  - name: compile_and_archive_dist_test_then_package_TG
+  - name: compile_build_tools_next_TG
+  - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
+  - name: .crypt

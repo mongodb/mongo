@@ -27,6 +27,7 @@ buildvariants:
     scons_cache_scope: shared
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
     large_distro_name: amazon1-2018-build
+    compile_variant: amazon
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -89,6 +90,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
+    compile_variant: enterprise-linux-64-amazon-ami
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -145,6 +147,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: amazon2-large
+    compile_variant: amazon2
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -212,6 +215,7 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
+    compile_variant: enterprise-amazon2
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -268,6 +272,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: amazon2-arm64-large
+    compile_variant: amazon2-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -337,6 +342,7 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
+    compile_variant: enterprise-amazon2-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -451,6 +457,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: amazon2022-arm64-large
+    compile_variant: amazon2022-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -510,6 +517,7 @@ buildvariants:
     packager_distro: amazon2022
     repo_edition: enterprise
     scons_cache_scope: shared
+    compile_variant: enterprise-amazon2022-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -631,6 +639,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: debian10-build
+    compile_variant: debian10
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -700,6 +709,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: debian10-build
+    compile_variant: enterprise-debian10-64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -755,6 +765,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: debian11-large
+    compile_variant: debian11
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -822,6 +833,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: debian11-large
+    compile_variant: enterprise-debian11-64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -874,6 +886,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: rhel70
+    compile_variant: rhel70
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -918,6 +931,7 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_variant: rhel76_compile_rhel70
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -943,6 +957,7 @@ buildvariants:
     build_mongoreplay: true
     test_flags: >-
       --excludeWithAnyTags=requires_os_access
+    compile_variant: ubi8
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -974,6 +989,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: rhel80-build
+    compile_variant: rhel80
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1043,6 +1059,7 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 3
     large_distro_name: rhel80-medium
+    compile_variant: enterprise-rhel-80-64-bit
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1151,6 +1168,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: rhel82-arm64-large
+    compile_variant: rhel-82-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1213,6 +1231,7 @@ buildvariants:
     packager_distro: rhel82
     repo_edition: enterprise
     scons_cache_scope: shared
+    compile_variant: enterprise-rhel-82-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1271,6 +1290,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: rhel90-build
+    compile_variant: rhel90
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1326,6 +1346,7 @@ buildvariants:
     packager_distro: rhel90
     repo_edition: enterprise
     scons_cache_scope: shared
+    compile_variant: enterprise-rhel-90-64-bit
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1404,6 +1425,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: suse12-sp5-large
+    compile_variant: suse12
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1469,6 +1491,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: enterprise
     scons_cache_scope: shared
+    compile_variant: enterprise-suse12-64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1524,6 +1547,7 @@ buildvariants:
     packager_distro: suse15
     repo_edition: enterprise
     scons_cache_scope: shared
+    compile_variant: enterprise-suse15-64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1576,6 +1600,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: suse15-build
+    compile_variant: suse15
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1634,6 +1659,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: ubuntu1804-build
+    compile_variant: ubuntu1804
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1711,6 +1737,7 @@ buildvariants:
     large_distro_name: ubuntu1804-build
     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
     external_auth_jobs_max: 1
+    compile_variant: enterprise-ubuntu1804-64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1791,6 +1818,7 @@ buildvariants:
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
     scons_cache_scope: shared
+    compile_variant: enterprise-ubuntu1804-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
   - name: aggregation !.feature_flag_guarded
@@ -1851,6 +1879,7 @@ buildvariants:
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: targeted
     scons_cache_scope: shared
+    compile_variant: ubuntu1804-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
   - name: free_monitoring
@@ -1888,6 +1917,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: ubuntu2204-large
+    compile_variant: ubuntu2204
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -1944,6 +1974,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: ubuntu2004-large
+    compile_variant: ubuntu2004
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -2012,6 +2043,7 @@ buildvariants:
     large_distro_name: ubuntu2004-large
     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
     external_auth_jobs_max: 1
+    compile_variant: enterprise-ubuntu2004-64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -2079,6 +2111,7 @@ buildvariants:
     large_distro_name: ubuntu2204-large
     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
     external_auth_jobs_max: 1
+    compile_variant: enterprise-ubuntu2204-64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -2145,6 +2178,7 @@ buildvariants:
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
     scons_cache_scope: shared
+    compile_variant: enterprise-ubuntu2004-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
   - name: aggregation !.feature_flag_guarded
@@ -2201,6 +2235,7 @@ buildvariants:
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: targeted
     scons_cache_scope: shared
+    compile_variant: ubuntu2004-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
   - name: free_monitoring
@@ -2241,6 +2276,7 @@ buildvariants:
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
     scons_cache_scope: shared
+    compile_variant: enterprise-ubuntu2204-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
   - name: aggregation !.feature_flag_guarded
@@ -2296,6 +2332,7 @@ buildvariants:
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: targeted
     scons_cache_scope: shared
+    compile_variant: ubuntu2204-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
   - name: free_monitoring
@@ -2337,6 +2374,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: windows-vsCurrent-large
     test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
+    compile_variant: windows
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -2412,6 +2450,7 @@ buildvariants:
     push_arch: x86_64-enterprise
     test_flags: *windows_common_test_excludes
     exec_timeout_secs: 14400 # 3 hour timeout
+    compile_variant: enterprise-windows
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -2475,6 +2514,7 @@ buildvariants:
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
+    compile_variant: macos
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
@@ -2530,6 +2570,7 @@ buildvariants:
       --libc++
       --variables-files=etc/scons/xcode_macosx_arm.vars
     resmoke_jobs_max: 6
+    compile_variant: macos-arm64
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
@@ -2592,6 +2633,7 @@ buildvariants:
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
+    compile_variant: enterprise-macos
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
@@ -2640,6 +2682,7 @@ buildvariants:
       --libc++
       --variables-files=etc/scons/xcode_macosx_arm.vars
     resmoke_jobs_max: 6
+    compile_variant: enterprise-macos-arm64
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG

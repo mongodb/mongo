@@ -59,13 +59,56 @@ include:
 - filename: etc/evergreen_yml_components/variants/sanitizer.yml
 - filename: etc/evergreen_yml_components/variants/in_memory.yml
 - filename: etc/evergreen_yml_components/variants/ninja.yml
+- filename: etc/evergreen_yml_components/variants/compile_static_analysis.yml
 
 variables:
+
 - &libfuzzertests
   name: libfuzzertests!
   execution_tasks:
   - compile_and_archive_libfuzzertests
   - fetch_and_run_libfuzzertests
+
+# Common compile variant dependency specifications.
+- &linux_x86_dynamic_compile_variant_dependency
+  activate: false
+  depends_on:
+  - name: archive_dist_test
+    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile-required
+  - name: version_gen
+    variant: generate-tasks-for-version
+
+- &linux_x86_dynamic_debug_compile_variant_dependency
+  activate: false
+  depends_on:
+  - name: archive_dist_test
+    variant: &linux_x86_dynamic_debug_compile_variant_name linux-x86-dynamic-debug-compile-required
+  - name: version_gen
+    variant: generate-tasks-for-version
+
+- &linux_debug_aubsan_compile_variant_dependency
+  activate: false
+  depends_on:
+  - name: archive_dist_test
+    variant: &linux_debug_aubsan_compile_variant_name linux-debug-aubsan-compile-required
+  - name: version_gen
+    variant: generate-tasks-for-version
+
+- &windows_compile_variant_dependency
+  activate: false
+  depends_on:
+  - name: archive_dist_test
+    variant: &windows_compile_variant_name windows-compile-required
+  - name: version_gen
+    variant: generate-tasks-for-version
+
+- &linux_x86_generic_expansions
+  multiversion_platform: rhel80
+  multiversion_edition: enterprise
+  repo_edition: enterprise
+  large_distro_name: rhel80-medium
+  num_scons_link_jobs_available: 0.99
+  compile_variant: *linux_x86_dynamic_compile_variant_name
 
 # Use this template for enterprise Windows testing coverage on non-pushing
 # variants
@@ -110,9 +153,6 @@ variables:
   - name: auth_audit_gen
   - name: buildscripts_test
   - name: causally_consistent_jscore_txns_passthrough
-  - name: .crypt
-    distros:
-    - windows-vsCurrent-xlarge
   - name: .encrypt !.aggregation !.gcm !.feature_flag_guarded
   - name: external_auth
   - name: external_auth_aws
@@ -232,38 +272,21 @@ buildvariants:
 #         Linux buildvariants             #
 ###########################################
 - &linux-64-debug-required-template
-  name: linux-64-debug-required
-  display_name: "! Shared Library Linux DEBUG"
+  <<: *linux_x86_dynamic_debug_compile_variant_dependency
+  name: &linux-64-debug-required linux-64-debug-required
+  display_name: "! Linux x86 Shared Library DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  activate: false
   run_on:
   - rhel80-medium
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: >-
-      --dbg=on
-      --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      --enable-free-mon=on
-      --enable-http-client=on
-      --link-model=dynamic
-    scons_cache_scope: shared
-    scons_cache_mode: all
     test_flags: --excludeWithAnyTags=requires_http_client
     target_resmoke_time: 15
     max_sub_suites: 5
-    num_scons_link_jobs_available: 0.99
     large_distro_name: rhel80-medium
+    compile_variant: *linux_x86_dynamic_debug_compile_variant_name
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-xlarge
   - name: .aggregation !.encrypt !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: .causally_consistent !.wo_snapshot
@@ -272,7 +295,6 @@ buildvariants:
   - name: .misc_js
   - name: disk_wiredtiger
   - name: free_monitoring
-  - name: .integration !.audit
   - name: .jscore .common
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -293,17 +315,9 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot
   - name: sharding_gen
   - name: sharding_opportunistic_secondary_targeting_gen
-  - name: .stitch
-  - name: server_discovery_and_monitoring_json_test_TG
-    distros:
-    - rhel80-large
-  - name: server_selection_json_test_TG
-    distros:
-    - rhel80-large
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *linux-64-debug-required-template
-  name: linux-64-debug-wtdevelop
+  name: &linux-64-debug-wtdevelop linux-64-debug-wtdevelop
   display_name: "~ Linux DEBUG WiredTiger develop"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
@@ -323,8 +337,9 @@ buildvariants:
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
     test_flags: --excludeWithAnyTags=requires_http_client
+    compile_variant: *linux-64-debug-wtdevelop
 
-- name: tla-plus
+- name: &tla-plus tla-plus
   display_name: TLA+
   run_on:
   - rhel80-build
@@ -336,7 +351,7 @@ buildvariants:
   - name: tla_plus
 
 - &enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: enterprise-rhel80-dynamic-v4gcc-debug-experimental
+  name: &enterprise-rhel80-dynamic-v4gcc-debug-experimental enterprise-rhel80-dynamic-v4gcc-debug-experimental
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -360,6 +375,7 @@ buildvariants:
     scons_cache_mode: all
     large_distro_name: rhel80-medium
     num_scons_link_jobs_available: 0.99
+    compile_variant: *enterprise-rhel80-dynamic-v4gcc-debug-experimental
   tasks: &enterprise-rhel80-dynamic-v4gcc-debug-experimental-tasks
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -430,7 +446,7 @@ buildvariants:
     - rhel80-xlarge
 
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: enterprise-rhel80-dynamic-v4clang-debug-experimental
+  name: &enterprise-rhel80-dynamic-v4clang-debug-experimental enterprise-rhel80-dynamic-v4clang-debug-experimental
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang DEBUG"
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
@@ -440,9 +456,10 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
       --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
+    compile_variant: *enterprise-rhel80-dynamic-v4clang-debug-experimental
 
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: enterprise-rhel80-dynamic-v4gcc-cxx20-debug-experimental
+  name: &enterprise-rhel80-dynamic-v4gcc-cxx20-debug-experimental enterprise-rhel80-dynamic-v4gcc-cxx20-debug-experimental
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC C++20 DEBUG"
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
@@ -453,9 +470,10 @@ buildvariants:
       --link-model=dynamic
       --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars
       --cxx-std=20
+    compile_variant: *enterprise-rhel80-dynamic-v4gcc-cxx20-debug-experimental
 
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: enterprise-rhel80-dynamic-v4clang-cxx20-debug-experimental
+  name: &enterprise-rhel80-dynamic-v4clang-cxx20-debug-experimental enterprise-rhel80-dynamic-v4clang-cxx20-debug-experimental
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang C++20 DEBUG"
   expansions:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
@@ -466,8 +484,9 @@ buildvariants:
       --link-model=dynamic
       --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
       --cxx-std=20
+    compile_variant: *enterprise-rhel80-dynamic-v4clang-cxx20-debug-experimental
 
-- name: enterprise-rhel-80-64-bit-coverage
+- name: &enterprise-rhel-80-64-bit-coverage enterprise-rhel-80-64-bit-coverage
   display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage"
   modules:
   - enterprise
@@ -504,6 +523,7 @@ buildvariants:
     use_scons_cache: false
     gcov_tool: /opt/mongodbtoolchain/v3/bin/gcov
     num_scons_link_jobs_available: 0.99
+    compile_variant: *enterprise-rhel-80-64-bit-coverage
   tasks: &enterprise-rhel-80-64-bit-coverage-tasks
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -514,51 +534,11 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-large
-  # to reduce the overall size of the generated configuration, most of the
-  # tasks we would normally include have been disabled. See revert of
-  # SERVER-60832
-  #- name: .aggfuzzer !.feature_flag_guarded
-  #- name: .aggregation !.unwind !.feature_flag_guarded
-  #- name: audit
-  #- name: .auth
-  #- name: causally_consistent_jscore_txns_passthrough
-  #- name: .change_streams
-  #- name: .misc_js # serial_run needs extra memory
-  #  distros:
-  #  - rhel80-large
-  #- name: .concurrency !.ubsan !.no_txns !.stepdowns !.kill_terminate !.disabled_on_code_coverage
-  #- name: disk_wiredtiger
-  #- name: .encrypt
-  #- name: initial_sync_fuzzer_gen
-  #- name: .integration !.audit
   - name: .jscore .common
-  #- name: jsCore_txns_large_txns_format
-  #- name: jsCore_minimum_batch_size
-  #- name: libunwind_tests
-  #- name: .logical_session_cache .one_sec
-  #- name: .multi_shard .common
-  #- name: multiversion_gen
-  #- name: .multiversion_fuzzer
-  #- name: .multiversion_passthrough
-  #- name: .query_fuzzer
-  #- name: .random_multiversion_ds
-  #- name: .read_write_concern
   - name: .replica_sets !.ignore_non_generated_replica_sets_jscore_passthrough !.ignore_on_code_coverage
   - name: replica_sets_jscore_passthrough_gen
-  #- name: .read_only
-  #- name: .rollbackfuzzer
-  #- name: retryable_writes_jscore_passthrough_gen
-  #- name: sasl
-  #- name: search
-  #- name: search_auth
-  #- name: search_ssl
-  #- name: secondary_reads_passthrough_gen
-  #- name: session_jscore_passthrough
-  #- name: .sharding .jscore !.wo_snapshot
-  #- name: .sharding .common
-  #- name: update_fuzzer_gen
 
-- name: enterprise-rhel-80-64-bit-coverage-clang
+- name: &enterprise-rhel-80-64-bit-coverage-clang enterprise-rhel-80-64-bit-coverage-clang
   display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage (clang)"
   modules:
     - enterprise
@@ -598,10 +578,11 @@ buildvariants:
     # the v3 gcov can read natively anyway, so we don't need it.
     gcov_tool: /opt/mongodbtoolchain/v3/bin/gcov
     num_scons_link_jobs_available: 0.99
+    compile_variant: *enterprise-rhel-80-64-bit-coverage-clang
   tasks:
     *enterprise-rhel-80-64-bit-coverage-tasks
 
-- name: enterprise-rhel-80-64-bit-coverage-experimental
+- name: &enterprise-rhel-80-64-bit-coverage-experimental enterprise-rhel-80-64-bit-coverage-experimental
   display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage (v4)"
   modules:
     - enterprise
@@ -638,10 +619,11 @@ buildvariants:
     use_scons_cache: false
     gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
     num_scons_link_jobs_available: 0.99
+    compile_variant: *enterprise-rhel-80-64-bit-coverage-experimental
   tasks:
     *enterprise-rhel-80-64-bit-coverage-tasks
 
-- name: enterprise-rhel-80-64-bit-coverage-clang-experimental
+- name: &enterprise-rhel-80-64-bit-coverage-clang-experimental enterprise-rhel-80-64-bit-coverage-clang-experimental
   display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage (v4 clang)"
   modules:
     - enterprise
@@ -678,6 +660,7 @@ buildvariants:
     use_scons_cache: false
     gcov_tool: /opt/mongodbtoolchain/v4/bin/llvm-cov gcov
     num_scons_link_jobs_available: 0.99
+    compile_variant: *enterprise-rhel-80-64-bit-coverage-clang-experimental
   tasks:
     *enterprise-rhel-80-64-bit-coverage-tasks
 
@@ -690,7 +673,7 @@ buildvariants:
 #    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=* --disable-warnings-as-errors
 
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: enterprise-rhel80-dynamic-v4clang-cxx20-debug-pm-1328-experimental
+  name: &enterprise-rhel80-dynamic-v4clang-cxx20-debug-pm-1328-experimental enterprise-rhel80-dynamic-v4clang-cxx20-debug-pm-1328-experimental
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang C++20 DEBUG + PM-1328"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
@@ -704,9 +687,10 @@ buildvariants:
       --cxx-std=20
       --experimental-optimization=*
       --experimental-runtime-hardening=*
+    compile_variant: *enterprise-rhel80-dynamic-v4clang-cxx20-debug-pm-1328-experimental
 
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: enterprise-rhel80-v4gcc-cxx20-pm-1328-experimental
+  name: &enterprise-rhel80-v4gcc-cxx20-pm-1328-experimental enterprise-rhel80-v4gcc-cxx20-pm-1328-experimental
   display_name: "~ Enterprise RHEL 8.0 v4 Toolchain GCC C++20 + PM-1328"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
@@ -719,6 +703,7 @@ buildvariants:
       --experimental-optimization=*
       --experimental-runtime-hardening=*
       --disable-warnings-as-errors
+    compile_variant: *enterprise-rhel80-v4gcc-cxx20-pm-1328-experimental
   tasks: &enterprise-rhel80-dynamic-v4gcc-debug-experimental-tasks-no-unittests
     - name: compile_test_and_package_parallel_core_stream_TG
       distros:
@@ -787,7 +772,7 @@ buildvariants:
 
 
 - <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: enterprise-rhel80-v4clang-cxx20-pm-1328-experimental
+  name: &enterprise-rhel80-v4clang-cxx20-pm-1328-experimental enterprise-rhel80-v4clang-cxx20-pm-1328-experimental
   display_name: "~ Enterprise RHEL 8.0 v4 Toolchain Clang C++20 + PM-1328"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
@@ -799,9 +784,10 @@ buildvariants:
       --cxx-std=20
       --experimental-optimization=*
       --experimental-runtime-hardening=*
+    compile_variant: *enterprise-rhel80-v4clang-cxx20-pm-1328-experimental
   tasks: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-tasks-no-unittests
 
-- name: stm-daily-cron
+- name: &stm-daily-cron stm-daily-cron
   modules:
   - enterprise
   display_name: "~ STM Daily Cron"
@@ -811,13 +797,14 @@ buildvariants:
   expansions:
     multiversion_platform: rhel80
     multiversion_edition: enterprise
+    compile_variant: *stm-daily-cron
   stepback: false
   tasks:
   - name: lint_fuzzer_sanity_all
   - name: powercycle_sentinel
   - name: powercycle_smoke_skip_compile_gen
 
-- name: security-daily-cron
+- name: &security-daily-cron security-daily-cron
   modules:
   - enterprise
   display_name: "~ Security Daily Cron"
@@ -841,7 +828,7 @@ buildvariants:
 #         Windows buildvariants           #
 ###########################################
 
-- name: windows-debug-suggested
+- name: &windows-debug-suggested windows-debug-suggested
   display_name: "* Windows DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
@@ -863,6 +850,7 @@ buildvariants:
     multiversion_edition: enterprise
     large_distro_name: windows-vsCurrent-large
     test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
+    compile_variant: *windows-debug-suggested
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -914,34 +902,21 @@ buildvariants:
   - name: server_selection_json_test_TG
 
 - &enterprise-windows-required-template
-  name: enterprise-windows-required
+  <<: *windows_compile_variant_dependency
+  name: &enterprise-windows-required enterprise-windows-required
   display_name: "! Enterprise Windows"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
   - windows-vsCurrent-small
-  expansions:
+  expansions: &windows_required_expansions
+    compile_variant: *windows_compile_variant_name
     burn_in_tests_build_variant: enterprise-windows-required
     exe: ".exe"
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-      msi
-      archive-mh
-      archive-mh-debug
     content_type: application/zip
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=windows
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
-      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8")
-      --win-version-min=win10
-    num_scons_link_jobs_available: 0.2
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
-    scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
@@ -955,20 +930,11 @@ buildvariants:
     test_flags: *windows_common_test_excludes
     external_auth_jobs_max: 1
   tasks:
-  - name: compile_test_and_package_serial_TG
-    distros:
-    - windows-vsCurrent-xlarge
-  - name: compile_build_tools_next_TG
-    distros:
-    - windows-vsCurrent-xlarge
   - name: burn_in_tests_gen
   - name: audit
   - name: auth_audit_gen
   - name: buildscripts_test
   - name: causally_consistent_jscore_txns_passthrough
-    distros:
-    - windows-vsCurrent-large
-  - name: .crypt
     distros:
     - windows-vsCurrent-large
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
@@ -992,8 +958,6 @@ buildvariants:
     - windows-vsCurrent-large
   - name: replica_sets_ese_gen
   - name: sasl
-  - name: server_discovery_and_monitoring_json_test_TG
-  - name: server_selection_json_test_TG
   - name: .sharding .txns
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
@@ -1002,30 +966,16 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
 
 - <<: *enterprise-windows-required-template
-  name: enterprise-windows-all-feature-flags-required
+  name: &enterprise-windows-all-feature-flags-required enterprise-windows-all-feature-flags-required
   display_name: "! Enterprise Windows (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   expansions:
+    <<: *windows_required_expansions
     burn_in_tests_build_variant: enterprise-windows-required
     exe: ".exe"
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-      msi
-      archive-mh
-      archive-mh-debug
     content_type: application/zip
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=windows
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
-      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-      --win-version-min=win10
-    num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
-    scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
@@ -1046,21 +996,12 @@ buildvariants:
   - name: cqf_parallel
   - name: query_golden_classic
   - name: query_golden_cqf
-  - name: compile_and_archive_dist_test_then_package_TG
-    distros:
-    - windows-vsCurrent-xlarge
-  - name: compile_build_tools_next_TG
-    distros:
-    - windows-vsCurrent-xlarge
   - name: burn_in_tests_gen
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
     distros:
     - windows-vsCurrent-large
-  - name: .crypt
-    distros:
-    - windows-vsCurrent-xlarge
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
@@ -1085,16 +1026,8 @@ buildvariants:
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
-# Disabling as the following tests are not aware of feature flags.
-#    - name: buildscripts_test
-#    - name: unittest_shell_hang_analyzer_gen
-#    - name: server_selection_json_test_TG
-#    - name: server_discovery_and_monitoring_json_test_TG
-#    - name: compile_run_and_archive_dbtest_TG
-#      distros:
-#        - windows-vsCurrent-xlarge
 
-- name: enterprise-windows-cxx20-debug-experimental
+- name: &enterprise-windows-cxx20-debug-experimental enterprise-windows-cxx20-debug-experimental
   display_name: "~ Enterprise Windows C++20 DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -1103,6 +1036,7 @@ buildvariants:
   - windows-vsCurrent-small
   expansions:
     exe: ".exe"
+    compile_variant: *enterprise-windows-cxx20-debug-experimental
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -1162,7 +1096,7 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer !.multiversion
 
-- name: enterprise-windows-debug-unoptimized
+- name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
   display_name: Enterprise Windows DEBUG (Unoptimized)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -1170,6 +1104,7 @@ buildvariants:
   run_on:
   - windows-vsCurrent-small
   expansions:
+    compile_variant: *enterprise-windows-debug-unoptimized
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -1208,12 +1143,13 @@ buildvariants:
 ###########################################
 
 - &macos-debug-template
-  name: macos-debug-suggested
+  name: &macos-debug-suggested macos-debug-suggested
   display_name: "* macOS DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
   - macos-1100
   expansions: &macos-debug-expansions
+    compile_variant: *macos-debug-suggested
     test_flags: --excludeWithAnyTags=incompatible_with_macos
     resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
@@ -1243,7 +1179,7 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: enterprise-macos-rosetta-2
+- name: &enterprise-macos-rosetta-2 enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -1251,6 +1187,7 @@ buildvariants:
   run_on:
   - macos-1100-arm64
   expansions:
+    compile_variant: *enterprise-macos-rosetta-2
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: >-
@@ -1275,7 +1212,7 @@ buildvariants:
   - name: sasl
   - name: .crypt
 
-- name: enterprise-macos-cxx20
+- name: &enterprise-macos-cxx20 enterprise-macos-cxx20
   display_name: "Enterprise macOS C++20 DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -1283,6 +1220,7 @@ buildvariants:
   run_on:
   - macos-1100
   expansions:
+    compile_variant: *enterprise-macos-cxx20
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: >-
@@ -1310,13 +1248,14 @@ buildvariants:
   - name: sasl
   - name: .crypt
 
-- name: enterprise-macos-arm64
+- name: &enterprise-macos-arm64 enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64"
   modules:
   - enterprise
   run_on:
   - macos-1100-arm64
   expansions:
+    compile_variant: *enterprise-macos-arm64
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: >-
@@ -1351,12 +1290,13 @@ buildvariants:
 #          Embedded SDK buildvariants     #
 ###########################################
 
-- name: embedded-sdk-macos
+- name: &embedded-sdk-macos embedded-sdk-macos
   display_name: "Embedded SDK - macOS"
   run_on:
   - macos-1100
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
+    compile_variant: *embedded-sdk-macos
     test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
@@ -1378,12 +1318,13 @@ buildvariants:
   tasks:
   - name: embedded_sdk_build_and_test
 
-- name: embedded-sdk-ubuntu-1804-x86_64
+- name: &embedded-sdk-ubuntu-1804-x86_64 embedded-sdk-ubuntu-1804-x86_64
   display_name: "Embedded SDK - Ubuntu 18.04 x86_64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1804-build
   expansions:
+    compile_variant: *embedded-sdk-ubuntu-1804-x86_64
     test_flags: --excludeWithAnyTags=uses_transactions
     # We need --allocator=system here to work around SERVER-27675
     compile_flags: >-
@@ -1405,7 +1346,8 @@ buildvariants:
 ###########################################
 
 - &enterprise-rhel-80-64-bit-dynamic-required-template
-  name: enterprise-rhel-80-64-bit-dynamic-required
+  <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel-80-64-bit-dynamic-required enterprise-rhel-80-64-bit-dynamic-required
   display_name: "! Shared Library Enterprise RHEL 8.0"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
@@ -1413,25 +1355,10 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-dynamic-required-expansions
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      --link-model=dynamic
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    has_packages: false
+    <<: *linux_x86_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
+    has_packages: false
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
@@ -1442,23 +1369,16 @@ buildvariants:
     burn_in_tag_buildvariants: >-
       enterprise-rhel-80-64-bit-inmem
       enterprise-rhel-80-64-bit-multiversion
-    burn_in_tag_compile_distro: rhel80-xlarge
     burn_in_tag_compile_task_group_name: compile_and_archive_dist_test_TG
-    num_scons_link_jobs_available: 0.99
+    burn_in_tag_compile_distro: rhel80-xlarge
+  depends_on:
+  - name: archive_dist_test
+    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile-required
+  - name: version_gen
+    variant: generate-tasks-for-version
+  - name: version_burn_in_gen
+    variant: generate-tasks-for-version
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge
-  #  - name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
-  #    distros:
-  #      - rhel80-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: .lint
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
   - name: burn_in_tests_gen
@@ -1495,9 +1415,6 @@ buildvariants:
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - rhel80-medium
   - name: jsCore
     distros:
     - rhel80-xlarge
@@ -1545,31 +1462,20 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common
   - name: sharding_opportunistic_secondary_targeting_gen
-  - name: .stitch
-  - name: .crypt
-    distros:
-    - rhel80-xlarge
-  - name: crypt_build_debug_and_test
-    distros:
-    - rhel80-xlarge
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
-  - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
     distros:
     - rhel80-xlarge
-  - name: server_selection_json_test_TG
-    distros:
-    - rhel80-xlarge
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-required-template
-  name: enterprise-rhel-80-64-bit-dynamic-debug-mode
+  name: &enterprise-rhel-80-64-bit-dynamic-debug-mode enterprise-rhel-80-64-bit-dynamic-debug-mode
   display_name: "Shared Library Enterprise RHEL 8.0 Debug Mode"
   cron: "0 4 * * 0" # Run once a week on sunday at 4am
   stepback: false
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
+    compile_variant: *enterprise-rhel-80-64-bit-dynamic-debug-mode
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=rhel80
@@ -1581,6 +1487,7 @@ buildvariants:
       --allocator=system
     exec_timeout_secs: 32400 # 9 hour timeout
     timeout_secs: 18000 # 5 hour idle timeout
+  depends_on: []
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -1675,66 +1582,29 @@ buildvariants:
   - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
-  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
+  <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
   display_name: "! Shared Library Enterprise RHEL 8.0 (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  stepback: false
   modules:
   - enterprise
   run_on:
   - rhel80-small
+  stepback: false
   expansions: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      --link-model=dynamic
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-      -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    has_packages: false
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    jstestfuzz_num_generated_files: 40
-    jstestfuzz_concurrent_num_files: 10
-    target_resmoke_time: 10
-    max_sub_suites: 5
-    large_distro_name: rhel80-medium
-    num_scons_link_jobs_available: 0.99
+    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --runAllFeatureFlagTests
       --excludeWithAnyTags=incompatible_with_shard_merge
-  tasks: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-tasks
+  tasks:
   - name: cqf
   - name: cqf_disabled_pipeline_opt
   - name: cqf_passthrough
   - name: cqf_parallel
   - name: query_golden_classic
   - name: query_golden_cqf
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-large
-  # Disabling as the following tests are not aware of feature flags.
-  #  - name: compile_test_and_package_parallel_unittest_stream_TG
-  #    distros:
-  #      - rhel80-large
-  #  - name: compile_test_and_package_parallel_dbtest_stream_TG
-  #    distros:
-  #    - rhel80-medium
-  - name: libdeps_graph_linting_TG
-    distros:
-    - rhel80-large
   - name: burn_in_tests_gen
   - name: .aggfuzzer
   - name: .aggregation
@@ -1760,9 +1630,6 @@ buildvariants:
   - name: feature_flag_multiversion_gen
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - rhel80-medium
   - name: .jscore .common
   - name: jsCore_column_store_indexes
   - name: jsCore_minimum_batch_size
@@ -1809,63 +1676,43 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common
   - name: sharded_multi_stmt_txn_jscore_passthrough
-  - name: .stitch
-  - name: .crypt
-    distros:
-    - rhel80-xlarge
   - name: .serverless
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: .shard_merge
-# Disabling as the following tests are not aware of feature flags.
-#  - name: server_discovery_and_monitoring_json_test_TG
-#    distros:
-#      - rhel80-large
-#  - name: server_selection_json_test_TG
-#    distros:
-#      - rhel80-large
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
+  <<: *linux_x86_dynamic_compile_variant_dependency
   name: enterprise-rhel-80-64-bit-dynamic-classic-engine
   display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  stepback: false
   modules:
   - enterprise
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-dynamic-classic-engine-expansions
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      --link-model=dynamic
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    has_packages: false
-    scons_cache_scope: shared
-    scons_cache_mode: all
+  stepback: false
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
     max_sub_suites: 5
+    test_flags: >-
+      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
     large_distro_name: rhel80-medium
     burn_in_tag_buildvariants: >-
       enterprise-rhel-80-64-bit-inmem
       enterprise-rhel-80-64-bit-multiversion
-    burn_in_tag_compile_distro: rhel80-xlarge
     burn_in_tag_compile_task_group_name: compile_and_archive_dist_test_TG
-    num_scons_link_jobs_available: 0.99
-    test_flags: >-
-      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+    burn_in_tag_compile_distro: rhel80-xlarge
+  depends_on:
+  - name: archive_dist_test
+    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile-required
+  - name: version_gen
+    variant: generate-tasks-for-version
+  - name: version_burn_in_gen
+    variant: generate-tasks-for-version
   tasks:
   - name: .aggfuzzer !.sbe_only
   - name: .aggregation !.sbe_only
@@ -1878,12 +1725,8 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: .encrypt
-  - name: .integration
-    distros:
-    - rhel80-medium
   - name: .jscore .common !jsCore !.sbe_only
   - name: .jstestfuzz !.flow_control
-  - name: .lint
   - name: .misc_js
   - name: .multi_shard
   - name: .query_fuzzer
@@ -1900,7 +1743,6 @@ buildvariants:
   - name: .sharding .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
-  - name: .stitch
   - name: .serverless
     distros:
     - rhel80-xlarge
@@ -1910,18 +1752,6 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-    - rhel80-xlarge
-  #  - name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
-  #    distros:
-  #      - rhel80-xlarge
   - name: disk_wiredtiger
   - name: initial_sync_fuzzer_gen
   - name: jsCore
@@ -1950,7 +1780,6 @@ buildvariants:
   - name: search_auth
   - name: search_ssl
   - name: secondary_reads_passthrough_gen
-  - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
@@ -1959,43 +1788,20 @@ buildvariants:
   - name: test_api_version_compatibility
   - name: unittest_shell_hang_analyzer_gen
 
-- name: enterprise-rhel-80-64-bit-large-txns-format
+- <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel-80-64-bit-large-txns-format enterprise-rhel-80-64-bit-large-txns-format
   display_name: "Enterprise RHEL 8.0 (large transactions format)"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   modules:
   - enterprise
   run_on:
   - rhel80-small
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      --link-model=dynamic
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    repo_edition: enterprise
-    scons_cache_mode: all
-    scons_cache_scope: shared
-    num_scons_link_jobs_available: 0.99
-    large_distro_name: rhel80-medium
+    <<: *linux_x86_generic_expansions
     test_flags: >-
       --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
       --excludeWithAnyTags=exclude_from_large_txns
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-large
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-    - rhel80-large
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-large
   - name: auth_gen
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -2039,150 +1845,49 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
     distros:
     - rhel80-medium
-  - name: generate_buildid_to_debug_symbols_mapping
 
 # This build variant is used to run multiversion tests as part of burn_in_tags as these tests are
 # currently only run on our daily builders.
-- &enterprise-rhel-80-64-bit-multiversion-template
-  name: enterprise-rhel-80-64-bit-multiversion
+- &linux-x86-multiversion-template
+  <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel-80-64-bit-multiversion enterprise-rhel-80-64-bit-multiversion
   display_name: "Enterprise RHEL 8.0 (implicit multiversion)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-multiversion-expansions-template
-    compile_flags: >-
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --ssl
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      MONGO_DISTMOD=rhel80
-      --link-model=dynamic
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    num_scons_link_jobs_available: 0.99
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
-    large_distro_name: rhel80-medium
+  expansions: &linux-x86-multiversion-expansions-template
+    <<: *linux_x86_generic_expansions
     resmoke_jobs_factor: 0.25
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-xlarge
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .random_multiversion_ds
 
-- <<: *enterprise-rhel-80-64-bit-multiversion-template
-  name: enterprise-rhel-80-64-bit-multiversion-all-feature-flags
+- <<: *linux-x86-multiversion-template
+  name: &enterprise-rhel-80-64-bit-multiversion-all-feature-flags enterprise-rhel-80-64-bit-multiversion-all-feature-flags
   display_name: "Enterprise RHEL 8.0 (implicit multiversion & all feature flags)"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
-    <<: *enterprise-rhel-80-64-bit-multiversion-expansions-template
+    <<: *linux-x86-multiversion-expansions-template
     # No feature flag tests since they aren't compatible with the older binaries.
     test_flags: >-
       --runAllFeatureFlagsNoTests
       --excludeWithAnyTags=incompatible_with_shard_merge
-  tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge
-  # Disabling as the following tests are not aware of feature flags.
-  # - name: compile_test_and_package_parallel_unittest_stream_TG
-  #   distros:
-  #   - rhel80-xlarge
-  # - name: compile_test_and_package_parallel_dbtest_stream_TG
-  #   distros:
-  #   - rhel80-xlarge
-  - name: .multiversion_fuzzer
-  - name: .multiversion_passthrough
-  - name: .random_multiversion_ds
 
-- name: enterprise-rhel-80-64-bit-future-git-tag-multiversion
+- <<: *linux-x86-multiversion-template
+  name: &enterprise-rhel-80-64-bit-future-git-tag-multiversion enterprise-rhel-80-64-bit-future-git-tag-multiversion
   display_name: "Enterprise RHEL 8.0 (future git tag multiversion)"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  run_on:
-  - rhel80-small
   expansions:
-    compile_flags: >-
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --ssl
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      MONGO_DISTMOD=rhel80
-      --link-model=dynamic
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    num_scons_link_jobs_available: 0.99
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
-    large_distro_name: rhel80-medium
-    resmoke_jobs_factor: 0.25
+    <<: *linux-x86-multiversion-expansions-template
     bv_future_git_tag: r100.0.0-9999
     test_flags: >-
       --excludeWithAnyTags=future_git_tag_incompatible
   tasks:
-  - name: version_expansions_gen
-    distros:
-    - rhel80-small
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-xlarge
   - name: .multiversion !.future_git_tag_incompatible
   - name: .multiversion_future_git_tag
 
-#- name: rhel-80-64-bit-nossl
-#  display_name: "RHEL 8.0 Shared Library (No SSL)"
-#  run_on:
-#  - rhel80-small
-#  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-#  expansions:
-#    compile_flags: >-
-#      -j$(grep -c ^processor /proc/cpuinfo)
-#      --ssl=off
-#      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-#      MONGO_DISTMOD=rhel80
-#      --link-model=dynamic
-#    multiversion_platform: rhel80
-#    multiversion_edition: enterprise
-#    scons_cache_scope: shared
-#    scons_cache_mode: all
-#    num_scons_link_jobs_available: 0.99
-#    build_mongoreplay: false
-#    large_distro_name: rhel80-medium
-#  tasks:
-#  - name: compile_test_and_package_parallel_core_stream_TG
-#    distros:
-#    - rhel80-large
-#  - name: compile_test_and_package_parallel_unittest_stream_TG
-#    distros:
-#    - rhel80-large
-#  - name: compile_test_and_package_parallel_dbtest_stream_TG
-#    distros:
-#    - rhel80-large
-#  - name: jsCore
-
-- &enterprise-rhel-80-64-bit-suggested-template
-  name: enterprise-rhel-80-64-bit-suggested
+- name: &enterprise-rhel-80-64-bit-suggested enterprise-rhel-80-64-bit-suggested
   display_name: "* Enterprise RHEL 8.0"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
@@ -2209,6 +1914,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: rhel80-large
+    compile_variant: *enterprise-rhel-80-64-bit-suggested
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -2242,8 +1948,7 @@ buildvariants:
   - name: selinux_rhel8_enterprise
   - name: generate_buildid_to_debug_symbols_mapping
 
-
-- name: enterprise-rhel-80-64-bit-build-metrics
+- name: &enterprise-rhel-80-64-bit-build-metrics enterprise-rhel-80-64-bit-build-metrics
   display_name: "~ Build Metrics Enterprise RHEL 8.0 "
   cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
   stepback: false
@@ -2262,7 +1967,7 @@ buildvariants:
   tasks:
   - name: build_metrics_gen_TG
 
-- name: macos-enterprise-build-metrics
+- name: &macos-enterprise-build-metrics macos-enterprise-build-metrics
   display_name: "~ Build Metrics Enterprise MacOS"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   stepback: false
@@ -2281,7 +1986,7 @@ buildvariants:
   tasks:
   - name: build_metrics_gen_TG
 
-- name: enterprise-windows-build-metrics
+- name: &enterprise-windows-build-metrics enterprise-windows-build-metrics
   display_name: "~ Build Metrics Enterprise Windows"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   stepback: false
@@ -2298,22 +2003,8 @@ buildvariants:
   tasks:
   - name: build_metrics_gen_TG
 
-# This variant is to intentionally test uncommon features nightly
-#- <<: *enterprise-rhel-70-64-bit-template
-#  name: enterprise-rhel-70-64-bit-kitchen-sink
-#  display_name: "~ Enterprise RHEL 7.0"
-#  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-#  expansions:
-#    <<: *enterprise-rhel-70-64-bit-expansions-template
-#    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-#  tasks:
-#  - name: compile_test_and_package_serial_TG
-#    distros:
-#    - rhel70
-#  - name: jsCore
-
 - <<: *enterprise-rhel-70-64-bit-template
-  name: hot_backups-rhel-70-64-bit
+  name: &hot_backups-rhel-70-64-bit hot_backups-rhel-70-64-bit
   display_name: "hot_backups RHEL 7.0"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -2328,6 +2019,7 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
       --enterprise-features=hot_backups
       --link-model=dynamic
+    compile_variant: *hot_backups-rhel-70-64-bit
     has_packages: false
     scons_cache_mode: all
     scons_cache_scope: shared
@@ -2340,7 +2032,7 @@ buildvariants:
   - name: noPassthroughHotBackups_gen
 
 - <<: *enterprise-rhel-70-64-bit-template
-  name: enterprise-rhel-70-64-bit-no-libunwind
+  name: &enterprise-rhel-70-64-bit-no-libunwind enterprise-rhel-70-64-bit-no-libunwind
   display_name: "~ Enterprise RHEL 7.0 (no-libunwind)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   run_on:
@@ -2355,6 +2047,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
       --link-model=dynamic
+    compile_variant: *enterprise-rhel-70-64-bit-no-libunwind
     has_packages: false
     additional_package_targets: ""
     scons_cache_mode: all
@@ -2394,13 +2087,14 @@ buildvariants:
   - name: sharding_auth_gen
   - name: .stitch
 
-- name: ubuntu1804-container
+- name: &ubuntu1804-container ubuntu1804-container
   display_name: "Ubuntu 18.04 Container"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1804-container-server
   expansions:
     resmoke_jobs_factor: 1
+    compile_variant: *ubuntu1804-container
     disable_shared_scons_cache: true
     compile_flags: >-
       MONGO_DISTMOD=ubuntu1804
@@ -2419,7 +2113,7 @@ buildvariants:
   - name: sharding_gen
   - name: replica_sets_gen
 
-- name: enterprise-rhel-72-s390x-compile
+- name: &enterprise-rhel-72-s390x-compile enterprise-rhel-72-s390x-compile
   display_name: Enterprise RHEL 7.2 s390x Compile
   modules:
   - enterprise
@@ -2428,6 +2122,7 @@ buildvariants:
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
+    compile_variant: *enterprise-rhel-72-s390x-compile
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -2457,68 +2152,27 @@ buildvariants:
     - rhel72-zseries-build
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &enterprise-rhel-80-64-dynamic-clang-tidy
-  name: enterprise-rhel80-dynamic-clang-tidy-required
-  display_name: "! Enterprise Clang Tidy"
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-  modules:
-  - enterprise
-  run_on:
-  - rhel80-xxlarge
-  expansions:
-    lang_environment: LANG=C
-    compile_flags: >-
-      --link-model=dynamic
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_${clang_tidy_toolchain}_clang.vars
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    show_scons_timings: false
-    clang_tidy_toolchain: v3
-    clang_tidy_file: .clang-tidy
-  tasks:
-  - name: clang_tidy_TG
-
-- <<: *enterprise-rhel-80-64-dynamic-clang-tidy
-  name: enterprise-rhel80-dynamic-clang-tidy-v4
+- name: &enterprise-rhel80-dynamic-clang-tidy-v4 enterprise-rhel80-dynamic-clang-tidy-v4
   display_name: "Enterprise Clang Tidy v4 Toolchain"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  run_on:
+  - rhel80-xxlarge
   expansions:
     clang_tidy_toolchain: v4
   tasks:
   - name: clang_tidy_TG
 
-
-- name: rhel80-debug-suggested
-  display_name: "* Shared Library RHEL 8.0 DEBUG"
+- <<: *linux_x86_dynamic_debug_compile_variant_dependency
+  name: &linux-debug-suggested linux-debug-suggested
+  display_name: "* Linux x86 Shared Library DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
   - rhel80-small
   expansions:
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: >-
-      --dbg=on
-      --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      --link-model=dynamic
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    num_scons_link_jobs_available: 0.99
     large_distro_name: rhel80-large
+    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
+    compile_variant: *linux_x86_dynamic_debug_compile_variant_name
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_build_tools_next_TG
-    distros:
-    - rhel80-xlarge
   - name: jsCore
   - name: .read_write_concern !.write !.aggregation
   - name: replica_sets_jscore_passthrough
@@ -2526,15 +2180,12 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough
   - name: sharding_gen
   - name: sharding_auth_gen
-  - name: .stitch
-  - name: unittest_shell_hang_analyzer_gen
-  - name: generate_buildid_to_debug_symbols_mapping
 
 ################################
 # storage engine buildvariants #
 ################################
 
-- name: enterprise-rhel-80-benchmarks
+- name: &enterprise-rhel-80-benchmarks enterprise-rhel-80-benchmarks
   display_name: Enterprise RHEL 8.0 (Benchmarks)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -2548,6 +2199,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     scons_cache_scope: shared
+    compile_variant: *enterprise-rhel-80-benchmarks
   tasks:
   - name: compile_upload_benchmarks_TG
   - name: .benchmarks
@@ -2558,7 +2210,7 @@ buildvariants:
 ###########################################
 
 - &rhel80-debug-asan-all-feature-flags-template
-  name: rhel80-debug-asan-all-feature-flags
+  name: &rhel80-debug-asan-all-feature-flags rhel80-debug-asan-all-feature-flags
   display_name: "~ Shared Library ASAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -2577,6 +2229,7 @@ buildvariants:
     san_options: >-
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
       ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
+    compile_variant: *rhel80-debug-asan-all-feature-flags
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
       --dbg=on
@@ -2652,16 +2305,16 @@ buildvariants:
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks - building benchmarks is also disabled
 #  - name: unittest_shell_hang_analyzer_gen
-#  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
 
 - <<: *rhel80-debug-asan-all-feature-flags-template
-  name: rhel80-debug-v4asan-all-feature-flags-experimental
+  name: &rhel80-debug-v4asan-all-feature-flags-experimental rhel80-debug-v4asan-all-feature-flags-experimental
   display_name: "~ Shared Library V4 Toolchain ASAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   expansions:
+    compile_variant: *rhel80-debug-v4asan-all-feature-flags-experimental
     toolchain_version: v4
 
-- name: rhel80-debug-asan-classic-engine
+- name: &rhel80-debug-asan-classic-engine rhel80-debug-asan-classic-engine
   display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG (Classic Engine)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -2689,6 +2342,7 @@ buildvariants:
       --ocsp-stapling=off
       --enable-free-mon=on
       -j$(grep -c ^processor /proc/cpuinfo)
+    compile_variant: *rhel80-debug-asan-classic-engine
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
@@ -2746,7 +2400,7 @@ buildvariants:
   - name: server_selection_json_test_TG
 
 - &rhel80-debug-ubsan-all-feature-flags-template
-  name: rhel80-debug-ubsan-all-feature-flags
+  name: &rhel80-debug-ubsan-all-feature-flags rhel80-debug-ubsan-all-feature-flags
   display_name: "~ Shared Library UBSAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -2772,6 +2426,7 @@ buildvariants:
       --ocsp-stapling=off
       --enable-free-mon=on
       -j$(grep -c ^processor /proc/cpuinfo)
+    compile_variant: *rhel80-debug-ubsan-all-feature-flags
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
@@ -2838,12 +2493,13 @@ buildvariants:
 #  - name: server_selection_json_test_TG
 
 - <<: *rhel80-debug-ubsan-all-feature-flags-template
-  name: rhel80-debug-v4ubsan-all-feature-flags-experimental
+  name: &rhel80-debug-v4ubsan-all-feature-flags-experimental rhel80-debug-v4ubsan-all-feature-flags-experimental
   display_name: "~ Shared Library V4 Toolchain UBSAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   expansions:
     toolchain_version: v4
+    compile_variant: *rhel80-debug-v4ubsan-all-feature-flags-experimental
 
-- name: rhel80-debug-ubsan-classic-engine
+- name: &rhel80-debug-ubsan-classic-engine rhel80-debug-ubsan-classic-engine
   display_name: "~ UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -2859,6 +2515,7 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+    compile_variant: *rhel80-debug-ubsan-classic-engine
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
       --dbg=on
@@ -2919,18 +2576,16 @@ buildvariants:
   - name: server_selection_json_test_TG
 
 - &rhel80-debug-aubsan-lite-required-template
-  name: rhel80-debug-aubsan-lite-required
+  <<: *linux_debug_aubsan_compile_variant_dependency
+  name: &rhel80-debug-aubsan-lite-required rhel80-debug-aubsan-lite-required
   display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
   - rhel80-build
-  stepback: true
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
+  expansions: &aubsan-lite-required-expansions
+    compile_variant: *linux_debug_aubsan_compile_variant_name
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
@@ -2938,97 +2593,36 @@ buildvariants:
       UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
       ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
-      --dbg=on
-      --opt=on
-      --allocator=system
-      --sanitize=undefined,address
-      --ssl
-      --ocsp-stapling=off
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --link-model=dynamic
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
-    scons_cache_scope: shared
-    scons_cache_mode: all
     max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
-    separate_debug: off
     large_distro_name: rhel80-build
+
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-xlarge
   - name: jsCore
   - name: jsCore_txns
-  - name: unittest_shell_hang_analyzer_gen
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *rhel80-debug-aubsan-lite-required-template
-  name: rhel80-debug-aubsan-lite-all-feature-flags-required
+  name: &rhel80-debug-aubsan-lite-all-feature-flags-required rhel80-debug-aubsan-lite-all-feature-flags-required
   display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    lang_environment: LANG=C
-    # If you add anything to san_options, make sure the appropriate changes are
-    # also made to SConstruct.
-    san_options: >-
-      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
-      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
-      --dbg=on
-      --opt=on
-      --allocator=system
-      --sanitize=undefined,address
-      --ssl
-      --ocsp-stapling=off
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --link-model=dynamic
+    <<: *aubsan-lite-required-expansions
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --excludeWithAnyTags=requires_ocsp_stapling
       --excludeWithAnyTags=incompatible_with_shard_merge
       --runAllFeatureFlagTests
-    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    hang_analyzer_dump_core: false
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    max_sub_suites: 3
-    num_scons_link_jobs_available: 0.99
-    separate_debug: off
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge
   - name: jsCore
   - name: jsCore_txns
   - name: jsCore_column_store_indexes
-# Disabling these tests as they are not aware of feature flags.
-#  - name: compile_test_and_package_parallel_unittest_stream_TG
-#    distros:
-#      - rhel80-xlarge
-#  - name: compile_test_and_package_parallel_dbtest_stream_TG
-#    distros:
-#      - rhel80-xlarge
-#  - name: unittest_shell_hang_analyzer_gen
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel80-debug-tsan-template
-  name: enterprise-rhel80-debug-tsan
+  name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan
   display_name: ~ TSAN Enterprise RHEL 8.0 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -3042,6 +2636,7 @@ buildvariants:
       archive-mongocryptd-debug
     lang_environment: LANG=C
     toolchain_version: v3
+    compile_variant: *enterprise-rhel80-debug-tsan
     # If you add anything to san_options, make sure the appropriate
     # changes are also made to SConstruct.
     #
@@ -3170,7 +2765,7 @@ buildvariants:
     - rhel80-xlarge
 
 - &enterprise-rhel80-debug-complete-tsan-template
-  name: enterprise-rhel80-debug-complete-tsan
+  name: &enterprise-rhel80-debug-complete-tsan enterprise-rhel80-debug-complete-tsan
   display_name: ~ TSAN Enterprise RHEL 8.0 COMPLETE DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -3180,6 +2775,7 @@ buildvariants:
   stepback: false
   expansions:
     <<: *enterprise-rhel80-debug-tsan-expansions-template
+    compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
   - name: compile_test_and_package_serial_TG
   # - name: test_api_version_compatibility # Not relevant for TSAN
@@ -3280,18 +2876,20 @@ buildvariants:
     - rhel80-xlarge
 
 - <<: *enterprise-rhel80-debug-tsan-template
-  name: enterprise-rhel80-debug-v4tsan-experimental
+  name: &enterprise-rhel80-debug-v4tsan-experimental enterprise-rhel80-debug-v4tsan-experimental
   display_name: "~ V4 Toolchain TSAN Enterprise RHEL 8.0 DEBUG"
   expansions:
     toolchain_version: v4
+    compile_variant: *enterprise-rhel80-debug-v4tsan-experimental
 
 - <<: *enterprise-rhel80-debug-complete-tsan-template
-  name: enterprise-rhel80-debug-complete-v4tsan-experimental
+  name: &enterprise-rhel80-debug-complete-v4tsan-experimental enterprise-rhel80-debug-complete-v4tsan-experimental
   display_name: "~ V4 Toolchain TSAN Enterprise RHEL 8.0 COMPLETE DEBUG"
   expansions:
     toolchain_version: v4
+    compile_variant: *enterprise-rhel80-debug-complete-v4tsan-experimental
 
-- name: enterprise-rhel80-no-latch-64-bit
+- name: &enterprise-rhel80-no-latch-64-bit enterprise-rhel80-no-latch-64-bit
   display_name: "~ Enterprise RHEL 8.0 (without Diagnostic Latches)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -3306,6 +2904,7 @@ buildvariants:
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
+    compile_variant: *enterprise-rhel80-no-latch-64-bit
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -3317,7 +2916,7 @@ buildvariants:
     distros:
     - rhel80-build
 
-- name: enterprise-rhel80-unoptimized-64-bit
+- name: &enterprise-rhel80-unoptimized-64-bit enterprise-rhel80-unoptimized-64-bit
   display_name: "~ Enterprise RHEL 8.0 DEBUG (Unoptimized)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -3333,6 +2932,7 @@ buildvariants:
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
+    compile_variant: *enterprise-rhel80-unoptimized-64-bit
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -3344,24 +2944,16 @@ buildvariants:
     distros:
     - rhel80-build
 
-- name: enterprise-rhel80-fixed-service-executor-64-bit
+- <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel80-fixed-service-executor-64-bit enterprise-rhel80-fixed-service-executor-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with FixedServiceExecutor)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-small
   modules:
   - enterprise
+  run_on:
+  - rhel80-small
   expansions:
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    num_scons_link_jobs_available: 0.99
-    compile_flags: >-
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      --link-model=dynamic
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
+    <<: *linux_x86_generic_expansions
     test_flags: >-
       --mongosSetParameters="{initialServiceExecutorUseDedicatedThread: false}"
       --mongodSetParameters="{initialServiceExecutorUseDedicatedThread: false}"
@@ -3388,24 +2980,16 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-rhel80-sdam-replica-set-monitor-64-bit
+- <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel80-sdam-replica-set-monitor-64-bit enterprise-rhel80-sdam-replica-set-monitor-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with SdamReplicaSetMonitor)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-small
   modules:
   - enterprise
+  run_on:
+  - rhel80-small
   expansions:
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    num_scons_link_jobs_available: 0.99
-    compile_flags: >-
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      --link-model=dynamic
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
+    <<: *linux_x86_generic_expansions
     test_flags: >-
       --mongosSetParameters="{replicaSetMonitorProtocol: sdam}"
       --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
@@ -3431,24 +3015,16 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit
+- <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-small
   modules:
   - enterprise
+  run_on:
+  - rhel80-small
   expansions:
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    num_scons_link_jobs_available: 0.99
-    compile_flags: >-
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      --link-model=dynamic
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
+    <<: *linux_x86_generic_expansions
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
@@ -3473,7 +3049,8 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit
+- <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -3481,6 +3058,7 @@ buildvariants:
   modules:
   - enterprise
   expansions:
+    <<: *linux_x86_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
@@ -3515,7 +3093,8 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit
+- <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -3523,6 +3102,7 @@ buildvariants:
   modules:
   - enterprise
   expansions:
+    <<: *linux_x86_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
@@ -3557,7 +3137,8 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-rhel80-join-ingress-sessions-on-shutdown
+- <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel80-join-ingress-sessions-on-shutdown enterprise-rhel80-join-ingress-sessions-on-shutdown
   display_name: "~ Enterprise RHEL 8.0 (with {joinIngressSessionsOnShutdown: \"true\"})"
   activate: false
   run_on:
@@ -3565,6 +3146,7 @@ buildvariants:
   modules:
   - enterprise
   expansions:
+    <<: *linux_x86_generic_expansions
     scons_cache_scope: shared
     compile_flags: >-
       MONGO_DISTMOD=rhel80
@@ -3600,7 +3182,7 @@ buildvariants:
   - name: .sharding .common !.csrs
     patch_only: true
 
-- name: shared-scons-cache-pruning
+- name: &shared-scons-cache-pruning shared-scons-cache-pruning
   display_name: "Shared SCons Cache Pruning"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -3609,7 +3191,7 @@ buildvariants:
   tasks:
   - name: shared_scons_cache_pruning
 
-- name: windows-shared-scons-cache-pruning
+- name: &windows-shared-scons-cache-pruning windows-shared-scons-cache-pruning
   display_name: "Windows shared SCons Cache Pruning"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -3621,10 +3203,28 @@ buildvariants:
   - name: win_shared_scons_cache_pruning
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-required-template
-  name: commit-queue
+  name: &commit-queue commit-queue
   display_name: "~ Commit Queue"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
+  expansions:
+    <<: *linux_x86_generic_expansions
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
+    clang_tidy_toolchain: v3
+    compile_variant: *commit-queue
+  depends_on: []
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -3643,7 +3243,7 @@ buildvariants:
   - name: validate_commit_message
   - name: check_feature_flag_tags
 
-- name: windows-dynamic-visibility-test
+- name: &windows-dynamic-visibility-test windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
@@ -3660,6 +3260,7 @@ buildvariants:
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
+    compile_variant: *windows-dynamic-visibility-test
   tasks:
   - name: visibility_test_TG
     distros:
@@ -3667,11 +3268,11 @@ buildvariants:
 
 ### QO & QE Patch-Specific Build Variants ###
 - <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine
-  name: enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only
+  name: &enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (Classic Engine)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine-expansions
+    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
     jstestfuzz_num_generated_files: 20
     jstestfuzz_concurrent_num_files: 5
     target_resmoke_time: 30
@@ -3681,7 +3282,7 @@ buildvariants:
       --excludeWithAnyTags=resource_intensive
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
-  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only
+  name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (all feature flags)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
@@ -3696,7 +3297,7 @@ buildvariants:
       --excludeWithAnyTags=incompatible_with_shard_merge
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
-  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only
+  name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Security Patch Only (all feature flags)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
@@ -3709,36 +3310,9 @@ buildvariants:
   - name: .encrypt .patch_build
   - name: external_auth
   - name: external_auth_aws
-  - name: .lint
   - name: lint_fuzzer_sanity_patch
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-      - rhel80-xlarge
-# Disable unittests for now since they're not aware of feature flags.
-# - name: compile_test_and_package_parallel_unittest_stream_TG
-#   distros:
-#     - rhel80-xlarge
-#  - name: compile_test_and_package_parallel_dbtest_stream_TG
-#    distros:
-#      - rhel80-xlarge
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
-  name: enterprise-rhel-80-64-bit-dynamic-required-security-patch-only-unittests
-  display_name: "~ Shared Library Enterprise RHEL 8.0 Security Patch Only (Unittests)"
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
-  expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
-    target_resmoke_time: 15
-    max_sub_suites: 15
-  tasks:
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-      - rhel80-xlarge
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-      - rhel80-xlarge
-
-- name: enterprise-ubuntu1804-64-libvoidstar
+- name: &enterprise-ubuntu1804-64-libvoidstar enterprise-ubuntu1804-64-libvoidstar
   display_name: ~ Enterprise Ubuntu 18.04 w/ libvoidstar
   modules:
   - enterprise
@@ -3746,6 +3320,7 @@ buildvariants:
   - ubuntu1804-large
   stepback: false
   expansions:
+    compile_variant: *enterprise-ubuntu1804-64-libvoidstar
     # Do not set link-model=dynamic on this build. The antithesis image builder
     # scripts cannot handle the shared library build
     compile_flags: >-
@@ -3766,9 +3341,11 @@ buildvariants:
   - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *enterprise-windows-nopush-template
-  name: enterprise-windows-benchmarks
+  name: &enterprise-windows-benchmarks enterprise-windows-benchmarks
   display_name: "~ Enterprise Windows (Benchmarks)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  expansions:
+    compile_variant: *enterprise-windows-benchmarks
   tasks:
   - name: compile_upload_benchmarks_TG
     distros:
@@ -3776,7 +3353,7 @@ buildvariants:
   - name: .benchmarks !benchmarks_orphaned
 
 - <<: *enterprise-windows-nopush-template
-  name: enterprise-windows-wtdevelop
+  name: &enterprise-windows-wtdevelop enterprise-windows-wtdevelop
   display_name: "~ Enterprise Windows WiredTiger develop"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
@@ -3785,19 +3362,23 @@ buildvariants:
   expansions:
     <<: *enterprise-windows-nopush-expansions-template
     use_wt_develop: true
+    compile_variant: *enterprise-windows-wtdevelop
 
 ### QO & QE Patch-Specific Build Variants ###
 - <<: *enterprise-windows-nopush-template
-  name: windows-compile-query-patch-only
+  name: &windows-compile-query-patch-only windows-compile-query-patch-only
   display_name: "~ Windows Compile Query Patch Only"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+  expansions:
+    <<: *enterprise-windows-nopush-expansions-template
+    compile_variant: *windows-compile-query-patch-only
   tasks:
   - name: compile_dist_test_TG
     distros:
     - windows-vsCurrent-large
 
 - &rhel80-debug-aubsan-lite_fuzzer-template
-  name: rhel80-debug-aubsan-lite_fuzzer
+  name: &rhel80-debug-aubsan-lite_fuzzer rhel80-debug-aubsan-lite_fuzzer
   display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -3833,13 +3414,15 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     separate_debug: off
+    compile_variant: *rhel80-debug-aubsan-lite_fuzzer
   display_tasks:
   - *libfuzzertests
   tasks:
   - name: compile_archive_and_run_libfuzzertests_TG
 
 - <<: *rhel80-debug-aubsan-lite_fuzzer-template
-  name: rhel80-debug-v4aubsan-lite_fuzzer-experimental
+  name: &rhel80-debug-v4aubsan-lite_fuzzer-experimental rhel80-debug-v4aubsan-lite_fuzzer-experimental
   display_name: "V4 Toolchain {A,UB}SAN Enterprise RHEL 8.0 FUZZER"
   expansions:
     toolchain_version: v4
+    compile_variant: *rhel80-debug-v4aubsan-lite_fuzzer-experimental

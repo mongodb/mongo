@@ -36,6 +36,7 @@ buildvariants:
     multiversion_platform: rhel81
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
+    compile_variant: enterprise-rhel-81-ppc64le
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -101,6 +102,7 @@ buildvariants:
     multiversion_platform: rhel72
     multiversion_architecture: s390x
     multiversion_edition: enterprise
+    compile_variant: enterprise-rhel-72-s390x
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -165,6 +167,7 @@ buildvariants:
     multiversion_platform: rhel83
     multiversion_architecture: s390x
     multiversion_edition: enterprise
+    compile_variant: enterprise-rhel-83-s390x
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:

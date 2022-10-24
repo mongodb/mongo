@@ -24,6 +24,7 @@ buildvariants:
     multiversion_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: rhel80-large
+    compile_variant: enterprise-rhel-80-64-bit-inmem
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -101,6 +102,7 @@ buildvariants:
     multiversion_platform: windows
     multiversion_edition: enterprise
     large_distro_name: windows-vsCurrent-large
+    compile_variant: enterprise-windows-inmem
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
