@@ -6,6 +6,7 @@ selector:
   exclude_with_any_tags:
   # Don't run tests that require the encrypted collscan mode in this suite.
   - requires_fle2_encrypted_collscan
+  - fle2_no_mongos
 executor:
   archive:
     hooks:
