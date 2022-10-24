@@ -29,7 +29,7 @@
 global:
   cpp_namespace: "mongo"
   cpp_includes:
-    - "mongo/db/storage/ticketholder_storage_parameters.h"
+    - "mongo/db/storage/ticketholder_manager.h"
 
 server_parameters:
 
@@ -38,7 +38,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<int>
     cpp_varname: gConcurrentWriteTransactions
-    on_update: "TickerHolderStorageParams::updateConcurrentWriteTransactions"
+    on_update: "TicketHolderManager::updateConcurrentWriteTransactions"
     deprecated_name:
       - wiredTigerConcurrentWriteTransactions
     # Default value being 0 means we're allowing the underlying storage engines to use their default values.
@@ -51,7 +51,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<int>
     cpp_varname: gConcurrentReadTransactions
-    on_update: "TickerHolderStorageParams::updateConcurrentReadTransactions"
+    on_update: "TicketHolderManager::updateConcurrentReadTransactions"
     deprecated_name:
       - wiredTigerConcurrentReadTransactions
     # Default value being 0 means we're allowing the underlying storage engines to use their default values.

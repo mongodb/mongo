@@ -30,14 +30,56 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 
-class TickerHolderStorageParams {
+class TicketHolder;
+
+/**
+ * A ticket mechanism is required for global lock acquisition to reduce contention on storage engine
+ * resources.
+ *
+ * Each TicketHolder maintains a pool of n available tickets. The TicketHolderManager is responsible
+ * for sizing each ticket pool and determining which ticket pool a caller should use for ticket
+ * acquisition.
+ *
+ */
+class TicketHolderManager {
 public:
+    TicketHolderManager(std::unique_ptr<TicketHolder> readTicketHolder,
+                        std::unique_ptr<TicketHolder> writeTicketHolder)
+        : _readTicketHolder(std::move(readTicketHolder)),
+          _writeTicketHolder(std::move(writeTicketHolder)){};
+
+    ~TicketHolderManager(){};
+
     static Status updateConcurrentWriteTransactions(const int& newWriteTransactions);
-
     static Status updateConcurrentReadTransactions(const int& newReadTransactions);
-};
 
+    static TicketHolderManager* get(ServiceContext* svcCtx);
+
+    static void use(ServiceContext* svcCtx,
+                    std::unique_ptr<TicketHolderManager> newTicketHolderManager);
+
+    /**
+     * Given the 'mode' a user requests for a GlobalLock, returns the corresponding TicketHolder.
+     */
+    TicketHolder* getTicketHolder(LockMode mode);
+
+    void appendStats(BSONObjBuilder& b);
+
+private:
+    /**
+     * Holds tickets for MODE_S/MODE_IS global locks requests.
+     */
+    std::unique_ptr<TicketHolder> _readTicketHolder;
+
+    /**
+     * Holds tickets for MODE_X/MODE_IX global lock requests.
+     */
+    std::unique_ptr<TicketHolder> _writeTicketHolder;
+};
 }  // namespace mongo

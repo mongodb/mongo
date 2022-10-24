@@ -40,6 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/flow_control.h"
+#include "mongo/db/storage/ticketholder_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/new.h"
@@ -299,7 +300,7 @@ LockerImpl::LockerImpl(ServiceContext* serviceCtx)
     : _id(idCounter.addAndFetch(1)),
       _wuowNestingLevel(0),
       _threadId(stdx::this_thread::get_id()),
-      _ticketHolder(TicketHolder::get(serviceCtx)) {}
+      _ticketHolderManager(TicketHolderManager::get(serviceCtx)) {}
 
 stdx::thread::id LockerImpl::getThreadId() const {
     return _threadId;
@@ -370,7 +371,7 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
     _admCtx.setLockMode(mode);
 
     // Upon startup, the holder is not guaranteed to be initialized.
-    auto holder = _ticketHolder;
+    auto holder = _ticketHolderManager ? _ticketHolderManager->getTicketHolder(mode) : nullptr;
     const bool reader = isSharedLockMode(mode);
 
     if (!shouldWaitForTicket() && holder) {

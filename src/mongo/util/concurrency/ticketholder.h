@@ -47,13 +47,11 @@
 namespace mongo {
 
 class Ticket;
-class ReaderWriterTicketHolder;
 
 /**
- * A ticket mechanism is required for global lock acquisition to reduce contention on storage
- * engine resources.
- *
- * Manages the distribution of tickets across operations.
+ * Maintains and distributes tickets across operations from a limited pool of tickets. The ticketing
+ * mechanism is required for global lock acquisition to reduce contention on storage engine
+ * resources.
  */
 class TicketHolder {
     friend class Ticket;
@@ -66,9 +64,10 @@ public:
      */
     enum WaitMode { kInterruptible, kUninterruptible };
 
-    static TicketHolder* get(ServiceContext* svcCtx);
-
-    static void use(ServiceContext* svcCtx, std::unique_ptr<TicketHolder> newTicketHolder);
+    /**
+     * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
+     */
+    virtual void resize(int newSize) noexcept {};
 
     /**
      * Immediately returns a ticket without impacting the number of tickets available. Reserved for
@@ -121,8 +120,6 @@ private:
  * A ticketholder which manages both aggregate and policy specific queueing statistics.
  */
 class TicketHolderWithQueueingStats : public TicketHolder {
-    friend class ReaderWriterTicketHolder;
-
 public:
     TicketHolderWithQueueingStats(int numTickets, ServiceContext* svcCtx)
         : _outof(numTickets), _serviceContext(svcCtx){};
@@ -145,7 +142,7 @@ public:
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
      */
-    void resize(int newSize) noexcept;
+    void resize(int newSize) noexcept override;
 
     virtual int used() const {
         return outof() - available();
@@ -227,46 +224,6 @@ private:
 
 protected:
     ServiceContext* _serviceContext;
-};
-
-/**
- * A TicketHolder implementation that delegates actual ticket management to two underlying
- * TicketHolderQueues. The routing decision will be based on the lock mode requested by the caller
- * directing MODE_IS/MODE_S requests to the "Readers" TicketHolderWithQueueingStats and MODE_IX
- * requests to the "Writers" TicketHolderWithQueueingStats.
- */
-class ReaderWriterTicketHolder final : public TicketHolder {
-public:
-    ReaderWriterTicketHolder(std::unique_ptr<TicketHolderWithQueueingStats> readerTicketHolder,
-                             std::unique_ptr<TicketHolderWithQueueingStats> writerTicketHolder)
-        : _reader(std::move(readerTicketHolder)), _writer(std::move(writerTicketHolder)){};
-
-    ~ReaderWriterTicketHolder() override final;
-
-    Ticket acquireImmediateTicket(AdmissionContext* admCtx) override final;
-
-    boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) override final;
-
-    Ticket waitForTicket(OperationContext* opCtx,
-                         AdmissionContext* admCtx,
-                         WaitMode waitMode) override final;
-
-    boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
-                                               AdmissionContext* admCtx,
-                                               Date_t until,
-                                               WaitMode waitMode) override final;
-
-    void appendStats(BSONObjBuilder& b) const override final;
-
-    void resizeReaders(int newSize);
-    void resizeWriters(int newSize);
-
-private:
-    void _releaseImmediateTicket(AdmissionContext* admCtx) noexcept final;
-    void _releaseToTicketPool(AdmissionContext* admCtx) noexcept override final;
-
-    std::unique_ptr<TicketHolderWithQueueingStats> _reader;
-    std::unique_ptr<TicketHolderWithQueueingStats> _writer;
 };
 
 class SemaphoreTicketHolder final : public TicketHolderWithQueueingStats {
@@ -462,7 +419,6 @@ private:
  */
 class Ticket {
     friend class TicketHolder;
-    friend class ReaderWriterTicketHolder;
     friend class TicketHolderWithQueueingStats;
     friend class SemaphoreTicketHolder;
     friend class PriorityTicketHolder;

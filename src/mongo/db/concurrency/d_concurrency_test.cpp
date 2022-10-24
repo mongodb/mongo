@@ -37,11 +37,11 @@
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/storage/ticketholder_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/scopeguard.h"
@@ -68,13 +68,13 @@ class UseReaderWriterGlobalThrottling {
 public:
     explicit UseReaderWriterGlobalThrottling(ServiceContext* svcCtx, int numTickets)
         : _svcCtx(svcCtx) {
-        auto ticketHolder = std::make_unique<ReaderWriterTicketHolder>(
+        auto ticketHolderManager = std::make_unique<TicketHolderManager>(
             std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx),
             std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx));
-        TicketHolder::use(_svcCtx, std::move(ticketHolder));
+        TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
     }
     ~UseReaderWriterGlobalThrottling() noexcept(false) {
-        TicketHolder::use(_svcCtx, nullptr);
+        TicketHolderManager::use(_svcCtx, nullptr);
     }
 
 private:

@@ -44,9 +44,6 @@
 namespace mongo {
 
 namespace {
-const auto ticketHolderDecoration =
-    mongo::ServiceContext::declareDecoration<std::unique_ptr<mongo::TicketHolder>>();
-
 void updateQueueStatsOnRelease(ServiceContext* serviceContext,
                                TicketHolderWithQueueingStats::QueueStats& queueStats,
                                AdmissionContext* admCtx) {
@@ -90,120 +87,6 @@ void appendCommonQueueImplStats(BSONObjBuilder& b,
     b.append("totalTimeQueuedMicros", stats.totalTimeQueuedMicros.loadRelaxed());
 }
 }  // namespace
-
-TicketHolder* TicketHolder::get(ServiceContext* svcCtx) {
-    return ticketHolderDecoration(svcCtx).get();
-}
-
-void TicketHolder::use(ServiceContext* svcCtx, std::unique_ptr<TicketHolder> newTicketHolder) {
-    ticketHolderDecoration(svcCtx) = std::move(newTicketHolder);
-}
-
-ReaderWriterTicketHolder::~ReaderWriterTicketHolder(){};
-
-Ticket ReaderWriterTicketHolder::acquireImmediateTicket(AdmissionContext* admCtx) {
-    switch (admCtx->getLockMode()) {
-        case MODE_IS:
-        case MODE_S:
-            return _reader->acquireImmediateTicket(admCtx);
-        case MODE_IX:
-            return _writer->acquireImmediateTicket(admCtx);
-        default:
-            // Tickets are linked to the GlobalLock and a MODE_X lock is already exclusive - all
-            // other operations waiting for MODE_X will be blocked so no need to go through the
-            // ticketing mechanism.
-            MONGO_UNREACHABLE;
-    }
-}
-
-boost::optional<Ticket> ReaderWriterTicketHolder::tryAcquire(AdmissionContext* admCtx) {
-
-    switch (admCtx->getLockMode()) {
-        case MODE_IS:
-        case MODE_S:
-            return _reader->tryAcquire(admCtx);
-        case MODE_IX:
-            return _writer->tryAcquire(admCtx);
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-Ticket ReaderWriterTicketHolder::waitForTicket(OperationContext* opCtx,
-                                               AdmissionContext* admCtx,
-                                               WaitMode waitMode) {
-    switch (admCtx->getLockMode()) {
-        case MODE_IS:
-        case MODE_S:
-            return _reader->waitForTicket(opCtx, admCtx, waitMode);
-        case MODE_IX:
-            return _writer->waitForTicket(opCtx, admCtx, waitMode);
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-boost::optional<Ticket> ReaderWriterTicketHolder::waitForTicketUntil(OperationContext* opCtx,
-                                                                     AdmissionContext* admCtx,
-                                                                     Date_t until,
-                                                                     WaitMode waitMode) {
-    switch (admCtx->getLockMode()) {
-        case MODE_IS:
-        case MODE_S:
-            return _reader->waitForTicketUntil(opCtx, admCtx, until, waitMode);
-        case MODE_IX:
-            return _writer->waitForTicketUntil(opCtx, admCtx, until, waitMode);
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-void ReaderWriterTicketHolder::appendStats(BSONObjBuilder& b) const {
-    invariant(_writer, "Writer queue is not present in the ticketholder");
-    invariant(_reader, "Reader queue is not present in the ticketholder");
-    {
-        BSONObjBuilder bbb(b.subobjStart("write"));
-        _writer->appendStats(bbb);
-        bbb.done();
-    }
-    {
-        BSONObjBuilder bbb(b.subobjStart("read"));
-        _reader->appendStats(bbb);
-        bbb.done();
-    }
-}
-
-void ReaderWriterTicketHolder::_releaseImmediateTicket(AdmissionContext* admCtx) noexcept {
-    switch (admCtx->getLockMode()) {
-        case MODE_IS:
-        case MODE_S:
-            return _reader->_releaseImmediateTicket(admCtx);
-        case MODE_IX:
-            return _writer->_releaseImmediateTicket(admCtx);
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-void ReaderWriterTicketHolder::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
-    switch (admCtx->getLockMode()) {
-        case MODE_IS:
-        case MODE_S:
-            return _reader->_releaseToTicketPool(admCtx);
-        case MODE_IX:
-            return _writer->_releaseToTicketPool(admCtx);
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-void ReaderWriterTicketHolder::resizeReaders(int newSize) {
-    return _reader->resize(newSize);
-}
-
-void ReaderWriterTicketHolder::resizeWriters(int newSize) {
-    return _writer->resize(newSize);
-}
 
 Ticket TicketHolderWithQueueingStats::acquireImmediateTicket(AdmissionContext* admCtx) {
     invariant(admCtx->getPriority() == AdmissionContext::Priority::kImmediate);

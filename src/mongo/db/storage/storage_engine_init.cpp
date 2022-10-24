@@ -161,15 +161,16 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         auto svcCtx = opCtx->getServiceContext();
         if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabledAndIgnoreFCV()) {
             LOGV2_DEBUG(6902900, 1, "Using Priority Queue-based ticketing scheduler");
-            auto ticketHolder = std::make_unique<ReaderWriterTicketHolder>(
+
+            auto ticketHolderManager = std::make_unique<TicketHolderManager>(
                 std::make_unique<PriorityTicketHolder>(readTransactions, svcCtx),
                 std::make_unique<PriorityTicketHolder>(writeTransactions, svcCtx));
-            TicketHolder::use(svcCtx, std::move(ticketHolder));
+            TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
         } else {
-            auto ticketHolder = std::make_unique<ReaderWriterTicketHolder>(
+            auto ticketHolderManager = std::make_unique<TicketHolderManager>(
                 std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
                 std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
-            TicketHolder::use(svcCtx, std::move(ticketHolder));
+            TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
         }
     }
 
