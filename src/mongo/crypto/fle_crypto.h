@@ -586,6 +586,8 @@ public:
                                                           uint64_t maxContentionFactor,
                                                           const FLE2RangeFindSpec& spec);
 
+    static FLE2FindRangePayload serializeFindRangeStub(const FLE2RangeFindSpec& spec);
+
     /**
      * Generates a client-side payload that is sent to the server.
      *
