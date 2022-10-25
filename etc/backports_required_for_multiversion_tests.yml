@@ -18,735 +18,601 @@
 # 'replica_sets_multiversion_gen' task until this file has been updated with the same
 # (ticket, test_file) pair on the last-lts branch.
 #
-
 last-continuous:
-  # Tests that should be excluded from ALL multiversion suites should be listed here.
   all:
-    - ticket: SERVER-56800
-      test_file: jstests/sharding/cwwc_conflict_add_shard.js
-    - ticket: SERVER-57262
-      test_file: jstests/replsets/catchup_takeover_with_higher_config.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_min_fetch_ts_with_txn.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_clones_duplicate_key.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_abort_command.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_clones_initial_data.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_commit.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_collection_cloner_resuming.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/reshard_collection_existing_sk_index_not_duplicated.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_metrics.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_fails_on_nonempty_stash.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_txn_cloner.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_size_estimate.js
-    - ticket: SERVER-58898
-      test_file: jstests/replsets/write_concern_write_to_local.js
-    - ticket: SERVER-56846
-      test_file: jstests/sharding/reconfig_fails_no_cwwc_set_sharding.js
-    - ticket: SERVER-59057
-      test_file: jstests/replsets/rollback_transaction_table.js
-    - ticket: SERVER-58353
-      test_file: jstests/replsets/tenant_migration_aborted_buildindex.js
-    - ticket: SERVER-53335
-      test_file: jstests/sharding/query/collation_shard_targeting_hashed_shard_key.js
-    - ticket: SERVER-58696
-      test_file: jstests/sharding/implicit_default_write_concern_add_shard.js
-    - ticket: SERVER-59197
-      test_file: jstests/replsets/sessions_collection_reaping.js
-    - ticket: SERVER-58203
-      test_file: jstests/sharding/query/pipeline_length_limit.js
-    - ticket: SERVER-65101
-      test_file: jstests/sharding/database_versioning_all_commands.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_recipient_fetches_retryable_writes_oplog_entries.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_recipient_fetches_synthetic_find_and_modify_oplog_entries.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_retryable_write_retry.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
-    - ticket: SERVER-51943
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
-    - ticket: SERVER-59525
-      test_file: jstests/replsets/tenant_migration_recipient_access_blocker_rollback.js
-    - ticket: SERVER-59023
-      test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
-    - ticket: SERVER-57772
-      test_file: jstests/sharding/rewrite_state_change_errors.js
-    - ticket: SERVER-59666
-      test_file: jstests/core/timeseries/timeseries_bucket_rename.js
-    - ticket: SERVER-59424
-      test_file: jstests/sharding/change_stream_show_migration_events.js
-    - ticket: SERVER-59108
-      test_file: jstests/replsets/stepdown_race_with_transaction.js
-    - ticket: SERVER-58636
-      test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
-    - ticket: SERVER-59613
-      test_file: jstests/aggregation/range.js
-    - ticket: SERVER-59923
-      test_file: jstests/sharding/test_resharding_test_fixture_shutdown_retry_needed.js
-    - ticket: SERVER-61087
-      test_file: jstests/core/sbe/sbe_ixscan_explain.js
-    - ticket: SERVER-56127
-      test_file: jstests/sharding/retryable_writes_nested_shard_key.js
-    - ticket: SERVER-54909
-      test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
-    - ticket: SERVER-58744
-      test_file: jstests/replsets/apply_ops_capped_collection.js
-    - ticket: SERVER-57700
-      test_file: jstests/sharding/resharding_histogram_metrics.js
-    - ticket: SERVER-59721
-      test_file: jstests/replsets/sync_source_selection_ignores_minvalid_after_rollback.js
-    - ticket: SERVER-59721
-      test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
-    - ticket: SERVER-57588
-      test_file: jstests/core/match_numeric_components.js
-    - ticket: SERVER-60682
-      test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
-    - ticket: SERVER-60685
-      test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
-    - ticket: SERVER-58506
-      test_file: jstests/noPassthrough/getParameterWithDetails.js
-    - ticket: SERVER-57766
-      test_file: jstests/sharding/resharding_metrics.js
-    - ticket: SERVER-61757
-      test_file: jstests/replsets/dbcheck.js
-    - ticket: SERVER-61955
-      test_file: jstests/auth/dbcheck.js
-    - ticket: SERVER-61666
-      test_file: jstests/replsets/tenant_migration_transaction_boundary.js
-    - ticket: SERVER-62245
-      test_file: jstests/sharding/recover_multiple_migrations_on_stepup.js
-    - ticket: SERVER-64184
-      test_file: jstests/noPassthrough/aggregate_metrics.js
-    - ticket: SERVER-62212
-      test_file: jstests/replsets/dbcheck_write_concern.js
-    - ticket: SERVER-62296
-      test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
-    - ticket: SERVER-60817
-      test_file: jstests/replsets/dont_set_invalid_rwconcern.js
-    - ticket: SERVER-61977
-      test_file: jstests/replsets/rollback_during_step_up.js
-    - ticket: SERVER-61755
-      test_file: jstests/sharding/range_deleter_interacts_correctly_with_refine_shard_key.js
-    - ticket: SERVER-62147
-      test_file: jstests/core/exhaust.js
-    - ticket: SERVER-63141
-      test_file: jstests/aggregation/lookup_let_optimization.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_cloning_uses_read_concern_majority.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_collection_ttl.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_concurrent_reads_on_recipient.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_concurrent_writes_on_recipient.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_recipient_current_op.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_retry_session_migration.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_timeseries_retryable_write_retry_on_recipient.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_recipient_initial_sync_recovery.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_recipient_startup_recovery.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_network_error_via_rollback.js
-    - ticket: SERVER-63129
-      test_file: jstests/replsets/tenant_migration_resume_collection_cloner_after_recipient_failover_with_dropped_views.js
-    - ticket: SERVER-61864
-      test_file: jstests/replsets/reconfig_may_not_remove_custom_wc_in_use.js
-    - ticket: SERVER-61864
-      test_file: jstests/replsets/default_write_concern_race_with_config_tags.js
-    - ticket: SERVER-61864
-      test_file: jstests/replsets/config_tags_race_with_default_write_concern.js
-    - ticket: SERVER-62710
-      test_file: jstests/sharding/max_time_ms_does_not_leak_shard_cursor.js
-    - ticket: SERVER-62759
-      test_file: jstests/replsets/apply_ops_dropDatabase.js
-    - ticket: SERVER-63732
-      test_file: jstests/sharding/shard_collection_basic.js
-    - ticket: SERVER-6491
-      test_file: jstests/sharding/shard_key_index_must_exist.js
-    - ticket: SERVER-64142
-      test_file: jstests/sharding/refine_collection_shard_key_basic.js
-    - ticket: SERVER-64485
-      test_file: jstests/sharding/update_with_dollar_fields.js
-    - ticket: SERVER-64141
-      test_file: jstests/core/in_with_mixed_values.js
-    - ticket: SERVER-63531
-      test_file: jstests/replsets/buildindexes_false_commit_quorum.js
-    - ticket: SERVER-64780
-      test_file: jstests/sharding/resharding_change_stream_namespace_filtering.js
-    - ticket: SERVER-65261
-      test_file: jstests/replsets/capped_deletes.js
-    - ticket: SERVER-65022
-      test_file: jstests/sharding/change_stream_shard_failover.js
-    - ticket: SERVER-63049
-      test_file: jstests/noPassthrough/operator_counters_accumulators.js
-    - ticket: SERVER-65300
-      test_file: jstests/replsets/tenant_migration_recipient_rollback_recovery.js
-    - ticket: SERVER-65773
-      test_file: jstests/aggregation/agg_infinite_recursion.js
-    - ticket: SERVER-64315
-      test_file: jstests/core/plan_cache_sbe.js
-    - ticket: SERVER-64315
-      test_file: jstests/core/sbe/plan_cache_sbe_with_or_queries.js
-    - ticket: SERVER-64315
-      test_file: jstests/core/sbe_plan_cache_autoparameterize_collscan.js
-    - ticket: SERVER-64315
-      test_file: jstests/core/wildcard_index_cached_plans.js
-    - ticket: SERVER-66719
-      test_file: jstests/replsets/dbhash_lock_acquisition.js
-    - ticket: SERVER-62272
-      test_file: jstests/sharding/chunk_migration_with_schema_validation.js
-    - ticket: SERVER-60829
-      test_file: jstests/replsets/tenant_migration_donor_resume_on_stepup_and_restart.js
-    - ticket: SERVER-65188
-      test_file: jstests/sharding/sessions_collection_auto_healing.js
-    - ticket: SERVER-65188
-      test_file: jstests/replsets/sessions_collection_auto_healing.js
-    - ticket: SERVER-66089
-      test_file: jstests/replsets/initial_sync_with_partial_transaction.js
-    - ticket: SERVER-66389
-      test_file: jstests/core/where_multiple_plans.js
-    - ticket: SERVER-66445
-      test_file: jstests/concurrency/fsm_workloads/find_flip_sbe_enabled.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/index_stats.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/wildcard_index_cached_plans.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/index_filter_commands_invalidate_plan_cache_entries.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/idhack.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/sbe/sbe_explain_rejected_plans.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/plan_cache_list_shapes.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/plan_cache_list_plans.js
-    - ticket: SERVER-65947
-      test_file: jstests/sharding/migration_retries_on_write_conflict_exceptions.js
-    - ticket: SERVER-64395
-      test_file: jstests/sharding/resharding_metrics_increment.js
-    - ticket: SERVER-64395
-      test_file: jstests/sharding/resharding_abort_command.js
-    - ticket: SERVER-66078
-      test_file: jstests/sharding/data_size_aware_balancing_sessions_collection.js
-    - ticket: SERVER-66379
-      test_file: jstests/core/or_to_in.js
-    - ticket: SERVER-66422
-      test_file: jstests/sharding/resharding_metrics.js
-    - ticket: SERVER-50792
-      test_file: jstests/core/check_shard_index.js
-    - ticket: SERVER-50792
-      test_file: jstests/sharding/refine_collection_shard_key_basic.js
-    - ticket: SERVER-67532
-      test_file: jstests/replsets/optime.js
-    - ticket: SERVER-66072
-      test_file: jstests/aggregation/match_no_swap_rand.js
-    - ticket: SERVER-67723
-      test_file: jstests/replsets/internal_sessions_reaping_basic.js
-    - ticket: SERVER-67885
-      test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
-    - ticket: SERVER-67492
-      test_file: jstests/sharding/move_chunk_interrupt_postimage.js
-    - ticket: SERVER-67299
-      test_file: jstests/sharding/drop_index_fails_if_multikey_index_is_last_compatible.js
-    - ticket: SERVER-68628
-      test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
-    - ticket: SERVER-66854
-      test_file: jstests/replsets/prepared_transaction_kill_during_step_up_refresh.js
-    - ticket: SERVER-66854
-      test_file: jstests/replsets/step_up_kill_abort_transactions.js
-    - ticket: SERVER-68728
-      test_file: jstests/sharding/move_chunk_interrupt_postimage.js
-    - ticket: SERVER-64741
-      test_file: jstests/sharding/append_oplog_note_mongos.js
-    - ticket: SERVER-68556
-      test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
-    - ticket: SERVER-68556
-      test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
-    - ticket: SERVER-69348
-      test_file: jstests/core/views/views_all_commands.js
-    - ticket: SERVER-69348
-      test_file: jstests/replsets/db_reads_while_recovering_all_commands.js
-    - ticket: SERVER-69348
-      test_file: jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js
-    - ticket: SERVER-69348
-      test_file: jstests/sharding/read_write_concern_defaults_application.js
-    - ticket: SERVER-68932
-      test_file: jstests/sharding/resharding_critical_section_metrics.js
-    - ticket: SERVER-68115
-      test_file: jstests/core/elemmatch_index.js
-    - ticket: SERVER-69861
-      test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_cannot_vote_twice_same_term.js
-    - ticket: SERVER-69861
-      test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
-    - ticket: SERVER-70190
-      test_file: jstests/aggregation/expressions/switch_errors.js
-
-  # Tests that should only be excluded from particular suites should be listed under that suite.
-  suites:
-
+  - test_file: jstests/core/check_shard_index.js
+    ticket: SERVER-50792
+  - test_file: jstests/sharding/refine_collection_shard_key_basic.js
+    ticket: SERVER-50792
+  - test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    ticket: SERVER-51943
+  - test_file: jstests/sharding/query/collation_shard_targeting_hashed_shard_key.js
+    ticket: SERVER-53335
+  - test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
+    ticket: SERVER-54909
+  - test_file: jstests/sharding/cwwc_conflict_add_shard.js
+    ticket: SERVER-56800
+  - test_file: jstests/sharding/reconfig_fails_no_cwwc_set_sharding.js
+    ticket: SERVER-56846
+  - test_file: jstests/replsets/catchup_takeover_with_higher_config.js
+    ticket: SERVER-57262
+  - test_file: jstests/replsets/tenant_migration_recipient_fetches_retryable_writes_oplog_entries.js
+    ticket: SERVER-57617
+  - test_file: jstests/replsets/tenant_migration_recipient_fetches_synthetic_find_and_modify_oplog_entries.js
+    ticket: SERVER-57617
+  - test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    ticket: SERVER-57617
+  - test_file: jstests/replsets/tenant_migration_retryable_write_retry.js
+    ticket: SERVER-57617
+  - test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
+    ticket: SERVER-57617
+  - test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
+    ticket: SERVER-57617
+  - test_file: jstests/sharding/resharding_min_fetch_ts_with_txn.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_clones_duplicate_key.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_abort_command.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_clones_initial_data.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_commit.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_collection_cloner_resuming.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/reshard_collection_existing_sk_index_not_duplicated.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_metrics.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_fails_on_nonempty_stash.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_txn_cloner.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_size_estimate.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_histogram_metrics.js
+    ticket: SERVER-57700
+  - test_file: jstests/sharding/resharding_metrics.js
+    ticket: SERVER-57766
+  - test_file: jstests/sharding/rewrite_state_change_errors.js
+    ticket: SERVER-57772
+  - test_file: jstests/sharding/query/pipeline_length_limit.js
+    ticket: SERVER-58203
+  - test_file: jstests/replsets/tenant_migration_aborted_buildindex.js
+    ticket: SERVER-58353
+  - test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
+    ticket: SERVER-58636
+  - test_file: jstests/sharding/implicit_default_write_concern_add_shard.js
+    ticket: SERVER-58696
+  - test_file: jstests/replsets/apply_ops_capped_collection.js
+    ticket: SERVER-58744
+  - test_file: jstests/replsets/write_concern_write_to_local.js
+    ticket: SERVER-58898
+  - test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
+    ticket: SERVER-59023
+  - test_file: jstests/replsets/rollback_transaction_table.js
+    ticket: SERVER-59057
+  - test_file: jstests/replsets/stepdown_race_with_transaction.js
+    ticket: SERVER-59108
+  - test_file: jstests/sharding/change_stream_show_migration_events.js
+    ticket: SERVER-59424
+  - test_file: jstests/replsets/tenant_migration_recipient_access_blocker_rollback.js
+    ticket: SERVER-59525
+  - test_file: jstests/core/timeseries/timeseries_bucket_rename.js
+    ticket: SERVER-59666
+  - test_file: jstests/replsets/sync_source_selection_ignores_minvalid_after_rollback.js
+    ticket: SERVER-59721
+  - test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
+    ticket: SERVER-59721
+  - test_file: jstests/sharding/test_resharding_test_fixture_shutdown_retry_needed.js
+    ticket: SERVER-59923
+  - test_file: jstests/replsets/dont_set_invalid_rwconcern.js
+    ticket: SERVER-60817
+  - test_file: jstests/replsets/tenant_migration_donor_resume_on_stepup_and_restart.js
+    ticket: SERVER-60829
+  - test_file: jstests/core/sbe/sbe_ixscan_explain.js
+    ticket: SERVER-61087
+  - test_file: jstests/replsets/tenant_migration_transaction_boundary.js
+    ticket: SERVER-61666
+  - test_file: jstests/sharding/range_deleter_interacts_correctly_with_refine_shard_key.js
+    ticket: SERVER-61755
+  - test_file: jstests/replsets/dbcheck.js
+    ticket: SERVER-61757
+  - test_file: jstests/replsets/reconfig_may_not_remove_custom_wc_in_use.js
+    ticket: SERVER-61864
+  - test_file: jstests/replsets/default_write_concern_race_with_config_tags.js
+    ticket: SERVER-61864
+  - test_file: jstests/replsets/config_tags_race_with_default_write_concern.js
+    ticket: SERVER-61864
+  - test_file: jstests/auth/dbcheck.js
+    ticket: SERVER-61955
+  - test_file: jstests/replsets/rollback_during_step_up.js
+    ticket: SERVER-61977
+  - test_file: jstests/replsets/dbcheck_write_concern.js
+    ticket: SERVER-62212
+  - test_file: jstests/sharding/recover_multiple_migrations_on_stepup.js
+    ticket: SERVER-62245
+  - test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
+    ticket: SERVER-62296
+  - test_file: jstests/sharding/max_time_ms_does_not_leak_shard_cursor.js
+    ticket: SERVER-62710
+  - test_file: jstests/replsets/apply_ops_dropDatabase.js
+    ticket: SERVER-62759
+  - test_file: jstests/noPassthrough/operator_counters_accumulators.js
+    ticket: SERVER-63049
+  - test_file: jstests/replsets/tenant_migration_cloning_uses_read_concern_majority.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_collection_ttl.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_concurrent_reads_on_recipient.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_concurrent_writes_on_recipient.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_recipient_current_op.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_retry_session_migration.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_timeseries_retryable_write_retry_on_recipient.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_recipient_initial_sync_recovery.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_recipient_startup_recovery.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_network_error_via_rollback.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_resume_collection_cloner_after_recipient_failover_with_dropped_views.js
+    ticket: SERVER-63129
+  - test_file: jstests/replsets/buildindexes_false_commit_quorum.js
+    ticket: SERVER-63531
+  - test_file: jstests/core/in_with_mixed_values.js
+    ticket: SERVER-64141
+  - test_file: jstests/sharding/refine_collection_shard_key_basic.js
+    ticket: SERVER-64142
+  - test_file: jstests/core/plan_cache_sbe.js
+    ticket: SERVER-64315
+  - test_file: jstests/core/sbe/plan_cache_sbe_with_or_queries.js
+    ticket: SERVER-64315
+  - test_file: jstests/core/sbe_plan_cache_autoparameterize_collscan.js
+    ticket: SERVER-64315
+  - test_file: jstests/core/wildcard_index_cached_plans.js
+    ticket: SERVER-64315
+  - test_file: jstests/sharding/resharding_metrics_increment.js
+    ticket: SERVER-64395
+  - test_file: jstests/sharding/resharding_abort_command.js
+    ticket: SERVER-64395
+  - test_file: jstests/sharding/update_with_dollar_fields.js
+    ticket: SERVER-64485
+  - test_file: jstests/sharding/resharding_change_stream_namespace_filtering.js
+    ticket: SERVER-64780
+  - test_file: jstests/sharding/shard_key_index_must_exist.js
+    ticket: SERVER-6491
+  - test_file: jstests/sharding/change_stream_shard_failover.js
+    ticket: SERVER-65022
+  - test_file: jstests/sharding/database_versioning_all_commands.js
+    ticket: SERVER-65101
+  - test_file: jstests/sharding/sessions_collection_auto_healing.js
+    ticket: SERVER-65188
+  - test_file: jstests/replsets/sessions_collection_auto_healing.js
+    ticket: SERVER-65188
+  - test_file: jstests/replsets/capped_deletes.js
+    ticket: SERVER-65261
+  - test_file: jstests/replsets/tenant_migration_recipient_rollback_recovery.js
+    ticket: SERVER-65300
+  - test_file: jstests/aggregation/agg_infinite_recursion.js
+    ticket: SERVER-65773
+  - test_file: jstests/sharding/migration_retries_on_write_conflict_exceptions.js
+    ticket: SERVER-65947
+  - test_file: jstests/aggregation/match_no_swap_rand.js
+    ticket: SERVER-66072
+  - test_file: jstests/sharding/data_size_aware_balancing_sessions_collection.js
+    ticket: SERVER-66078
+  - test_file: jstests/replsets/initial_sync_with_partial_transaction.js
+    ticket: SERVER-66089
+  - test_file: jstests/core/or_to_in.js
+    ticket: SERVER-66379
+  - test_file: jstests/core/where_multiple_plans.js
+    ticket: SERVER-66389
+  - test_file: jstests/sharding/resharding_metrics.js
+    ticket: SERVER-66422
+  - test_file: jstests/concurrency/fsm_workloads/find_flip_sbe_enabled.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/index_stats.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/wildcard_index_cached_plans.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/index_filter_commands_invalidate_plan_cache_entries.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/idhack.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/sbe/sbe_explain_rejected_plans.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/plan_cache_list_shapes.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/plan_cache_list_plans.js
+    ticket: SERVER-66445
+  - test_file: jstests/replsets/dbhash_lock_acquisition.js
+    ticket: SERVER-66719
+  - test_file: jstests/replsets/prepared_transaction_kill_during_step_up_refresh.js
+    ticket: SERVER-66854
+  - test_file: jstests/replsets/step_up_kill_abort_transactions.js
+    ticket: SERVER-66854
+  - test_file: jstests/sharding/drop_index_fails_if_multikey_index_is_last_compatible.js
+    ticket: SERVER-67299
+  - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
+    ticket: SERVER-67492
+  - test_file: jstests/replsets/optime.js
+    ticket: SERVER-67532
+  - test_file: jstests/replsets/internal_sessions_reaping_basic.js
+    ticket: SERVER-67723
+  - test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
+    ticket: SERVER-67885
+  - test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
+    ticket: SERVER-68556
+  - test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
+    ticket: SERVER-68556
+  - test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
+    ticket: SERVER-68628
+  - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
+    ticket: SERVER-68728
+  - test_file: jstests/sharding/resharding_critical_section_metrics.js
+    ticket: SERVER-68932
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_cannot_vote_twice_same_term.js
+    ticket: SERVER-69861
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
+    ticket: SERVER-69861
+  - test_file: jstests/aggregation/expressions/switch_errors.js
+    ticket: SERVER-70190
+  suites: null
 last-lts:
-  # Tests that should be excluded from ALL multiversion suites should be listed here.
   all:
-    - ticket: SERVER-49471
-      test_file: jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
-    - ticket: SERVER-47645
-      test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
-    - ticket: SERVER-47773
-      test_file: jstests/core/geo_near_tailable.js
-    - ticket: SERVER-47469
-      test_file: jstests/core/apply_ops_system_dot_views.js
-    - ticket: SERVER-48614
-      test_file: jstests/core/wildcard_index_partial_index.js
-    - ticket: SERVER-51120
-      test_file: jstests/core/merge_sort_collation.js
-    - ticket: SERVER-48525
-      test_file: jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
-    - ticket: SERVER-47810
-      test_file: jstests/change_streams/report_post_batch_resume_token.js
-    - ticket: SERVER-50140
-      test_file: jstests/replsets/initial_sync_fails_unclean_restart.js
-    - ticket: SERVER-49987
-      test_file: jstests/core/hello_response_validation.js
-    - ticket: SERVER-49987
-      test_file: jstests/replsets/check_replication_hello_response_fields.js
-    - ticket: SERVER-50640
-      test_file: jstests/core/views/views_all_commands.js
-    - ticket: SERVER-65101
-      test_file: jstests/sharding/database_versioning_all_commands.js
-    - ticket: SERVER-49988
-      test_file: jstests/sharding/hello_response_validation.js
-    - ticket: SERVER-53335
-      test_file: jstests/sharding/query/collation_shard_targeting_hashed_shard_key.js
-    - ticket: SERVER-50640
-      test_file: jstests/sharding/read_write_concern_defaults_application.js
-    - ticket: SERVER-50640
-      test_file: jstests/sharding/safe_secondary_reads_drop_recreate.js
-    - ticket: SERVER-50640
-      test_file: jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
-    - ticket: SERVER-50640
-      test_file: jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
-    - ticket: SERVER-64184
-      test_file: jstests/noPassthrough/aggregate_metrics.js
-    - ticket: SERVER-49991
-      test_file: jstests/replsets/get_replication_info_helper.js
-    - ticket: SERVER-47469
-      test_file: jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
-    - ticket: SERVER-49990
-      test_file: jstests/replsets/secondaryOk_slaveOk_aliases.js
-    - ticket: SERVER-43902
-      test_file: jstests/sharding/scaled_collection_stats.js
-    - ticket: SERVER-50417
-      test_file: jstests/replsets/no_disconnect_on_stepdown.js
-    - ticket: SERVER-50417
-      test_file: jstests/replsets/not_primary_unacknowledged_write.js
-    - ticket: SERVER-50417
-      test_file: jstests/replsets/read_operations_during_step_down.js
-    - ticket: SERVER-50417
-      test_file: jstests/replsets/read_operations_during_step_up.js
-    - ticket: SERVER-50320
-      test_file: jstests/replsets/change_sync_source_in_initial_sync.js
-    - ticket: SERVER-50415
-      test_file: jstests/sharding/awaitable_hello_primary_failures.js
-    - ticket: SERVER-50420
-      test_file: jstests/replsets/server_status_repl_is_writable_primary.js
-    - ticket: SERVER-51262
-      test_file: jstests/replsets/read_operations_during_rollback.js
-    - ticket: SERVER-51262
-      test_file: jstests/replsets/transactions_on_secondaries_not_allowed.js
-    - ticket: SERVER-43904
-      test_file: jstests/replsets/election_handoff_skips_unelectable_nodes.js
-    - ticket: SERVER-51259
-      test_file: jstests/replsets/awaitable_hello_errors_on_horizon_change.js
-    - ticket: SERVER-51259
-      test_file: jstests/replsets/awaitable_hello_fcv_change.js
-    - ticket: SERVER-51259
-      test_file: jstests/replsets/awaitable_hello_metrics_on_state_change.js
-    - ticket: SERVER-51259
-      test_file: jstests/replsets/awaitable_hello_on_nodes_with_invalid_configs.js
-    - ticket: SERVER-51259
-      test_file: jstests/replsets/awaitable_hello_stepdown_stepup.js
-    - ticket: SERVER-51259
-      test_file: jstests/replsets/quiesce_mode.js
-    - ticket: SERVER-51259
-      test_file: jstests/sharding/mongos_quiesce_mode.js
-    - ticket: SERVER-50412
-      test_file: jstests/replsets/not_primary_errors_returned_if_client_sends_helloOk.js
-    - ticket: SERVER-50412
-      test_file: jstests/sharding/mongos_helloOk_protocol.js
-    - ticket: SERVER-51049
-      test_file: jstests/replsets/node_restarts_no_oplog_entry_at_stable.js
-    - ticket: SERVER-50414
-      test_file: jstests/replsets/not_primary_errors_returned_during_rollback_if_helloOk.js
-    - ticket: SERVER-50769
-      test_file: jstests/sharding/change_stream_empty_apply_ops.js
-    - ticket: SERVER-52547
-      test_file: jstests/core/txns/errors_on_committed_transaction.js
-    - ticket: SERVER-53612
-      test_file: jstests/replsets/election_handoff_not_immediately_electable.js
-    - ticket: SERVER-50486
-      test_file: jstests/replsets/dont_refresh_session_prepare_secondary.js
-    - ticket: SERVER-53932
-      test_file: jstests/replsets/rollback_reconstructs_transactions_prepared_before_stable.js
-    - ticket: SERVER-53431
-      test_file: jstests/replsets/stepdown_kill_other_ops.js
-    - ticket: SERVER-53394
-      test_file: jstests/sharding/sharding_task_executor_pool_matching_policy.js
-    - ticket: SERVER-53849
-      test_file: jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
-    - ticket: SERVER-53985
-      test_file: jstests/replsets/unconditional_step_down.js
-    - ticket: SERVER-54366
-      test_file: jstests/replsets/force_shutdown_primary.js
-    - ticket: SERVER-52953
-      test_file: jstests/core/geo_near_point_query.js
-    - ticket: SERVER-48179
-      test_file: jstests/replsets/reconfig_removes_node_in_rollback.js
-    - ticket: SERVER-56371
-      test_file: jstests/sharding/time_zone_info_mongos.js
-    - ticket: SERVER-55305
-      test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application.js
-    - ticket: SERVER-55305
-      test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_from_vectored_inserts.js
-    - ticket: SERVER-53760
-      test_file: jstests/core/sort_spill_estimate_data_size.js
-    - ticket: SERVER-56772
-      test_file: jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-    - ticket: SERVER-55111
-      test_file: jstests/sharding/transactions_reject_writes_for_moved_chunks.js
-    - ticket: SERVER-59952
-      test_file: jstests/sharding/write_transactions_during_migration.js
-    - ticket: SERVER-59952
-      test_file: jstests/sharding/retryable_writes.js
-    - ticket: SERVER-59952
-      test_file: jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
-    - ticket: SERVER-57117
-      test_file: jstests/sharding/read_pref_with_hedging_mode.js
-    - ticket: SERVER-56377
-      test_file: jstests/concurrency/fsm_workloads/findAndModify_flip_location.js
-    - ticket: SERVER-56518
-      test_file: jstests/sharding/txn_writes_during_movechunk.js
-    - ticket: SERVER-57476
-      test_file: jstests/replsets/assert_on_prepare_conflict_with_hole.js
-    - ticket: SERVER-21929
-      test_file: jstests/core/null_query_semantics.js
-    - ticket: SERVER-21929
-      test_file: jstests/core/or_to_in.js
-    - ticket: SERVER-21929
-      test_file: jstests/aggregation/sources/lookup/lookup_null_semantics.js
-    - ticket: SERVER-52906
-      test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    - ticket: SERVER-52906
-      test_file: jstests/sharding/migration_waits_for_majority_commit.js
-    - ticket: SERVER-52906
-      test_file: jstests/sharding/migration_ignore_interrupts_1.js
-    - ticket: SERVER-52906
-      test_file: jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
-    - ticket: SERVER-52906
-      test_file: jstests/sharding/movechunk_parallel.js
-    - ticket: SERVER-52906
-      test_file: jstests/sharding/txn_writes_during_movechunk.js
-    - ticket: SERVER-50559
-      test_file: jstests/sharding/log_remote_op_wait.js
-    - ticket: SERVER-37904
-      test_file: jstests/replsets/cluster_chaining_override.js
-    - ticket: SERVER-57729
-      test_file: jstests/core/timeseries/timeseries_bucket_drop.js
-    - ticket: SERVER-59505
-      test_file: jstests/core/timeseries/timeseries_find.js
-    - ticket: SERVER-56800
-      test_file: jstests/sharding/cwwc_conflict_add_shard.js
-    - ticket: SERVER-57262
-      test_file: jstests/replsets/catchup_takeover_with_higher_config.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_min_fetch_ts_with_txn.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_clones_duplicate_key.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_abort_command.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_clones_initial_data.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_commit.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_collection_cloner_resuming.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/reshard_collection_existing_sk_index_not_duplicated.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_metrics.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_fails_on_nonempty_stash.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_txn_cloner.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
-    - ticket: SERVER-57667
-      test_file: jstests/sharding/resharding_size_estimate.js
-    - ticket: SERVER-58898
-      test_file: jstests/replsets/write_concern_write_to_local.js
-    - ticket: SERVER-59057
-      test_file: jstests/replsets/rollback_transaction_table.js
-    - ticket: SERVER-58353
-      test_file: jstests/replsets/tenant_migration_aborted_buildindex.js
-    - ticket: SERVER-58696
-      test_file: jstests/sharding/implicit_default_write_concern_add_shard.js
-    - ticket: SERVER-59197
-      test_file: jstests/replsets/sessions_collection_reaping.js
-    - ticket: SERVER-58203
-      test_file: jstests/sharding/query/pipeline_length_limit.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_recipient_fetches_retryable_writes_oplog_entries.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_recipient_fetches_synthetic_find_and_modify_oplog_entries.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_retryable_write_retry.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
-    - ticket: SERVER-51943
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
-    - ticket: SERVER-59525
-      test_file: jstests/replsets/tenant_migration_recipient_access_blocker_rollback.js
-    - ticket: SERVER-59023
-      test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
-    - ticket: SERVER-59765
-      test_file: jstests/aggregation/expressions/date_add_subtract.js
-    - ticket: SERVER-59424
-      test_file: jstests/sharding/change_stream_show_migration_events.js
-    - ticket: SERVER-59108
-      test_file: jstests/replsets/stepdown_race_with_transaction.js
-    - ticket: SERVER-58636
-      test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
-    - ticket: SERVER-59613
-      test_file: jstests/aggregation/range.js
-    - ticket: SERVER-59923
-      test_file: jstests/sharding/test_resharding_test_fixture_shutdown_retry_needed.js
-    - ticket: SERVER-61087
-      test_file: jstests/core/sbe/sbe_ixscan_explain.js
-    - ticket: SERVER-56127
-      test_file: jstests/sharding/retryable_writes_nested_shard_key.js
-    - ticket: SERVER-54909
-      test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
-    - ticket: SERVER-35649
-      test_file: jstests/replsets/disallow_adding_initialized_node1.js
-    - ticket: SERVER-57700
-      test_file: jstests/sharding/resharding_histogram_metrics.js
-    - ticket: SERVER-59721
-      test_file: jstests/replsets/sync_source_selection_ignores_minvalid_after_rollback.js
-    - ticket: SERVER-59721
-      test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
-    - ticket: SERVER-57588
-      test_file: jstests/core/match_numeric_components.js
-    - ticket: SERVER-60682
-      test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
-    - ticket: SERVER-60685
-      test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
-    - ticket: SERVER-58506
-      test_file: jstests/noPassthrough/getParameterWithDetails.js
-    - ticket: SERVER-57766
-      test_file: jstests/sharding/resharding_metrics.js
-    - ticket: SERVER-61757
-      test_file: jstests/replsets/dbcheck.js
-    - ticket: SERVER-61955
-      test_file: jstests/auth/dbcheck.js
-    - ticket: SERVER-61666
-      test_file: jstests/replsets/tenant_migration_transaction_boundary.js
-    - ticket: SERVER-62245
-      test_file: jstests/sharding/recover_multiple_migrations_on_stepup.js
-    - ticket: SERVER-62296
-      test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
-    - ticket: SERVER-60817
-      test_file: jstests/replsets/dont_set_invalid_rwconcern.js
-    - ticket: SERVER-61977
-      test_file: jstests/replsets/rollback_during_step_up.js
-    - ticket: SERVER-61755
-      test_file: jstests/sharding/range_deleter_interacts_correctly_with_refine_shard_key.js
-    - ticket: SERVER-62147
-      test_file: jstests/core/exhaust.js
-    - ticket: SERVER-63141
-      test_file: jstests/aggregation/lookup_let_optimization.js
-    - ticket: SERVER-63129
-      test_file: jstests/replsets/tenant_migration_resume_collection_cloner_after_recipient_failover_with_dropped_views.js
-    - ticket: SERVER-61864
-      test_file: jstests/replsets/reconfig_may_not_remove_custom_wc_in_use.js
-    - ticket: SERVER-61864
-      test_file: jstests/replsets/default_write_concern_race_with_config_tags.js
-    - ticket: SERVER-61864
-      test_file: jstests/replsets/config_tags_race_with_default_write_concern.js
-    - ticket: SERVER-62710
-      test_file: jstests/sharding/max_time_ms_does_not_leak_shard_cursor.js
-    - ticket: SERVER-62759
-      test_file: jstests/replsets/apply_ops_dropDatabase.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_cloning_uses_read_concern_majority.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_collection_ttl.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_concurrent_reads_on_recipient.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_concurrent_writes_on_recipient.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_recipient_current_op.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_retry_session_migration.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_timeseries_retryable_write_retry_on_recipient.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_recipient_initial_sync_recovery.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_recipient_startup_recovery.js
-    - ticket: SERVER-63122
-      test_file: jstests/replsets/tenant_migration_network_error_via_rollback.js
-    - ticket: SERVER-63732
-      test_file: jstests/sharding/shard_collection_basic.js
-    - ticket: SERVER-6491
-      test_file: jstests/sharding/shard_key_index_must_exist.js
-    - ticket: SERVER-63531
-      test_file: jstests/replsets/buildindexes_false_commit_quorum.js
-    - ticket: SERVER-64485
-      test_file: jstests/sharding/update_with_dollar_fields.js
-    - ticket: SERVER-64142
-      test_file: jstests/sharding/refine_collection_shard_key_basic.js
-    - ticket: SERVER-65261
-      test_file: jstests/replsets/capped_deletes.js
-    - ticket: SERVER-65022
-      test_file: jstests/sharding/change_stream_shard_failover.js
-    - ticket: SERVER-65300
-      test_file: jstests/replsets/tenant_migration_recipient_rollback_recovery.js
-    - ticket: SERVER-65773
-      test_file: jstests/aggregation/agg_infinite_recursion.js
-    - ticket: SERVER-64315
-      test_file: jstests/core/plan_cache_sbe.js
-    - ticket: SERVER-64315
-      test_file: jstests/core/sbe/plan_cache_sbe_with_or_queries.js
-    - ticket: SERVER-64315
-      test_file: jstests/core/sbe_plan_cache_autoparameterize_collscan.js
-    - ticket: SERVER-64315
-      test_file: jstests/core/wildcard_index_cached_plans.js
-    - ticket: SERVER-66719
-      test_file: jstests/replsets/dbhash_lock_acquisition.js
-    - ticket: SERVER-62272
-      test_file: jstests/sharding/chunk_migration_with_schema_validation.js
-    - ticket: SERVER-60829
-      test_file: jstests/replsets/tenant_migration_donor_resume_on_stepup_and_restart.js
-    - ticket: SERVER-65188
-      test_file: jstests/sharding/sessions_collection_auto_healing.js
-    - ticket: SERVER-65188
-      test_file: jstests/replsets/sessions_collection_auto_healing.js
-    - ticket: SERVER-66089
-      test_file: jstests/replsets/initial_sync_with_partial_transaction.js
-    - ticket: SERVER-66389
-      test_file: jstests/core/where_multiple_plans.js
-    - ticket: SERVER-66445
-      test_file: jstests/concurrency/fsm_workloads/find_flip_sbe_enabled.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/index_stats.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/wildcard_index_cached_plans.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/index_filter_commands_invalidate_plan_cache_entries.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/idhack.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/sbe/sbe_explain_rejected_plans.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/plan_cache_list_shapes.js
-    - ticket: SERVER-66445
-      test_file: jstests/core/plan_cache_list_plans.js
-    - ticket: SERVER-65947
-      test_file: jstests/sharding/migration_retries_on_write_conflict_exceptions.js
-    - ticket: SERVER-64395
-      test_file: jstests/sharding/resharding_metrics_increment.js
-    - ticket: SERVER-64395
-      test_file: jstests/sharding/resharding_abort_command.js
-    - ticket: SERVER-66078
-      test_file: jstests/sharding/data_size_aware_balancing_sessions_collection.js
-    - ticket: SERVER-66379
-      test_file: jstests/core/or_to_in.js
-    - ticket: SERVER-66422
-      test_file: jstests/sharding/resharding_metrics.js
-    - ticket: SERVER-50792
-      test_file: jstests/core/check_shard_index.js
-    - ticket: SERVER-50792
-      test_file: jstests/sharding/refine_collection_shard_key_basic.js
-    - ticket: SERVER-67532
-      test_file: jstests/replsets/optime.js
-    - ticket: SERVER-66072
-      test_file: jstests/aggregation/match_no_swap_rand.js
-    - ticket: SERVER-67723
-      test_file: jstests/replsets/internal_sessions_reaping_basic.js
-    - ticket: SERVER-67885
-      test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
-    - ticket: SERVER-67492
-      test_file: jstests/sharding/move_chunk_interrupt_postimage.js
-    - ticket: SERVER-67299
-      test_file: jstests/sharding/drop_index_fails_if_multikey_index_is_last_compatible.js
-    - ticket: SERVER-68628
-      test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
-    - ticket: SERVER-66854
-      test_file: jstests/replsets/prepared_transaction_kill_during_step_up_refresh.js
-    - ticket: SERVER-66854
-      test_file: jstests/replsets/step_up_kill_abort_transactions.js
-    - ticket: SERVER-68728
-      test_file: jstests/sharding/move_chunk_interrupt_postimage.js
-    - ticket: SERVER-64741
-      test_file: jstests/sharding/append_oplog_note_mongos.js
-    - ticket: SERVER-68556
-      test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
-    - ticket: SERVER-68556
-      test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
-    - ticket: SERVER-69348
-      test_file: jstests/core/views/views_all_commands.js
-    - ticket: SERVER-69348
-      test_file: jstests/replsets/db_reads_while_recovering_all_commands.js
-    - ticket: SERVER-69348
-      test_file: jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js
-    - ticket: SERVER-69348
-      test_file: jstests/sharding/read_write_concern_defaults_application.js
-    - ticket: SERVER-68115
-      test_file: jstests/core/elemmatch_index.js
-    - ticket: SERVER-69861
-      test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_cannot_vote_twice_same_term.js
-    - ticket: SERVER-69861
-      test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
-    - ticket: SERVER-70190
-      test_file: jstests/aggregation/expressions/switch_errors.js
-
-  # Tests that should only be excluded from particular suites should be listed under that suite.
-  suites:
+  - test_file: jstests/core/null_query_semantics.js
+    ticket: SERVER-21929
+  - test_file: jstests/core/or_to_in.js
+    ticket: SERVER-21929
+  - test_file: jstests/aggregation/sources/lookup/lookup_null_semantics.js
+    ticket: SERVER-21929
+  - test_file: jstests/replsets/disallow_adding_initialized_node1.js
+    ticket: SERVER-35649
+  - test_file: jstests/replsets/cluster_chaining_override.js
+    ticket: SERVER-37904
+  - test_file: jstests/sharding/scaled_collection_stats.js
+    ticket: SERVER-43902
+  - test_file: jstests/core/apply_ops_system_dot_views.js
+    ticket: SERVER-47469
+  - test_file: jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
+    ticket: SERVER-47469
+  - test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
+    ticket: SERVER-47645
+  - test_file: jstests/change_streams/report_post_batch_resume_token.js
+    ticket: SERVER-47810
+  - test_file: jstests/replsets/reconfig_removes_node_in_rollback.js
+    ticket: SERVER-48179
+  - test_file: jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
+    ticket: SERVER-48525
+  - test_file: jstests/replsets/initial_sync_fails_unclean_restart.js
+    ticket: SERVER-50140
+  - test_file: jstests/replsets/change_sync_source_in_initial_sync.js
+    ticket: SERVER-50320
+  - test_file: jstests/sharding/awaitable_hello_primary_failures.js
+    ticket: SERVER-50415
+  - test_file: jstests/replsets/server_status_repl_is_writable_primary.js
+    ticket: SERVER-50420
+  - test_file: jstests/sharding/log_remote_op_wait.js
+    ticket: SERVER-50559
+  - test_file: jstests/core/views/views_all_commands.js
+    ticket: SERVER-50640
+  - test_file: jstests/sharding/read_write_concern_defaults_application.js
+    ticket: SERVER-50640
+  - test_file: jstests/sharding/safe_secondary_reads_drop_recreate.js
+    ticket: SERVER-50640
+  - test_file: jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
+    ticket: SERVER-50640
+  - test_file: jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
+    ticket: SERVER-50640
+  - test_file: jstests/core/check_shard_index.js
+    ticket: SERVER-50792
+  - test_file: jstests/sharding/refine_collection_shard_key_basic.js
+    ticket: SERVER-50792
+  - test_file: jstests/replsets/node_restarts_no_oplog_entry_at_stable.js
+    ticket: SERVER-51049
+  - test_file: jstests/replsets/awaitable_hello_errors_on_horizon_change.js
+    ticket: SERVER-51259
+  - test_file: jstests/replsets/awaitable_hello_fcv_change.js
+    ticket: SERVER-51259
+  - test_file: jstests/replsets/awaitable_hello_metrics_on_state_change.js
+    ticket: SERVER-51259
+  - test_file: jstests/replsets/awaitable_hello_on_nodes_with_invalid_configs.js
+    ticket: SERVER-51259
+  - test_file: jstests/replsets/awaitable_hello_stepdown_stepup.js
+    ticket: SERVER-51259
+  - test_file: jstests/replsets/quiesce_mode.js
+    ticket: SERVER-51259
+  - test_file: jstests/sharding/mongos_quiesce_mode.js
+    ticket: SERVER-51259
+  - test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    ticket: SERVER-51943
+  - test_file: jstests/core/txns/errors_on_committed_transaction.js
+    ticket: SERVER-52547
+  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
+    ticket: SERVER-52906
+  - test_file: jstests/sharding/migration_waits_for_majority_commit.js
+    ticket: SERVER-52906
+  - test_file: jstests/sharding/migration_ignore_interrupts_1.js
+    ticket: SERVER-52906
+  - test_file: jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
+    ticket: SERVER-52906
+  - test_file: jstests/sharding/movechunk_parallel.js
+    ticket: SERVER-52906
+  - test_file: jstests/sharding/txn_writes_during_movechunk.js
+    ticket: SERVER-52906
+  - test_file: jstests/replsets/stepdown_kill_other_ops.js
+    ticket: SERVER-53431
+  - test_file: jstests/core/sort_spill_estimate_data_size.js
+    ticket: SERVER-53760
+  - test_file: jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
+    ticket: SERVER-53849
+  - test_file: jstests/replsets/unconditional_step_down.js
+    ticket: SERVER-53985
+  - test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
+    ticket: SERVER-54909
+  - test_file: jstests/sharding/transactions_reject_writes_for_moved_chunks.js
+    ticket: SERVER-55111
+  - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application.js
+    ticket: SERVER-55305
+  - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_from_vectored_inserts.js
+    ticket: SERVER-55305
+  - test_file: jstests/sharding/time_zone_info_mongos.js
+    ticket: SERVER-56371
+  - test_file: jstests/concurrency/fsm_workloads/findAndModify_flip_location.js
+    ticket: SERVER-56377
+  - test_file: jstests/sharding/txn_writes_during_movechunk.js
+    ticket: SERVER-56518
+  - test_file: jstests/concurrency/fsm_workloads/collmod_writeconflict.js
+    ticket: SERVER-56772
+  - test_file: jstests/sharding/cwwc_conflict_add_shard.js
+    ticket: SERVER-56800
+  - test_file: jstests/sharding/read_pref_with_hedging_mode.js
+    ticket: SERVER-57117
+  - test_file: jstests/replsets/catchup_takeover_with_higher_config.js
+    ticket: SERVER-57262
+  - test_file: jstests/replsets/assert_on_prepare_conflict_with_hole.js
+    ticket: SERVER-57476
+  - test_file: jstests/replsets/tenant_migration_recipient_fetches_retryable_writes_oplog_entries.js
+    ticket: SERVER-57617
+  - test_file: jstests/replsets/tenant_migration_recipient_fetches_synthetic_find_and_modify_oplog_entries.js
+    ticket: SERVER-57617
+  - test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    ticket: SERVER-57617
+  - test_file: jstests/replsets/tenant_migration_retryable_write_retry.js
+    ticket: SERVER-57617
+  - test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
+    ticket: SERVER-57617
+  - test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
+    ticket: SERVER-57617
+  - test_file: jstests/sharding/resharding_min_fetch_ts_with_txn.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_clones_duplicate_key.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_abort_command.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_clones_initial_data.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_commit.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_collection_cloner_resuming.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/reshard_collection_existing_sk_index_not_duplicated.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_metrics.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_fails_on_nonempty_stash.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_txn_cloner.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_size_estimate.js
+    ticket: SERVER-57667
+  - test_file: jstests/sharding/resharding_histogram_metrics.js
+    ticket: SERVER-57700
+  - test_file: jstests/core/timeseries/timeseries_bucket_drop.js
+    ticket: SERVER-57729
+  - test_file: jstests/sharding/resharding_metrics.js
+    ticket: SERVER-57766
+  - test_file: jstests/sharding/query/pipeline_length_limit.js
+    ticket: SERVER-58203
+  - test_file: jstests/replsets/tenant_migration_aborted_buildindex.js
+    ticket: SERVER-58353
+  - test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
+    ticket: SERVER-58636
+  - test_file: jstests/sharding/implicit_default_write_concern_add_shard.js
+    ticket: SERVER-58696
+  - test_file: jstests/replsets/write_concern_write_to_local.js
+    ticket: SERVER-58898
+  - test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
+    ticket: SERVER-59023
+  - test_file: jstests/replsets/rollback_transaction_table.js
+    ticket: SERVER-59057
+  - test_file: jstests/replsets/stepdown_race_with_transaction.js
+    ticket: SERVER-59108
+  - test_file: jstests/sharding/change_stream_show_migration_events.js
+    ticket: SERVER-59424
+  - test_file: jstests/core/timeseries/timeseries_find.js
+    ticket: SERVER-59505
+  - test_file: jstests/replsets/tenant_migration_recipient_access_blocker_rollback.js
+    ticket: SERVER-59525
+  - test_file: jstests/replsets/sync_source_selection_ignores_minvalid_after_rollback.js
+    ticket: SERVER-59721
+  - test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
+    ticket: SERVER-59721
+  - test_file: jstests/aggregation/expressions/date_add_subtract.js
+    ticket: SERVER-59765
+  - test_file: jstests/sharding/test_resharding_test_fixture_shutdown_retry_needed.js
+    ticket: SERVER-59923
+  - test_file: jstests/sharding/write_transactions_during_migration.js
+    ticket: SERVER-59952
+  - test_file: jstests/sharding/retryable_writes.js
+    ticket: SERVER-59952
+  - test_file: jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
+    ticket: SERVER-59952
+  - test_file: jstests/replsets/dont_set_invalid_rwconcern.js
+    ticket: SERVER-60817
+  - test_file: jstests/replsets/tenant_migration_donor_resume_on_stepup_and_restart.js
+    ticket: SERVER-60829
+  - test_file: jstests/core/sbe/sbe_ixscan_explain.js
+    ticket: SERVER-61087
+  - test_file: jstests/replsets/tenant_migration_transaction_boundary.js
+    ticket: SERVER-61666
+  - test_file: jstests/sharding/range_deleter_interacts_correctly_with_refine_shard_key.js
+    ticket: SERVER-61755
+  - test_file: jstests/replsets/dbcheck.js
+    ticket: SERVER-61757
+  - test_file: jstests/replsets/reconfig_may_not_remove_custom_wc_in_use.js
+    ticket: SERVER-61864
+  - test_file: jstests/replsets/default_write_concern_race_with_config_tags.js
+    ticket: SERVER-61864
+  - test_file: jstests/replsets/config_tags_race_with_default_write_concern.js
+    ticket: SERVER-61864
+  - test_file: jstests/auth/dbcheck.js
+    ticket: SERVER-61955
+  - test_file: jstests/replsets/rollback_during_step_up.js
+    ticket: SERVER-61977
+  - test_file: jstests/sharding/recover_multiple_migrations_on_stepup.js
+    ticket: SERVER-62245
+  - test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
+    ticket: SERVER-62296
+  - test_file: jstests/sharding/max_time_ms_does_not_leak_shard_cursor.js
+    ticket: SERVER-62710
+  - test_file: jstests/replsets/apply_ops_dropDatabase.js
+    ticket: SERVER-62759
+  - test_file: jstests/replsets/tenant_migration_cloning_uses_read_concern_majority.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_collection_ttl.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_concurrent_reads_on_recipient.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_concurrent_writes_on_recipient.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_recipient_current_op.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_retry_session_migration.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_timeseries_retryable_write_retry_on_recipient.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_recipient_initial_sync_recovery.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_recipient_startup_recovery.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_network_error_via_rollback.js
+    ticket: SERVER-63122
+  - test_file: jstests/replsets/tenant_migration_resume_collection_cloner_after_recipient_failover_with_dropped_views.js
+    ticket: SERVER-63129
+  - test_file: jstests/replsets/buildindexes_false_commit_quorum.js
+    ticket: SERVER-63531
+  - test_file: jstests/sharding/refine_collection_shard_key_basic.js
+    ticket: SERVER-64142
+  - test_file: jstests/core/plan_cache_sbe.js
+    ticket: SERVER-64315
+  - test_file: jstests/core/sbe/plan_cache_sbe_with_or_queries.js
+    ticket: SERVER-64315
+  - test_file: jstests/core/sbe_plan_cache_autoparameterize_collscan.js
+    ticket: SERVER-64315
+  - test_file: jstests/core/wildcard_index_cached_plans.js
+    ticket: SERVER-64315
+  - test_file: jstests/sharding/resharding_metrics_increment.js
+    ticket: SERVER-64395
+  - test_file: jstests/sharding/resharding_abort_command.js
+    ticket: SERVER-64395
+  - test_file: jstests/sharding/update_with_dollar_fields.js
+    ticket: SERVER-64485
+  - test_file: jstests/sharding/shard_key_index_must_exist.js
+    ticket: SERVER-6491
+  - test_file: jstests/sharding/change_stream_shard_failover.js
+    ticket: SERVER-65022
+  - test_file: jstests/sharding/database_versioning_all_commands.js
+    ticket: SERVER-65101
+  - test_file: jstests/sharding/sessions_collection_auto_healing.js
+    ticket: SERVER-65188
+  - test_file: jstests/replsets/sessions_collection_auto_healing.js
+    ticket: SERVER-65188
+  - test_file: jstests/replsets/capped_deletes.js
+    ticket: SERVER-65261
+  - test_file: jstests/replsets/tenant_migration_recipient_rollback_recovery.js
+    ticket: SERVER-65300
+  - test_file: jstests/aggregation/agg_infinite_recursion.js
+    ticket: SERVER-65773
+  - test_file: jstests/sharding/migration_retries_on_write_conflict_exceptions.js
+    ticket: SERVER-65947
+  - test_file: jstests/aggregation/match_no_swap_rand.js
+    ticket: SERVER-66072
+  - test_file: jstests/sharding/data_size_aware_balancing_sessions_collection.js
+    ticket: SERVER-66078
+  - test_file: jstests/replsets/initial_sync_with_partial_transaction.js
+    ticket: SERVER-66089
+  - test_file: jstests/core/or_to_in.js
+    ticket: SERVER-66379
+  - test_file: jstests/core/where_multiple_plans.js
+    ticket: SERVER-66389
+  - test_file: jstests/sharding/resharding_metrics.js
+    ticket: SERVER-66422
+  - test_file: jstests/concurrency/fsm_workloads/find_flip_sbe_enabled.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/index_stats.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/wildcard_index_cached_plans.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/index_filter_commands_invalidate_plan_cache_entries.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/idhack.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/sbe/sbe_explain_rejected_plans.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/plan_cache_list_shapes.js
+    ticket: SERVER-66445
+  - test_file: jstests/core/plan_cache_list_plans.js
+    ticket: SERVER-66445
+  - test_file: jstests/replsets/dbhash_lock_acquisition.js
+    ticket: SERVER-66719
+  - test_file: jstests/replsets/prepared_transaction_kill_during_step_up_refresh.js
+    ticket: SERVER-66854
+  - test_file: jstests/replsets/step_up_kill_abort_transactions.js
+    ticket: SERVER-66854
+  - test_file: jstests/sharding/drop_index_fails_if_multikey_index_is_last_compatible.js
+    ticket: SERVER-67299
+  - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
+    ticket: SERVER-67492
+  - test_file: jstests/replsets/optime.js
+    ticket: SERVER-67532
+  - test_file: jstests/replsets/internal_sessions_reaping_basic.js
+    ticket: SERVER-67723
+  - test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
+    ticket: SERVER-67885
+  - test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
+    ticket: SERVER-68556
+  - test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
+    ticket: SERVER-68556
+  - test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
+    ticket: SERVER-68628
+  - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
+    ticket: SERVER-68728
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_cannot_vote_twice_same_term.js
+    ticket: SERVER-69861
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
+    ticket: SERVER-69861
+  - test_file: jstests/aggregation/expressions/switch_errors.js
+    ticket: SERVER-70190
+  suites: null
