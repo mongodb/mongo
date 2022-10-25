@@ -2664,6 +2664,8 @@ tasks:
   commands:
   - func: "scons compile"
     vars:
+      task_compile_flags: >-
+        --build-profile=compiledb
       targets: compiledb
       compiling_for_test: true
       compile_flags: >-
