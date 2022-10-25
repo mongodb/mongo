@@ -37,7 +37,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"

@@ -37,7 +37,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"

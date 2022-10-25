@@ -38,7 +38,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

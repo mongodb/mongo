@@ -34,7 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_databases_gen.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"

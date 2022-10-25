@@ -32,7 +32,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
@@ -114,7 +114,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
             if (_callbacks) {
                 _callbacks->handledWriteConflict(opCtx);
             }
-            WriteConflictException::logAndBackoff(attempt, "query yield", ""_sd);
+            logWriteConflictAndBackoff(attempt, "query yield", ""_sd);
             // Retry the yielding process.
         } catch (...) {
             // Errors other than write conflicts don't get retried, and should instead result in

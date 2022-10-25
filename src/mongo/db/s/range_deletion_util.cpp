@@ -40,7 +40,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/working_set_common.h"

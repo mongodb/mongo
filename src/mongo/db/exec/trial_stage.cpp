@@ -34,7 +34,7 @@
 #include <algorithm>
 #include <memory>
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set_common.h"

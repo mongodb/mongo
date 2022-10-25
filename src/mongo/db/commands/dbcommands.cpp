@@ -57,7 +57,6 @@
 #include "mongo/db/coll_mod_reply_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"

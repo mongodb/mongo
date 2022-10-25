@@ -31,7 +31,7 @@
 
 #include "mongo/db/query/wildcard_multikey_paths.h"
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/record_id_helpers.h"

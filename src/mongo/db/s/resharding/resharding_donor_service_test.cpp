@@ -34,7 +34,6 @@
 #include <boost/optional/optional_io.hpp>
 #include <utility>
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"

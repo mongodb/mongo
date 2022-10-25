@@ -36,7 +36,7 @@
 
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/view_catalog.h"

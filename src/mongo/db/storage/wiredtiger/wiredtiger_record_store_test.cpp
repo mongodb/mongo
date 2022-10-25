@@ -38,7 +38,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"

@@ -36,7 +36,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"

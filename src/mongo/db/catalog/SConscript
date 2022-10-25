@@ -137,7 +137,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog_raii',
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         'multi_index_block',
     ]
@@ -205,6 +205,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/catalog/collection_query_info',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
@@ -247,7 +248,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog_raii',
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/resumable_index_builds_idl',
@@ -285,7 +286,7 @@ env.Library(
         'collection',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/idl/server_parameter',
     ]
@@ -494,6 +495,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/query_exec',

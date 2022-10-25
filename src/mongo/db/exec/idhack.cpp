@@ -34,7 +34,7 @@
 #include <memory>
 
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/scoped_timer.h"

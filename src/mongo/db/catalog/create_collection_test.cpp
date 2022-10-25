@@ -34,7 +34,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator.h"

@@ -168,6 +168,7 @@ protected:
     }
 };
 
+class WriteConflictException;
 
 /**
  * This namespace contains implementation details for our error handling code and should not be used
@@ -204,6 +205,11 @@ struct ExceptionForDispatcher<code, CategoryList<categories...>> {
     using type = std::conditional_t<sizeof...(categories) == 0,
                                     ExceptionForImpl<code, AssertionException>,
                                     ExceptionForImpl<code, ExceptionForCat<categories>...>>;
+};
+
+template <>
+struct ExceptionForDispatcher<ErrorCodes::WriteConflict> {
+    using type = WriteConflictException;
 };
 
 }  // namespace error_details

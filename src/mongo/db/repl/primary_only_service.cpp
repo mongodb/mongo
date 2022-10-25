@@ -38,7 +38,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"

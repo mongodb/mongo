@@ -33,7 +33,7 @@
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/unittest/unittest.h"
 

@@ -30,7 +30,7 @@
 #include "mongo/db/exec/upsert_stage.h"
 
 #include "mongo/db/catalog/local_oplog_info.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/s/operation_sharding_state.h"

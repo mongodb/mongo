@@ -42,7 +42,7 @@
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
@@ -249,7 +249,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         } catch (const WriteConflictException&) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             retries++;  // logAndBackoff expects this to be 1 on first call.
-            WriteConflictException::logAndBackoff(retries, "cloneCollectionAsCapped", fromNss.ns());
+            logWriteConflictAndBackoff(retries, "cloneCollectionAsCapped", fromNss.ns());
 
             // Can't use writeConflictRetry since we need to save/restore exec around call to
             // abandonSnapshot.

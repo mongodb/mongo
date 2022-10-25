@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/logical_session_id_helpers.h"

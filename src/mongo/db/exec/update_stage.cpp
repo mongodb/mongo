@@ -39,7 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/write_stage_common.h"

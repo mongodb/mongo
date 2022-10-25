@@ -46,6 +46,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
         '$BUILD_DIR/mongo/db/repl/primary_only_service',

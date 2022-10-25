@@ -33,7 +33,7 @@
 
 #include <mutex>
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/util/fail_point.h"

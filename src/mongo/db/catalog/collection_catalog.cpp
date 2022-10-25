@@ -34,8 +34,8 @@
 
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_helper.h"

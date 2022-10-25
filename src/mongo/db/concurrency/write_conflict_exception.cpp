@@ -27,17 +27,12 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
-
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/util/log_and_backoff.h"
+
+#include "mongo/base/error_codes.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
-
-AtomicWord<bool> WriteConflictException::trace(false);
 
 WriteConflictException::WriteConflictException()
     : DBException(Status(ErrorCodes::WriteConflict,
@@ -48,13 +43,4 @@ WriteConflictException::WriteConflictException()
     }
 }
 
-void WriteConflictException::logAndBackoff(int attempt, StringData operation, StringData ns) {
-    mongo::logAndBackoff(4640401,
-                         ::mongo::logv2::LogComponent::kWrite,
-                         logv2::LogSeverity::Debug(1),
-                         static_cast<size_t>(attempt),
-                         "Caught WriteConflictException",
-                         "operation"_attr = operation,
-                         "ns"_attr = ns);
-}
 }  // namespace mongo

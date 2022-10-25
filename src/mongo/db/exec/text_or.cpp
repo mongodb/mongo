@@ -33,7 +33,7 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/scoped_timer.h"

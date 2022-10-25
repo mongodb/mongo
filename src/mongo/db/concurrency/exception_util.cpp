@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,55 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-#include "mongo/db/catalog/health_log.h"
-#include "mongo/db/catalog/health_log_gen.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/exception_util.h"
+
+#include "mongo/base/counter.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/log_and_backoff.h"
 
 namespace mongo {
 
-namespace {
-const ServiceContext::Decoration<HealthLog> getHealthLog =
-    ServiceContext::declareDecoration<HealthLog>();
+MONGO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
 
-const int64_t kDefaultHealthlogSize = 100'000'000;
-
-CollectionOptions getOptions(void) {
-    CollectionOptions options;
-    options.capped = true;
-    options.cappedSize = kDefaultHealthlogSize;
-    options.setNoIdIndex();
-    return options;
-}
-}  // namespace
-
-HealthLog::HealthLog() : _writer(nss, getOptions(), kMaxBufferSize) {}
-
-void HealthLog::startup(void) {
-    _writer.startup(std::string("healthlog writer"));
+void logWriteConflictAndBackoff(int attempt, StringData operation, StringData ns) {
+    logAndBackoff(4640401,
+                  logv2::LogComponent::kWrite,
+                  logv2::LogSeverity::Debug(1),
+                  static_cast<size_t>(attempt),
+                  "Caught WriteConflictException",
+                  "operation"_attr = operation,
+                  logAttrs(NamespaceString(ns)));
 }
 
-void HealthLog::shutdown(void) {
-    _writer.shutdown();
-}
-
-HealthLog& HealthLog::get(ServiceContext* svcCtx) {
-    return getHealthLog(svcCtx);
-}
-
-HealthLog& HealthLog::get(OperationContext* opCtx) {
-    return getHealthLog(opCtx->getServiceContext());
-}
-
-bool HealthLog::log(const HealthLogEntry& entry) {
-    BSONObjBuilder builder;
-    OID oid;
-    oid.init();
-    builder.append("_id", oid);
-    entry.serialize(&builder);
-    return _writer.insertDocument(builder.obj());
-}
-
-const NamespaceString HealthLog::nss("local", "system.healthlog");
 }  // namespace mongo

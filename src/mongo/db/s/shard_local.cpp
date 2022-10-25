@@ -36,7 +36,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/repl_client_info.h"
