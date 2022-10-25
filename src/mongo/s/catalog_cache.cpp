@@ -394,22 +394,22 @@ StatusWith<ChunkManager> CatalogCache::getCollectionRoutingInfoAt(OperationConte
     return _getCollectionRoutingInfoAt(opCtx, nss, atClusterTime, false);
 }
 
-GlobalIndexesCache CatalogCache::getCollectionIndexInfo(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        bool allowLocks) {
+boost::optional<GlobalIndexesCache> CatalogCache::getCollectionIndexInfo(OperationContext* opCtx,
+                                                                         const NamespaceString& nss,
+                                                                         bool allowLocks) {
     return _getCollectionIndexInfoAt(opCtx, nss, boost::none, allowLocks);
 }
 
-GlobalIndexesCache CatalogCache::getCollectionIndexInfoAt(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          Timestamp atClusterTime) {
+boost::optional<GlobalIndexesCache> CatalogCache::getCollectionIndexInfoAt(
+    OperationContext* opCtx, const NamespaceString& nss, Timestamp atClusterTime) {
     return _getCollectionIndexInfoAt(opCtx, nss, atClusterTime, false);
 }
 
-GlobalIndexesCache CatalogCache::_getCollectionIndexInfoAt(OperationContext* opCtx,
-                                                           const NamespaceString& nss,
-                                                           boost::optional<Timestamp> atClusterTime,
-                                                           bool allowLocks) {
+boost::optional<GlobalIndexesCache> CatalogCache::_getCollectionIndexInfoAt(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<Timestamp> atClusterTime,
+    bool allowLocks) {
     if (!allowLocks) {
         invariant(!opCtx->lockState() || !opCtx->lockState()->isLocked(),
                   "Do not hold a lock while refreshing the catalog cache. Doing so would "
@@ -444,7 +444,7 @@ GlobalIndexesCache CatalogCache::_getCollectionIndexInfoAt(OperationContext* opC
         uassert(ShardCannotRefreshDueToLocksHeldInfo(nss),
                 "Index info refresh did not complete",
                 indexEntryFuture.isReady());
-        return *indexEntryFuture.get(opCtx);
+        return indexEntryFuture.get(opCtx)->optGii;
     }
 
     // From this point we can guarantee that allowLocks is false
@@ -456,7 +456,7 @@ GlobalIndexesCache CatalogCache::_getCollectionIndexInfoAt(OperationContext* opC
         try {
             auto indexEntry = indexEntryFuture.get(opCtx);
 
-            return std::move(*indexEntry);
+            return indexEntry->optGii;
         } catch (const DBException& ex) {
             bool isCatalogCacheRetriableError = ex.isA<ErrorCategory::SnapshotError>() ||
                 ex.code() == ErrorCodes::ConflictingOperationInProgress ||
@@ -495,8 +495,8 @@ StatusWith<ChunkManager> CatalogCache::getCollectionRoutingInfoWithRefresh(
     return getCollectionRoutingInfo(opCtx, nss);
 }
 
-GlobalIndexesCache CatalogCache::getCollectionIndexInfoWithRefresh(OperationContext* opCtx,
-                                                                   const NamespaceString& nss) {
+boost::optional<GlobalIndexesCache> CatalogCache::getCollectionIndexInfoWithRefresh(
+    OperationContext* opCtx, const NamespaceString& nss) {
     _indexCache.advanceTimeInStore(
         nss, ComparableIndexVersion::makeComparableIndexVersionForForcedRefresh());
     setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
@@ -561,10 +561,8 @@ void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
 
     const bool routingInfoTimeAdvanced = _collectionCache.advanceTimeInStore(nss, newChunkVersion);
 
-    // TODO(SERVER-70195): replace boost::none with wantedVersion->indexVersion() once the
-    // ComparableIndexVersion takes a timestamp and not a CollectionIndexes.
     const auto newIndexVersion = wantedVersion
-        ? ComparableIndexVersion::makeComparableIndexVersion(boost::none)
+        ? ComparableIndexVersion::makeComparableIndexVersion(wantedVersion->indexVersion())
         : ComparableIndexVersion::makeComparableIndexVersionForForcedRefresh();
 
     _indexCache.advanceTimeInStore(nss, newIndexVersion);
@@ -922,7 +920,7 @@ CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
     const ValueHandle& indexes,
     const ComparableIndexVersion& previousVersion) {
 
-    // This object will define the new time of the routing info obtained by this refresh
+    // This object will define the new time of the index info obtained by this refresh
     ComparableIndexVersion newComparableVersion =
         ComparableIndexVersion::makeComparableIndexVersion(boost::none);
 
@@ -944,14 +942,9 @@ CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
         auto collAndIndexes = Grid::get(opCtx)->catalogClient()->getCollectionAndGlobalIndexes(
             opCtx, nss, readConcern);
         const auto& coll = collAndIndexes.first;
+        const auto& indexVersion = coll.getIndexVersion();
         newComparableVersion.setCollectionIndexes(
-            coll.getIndexVersion() ? boost::make_optional(CollectionIndexes(
-                                         coll.getUuid(), coll.getIndexVersion()->indexVersion()))
-                                   : boost::none);
-        IndexCatalogTypeMap newIndexesMap;
-        for (const auto& index : collAndIndexes.second) {
-            newIndexesMap[index.getName()] = index;
-        }
+            indexVersion ? boost::make_optional(indexVersion->indexVersion()) : boost::none);
 
         LOGV2_FOR_CATALOG_REFRESH(6686303,
                                   newComparableVersion != previousVersion ? 0 : 1,
@@ -959,11 +952,20 @@ CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
                                   "namespace"_attr = nss,
                                   "newVersion"_attr = newComparableVersion,
                                   "timeInStore"_attr = previousVersion);
+
+        if (!indexVersion) {
+            return LookupResult(OptionalGlobalIndexesInfo(), std::move(newComparableVersion));
+        }
+
+        IndexCatalogTypeMap newIndexesMap;
+        for (const auto& index : collAndIndexes.second) {
+            newIndexesMap[index.getName()] = index;
+        }
+
         return LookupResult(
-            GlobalIndexesCache(coll.getIndexVersion()
-                                   ? boost::make_optional(coll.getIndexVersion()->indexVersion())
-                                   : boost::none,
-                               std::move(newIndexesMap)),
+            OptionalGlobalIndexesInfo(GlobalIndexesCache(
+                indexVersion ? boost::make_optional(indexVersion->indexVersion()) : boost::none,
+                std::move(newIndexesMap))),
             std::move(newComparableVersion));
     } catch (const DBException& ex) {
         LOGV2_FOR_CATALOG_REFRESH(6686304,

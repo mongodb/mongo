@@ -188,9 +188,9 @@ public:
      * If the given atClusterTime is so far in the past that it is not possible to construct index
      * info, returns a StaleClusterTime error.
      */
-    GlobalIndexesCache getCollectionIndexInfoAt(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                Timestamp atClusterTime);
+    boost::optional<GlobalIndexesCache> getCollectionIndexInfoAt(OperationContext* opCtx,
+                                                                 const NamespaceString& nss,
+                                                                 Timestamp atClusterTime);
 
     /**
      * Same as the getCollectionIndexInfoAt call above, but returns the latest known index
@@ -200,9 +200,9 @@ public:
      * guaranteed to never throw StaleClusterTime, because the latest index information should
      * always be available.
      */
-    virtual GlobalIndexesCache getCollectionIndexInfo(OperationContext* opCtx,
-                                                      const NamespaceString& nss,
-                                                      bool allowLocks = false);
+    virtual boost::optional<GlobalIndexesCache> getCollectionIndexInfo(OperationContext* opCtx,
+                                                                       const NamespaceString& nss,
+                                                                       bool allowLocks = false);
 
     /**
      * Same as getDatbase above, but in addition forces the database entry to be refreshed.
@@ -219,8 +219,8 @@ public:
     /**
      * Same as getCollectionIndexInfo above, but in addition causes the namespace to be refreshed.
      */
-    GlobalIndexesCache getCollectionIndexInfoWithRefresh(OperationContext* opCtx,
-                                                         const NamespaceString& nss);
+    boost::optional<GlobalIndexesCache> getCollectionIndexInfoWithRefresh(
+        OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Same as getCollectionRoutingInfo above, but throws NamespaceNotSharded error if the namespace
@@ -389,10 +389,11 @@ private:
                                                          boost::optional<Timestamp> atClusterTime,
                                                          bool allowLocks = false);
 
-    GlobalIndexesCache _getCollectionIndexInfoAt(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 boost::optional<Timestamp> atClusterTime,
-                                                 bool allowLocks = false);
+    boost::optional<GlobalIndexesCache> _getCollectionIndexInfoAt(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<Timestamp> atClusterTime,
+        bool allowLocks = false);
 
     // Interface from which chunks will be retrieved
     CatalogCacheLoader& _cacheLoader;

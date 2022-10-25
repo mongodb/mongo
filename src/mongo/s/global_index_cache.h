@@ -66,22 +66,21 @@ private:
  * Constructed to be used exclusively by the CatalogCache as a vector clock (Time) to drive
  * IndexCache's lookups.
  *
- * The CollectionIndexes class contains a timestamp for the collection generation which resets to 0
- * if the collection is dropped, in which case the versions cannot be compared.
+ * This class wraps an IndexVersion timestamp with a disambiguating sequence number and a forced
+ * refresh sequence number. When a collection is dropped and recreated, the index version resets to
+ * boost::none. This cannot be compared with a valid timestamp, so the disambiguatingSequenceNumber
+ * is used to compare those cases.
  *
- * This class wraps a CollectionIndexes object with a node-local sequence number
- * (_epochDisambiguatingSequenceNum) that allows the comparision.
- *
+ * Two ComparableIndexVersions with no indexes (boost::none timestamp) will always be the same
+ * regardless of the collection they refer to.
  */
 class ComparableIndexVersion {
 public:
     /**
-     * Creates a ComparableIndexVersion that wraps the given CollectionIndexes.
-     * Each object created through this method will have a local sequence number greater than the
-     * previously created ones.
+     * Creates a ComparableIndexVersion that wraps the CollectionIndexes' timestamp.
      */
     static ComparableIndexVersion makeComparableIndexVersion(
-        const boost::optional<CollectionIndexes>& version);
+        const boost::optional<Timestamp>& version);
 
     /**
      * Creates a new instance which will artificially be greater than any previously created
@@ -93,10 +92,6 @@ public:
 
     /**
      * Empty constructor needed by the ReadThroughCache.
-     *
-     * Instances created through this constructor will be always less then the ones created through
-     * the two static constructors, but they do not carry any meaningful value and can only be used
-     * for comparison purposes.
      */
     ComparableIndexVersion() = default;
 
@@ -109,9 +104,8 @@ public:
     }
 
     /**
-     * In case the two compared instances have different generations, the most recently created one
-     * will be greater, otherwise the comparision will be driven by the index versions of the
-     * underlying CollectionIndexes.
+     * Two boost::none timestamps will always evaluate as equal. If one version is boost::none and
+     * the other has a timestamp, the comparison will depend on the disambiguating sequence number.
      */
     bool operator<(const ComparableIndexVersion& other) const;
 
@@ -130,29 +124,46 @@ public:
 private:
     friend class CatalogCache;
 
-    static AtomicWord<uint64_t> _epochDisambiguatingSequenceNumSource;
+    static AtomicWord<uint64_t> _disambiguatingSequenceNumSource;
     static AtomicWord<uint64_t> _forcedRefreshSequenceNumSource;
 
     ComparableIndexVersion(uint64_t forcedRefreshSequenceNum,
-                           boost::optional<CollectionIndexes> version,
-                           uint64_t epochDisambiguatingSequenceNum)
+                           boost::optional<Timestamp> version,
+                           uint64_t disambiguatingSequenceNum)
         : _forcedRefreshSequenceNum(forcedRefreshSequenceNum),
           _indexVersion(std::move(version)),
-          _epochDisambiguatingSequenceNum(epochDisambiguatingSequenceNum) {}
+          _disambiguatingSequenceNum(disambiguatingSequenceNum) {}
 
-    void setCollectionIndexes(const boost::optional<CollectionIndexes>& version);
+    void setCollectionIndexes(const boost::optional<Timestamp>& version);
 
     uint64_t _forcedRefreshSequenceNum{0};
 
-    boost::optional<CollectionIndexes> _indexVersion;
+    boost::optional<Timestamp> _indexVersion;
 
-    // Locally incremented sequence number that allows to compare two colection versions with
-    // different generations. Each new ComparableIndexVersion will have a greater sequence number
-    // than the ones created before.
-    uint64_t _epochDisambiguatingSequenceNum{0};
+    // Locally incremented sequence number that allows to compare two versions where one is
+    // boost::none and the other has a timestamp. Two boost::none versions with different
+    // disambiguating sequence numbers are still considered equal.
+    uint64_t _disambiguatingSequenceNum{0};
+};
+
+/**
+ * This intermediate structure is necessary to be able to store collections without any global
+ * indexes in the cache. The cache does not allow for an empty value, so this intermediate structure
+ * is needed.
+ */
+struct OptionalGlobalIndexesInfo {
+    // No indexes constructor.
+    OptionalGlobalIndexesInfo() = default;
+
+    // Constructor with global indexes
+    OptionalGlobalIndexesInfo(GlobalIndexesCache gii) : optGii(std::move(gii)) {}
+
+    // If nullptr, the collection has an index version of boost::none and no global indexes.
+    // Otherwise, the index version is some valid timestamp (there still may be no global indexes).
+    boost::optional<GlobalIndexesCache> optGii;
 };
 
 using GlobalIndexesCacheBase =
-    ReadThroughCache<NamespaceString, GlobalIndexesCache, ComparableIndexVersion>;
+    ReadThroughCache<NamespaceString, OptionalGlobalIndexesInfo, ComparableIndexVersion>;
 
 }  // namespace mongo

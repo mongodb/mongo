@@ -236,24 +236,24 @@ public:
     /**
      * Gets the index list under a lock.
      */
-    GlobalIndexesCache& getIndexes(OperationContext* opCtx);
+    boost::optional<GlobalIndexesCache>& getIndexes(OperationContext* opCtx);
 
     /**
-     * Add a new index to the shard-role index cache under a lock.
+     * Add a new index to the shard-role index info under a lock.
      */
     void addIndex(OperationContext* opCtx,
                   const IndexCatalogType& index,
                   const Timestamp& indexVersion);
 
     /**
-     * Removes an index from the shard-role index cache under a lock.
+     * Removes an index from the shard-role index info under a lock.
      */
     void removeIndex(OperationContext* opCtx,
                      const std::string& name,
                      const Timestamp& indexVersion);
 
     /**
-     * Clears the shard-role index cache and set the indexVersion to boost::none.
+     * Clears the shard-role index info and set the indexVersion to boost::none.
      */
     void clearIndexes(OperationContext* opCtx);
 
@@ -349,11 +349,9 @@ private:
     // a CancellationSource to cancel it
     boost::optional<ShardVersionRecoverOrRefresh> _shardVersionInRecoverOrRefresh;
 
-    // Contains the latest index version of the collection. This is used to indicate the creation or
-    // drop of a global index.
-    boost::optional<Timestamp> _indexVersion;
-
-    GlobalIndexesCache _indexCache;
+    // Contains the global indexes for the collection. This will be boost::none if no global indexes
+    // have ever been created for the collection.
+    boost::optional<GlobalIndexesCache> _globalIndexesInfo;
 };
 
 /**

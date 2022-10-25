@@ -606,14 +606,14 @@ public:
 TEST_F(CollectionShardingRuntimeWithCatalogTest, TestGlobalIndexesCache) {
     OperationContext* opCtx = operationContext();
 
-    ASSERT_EQ(true, csr().getIndexes(opCtx).empty());
+    ASSERT_EQ(false, csr().getIndexes(opCtx).is_initialized());
 
     Timestamp indexVersion(1, 0);
     addGlobalIndexCatalogEntryToCollection(
         opCtx, kTestNss, "x_1", BSON("x" << 1), BSONObj(), uuid(), indexVersion, boost::none);
 
-    ASSERT_EQ(false, csr().getIndexes(opCtx).empty());
-    ASSERT_EQ(indexVersion, *csr().getIndexes(opCtx).getVersion());
+    ASSERT_EQ(true, csr().getIndexes(opCtx).is_initialized());
+    ASSERT_EQ(indexVersion, *csr().getIndexes(opCtx)->getVersion());
     ASSERT_EQ(indexVersion, *csr().getIndexVersion(opCtx));
 }
 }  // namespace
