@@ -177,6 +177,16 @@ public:
         _slots.erase(str);
     }
 
+    void clearAllFields() {
+        for (auto it = _slots.begin(); it != _slots.end();) {
+            if (it->first.first == kField) {
+                _slots.erase(it++);
+                continue;
+            }
+            ++it;
+        }
+    }
+
     /**
      * This method applies an action to some/all of the slots within this struct. For each slot in
      * this struct, the action is will be applied to the slot if (and only if) the corresponding
@@ -326,7 +336,7 @@ public:
     PlanStageReqs& clearAllOfType(Type t) {
         auto fields = getOfType(t);
         for (const auto& field : fields) {
-            _slots.erase(std::make_pair(kField, StringData(field)));
+            _slots.erase(std::make_pair(t, StringData(field)));
         }
         return *this;
     }
@@ -631,9 +641,7 @@ private:
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionDefaultCovered(
-        const QuerySolutionNode* root,
-        const PlanStageReqs& reqs,
-        const IndexScanNode* ixn = nullptr);
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildOr(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);

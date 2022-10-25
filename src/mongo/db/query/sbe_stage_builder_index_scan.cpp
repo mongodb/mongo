@@ -714,9 +714,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                      accessMethod->getSortedDataInterface()->getKeyStringVersion(),
                                      accessMethod->getSortedDataInterface()->getOrdering());
 
-    std::unique_ptr<sbe::PlanStage> stage;
-    PlanStageSlots outputs;
-
     // Determine the set of fields from the index required to apply the filter and union those with
     // the set of fields from the index required by the parent stage.
     auto [indexFilterKeyBitset, indexFilterKeyFields] = [&]() {
@@ -728,39 +725,39 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
         return std::make_pair(sbe::IndexKeysInclusionSet{}, std::vector<std::string>{});
     }();
     auto indexKeyBitset = originalIndexKeyBitset | indexFilterKeyBitset;
-    auto indexKeySlots = state.slotIdGenerator->generateMultiple(indexKeyBitset.count());
-    sbe::value::SlotVector relevantSlots;
 
-    // Generate the relevant slots and add the access method corresponding to 'indexName' to
-    // 'iamMap' if a parent stage needs to execute a consistency check.
-    boost::optional<sbe::value::SlotId> snapshotIdSlot;
-    boost::optional<sbe::value::SlotId> indexIdSlot;
-    boost::optional<sbe::value::SlotId> indexKeySlot;
+    std::vector<std::string> keys;
+    size_t i = 0;
+    for (const auto& elt : ixn->index.keyPattern) {
+        if (indexKeyBitset.test(i)) {
+            keys.emplace_back(elt.fieldNameStringData());
+        }
+        ++i;
+    }
 
+    // Add the access method corresponding to 'indexName' to 'iamMap' if needed.
     if (iamMap) {
         iamMap->insert({indexName, accessMethod});
-
-        snapshotIdSlot = state.slotId();
-        outputs.set(PlanStageSlots::kSnapshotId, *snapshotIdSlot);
-        relevantSlots.push_back(*snapshotIdSlot);
-
-        indexIdSlot = state.slotId();
-        outputs.set(PlanStageSlots::kIndexId, *indexIdSlot);
-        relevantSlots.push_back(*indexIdSlot);
-
-        indexKeySlot = state.slotId();
-        outputs.set(PlanStageSlots::kIndexKey, *indexKeySlot);
-        relevantSlots.push_back(*indexKeySlot);
     }
 
-    // Generate a slot for an index key pattern if a parent stage needs to execute a corruption
-    // check.
-    boost::optional<sbe::value::SlotId> indexKeyPatternSlot;
-    if (needsCorruptionCheck) {
-        indexKeyPatternSlot = state.slotId();
-        outputs.set(PlanStageSlots::kIndexKeyPattern, *indexKeyPatternSlot);
-        relevantSlots.push_back(*indexKeyPatternSlot);
+    // Generate the various slots needed for a consistency check and/or a corruption check if
+    // requested. Also generate slots for the index keys that are required by 'indexKeyBitset'.
+    PlanStageReqs reqs;
+    reqs.setIf(PlanStageSlots::kSnapshotId, iamMap)
+        .setIf(PlanStageSlots::kIndexId, iamMap)
+        .setIf(PlanStageSlots::kIndexKey, iamMap)
+        .setIf(PlanStageSlots::kIndexKeyPattern, needsCorruptionCheck)
+        .setKeys(keys);
+
+    PlanStageSlots outputs(reqs, state.slotIdGenerator);
+    std::unique_ptr<sbe::PlanStage> stage;
+
+    auto indexKeySlots = sbe::makeSV();
+    for (const auto& key : keys) {
+        indexKeySlots.emplace_back(outputs.get(std::make_pair(PlanStageSlots::kKey, key)));
     }
+
+    reqs.set(PlanStageSlots::kRecordId);
 
     if (intervals.size() == 1) {
         // If we have just a single interval, we can construct a simplified sub-tree.
@@ -777,10 +774,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                             std::move(highKey),
                                             indexKeyBitset,
                                             indexKeySlots,
-                                            snapshotIdSlot,
-                                            indexIdSlot,
-                                            indexKeySlot,
-                                            indexKeyPatternSlot,
+                                            outputs.getIfExists(PlanStageSlots::kSnapshotId),
+                                            outputs.getIfExists(PlanStageSlots::kIndexId),
+                                            outputs.getIfExists(PlanStageSlots::kIndexKey),
+                                            outputs.getIfExists(PlanStageSlots::kIndexKeyPattern),
                                             yieldPolicy,
                                             ixn->nodeId());
 
@@ -789,21 +786,21 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
         // If we were able to decompose multi-interval index bounds into a number of single-interval
         // bounds, we can also built an optimized sub-tree to perform an index scan.
         sbe::value::SlotId recordIdSlot;
-        std::tie(recordIdSlot, stage, std::ignore) =
-            generateOptimizedMultiIntervalIndexScan(state,
-                                                    collection,
-                                                    indexName,
-                                                    keyPattern,
-                                                    ixn->direction == 1,
-                                                    std::move(intervals),
-                                                    indexKeyBitset,
-                                                    indexKeySlots,
-                                                    snapshotIdSlot,
-                                                    indexIdSlot,
-                                                    indexKeySlot,
-                                                    indexKeyPatternSlot,
-                                                    yieldPolicy,
-                                                    ixn->nodeId());
+        std::tie(recordIdSlot, stage, std::ignore) = generateOptimizedMultiIntervalIndexScan(
+            state,
+            collection,
+            indexName,
+            keyPattern,
+            ixn->direction == 1,
+            std::move(intervals),
+            indexKeyBitset,
+            indexKeySlots,
+            outputs.getIfExists(PlanStageSlots::kSnapshotId),
+            outputs.getIfExists(PlanStageSlots::kIndexId),
+            outputs.getIfExists(PlanStageSlots::kIndexKey),
+            outputs.getIfExists(PlanStageSlots::kIndexKeyPattern),
+            yieldPolicy,
+            ixn->nodeId());
 
         outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
     } else {
@@ -819,10 +816,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
             accessMethod->getSortedDataInterface()->getOrdering(),
             indexKeyBitset,
             indexKeySlots,
-            snapshotIdSlot,
-            indexIdSlot,
-            indexKeySlot,
-            indexKeyPatternSlot,
+            outputs.getIfExists(PlanStageSlots::kSnapshotId),
+            outputs.getIfExists(PlanStageSlots::kIndexId),
+            outputs.getIfExists(PlanStageSlots::kIndexKey),
+            outputs.getIfExists(PlanStageSlots::kIndexKeyPattern),
             yieldPolicy);
 
         outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
@@ -833,36 +830,22 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
             std::move(stage), sbe::makeSV(outputs.get(PlanStageSlots::kRecordId)), ixn->nodeId());
     }
 
-    relevantSlots.push_back(outputs.get(PlanStageSlots::kRecordId));
-
     if (ixn->filter) {
-        // We only need to pass those index key slots to the filter generator which correspond to
-        // the fields of the index key pattern that are depended on to compute the predicate.
-        auto indexFilterKeySlots = makeIndexKeyOutputSlotsMatchingParentReqs(
-            ixn->index.keyPattern, indexFilterKeyBitset, indexKeyBitset, indexKeySlots);
-
         // Relevant slots must include slots for all index keys in case they are needed by parent
         // stages (for instance, covered shard filter).
-        relevantSlots.insert(relevantSlots.end(), indexKeySlots.begin(), indexKeySlots.end());
+        auto relevantSlots = getSlotsToForward(reqs, outputs);
 
-        auto outputStage = generateIndexFilter(state,
+        auto [_, outputStage] = generateFilter(state,
                                                ixn->filter.get(),
                                                {std::move(stage), std::move(relevantSlots)},
-                                               std::move(indexFilterKeySlots),
-                                               std::move(indexFilterKeyFields),
-                                               ixn->nodeId());
-        stage = outputStage.extractStage(ixn->nodeId());
-    }
+                                               boost::none,
+                                               &outputs,
+                                               ixn->nodeId(),
+                                               indexFilterKeyFields,
+                                               true /* useKeySlots */,
+                                               false /* trackIndex */);
 
-    size_t i = 0;
-    size_t slotIdx = 0;
-    for (const auto& elt : ixn->index.keyPattern) {
-        StringData name = elt.fieldNameStringData();
-        if (indexKeyBitset.test(i)) {
-            outputs.set(std::make_pair(PlanStageSlots::kKey, name), indexKeySlots[slotIdx]);
-            ++slotIdx;
-        }
-        ++i;
+        stage = outputStage.extractStage(ixn->nodeId());
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -966,8 +949,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     if (iamMap) {
         iamMap->insert({indexName, accessMethod});
     }
+
+    PlanStageReqs reqs;
     PlanStageSlots outputs;
-    sbe::value::SlotVector relevantSlots;
+
     std::unique_ptr<sbe::PlanStage> stage;
     sbe::value::SlotId recordIdSlot;
     ParameterizedIndexScanSlots parameterizedScanSlots;
@@ -995,8 +980,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
                 return boost::none;
 
             const auto slot = state.slotId();
+            reqs.set(slotKey);
             outputs.set(slotKey, slot);
-            relevantSlots.push_back(slot);
             return slot;
         };
 
@@ -1017,7 +1002,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
             makeSlot(needsCorruptionCheck, PlanStageSlots::kIndexKeyPattern),
             yieldPolicy,
             ixn->nodeId());
-        relevantSlots.push_back(recordIdSlot);
+        reqs.set(PlanStageSlots::kRecordId);
         outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
         tassert(6484702,
                 "lowKey and highKey runtime environment slots must be present",
@@ -1041,11 +1026,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
             const auto genericSlot = state.slotId();
             const auto optimizedSlot = state.slotId();
             const auto outputSlot = state.slotId();
+            reqs.set(slotKey);
             outputs.set(slotKey, outputSlot);
             genericIndexScanSlots.push_back(genericSlot);
             optimizedIndexScanSlots.push_back(optimizedSlot);
             branchOutputSlots.push_back(outputSlot);
-            relevantSlots.push_back(outputSlot);
             return {genericSlot, optimizedSlot};
         };
 
@@ -1112,8 +1097,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
             sbe::value::TypeTags::Nothing, 0, true /* owned */, state.slotIdGenerator);
         auto isGenericScanCondition = makeVariable(isGenericScanSlot);
         recordIdSlot = state.slotId();
-        relevantSlots.push_back(recordIdSlot);
         branchOutputSlots.push_back(recordIdSlot);
+        reqs.set(PlanStageSlots::kRecordId);
         outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
         stage = sbe::makeS<sbe::BranchStage>(std::move(genericIndexScanPlanStage),
                                              std::move(optimizedIndexScanPlanStage),
@@ -1132,23 +1117,33 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
             std::move(stage), sbe::makeSV(outputs.get(PlanStageSlots::kRecordId)), ixn->nodeId());
     }
 
-    if (ixn->filter) {
-        // We only need to pass those index key slots to the filter generator which correspond
-        // to the fields of the index key pattern that are depended on to compute the predicate.
-        auto indexFilterKeySlots = makeIndexKeyOutputSlotsMatchingParentReqs(
-            ixn->index.keyPattern, indexFilterKeyBitset, indexKeyBitset, outputIndexKeySlots);
+    size_t i = 0;
+    size_t slotIdx = 0;
+    for (const auto& elt : ixn->index.keyPattern) {
+        StringData name = elt.fieldNameStringData();
+        if (indexKeyBitset.test(i)) {
+            reqs.set(std::make_pair(PlanStageSlots::kKey, name));
+            outputs.set(std::make_pair(PlanStageSlots::kKey, name), outputIndexKeySlots[slotIdx]);
+            ++slotIdx;
+        }
+        ++i;
+    }
 
+    if (ixn->filter) {
         // Relevant slots must include slots for all index keys in case they are needed by parent
         // stages (for instance, covered shard filter).
-        relevantSlots.insert(
-            relevantSlots.end(), outputIndexKeySlots.begin(), outputIndexKeySlots.end());
+        auto relevantSlots = getSlotsToForward(reqs, outputs);
 
-        auto outputStage = generateIndexFilter(state,
+        auto [_, outputStage] = generateFilter(state,
                                                ixn->filter.get(),
                                                {std::move(stage), std::move(relevantSlots)},
-                                               std::move(indexFilterKeySlots),
-                                               std::move(indexFilterKeyFields),
-                                               ixn->nodeId());
+                                               boost::none,
+                                               &outputs,
+                                               ixn->nodeId(),
+                                               indexFilterKeyFields,
+                                               true /* useKeySlots */,
+                                               false /* trackIndex */);
+
         stage = outputStage.extractStage(ixn->nodeId());
     }
 
@@ -1159,17 +1154,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
                                   ixn->direction,
                                   std::move(ixn->iets),
                                   std::move(parameterizedScanSlots)});
-
-    size_t i = 0;
-    size_t slotIdx = 0;
-    for (const auto& elt : ixn->index.keyPattern) {
-        StringData name = elt.fieldNameStringData();
-        if (indexKeyBitset.test(i)) {
-            outputs.set(std::make_pair(PlanStageSlots::kKey, name), outputIndexKeySlots[slotIdx]);
-            ++slotIdx;
-        }
-        ++i;
-    }
 
     return {std::move(stage), std::move(outputs)};
 }

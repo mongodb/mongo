@@ -59,7 +59,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     StageBuilderState& state,
     const CollectionPtr& collection,
     const CollectionScanNode* csn,
-    const std::vector<std::string>& fields,
+    std::vector<std::string> fields,
     PlanYieldPolicy* yieldPolicy,
     bool isTailableResumeBranch);
 

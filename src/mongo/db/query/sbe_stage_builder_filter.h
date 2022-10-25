@@ -38,44 +38,39 @@
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
+class PlanStageSlots;
+
 /**
  * This function generates an SBE plan stage tree implementing a filter expression represented by
  * 'root'. The 'stage' parameter provides the input subtree to build on top of. The 'inputSlot'
- * parameter specifies the input slot the filter should use.
+ * and 'slots' parameters specify the input(s) that the filter should use.
  *
- * Optional slot returned by this function stores index of array element that matches the 'root'
- * match expression. The role of this slot is to be a replacement of 'MatchDetails::elemMatchKey()'.
- * If 'trackIndex' is true and 'root' contains match expression with array semantics (there are
- * certain predicates that do not, such as '{}'), valid slot id is returned. This slot is pointing
- * to an optional value of type int32. Otherwise, 'boost::none' is returned.
+ * The 'useKeySlots' parameter controls whether kKey slots in 'slots' are allowed to be used as a
+ * source of input. Typically 'useKeySlots' is false unless we are generating a filter over an
+ * index scan.
  *
- * If match expression found matching array element, value behind slot id is an int32 array index.
- * Otherwise, it is Nothing.
+ * If the caller sets 'useKeySlots' to true, then the caller must also provide a vector of key field
+ * names ('keyFields') that lists the names of all the kKey slots that are needed by 'root'.
+ *
+ * This function returns a pair containing an optional<SlotId> and an EvalStage. If 'trackIndex' is
+ * false then the optional<SlotId> will always be boost::none. If 'trackIndex' is true, then this
+ * optional<SlotId> will be set to a slot that holds information about the index of the matching
+ * element if an array traversal was performed. (If multiple array traversals were performed, it is
+ * undefined which traversal will report the index of the matching array element.)
+ *
+ * Note that this function does not allow both 'useKeySlots' and 'trackIndex' to be true. If they
+ * are both true, then this function will throw an exception.
  */
 std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
     StageBuilderState& state,
     const MatchExpression* root,
     EvalStage stage,
-    sbe::value::SlotId inputSlot,
+    boost::optional<sbe::value::SlotId> inputSlot,
+    const PlanStageSlots* slots,
     PlanNodeId planNodeId,
+    const std::vector<std::string>& keyFields = {},
+    bool useKeySlots = false,
     bool trackIndex = false);
-
-/**
- * Similar to 'generateFilter' but used to generate a PlanStage sub-tree implementing a filter
- * attached to an 'IndexScan' QSN. It differs from 'generateFilter' in the following way:
- *  - Instead of a single input slot it takes 'keyFields' and 'keySlots' vectors representing a
- *    subset of the fields of the index key pattern that are depended on to evaluate the predicate,
- *    and corresponding slots for each of the fields.
- *  - It cannot track and returned an index of a matching element within an array, because index
- *    keys cannot contain an array. As such, this function doesn't take a 'trackIndex' parameter
- *    and doesn't return an optional SLotId holding the index of a matching array element.
- */
-EvalStage generateIndexFilter(StageBuilderState& state,
-                              const MatchExpression* root,
-                              EvalStage stage,
-                              sbe::value::SlotVector keySlots,
-                              std::vector<std::string> keyFields,
-                              PlanNodeId planNodeId);
 
 /**
  * Converts the list of equalities inside the given $in expression ('expr') into an SBE array, which

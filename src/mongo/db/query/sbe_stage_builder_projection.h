@@ -38,6 +38,8 @@
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
+class PlanStageSlots;
+
 /**
  * Generates an SBE plan stage sub-tree implementing a query projection. The 'stage' parameter
  * defines an input stage to the generated SBE plan stage sub-tree. The 'inputVar' defines a
@@ -47,5 +49,6 @@ std::pair<sbe::value::SlotId, EvalStage> generateProjection(StageBuilderState& s
                                                             const projection_ast::Projection* proj,
                                                             EvalStage stage,
                                                             sbe::value::SlotId inputVar,
-                                                            PlanNodeId planNodeId);
+                                                            PlanNodeId planNodeId,
+                                                            const PlanStageSlots* slots = nullptr);
 }  // namespace mongo::stage_builder

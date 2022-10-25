@@ -121,56 +121,27 @@ using MakePredicateFn =
  * A struct for storing context across calls to visit() methods in MatchExpressionVisitor's.
  */
 struct MatchExpressionVisitorContext {
-    // Construct a visitor context to generate a filter expression from a single input slot
-    // holding a document against which to perform the match.
     MatchExpressionVisitorContext(StageBuilderState& state,
                                   EvalStage inputStage,
-                                  sbe::value::SlotId inputSlot,
+                                  boost::optional<sbe::value::SlotId> inputSlot,
                                   const MatchExpression* root,
                                   PlanNodeId planNodeId,
+                                  const PlanStageSlots* slots,
+                                  bool useKeySlots,
                                   const FilterStateHelper& stateHelper)
         : state{state},
           inputSlot{inputSlot},
+          slots{slots},
+          useKeySlots{useKeySlots},
           topLevelAnd{nullptr},
           planNodeId{planNodeId},
           stateHelper{stateHelper} {
+        tassert(7097201,
+                "Expected 'inputSlot' or 'slots' to be defined",
+                inputSlot.has_value() || slots != nullptr);
+
         // Set up the top-level EvalFrame.
         evalStack.emplaceFrame(std::move(inputStage), inputSlot);
-
-        // If the root node is an $and, store it in 'topLevelAnd'.
-        // TODO: SERVER-50673: Revisit how we implement the top-level $and optimization.
-        if (root->matchType() == MatchExpression::AND &&
-            root->numChildren() <= kMaxChildrenForTopLevelAndOptimization) {
-            topLevelAnd = root;
-        }
-    }
-
-    // Construct a visitor context to generate a filter expression that is attached to an index
-    // scan and can evaluate an expression from the index keys without fetching an entire document.
-    // Instead of a single input slot holding the root document, it takes a vector of 'keySlots' and
-    // 'keyFields' which represent a subset of the fields of the index key pattern that are depended
-    // on to evaluate the predicate, and corresponding slots for each of the key fields.
-    MatchExpressionVisitorContext(StageBuilderState& state,
-                                  EvalStage inputStage,
-                                  sbe::value::SlotVector keySlots,
-                                  std::vector<std::string> keyFields,
-                                  const MatchExpression* root,
-                                  PlanNodeId planNodeId,
-                                  const FilterStateHelper& stateHelper)
-        : state{state}, topLevelAnd{nullptr}, planNodeId{planNodeId}, stateHelper{stateHelper} {
-        // Set up the top-level EvalFrame.
-        evalStack.emplaceFrame(std::move(inputStage), boost::none);
-
-        tassert(5273400, "Index key slots vector is empty", keySlots.size() > 0);
-        tassert(5273401,
-                "Mismatch between index key slots and fields",
-                keySlots.size() == keyFields.size());
-
-        for (size_t idx = 0; idx < keySlots.size(); ++idx) {
-            auto&& field = keyFields[idx];
-            tassert(5273410, "Index key field is empty", !field.empty());
-            indexKeySlots[field] = keySlots[idx];
-        }
 
         // If the root node is an $and, store it in 'topLevelAnd'.
         // TODO: SERVER-50673: Revisit how we implement the top-level $and optimization.
@@ -209,30 +180,31 @@ struct MatchExpressionVisitorContext {
     }
 
     struct FrameData {
+        FrameData(boost::optional<sbe::value::SlotId> inputSlot, bool childOfElemMatchValue = false)
+            : inputSlot(inputSlot), childOfElemMatchValue(childOfElemMatchValue) {}
+
         // For an index filter we don't build a traversal sub-tree, and do not use complex
         // expressions, such as $elemMatch or nested logical $and/$or/$nor. As such, we don't need
         // to create nested EvalFrames, and we don't need an 'inputSlot' for the frame, because
-        // values are read from the 'indexKeySlots' map  stored in the context. Yet, we still need a
-        // top-level EvalFrame, as the the entire filter generator logic is based on the assumption
+        // values are read from the 'slots' map stored in the context. Yet, we still need a top-
+        // level EvalFrame, as the the entire filter generator logic is based on the assumption
         // that we've got at least one EvalFrame. Hence, the 'inputSlot' is declared optional.
         boost::optional<sbe::value::SlotId> inputSlot;
 
         bool childOfElemMatchValue = false;
-
-        FrameData(boost::optional<sbe::value::SlotId> inputSlot, bool childOfElemMatchValue = false)
-            : inputSlot(inputSlot), childOfElemMatchValue(childOfElemMatchValue) {}
     };
 
     StageBuilderState& state;
 
     EvalStack<FrameData> evalStack;
-    // The current context must be initialized either with an 'inputSlot' over which an entire match
-    // expression needs to be evaluated, or a pair of 'keySlots' and 'keyFields' vectors
-    // representing a subset of the fields of the index key pattern that are depended on to evaluate
-    // the predicate, and corresponding slots for each of the fields, which are stored in
-    // 'indexKeySlots' map.
+
+    // The current context must be initialized either with a slot containing the entire document
+    // ('inputSlot') or with set of kField slots and/or kKey slots ('slots').
     boost::optional<sbe::value::SlotId> inputSlot;
-    StringMap<sbe::value::SlotId> indexKeySlots;
+    const PlanStageSlots* slots = nullptr;
+
+    bool useKeySlots = false;
+
     const MatchExpression* topLevelAnd;
 
     // The id of the 'QuerySolutionNode' which houses the match expression that we are converting to
@@ -271,13 +243,19 @@ enum class LeafTraversalMode {
     kArrayElementsOnly = 2,
 };
 
-std::unique_ptr<sbe::EExpression> generateTraverseF(const sbe::EVariable& inputVar,
-                                                    const sbe::MatchPath& fp,
-                                                    FieldIndex level,
-                                                    sbe::value::FrameIdGenerator* frameIdGenerator,
-                                                    const MakePredicateExprFn& makePredicateExpr,
-                                                    bool matchesNothing,
-                                                    LeafTraversalMode mode) {
+std::unique_ptr<sbe::EExpression> generateTraverseF(
+    std::unique_ptr<sbe::EExpression> inputVar,
+    boost::optional<sbe::value::SlotId> topLevelFieldSlot,
+    const sbe::MatchPath& fp,
+    FieldIndex level,
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    const MakePredicateExprFn& makePredicateExpr,
+    bool matchesNothing,
+    LeafTraversalMode mode) {
+    tassert(7097202,
+            "Expected an input expression or top level field",
+            inputVar.get() || topLevelFieldSlot.has_value());
+
     // If 'level' is currently pointing to the second last part of the field path AND the last
     // part of the field path is "", then 'childIsLeafWithEmptyName' will be true. Otherwise it
     // will be false.
@@ -291,7 +269,9 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(const sbe::EVariable& inputV
     auto lambdaFrameId = frameIdGenerator->generate();
     auto lambdaParam = sbe::EVariable{lambdaFrameId, 0};
 
-    auto fieldExpr = makeFunction("getField", inputVar.clone(), makeConstant(fp.getPart(level)));
+    auto fieldExpr = topLevelFieldSlot
+        ? makeVariable(*topLevelFieldSlot)
+        : makeFunction("getField", inputVar->clone(), makeConstant(fp.getPart(level)));
 
     if (childIsLeafWithEmptyName) {
         auto frameId = frameIdGenerator->generate();
@@ -306,7 +286,8 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(const sbe::EVariable& inputV
     }
 
     auto resultExpr = isLeafField ? makePredicateExpr(lambdaParam)
-                                  : generateTraverseF(lambdaParam,
+                                  : generateTraverseF(lambdaParam.clone(),
+                                                      boost::none /* topLevelFieldSlot */,
                                                       fp,
                                                       level + 1,
                                                       frameIdGenerator,
@@ -364,7 +345,8 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(const sbe::EVariable& inputV
                              sbe::value::bitcastFrom<int64_t>(getBSONTypeMask(BSONType::Array) |
                                                               getBSONTypeMask(BSONType::Object))))),
             std::move(traverseFExpr),
-            makeNot(makeFillEmptyFalse(makeFunction("isArray", inputVar.clone()))));
+            inputVar ? makeNot(makeFillEmptyFalse(makeFunction("isArray", inputVar->clone())))
+                     : makeConstant(sbe::value::TypeTags::Boolean, true));
     }
 
     if (frameId) {
@@ -418,7 +400,8 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(const sbe::EVariable& inputV
  *             coscan
  */
 EvalExprStagePair generatePathTraversal(EvalStage inputStage,
-                                        sbe::value::SlotId inputDocumentSlot,
+                                        boost::optional<sbe::value::SlotId> inputDocumentSlot,
+                                        boost::optional<sbe::value::SlotId> topLevelFieldSlot,
                                         const sbe::MatchPath& fp,
                                         FieldIndex level,
                                         PlanNodeId planNodeId,
@@ -430,6 +413,10 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
     using namespace std::literals;
 
     invariant(level < fp.numParts());
+
+    tassert(7097203,
+            "Expected an input slot or top level field",
+            inputDocumentSlot.has_value() || topLevelFieldSlot.has_value());
 
     // If 'level' is currently pointing to the second last part of the field path AND the last
     // part of the field path is "", then 'childIsLeafWithEmptyName' will be true. Otherwise it
@@ -445,8 +432,9 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
     auto fieldName = fp.getPart(level);
     auto inputSlot = slotIdGenerator->generate();
 
-    auto fromExpr =
-        makeFunction("getField", makeVariable(inputDocumentSlot), makeConstant(fieldName));
+    auto fromExpr = topLevelFieldSlot
+        ? makeVariable(*topLevelFieldSlot)
+        : makeFunction("getField", makeVariable(*inputDocumentSlot), makeConstant(fieldName));
 
     if (childIsLeafWithEmptyName) {
         auto frameId = frameIdGenerator->generate();
@@ -568,6 +556,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
         // Recursive case.
         : generatePathTraversal(std::move(innerBranch),
                                 innerInputSlot,
+                                boost::none /* topLevelFieldSlot */,
                                 fp,
                                 level + 1,
                                 planNodeId,
@@ -702,65 +691,79 @@ void generatePredicateImpl(MatchExpressionVisitorContext* context,
     auto& frame = context->evalStack.topFrame();
 
     auto&& [expr, stage] = [&]() {
-        if (frame.data().inputSlot) {
-            if (frame.data().childOfElemMatchValue) {
-                // If matchExpr's parent is a ElemMatchValueMatchExpression, then we should just
-                // apply the predicate directly on 'inputSlot'. 'inputSlot' will be a "correlated
-                // slot" that holds the value of the ElemMatchValueMatchExpression's field path.
-                auto result = makePredicate(*frame.data().inputSlot, frame.extractStage());
-                if (useCombinator) {
-                    return context->stateHelper.makePredicateCombinator(std::move(result));
-                }
-                return result;
-            }
+        if (frame.data().childOfElemMatchValue) {
+            tassert(7097204,
+                    "Expected input slot or key slots to be defined",
+                    frame.data().inputSlot.has_value());
 
-            // Using traverseF() and lambdas performs better than using TraverseStage, so we prefer
-            // to use traverseF()/lambdas where possible. We currently support traverseF()/lambdas
-            // when the caller provides a non-null 'makePredicateExpr' and when 'stateHelper' does
-            // not contain a value.
-            if (makePredicateExpr != nullptr && !context->stateHelper.stateContainsValue()) {
-                auto inputStage = frame.extractStage();
-                auto result = generateTraverseF(sbe::EVariable{*frame.data().inputSlot},
-                                                path,
-                                                0,
-                                                context->state.frameIdGenerator,
-                                                makePredicateExpr,
-                                                matchesNothing,
-                                                mode);
-
-                return EvalExprStagePair{std::move(result), std::move(inputStage)};
-            }
-
-            return generatePathTraversal(frame.extractStage(),
-                                         *frame.data().inputSlot,
-                                         path,
-                                         0,
-                                         context->planNodeId,
-                                         context->state.slotIdGenerator,
-                                         context->state.frameIdGenerator,
-                                         makePredicate,
-                                         mode,
-                                         context->stateHelper);
-        } else {
-            // If an input slot for the current frame is not defined, then we must generating a
-            // filter predicate for an index scan. In this case we don't need to perform any complex
-            // path traversal but rather evaluate the predicate directly on the input slot for the
-            // current field path - the index scan will extract the value for this field path and
-            // will store it in a corresponding slot in the 'indexKeySlots' map.
-
-            tassert(5273402, "Field path cannot be empty for an index filter", !path.empty());
-
-            auto it = context->indexKeySlots.find(path.dottedField());
-            tassert(5273403,
-                    str::stream() << "Unknown field path in index filter: " << path.dottedField(),
-                    it != context->indexKeySlots.end());
-
-            auto result = makePredicate(it->second, frame.extractStage());
+            // If matchExpr's parent is a ElemMatchValueMatchExpression, then we should just
+            // apply the predicate directly on 'inputSlot'. 'inputSlot' will be a "correlated
+            // slot" that holds the value of the ElemMatchValueMatchExpression's field path.
+            auto result = makePredicate(*frame.data().inputSlot, frame.extractStage());
             if (useCombinator) {
                 return context->stateHelper.makePredicateCombinator(std::move(result));
             }
             return result;
         }
+
+        const bool isFieldPathOnRootDoc =
+            (!context->inputSlot || *context->inputSlot == *frame.data().inputSlot);
+
+        boost::optional<sbe::value::SlotId> topLevelFieldSlot;
+        if (isFieldPathOnRootDoc && context->slots) {
+            // If we are allowed to use the kKey slots, search for a kKey slot whose path matches
+            // 'path' (this is how we generate filter predicates for index scans).
+            if (context->useKeySlots && !path.empty()) {
+                auto name = std::make_pair(PlanStageSlots::kKey, path.dottedField());
+                if (auto slot = context->slots->getIfExists(name); slot) {
+                    // We found a kKey slot that matches. We don't need to perform any traversal;
+                    // we can just evaluate the predicate on the slot directly and return.
+                    auto result = makePredicate(*slot, frame.extractStage());
+                    if (useCombinator) {
+                        return context->stateHelper.makePredicateCombinator(std::move(result));
+                    }
+                    return result;
+                }
+            }
+            // Search for a kField slot whose path matches the first part of 'path'.
+            topLevelFieldSlot = context->slots->getIfExists(
+                std::make_pair(PlanStageSlots::kField, path.getPart(0)));
+        }
+
+        tassert(7097205,
+                "Expected either input slot or top-level field slot to be defined",
+                frame.data().inputSlot.has_value() || topLevelFieldSlot.has_value());
+
+        // Using traverseF() and lambdas performs better than using TraverseStage, so we prefer
+        // to use traverseF()/lambdas where possible. We currently support traverseF()/lambdas
+        // when the caller provides a non-null 'makePredicateExpr' and when 'stateHelper' does
+        // not contain a value.
+        if (makePredicateExpr != nullptr && !context->stateHelper.stateContainsValue()) {
+            auto result =
+                generateTraverseF(frame.data().inputSlot ? makeVariable(*frame.data().inputSlot)
+                                                         : std::unique_ptr<sbe::EExpression>{},
+                                  topLevelFieldSlot,
+                                  path,
+                                  0, /* level */
+                                  context->state.frameIdGenerator,
+                                  makePredicateExpr,
+                                  matchesNothing,
+                                  mode);
+
+            return EvalExprStagePair{std::move(result), frame.extractStage()};
+        }
+
+        return generatePathTraversal(frame.extractStage(),
+                                     frame.data().inputSlot,
+                                     topLevelFieldSlot,
+                                     path,
+                                     0, /* level */
+                                     context->planNodeId,
+                                     context->state.slotIdGenerator,
+                                     context->state.frameIdGenerator,
+                                     makePredicate,
+                                     mode,
+                                     context->stateHelper);
     }();
 
     frame.setStage(std::move(stage));
@@ -1416,7 +1419,8 @@ public:
                                                   matchExpr->getExpression().get(),
                                                   frame.extractStage(),
                                                   *frame.data().inputSlot,
-                                                  _context->planNodeId);
+                                                  _context->planNodeId,
+                                                  _context->slots);
         auto frameId = _context->state.frameId();
 
         // We will need to convert the result of $expr to a boolean value, so we'll wrap it into an
@@ -1824,105 +1828,94 @@ public:
 private:
     MatchExpressionVisitorContext* _context;
 };
+
+EvalStage applyClassicMatcher(const MatchExpression* root,
+                              EvalStage stage,
+                              sbe::value::SlotId inputSlot,
+                              PlanNodeId planNodeId) {
+    auto expr = makeFunction("applyClassicMatcher",
+                             makeConstant(sbe::value::TypeTags::classicMatchExpresion,
+                                          sbe::value::bitcastFrom<const MatchExpression*>(
+                                              root->shallowClone().release())),
+                             makeVariable(inputSlot));
+
+    return makeFilter<false>(std::move(stage), std::move(expr), planNodeId);
+}
+
+EvalStage applyClassicMatcherOverIndexScan(const MatchExpression* root,
+                                           EvalStage stage,
+                                           const PlanStageSlots* slots,
+                                           const std::vector<std::string>& keyFields,
+                                           PlanNodeId planNodeId) {
+    BSONObjBuilder keyPatternBuilder;
+    auto keySlots = sbe::makeSV();
+    for (const auto& field : keyFields) {
+        keyPatternBuilder.append(field, 1);
+        keySlots.emplace_back(slots->get(std::make_pair(PlanStageSlots::kKey, StringData(field))));
+    }
+
+    auto keyPatternTree = buildKeyPatternTree(keyPatternBuilder.obj(), keySlots);
+    auto mkObjExpr = buildNewObjExpr(keyPatternTree.get());
+
+    auto expr = makeFunction("applyClassicMatcher",
+                             makeConstant(sbe::value::TypeTags::classicMatchExpresion,
+                                          sbe::value::bitcastFrom<const MatchExpression*>(
+                                              root->shallowClone().release())),
+                             std::move(mkObjExpr));
+
+    return makeFilter<false>(std::move(stage), std::move(expr), planNodeId);
+}
 }  // namespace
 
 std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
     StageBuilderState& state,
     const MatchExpression* root,
     EvalStage stage,
-    sbe::value::SlotId inputSlot,
-    PlanNodeId planNodeId,
+    boost::optional<sbe::value::SlotId> inputSlot,
+    const PlanStageSlots* slots,
+    PlanNodeId nodeId,
+    const std::vector<std::string>& keyFields,
+    bool useKeySlots,
     bool trackIndex) {
+    // We don't support tracking the index when 'useKeySlots' is true.
+    tassert(7097206,
+            "The 'trackIndex' option is not support for filters over index scans",
+            !useKeySlots || !trackIndex);
+
     // The planner adds an $and expression without the operands if the query was empty. We can bail
     // out early without generating the filter plan stage if this is the case.
     if (root->matchType() == MatchExpression::AND && root->numChildren() == 0) {
         return {boost::none, std::move(stage)};
     }
 
-    // We only use the classic matcher path (aka "franken matcher") when the SBE is not fully
-    // enabled. Fully enabling SBE turns on the SBE plan cache, and embedding the classic matcher
-    // into the query execution tree is not compatible with the plan cache's use of
-    // auto-parameterization. This is because when embedding the classic matcher all of the
-    // constants used in the filter are in the MatchExpression itself rather than in slots.
+    // We only use the classic matcher path (aka "franken matcher") when SBE is not fully enabled.
+    // Fully enabling SBE turns on the SBE plan cache, and embedding the classic matcher into the
+    // query execution tree is not compatible with the plan cache's use of auto-parameterization.
+    // This is because when embedding the classic matcher all of the constants used in the filter
+    // are in the MatchExpression itself rather than in slots.
     if (!feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         tassert(6681403, "trackIndex=true not supported for classic matcher in SBE", !trackIndex);
+        tassert(7097207,
+                "Expected input slot or key slots to be defined",
+                inputSlot.has_value() || useKeySlots);
 
-        auto expr = makeFunction("applyClassicMatcher",
-                                 makeConstant(sbe::value::TypeTags::classicMatchExpresion,
-                                              sbe::value::bitcastFrom<const MatchExpression*>(
-                                                  root->shallowClone().release())),
-                                 makeVariable(inputSlot));
-
-        auto filterStage = makeFilter<false>(std::move(stage), std::move(expr), planNodeId);
-        return {boost::none, std::move(filterStage)};
+        auto outputStage = useKeySlots
+            ? applyClassicMatcherOverIndexScan(root, std::move(stage), slots, keyFields, nodeId)
+            : applyClassicMatcher(root, std::move(stage), *inputSlot, nodeId);
+        return {boost::none, std::move(outputStage)};
     }
 
     auto stateHelper = makeFilterStateHelper(trackIndex);
     MatchExpressionVisitorContext context{
-        state, std::move(stage), inputSlot, root, planNodeId, *stateHelper};
-    MatchExpressionPreVisitor preVisitor{&context};
-    MatchExpressionInVisitor inVisitor{&context};
-    MatchExpressionPostVisitor postVisitor{&context};
-    MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
-    tree_walker::walk<true, MatchExpression>(root, &walker);
-    auto [resultSlot, resultStage] = context.done();
-    return {resultSlot, std::move(resultStage)};
-}
+        state, std::move(stage), inputSlot, root, nodeId, slots, useKeySlots, *stateHelper};
 
-EvalStage generateIndexFilter(StageBuilderState& state,
-                              const MatchExpression* root,
-                              EvalStage stage,
-                              sbe::value::SlotVector keySlots,
-                              std::vector<std::string> keyFields,
-                              PlanNodeId planNodeId) {
-    // The planner adds an $and expression without the operands if the query was empty. We can bail
-    // out early without generating the filter plan stage if this is the case.
-    if (root->matchType() == MatchExpression::AND && root->numChildren() == 0) {
-        return stage;
-    }
-
-    // We only use the classic matcher path (aka "franken matcher") when SBE is not fully enabled.
-    // Fully enabling SBE turns on the SBE plan cache, and embedding the classic matcher into the
-    // query execution tree is not compatible with the plan cache's use of auto-parameterization.
-    // This is because when embedding the classic mathcer all of the constants used in the filter
-    // are in the MatchExpression itself rather than in slots.
-    if (!feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-        BSONObjBuilder keyPatternBuilder;
-        for (auto& field : keyFields) {
-            keyPatternBuilder.append(field, 1);
-        }
-        auto keyPatternTree = buildKeyPatternTree(keyPatternBuilder.obj(), keySlots);
-        auto mkObjExpr = buildNewObjExpr(keyPatternTree.get());
-
-        auto expr = makeFunction("applyClassicMatcher",
-                                 makeConstant(sbe::value::TypeTags::classicMatchExpresion,
-                                              sbe::value::bitcastFrom<const MatchExpression*>(
-                                                  root->shallowClone().release())),
-                                 std::move(mkObjExpr));
-
-        return makeFilter<false>(std::move(stage), std::move(expr), planNodeId);
-    }
-
-    // Covered filters never need to track the index of a matching element in the array as they
-    // cannot be used with a positional projection.
-    const bool trackIndex = false;
-    auto stateHelper = makeFilterStateHelper(trackIndex);
-    MatchExpressionVisitorContext context{state,
-                                          std::move(stage),
-                                          std::move(keySlots),
-                                          std::move(keyFields),
-                                          root,
-                                          planNodeId,
-                                          *stateHelper};
     MatchExpressionPreVisitor preVisitor{&context};
     MatchExpressionInVisitor inVisitor{&context};
     MatchExpressionPostVisitor postVisitor{&context};
     MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
     tree_walker::walk<true, MatchExpression>(root, &walker);
 
-    auto [resultSlot, resultStage] = context.done();
-    tassert(5273411, "Index filter must not track a matching element index", !resultSlot);
-    return std::move(resultStage);
+    return context.done();
 }
 
 std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool, bool> convertInExpressionEqualities(

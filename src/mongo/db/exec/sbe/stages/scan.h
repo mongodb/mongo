@@ -137,6 +137,12 @@ private:
     // Returns the primary cursor or the random cursor depending on whether _useRandomCursor is set.
     RecordCursor* getActiveCursor() const;
 
+    static uint64_t computeFieldMask(const char* name, size_t length) {
+        // Discard the upper bits so that 'shiftAmt' is always between 0 and 63 inclusive.
+        auto shiftAmt = static_cast<unsigned char>(name[length / 2]) & 63u;
+        return uint64_t{1} << shiftAmt;
+    }
+
     const UUID _collUuid;
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
@@ -171,6 +177,11 @@ private:
     value::SlotAccessor* _indexIdAccessor{nullptr};
     value::SlotAccessor* _indexKeyAccessor{nullptr};
     value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
+
+    // If this ScanStage was constructed with _oplogTsSlot set, then _oplogTsAccessor will point to
+    // an accessor in the RuntimeEnvironment, and value of the "ts" field (if it exists) from each
+    // record scanned will be written to this accessor. The engine uses mechanism to keep track of
+    // the most recent timestamp that has been observed when scanning the oplog collection.
     RuntimeEnvironment::Accessor* _oplogTsAccessor{nullptr};
 
     // Used to return a random sample of the collection.
@@ -179,6 +190,12 @@ private:
     value::FieldAccessorMap _fieldAccessors;
     value::SlotAccessorMap _varAccessors;
     value::SlotAccessor* _seekKeyAccessor{nullptr};
+
+    // _tsFieldAccessor points to the accessor for field "ts". We use _tsFieldAccessor to get at
+    // the accessor quickly rather than having to look it up in the _fieldAccessors hashtable.
+    value::SlotAccessor* _tsFieldAccessor{nullptr};
+
+    uint64_t _fieldsBloomFilter{0};
 
     RecordId _recordId;
 

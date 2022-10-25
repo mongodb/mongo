@@ -83,6 +83,14 @@ ScanStage::ScanStage(UUID collectionUuid,
                  _fields.end()));
     // We cannot use a random cursor if we are seeking or requesting a reverse scan.
     invariant(!_useRandomCursor || (!_seekKeySlot && _forward));
+
+    // Initialize _fieldsBloomFilter.
+    _fieldsBloomFilter = 0;
+    for (size_t idx = 0; idx < _fields.size(); ++idx) {
+        const char* str = _fields[idx].c_str();
+        auto len = _fields[idx].size();
+        _fieldsBloomFilter = _fieldsBloomFilter | computeFieldMask(str, len);
+    }
 }
 
 std::unique_ptr<PlanStage> ScanStage::clone() const {
@@ -120,6 +128,10 @@ void ScanStage::prepare(CompileCtx& ctx) {
         uassert(4822814, str::stream() << "duplicate field: " << _fields[idx], inserted);
         auto [itRename, insertedRename] = _varAccessors.emplace(_vars[idx], it->second.get());
         uassert(4822815, str::stream() << "duplicate field: " << _vars[idx], insertedRename);
+
+        if (_oplogTsSlot && _fields[idx] == repl::OpTime::kTimestampFieldName) {
+            _tsFieldAccessor = it->second.get();
+        }
     }
 
     if (_seekKeySlot) {
@@ -414,33 +426,72 @@ PlanState ScanStage::getNext() {
     }
 
     if (!_fieldAccessors.empty()) {
-        auto fieldsToMatch = _fieldAccessors.size();
         auto rawBson = nextRecord->data.data();
-        auto be = rawBson + 4;
+        auto start = rawBson + 4;
         auto end = rawBson + ConstDataView(rawBson).read<LittleEndian<uint32_t>>();
-        for (auto& [name, accessor] : _fieldAccessors) {
-            accessor->reset();
-        }
-        while (*be != 0) {
-            auto sv = bson::fieldNameView(be);
-            if (auto it = _fieldAccessors.find(sv); it != _fieldAccessors.end()) {
-                // Found the field so convert it to Value.
-                auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
+        auto last = end - 1;
 
-                if (_oplogTsAccessor && it->first == repl::OpTime::kTimestampFieldName) {
-                    auto&& [ownedTag, ownedVal] = value::copyValue(tag, val);
-                    _oplogTsAccessor->reset(false, ownedTag, ownedVal);
+        if (_fieldAccessors.size() == 1) {
+            // If we're only looking for 1 field, then it's more efficient to forgo the hashtable
+            // and just use equality comparison.
+            auto name = StringData{_fields[0]};
+            auto [tag, val] = [start, last, end, name] {
+                for (auto bsonElement = start; bsonElement != last;) {
+                    auto field = bson::fieldNameView(bsonElement);
+                    if (field == name) {
+                        return bson::convertFrom<true>(bsonElement, end, field.size());
+                    }
+                    bsonElement = bson::advance(bsonElement, field.size());
                 }
+                return std::make_pair(value::TypeTags::Nothing, value::Value{0});
+            }();
 
-                it->second->reset(false, tag, val);
-
-                if ((--fieldsToMatch) == 0) {
-                    // No need to scan any further so bail out early.
-                    break;
-                }
+            _fieldAccessors.begin()->second->reset(false, tag, val);
+        } else {
+            // If we're looking for 2 or more fields, it's more efficient to use the hashtable.
+            for (auto& [name, accessor] : _fieldAccessors) {
+                accessor->reset();
             }
 
-            be = bson::advance(be, sv.size());
+            auto fieldsToMatch = _fieldAccessors.size();
+            for (auto bsonElement = start; bsonElement != last;) {
+                // Oftentimes _fieldAccessors hashtable only has a few entries, but the object we're
+                // scanning could have dozens of fields. In this common scenario, most hashtable
+                // lookups will "miss" (i.e. they won't find a matching entry in the hashtable). To
+                // optimize for this, we put a very simple bloom filter (requiring only a few basic
+                // machine instructions) in front of the hashtable. When we "miss" in the bloom
+                // filter, we can quickly skip over a field without having to generate the hash for
+                // the field.
+                auto field = bson::fieldNameView(bsonElement);
+                if (!(_fieldsBloomFilter & computeFieldMask(field.rawData(), field.size()))) {
+                    bsonElement = bson::advance(bsonElement, field.size());
+                    continue;
+                }
+                // Search for the field in the hashtable.
+                if (auto it = _fieldAccessors.find(field); it != _fieldAccessors.end()) {
+                    auto [tag, val] = bson::convertFrom<true>(bsonElement, end, field.size());
+                    it->second->reset(false, tag, val);
+                    if ((--fieldsToMatch) == 0) {
+                        // No need to scan any further so bail out early.
+                        break;
+                    }
+                }
+
+                bsonElement = bson::advance(bsonElement, field.size());
+            }
+        }
+
+        if (_oplogTsAccessor) {
+            // If _oplogTsAccessor is set, then we check if the document had a "ts" field, and if
+            // so we write the value of "ts" into _oplogTsAccessor. The engine uses mechanism to
+            // keep track of the most recent timestamp that has been observed when scanning the
+            // oplog collection.
+            tassert(7097200, "Expected _tsFieldAccessor to be defined", _tsFieldAccessor);
+            auto [tag, val] = _tsFieldAccessor->getViewOfValue();
+            if (tag != value::TypeTags::Nothing) {
+                auto&& [copyTag, copyVal] = value::copyValue(tag, val);
+                _oplogTsAccessor->reset(true, copyTag, copyVal);
+            }
         }
     }
 

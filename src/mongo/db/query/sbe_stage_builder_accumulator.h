@@ -38,6 +38,8 @@
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
+class PlanStageSlots;
+
 /**
  * Translates the argument Expression of an AccumulationExpression carried by the
  * AccumulationStatement. The 'stage' parameter provides the input subtree to build on top of.
@@ -47,7 +49,8 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildArgument(
     const AccumulationStatement& acc,
     EvalStage stage,
     boost::optional<sbe::value::SlotId> optionalRootSlot,
-    PlanNodeId planNodeId);
+    PlanNodeId planNodeId,
+    const PlanStageSlots* slots = nullptr);
 
 /**
  * Translates an input AccumulationStatement into an SBE EExpression for accumulation expressions.

@@ -431,7 +431,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto [stage, outputs] = generateCollScan(_state,
                                              getCurrentCollection(reqs),
                                              csn,
-                                             fields,
+                                             std::move(fields),
                                              _yieldPolicy,
                                              reqs.getIsTailableCollScanResumeBranch());
 
@@ -441,10 +441,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         stage = sbe::makeProjectStage(
             std::move(stage), root->nodeId(), outputs.get(kReturnKey), makeFunction("newObj"_sd));
     }
-    // Don't advertize the RecordId output if none of our ancestors are going to use it.
-    if (!reqs.has(kRecordId)) {
-        outputs.clear(kRecordId);
-    }
+
+    outputs.clearNonRequiredSlots(reqs);
 
     return {std::move(stage), std::move(outputs)};
 }
@@ -540,18 +538,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         ++i;
     }
 
-    auto additionalKeys =
-        filterVector(reqKeys, [&](const std::string& s) { return !indexKeyPatternSet.count(s); });
+    for (auto&& key : reqKeys) {
+        tassert(7097208,
+                str::stream() << "Expected key '" << key << "' to be part of index pattern",
+                indexKeyPatternSet.count(key));
+    }
 
-    sbe::IndexKeysInclusionSet indexKeyBitset;
     if (reqs.has(kReturnKey) || reqs.has(kResult) || reqs.hasFields()) {
         // If either 'reqs.result' or 'reqs.returnKey' or 'reqs.hasFields()' is true, we need to
         // get all parts of the index key so that we can create the inflated index key.
         for (int j = 0; j < ixn->index.keyPattern.nFields(); ++j) {
-            indexKeyBitset.set(j);
+            keysBitset.set(j);
         }
-    } else {
-        indexKeyBitset = keysBitset;
     }
 
     // If the slots necessary for performing an index consistency check were not requested in
@@ -567,7 +565,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto&& [scanStage, scanOutputs] = generateIndexScanFunc(_state,
                                                             getCurrentCollection(reqs),
                                                             ixn,
-                                                            indexKeyBitset,
+                                                            keysBitset,
                                                             _yieldPolicy,
                                                             iamMap,
                                                             reqs.has(kIndexKeyPattern));
@@ -609,14 +607,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         stage = rehydrateIndexKey(
             std::move(stage), ixn->index.keyPattern, ixn->nodeId(), indexKeySlots, resultSlot);
-    }
-
-    auto [outStage, nothingSlots] = projectNothingToSlots(
-        std::move(stage), additionalKeys.size(), root->nodeId(), &_slotIdGenerator);
-    stage = std::move(outStage);
-    for (size_t i = 0; i < additionalKeys.size(); ++i) {
-        outputs.set(std::make_pair(PlanStageSlots::kKey, std::move(additionalKeys[i])),
-                    nothingSlots[i]);
     }
 
     outputs.clearNonRequiredSlots(reqs);
@@ -918,6 +908,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                csn->postAssemblyFilter.get(),
                                                {std::move(stage), std::move(relevantSlots)},
                                                reconstructedRecordSlot,
+                                               &outputs,
                                                csn->nodeId());
         stage = outputStage.extractStage(csn->nodeId());
     }
@@ -935,9 +926,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // logic below.
     auto child = fn->children[0].get();
 
-    auto childReqs = reqs.copy()
-                         .clear(kResult)
-                         .clearAllFields()
+    auto forwardingReqs = reqs.copy().clear(kResult).clear(kRecordId).clearAllFields();
+
+    auto childReqs = forwardingReqs.copy()
                          .set(kRecordId)
                          .set(kSnapshotId)
                          .set(kIndexId)
@@ -947,6 +938,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto [stage, outputs] = build(child, childReqs);
 
     auto iamMap = _data.iamMap;
+
     uassert(4822880, "RecordId slot is not defined", outputs.has(kRecordId));
     uassert(
         4953600, "ReturnKey slot is not defined", !reqs.has(kReturnKey) || outputs.has(kReturnKey));
@@ -955,15 +947,25 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     uassert(5290711, "Index key slot is not defined", outputs.has(kIndexKey));
     uassert(5113713, "Index key pattern slot is not defined", outputs.has(kIndexKeyPattern));
 
-    auto forwardingReqs = reqs.copy().clear(kResult).clear(kRecordId).clearAllFields();
-    auto relevantSlots = getSlotsToForward(forwardingReqs, outputs);
-
     auto fields = reqs.getFields();
+
+    if (fn->filter) {
+        DepsTracker deps;
+        match_expression::addDependencies(fn->filter.get(), &deps);
+        // If the filter predicate doesn't need the whole document, then we take all the top-level
+        // fields referenced by the filter predicate and we add them to 'fields'.
+        if (!deps.needWholeDocument) {
+            auto topLevelFields = getTopLevelFields(deps.fields);
+            fields = appendVectorUnique(std::move(fields), std::move(topLevelFields));
+        }
+    }
 
     auto childRecordId = outputs.get(kRecordId);
     auto fetchResultSlot = _slotIdGenerator.generate();
     auto fetchRecordIdSlot = _slotIdGenerator.generate();
     auto fieldSlots = _slotIdGenerator.generateMultiple(fields.size());
+
+    auto relevantSlots = getSlotsToForward(forwardingReqs, outputs);
 
     stage = makeLoopJoinForFetch(std::move(stage),
                                  fetchResultSlot,
@@ -994,14 +996,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     if (fn->filter) {
-        forwardingReqs = reqs.copy().set(kResult);
-
+        auto forwardingReqs = reqs.copy().set(kResult).setFields(fields);
         auto relevantSlots = getSlotsToForward(forwardingReqs, outputs);
 
         auto [_, outputStage] = generateFilter(_state,
                                                fn->filter.get(),
                                                {std::move(stage), std::move(relevantSlots)},
                                                outputs.get(kResult),
+                                               &outputs,
                                                root->nodeId());
         stage = outputStage.extractStage(root->nodeId());
     }
@@ -1058,24 +1060,38 @@ std::unique_ptr<sbe::EExpression> generateArrayCheckForSort(
     std::unique_ptr<sbe::EExpression> inputExpr,
     const FieldPath& fp,
     FieldIndex level,
-    sbe::value::FrameIdGenerator* frameIdGenerator) {
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    boost::optional<sbe::value::SlotId> fieldSlot = boost::none) {
     invariant(level < fp.getPathLength());
 
-    auto fieldExpr = makeFillEmptyNull(
-        makeFunction("getField"_sd, std::move(inputExpr), makeConstant(fp.getFieldName(level))));
+    auto fieldExpr = fieldSlot
+        ? makeVariable(*fieldSlot)
+        : makeFunction("getField"_sd, std::move(inputExpr), makeConstant(fp.getFieldName(level)));
 
-    if (level == fp.getPathLength() - 1u) {
-        return makeFunction("isArray"_sd, std::move(fieldExpr));
-    } else {
-        auto frameId = frameIdGenerator->generate();
-        return sbe::makeE<sbe::ELocalBind>(
-            frameId,
-            sbe::makeEs(std::move(fieldExpr)),
+    auto resultExpr = [&] {
+        if (level == fp.getPathLength() - 1u) {
+            return makeFunction("isArray"_sd, std::move(fieldExpr));
+        }
+        auto frameId = fieldSlot ? boost::optional<sbe::FrameId>{}
+                                 : boost::make_optional(frameIdGenerator->generate());
+        auto var = fieldSlot ? std::move(fieldExpr) : makeVariable(*frameId, 0);
+        auto resultExpr =
             makeBinaryOp(sbe::EPrimBinary::logicOr,
-                         makeFunction("isArray"_sd, makeVariable(frameId, 0)),
-                         generateArrayCheckForSort(
-                             makeVariable(frameId, 0), fp, level + 1, frameIdGenerator)));
+                         makeFunction("isArray"_sd, var->clone()),
+                         generateArrayCheckForSort(var->clone(), fp, level + 1, frameIdGenerator));
+
+        if (!fieldSlot) {
+            resultExpr = sbe::makeE<sbe::ELocalBind>(
+                *frameId, sbe::makeEs(std::move(fieldExpr)), std::move(resultExpr));
+        }
+        return resultExpr;
+    }();
+
+    if (level == 0) {
+        resultExpr = makeFillEmptyFalse(std::move(resultExpr));
     }
+
+    return resultExpr;
 }
 
 /**
@@ -1088,33 +1104,44 @@ std::unique_ptr<sbe::EExpression> generateSortTraverse(
     boost::optional<sbe::value::SlotId> collatorSlot,
     const FieldPath& fp,
     size_t level,
-    sbe::value::FrameIdGenerator* frameIdGenerator) {
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    boost::optional<sbe::value::SlotId> fieldSlot = boost::none) {
     using namespace std::literals;
 
     invariant(level < fp.getPathLength());
 
     StringData helperFn = isAscending ? "_internalLeast"_sd : "_internalGreatest"_sd;
-    auto collatorArg =
-        collatorSlot ? makeVariable(*collatorSlot) : makeConstant(sbe::value::TypeTags::Nothing, 0);
 
     // Generate an expression to read a sub-field at the current nested level.
-    auto fieldExpr =
-        makeFunction("getField"_sd, inputVar.clone(), makeConstant(fp.getFieldName(level)));
+    auto fieldExpr = fieldSlot
+        ? makeVariable(*fieldSlot)
+        : makeFunction("getField"_sd, inputVar.clone(), makeConstant(fp.getFieldName(level)));
 
     if (level == fp.getPathLength() - 1) {
         // For the last level, we can just return the field slot without the need for a
         // traverse expression.
-        auto frameId = frameIdGenerator->generate();
-        return sbe::makeE<sbe::ELocalBind>(
-            frameId,
-            sbe::makeEs(std::move(fieldExpr)),
-            sbe::makeE<sbe::EIf>(
-                makeFillEmptyFalse(makeFunction("isArray"_sd, makeVariable(frameId, 0))),
-                // According to MQL's sorting semantics, when a leaf field is an empty array we
-                // should use Undefined as the sort key.
-                makeFillEmptyUndefined(
-                    makeFunction(helperFn, makeMoveVariable(frameId, 0), std::move(collatorArg))),
-                makeFillEmptyNull(makeMoveVariable(frameId, 0))));
+        auto frameId = fieldSlot ? boost::optional<sbe::FrameId>{}
+                                 : boost::make_optional(frameIdGenerator->generate());
+        auto var = fieldSlot ? fieldExpr->clone() : makeVariable(*frameId, 0);
+        auto moveVar = fieldSlot ? std::move(fieldExpr) : makeMoveVariable(*frameId, 0);
+
+        auto helperArgs = sbe::makeEs(moveVar->clone());
+        if (collatorSlot) {
+            helperArgs.emplace_back(makeVariable(*collatorSlot));
+        }
+
+        // According to MQL's sorting semantics, when a leaf field is an empty array we
+        // should use Undefined as the sort key.
+        auto resultExpr = sbe::makeE<sbe::EIf>(
+            makeFillEmptyFalse(makeFunction("isArray"_sd, std::move(var))),
+            makeFillEmptyUndefined(sbe::makeE<sbe::EFunction>(helperFn, std::move(helperArgs))),
+            makeFillEmptyNull(std::move(moveVar)));
+
+        if (!fieldSlot) {
+            resultExpr = sbe::makeE<sbe::ELocalBind>(
+                *frameId, sbe::makeEs(std::move(fieldExpr)), std::move(resultExpr));
+        }
+        return resultExpr;
     }
 
     // Prepare a lambda expression that will navigate to the next component of the field path.
@@ -1132,20 +1159,66 @@ std::unique_ptr<sbe::EExpression> generateSortTraverse(
     // Be sure to invoke the least/greatest fold expression only if the current nested level is an
     // array.
     auto frameId = frameIdGenerator->generate();
+    auto var = fieldSlot ? makeVariable(*fieldSlot) : makeVariable(frameId, 0);
+    auto resultVar = makeMoveVariable(frameId, fieldSlot ? 0 : 1);
+
+    auto binds = sbe::makeEs();
+    if (!fieldSlot) {
+        binds.emplace_back(std::move(fieldExpr));
+    }
+    binds.emplace_back(
+        makeFunction("traverseP",
+                     var->clone(),
+                     std::move(lambdaExpr),
+                     makeConstant(sbe::value::TypeTags::NumberInt32, 1) /* maxDepth */));
+
+    auto helperArgs = sbe::makeEs(resultVar->clone());
+    if (collatorSlot) {
+        helperArgs.emplace_back(makeVariable(*collatorSlot));
+    }
+
     return sbe::makeE<sbe::ELocalBind>(
         frameId,
-        sbe::makeEs(
-            std::move(fieldExpr),
-            makeFunction("traverseP",
-                         makeVariable(frameId, 0),
-                         std::move(lambdaExpr),
-                         makeConstant(sbe::value::TypeTags::NumberInt32, 1) /* maxDepth */)),
+        std::move(binds),
         // According to MQL's sorting semantics, when a non-leaf field is an empty array or
         // doesn't exist we should use Null as the sort key.
-        makeFillEmptyNull(sbe::makeE<sbe::EIf>(
-            makeFillEmptyFalse(makeFunction("isArray"_sd, makeVariable(frameId, 0))),
-            makeFunction(helperFn, makeMoveVariable(frameId, 1), std::move(collatorArg)),
-            makeMoveVariable(frameId, 1))));
+        makeFillEmptyNull(
+            sbe::makeE<sbe::EIf>(makeFillEmptyFalse(makeFunction("isArray"_sd, var->clone())),
+                                 sbe::makeE<sbe::EFunction>(helperFn, std::move(helperArgs)),
+                                 resultVar->clone())));
+}
+
+void visitPatternTreeLeaves(
+    IndexKeyPatternTreeNode* patternRoot,
+    const std::function<void(const std::string&, IndexKeyPatternTreeNode*)>& fn) {
+    tassert(7097209,
+            "Expected non-empty pattern",
+            patternRoot && patternRoot->childrenOrder.size() >= 1);
+
+    // Perform a depth-first traversal using 'visitTreeStack' to keep track of where we are
+    std::vector<std::pair<IndexKeyPatternTreeNode*, size_t>> visitTreeStack;
+    std::string path;
+    visitTreeStack.emplace_back(patternRoot, 0);
+    while (!visitTreeStack.empty()) {
+        auto [node, idx] = visitTreeStack.back();
+        if (idx < node->childrenOrder.size()) {
+            const auto& childName = node->childrenOrder[idx];
+            visitTreeStack.back().second = idx + 1;
+            visitTreeStack.emplace_back(node->children[childName].get(), 0);
+            if (!path.empty()) {
+                path.append(1, '.');
+            }
+            path += childName;
+        } else {
+            // If this is a leaf node, invoke the callback
+            if (node->childrenOrder.empty()) {
+                fn(path, node);
+            }
+            visitTreeStack.pop_back();
+            auto pos = path.find_last_of('.');
+            path.resize(pos != std::string::npos ? pos : 0);
+        }
+    }
 }
 }  // namespace
 
@@ -1178,7 +1251,20 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    auto childReqs = reqs.copy().set(kResult);
+    auto fields = reqs.getFields();
+
+    if (!hasPartsWithCommonPrefix) {
+        DepsTracker deps;
+        sortPattern.addDependencies(&deps);
+        // If the sort pattern doesn't need the whole document, then we take all the top-level
+        // fields referenced by the filter predicate and we add them to 'fields'.
+        if (!deps.needWholeDocument) {
+            auto topLevelFields = getTopLevelFields(deps.fields);
+            fields = appendVectorUnique(std::move(fields), std::move(topLevelFields));
+        }
+    }
+
+    auto childReqs = reqs.copy().set(kResult).setFields(fields);
     auto [stage, childOutputs] = build(child, childReqs);
     auto outputs = std::move(childOutputs);
 
@@ -1207,7 +1293,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 // perform the "parallel arrays" check.
                 auto makeIsNotArrayCheck = [&](const FieldPath& fp) {
                     return makeNot(generateArrayCheckForSort(
-                        makeVariable(outputSlotId), fp, 0 /* level */, &_frameIdGenerator));
+                        makeVariable(outputSlotId),
+                        fp,
+                        0 /* level */,
+                        &_frameIdGenerator,
+                        outputs.getIfExists(
+                            std::make_pair(PlanStageSlots::kField, fp.getFieldName(0)))));
                 };
 
                 return makeBinaryOp(sbe::EPrimBinary::logicOr,
@@ -1220,10 +1311,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 // perform the "parallel arrays" check that works (and scales well) for an
                 // arbitrary number of sort pattern parts.
                 auto makeIsArrayCheck = [&](const FieldPath& fp) {
-                    return makeBinaryOp(sbe::EPrimBinary::cmp3w,
-                                        generateArrayCheckForSort(
-                                            makeVariable(outputSlotId), fp, 0, &_frameIdGenerator),
-                                        makeConstant(sbe::value::TypeTags::Boolean, false));
+                    return makeBinaryOp(
+                        sbe::EPrimBinary::cmp3w,
+                        generateArrayCheckForSort(makeVariable(outputSlotId),
+                                                  fp,
+                                                  0,
+                                                  &_frameIdGenerator,
+                                                  outputs.getIfExists(std::make_pair(
+                                                      PlanStageSlots::kField, fp.getFieldName(0)))),
+                        makeConstant(sbe::value::TypeTags::Boolean, false));
                 };
 
                 auto numArraysExpr = makeIsArrayCheck(*sortPattern[0].fieldPath);
@@ -1252,13 +1348,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> sortExpressions;
 
         for (const auto& part : sortPattern) {
+            auto topLevelFieldSlot = outputs.get(
+                std::make_pair(PlanStageSlots::kField, part.fieldPath->getFieldName(0)));
+
             std::unique_ptr<sbe::EExpression> sortExpr =
                 generateSortTraverse(sbe::EVariable{outputSlotId},
                                      part.isAscending,
                                      collatorSlot,
                                      *part.fieldPath,
                                      0,
-                                     &_frameIdGenerator);
+                                     &_frameIdGenerator,
+                                     topLevelFieldSlot);
 
             // Apply the transformation required by the collation, if specified.
             if (collatorSlot) {
@@ -1301,7 +1401,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Slots for sort stage to forward to parent stage. Values in these slots are not used during
     // sorting.
-    auto forwardedSlots = getSlotsToForward(childReqs, outputs, orderBy);
+    auto forwardedSlots = getSlotsToForward(reqs, outputs);
 
     stage =
         sbe::makeS<sbe::SortStage>(std::move(stage),
@@ -1649,7 +1749,7 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
     // TODO SERVER-57533: Support multiple index scan nodes located below OR and SORT_MERGE stages.
     if (const auto [ixn, ct] = getFirstNodeByType(root, STAGE_IXSCAN);
         !pn->fetched() && projection.isInclusionOnly() && ixn && ct == 1) {
-        return buildProjectionDefaultCovered(root, reqs, static_cast<const IndexScanNode*>(ixn));
+        return buildProjectionDefaultCovered(root, reqs);
     }
 
     // The child must produce all of the slots required by the parent of this ProjectionNodeDefault.
@@ -1666,11 +1766,13 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
                            &projection,
                            {std::move(stage), std::move(relevantSlots)},
                            outputs.get(kResult),
-                           root->nodeId());
+                           root->nodeId(),
+                           &outputs);
 
     stage = resultStage.extractStage(root->nodeId());
     outputs.set(kResult, resultSlot);
 
+    outputs.clearAllFields();
     outputs.clearNonRequiredSlots(reqs);
 
     return {std::move(stage), std::move(outputs)};
@@ -1678,8 +1780,7 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::buildProjectionDefaultCovered(const QuerySolutionNode* root,
-                                                     const PlanStageReqs& reqs,
-                                                     const IndexScanNode* ixn) {
+                                                     const PlanStageReqs& reqs) {
     tassert(6023408, "buildProjectionDefaultCovered() does not support kKey", !reqs.hasKeys());
 
     auto pn = static_cast<const ProjectionNodeDefault*>(root);
@@ -1691,25 +1792,16 @@ SlotBasedStageBuilder::buildProjectionDefaultCovered(const QuerySolutionNode* ro
     tassert(
         7055403, "buildProjectionDefaultCovered() expected 'pn' to not be fetched", !pn->fetched());
 
-    if (!ixn) {
-        ixn = static_cast<const IndexScanNode*>(getLoneNodeByType(root, STAGE_IXSCAN));
-    }
-
-    auto& indexKeyPattern = ixn->index.keyPattern;
     auto patternRoot = buildPatternTree(pn->proj);
     std::vector<std::string> keys;
-    StringDataSet keysSet;
+    StringSet keysSet;
     std::vector<IndexKeyPatternTreeNode*> patternNodesForSlots;
-    for (const auto& element : indexKeyPattern) {
-        sbe::MatchPath fieldRef{element.fieldNameStringData()};
-        // Projection field paths are always leaf nodes. In other words, projection like
-        // {a: 1, 'a.b': 1} would produce a path collision error.
-        if (auto node = patternRoot.findLeafNode(fieldRef); node) {
-            keys.emplace_back(element.fieldNameStringData());
-            keysSet.emplace(element.fieldNameStringData());
-            patternNodesForSlots.push_back(node);
-        }
-    }
+
+    visitPatternTreeLeaves(&patternRoot, [&](const std::string& path, IndexKeyPatternTreeNode* n) {
+        keys.emplace_back(path);
+        keysSet.emplace(path);
+        patternNodesForSlots.push_back(n);
+    });
 
     auto childReqs = reqs.copy().clear(kResult).clearAllFields().setKeys(keys);
 
@@ -1746,9 +1838,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     tassert(6023409, "buildOr() does not support kKey", !reqs.hasKeys());
 
-    sbe::PlanStage::Vector inputStages;
-    std::vector<sbe::value::SlotVector> inputSlots;
-
     auto orn = static_cast<const OrNode*>(root);
 
     // Children must produce all of the slots required by the parent of this OrNode. In addition
@@ -1756,13 +1845,28 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // children must always produce a 'resultSlot' if 'filter' is non-null.
     auto childReqs = reqs.copy().setIf(kResult, orn->filter.get()).setIf(kRecordId, orn->dedup);
 
+    auto fields = reqs.getFields();
+
+    if (orn->filter) {
+        DepsTracker deps;
+        match_expression::addDependencies(orn->filter.get(), &deps);
+        // If the filter predicate doesn't need the whole document, then we take all the top-level
+        // fields referenced by the filter predicate and we add them to 'fields'.
+        if (!deps.needWholeDocument) {
+            auto topLevelFields = getTopLevelFields(deps.fields);
+            fields = appendVectorUnique(std::move(fields), std::move(topLevelFields));
+        }
+    }
+
+    childReqs.setFields(fields);
+
+    sbe::PlanStage::Vector inputStages;
+    std::vector<sbe::value::SlotVector> inputSlots;
     for (auto&& child : orn->children) {
         auto [stage, outputs] = build(child.get(), childReqs);
 
-        auto sv = getSlotsToForward(childReqs, outputs);
-
-        inputStages.push_back(std::move(stage));
-        inputSlots.emplace_back(std::move(sv));
+        inputStages.emplace_back(std::move(stage));
+        inputSlots.emplace_back(getSlotsToForward(childReqs, outputs));
     }
 
     // Construct a union stage whose branches are translated children of the 'Or' node.
@@ -1782,16 +1886,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     if (orn->filter) {
-        auto forwardingReqs = reqs.copy().set(kResult);
+        auto forwardingReqs = reqs.copy().set(kResult).setFields(std::move(fields));
         auto relevantSlots = getSlotsToForward(forwardingReqs, outputs);
 
         auto [_, outputStage] = generateFilter(_state,
                                                orn->filter.get(),
                                                {std::move(stage), std::move(relevantSlots)},
                                                outputs.get(kResult),
+                                               &outputs,
                                                root->nodeId());
         stage = outputStage.extractStage(root->nodeId());
     }
+
+    outputs.clearNonRequiredSlots(reqs);
 
     return {std::move(stage), std::move(outputs)};
 }
@@ -2179,12 +2286,11 @@ void walkAndActOnFieldPaths(Expression* expr, const F& fn) {
  */
 EvalStage optimizeFieldPaths(StageBuilderState& state,
                              const boost::intrusive_ptr<Expression>& expr,
-                             EvalStage childEvalStage,
-                             const PlanStageSlots& childOutputs,
+                             EvalStage stage,
+                             const PlanStageSlots& outputs,
                              PlanNodeId nodeId) {
     using namespace fmt::literals;
-    auto rootSlot = childOutputs.getIfExists(PlanStageSlots::kResult);
-    auto retEvalStage = std::move(childEvalStage);
+    auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
 
     walkAndActOnFieldPaths(expr.get(), [&](const ExpressionFieldPath* fieldExpr, int32_t) {
         // We optimize neither a field path for the top-level document itself nor a field path that
@@ -2196,69 +2302,58 @@ EvalStage optimizeFieldPaths(StageBuilderState& state,
         auto fieldPathStr = fieldExpr->getFieldPath().fullPath();
 
         if (!state.preGeneratedExprs.contains(fieldPathStr)) {
-            auto [curEvalExpr, curEvalStage] = generateExpression(
-                state, fieldExpr, std::move(retEvalStage), rootSlot, nodeId, &childOutputs);
+            auto [curEvalExpr, curEvalStage] =
+                generateExpression(state, fieldExpr, std::move(stage), rootSlot, nodeId, &outputs);
 
-            auto [slot, stage] = projectEvalExpr(
+            auto [slot, projectStage] = projectEvalExpr(
                 std::move(curEvalExpr), std::move(curEvalStage), nodeId, state.slotIdGenerator);
 
             state.preGeneratedExprs.emplace(fieldPathStr, slot);
-            retEvalStage = std::move(stage);
+            stage = std::move(projectStage);
         }
     });
 
-    return retEvalStage;
+    return stage;
 }
 
 std::pair<EvalExpr, EvalStage> generateGroupByKeyImpl(
     StageBuilderState& state,
     const boost::intrusive_ptr<Expression>& idExpr,
-    const PlanStageSlots& childOutputs,
-    const boost::optional<sbe::value::SlotId>& optionalRootSlot,
-    EvalStage childEvalStage,
+    const PlanStageSlots& outputs,
+    const boost::optional<sbe::value::SlotId>& rootSlot,
+    EvalStage stage,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator) {
-    auto evalStage =
-        optimizeFieldPaths(state, idExpr, std::move(childEvalStage), childOutputs, nodeId);
+    // Optimize field paths before generating the expression.
+    stage = optimizeFieldPaths(state, idExpr, std::move(stage), outputs, nodeId);
 
-    auto [groupByEvalExpr, groupByEvalStage] = stage_builder::generateExpression(
-        state, idExpr.get(), std::move(evalStage), optionalRootSlot, nodeId, &childOutputs);
-
-    return {std::move(groupByEvalExpr), std::move(groupByEvalStage)};
+    return stage_builder::generateExpression(
+        state, idExpr.get(), std::move(stage), rootSlot, nodeId, &outputs);
 }
 
 std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>> generateGroupByKey(
     StageBuilderState& state,
     const boost::intrusive_ptr<Expression>& idExpr,
-    const PlanStageSlots& childOutputs,
-    std::unique_ptr<sbe::PlanStage> childStage,
+    const PlanStageSlots& outputs,
+    EvalStage stage,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator) {
-    auto optionalRootSlot = childOutputs.getIfExists(PlanStageSlots::kResult);
-    EvalStage retEvalStage{std::move(childStage),
-                           optionalRootSlot ? sbe::value::SlotVector{*optionalRootSlot}
-                                            : sbe::value::SlotVector{}};
+    auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
 
     if (auto idExprObj = dynamic_cast<ExpressionObject*>(idExpr.get()); idExprObj) {
         sbe::value::SlotVector slots;
         sbe::EExpression::Vector exprs;
 
         for (auto&& [fieldName, fieldExpr] : idExprObj->getChildExpressions()) {
-            auto [groupByEvalExpr, groupByEvalStage] =
-                generateGroupByKeyImpl(state,
-                                       fieldExpr,
-                                       childOutputs,
-                                       optionalRootSlot,
-                                       std::move(retEvalStage),
-                                       nodeId,
-                                       slotIdGenerator);
+            auto [groupByEvalExpr, groupByEvalStage] = generateGroupByKeyImpl(
+                state, fieldExpr, outputs, rootSlot, std::move(stage), nodeId, slotIdGenerator);
 
-            auto [slot, stage] = projectEvalExpr(
+            auto [slot, projectStage] = projectEvalExpr(
                 std::move(groupByEvalExpr), std::move(groupByEvalStage), nodeId, slotIdGenerator);
 
             slots.push_back(slot);
             groupByEvalExpr = slot;
-            retEvalStage = std::move(stage);
+            stage = std::move(projectStage);
 
             exprs.emplace_back(makeConstant(fieldName));
             exprs.emplace_back(groupByEvalExpr.extractExpr());
@@ -2271,55 +2366,46 @@ std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>>
         // SERVER-21992 issue goes away and the distinct scan should be able to return 'Nothing' and
         // 'Null' separately.
         if (slots.size() == 1) {
-            auto [slot, tempEvalStage] = projectEvalExpr(makeFillEmptyNull(std::move(exprs[1])),
-                                                         std::move(retEvalStage),
-                                                         nodeId,
-                                                         slotIdGenerator);
+            auto [slot, projectStage] = projectEvalExpr(
+                makeFillEmptyNull(std::move(exprs[1])), std::move(stage), nodeId, slotIdGenerator);
             slots[0] = slot;
             exprs[1] = makeVariable(slots[0]);
-            retEvalStage = std::move(tempEvalStage);
+            stage = std::move(projectStage);
         }
 
         // Composes the _id document and assigns a slot to the result using 'newObj' function if _id
         // should produce a document. For example, resultSlot = newObj(field1, slot1, ..., fieldN,
         // slotN)
-        return {slots,
-                std::move(retEvalStage),
-                sbe::makeE<sbe::EFunction>("newObj"_sd, std::move(exprs))};
+        return {slots, std::move(stage), sbe::makeE<sbe::EFunction>("newObj"_sd, std::move(exprs))};
     }
 
-    auto [groupByEvalExpr, groupByEvalStage] = generateGroupByKeyImpl(state,
-                                                                      idExpr,
-                                                                      childOutputs,
-                                                                      optionalRootSlot,
-                                                                      std::move(retEvalStage),
-                                                                      nodeId,
-                                                                      slotIdGenerator);
+    auto [groupByEvalExpr, groupByEvalStage] = generateGroupByKeyImpl(
+        state, idExpr, outputs, rootSlot, std::move(stage), nodeId, slotIdGenerator);
 
     // The group-by field may end up being 'Nothing' and in that case _id: null will be
     // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
     auto fillEmptyNullExpr = makeFillEmptyNull(groupByEvalExpr.extractExpr());
-    sbe::value::SlotId slot;
-    std::tie(slot, retEvalStage) = projectEvalExpr(
+    auto [slot, projectStage] = projectEvalExpr(
         std::move(fillEmptyNullExpr), std::move(groupByEvalStage), nodeId, slotIdGenerator);
+    stage = std::move(projectStage);
 
-    return {sbe::value::SlotVector{slot}, std::move(retEvalStage), nullptr};
+    return {sbe::value::SlotVector{slot}, std::move(stage), nullptr};
 }
 
 std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
     StageBuilderState& state,
     const AccumulationStatement& accStmt,
-    EvalStage childEvalStage,
-    const PlanStageSlots& childOutputs,
+    EvalStage stage,
+    const PlanStageSlots& outputs,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>>& accSlotToExprMap) {
+    auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
+
     // Input fields may need field traversal.
-    auto evalStage = optimizeFieldPaths(
-        state, accStmt.expr.argument, std::move(childEvalStage), childOutputs, nodeId);
-    auto optionalRootSlot = childOutputs.getIfExists(PlanStageSlots::kResult);
-    auto [argExpr, accArgEvalStage] = stage_builder::buildArgument(
-        state, accStmt, std::move(evalStage), optionalRootSlot, nodeId);
+    stage = optimizeFieldPaths(state, accStmt.expr.argument, std::move(stage), outputs, nodeId);
+    auto [argExpr, accArgEvalStage] =
+        stage_builder::buildArgument(state, accStmt, std::move(stage), rootSlot, nodeId, &outputs);
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
@@ -2465,17 +2551,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto childReqs = reqs.copy().set(kResult).clearAllFields();
 
-    // Don't ask the GROUP child for the result slot to avoid unnecessary materialization if it's
-    // possible to get everything we need from top-level field slots.
-    if (childNode->getType() == StageType::STAGE_GROUP && !groupNode->needWholeDocument &&
-        !groupNode->needsAnyMetadata) {
-        childReqs.clear(kResult);
+    // If the group node doesn't need the whole document, then we take all the top-level fields
+    // referenced by the group node and we add them to 'childReqs'.
+    if (!groupNode->needWholeDocument) {
+        childReqs.setFields(getTopLevelFields(groupNode->requiredFields));
+    }
 
-        for (auto&& pathStr : groupNode->requiredFields) {
-            auto path = sbe::MatchPath{pathStr};
-            const auto& topLevelField = path.getPart(0);
-            childReqs.set(std::make_pair(PlanStageSlots::kField, topLevelField));
-        }
+    // If the child is a GROUP and we can get everything we need from top-level field slots, then
+    // we can avoid unnecessary materialization and not request the kResult slot from the child.
+    if (childNode->getType() == StageType::STAGE_GROUP && !groupNode->needWholeDocument &&
+        !containsPoisonTopLevelField(groupNode->requiredFields)) {
+        childReqs.clear(kResult);
     }
 
     // Builds the child and gets the child result slot.
@@ -2487,8 +2573,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Translates the group-by expression and wraps it with 'fillEmpty(..., null)' because the
     // missing field value for _id should be mapped to 'Null'.
+    auto forwardingReqs = childReqs.copy().setIf(kResult, childOutputs.has(kResult));
+    auto childEvalStage =
+        EvalStage{std::move(childStage), getSlotsToForward(forwardingReqs, childOutputs)};
+
     auto [groupBySlots, groupByEvalStage, idDocExpr] = generateGroupByKey(
-        _state, idExpr, childOutputs, std::move(childStage), nodeId, &_slotIdGenerator);
+        _state, idExpr, childOutputs, std::move(childEvalStage), nodeId, &_slotIdGenerator);
 
     // Translates accumulators which are executed inside the group stage and gets slots for
     // accumulators.

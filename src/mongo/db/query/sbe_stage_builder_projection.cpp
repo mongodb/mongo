@@ -44,6 +44,7 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/tree_walker.h"
@@ -213,12 +214,14 @@ struct ProjectionTraversalVisitorContext {
                                       PlanStageType inputStage,
                                       sbe::value::SlotId inputSlot,
                                       sbe::value::SlotId preImageSlot,
+                                      const PlanStageSlots* slots,
                                       bool isBasicProjection)
         : state(state),
           planNodeId(planNodeId),
           projectType(projectType),
           inputSlot(inputSlot),
           preImageSlot(preImageSlot),
+          slots(slots),
           isBasicProjection(isBasicProjection) {
         levels.push({inputSlot, {}, boost::none});
         topLevel().evalStage = std::move(inputStage);
@@ -236,6 +239,8 @@ struct ProjectionTraversalVisitorContext {
     sbe::value::SlotId preImageSlot;
 
     std::stack<NestedLevel> levels;
+
+    const PlanStageSlots* slots;
 
     bool isBasicProjection = false;
 
@@ -399,7 +404,8 @@ public:
                                                 expression.get(),
                                                 std::move(_context->topLevel().evalStage),
                                                 _context->inputSlot,
-                                                _context->planNodeId);
+                                                _context->planNodeId,
+                                                _context->slots);
 
         _context->topLevelEvals().emplace_back(std::move(expr));
         _context->topLevel().evalStage = std::move(stage);
@@ -488,12 +494,20 @@ public:
                                                  : childInputExpr->clone());
         }
 
-        auto parentInputExpr = _context->topLevel().getInputExpr();
-        auto fromExpr = _context->isLastLevel()
-            ? std::move(parentInputExpr)
-            : makeFunction("getField"_sd,
-                           std::move(parentInputExpr),
-                           makeConstant(_context->topFrontField()));
+        auto fromExpr = [&]() {
+            if (_context->isLastLevel()) {
+                return _context->topLevel().getInputExpr();
+            } else if (_context->numLevels() == 2 && _context->slots) {
+                auto name =
+                    std::make_pair(PlanStageSlots::kField, StringData(_context->topFrontField()));
+                if (auto slot = _context->slots->getIfExists(name); slot) {
+                    return makeVariable(*slot);
+                }
+            }
+            return makeFunction("getField"_sd,
+                                _context->topLevel().getInputExpr(),
+                                makeConstant(_context->topFrontField()));
+        }();
 
         if (_context->isBasicProjection) {
             // If this is a basic projection, we can make use of traverseP().
@@ -615,8 +629,12 @@ public:
                 invariant(elemMatchObject);
                 invariant(elemMatchObject->numChildren() == 1);
                 auto elemMatchPredicate = elemMatchObject->getChild(0);
-                auto [_, elemMatchPredicateTree] = generateFilter(
-                    _context->state, elemMatchPredicate, {}, inputArraySlot, _context->planNodeId);
+                auto [_, elemMatchPredicateTree] = generateFilter(_context->state,
+                                                                  elemMatchPredicate,
+                                                                  {},
+                                                                  inputArraySlot,
+                                                                  nullptr /* slots */,
+                                                                  _context->planNodeId);
 
                 auto isObjectOrArrayExpr =
                     makeBinaryOp(sbe::EPrimBinary::logicOr,
@@ -637,8 +655,12 @@ public:
                     auto clonedChild = elemMatchValue->getChild(i)->shallowClone();
                     topLevelAnd->add(std::move(clonedChild));
                 }
-                auto [_, stage] = generateFilter(
-                    _context->state, topLevelAnd.get(), {}, inputArraySlot, _context->planNodeId);
+                auto [_, stage] = generateFilter(_context->state,
+                                                 topLevelAnd.get(),
+                                                 {},
+                                                 inputArraySlot,
+                                                 nullptr /* slots */,
+                                                 _context->planNodeId);
                 return std::move(stage);
             } else {
                 MONGO_UNREACHABLE;
@@ -698,7 +720,7 @@ public:
                                           inputArraySlot,
                                           filteredArraySlot,
                                           inputArraySlot,
-                                          nullptr,
+                                          nullptr /* slots */,
                                           makeVariable(earlyExitFlagSlot),
                                           _context->planNodeId,
                                           1);
@@ -1010,8 +1032,16 @@ std::pair<sbe::value::SlotId, PlanStageType> generatePositionalProjection(
     sbe::value::SlotId preImageSlot) {
     // First step is to generate filter tree that will record an array index for positional
     // projection.
-    auto [maybeIndexSlot, indexStage] = generateFilter(
-        state, &*data.matchExpression, {}, preImageSlot, planNodeId, true /* trackIndex */);
+    const bool trackIndex = true;
+    auto [maybeIndexSlot, indexStage] = generateFilter(state,
+                                                       &*data.matchExpression,
+                                                       {},
+                                                       preImageSlot,
+                                                       nullptr /* slots */,
+                                                       planNodeId,
+                                                       {},
+                                                       false,
+                                                       trackIndex);
     // The index slot is optional because there are certain queries that do not support index
     // tracking (see 'generateFilter' declaration). For such queries we do not want to include
     // stages generated by this function since we will not use any output from them. If index
@@ -1228,12 +1258,13 @@ std::pair<sbe::value::SlotId, EvalStage> generateProjection(
     const projection_ast::Projection* projection,
     EvalStage stage,
     sbe::value::SlotId inputVar,
-    PlanNodeId planNodeId) {
-    auto projType = projection->type();
-    bool isBasicProj = projectionIsBasic(projection->root());
+    PlanNodeId planNodeId,
+    const PlanStageSlots* slots) {
+    auto type = projection->type();
+    bool isBasic = projectionIsBasic(projection->root());
 
     ProjectionTraversalVisitorContext context{
-        state, planNodeId, projType, std::move(stage), inputVar, inputVar, isBasicProj};
+        state, planNodeId, type, std::move(stage), inputVar, inputVar, slots, isBasic};
     ProjectionTraversalPreVisitor preVisitor{&context};
     ProjectionTraversalInVisitor inVisitor{&context};
     ProjectionTraversalPostVisitor postVisitor{&context};
@@ -1248,7 +1279,7 @@ std::pair<sbe::value::SlotId, EvalStage> generateProjection(
         // of it for $slice operator. This second tree modifies resulting objects from from other
         // operators to include fields with $slice operator.
         ProjectionTraversalVisitorContext sliceContext{
-            state, planNodeId, projType, std::move(resultStage), resultSlot, inputVar, isBasicProj};
+            state, planNodeId, type, std::move(resultStage), resultSlot, inputVar, slots, isBasic};
         ProjectionTraversalPreVisitor slicePreVisitor{&sliceContext};
         ProjectionTraversalInVisitor sliceInVisitor{&sliceContext};
         SliceProjectionTraversalPostVisitor slicePostVisitor{&sliceContext};

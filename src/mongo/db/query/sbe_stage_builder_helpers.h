@@ -1048,8 +1048,38 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectNothin
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator);
 
+inline StringData getTopLevelField(const std::string& path) {
+    auto idx = path.find_first_of('.');
+    return StringData(path.c_str(), idx != std::string::npos ? idx : path.size());
+}
+
+template <typename T>
+inline std::vector<std::string> getTopLevelFields(const T& setOfPaths) {
+    const bool testCommandsEnabled = getTestCommandsEnabled();
+    std::vector<std::string> topLevelFields;
+
+    for (const auto& path : setOfPaths) {
+        auto field = getTopLevelField(path);
+        // If test commands are enabled, then we need to skip any top-level field named
+        // "POISON" so that the "failOnPoisonedFieldLookup" fail point works correctly.
+        if (testCommandsEnabled && field == "POISON") {
+            continue;
+        }
+
+        topLevelFields.emplace_back(std::string(field));
+    }
+
+    return topLevelFields;
+}
+
+template <typename T>
+inline bool containsPoisonTopLevelField(const T& setOfPaths) {
+    auto it = setOfPaths.lower_bound("POISON");
+    return getTestCommandsEnabled() && it != setOfPaths.end() && getTopLevelField(*it) == "POISON";
+}
+
 template <typename T, typename FuncT>
-std::vector<T> filterVector(std::vector<T> vec, FuncT fn) {
+inline std::vector<T> filterVector(std::vector<T> vec, FuncT fn) {
     std::vector<T> result;
     std::copy_if(std::make_move_iterator(vec.begin()),
                  std::make_move_iterator(vec.end()),
@@ -1059,7 +1089,7 @@ std::vector<T> filterVector(std::vector<T> vec, FuncT fn) {
 }
 
 template <typename T, typename FuncT>
-std::pair<std::vector<T>, std::vector<T>> splitVector(std::vector<T> vec, FuncT fn) {
+inline std::pair<std::vector<T>, std::vector<T>> splitVector(std::vector<T> vec, FuncT fn) {
     std::pair<std::vector<T>, std::vector<T>> result;
     for (size_t i = 0; i < vec.size(); ++i) {
         if (fn(vec[i])) {
@@ -1071,4 +1101,15 @@ std::pair<std::vector<T>, std::vector<T>> splitVector(std::vector<T> vec, FuncT 
     return result;
 }
 
+template <typename T>
+inline std::vector<T> appendVectorUnique(std::vector<T> lhs, std::vector<T> rhs) {
+    auto valueSet = std::set<T>{lhs.begin(), lhs.end()};
+    for (size_t i = 0; i < rhs.size(); ++i) {
+        if (!valueSet.count(rhs[i])) {
+            valueSet.emplace(rhs[i]);
+            lhs.emplace_back(std::move(rhs[i]));
+        }
+    }
+    return lhs;
+}
 }  // namespace mongo::stage_builder

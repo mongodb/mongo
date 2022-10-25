@@ -41,6 +41,7 @@
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/union.h"
+#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/util/make_data_structure.h"
@@ -248,7 +249,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     StageBuilderState& state,
     const CollectionPtr& collection,
     const CollectionScanNode* csn,
-    const std::vector<std::string>& fields,
+    std::vector<std::string> fields,
     PlanYieldPolicy* yieldPolicy,
     bool isTailableResumeBranch) {
     invariant(collection->ns().isOplog());
@@ -483,6 +484,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                                csn->filter.get(),
                                                {std::move(stage), std::move(relevantSlots)},
                                                resultSlot,
+                                               nullptr /* planStageSlots */,
                                                csn->nodeId());
         stage = outputStage.extractStage(csn->nodeId());
 
@@ -571,7 +573,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     StageBuilderState& state,
     const CollectionPtr& collection,
     const CollectionScanNode* csn,
-    const std::vector<std::string>& fields,
+    std::vector<std::string> fields,
     PlanYieldPolicy* yieldPolicy,
     bool isTailableResumeBranch) {
     const auto forward = csn->direction == CollectionScanParams::FORWARD;
@@ -579,6 +581,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     invariant(!csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
     invariant(!csn->resumeAfterRecordId || forward);
     invariant(!csn->resumeAfterRecordId || !csn->tailable);
+
+    if (csn->filter) {
+        DepsTracker deps;
+        match_expression::addDependencies(csn->filter.get(), &deps);
+        // If the filter predicate doesn't need the whole document, then we take all the top-level
+        // fields referenced by the filter predicate and we add them to 'fields'.
+        if (!deps.needWholeDocument) {
+            auto topLevelFields = getTopLevelFields(deps.fields);
+            fields = appendVectorUnique(std::move(fields), std::move(topLevelFields));
+        }
+    }
 
     auto fieldSlots = state.slotIdGenerator->generateMultiple(fields.size());
 
@@ -632,6 +645,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                                true /* resumeAfterRecordId  */);
     }
 
+    PlanStageSlots outputs;
+    outputs.set(PlanStageSlots::kResult, resultSlot);
+    outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
+    for (size_t i = 0; i < fields.size(); ++i) {
+        outputs.set(std::make_pair(PlanStageSlots::kField, fields[i]), fieldSlots[i]);
+    }
+
     if (csn->filter) {
         // The 'stopApplyingFilterAfterFirstMatch' optimization is only applicable when the 'ts'
         // lower bound is also provided for an oplog scan, and is handled in
@@ -645,15 +665,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                                csn->filter.get(),
                                                {std::move(stage), std::move(relevantSlots)},
                                                resultSlot,
+                                               &outputs,
                                                csn->nodeId());
         stage = outputStage.extractStage(csn->nodeId());
-    }
-
-    PlanStageSlots outputs;
-    outputs.set(PlanStageSlots::kResult, resultSlot);
-    outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
-    for (size_t i = 0; i < fields.size(); ++i) {
-        outputs.set(std::make_pair(PlanStageSlots::kField, fields[i]), fieldSlots[i]);
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -664,15 +678,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     StageBuilderState& state,
     const CollectionPtr& collection,
     const CollectionScanNode* csn,
-    const std::vector<std::string>& fields,
+    std::vector<std::string> fields,
     PlanYieldPolicy* yieldPolicy,
     bool isTailableResumeBranch) {
     if (csn->minRecord || csn->maxRecord || csn->stopApplyingFilterAfterFirstMatch) {
         return generateOptimizedOplogScan(
-            state, collection, csn, fields, yieldPolicy, isTailableResumeBranch);
+            state, collection, csn, std::move(fields), yieldPolicy, isTailableResumeBranch);
     } else {
         return generateGenericCollScan(
-            state, collection, csn, fields, yieldPolicy, isTailableResumeBranch);
+            state, collection, csn, std::move(fields), yieldPolicy, isTailableResumeBranch);
     }
 }
 }  // namespace mongo::stage_builder
