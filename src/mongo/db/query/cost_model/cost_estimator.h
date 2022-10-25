@@ -30,35 +30,27 @@
 #pragma once
 
 #include "mongo/db/query/cost_model/cost_model_gen.h"
+#include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include "mongo/db/query/optimizer/cascades/memo.h"
 
 namespace mongo::cost_model {
-
 /**
- * This class is main access point to Cost Model Coefficients, it rerieves them and applies
- * overrides.
+ * Default costing for physical nodes with logical delegator (not-yet-optimized) inputs.
  */
-class CostModelManager {
+class CostEstimator : public optimizer::cascades::CostingInterface {
 public:
-    CostModelManager();
+    CostEstimator(CostModelCoefficients coefficicients)
+        : _coefficients{std::move(coefficicients)} {}
 
-    /**
-     * Returns default version of Cost Model Coefficients with applied overrides specified in the
-     * 'overrides' parameters as a BSON Object. See the IDL definition of 'CostModelCoefficients'
-     * for the names of the fields.
-     *
-     * Usage:
-     * @code
-     * costModelManager.getCoefficients(BSON("scanIncrementalCost" << 0.001));
-     * @endcode
-     */
-    CostModelCoefficients getCoefficients(const BSONObj& overrides) const;
-
-    /**
-     * Returns default version of Cost Model Coefficients.
-     */
-    CostModelCoefficients getDefaultCoefficients() const;
+    optimizer::CostAndCE deriveCost(const optimizer::Metadata& metadata,
+                                    const optimizer::cascades::Memo& memo,
+                                    const optimizer::properties::PhysProps& physProps,
+                                    optimizer::ABT::reference_type physNodeRef,
+                                    const optimizer::ChildPropsType& childProps,
+                                    const optimizer::NodeCEMap& nodeCEMap) const override final;
 
 private:
-    BSONObj _coefficients;
+    const CostModelCoefficients _coefficients;
 };
+
 }  // namespace mongo::cost_model

@@ -29,35 +29,22 @@
 
 #pragma once
 
-#include "mongo/db/query/optimizer/cascades/cost_model_gen.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
 
 namespace mongo::optimizer::cascades {
 
 /**
- * Populate given cost model coefficients object with default values.
- */
-void initializeCoefficients(CostModelCoefficients& coefficients);
-
-/**
  * Default costing for physical nodes with logical delegator (not-yet-optimized) inputs.
  */
 class DefaultCosting : public CostingInterface {
 public:
-    DefaultCosting();
-    DefaultCosting(CostModelCoefficients coefficicients)
-        : _coefficients{std::move(coefficicients)} {}
-
     CostAndCE deriveCost(const Metadata& metadata,
                          const Memo& memo,
                          const properties::PhysProps& physProps,
                          ABT::reference_type physNodeRef,
                          const ChildPropsType& childProps,
                          const NodeCEMap& nodeCEMap) const override final;
-
-private:
-    const CostModelCoefficients _coefficients;
 };
 
 }  // namespace mongo::optimizer::cascades

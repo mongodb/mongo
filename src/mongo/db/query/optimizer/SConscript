@@ -96,7 +96,6 @@ env.Library(
     target="optimizer_default_costing",
     source=[
         "cascades/cost_derivation.cpp",
-        "cascades/cost_model.idl",
     ],
     LIBDEPS=[
         "optimizer_memo",

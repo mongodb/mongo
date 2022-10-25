@@ -39,11 +39,11 @@
 #include "mongo/db/query/ce/ce_sampling.h"
 #include "mongo/db/query/ce/collection_statistics_impl.h"
 #include "mongo/db/query/ce_mode_parameter.h"
+#include "mongo/db/query/cost_model/cost_estimator.h"
+#include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/cost_model/cost_model_manager.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
-#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
-#include "mongo/db/query/optimizer/cascades/cost_model_gen.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/node.h"
@@ -61,6 +61,7 @@
 
 namespace mongo {
 using namespace optimizer;
+using cost_model::CostEstimator;
 using cost_model::CostModelManager;
 
 namespace {
@@ -555,7 +556,7 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
 enum class CEMode { kSampling, kHistogram, kHeuristic };
 
 static OptPhaseManager createPhaseManager(const CEMode mode,
-                                          const CostModelCoefficients& costModel,
+                                          const cost_model::CostModelCoefficients& costModel,
                                           const NamespaceString& nss,
                                           OperationContext* opCtx,
                                           const int64_t collectionSize,
@@ -578,7 +579,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                                                     false /*requireRID*/,
                                                     std::move(metadataForSampling),
                                                     std::make_unique<HeuristicCE>(),
-                                                    std::make_unique<DefaultCosting>(costModel),
+                                                    std::make_unique<CostEstimator>(costModel),
                                                     defaultConvertPathToInterval,
                                                     constFold,
                                                     DebugInfo::kDefaultForProd,
@@ -591,7 +592,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                                                           std::move(phaseManagerForSampling),
                                                           collectionSize,
                                                           std::make_unique<HeuristicCE>()),
-                    std::make_unique<DefaultCosting>(costModel),
+                    std::make_unique<CostEstimator>(costModel),
                     defaultConvertPathToInterval,
                     constFold,
                     DebugInfo::kDefaultForProd,
@@ -606,7 +607,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     std::make_unique<CEHistogramTransport>(
                         std::make_shared<ce::CollectionStatisticsImpl>(collectionSize, nss),
                         std::make_unique<HeuristicCE>()),
-                    std::make_unique<DefaultCosting>(costModel),
+                    std::make_unique<CostEstimator>(costModel),
                     defaultConvertPathToInterval,
                     constFold,
                     DebugInfo::kDefaultForProd,
@@ -618,7 +619,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     requireRID,
                     std::move(metadata),
                     std::make_unique<HeuristicCE>(),
-                    std::make_unique<DefaultCosting>(costModel),
+                    std::make_unique<CostEstimator>(costModel),
                     defaultConvertPathToInterval,
                     constFold,
                     DebugInfo::kDefaultForProd,

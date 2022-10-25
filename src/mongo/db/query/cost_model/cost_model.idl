@@ -27,7 +27,7 @@
 #
 
 global:
-    cpp_namespace: "mongo::optimizer::cascades"
+    cpp_namespace: "mongo::cost_model"
 
 imports:
     - "mongo/db/basic_types.idl"

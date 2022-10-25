@@ -7,9 +7,11 @@ env = env.Clone()
 env.Library(
     target="query_cost_model",
     source=[
+        'cost_estimator.cpp',
+        'cost_model.idl',
         'cost_model_manager.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_default_costing',
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
     ],
 )
