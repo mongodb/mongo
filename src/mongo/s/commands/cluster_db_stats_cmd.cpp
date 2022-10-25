@@ -47,14 +47,14 @@ void aggregateResults(int scale,
     long long collections = 0;
     long long views = 0;
     long long objects = 0;
-    long long unscaledDataSize = 0;
-    long long dataSize = 0;
-    long long storageSize = 0;
-    long long totalSize = 0;
+    double unscaledDataSize = 0;
+    double dataSize = 0;
+    double storageSize = 0;
+    double totalSize = 0;
     long long indexes = 0;
-    long long indexSize = 0;
-    long long fsUsedSize = 0;
-    long long fsTotalSize = 0;
+    double indexSize = 0;
+    double fsUsedSize = 0;
+    double fsTotalSize = 0;
 
     for (const auto& response : responses) {
         invariant(response.swResponse.getStatus().isOK());
@@ -80,7 +80,7 @@ void aggregateResults(int scale,
 
     // avgObjSize on mongod is not scaled based on the argument to db.stats(), so we use
     // unscaledDataSize here for consistency.  See SERVER-7347.
-    output.append("avgObjSize", objects == 0 ? 0 : double(unscaledDataSize) / double(objects));
+    output.appendNumber("avgObjSize", objects == 0 ? 0 : unscaledDataSize / double(objects));
     output.appendNumber("dataSize", dataSize);
     output.appendNumber("storageSize", storageSize);
     output.appendNumber("totalSize", totalSize);
