@@ -32,9 +32,20 @@
 #include "mongo/db/exec/scoped_timer.h"
 
 namespace mongo {
-ScopedTimer::ScopedTimer(Microseconds* counter, TickSource* ts) : _counter(counter), _timer(ts) {}
+ScopedTimer::ScopedTimer(Microseconds* counter, TickSource* ts)
+    : _counter(counter), _tickSource(ts), _startTS(ts->getTicks()) {}
+
+ScopedTimer::ScopedTimer(Microseconds* counter, ClockSource* cs)
+    : _counter(counter), _clockSource(cs), _startCS(cs->now()) {}
 
 ScopedTimer::~ScopedTimer() {
-    *_counter += _timer.elapsed();
+    if (_clockSource) {
+        *_counter +=
+            Microseconds{(durationCount<Milliseconds>(_clockSource->now() - _startCS) * 1000)};
+        return;
+    }
+    if (_tickSource) {
+        *_counter += _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - _startTS);
+    }
 }
 }  // namespace mongo

@@ -31,7 +31,6 @@
 
 #include "mongo/stdx/variant.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/clock_tick_source.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -48,13 +47,18 @@ class ScopedTimer {
 public:
     ScopedTimer(ScopedTimer&& other) = default;
 
-    ScopedTimer(Microseconds* counter, TickSource* clock);
+    ScopedTimer(Microseconds* counter, TickSource* ts);
+    ScopedTimer(Microseconds* counter, ClockSource* cs);
 
     ~ScopedTimer();
 
 private:
     // Reference to the counter that we are incrementing with the elapsed time.
     Microseconds* const _counter;
-    Timer _timer;
+    TickSource* _tickSource = nullptr;
+    ClockSource* _clockSource = nullptr;
+
+    Date_t _startCS;
+    TickSource::Tick _startTS;
 };
 }  // namespace mongo

@@ -31,7 +31,6 @@
 
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/clock_tick_source.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
@@ -68,26 +67,6 @@ TEST(TickSourceTest, SpansToDurationConversion) {
     ASSERT_EQ(tsSecs.spanTo<Milliseconds>(ten, zero).count(), 0);
     ASSERT_EQ(tsSecs.spanTo<Microseconds>(zero, ten).count(), 10 * 1000 * 1000);
     ASSERT_EQ(tsSecs.spanTo<Microseconds>(ten, zero).count(), 0);
-}
-
-TEST(TickSourceTest, ClockTickSourceTest) {
-    ClockSourceMock mockSource;
-    std::unique_ptr<TickSource> ts = std::make_unique<ClockTickSource>(&mockSource);
-    auto start = ts->getTicks();
-    mockSource.advance(Milliseconds(10));
-    auto end = ts->getTicks();
-    auto elapsedSecs = ts->spanTo<Seconds>(start, end).count();
-    auto elapsedMils = ts->spanTo<Milliseconds>(start, end).count();
-    auto elapsedMics = ts->spanTo<Microseconds>(start, end).count();
-
-    ASSERT_LT(elapsedSecs, 1);
-    ASSERT_GTE(elapsedSecs, 0);
-
-    ASSERT_LTE(elapsedMils, 11);
-    ASSERT_GTE(elapsedMils, 10);
-
-    ASSERT_LTE(elapsedMics, 11 * 1000);
-    ASSERT_GTE(elapsedMics, 10 * 1000);
 }
 }  // namespace
 }  // namespace mongo

@@ -102,7 +102,6 @@ ServiceContext::ServiceContext()
     : _opIdRegistry(UniqueOperationIdRegistry::create()),
       _tickSource(std::make_unique<SystemTickSource>()),
       _fastClockSource(std::make_unique<SystemClockSource>()),
-      _clockTickSource(_fastClockSource.get()),
       _preciseClockSource(std::make_unique<SystemClockSource>()) {}
 
 
@@ -213,7 +212,6 @@ void ServiceContext::setTickSource(std::unique_ptr<TickSource> newSource) {
 }
 
 void ServiceContext::setFastClockSource(std::unique_ptr<ClockSource> newSource) {
-    _clockTickSource.setClockSource(newSource.get());
     _fastClockSource = std::move(newSource);
 }
 

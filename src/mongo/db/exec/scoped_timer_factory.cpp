@@ -37,7 +37,7 @@ boost::optional<ScopedTimer> make(ServiceContext* context,
                                   Microseconds* counter) {
     invariant(context);
     if (precision == QueryExecTimerPrecision::kMillis) {
-        return {{counter, context->getFastTickSource()}};
+        return {{counter, context->getFastClockSource()}};
     }
     if (precision == QueryExecTimerPrecision::kMicros) {
         return {{counter, context->getTickSource()}};
