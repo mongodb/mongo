@@ -76,26 +76,7 @@ std::string ShardLocal::toString() const {
 }
 
 bool ShardLocal::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
-    switch (options) {
-        case Shard::RetryPolicy::kNoRetry: {
-            return false;
-        } break;
-
-        case Shard::RetryPolicy::kIdempotent: {
-            return code == ErrorCodes::WriteConcernFailed;
-        } break;
-
-        case Shard::RetryPolicy::kIdempotentOrCursorInvalidated: {
-            return isRetriableError(code, Shard::RetryPolicy::kIdempotent) ||
-                ErrorCodes::isCursorInvalidatedError(code);
-        } break;
-
-        case Shard::RetryPolicy::kNotIdempotent: {
-            return false;
-        } break;
-    }
-
-    MONGO_UNREACHABLE;
+    return localIsRetriableError(code, options);
 }
 
 StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* opCtx,

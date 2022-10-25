@@ -137,7 +137,11 @@ public:
      * (i.e. is safe to retry and has the potential to succeed next time).  The 'options' argument
      * describes whether the operation that generated the given code was idempotent, which affects
      * which codes are safe to retry on.
+     *
+     * isRetriableError() routes to either of the static functions depending on object type.
      */
+    static bool localIsRetriableError(ErrorCodes::Error code, RetryPolicy options);
+    static bool remoteIsRetriableError(ErrorCodes::Error code, RetryPolicy options);
     virtual bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) = 0;
 
     /**

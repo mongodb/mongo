@@ -102,30 +102,7 @@ ShardRemote::ShardRemote(const ShardId& id,
 ShardRemote::~ShardRemote() = default;
 
 bool ShardRemote::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
-    if (gInternalProhibitShardOperationRetry.loadRelaxed()) {
-        return false;
-    }
-
-    switch (options) {
-        case RetryPolicy::kNoRetry: {
-            return false;
-        } break;
-
-        case RetryPolicy::kIdempotent: {
-            return isMongosRetriableError(code);
-        } break;
-
-        case RetryPolicy::kIdempotentOrCursorInvalidated: {
-            return isRetriableError(code, Shard::RetryPolicy::kIdempotent) ||
-                ErrorCodes::isCursorInvalidatedError(code);
-        } break;
-
-        case RetryPolicy::kNotIdempotent: {
-            return ErrorCodes::isNotPrimaryError(code);
-        } break;
-    }
-
-    MONGO_UNREACHABLE;
+    return remoteIsRetriableError(code, options);
 }
 
 // Any error code changes should possibly also be made to Shard::shouldErrorBePropagated!

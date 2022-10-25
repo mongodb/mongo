@@ -9,7 +9,6 @@ env.Library(
     source=[
         'num_hosts_targeted_metrics.cpp',
         'shard_remote.cpp',
-        'shard_remote.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/fetcher',
@@ -26,6 +25,7 @@ env.Library(
     target='shard_interface',
     source=[
         'shard.cpp',
+        'shard_remote.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

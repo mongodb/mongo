@@ -35,6 +35,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/shard_remote_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -99,6 +100,56 @@ Shard::Shard(const ShardId& id) : _id(id) {}
 
 bool Shard::isConfig() const {
     return _id == ShardId::kConfigServerId;
+}
+
+bool Shard::localIsRetriableError(ErrorCodes::Error code, RetryPolicy options) {
+    switch (options) {
+        case Shard::RetryPolicy::kNoRetry: {
+            return false;
+        } break;
+
+        case Shard::RetryPolicy::kIdempotent: {
+            return code == ErrorCodes::WriteConcernFailed;
+        } break;
+
+        case Shard::RetryPolicy::kIdempotentOrCursorInvalidated: {
+            return localIsRetriableError(code, Shard::RetryPolicy::kIdempotent) ||
+                ErrorCodes::isCursorInvalidatedError(code);
+        } break;
+
+        case Shard::RetryPolicy::kNotIdempotent: {
+            return false;
+        } break;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+bool Shard::remoteIsRetriableError(ErrorCodes::Error code, RetryPolicy options) {
+    if (gInternalProhibitShardOperationRetry.loadRelaxed()) {
+        return false;
+    }
+
+    switch (options) {
+        case RetryPolicy::kNoRetry: {
+            return false;
+        } break;
+
+        case RetryPolicy::kIdempotent: {
+            return isMongosRetriableError(code);
+        } break;
+
+        case RetryPolicy::kIdempotentOrCursorInvalidated: {
+            return remoteIsRetriableError(code, Shard::RetryPolicy::kIdempotent) ||
+                ErrorCodes::isCursorInvalidatedError(code);
+        } break;
+
+        case RetryPolicy::kNotIdempotent: {
+            return ErrorCodes::isNotPrimaryError(code);
+        } break;
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
