@@ -705,7 +705,7 @@ assertErrorCode(coll, pipeline, ErrorCodes.ConversionFailure);
 
 // Test umatched format specifier string.
 pipeline = [{$project: {date: {$dateFromString: {dateString: "2018-01", format: "%Y-%m-%d"}}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Data missing");
+assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Not enough data");
 
 pipeline = [{$project: {date: {$dateFromString: {dateString: "2018-01", format: "%Y"}}}}];
 assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Trailing data");
@@ -766,7 +766,7 @@ assertErrCodeAndErrMsgContains(coll,
 // Test embedded null bytes in the 'dateString' and 'format' fields.
 pipeline =
     [{$project: {date: {$dateFromString: {dateString: "12/31\0/2018", format: "%m/%d/%Y"}}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Data missing");
+assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Not enough data");
 
 pipeline =
     [{$project: {date: {$dateFromString: {dateString: "12/31/2018", format: "%m/%d\0/%Y"}}}}];

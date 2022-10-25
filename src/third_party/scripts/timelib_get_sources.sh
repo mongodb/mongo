@@ -7,12 +7,9 @@ set -o errexit
 # timelib does not use any autotools/cmake/config system to it is a simple import.
 
 # This script is designed to run on Linux or Mac OS X
-# Parsers make use of re2c, which needs to be installed and be version 0.15.3
-# *only*. re2c 0.16 introduces an issues with clang which causes any date
-# parser to hang.
 #
 
-VERSION=2021.06
+VERSION=2022.02
 NAME=timelib
 TARBALL=$VERSION.tar.gz
 TARBALL_DIR=$NAME-$VERSION
@@ -27,12 +24,6 @@ DEST_DIR=`git rev-parse --show-toplevel`/src/third_party/$NAME-$VERSION
 # Check prerequisites: re2c, wget
 if ! [ -x "$(command -v re2c)" ]; then
     echo 'Error: re2c is not installed.' >&2
-    exit 1
-fi
-
-RE2C_VERSION=`re2c --version`
-if ! [ "re2c 0.15.3" == "$RE2C_VERSION" ]; then
-    echo 'Error: re2c MUST be version 0.15.3.' >&2
     exit 1
 fi
 
