@@ -651,6 +651,8 @@ void ClusterWriteCmd::InvocationBase::run(OperationContext* opCtx,
 void ClusterWriteCmd::InvocationBase::explain(OperationContext* opCtx,
                                               ExplainOptions::Verbosity verbosity,
                                               rpc::ReplyBuilderInterface* result) {
+    preRunImplHook(opCtx);
+
     uassert(ErrorCodes::InvalidLength,
             "explained write batches must be of size 1",
             _batchedRequest.sizeWriteOps() == 1U);
