@@ -89,4 +89,23 @@ BUILD_PROFILES = {
             NINJA_PREFIX="san",
             VARIANT_DIR="san",
         ),
+
+    #These options are the preferred settings for compiledb to generating compile_commands.json
+    "compiledb":
+        BuildProfile(
+            ninja="disabled",
+            variables_files=[
+                './etc/scons/mongodbtoolchain_stable_clang.vars',
+                './etc/scons/developer_versions.vars',
+            ],
+            allocator="auto",
+            sanitize=None,
+            link_model="dynamic",
+            dbg="on",
+            opt="off",
+            ICECC=None,
+            CCACHE=None,
+            NINJA_PREFIX="build",
+            VARIANT_DIR=mongo_generators.default_variant_dir_generator,
+        ),
 }
