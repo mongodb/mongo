@@ -45,10 +45,10 @@
 namespace mongo {
 namespace {
 
-const BSONObj _createCmdObj(const BSONObj& writeCmd,
-                            const StringData& commandName,
-                            const BSONObj& targetDocId,
-                            const NamespaceString& nss) {
+BSONObj _createCmdObj(const BSONObj& writeCmd,
+                      const StringData& commandName,
+                      const BSONObj& targetDocId,
+                      const NamespaceString& nss) {
     // Drop collation and writeConcern as
     // targeting by _id uses default collation and writeConcern cannot be specified for
     // commands run in internal transactions. This object will be used to construct the command
