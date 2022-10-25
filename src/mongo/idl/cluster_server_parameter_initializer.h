@@ -52,22 +52,32 @@ public:
     static ClusterServerParameterInitializer* get(OperationContext* opCtx);
     static ClusterServerParameterInitializer* get(ServiceContext* serviceContext);
 
-    void updateParameter(OperationContext* opCtx, BSONObj doc, StringData mode);
-    void clearParameter(OperationContext* opCtx, ServerParameter* sp);
-    void clearParameter(OperationContext* opCtx, StringData id);
-    void clearAllParameters(OperationContext* opCtx);
+    void updateParameter(OperationContext* opCtx,
+                         BSONObj doc,
+                         StringData mode,
+                         const boost::optional<TenantId>& tenantId);
+    void clearParameter(OperationContext* opCtx,
+                        ServerParameter* sp,
+                        const boost::optional<TenantId>& tenantId);
+    void clearParameter(OperationContext* opCtx,
+                        StringData id,
+                        const boost::optional<TenantId>& tenantId);
+    void clearAllTenantParameters(OperationContext* opCtx,
+                                  const boost::optional<TenantId>& tenantId);
 
     /**
      * Used to initialize in-memory cluster parameter state based on the on-disk contents after
      * startup recovery or initial sync is complete.
      */
-    void initializeAllParametersFromDisk(OperationContext* opCtx);
+    void initializeAllTenantParametersFromDisk(OperationContext* opCtx,
+                                               const boost::optional<TenantId>& tenantId);
 
     /**
      * Used on rollback and rename with drop.
      * Updates settings which are present and clears settings which are not.
      */
-    void resynchronizeAllParametersFromDisk(OperationContext* opCtx);
+    void resynchronizeAllTenantParametersFromDisk(OperationContext* opCtx,
+                                                  const boost::optional<TenantId>& tenantId);
 
     // Virtual methods coming from the ReplicaSetAwareService
     void onStartup(OperationContext* opCtx) override final {}
@@ -85,16 +95,18 @@ public:
 
 private:
     template <typename OnEntry>
-    void doLoadAllParametersFromDisk(OperationContext* opCtx,
-                                     StringData mode,
-                                     OnEntry onEntry) try {
+    void doLoadAllTenantParametersFromDisk(OperationContext* opCtx,
+                                           StringData mode,
+                                           OnEntry onEntry,
+                                           const boost::optional<TenantId>& tenantId) try {
         std::vector<Status> failures;
 
         DBDirectClient client(opCtx);
-        FindCommandRequest findRequest{NamespaceString::kClusterParametersNamespace};
+
+        FindCommandRequest findRequest{NamespaceString::makeClusterParametersNSS(tenantId)};
         client.find(std::move(findRequest), [&](BSONObj doc) {
             try {
-                onEntry(opCtx, doc, mode);
+                onEntry(opCtx, doc, mode, tenantId);
             } catch (const DBException& ex) {
                 failures.push_back(ex.toStatus());
             }

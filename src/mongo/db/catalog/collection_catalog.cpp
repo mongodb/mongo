@@ -86,6 +86,9 @@ void assertViewCatalogValid(const ViewsForDatabase& viewsForDb) {
             viewsForDb.valid());
 }
 
+const auto maxUuid = UUID::parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF").getValue();
+const auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+
 }  // namespace
 
 class IgnoreExternalViewChangesForDatabase {
@@ -347,7 +350,6 @@ CollectionCatalog::iterator::iterator(OperationContext* opCtx,
                                       const DatabaseName& dbName,
                                       const CollectionCatalog& catalog)
     : _opCtx(opCtx), _dbName(dbName), _catalog(&catalog) {
-    auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
 
     _mapIter = _catalog->_orderedCollections.lower_bound(std::make_pair(_dbName, minUuid));
 
@@ -1346,7 +1348,6 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(UUID uuid, CollectionInfoFn
 }
 
 std::vector<UUID> CollectionCatalog::getAllCollectionUUIDsFromDb(const DatabaseName& dbName) const {
-    auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto it = _orderedCollections.lower_bound(std::make_pair(dbName, minUuid));
 
     std::vector<UUID> ret;
@@ -1363,8 +1364,6 @@ std::vector<NamespaceString> CollectionCatalog::getAllCollectionNamesFromDb(
     OperationContext* opCtx, const DatabaseName& dbName) const {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_S));
 
-    auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
-
     std::vector<NamespaceString> ret;
     for (auto it = _orderedCollections.lower_bound(std::make_pair(dbName, minUuid));
          it != _orderedCollections.end() && it->first.first == dbName;
@@ -1376,19 +1375,24 @@ std::vector<NamespaceString> CollectionCatalog::getAllCollectionNamesFromDb(
     return ret;
 }
 
-std::vector<DatabaseName> CollectionCatalog::_getAllDbNamesHelper(DatabaseName firstDbName) const {
-    std::vector<DatabaseName> ret;
-    auto maxUuid = UUID::parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF").getValue();
+Status CollectionCatalog::_iterAllDbNamesHelper(
+    const boost::optional<TenantId>& tenantId,
+    const std::function<Status(const DatabaseName&)>& callback,
+    const std::function<std::pair<DatabaseName, UUID>(const DatabaseName&)>& nextUpperBound) const {
     // _orderedCollections is sorted by <dbName, uuid>. upper_bound will return the iterator to the
     // first element in _orderedCollections greater than <firstDbName, maxUuid>.
-    auto iter = _orderedCollections.upper_bound(std::make_pair(firstDbName, maxUuid));
+    auto iter =
+        _orderedCollections.upper_bound(std::make_pair(DatabaseName(tenantId, ""), maxUuid));
     while (iter != _orderedCollections.end()) {
         auto dbName = iter->first.first;
-        if (firstDbName.tenantId() != boost::none && dbName.tenantId() != firstDbName.tenantId()) {
+        if (tenantId && dbName.tenantId() != tenantId) {
             break;
         }
         if (iter->second->isCommitted()) {
-            ret.push_back(dbName);
+            auto status = callback(dbName);
+            if (!status.isOK()) {
+                return status;
+            }
         } else {
             // If the first collection found for `dbName` is not yet committed, increment the
             // iterator to find the next visible collection (possibly under a different
@@ -1397,18 +1401,42 @@ std::vector<DatabaseName> CollectionCatalog::_getAllDbNamesHelper(DatabaseName f
             continue;
         }
         // Move on to the next database after `dbName`.
-        iter = _orderedCollections.upper_bound(std::make_pair(dbName, maxUuid));
+        iter = _orderedCollections.upper_bound(nextUpperBound(dbName));
     }
-    return ret;
+    return Status::OK();
 }
 
 std::vector<DatabaseName> CollectionCatalog::getAllDbNames() const {
-    return _getAllDbNamesHelper(DatabaseName());
+    return getAllDbNamesForTenant(boost::none);
 }
 
 std::vector<DatabaseName> CollectionCatalog::getAllDbNamesForTenant(
     boost::optional<TenantId> tenantId) const {
-    return _getAllDbNamesHelper(DatabaseName(tenantId, ""));
+    std::vector<DatabaseName> ret;
+    (void)_iterAllDbNamesHelper(
+        tenantId,
+        [&ret](const DatabaseName& dbName) {
+            ret.push_back(dbName);
+            return Status::OK();
+        },
+        [](const DatabaseName& dbName) { return std::make_pair(dbName, maxUuid); });
+    return ret;
+}
+
+std::set<TenantId> CollectionCatalog::getAllTenants() const {
+    std::set<TenantId> ret;
+    (void)_iterAllDbNamesHelper(boost::none,
+                                [&ret](const DatabaseName& dbName) {
+                                    if (const auto& tenantId = dbName.tenantId()) {
+                                        ret.insert(*tenantId);
+                                    }
+                                    return Status::OK();
+                                },
+                                [](const DatabaseName& dbName) {
+                                    return std::make_pair(DatabaseName(dbName.tenantId(), "\xff"),
+                                                          maxUuid);
+                                });
+    return ret;
 }
 
 void CollectionCatalog::setDatabaseProfileSettings(

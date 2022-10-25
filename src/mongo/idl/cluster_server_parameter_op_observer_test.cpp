@@ -55,6 +55,8 @@ public:
         auto opCtx = makeOperationContext();
         ASSERT_OK(createCollection(opCtx.get(),
                                    CreateCommand(NamespaceString::kClusterParametersNamespace)));
+        ASSERT_OK(createCollection(
+            opCtx.get(), CreateCommand(NamespaceString::makeClusterParametersNSS(kTenantId))));
         for (auto&& nss : kIgnoredNamespaces) {
             ASSERT_OK(createCollection(opCtx.get(), CreateCommand(nss)));
         }
@@ -91,9 +93,9 @@ public:
         observer.onDelete(opCtx.get(), nss, uuid, 1 /* StmtId */, args);
     }
 
-    void doDropDatabase(StringData dbname) {
+    void doDropDatabase(const DatabaseName& dbname) {
         auto opCtx = cc().makeOperationContext();
-        observer.onDropDatabase(opCtx.get(), DatabaseName(boost::none, dbname));
+        observer.onDropDatabase(opCtx.get(), dbname);
     }
 
     void doRenameCollection(const NamespaceString& fromColl, const NamespaceString& toColl) {
@@ -129,28 +131,36 @@ public:
 
     // Asserts that the parameter state does not change for this action.
     template <typename F>
-    void assertIgnored(const NamespaceString& nss, F fn) {
+    void assertIgnored(const NamespaceString& nss,
+                       F fn,
+                       const boost::optional<TenantId>& tenantId) {
         auto* sp =
             ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
         ASSERT(sp != nullptr);
 
-        const auto initialCPTime = sp->getClusterParameterTime(boost::none);
-        ClusterServerParameterTest initialCspTest = sp->getValue(boost::none);
+        const auto initialCPTime = sp->getClusterParameterTime(tenantId);
+        ClusterServerParameterTest initialCspTest = sp->getValue(tenantId);
         fn(nss);
-        ClusterServerParameterTest finalCspTest = sp->getValue(boost::none);
+        ClusterServerParameterTest finalCspTest = sp->getValue(tenantId);
 
-        ASSERT_EQ(sp->getClusterParameterTime(boost::none), initialCPTime);
+        ASSERT_EQ(sp->getClusterParameterTime(tenantId), initialCPTime);
         ASSERT_EQ(finalCspTest.getIntValue(), initialCspTest.getIntValue());
         ASSERT_EQ(finalCspTest.getStrValue(), initialCspTest.getStrValue());
     }
 
-    BSONObj initializeState() {
+    std::pair<BSONObj, BSONObj> initializeState() {
         Timestamp now(time(nullptr));
         const auto doc =
             makeClusterParametersDoc(LogicalTime(now), kInitialIntValue, kInitialStrValue);
 
-        upsert(doc);
-        doInserts(NamespaceString::kClusterParametersNamespace, {doc});
+        upsert(doc, boost::none);
+        doInserts(NamespaceString::makeClusterParametersNSS(boost::none), {doc});
+
+        const auto docT = makeClusterParametersDoc(
+            LogicalTime(now), kInitialTenantIntValue, kInitialTenantStrValue);
+
+        upsert(docT, kTenantId);
+        doInserts(NamespaceString::makeClusterParametersNSS(kTenantId), {docT});
 
         auto* sp =
             ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
@@ -160,29 +170,58 @@ public:
         ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
         ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
 
-        return doc;
+        cspTest = sp->getValue(kTenantId);
+        ASSERT_EQ(cspTest.getIntValue(), kInitialTenantIntValue);
+        ASSERT_EQ(cspTest.getStrValue(), kInitialTenantStrValue);
+
+        return {doc, docT};
     }
 
-    // Asserts that a given action is ignore anywhere outside of config.clusterParameters.
+    // Asserts that a given action is ignore anywhere outside of cluster parameter collections.
     template <typename F>
-    void assertIgnoredOtherNamespaces(F fn) {
+    void assertIgnoredOtherNamespaces(F fn, const boost::optional<TenantId>& tenantId) {
         for (const auto& nss : kIgnoredNamespaces) {
-            assertIgnored(nss, fn);
+            assertIgnored(nss, fn, tenantId);
         }
     }
 
-    // Asserts that a given action is ignored anywhere, even on the config.clusterParameters NS.
+    // Asserts that a given action is ignored anywhere, even on cluster parameter collections.
     template <typename F>
-    void assertIgnoredAlways(F fn) {
-        assertIgnoredOtherNamespaces(fn);
-        assertIgnored(NamespaceString::kClusterParametersNamespace, fn);
+    void assertIgnoredAlways(F fn, const boost::optional<TenantId>& tenantId) {
+        assertIgnoredOtherNamespaces(fn, tenantId);
+        assertIgnored(NamespaceString::makeClusterParametersNSS(boost::none), fn, tenantId);
+        assertIgnored(NamespaceString::makeClusterParametersNSS(kTenantId), fn, tenantId);
+    }
+
+    void assertParameterState(int line,
+                              const boost::optional<TenantId>& tenantId,
+                              int intVal,
+                              StringData strVal,
+                              boost::optional<LogicalTime> cpt = boost::none) {
+        auto* sp =
+            ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
+        try {
+            if (cpt) {
+                ASSERT_EQ(sp->getClusterParameterTime(tenantId), *cpt);
+            }
+
+            ClusterServerParameterTest cspTest = sp->getValue(tenantId);
+            ASSERT_EQ(cspTest.getIntValue(), intVal);
+            ASSERT_EQ(cspTest.getStrValue(), strVal);
+        } catch (...) {
+            LOGV2_ERROR(6887700, "ASSERT_PARAMETER_STATE failed", "line"_attr = line);
+            throw;
+        }
     }
 
 protected:
     ClusterServerParameterOpObserver observer;
 };
 
+#define ASSERT_PARAMETER_STATE(...) assertParameterState(__LINE__, __VA_ARGS__)
+
 TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
+    initializeState();
     auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
@@ -196,10 +235,8 @@ TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
     doInserts(NamespaceString::kClusterParametersNamespace,
               {makeClusterParametersDoc(singleLogicalTime, singleIntValue, singleStrValue)});
 
-    ClusterServerParameterTest cspTest = sp->getValue(boost::none);
-    ASSERT_EQ(sp->getClusterParameterTime(boost::none), singleLogicalTime);
-    ASSERT_EQ(cspTest.getIntValue(), singleIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), singleStrValue);
+    ASSERT_PARAMETER_STATE(boost::none, singleIntValue, singleStrValue, singleLogicalTime);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 
     // Multi-record insert.
     const auto multiLogicalTime = singleLogicalTime.addTicks(1);
@@ -214,37 +251,54 @@ TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
                   BSON(ClusterServerParameter::k_idFieldName << "alsoIgnored"),
               });
 
-    cspTest = sp->getValue(boost::none);
-    ASSERT_EQ(sp->getClusterParameterTime(boost::none), multiLogicalTime);
-    ASSERT_EQ(cspTest.getIntValue(), multiIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), multiStrValue);
+    ASSERT_PARAMETER_STATE(boost::none, multiIntValue, multiStrValue, multiLogicalTime);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 
     // Insert plausible records to namespaces we don't care about.
-    assertIgnoredOtherNamespaces([this](const auto& nss) {
-        doInserts(nss, {makeClusterParametersDoc(LogicalTime(), 42, "yellow")});
-    });
+    assertIgnoredOtherNamespaces(
+        [this](const auto& nss) {
+            doInserts(nss, {makeClusterParametersDoc(LogicalTime(), 42, "yellow")});
+        },
+        boost::none);
     // Plausible on other NS, multi-insert.
-    assertIgnoredOtherNamespaces([this](const auto& nss) {
-        auto d0 = makeClusterParametersDoc(LogicalTime(), 123, "red");
-        auto d1 = makeClusterParametersDoc(LogicalTime(), 234, "green");
-        auto d2 = makeClusterParametersDoc(LogicalTime(), 345, "blue");
-        doInserts(nss, {d0, d1, d2});
-    });
+    assertIgnoredOtherNamespaces(
+        [this](const auto& nss) {
+            auto d0 = makeClusterParametersDoc(LogicalTime(), 123, "red");
+            auto d1 = makeClusterParametersDoc(LogicalTime(), 234, "green");
+            auto d2 = makeClusterParametersDoc(LogicalTime(), 345, "blue");
+            doInserts(nss, {d0, d1, d2});
+        },
+        boost::none);
 
     // Unknown CSP record ignored on all namespaces.
-    assertIgnoredAlways([this](const auto& nss) {
-        doInserts(nss,
-                  {BSON("_id"
-                        << "ignored")});
-    });
+    assertIgnoredAlways(
+        [this](const auto& nss) {
+            doInserts(nss,
+                      {BSON("_id"
+                            << "ignored")});
+        },
+        boost::none);
     // Unknown CSP, multi-insert.
-    assertIgnoredAlways([this](const auto& nss) {
-        doInserts(nss,
-                  {BSON("_id"
-                        << "ignored"),
-                   BSON("_id"
-                        << "also-ingored")});
-    });
+    assertIgnoredAlways(
+        [this](const auto& nss) {
+            doInserts(nss,
+                      {BSON("_id"
+                            << "ignored"),
+                       BSON("_id"
+                            << "also-ingored")});
+        },
+        boost::none);
+
+    // Insert on separate tenant.
+    const auto tenantLogicalTime = multiLogicalTime.addTicks(1);
+    const auto tenantIntValue = multiIntValue + 1;
+    const auto tenantStrValue = "OnInsertRecord.tenant";
+
+    doInserts(NamespaceString::makeClusterParametersNSS(kTenantId),
+              {makeClusterParametersDoc(tenantLogicalTime, tenantIntValue, tenantStrValue)});
+
+    ASSERT_PARAMETER_STATE(boost::none, multiIntValue, multiStrValue, multiLogicalTime);
+    ASSERT_PARAMETER_STATE(kTenantId, tenantIntValue, tenantStrValue, tenantLogicalTime);
 }
 
 TEST_F(ClusterServerParameterOpObserverTest, OnUpdateRecord) {
@@ -262,72 +316,110 @@ TEST_F(ClusterServerParameterOpObserverTest, OnUpdateRecord) {
     doUpdate(NamespaceString::kClusterParametersNamespace,
              makeClusterParametersDoc(singleLogicalTime, singleIntValue, singleStrValue));
 
-    ClusterServerParameterTest cspTest = sp->getValue(boost::none);
-    ASSERT_EQ(sp->getClusterParameterTime(boost::none), singleLogicalTime);
-    ASSERT_EQ(cspTest.getIntValue(), singleIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), singleStrValue);
+    ASSERT_PARAMETER_STATE(boost::none, singleIntValue, singleStrValue, singleLogicalTime);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 
     // Plausible doc in wrong namespace.
-    assertIgnoredOtherNamespaces([this](const auto& nss) {
-        doUpdate(nss, makeClusterParametersDoc(LogicalTime(), 123, "ignored"));
-    });
+    assertIgnoredOtherNamespaces(
+        [this](const auto& nss) {
+            doUpdate(nss, makeClusterParametersDoc(LogicalTime(), 123, "ignored"));
+        },
+        boost::none);
 
     // Non cluster parameter doc.
-    assertIgnoredAlways([this](const auto& nss) {
-        doUpdate(nss, BSON(ClusterServerParameter::k_idFieldName << "ignored"));
-    });
+    assertIgnoredAlways(
+        [this](const auto& nss) {
+            doUpdate(nss, BSON(ClusterServerParameter::k_idFieldName << "ignored"));
+        },
+        boost::none);
+
+    // Update on separate tenant.
+    const auto tenantLogicalTime = singleLogicalTime.addTicks(1);
+    const auto tenantIntValue = singleIntValue + 1;
+    const auto tenantStrValue = "OnInsertRecord.tenant";
+
+    doUpdate(NamespaceString::makeClusterParametersNSS(kTenantId),
+             makeClusterParametersDoc(tenantLogicalTime, tenantIntValue, tenantStrValue));
+
+    ASSERT_PARAMETER_STATE(boost::none, singleIntValue, singleStrValue, singleLogicalTime);
+    ASSERT_PARAMETER_STATE(kTenantId, tenantIntValue, tenantStrValue, tenantLogicalTime);
 }
 
 TEST_F(ClusterServerParameterOpObserverTest, onDeleteRecord) {
     auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
-    const auto initialDoc = initializeState();
+    const auto [initialDocB, initialDocT] = initializeState();
+    // Structured bindings cannot be captured, move to variable.
+    const auto initialDoc = std::move(initialDocB);
 
     // Ignore deletes in other namespaces, whether with or without deleted doc.
-    assertIgnoredOtherNamespaces(
-        [this, initialDoc](const auto& nss) { doDelete(nss, initialDoc); });
+    assertIgnoredOtherNamespaces([this, initialDoc](const auto& nss) { doDelete(nss, initialDoc); },
+                                 boost::none);
 
     // Ignore deletes where the _id does not correspond to a known cluster server parameter.
-    assertIgnoredAlways([this](const auto& nss) {
-        doDelete(nss, BSON(ClusterServerParameter::k_idFieldName << "ignored"));
-    });
+    assertIgnoredAlways(
+        [this](const auto& nss) {
+            doDelete(nss, BSON(ClusterServerParameter::k_idFieldName << "ignored"));
+        },
+        boost::none);
 
     // Reset configuration to defaults when we claim to have deleted the doc.
     doDelete(NamespaceString::kClusterParametersNamespace, initialDoc);
-    ClusterServerParameterTest cspTest = sp->getValue(boost::none);
-    ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
 
+    ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 
     // Restore configured state, and delete without including deleteDoc reference.
     initializeState();
     doDelete(NamespaceString::kClusterParametersNamespace, initialDoc, false);
-    cspTest = sp->getValue(boost::none);
-    ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
+
+    ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Restore configured state, and delete other tenant with reference.
+    initializeState();
+    doDelete(NamespaceString::makeClusterParametersNSS(kTenantId), initialDocT);
+
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
+
+    // Restore and delete without reference.
+    initializeState();
+    doDelete(NamespaceString::makeClusterParametersNSS(kTenantId), initialDocT, false);
+
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
 }
 
 TEST_F(ClusterServerParameterOpObserverTest, onDropDatabase) {
     initializeState();
 
     // Drop ignorable databases.
-    assertIgnoredOtherNamespaces([this](const auto& nss) {
-        const auto dbname = nss.db();
-        if (dbname != kConfigDB) {
-            doDropDatabase(dbname);
-        }
-    });
+    assertIgnoredOtherNamespaces(
+        [this](const auto& nss) {
+            const auto dbname = nss.dbName();
+            if (dbname.db() != kConfigDB) {
+                doDropDatabase(dbname);
+            }
+        },
+        boost::none);
 
     // Actually drop the config DB.
-    doDropDatabase(kConfigDB);
+    doDropDatabase(DatabaseName(boost::none, kConfigDB));
 
     auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
-    ClusterServerParameterTest cspTest = sp->getValue(boost::none);
-    ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
+    ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Reinitialize and drop the other tenant's config DB.
+    initializeState();
+    doDropDatabase(DatabaseName(kTenantId, kConfigDB));
+
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
 }
 
 TEST_F(ClusterServerParameterOpObserverTest, onRenameCollection) {
@@ -335,8 +427,10 @@ TEST_F(ClusterServerParameterOpObserverTest, onRenameCollection) {
 
     const NamespaceString kTestFoo("test", "foo");
     // Rename ignorable collections.
-    assertIgnoredOtherNamespaces([&](const auto& nss) { doRenameCollection(nss, kTestFoo); });
-    assertIgnoredOtherNamespaces([&](const auto& nss) { doRenameCollection(kTestFoo, nss); });
+    assertIgnoredOtherNamespaces([&](const auto& nss) { doRenameCollection(nss, kTestFoo); },
+                                 boost::none);
+    assertIgnoredOtherNamespaces([&](const auto& nss) { doRenameCollection(kTestFoo, nss); },
+                                 boost::none);
 
     auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
@@ -344,17 +438,41 @@ TEST_F(ClusterServerParameterOpObserverTest, onRenameCollection) {
     // These renames "work" despite not mutating durable state
     // since the rename away doesn't require a rescan.
 
-    // Rename away (and reset to default)
+    // Upsert a doc for other tenant to make sure it doesn't get rescanned.
+    auto doc = makeClusterParametersDoc(LogicalTime(Timestamp(time(nullptr))), 111, "rename");
+    upsert(doc, kTenantId);
+    // Rename away (and reset that tenant to default)
     doRenameCollection(NamespaceString::kClusterParametersNamespace, kTestFoo);
-    ClusterServerParameterTest cspTest = sp->getValue(boost::none);
-    ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
+
+    ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Rename in (and restore that tenant to initialized state)
+    doRenameCollection(kTestFoo, NamespaceString::kClusterParametersNamespace);
+
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Repeat with other tenant
+    doRenameCollection(NamespaceString::makeClusterParametersNSS(kTenantId), kTestFoo);
+
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
 
     // Rename in (and restore to initialized state)
-    doRenameCollection(kTestFoo, NamespaceString::kClusterParametersNamespace);
-    cspTest = sp->getValue(boost::none);
-    ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
+    doRenameCollection(kTestFoo, NamespaceString::makeClusterParametersNSS(kTenantId));
+
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, 111, "rename");
+
+    doc = makeClusterParametersDoc(LogicalTime(Timestamp(time(nullptr))), 222, "rename2");
+    upsert(doc, kTenantId);
+    // Rename from one tenant to another -- should clear from-collection and reload to-collection
+    doRenameCollection(NamespaceString::makeClusterParametersNSS(boost::none),
+                       NamespaceString::makeClusterParametersNSS(kTenantId));
+
+    ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, 222, "rename2");
 }
 
 TEST_F(ClusterServerParameterOpObserverTest, onImportCollection) {
@@ -362,19 +480,29 @@ TEST_F(ClusterServerParameterOpObserverTest, onImportCollection) {
 
     const NamespaceString kTestFoo("test", "foo");
     // Import ignorable collections.
-    assertIgnoredOtherNamespaces([&](const auto& nss) { doImportCollection(nss); });
+    assertIgnoredOtherNamespaces([&](const auto& nss) { doImportCollection(nss); }, boost::none);
 
     auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
-    // Import the collection (rescan).
     auto doc =
         makeClusterParametersDoc(LogicalTime(Timestamp(time(nullptr))), 333, "onImportCollection");
-    upsert(doc);
+    upsert(doc, boost::none);
+    doc = makeClusterParametersDoc(
+        LogicalTime(Timestamp(time(nullptr))), 444, "onImportCollection.tenant");
+    upsert(doc, kTenantId);
+    // Import the collection -- should rescan only that tenant's cluster parameters.
     doImportCollection(NamespaceString::kClusterParametersNamespace);
-    ClusterServerParameterTest cspTest = sp->getValue(boost::none);
-    ASSERT_EQ(cspTest.getIntValue(), 333);
-    ASSERT_EQ(cspTest.getStrValue(), "onImportCollection");
+
+    ASSERT_PARAMETER_STATE(boost::none, 333, "onImportCollection");
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    remove(boost::none);
+    // Import the other tenant collection -- should rescan only other tenant's parameters.
+    doImportCollection(NamespaceString::makeClusterParametersNSS(kTenantId));
+
+    ASSERT_PARAMETER_STATE(boost::none, 333, "onImportCollection");
+    ASSERT_PARAMETER_STATE(kTenantId, 444, "onImportCollection.tenant");
 }
 
 TEST_F(ClusterServerParameterOpObserverTest, onReplicationRollback) {
@@ -382,34 +510,36 @@ TEST_F(ClusterServerParameterOpObserverTest, onReplicationRollback) {
 
     const NamespaceString kTestFoo("test", "foo");
     // Import ignorable collections.
-    assertIgnoredOtherNamespaces([&](const auto& nss) { doImportCollection(nss); });
+    assertIgnoredOtherNamespaces([&](const auto& nss) { doReplicationRollback({nss}); },
+                                 boost::none);
 
     auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
-    // Trigger rollback of ignorable namespaces.
+    remove(boost::none);
+    remove(kTenantId);
+    // Trigger rollback of ignorable namespaces and ensure no disk reload occurs.
     doReplicationRollback(kIgnoredNamespaces);
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 
-    ClusterServerParameterTest cspTest = sp->getValue(boost::none);
-    ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
-
-    // Trigger rollback of relevant namespace.
-    remove();
+    // Trigger rollback of relevant namespace and ensure disk reload occurs only for that tenant.
     doReplicationRollback({NamespaceString::kClusterParametersNamespace});
-    cspTest = sp->getValue(boost::none);
-    ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
 
-    // Rollback the rollback.
+    ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+    // Trigger rollback of other tenant's namespace and ensure disk reload occurs only for that
+    // tenant.
     auto doc = makeClusterParametersDoc(
         LogicalTime(Timestamp(time(nullptr))), 444, "onReplicationRollback");
-    upsert(doc);
-    cspTest = sp->getValue(boost::none);
-    doReplicationRollback({NamespaceString::kClusterParametersNamespace});
-    ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
+    upsert(doc, boost::none);
+    doReplicationRollback({NamespaceString::makeClusterParametersNSS(kTenantId)});
+
+    ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
 }
+
+#undef ASSERT_PARAMETER_STATE
 
 }  // namespace
 }  // namespace mongo

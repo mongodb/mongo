@@ -41,6 +41,7 @@
 #include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -468,6 +469,8 @@ public:
      * This function gets all the database names. The result is sorted in alphabetical ascending
      * order.
      *
+     * Callers of this method must hold the global lock in at least MODE_IS.
+     *
      * Unlike DatabaseHolder::getNames(), this does not return databases that are empty.
      */
     std::vector<DatabaseName> getAllDbNames() const;
@@ -476,9 +479,20 @@ public:
      * This function gets all the database names associated with tenantId. The result is sorted in
      * alphabetical ascending order.
      *
+     * Callers of this method must hold the global lock in at least MODE_IS.
+     *
      * Unlike DatabaseHolder::getNames(), this does not return databases that are empty.
      */
     std::vector<DatabaseName> getAllDbNamesForTenant(boost::optional<TenantId> tenantId) const;
+
+    /**
+     * This function gets all tenantIds in the database in ascending order.
+     *
+     * Callers of this method must hold the global lock in at least MODE_IS.
+     *
+     * Only returns tenantIds which are attached to at least one non-empty database.
+     */
+    std::set<TenantId> getAllTenants() const;
 
     /**
      * Sets 'newProfileSettings' as the profiling settings for the database 'dbName'.
@@ -647,10 +661,18 @@ private:
                                                                   const DatabaseName& dbName) const;
 
     /**
-     * Returns all relevant dbNames using the firstDbName to construct an iterator pointing to the
-     * first desired dbName.
+     * Iterates over databases, and performs a callback on each database. If any callback fails,
+     * returns its error code. If tenantId is set, will iterate only over databases with that
+     * tenantId. nextUpperBound is a callback that controls how we iterate -- given the current
+     * database name, returns a <DatabaseName, UUID> pair which must be strictly less than the next
+     * entry we iterate to.
      */
-    std::vector<DatabaseName> _getAllDbNamesHelper(DatabaseName firstDbName) const;
+    Status _iterAllDbNamesHelper(
+        const boost::optional<TenantId>& tenantId,
+        const std::function<Status(const DatabaseName&)>& callback,
+        const std::function<std::pair<DatabaseName, UUID>(const DatabaseName&)>& nextLowerBound)
+        const;
+
     /**
      * Sets all namespaces used by views for a database. Will uassert if there is a conflicting
      * collection name in the catalog.

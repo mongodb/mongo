@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -50,21 +51,34 @@ class ClusterServerParameterInitializerTest : public ClusterServerParameterTestB
 public:
     void setUp() final {
         ClusterServerParameterTestBase::setUp();
+        {
+            auto opCtx = cc().makeOperationContext();
+            ASSERT_OK(createCollection(
+                opCtx.get(), CreateCommand(NamespaceString::kClusterParametersNamespace)));
+            ASSERT_OK(createCollection(
+                opCtx.get(), CreateCommand(NamespaceString::makeClusterParametersNSS(kTenantId))));
+        }
 
-        // Insert a document on-disk for ClusterServerParameterTest. This should be loaded in-memory
+        // Insert documents on-disk for ClusterServerParameterTest. This should be loaded in-memory
         // by the initializer during startup recovery and at the end of initial sync.
         Timestamp now(time(nullptr));
-        const auto doc =
-            makeClusterParametersDoc(LogicalTime(now), kInitialIntValue, kInitialStrValue);
+        auto doc = makeClusterParametersDoc(LogicalTime(now), kInitialIntValue, kInitialStrValue);
 
-        upsert(doc);
+        upsert(doc, boost::none);
+
+        doc = makeClusterParametersDoc(
+            LogicalTime(now), kInitialTenantIntValue, kInitialTenantStrValue);
+
+        upsert(doc, kTenantId);
     }
 
     void tearDown() final {
         // Delete all cluster server parameter documents written and refresh in-memory state.
-        remove();
+        remove(boost::none);
+        remove(kTenantId);
         auto opCtx = cc().makeOperationContext();
-        _initializer.resynchronizeAllParametersFromDisk(opCtx.get());
+        _initializer.resynchronizeAllTenantParametersFromDisk(opCtx.get(), boost::none);
+        _initializer.resynchronizeAllTenantParametersFromDisk(opCtx.get(), kTenantId);
     }
     /**
      * Simulates the call to the ClusterServerParameterInitializer at the end of initial sync, when
@@ -97,6 +111,10 @@ TEST_F(ClusterServerParameterInitializerTest, OnInitialSync) {
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
 
+    cspTest = sp->getValue(kTenantId);
+    ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
+    ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
+
     // Indicate that data is available at the end of initial sync and check that the in-memory data
     // is updated.
     doInitialSync();
@@ -105,6 +123,10 @@ TEST_F(ClusterServerParameterInitializerTest, OnInitialSync) {
     cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
+
+    cspTest = sp->getValue(kTenantId);
+    ASSERT_EQ(cspTest.getIntValue(), kInitialTenantIntValue);
+    ASSERT_EQ(cspTest.getStrValue(), kInitialTenantStrValue);
 }
 
 TEST_F(ClusterServerParameterInitializerTest, OnStartupRecovery) {
@@ -123,6 +145,10 @@ TEST_F(ClusterServerParameterInitializerTest, OnStartupRecovery) {
     cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
+
+    cspTest = sp->getValue(kTenantId);
+    ASSERT_EQ(cspTest.getIntValue(), kInitialTenantIntValue);
+    ASSERT_EQ(cspTest.getStrValue(), kInitialTenantStrValue);
 }
 
 }  // namespace
