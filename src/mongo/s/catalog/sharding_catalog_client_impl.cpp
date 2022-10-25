@@ -351,9 +351,60 @@ AggregateCommandRequest makeCollectionAndIndexesAggregation(OperationContext* op
     return AggregateCommandRequest(CollectionType::ConfigNS, std::move(serializedPipeline));
 }
 
-AggregateCommandRequest makePlacementHistoryAggregation(OperationContext* opCtx,
-                                                        const Timestamp& minClusterTime,
-                                                        boost::optional<NamespaceString> nss) {
+std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
+                                           AggregateCommandRequest& aggRequest,
+                                           const repl::ReadConcernArgs& readConcern,
+                                           const Milliseconds& maxTimeout) {
+    aggRequest.setReadConcern(readConcern.toBSONInner());
+    aggRequest.setWriteConcern(WriteConcernOptions());
+
+    const auto readPref = [&]() -> ReadPreferenceSetting {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            return {};
+        }
+
+        const auto vcTime = VectorClock::get(opCtx)->getTime();
+        ReadPreferenceSetting readPref{kConfigReadSelector};
+        readPref.minClusterTime = vcTime.configTime().asTimestamp();
+        return readPref;
+    }();
+
+    aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
+
+    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        const Milliseconds maxTimeMS = std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeout);
+        aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+    }
+
+    // Run the aggregation
+    std::vector<BSONObj> aggResult;
+    auto callback = [&aggResult](const std::vector<BSONObj>& batch,
+                                 const boost::optional<BSONObj>& postBatchResumeToken) {
+        aggResult.insert(aggResult.end(),
+                         std::make_move_iterator(batch.begin()),
+                         std::make_move_iterator(batch.end()));
+        return true;
+    };
+
+    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
+        const Status status = configShard->runAggregation(opCtx, aggRequest, callback);
+        if (retry < kMaxWriteRetry &&
+            configShard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent)) {
+            aggResult.clear();
+            continue;
+        }
+        uassertStatusOK(status);
+        break;
+    }
+
+    return aggResult;
+}
+
+std::vector<ShardId> makeAndRunPlacementHistoryAggregation(
+    OperationContext* opCtx,
+    const Timestamp& minClusterTime,
+    const boost::optional<NamespaceString>& nss) {
     /*
         Stage 1. Select only the entry with timestamp <= clusterTime and filter out all nss that are
         not the collection or the database
@@ -376,7 +427,8 @@ AggregateCommandRequest makePlacementHistoryAggregation(OperationContext* opCtx,
         active shards
         Stage 9. Do not return the list of active shards (used only for the count)
 
-        regex=^db(.collection)?$
+        regex=^db(\.collection)?$ // matches db or db.collection ( this is skipped in case the whole
+       cluster info is searched)
         [
             {
                 "$match": { "timestamp": { "$lte": clusterTime } , "nss" : { $regex: regex} }
@@ -438,14 +490,22 @@ AggregateCommandRequest makePlacementHistoryAggregation(OperationContext* opCtx,
 
     // 1. Get all the history entries prior to the requested time concerning either the collection
     // or the parent database.
-    bool isCollectionSearch = !nss->db().empty() && !nss->coll().empty();
 
-    auto regex = isCollectionSearch ? "^" + nss->db() + "(\\." + nss->coll() + ")?$"
-                                    : "^" + nss->db() + "(\\..*)?$";
+    bool isCollectionSearch = nss.has_value() ? !nss->db().empty() && !nss->coll().empty() : false;
 
-    auto matchStage = DocumentSourceMatch::create(
-        BSON("timestamp" << BSON("$lte" << minClusterTime) << "nss" << BSON("$regex" << regex)),
-        expCtx);
+    auto matchStage = [&]() {
+        bool isClusterSearch = !nss.has_value();
+        if (isClusterSearch)
+            return DocumentSourceMatch::create(BSON("timestamp" << BSON("$lte" << minClusterTime)),
+                                               expCtx);
+
+        auto collSearch = isCollectionSearch ? pcre_util::quoteMeta(nss->coll()) : ".*";
+        auto regexString = "^" + pcre_util::quoteMeta(nss->db()) + "(\\." + collSearch + ")?$";
+        return DocumentSourceMatch::create(BSON("timestamp" << BSON("$lte" << minClusterTime)
+                                                            << "nss"
+                                                            << BSON("$regex" << regexString)),
+                                           expCtx);
+    }();
 
     // 2 & 3. Sort by timestamp and extract the first document for collection and database
     auto sortStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
@@ -533,71 +593,30 @@ AggregateCommandRequest makePlacementHistoryAggregation(OperationContext* opCtx,
     auto aggRequest = AggregateCommandRequest(NamespaceString::kConfigsvrPlacementHistoryNamespace,
                                               pipeline->serializeToBson());
 
-    return aggRequest;
-}
-
-std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
-                                           AggregateCommandRequest& aggRequest,
-                                           const repl::ReadConcernArgs& readConcern,
-                                           const Milliseconds& maxTimeout) {
-    aggRequest.setReadConcern(readConcern.toBSONInner());
-    aggRequest.setWriteConcern(WriteConcernOptions());
-
-    const auto readPref = [&]() -> ReadPreferenceSetting {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            return {};
-        }
-
-        const auto vcTime = VectorClock::get(opCtx)->getTime();
-        ReadPreferenceSetting readPref{kConfigReadSelector};
-        readPref.minClusterTime = vcTime.configTime().asTimestamp();
-        return readPref;
-    }();
-
-    aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
-
-    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-        const Milliseconds maxTimeMS = std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeout);
-        aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
-    }
 
     // Run the aggregation
-    std::vector<BSONObj> aggResult;
-    auto callback = [&aggResult](const std::vector<BSONObj>& batch,
-                                 const boost::optional<BSONObj>& postBatchResumeToken) {
-        aggResult.insert(aggResult.end(),
-                         std::make_move_iterator(batch.begin()),
-                         std::make_move_iterator(batch.end()));
-        return true;
-    };
-
-    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
-        const Status status = configShard->runAggregation(opCtx, aggRequest, callback);
-        if (retry < kMaxWriteRetry &&
-            configShard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent)) {
-            aggResult.clear();
-            continue;
+    const auto readConcern = [&]() -> repl::ReadConcernArgs {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            return {repl::ReadConcernLevel::kMajorityReadConcern};
+        } else {
+            const auto time = VectorClock::get(opCtx)->getTime();
+            return {time.configTime(), repl::ReadConcernLevel::kMajorityReadConcern};
         }
-        uassertStatusOK(status);
-        break;
-    }
+    }();
 
-    return aggResult;
-}
+    auto aggrResult =
+        runCatalogAggregation(opCtx, aggRequest, readConcern, Shard::kDefaultConfigCommandTimeout);
 
-std::vector<ShardId> extractShardIdsFromPlacementHistoryAggregationResult(
-    const std::vector<BSONObj>& aggrResult) {
-    // This may happen in case the placementHistory is empty
+    // Parse the result
     std::vector<ShardId> activeShards;
     if (!aggrResult.empty()) {
         invariant(aggrResult.size() == 1);
 
         // Extract the result
-        auto doc = aggrResult.front();
+        const auto& doc = aggrResult.front();
         auto numActiveShards = doc.getField("numActiveShards").Int();
         // Use Obj() instead of Array() to avoid instantiating a temporary std::vector.
-        auto shards = doc.getField("shards").Obj();
+        const auto& shards = doc.getField("shards").Obj();
 
         uassert(ErrorCodes::SnapshotTooOld,
                 "Part of the history may no longer be retrieved because of one or more removed "
@@ -1421,22 +1440,7 @@ std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataForCollAtClu
             "A full collection namespace must be specified",
             !collName.coll().empty());
 
-    // Run the aggregation
-    const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            return {repl::ReadConcernLevel::kMajorityReadConcern};
-        } else {
-            const auto time = VectorClock::get(opCtx)->getTime();
-            return {time.configTime(), repl::ReadConcernLevel::kMajorityReadConcern};
-        }
-    }();
-
-    auto aggRequest = makePlacementHistoryAggregation(opCtx, clusterTime, collName);
-    auto aggrResult =
-        runCatalogAggregation(opCtx, aggRequest, readConcern, Shard::kDefaultConfigCommandTimeout);
-
-
-    return extractShardIdsFromPlacementHistoryAggregationResult(aggrResult);
+    return makeAndRunPlacementHistoryAggregation(opCtx, clusterTime, collName);
 }
 
 
@@ -1447,21 +1451,13 @@ std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataForDbAtClust
             "A full db namespace must be specified",
             dbName.coll().empty() && !dbName.db().empty());
 
-    // Run the aggregation
-    const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            return {repl::ReadConcernLevel::kMajorityReadConcern};
-        } else {
-            const auto time = VectorClock::get(opCtx)->getTime();
-            return {time.configTime(), repl::ReadConcernLevel::kMajorityReadConcern};
-        }
-    }();
+    return makeAndRunPlacementHistoryAggregation(opCtx, clusterTime, dbName);
+}
 
-    auto aggRequest = makePlacementHistoryAggregation(opCtx, clusterTime, dbName);
-    auto aggrResult =
-        runCatalogAggregation(opCtx, aggRequest, readConcern, Shard::kDefaultConfigCommandTimeout);
+std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataAtClusterTime(
+    OperationContext* opCtx, const Timestamp& clusterTime) {
 
-    return extractShardIdsFromPlacementHistoryAggregationResult(aggrResult);
+    return makeAndRunPlacementHistoryAggregation(opCtx, clusterTime, boost::none);
 }
 
 }  // namespace mongo

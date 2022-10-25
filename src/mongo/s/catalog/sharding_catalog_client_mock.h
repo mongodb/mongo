@@ -155,6 +155,9 @@ public:
         const NamespaceString& dbName,
         const Timestamp& clusterTime) override;
 
+    std::vector<ShardId> getShardsThatOwnDataAtClusterTime(OperationContext* opCtx,
+                                                           const Timestamp& clusterTime) override;
+
 private:
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,

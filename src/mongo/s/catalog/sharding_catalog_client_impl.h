@@ -193,6 +193,13 @@ public:
         const NamespaceString& dbName,
         const Timestamp& clusterTime) override;
 
+    /**
+     * Returns the list of active shards that still contains data or that used to contain data
+     * at clusterTime >= input clusterTime based on placementHistory
+     */
+    std::vector<ShardId> getShardsThatOwnDataAtClusterTime(OperationContext* opCtx,
+                                                           const Timestamp& clusterTime) override;
+
 private:
     /**
      * Updates a single document (if useMultiUpdate is false) or multiple documents (if

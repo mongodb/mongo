@@ -329,15 +329,27 @@ public:
                                          boost::optional<BSONObj> hint = boost::none) = 0;
 
     /**
-     * Returns the list of active shards that still contains the specified collection or that used
-     * to contain the specified collection at clusterTime >= input clusterTime based on
-     * placementHistory
+     * Returns the list of active shards that still contains data for the specified collection or
+     * that used to contain data for the specified collection at clusterTime >= input clusterTime
+     * based on placementHistory
      */
     virtual std::vector<ShardId> getShardsThatOwnDataForCollAtClusterTime(
         OperationContext* opCtx, const NamespaceString& collName, const Timestamp& clusterTime) = 0;
 
+    /**
+     * Returns the list of active shards that still contains data for the specified database or
+     * that used to contain data for the specified database at clusterTime >= input clusterTime
+     * based on placementHistory
+     */
     virtual std::vector<ShardId> getShardsThatOwnDataForDbAtClusterTime(
         OperationContext* opCtx, const NamespaceString& dbName, const Timestamp& clusterTime) = 0;
+
+    /**
+     * Returns the list of active shards that still contains data or that used to contain data
+     * at clusterTime >= input clusterTime based on placementHistory
+     */
+    virtual std::vector<ShardId> getShardsThatOwnDataAtClusterTime(
+        OperationContext* opCtx, const Timestamp& clusterTime) = 0;
 
 protected:
     ShardingCatalogClient() = default;

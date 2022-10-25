@@ -210,7 +210,10 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_EmptyHis
 
     ASSERT_EQ(0U, shards2.size());
 
-    // TODO (SERVER-70097) add a test case for getShardsThatOwnDataAtClusterTime()
+    // no shards should be returned
+    auto shards3 = catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, Timestamp(4, 0));
+
+    ASSERT_EQ(0U, shards3.size());
 }  // namespace
 
 TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_NoData) {
@@ -256,14 +259,39 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_RegexSta
     auto opCtx = operationContext();
 
     PlacementHistoryCollection placementHistoryCollection;
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "config", "shard6");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(1, 0), "config.system.collections", {"shard6", "shard7"});
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(1, 0), "config.systemXcollections", {"shard8"});
+
     placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "db", "shard1");
-    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(2, 0), "dbXX", "shard1");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(2, 0), "db.collection1", {"shard1", "shard2"});
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(2, 0), "db.collection1.collection1", {"shard3", "shard4"});
+
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(3, 0), "dbXX", "shard10");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(3, 0), "dbXX.collection1", {"shard1", "shard2", "shard3", "shard4", "shard5"});
+
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(4, 0), "db_db", "shard11");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(4, 0), "db_db.collection1", {"shard1", "shard2", "shard3", "shard4", "shard5"});
+
+#ifndef _WIN32
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(5, 0), "db*db", "shard12");
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(5, 0), "db|db", "shard13");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(6, 0), "db*db.collection1", {"shard1", "shard2", "shard3", "shard4", "shard5"});
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(6, 0), "db|db.collection1", {"shard1", "shard2", "shard3", "shard4", "shard5"});
+#endif
+
+
     placementHistoryCollection.insertEntryForCreateDatabase(
-        Timestamp(3, 0), "dbXcollection1", "shard4");
-    placementHistoryCollection.insertEntryForShardCollection(
-        Timestamp(4, 0), "db.collection1", {"shard1", "shard2", "shard3"});
-    placementHistoryCollection.insertEntryForShardCollection(
-        Timestamp(5, 0), "dbXX.collection1", {"shard1", "shard2", "shard3"});
+        Timestamp(4, 0), "dbXcollection1", "shard5");
+
 
     // insert sample data into placementHistory collection
     for (auto& doc : placementHistoryCollection.getData()) {
@@ -271,66 +299,62 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_RegexSta
             opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, doc));
     }
 
-    for (auto& doc : generateConfigShardSampleData(4)) {
+    for (auto& doc : generateConfigShardSampleData(13)) {
         ASSERT_OK(insertToConfigCollection(opCtx, NamespaceString::kConfigsvrShardsNamespace, doc));
     }
 
-    // only primary shards should be returned since collectionX is not found
+    // there is only one db.collection1 which contains shard1 and shard2
     auto shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collectionX"), Timestamp(7, 0));
+        opCtx, NamespaceString("db.collection1"), Timestamp(7, 0));
+
+    ASSERT_EQ(2U, shards.size());
+    ASSERT_EQ("shard1", shards[0]);
+    ASSERT_EQ("shard2", shards[1]);
+
+    // testing config.system.collections
+    shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
+        opCtx, NamespaceString("config.system.collections"), Timestamp(7, 0));
+
+    ASSERT_EQ(2U, shards.size());
+    ASSERT_EQ("shard6", shards[0]);
+    ASSERT_EQ("shard7", shards[1]);
+
+    // only primary shards should be returned since collectionX is not found
+    shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
+        opCtx, NamespaceString("db.collectionX"), Timestamp(6, 0));
 
     ASSERT_EQ(1U, shards.size());
     ASSERT_EQ("shard1", shards[0]);
 
     // no data should be returned since the namespace is not found
     shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("dbX.collection1"), Timestamp(7, 0));
+        opCtx, NamespaceString("dbX.collection1"), Timestamp(6, 0));
 
     ASSERT_EQ(0U, shards.size());
 
     // Database and collection do not exist
     shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("dbX.collectionX"), Timestamp(7, 0));
+        opCtx, NamespaceString("dbX.collectionX"), Timestamp(6, 0));
 
     ASSERT_EQ(0U, shards.size());
 
     // Database does not exist
     shards = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("dbX"), Timestamp(7, 0));
+        opCtx, NamespaceString("dbX"), Timestamp(6, 0));
 
     ASSERT_EQ(0U, shards.size());
+
+    // db|db , db*db  etc... should not be found
+    shards = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
+        opCtx, NamespaceString("db"), Timestamp(6, 0));
+
+    ASSERT_EQ(4U, shards.size());
+    ASSERT_EQ("shard1", shards[0]);
+    ASSERT_EQ("shard2", shards[1]);
+    ASSERT_EQ("shard3", shards[2]);
+    ASSERT_EQ("shard4", shards[3]);
 }
 
-TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_SnapshotTooOld) {
-
-    auto opCtx = operationContext();
-
-    PlacementHistoryCollection placementHistoryCollection;
-    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "db", "shard1");
-    placementHistoryCollection.insertEntryForShardCollection(
-        Timestamp(2, 0), "db.collection1", {"shard1", "shard2", "shard3"});
-    placementHistoryCollection.insertEntryForShardCollection(
-        Timestamp(3, 0), "db.collection2", {"shard1", "shard2", "shard3"});
-    placementHistoryCollection.insertEntryForDropCollection(Timestamp(4, 0), "db.collection2");
-
-    // insert sample data into placementHistory collection
-    for (auto& doc : placementHistoryCollection.getData()) {
-        ASSERT_OK(insertToConfigCollection(
-            opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, doc));
-    }
-
-    // we force shard3 to miss
-    for (auto& doc : generateConfigShardSampleData(2)) {
-        ASSERT_OK(insertToConfigCollection(opCtx, NamespaceString::kConfigsvrShardsNamespace, doc));
-    }
-
-    // 3 shards should own collection1 at timestamp 4
-    // however, since shard3 is missing, we should get an error
-    ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-                           opCtx, NamespaceString("db.collection1"), Timestamp(4, 0)),
-                       DBException,
-                       ErrorCodes::SnapshotTooOld);
-}
 
 TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_ShardedWithData) {
 
@@ -397,14 +421,21 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_Dro
     ASSERT_EQ(0U, shards.size());
 }
 
-TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_SnapshotTooOld) {
+TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_ShardedWithData) {
+
     auto opCtx = operationContext();
 
     PlacementHistoryCollection placementHistoryCollection;
-
     placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "db", "shard1");
     placementHistoryCollection.insertEntryForShardCollection(
-        Timestamp(2, 0), "db.collection1", {"shard1", "shard2", "shard3", "shard4"});
+        Timestamp(2, 0), "db.collection1", {"shard1", "shard2", "shard3"});
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(3, 0), "db.collection2", {"shard1", "shard2", "shard6"});
+    placementHistoryCollection.insertEntryForDropCollection(Timestamp(4, 0), "db.collection2");
+    placementHistoryCollection.insertEntryForMovePrimary(Timestamp(5, 0), "db", "shard5");
+    placementHistoryCollection.insertEntryForCompleteMigration(
+        Timestamp(6, 0), "db.collection1", {"shard2", "shard3", "shard4"});
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(7, 0), "db2", "shard1");
 
     // insert sample data into placementHistory collection
     for (auto& doc : placementHistoryCollection.getData()) {
@@ -412,19 +443,51 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_Sna
             opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, doc));
     }
 
-    // we force shard3 to miss
-    for (auto& doc : generateConfigShardSampleData(2)) {
+    for (auto& doc : generateConfigShardSampleData(5)) {
         ASSERT_OK(insertToConfigCollection(opCtx, NamespaceString::kConfigsvrShardsNamespace, doc));
     }
 
-    // 3 shards should own collection1 at timestamp 7
-    // however, since shard3 and shard4 are missing, we should get an error
-    ASSERT_THROWS_CODE(catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-                           opCtx, NamespaceString("db"), Timestamp(2, 0)),
-                       DBException,
-                       ErrorCodes::SnapshotTooOld);
+    // 4 shards should own data for database db at timestamp 7
+    auto shards = catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, Timestamp(7, 0));
+
+    ASSERT_EQ(5U, shards.size());
+    std::sort(shards.begin(), shards.end());
+    ASSERT(shards[0] == "shard1");
+    ASSERT(shards[1] == "shard2");
+    ASSERT(shards[2] == "shard3");
+    ASSERT(shards[3] == "shard4");
+    ASSERT(shards[4] == "shard5");
 }
 
+TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_DropDatabase) {
+
+    PlacementHistoryCollection placementHistoryCollection;
+
+    placementHistoryCollection.insertEntryForCreateDatabase(Timestamp(1, 0), "db", "shard1");
+    placementHistoryCollection.insertEntryForShardCollection(
+        Timestamp(2, 0), "db.collection", {"shard1", "shard2", "shard3", "shard4"});
+    placementHistoryCollection.insertEntryForDropCollection(Timestamp(3, 0), "db.collection");
+    placementHistoryCollection.insertEntryForDropDatabase(Timestamp(4, 0), "db");
+
+    auto opCtx = operationContext();
+
+    // insert sample data into placementHistory collection
+    for (auto& doc : placementHistoryCollection.getData()) {
+        ASSERT_OK(insertToConfigCollection(
+            opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, doc));
+    }
+
+    for (auto& doc : generateConfigShardSampleData(4)) {
+        ASSERT_OK(insertToConfigCollection(opCtx, NamespaceString::kConfigsvrShardsNamespace, doc));
+    }
+
+    auto shards = catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, Timestamp(4, 0));
+
+    ASSERT_EQ(0U, shards.size());
+}
+
+
+// ############################# Indexes #############################
 TEST_F(CatalogClientAggregationsTest, TestCollectionAndIndexesAggregationWithNoIndexes) {
     const NamespaceString nss{"TestDB.TestColl"};
     const ChunkVersion placementVersion{{OID::gen(), Timestamp(1, 0)}, {1, 0}};
