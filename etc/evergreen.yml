@@ -254,6 +254,9 @@ variables:
   - name: .publish
     distros:
     - rhel70-small
+  - name: .publish_test
+    distros:
+    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 

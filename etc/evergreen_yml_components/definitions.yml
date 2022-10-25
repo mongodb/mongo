@@ -6991,6 +6991,41 @@ tasks:
       args:
       - "./src/evergreen/packages_publish.sh"
 
+- name: publish_packages_test
+  tags: ["publish_test"]
+  # This should prevent this task from running in patch builds, where we
+  # don't want to publish packages.
+  patchable: false
+  stepback: false
+  # Same dependencies as "push" below
+  depends_on:
+  - name: package
+  - name: jsCore
+  - name: run_dbtest
+  - name: replica_sets_jscore_passthrough
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "get and apply version expansions"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "fetch packages"
+  - func: "generate compile expansions"
+  - func: "apply compile expansions"
+  - func: "set up remote credentials"
+    vars:
+      aws_key_remote: ${repo_aws_key}
+      aws_secret_remote: ${repo_aws_secret}
+  - func: "set up notary client credentials"
+  - *f_expansions_write
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/packages_publish_test.sh"
+
 - name: push
   tags: ["publish"]
   patchable: false
