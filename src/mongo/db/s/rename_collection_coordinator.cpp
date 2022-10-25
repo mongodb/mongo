@@ -145,7 +145,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             "databases",
                             fromNss.db() == toNss.db() ||
                                 (!_doc.getExpectedSourceUUID() && !_doc.getExpectedTargetUUID()));
-
                     {
                         AutoGetCollection coll{
                             opCtx,
@@ -154,6 +153,19 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             AutoGetCollection::Options{}
                                 .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
                                 .expectedUUID(_doc.getExpectedSourceUUID())};
+
+                        uassert(ErrorCodes::CommandNotSupportedOnView,
+                                str::stream() << "Can't rename source collection `" << fromNss
+                                              << "` because it is a view.",
+                                !CollectionCatalog::get(opCtx)->lookupView(opCtx, fromNss));
+
+                        checkCollectionUUIDMismatch(
+                            opCtx, fromNss, *coll, _doc.getExpectedSourceUUID());
+
+
+                        uassert(ErrorCodes::NamespaceNotFound,
+                                str::stream() << "Collection " << fromNss << " doesn't exist.",
+                                coll.getCollection());
 
                         uassert(ErrorCodes::IllegalOperation,
                                 "Cannot rename an encrypted collection",
@@ -197,13 +209,10 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             toNss,
                             criticalSectionReason,
                             ShardingCatalogClient::kLocalWriteConcern);
-                    }
 
-                    // Make sure the target namespace is not a view
-                    {
-                        uassert(ErrorCodes::CommandNotSupportedOnView,
-                                str::stream() << "Can't rename to target collection `" << toNss
-                                              << "` because it is a view.",
+                        // Make sure the target namespace is not a view
+                        uassert(ErrorCodes::NamespaceExists,
+                                str::stream() << "a view already exists with that name: " << toNss,
                                 !CollectionCatalog::get(opCtx)->lookupView(opCtx, toNss));
                     }
 

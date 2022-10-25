@@ -66,6 +66,17 @@ const mongos = st.s0;
     testRename(st, dbName, toNs, false /* dropTarget */, false /* mustFail */);
 }
 
+// Rename non-existing source collection must fail
+{
+    const dbName = 'notExistingSource';
+    assert.commandWorked(
+        mongos.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandFailedWithCode(
+        st.getDB(dbName).adminCommand(
+            {renameCollection: dbName + ".source", to: dbName + ".target"}),
+        ErrorCodes.NamespaceNotFound);
+}
+
 // Rename to existing sharded target collection with dropTarget=true must succeed
 {
     const dbName = 'testRenameToExistingShardedCollection';
