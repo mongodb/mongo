@@ -5295,6 +5295,16 @@ if 'ICECC' in env and env['ICECC']:
 
     icecream = Tool('icecream')
     if not icecream.exists(env):
+        # SERVER-70648: Need to revert on how to update icecream
+        if 'ICECREAM_VERSION' in env and env['ICECREAM_VERSION'] < parse_version("1.3"):
+            env.FatalError(
+                textwrap.dedent(f"""\
+                Please refer to the following commands to update your icecream:
+                    sudo add-apt-repository ppa:mongodb-dev-prod/mongodb-build
+                    sudo apt update
+                    sudo apt-get --only-upgrade install icecc
+                """))
+
         env.FatalError(f"Failed to load icecream tool with ICECC={env['ICECC']}")
     icecream(env)
 
@@ -5366,11 +5376,6 @@ if get_option('ninja') != 'disabled':
 
     if env.ToolchainIs('gcc', 'clang'):
         env.AppendUnique(CCFLAGS=["-fdiagnostics-color"])
-    if 'ICECREAM_VERSION' in env and not env.get('CCACHE', None):
-        if env['ICECREAM_VERSION'] < parse_version("1.2"):
-            env.FatalError(
-                "Use of ccache is mandatory with --ninja and icecream older than 1.2. You are running {}."
-                .format(env['ICECREAM_VERSION']))
 
     ninja_builder = Tool("ninja")
     env["NINJA_BUILDDIR"] = env.Dir("$NINJA_BUILDDIR")
