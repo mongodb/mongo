@@ -1012,6 +1012,9 @@ done:
          */
         WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
 
+    /* Remove any backup file now that metadata has been synced. */
+    WT_ERR(__wt_backup_file_remove(session));
+
     /*
      * Update the open dhandles write generations and base write generation with the connection's
      * base write generation because the recovery checkpoint writes the pages to disk with new write
