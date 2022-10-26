@@ -2,7 +2,7 @@
  * Tests the collectionUUID parameter of the insert, update and delete commands.
  *
  * @tags: [
- *   requires_fcv_60,
+ *   requires_fcv_62,
  *   tenant_migration_incompatible,
  * ]
  */
@@ -63,6 +63,17 @@ var testCommand = function(cmd, cmdObj) {
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
     validateErrorResponse(res, testDB.getName(), uuid, coll2.getName(), coll.getName());
     assert(!testDB.getCollectionNames().includes(coll2.getName()));
+
+    jsTestLog(
+        "The command '" + cmd +
+        "' fails with CollectionUUIDMismatch when the provided UUID corresponds to a different " +
+        "collection, even if the provided namespace is a view.");
+    const view = 'view';
+    assert.commandWorked(testDB.createView(view, coll.getName(), []));
+    cmdObj[cmd] = view;
+    res =
+        assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
+    validateErrorResponse(res, testDB.getName(), uuid, view, coll.getName());
 
     jsTestLog("The command '" + cmd +
               "' fails with CollectionUUIDMismatch even if the database does not exist.");
