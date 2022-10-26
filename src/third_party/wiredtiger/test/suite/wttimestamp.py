@@ -49,7 +49,7 @@ class WiredTigerTimeStamp(object):
 @contextmanager
 def session_timestamped_transaction(session, timestamper):
     need_commit = False
-    if timestamper != None and \
+    if timestamper is not None and \
       not (hasattr(session, "_has_transaction") and session._has_transaction):
         session.begin_transaction()
         need_commit = True
@@ -58,7 +58,7 @@ def session_timestamped_transaction(session, timestamper):
         config = 'commit_timestamp=%x' % timestamper.get_incr()
         #wttest.WiredTigerTestCase.tty('commit_transaction ' + config)
         session.commit_transaction(config)
-    elif timestamper != None:
+    elif timestamper is not None:
         config = 'commit_timestamp=%x' % timestamper.get_incr()
         #wttest.WiredTigerTestCase.tty('timestamp_transaction ' + config)
         session.timestamp_transaction(config)

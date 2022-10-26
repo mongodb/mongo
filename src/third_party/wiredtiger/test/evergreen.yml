@@ -1950,6 +1950,31 @@ tasks:
         vars:
           unit_test_args: --hook timestamp
 
+  # The test_prepare_hs03.py test, when run with timestamp hooks, is run multiple times to facilitate
+  # catching intermittent problems in the test.
+  - name: test-prepare-hs03-hook-timestamp
+    tags: ["python"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            cd cmake_build
+            i=0
+            limit=100
+            while ((i < limit)) 
+            do
+              ((i=i+1))
+              echo "Test count: $i"
+              ${test_env_vars|} ${python_binary|python3} ../test/suite/run.py -v 4 test_prepare_hs03.py --hook timestamp
+            done
+
   # Break out Python unit tests into multiple buckets/tasks.  We have a fixed number of buckets,
   # and we use the -b option of the test/suite/run.py script to split up the tests.
 
@@ -4011,6 +4036,7 @@ buildvariants:
     - name: unit-test-hook-tiered
     - name: unit-test-hook-tiered-timestamp
     - name: unit-test-hook-timestamp
+    - name: test-prepare-hs03-hook-timestamp
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf
