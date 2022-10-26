@@ -76,7 +76,11 @@ ScalarHistogram::ScalarHistogram(const StatsHistogram& histogram) {
         _buckets.push_back(std::move(b));
     }
     for (const auto& bound : histogram.getBounds()) {
-        auto value = sbe::bson::convertFrom<1>(bound.getElement());
+        // We cannot insert a view here, because the lifetime of the of the bound is shorter than
+        // that of the histogram. In the case of a larger type, e.g. BigString/bsonString, we need
+        // to copy over the entire string as well, not just a pointer to memory which may be
+        // deallocated before we need it.
+        auto value = sbe::bson::convertFrom<false>(bound.getElement());
         _bounds.push_back(value.first, value.second);
     }
 }

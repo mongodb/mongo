@@ -249,7 +249,7 @@ public:
     }
 
 private:
-    long long _count;
+    double _count;
     std::vector<ce::SBEValue> _values;
 };
 

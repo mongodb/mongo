@@ -38,22 +38,22 @@
 
 namespace mongo::stats_serialization_utils {
 
-using TypeCount = std::list<std::pair<std::string, long long>>;
+using TypeCount = std::list<std::pair<std::string, double>>;
 
 /**
  * Returns owned BSON Object representing data matching mongo::StatsBucket IDL.
  */
-BSONObj makeStatsBucket(long long boundaryCount,
-                        long long rangeCount,
-                        long long rangeDistincts,
-                        long long cumulativeCount,
-                        long long cumulativeDistincts);
+BSONObj makeStatsBucket(double boundaryCount,
+                        double rangeCount,
+                        double rangeDistincts,
+                        double cumulativeCount,
+                        double cumulativeDistincts);
 /**
  * Returns owned BSON Object representing data matching mongo::StatsPath IDL.
  */
 BSONObj makeStatsPath(StringData path,
-                      long long documents,
-                      boost::optional<std::pair<long long, long long>> boolCount,
+                      double documents,
+                      boost::optional<std::pair<double, double>> boolCount,
                       boost::optional<TypeCount> typeCount,
                       boost::optional<std::list<BSONObj>> buckets,
                       sbe::value::Array* bounds,

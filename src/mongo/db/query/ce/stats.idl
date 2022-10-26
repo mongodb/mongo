@@ -36,15 +36,15 @@ structs:
         description: "Histogram bucket"
         fields:
             boundaryCount:
-                type: long
+                type: double
             rangeCount:
-                type: long
+                type: double
             rangeDistincts:
-                type: long
+                type: double
             cumulativeCount:
-                type: long
+                type: double
             cumulativeDistincts:
-                type: long
+                type: double
 
     StatsHistogram:
         description: "MaxDiff Histogram"
@@ -59,9 +59,9 @@ structs:
 counts"
         fields:
             trueCount:
-                type: long
+                type: double
             falseCount:
-                type: long
+                type: double
 
     TypeTag:
         description: "SBE types and their corresponding frequencies in the histogram"
@@ -69,7 +69,7 @@ counts"
             typeName:
                 type: string
             count:
-                type: long
+                type: double
 
     StatsArrayHistogram:
         description: "Array Histogram"
@@ -89,7 +89,7 @@ counts"
         description: "Serialized representation of data statistics for a key path"
         fields:
             documents:
-                type: long
+                type: double
             boolCount:
                 type: BoolCount
                 optional: true

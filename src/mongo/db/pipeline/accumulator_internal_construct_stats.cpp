@@ -53,7 +53,7 @@ REGISTER_ACCUMULATOR(
 
 AccumulatorInternalConstructStats::AccumulatorInternalConstructStats(
     ExpressionContext* const expCtx)
-    : AccumulatorState(expCtx), _count(0) {
+    : AccumulatorState(expCtx), _count(0.0) {
     assertAllowedInternalIfRequired(
         expCtx->opCtx, "_internalConstructStats", AllowedWithClientType::kInternal);
     _memUsageBytes = sizeof(*this);
@@ -113,7 +113,7 @@ Value AccumulatorInternalConstructStats::getValue(bool toBeMerged) {
 
 void AccumulatorInternalConstructStats::reset() {
     _memUsageBytes = sizeof(*this);
-    _count = 0;
+    _count = 0.0;
     _values.clear();
 }
 

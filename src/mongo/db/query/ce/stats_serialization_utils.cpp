@@ -36,11 +36,11 @@
 
 namespace mongo::stats_serialization_utils {
 
-BSONObj makeStatsBucket(long long boundaryCount,
-                        long long rangeCount,
-                        long long rangeDistincts,
-                        long long cumulativeCount,
-                        long long cumulativeDistincts) {
+BSONObj makeStatsBucket(double boundaryCount,
+                        double rangeCount,
+                        double rangeDistincts,
+                        double cumulativeCount,
+                        double cumulativeDistincts) {
     BSONObjBuilder bucketBuilder;
     bucketBuilder.append("boundaryCount", boundaryCount);
     bucketBuilder.append("rangeCount", rangeCount);
@@ -51,8 +51,8 @@ BSONObj makeStatsBucket(long long boundaryCount,
 }
 
 BSONObj makeStatsPath(StringData path,
-                      long long documents,
-                      boost::optional<std::pair<long long, long long>> boolCount,
+                      double documents,
+                      boost::optional<std::pair<double, double>> boolCount,
                       boost::optional<TypeCount> typeCount,
                       boost::optional<std::list<BSONObj>> histogram,
                       sbe::value::Array* bounds,

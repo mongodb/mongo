@@ -66,21 +66,21 @@ TEST(StatsPath, BasicValidStatsPath) {
     sbe::value::ValueGuard boundsGuard{boundsTag, boundsVal};
     auto bounds = sbe::value::getArrayView(boundsVal);
 
-    for (long long i = 1; i <= 3; i++) {
+    for (double i = 1; i <= 3; i++) {
         bounds->push_back(sbe::value::TypeTags::NumberDouble, double{i + 1.0});
 
         auto bucket = stats_serialization_utils::makeStatsBucket(i, i, i, i, i);
         buckets.push_back(bucket);
     }
     stats_serialization_utils::TypeCount types;
-    for (long long i = 1; i <= 3; i++) {
+    for (double i = 1; i <= 3; i++) {
         std::stringstream typeName;
         typeName << "type" << i;
-        auto typeElem = std::pair<std::string, long>(typeName.str(), i);
+        auto typeElem = std::pair<std::string, double>(typeName.str(), i);
         types.push_back(typeElem);
     }
     auto serializedPath = stats_serialization_utils::makeStatsPath(
-        "somePath", 100, std::make_pair(4LL, 6LL), types, buckets, bounds, boost::none);
+        "somePath", 100, std::make_pair(4.0, 6.0), types, buckets, bounds, boost::none);
 
     auto parsedPath = StatsPath::parse(ctx, serializedPath);
     auto pathToBSON = parsedPath.toBSON();
