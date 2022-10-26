@@ -56,4 +56,9 @@ void SorterFileStats::addSpilledDataSize(long long data) {
         _sorterTracker->bytesSpilled.fetchAndAdd(data);
     }
 }
+void SorterFileStats::addSpilledDataSizeUncompressed(long long data) {
+    if (_sorterTracker) {
+        _sorterTracker->bytesSpilledUncompressed.fetchAndAdd(data);
+    }
+}
 }  // namespace mongo

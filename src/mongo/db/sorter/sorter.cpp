@@ -58,6 +58,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/is_mongos.h"
@@ -722,12 +723,24 @@ public:
 
         _data.emplace_back(key.getOwned(), val.getOwned());
 
-        auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
-        _memUsed += memUsage;
-        this->_totalDataSizeSorted += memUsage;
+        auto& memPool = this->_memPool;
+        if (memPool) {
+            auto memUsedInsideSorter = (sizeof(Key) + sizeof(Value)) * (_data.size() + 1);
+            _memUsed = memPool->memUsage() + memUsedInsideSorter;
+            this->_totalDataSizeSorted = _memUsed;
+        } else {
+            auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
+            _memUsed += memUsage;
+            this->_totalDataSizeSorted += memUsage;
+        }
 
-        if (_memUsed > this->_opts.maxMemoryUsageBytes)
+        if (_memUsed > this->_opts.maxMemoryUsageBytes) {
             spill();
+            if (memPool) {
+                // We expect that all buffers are unused at this point.
+                memPool->freeUnused();
+            }
+        }
     }
 
     void emplace(Key&& key, Value&& val) override {
@@ -1113,13 +1126,26 @@ private:
 
 }  // namespace sorter
 
+namespace {
+SharedBufferFragmentBuilder makeMemPool() {
+    return SharedBufferFragmentBuilder(
+        gOperationMemoryPoolBlockInitialSizeKB.loadRelaxed() * static_cast<size_t>(1024),
+        SharedBufferFragmentBuilder::DoubleGrowStrategy(
+            gOperationMemoryPoolBlockMaxSizeKB.loadRelaxed() * static_cast<size_t>(1024)));
+}
+}  // namespace
+
 template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts)
     : SorterBase(opts.sorterTracker),
       _opts(opts),
       _file(opts.extSortAllowed ? std::make_shared<Sorter<Key, Value>::File>(
                                       opts.tempDir + "/" + nextFileName(), opts.sorterFileStats)
-                                : nullptr) {}
+                                : nullptr) {
+    if (opts.useMemPool) {
+        _memPool.emplace(makeMemPool());
+    }
+}
 
 template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts, const std::string& fileName)
@@ -1130,6 +1156,9 @@ Sorter<Key, Value>::Sorter(const SortOptions& opts, const std::string& fileName)
     invariant(opts.extSortAllowed);
     invariant(!opts.tempDir.empty());
     invariant(!fileName.empty());
+    if (opts.useMemPool) {
+        _memPool.emplace(makeMemPool());
+    }
 }
 
 template <typename Key, typename Value>
@@ -1288,7 +1317,7 @@ SortedFileWriter<Key, Value>::SortedFileWriter(
     : _settings(settings),
       _file(std::move(file)),
       _fileStartOffset(_file->currentOffset()),
-      _dbName(opts.dbName) {
+      _opts(opts) {
     // This should be checked by consumers, but if we get here don't allow writes.
     uassert(
         16946, "Attempting to use external sort from mongos. This is not allowed.", !isMongos());
@@ -1325,6 +1354,10 @@ void SortedFileWriter<Key, Value>::spill() {
     if (size == 0)
         return;
 
+    if (_opts.sorterFileStats) {
+        _opts.sorterFileStats->addSpilledDataSizeUncompressed(size);
+    }
+
     std::string compressed;
     snappy::Compress(outBuffer, size, &compressed);
     verify(compressed.size() <= size_t(std::numeric_limits<int32_t>::max()));
@@ -1345,7 +1378,7 @@ void SortedFileWriter<Key, Value>::spill() {
                                                         reinterpret_cast<uint8_t*>(out.get()),
                                                         protectedSizeMax,
                                                         &resultLen,
-                                                        _dbName);
+                                                        _opts.dbName);
         uassert(28842,
                 str::stream() << "Failed to compress data: " << status.toString(),
                 status.isOK());
@@ -1366,7 +1399,7 @@ SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
     spill();
 
     return new sorter::FileIterator<Key, Value>(
-        _file, _fileStartOffset, _file->currentOffset(), _settings, _dbName, _checksum);
+        _file, _fileStartOffset, _file->currentOffset(), _settings, _opts.dbName, _checksum);
 }
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
