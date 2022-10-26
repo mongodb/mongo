@@ -67,14 +67,12 @@ public:
     PropEnforcerVisitor(const GroupIdType groupId,
                         const Metadata& metadata,
                         const RIDProjectionsMap& ridProjections,
-                        PrefixId& prefixId,
                         PhysRewriteQueue& queue,
                         const PhysProps& physProps,
                         const LogicalProps& logicalProps)
         : _groupId(groupId),
           _metadata(metadata),
           _ridProjections(ridProjections),
-          _prefixId(prefixId),
           _queue(queue),
           _physProps(physProps),
           _logicalProps(logicalProps) {}
@@ -148,7 +146,8 @@ public:
             return;
         }
 
-        if (prop.getDistributionAndProjections()._type == DistributionType::UnknownPartitioning) {
+        const auto& requiredDistrAndProj = prop.getDistributionAndProjections();
+        if (requiredDistrAndProj._type == DistributionType::UnknownPartitioning) {
             // Cannot exchange into unknown partitioning.
             return;
         }
@@ -163,22 +162,22 @@ public:
             return;
         }
 
-        const auto& distributions =
+        const auto& availableDistrs =
             getPropertyConst<DistributionAvailability>(_logicalProps).getDistributionSet();
-        for (const auto& distribution : distributions) {
-            if (distribution == prop.getDistributionAndProjections()) {
+        for (const auto& availableDistr : availableDistrs) {
+            if (availableDistr == requiredDistrAndProj) {
                 // Same distribution.
                 continue;
             }
-            if (distribution._type == DistributionType::Replicated) {
+            if (availableDistr._type == DistributionType::Replicated) {
                 // Cannot switch "away" from replicated distribution.
                 continue;
             }
 
             PhysProps childProps = _physProps;
-            setPropertyOverwrite<DistributionRequirement>(childProps, distribution);
+            setPropertyOverwrite<DistributionRequirement>(childProps, availableDistr);
 
-            addProjectionsToProperties(childProps, distribution._projectionNames);
+            addProjectionsToProperties(childProps, requiredDistrAndProj._projectionNames);
             getProperty<DistributionRequirement>(childProps).setDisableExchanges(true);
 
             ABT enforcer = make<ExchangeNode>(prop, make<MemoLogicalDelegatorNode>(_groupId));
@@ -261,7 +260,6 @@ private:
     // We don't own any of those.
     const Metadata& _metadata;
     const RIDProjectionsMap& _ridProjections;
-    PrefixId& _prefixId;
     PhysRewriteQueue& _queue;
     const PhysProps& _physProps;
     const LogicalProps& _logicalProps;
@@ -270,12 +268,10 @@ private:
 void addEnforcers(const GroupIdType groupId,
                   const Metadata& metadata,
                   const RIDProjectionsMap& ridProjections,
-                  PrefixId& prefixId,
                   PhysRewriteQueue& queue,
                   const PhysProps& physProps,
                   const LogicalProps& logicalProps) {
-    PropEnforcerVisitor visitor(
-        groupId, metadata, ridProjections, prefixId, queue, physProps, logicalProps);
+    PropEnforcerVisitor visitor(groupId, metadata, ridProjections, queue, physProps, logicalProps);
     for (const auto& entry : physProps) {
         entry.second.visit(visitor);
     }

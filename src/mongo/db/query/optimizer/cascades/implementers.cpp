@@ -851,43 +851,58 @@ public:
                                  node.getRightChild());
         };
 
-        optimizeFn();
+        const auto& leftDistributions =
+            getPropertyConst<DistributionAvailability>(leftLogicalProps).getDistributionSet();
+        const auto& rightDistributions =
+            getPropertyConst<DistributionAvailability>(rightLogicalProps).getDistributionSet();
 
-        if (isIndex) {
-            switch (distrAndProjections._type) {
-                case DistributionType::HashPartitioning:
-                case DistributionType::RangePartitioning: {
-                    // Specifically for index intersection, try propagating the requirement on one
-                    // side and replicating the other.
+        const bool leftDistrOK = leftDistributions.count(distrAndProjections) > 0;
+        const bool rightDistrOK = rightDistributions.count(distrAndProjections) > 0;
+        const bool seekWithRoundRobin = !isIndex &&
+            distrAndProjections._type == DistributionType::RoundRobin &&
+            rightDistributions.count(DistributionType::UnknownPartitioning) > 0;
 
-                    const auto& leftDistributions =
-                        getPropertyConst<DistributionAvailability>(leftLogicalProps)
-                            .getDistributionSet();
-                    const auto& rightDistributions =
-                        getPropertyConst<DistributionAvailability>(rightLogicalProps)
-                            .getDistributionSet();
+        if (leftDistrOK && (rightDistrOK || seekWithRoundRobin)) {
+            // If we are not changing the distributions, both the left and right children need to
+            // have it available. For example, if optimizing under HashPartitioning on "var1", we
+            // need to check that this distribution is available in both child groups. If not, and
+            // it is available in one group, we can try replicating the other group (below).
+            // If optimizing the seek side specifically, we allow for a RoundRobin distribution
+            // which can match a collection with UnknownPartitioning.
+            optimizeFn();
+        }
 
-                    if (leftDistributions.count(distrAndProjections) > 0) {
-                        setPropertyOverwrite<DistributionRequirement>(leftPhysProps,
-                                                                      distribRequirement);
-                        setPropertyOverwrite<DistributionRequirement>(
-                            rightPhysProps, DistributionRequirement{DistributionType::Replicated});
-                        optimizeFn();
-                    }
+        if (!isIndex) {
+            // Nothing more to do for Complete target. The index side needs to be collocated with
+            // the seek side.
+            return;
+        }
 
-                    if (rightDistributions.count(distrAndProjections) > 0) {
-                        setPropertyOverwrite<DistributionRequirement>(
-                            leftPhysProps, DistributionRequirement{DistributionType::Replicated});
-                        setPropertyOverwrite<DistributionRequirement>(rightPhysProps,
-                                                                      distribRequirement);
-                        optimizeFn();
-                    }
-                    break;
+        // Specifically for index intersection, try propagating the requirement on one
+        // side and replicating the other.
+        switch (distrAndProjections._type) {
+            case DistributionType::HashPartitioning:
+            case DistributionType::RangePartitioning: {
+                if (leftDistrOK) {
+                    setPropertyOverwrite<DistributionRequirement>(leftPhysProps,
+                                                                  distribRequirement);
+                    setPropertyOverwrite<DistributionRequirement>(
+                        rightPhysProps, DistributionRequirement{DistributionType::Replicated});
+                    optimizeFn();
                 }
 
-                default:
-                    break;
+                if (rightDistrOK) {
+                    setPropertyOverwrite<DistributionRequirement>(
+                        leftPhysProps, DistributionRequirement{DistributionType::Replicated});
+                    setPropertyOverwrite<DistributionRequirement>(rightPhysProps,
+                                                                  distribRequirement);
+                    optimizeFn();
+                }
+                break;
             }
+
+            default:
+                break;
         }
     }
 

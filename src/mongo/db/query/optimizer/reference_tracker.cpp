@@ -69,18 +69,22 @@ struct CollectedInfo {
     /**
      * This is a destructive merge, the 'other' will be siphoned out.
      */
+    template <bool resolveFreeVarsWithOther = true>
     void merge(CollectedInfo&& other) {
-        // Incoming (other) info has some definitions. So let's try to resolve our free variables.
-        if (!other.defs.empty() && !freeVars.empty()) {
-            for (auto&& [name, def] : other.defs) {
-                resolveFreeVars(name, def);
+        if constexpr (resolveFreeVarsWithOther) {
+            // Incoming (other) info has some definitions. So let's try to resolve our free
+            // variables.
+            if (!other.defs.empty() && !freeVars.empty()) {
+                for (auto&& [name, def] : other.defs) {
+                    resolveFreeVars(name, def);
+                }
             }
-        }
 
-        // We have some definitions so let try to resolve other's free variables.
-        if (!defs.empty() && !other.freeVars.empty()) {
-            for (auto&& [name, def] : defs) {
-                other.resolveFreeVars(name, def);
+            // We have some definitions so let try to resolve other's free variables.
+            if (!defs.empty() && !other.freeVars.empty()) {
+                for (auto&& [name, def] : defs) {
+                    other.resolveFreeVars(name, def);
+                }
             }
         }
 
@@ -273,6 +277,7 @@ struct Collector {
     CollectedInfo transport(const ABT&, const T& op, Ts&&... ts) {
         // The default behavior resolves free variables, merges known definitions and propagates
         // them up unmodified.
+        // TODO: SERVER-70880: Remove default ABT type handler in the reference tracker.
         CollectedInfo result{};
         (result.merge(std::forward<Ts>(ts)), ...);
 
@@ -493,13 +498,59 @@ struct Collector {
             }
         }
 
-        // The correlated projections will be resolved automatically by the merging. We need to
-        // propagate the right child projections here, since these may be useful to ancestor ndoes.
         result.merge(std::move(leftChildResult));
-        result.merge(std::move(rightChildResult));
+
+        if (!result.defs.empty() && !rightChildResult.freeVars.empty()) {
+            // Manually resolve free variables in the right child using the correlated variables
+            // from the left child.
+            for (auto&& [name, def] : result.defs) {
+                if (correlatedProjNames.count(name) > 0) {
+                    rightChildResult.resolveFreeVars(name, def);
+                }
+            }
+        }
+
+        // Do not resolve further free variables. We also need to propagate the right child
+        // projections here, since these may be useful to ancestor nodes.
+        result.merge<false /*resolveFreeVarsWithOther*/>(std::move(rightChildResult));
+
         result.mergeNoDefs(std::move(filterResult));
 
         result.nodeDefs[&binaryJoinNode] = result.defs;
+
+        return result;
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const HashJoinNode& hashJoinNode,
+                            CollectedInfo leftChildResult,
+                            CollectedInfo rightChildResult,
+                            CollectedInfo refsResult) {
+        CollectedInfo result{};
+
+        result.merge(std::move(leftChildResult));
+        // Do not resolve further free variables.
+        result.merge<false /*resolveFreeVarsWithOther*/>(std::move(rightChildResult));
+        result.mergeNoDefs(std::move(refsResult));
+
+        result.nodeDefs[&hashJoinNode] = result.defs;
+
+        return result;
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const MergeJoinNode& mergeJoinNode,
+                            CollectedInfo leftChildResult,
+                            CollectedInfo rightChildResult,
+                            CollectedInfo refsResult) {
+        CollectedInfo result{};
+
+        result.merge(std::move(leftChildResult));
+        // Do not resolve further free variables.
+        result.merge<false /*resolveFreeVarsWithOther*/>(std::move(rightChildResult));
+        result.mergeNoDefs(std::move(refsResult));
+
+        result.nodeDefs[&mergeJoinNode] = result.defs;
 
         return result;
     }

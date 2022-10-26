@@ -40,7 +40,6 @@ namespace mongo::optimizer::cascades {
 void addEnforcers(GroupIdType groupId,
                   const Metadata& metadata,
                   const RIDProjectionsMap& ridProjections,
-                  PrefixId& prefixId,
                   PhysRewriteQueue& queue,
                   const properties::PhysProps& physProps,
                   const properties::LogicalProps& logicalProps);

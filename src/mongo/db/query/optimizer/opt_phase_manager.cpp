@@ -32,7 +32,6 @@
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
-#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
@@ -95,6 +94,17 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
     }
 }
 
+static std::string generateFreeVarsAssertMsg(const VariableEnvironment& env) {
+    std::string result;
+    for (const auto& name : env.freeVariableNames()) {
+        if (!result.empty()) {
+            result += ", ";
+        }
+        result += name;
+    }
+    return result;
+}
+
 template <OptPhase phase, class C>
 void OptPhaseManager::runStructuralPhase(C instance, VariableEnvironment& env, ABT& input) {
     if (!hasPhase(phase)) {
@@ -108,7 +118,9 @@ void OptPhaseManager::runStructuralPhase(C instance, VariableEnvironment& env, A
                 !_debugInfo.exceedsIterationLimit(iterationCount));
     }
 
-    tassert(6808709, "Environment has free variables.", !env.hasFreeVariables());
+    if (env.hasFreeVariables()) {
+        tasserted(6808709, "Plan has free variables: " + generateFreeVarsAssertMsg(env));
+    }
 }
 
 template <OptPhase phase1, OptPhase phase2, class C1, class C2>
@@ -141,7 +153,9 @@ void OptPhaseManager::runStructuralPhases(C1 instance1,
         }
     }
 
-    tassert(6808701, "Environment has free variables.", !env.hasFreeVariables());
+    if (env.hasFreeVariables()) {
+        tasserted(6808701, "Plan has free variables: " + generateFreeVarsAssertMsg(env));
+    }
 }
 
 void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
@@ -179,7 +193,9 @@ void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
         env.rebuild(input);
     }
 
-    tassert(6808703, "Environment has free variables.", !env.hasFreeVariables());
+    if (env.hasFreeVariables()) {
+        tasserted(6808703, "Plan has free variables: " + generateFreeVarsAssertMsg(env));
+    }
 }
 
 void OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
@@ -202,7 +218,7 @@ void OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
     if (_requireRID) {
         const auto& rootLogicalProps = _memo.getLogicalProps(rootGroupId);
         tassert(6808705,
-                "We cannot optain rid for this query.",
+                "We cannot obtain rid for this query.",
                 hasProperty<IndexingAvailability>(rootLogicalProps));
 
         const auto& scanDefName =
@@ -232,8 +248,9 @@ void OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
     std::tie(input, _nodeToGroupPropsMap) = extractPhysicalPlan(_physicalNodeId, _metadata, _memo);
 
     env.rebuild(input);
-
-    tassert(6808707, "Environment has free variables.", !env.hasFreeVariables());
+    if (env.hasFreeVariables()) {
+        tasserted(6808707, "Plan has free variables: " + generateFreeVarsAssertMsg(env));
+    }
 }
 
 void OptPhaseManager::runMemoRewritePhases(VariableEnvironment& env, ABT& input) {
@@ -263,23 +280,9 @@ void OptPhaseManager::runMemoRewritePhases(VariableEnvironment& env, ABT& input)
 
 void OptPhaseManager::optimize(ABT& input) {
     VariableEnvironment env = VariableEnvironment::build(input);
-
-    std::string freeVariables = "";
     if (env.hasFreeVariables()) {
-        bool first = true;
-        for (auto& name : env.freeVariableNames()) {
-            if (first) {
-                first = false;
-            } else {
-                freeVariables += ", ";
-            }
-            freeVariables += name;
-        }
+        tasserted(6808711, "Plan has free variables: " + generateFreeVarsAssertMsg(env));
     }
-
-    tassert(6808711,
-            "Environment has the following free variables: " + freeVariables + ".",
-            !env.hasFreeVariables());
 
     const auto sargableCheckFn = [this](const ABT& expr) {
         return convertExprToPartialSchemaReq(expr, false /*isFilterContext*/, _pathToInterval)
@@ -314,7 +317,9 @@ void OptPhaseManager::optimize(ABT& input) {
     }
 
     env.rebuild(input);
-    tassert(6808710, "Environment has free variables.", !env.hasFreeVariables());
+    if (env.hasFreeVariables()) {
+        tasserted(6808710, "Plan has free variables: " + generateFreeVarsAssertMsg(env));
+    }
 }
 
 bool OptPhaseManager::hasPhase(const OptPhase phase) const {

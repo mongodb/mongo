@@ -28,10 +28,10 @@
  */
 
 #include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
 
 namespace mongo::optimizer {
 namespace {
@@ -360,7 +360,13 @@ TEST(ReferenceTrackerTest, FreeVariablesBinaryJoin) {
             "evalProjB",
             make<EvalPath>(make<PathGet>("b", make<PathIdentity>()), make<Variable>("scanProj1")),
             std::move(scanNodeLeft)));
+    ABT evalNodeLeft1 = make<EvaluationNode>(
+        "evalProjA1",
+        make<EvalPath>(make<PathGet>("a1", make<PathIdentity>()), make<Variable>("scanProj1")),
+        std::move(evalNodeLeft));
 
+    // "evalProjA" needs to come from the left child and IS set to be correlated in the binary join
+    // below.
     ABT evalNodeRight = make<EvaluationNode>(
         "evalProjC",
         make<EvalPath>(make<PathGet>("c", make<PathIdentity>()), make<Variable>("scanProj2")),
@@ -368,22 +374,95 @@ TEST(ReferenceTrackerTest, FreeVariablesBinaryJoin) {
                              make<EvalPath>(make<PathIdentity>(), make<Variable>("evalProjA")),
                              std::move(scanNodeRight)));
 
-    ABT joinNode = make<BinaryJoinNode>(
-        JoinType::Inner,
-        ProjectionNameSet{},
-        make<BinaryOp>(Operations::Eq, make<Variable>("evalProjA"), make<Variable>("evalProjC")),
-        std::move(evalNodeLeft),
+    // "evalProjA1" needs to come from the left child and IS NOT set to be correlated in the binary
+    // join below.
+    ABT evalNodeRight1 = make<EvaluationNode>(
+        "evalProjC1",
+        make<EvalPath>(make<PathGet>("c1", make<PathIdentity>()), make<Variable>("evalProjA1")),
         std::move(evalNodeRight));
 
-    // Check that the binary join resolves the free variables in the filter and the right child.
+
+    ABT joinNode = make<BinaryJoinNode>(
+        JoinType::Inner,
+        ProjectionNameSet{"evalProjA"},
+        make<BinaryOp>(Operations::Eq, make<Variable>("evalProjA"), make<Variable>("evalProjC")),
+        std::move(evalNodeLeft1),
+        std::move(evalNodeRight1));
+
+    // Check that the binary join resolves "evalProjA" but not "evalProjA1" in the right child and
+    // the filter.
     auto env = VariableEnvironment::build(joinNode);
-    ASSERT(!env.hasFreeVariables());
+    ASSERT_EQ(env.freeOccurences("evalProjA1"), 1);
 
     // Check that the binary join node propagates up left and right projections.
     auto binaryProjs = env.getProjections(joinNode.ref());
-    ProjectionNameSet expectedBinaryProjSet = {
-        "evalProjA", "evalProjB", "scanProj1", "evalProjC", "evalProjD", "scanProj2"};
+    ProjectionNameSet expectedBinaryProjSet{"evalProjA",
+                                            "evalProjA1",
+                                            "evalProjB",
+                                            "scanProj1",
+                                            "evalProjC",
+                                            "evalProjC1",
+                                            "evalProjD",
+                                            "scanProj2"};
     ASSERT(expectedBinaryProjSet == binaryProjs);
+}
+
+TEST(ReferenceTrackerTest, HashJoin) {
+    ABT scanNodeLeft = make<ScanNode>("scanProj1", "coll");
+    ABT scanNodeRight = make<ScanNode>("scanProj2", "coll");
+
+    ABT evalNodeLeft = make<EvaluationNode>(
+        "evalProjA",
+        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("scanProj1")),
+        std::move(scanNodeLeft));
+
+    ABT evalNodeRight = make<EvaluationNode>(
+        "evalProjB",
+        make<EvalPath>(make<PathGet>("b", make<PathIdentity>()), make<Variable>("scanProj1")),
+        std::move(scanNodeRight));
+
+    ABT joinNode = make<HashJoinNode>(JoinType::Inner,
+                                      ProjectionNameVector{"evalProjA"},
+                                      ProjectionNameVector{"evalProjB"},
+                                      std::move(evalNodeLeft),
+                                      std::move(evalNodeRight));
+
+    auto env = VariableEnvironment::build(joinNode);
+    ASSERT_EQ(env.freeOccurences("scanProj1"), 1);
+
+    // Check that we propagate left and right projections.
+    auto joinProjs = env.getProjections(joinNode.ref());
+    ProjectionNameSet expectedProjSet{"evalProjA", "evalProjB", "scanProj1", "scanProj2"};
+    ASSERT(expectedProjSet == joinProjs);
+}
+
+TEST(ReferenceTrackerTest, MergeJoin) {
+    ABT scanNodeLeft = make<ScanNode>("scanProj1", "coll");
+    ABT scanNodeRight = make<ScanNode>("scanProj2", "coll");
+
+    ABT evalNodeLeft = make<EvaluationNode>(
+        "evalProjA",
+        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("scanProj1")),
+        std::move(scanNodeLeft));
+
+    ABT evalNodeRight = make<EvaluationNode>(
+        "evalProjB",
+        make<EvalPath>(make<PathGet>("b", make<PathIdentity>()), make<Variable>("scanProj1")),
+        std::move(scanNodeRight));
+
+    ABT joinNode = make<MergeJoinNode>(ProjectionNameVector{"evalProjA"},
+                                       ProjectionNameVector{"evalProjB"},
+                                       std::vector<CollationOp>{CollationOp::Ascending},
+                                       std::move(evalNodeLeft),
+                                       std::move(evalNodeRight));
+
+    auto env = VariableEnvironment::build(joinNode);
+    ASSERT_EQ(env.freeOccurences("scanProj1"), 1);
+
+    // Check that we propagate left and right projections.
+    auto joinProjs = env.getProjections(joinNode.ref());
+    ProjectionNameSet expectedProjSet{"evalProjA", "evalProjB", "scanProj1", "scanProj2"};
+    ASSERT(expectedProjSet == joinProjs);
 }
 
 TEST(ReferenceTrackerTest, SingleVarNotLastRef) {

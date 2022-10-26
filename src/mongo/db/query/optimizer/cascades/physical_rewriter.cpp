@@ -347,13 +347,8 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
     // Enforcement rewrites run just once, and are independent of the logical nodes.
     if (groupId != _rootGroupId) {
         // Verify properties can be enforced and add enforcers if necessary.
-        addEnforcers(groupId,
-                     _metadata,
-                     _ridProjections,
-                     prefixId,
-                     queue._queue,
-                     bestResult._physProps,
-                     logicalProps);
+        addEnforcers(
+            groupId, _metadata, _ridProjections, queue._queue, bestResult._physProps, logicalProps);
     }
 
     // Iterate until we perform all logical for the group and physical rewrites for our best plan.

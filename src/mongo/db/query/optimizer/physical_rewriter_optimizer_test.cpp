@@ -4478,7 +4478,7 @@ TEST(PhysRewriter, IndexPartitioning) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(75, 150, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(75, 125, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -4539,6 +4539,10 @@ TEST(PhysRewriter, IndexPartitioning1) {
     using namespace properties;
     PrefixId prefixId;
 
+    PartialSchemaSelHints hints;
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())}, 0.02);
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())}, 0.01);
+
     ABT scanNode = make<ScanNode>("root", "c1");
 
     ABT projectionANode = make<EvaluationNode>(
@@ -4574,6 +4578,7 @@ TEST(PhysRewriter, IndexPartitioning1) {
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
+        false /*requireRID*/,
         {{{"c1",
            createScanDef(
                {},
@@ -4592,11 +4597,15 @@ TEST(PhysRewriter, IndexPartitioning1) {
                ConstEval::constFold,
                {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("c"))})}},
          5 /*numberOfPartitions*/},
+        std::make_unique<HintedCE>(std::move(hints)),
+        std::make_unique<DefaultCosting>(),
+        {} /*pathToInterval*/,
+        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(150, 350, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(125, 175, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     const BSONObj& result = ExplainGenerator::explainBSONObj(optimized);
 
@@ -4607,15 +4616,17 @@ TEST(PhysRewriter, IndexPartitioning1) {
     ASSERT_BSON_PATH("\"GroupBy\"", result, "child.child.nodeType");
     ASSERT_BSON_PATH("\"HashJoin\"", result, "child.child.child.nodeType");
     ASSERT_BSON_PATH("\"Exchange\"", result, "child.child.child.leftChild.nodeType");
-    ASSERT_BSON_PATH(
-        "{ type: \"HashPartitioning\", disableExchanges: false, projections: [ \"pa\" ] }",
-        result,
-        "child.child.child.leftChild.distribution");
+    ASSERT_BSON_PATH("{ type: \"Replicated\", disableExchanges: false }",
+                     result,
+                     "child.child.child.leftChild.distribution");
     ASSERT_BSON_PATH("\"IndexScan\"", result, "child.child.child.leftChild.child.nodeType");
+    ASSERT_BSON_PATH("\"index2\"", result, "child.child.child.leftChild.child.indexDefName");
     ASSERT_BSON_PATH("\"Union\"", result, "child.child.child.rightChild.nodeType");
     ASSERT_BSON_PATH("\"Evaluation\"", result, "child.child.child.rightChild.children.0.nodeType");
     ASSERT_BSON_PATH(
         "\"IndexScan\"", result, "child.child.child.rightChild.children.0.child.nodeType");
+    ASSERT_BSON_PATH(
+        "\"index1\"", result, "child.child.child.rightChild.children.0.child.indexDefName");
 }
 
 TEST(PhysRewriter, LocalGlobalAgg) {
