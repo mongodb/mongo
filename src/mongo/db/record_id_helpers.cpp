@@ -172,7 +172,19 @@ RecordId reservedIdFor(ReservationId res, KeyFormat keyFormat) {
         return RecordId(kMinReservedLong);
     } else {
         invariant(keyFormat == KeyFormat::String);
-        constexpr char reservation[] = {kReservedStrPrefix, 0};
+        constexpr char reservation[] = {
+            kReservedStrPrefix, static_cast<char>(ReservationId::kWildcardMultikeyMetadataId)};
+        return RecordId(reservation, sizeof(reservation));
+    }
+}
+
+RecordId maxRecordId(KeyFormat keyFormat) {
+    if (keyFormat == KeyFormat::Long) {
+        return RecordId::maxLong();
+    } else {
+        invariant(keyFormat == KeyFormat::String);
+        constexpr char reservation[] = {
+            kReservedStrPrefix, static_cast<char>(ReservationId::kWildcardMultikeyMetadataId)};
         return RecordId(reservation, sizeof(reservation));
     }
 }

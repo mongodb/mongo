@@ -666,5 +666,49 @@ TEST(SortedDataInterface, InsertReservedRecordIdLong) {
     ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 }
 
+TEST(SortedDataInterface, InsertReservedRecordIdIntoUniqueIndex) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
+        /*unique=*/true, /*partial=*/false, KeyFormat::String));
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        constexpr char reservation[] = {
+            static_cast<char>(0xFF),
+            static_cast<char>(record_id_helpers::ReservationId::kWildcardMultikeyMetadataId)};
+        RecordId reservedId = RecordId(reservation, sizeof(reservation));
+        ASSERT(record_id_helpers::isReserved(reservedId));
+
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(sorted->insert(opCtx.get(),
+                                 makeKeyString(sorted.get(), key1, reservedId),
+                                 /*dupsAllowed=*/false));
+        wuow.commit();
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+
+        // There is only one reserved RecordId, kWildcardMultikeyMetadataId. In order to test that
+        // the upper bound for unique indexes works properly we insert a key with RecordId
+        // kWildcardMultikeyMetadataId + 1. This will result in a DuplicateKey as the key with
+        // RecordId kWildcardMultikeyMetadataId will be detected by the bounded cursor.
+        constexpr char reservation[] = {
+            static_cast<char>(0xFF),
+            static_cast<char>(record_id_helpers::ReservationId::kWildcardMultikeyMetadataId) + 1};
+        RecordId reservedId = RecordId(reservation, sizeof(reservation));
+        ASSERT(record_id_helpers::isReserved(reservedId));
+
+        WriteUnitOfWork wuow(opCtx.get());
+        Status status = sorted->insert(opCtx.get(),
+                                       makeKeyString(sorted.get(), key1, reservedId),
+                                       /*dupsAllowed=*/false);
+        ASSERT_NOT_OK(status);
+        ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
+    }
+}
+
 }  // namespace
 }  // namespace mongo

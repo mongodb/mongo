@@ -219,6 +219,23 @@ protected:
                                          size_t size);
 
     /**
+     * Checks whether the prefix key defined by 'keyString' and 'sizeWithoutRecordId' is in the
+     * index. If it is, returns the RecordId of the first matching key and positions the cursor 'c'
+     * on that key.
+     */
+    boost::optional<RecordId> _keyExistsBounded(OperationContext* opCtx,
+                                                WT_CURSOR* c,
+                                                const KeyString::Value& keyString,
+                                                size_t sizeWithoutRecordId);
+
+    /**
+     * Sets the upper bound on the passed in cursor to be the maximum value of the KeyString prefix.
+     */
+    void _setUpperBound(WT_CURSOR* c,
+                        const KeyString::Value& keyString,
+                        size_t sizeWithoutRecordId);
+
+    /**
      * Returns a DuplicateKey error if the prefix key exists in the index with a different RecordId.
      * Returns true if the prefix key exists in the index with the same RecordId. Returns false if
      * the prefix key does not exist in the index. Should only be used for non-_id indexes.
