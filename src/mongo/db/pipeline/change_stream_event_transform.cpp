@@ -137,7 +137,8 @@ std::set<std::string> ChangeStreamDefaultEventTransformation::getFieldNameDepend
                                             repl::OplogEntry::kSessionIdFieldName.toString(),
                                             repl::OplogEntry::kTxnNumberFieldName.toString(),
                                             DocumentSourceChangeStream::kTxnOpIndexField.toString(),
-                                            repl::OplogEntry::kWallClockTimeFieldName.toString()};
+                                            repl::OplogEntry::kWallClockTimeFieldName.toString(),
+                                            repl::OplogEntry::kTidFieldName.toString()};
 
     if (_preImageRequested || _postImageRequested) {
         accessedFields.insert(DocumentSourceChangeStream::kApplyOpsIndexField.toString());
@@ -497,7 +498,8 @@ std::set<std::string> ChangeStreamViewDefinitionEventTransformation::getFieldNam
                                  repl::OplogEntry::kUuidFieldName.toString(),
                                  repl::OplogEntry::kObjectFieldName.toString(),
                                  DocumentSourceChangeStream::kTxnOpIndexField.toString(),
-                                 repl::OplogEntry::kWallClockTimeFieldName.toString()};
+                                 repl::OplogEntry::kWallClockTimeFieldName.toString(),
+                                 repl::OplogEntry::kTidFieldName.toString()};
 }
 
 Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
