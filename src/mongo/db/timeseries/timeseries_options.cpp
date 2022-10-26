@@ -128,9 +128,19 @@ Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& current
         return Status{ErrorCodes::InvalidOptions, "No timeseries parameters were given"};
     }
 
+    // Check if we are trying to set the bucketing parameters to the existing values. If so, we do
+    // not need to update any existing options.
     if (currentOptions.getBucketMaxSpanSeconds() == targetMaxSpanSeconds) {
         if (!allowSecondsParameters ||
             currentOptions.getBucketRoundingSeconds() == targetRoundingSeconds) {
+            if (shouldUpdateOptions)
+                *shouldUpdateOptions = false;
+            return Status::OK();
+        }
+
+        if (allowSecondsParameters && currentGranularity &&
+            (targetRoundingSeconds ==
+             timeseries::getBucketRoundingSecondsFromGranularity(*currentGranularity))) {
             if (shouldUpdateOptions)
                 *shouldUpdateOptions = false;
             return Status::OK();
@@ -179,36 +189,29 @@ StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModificatio
     TimeseriesOptions newOptions = currentOptions;
     bool shouldUpdateOptions = true;
     bool updated = false;
-    bool allowSecondsParameters = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-        serverGlobalParams.featureCompatibility);
     auto targetGranularity = mod.getGranularity();
 
-    auto isValidTranistion =
+    auto isValidTransition =
         isTimeseriesGranularityValidAndUnchanged(currentOptions, mod, &shouldUpdateOptions);
-    if (!isValidTranistion.isOK()) {
-        return isValidTranistion;
+    if (!isValidTransition.isOK()) {
+        return isValidTransition;
     }
 
     if (shouldUpdateOptions) {
         int32_t targetMaxSpanSeconds = 0;
-        int32_t targetRoundingSeconds = 0;
+        boost::optional<int32_t> targetRoundingSeconds = boost::none;
 
         if (targetGranularity) {
             targetMaxSpanSeconds = getMaxSpanSecondsFromGranularity(targetGranularity.get());
-            targetRoundingSeconds =
-                getBucketRoundingSecondsFromGranularity(targetGranularity.get());
             newOptions.setGranularity(targetGranularity.get());
         } else {
             targetMaxSpanSeconds = mod.getBucketMaxSpanSeconds().get();
-            targetRoundingSeconds = mod.getBucketRoundingSeconds().get();
+            targetRoundingSeconds = mod.getBucketRoundingSeconds();
             newOptions.setGranularity(boost::none);
         }
 
         newOptions.setBucketMaxSpanSeconds(targetMaxSpanSeconds);
-
-        if (allowSecondsParameters)
-            newOptions.setBucketRoundingSeconds(targetRoundingSeconds);
-
+        newOptions.setBucketRoundingSeconds(targetRoundingSeconds);
         updated = true;
     }
 
@@ -321,34 +324,30 @@ Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions) {
     auto roundingSecondsFromGranularity = getBucketRoundingSecondsFromGranularity(
         granularity.get_value_or(BucketGranularityEnum::Seconds));
 
-    if (allowSecondsParameters) {
-        if (granularity) {
-            if (maxSpanSeconds && maxSpanSeconds != maxSpanSecondsFromGranularity) {
-                return Status{
-                    ErrorCodes::InvalidOptions,
-                    fmt::format("Timeseries 'bucketMaxSpanSeconds' is not configurable to a value "
-                                "other than the default of {} for the provided granularity",
-                                maxSpanSecondsFromGranularity)};
-            }
-
-            if (roundingSeconds && roundingSeconds != roundingSecondsFromGranularity) {
-                return Status{
-                    ErrorCodes::InvalidOptions,
-                    fmt::format("Timeseries 'bucketRoundingSeconds' is not configurable to a value "
-                                "other than the default of {} for the provided granularity",
-                                roundingSecondsFromGranularity)};
-            }
-
-            if (!maxSpanSeconds)
-                timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
-
-            if (!roundingSeconds)
-                timeseriesOptions.setBucketRoundingSeconds(roundingSecondsFromGranularity);
-
-            return Status::OK();
+    if (granularity) {
+        if (maxSpanSeconds && maxSpanSeconds != maxSpanSecondsFromGranularity) {
+            return Status{
+                ErrorCodes::InvalidOptions,
+                fmt::format("Timeseries 'bucketMaxSpanSeconds' is not configurable to a value "
+                            "other than the default of {} for the provided granularity",
+                            maxSpanSecondsFromGranularity)};
         }
 
-        if (!maxSpanAndRoundingSecondsSpecified && (maxSpanSeconds || roundingSeconds)) {
+        if (roundingSeconds && roundingSeconds != roundingSecondsFromGranularity) {
+            return Status{
+                ErrorCodes::InvalidOptions,
+                fmt::format("Timeseries 'bucketRoundingSeconds' is not configurable to a value "
+                            "other than the default of {} for the provided granularity",
+                            roundingSecondsFromGranularity)};
+        }
+
+        if (!maxSpanSeconds)
+            timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
+
+        // If the granularity is specified, do not set the 'bucketRoundingSeconds' field.
+        timeseriesOptions.setBucketRoundingSeconds(boost::none);
+    } else if (allowSecondsParameters && (maxSpanSeconds || roundingSeconds)) {
+        if (!maxSpanAndRoundingSecondsSpecified) {
             return Status{
                 ErrorCodes::InvalidOptions,
                 "Timeseries 'bucketMaxSpanSeconds' and 'bucketRoundingSeconds' need to be "
@@ -360,12 +359,6 @@ Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions) {
                           "Timeseries 'bucketRoundingSeconds' needs to be equal to "
                           "'bucketMaxSpanSeconds'"};
         }
-
-        if (!maxSpanSeconds) {
-            timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
-            timeseriesOptions.setBucketRoundingSeconds(roundingSecondsFromGranularity);
-            timeseriesOptions.setGranularity(BucketGranularityEnum::Seconds);
-        }
     } else {
         if (maxSpanSeconds && maxSpanSecondsFromGranularity != maxSpanSeconds) {
             return Status{
@@ -374,14 +367,17 @@ Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions) {
                             "other than the default of {} for the provided granularity",
                             maxSpanSecondsFromGranularity)};
         }
-        if (!granularity)
+        if (!granularity) {
             timeseriesOptions.setGranularity(BucketGranularityEnum::Seconds);
+        }
 
-        if (!maxSpanSeconds)
+        if (!maxSpanSeconds) {
             timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
+        }
     }
 
     return Status::OK();
 }
+
 }  // namespace timeseries
 }  // namespace mongo

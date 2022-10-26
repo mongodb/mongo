@@ -637,7 +637,8 @@ private:
                         dbName,
                         MODE_S,
                         [&](const CollectionPtr& collection) {
-                            invariant(collection->getTimeseriesOptions());
+                            auto tsOptions = collection->getTimeseriesOptions();
+                            invariant(tsOptions);
 
                             auto indexCatalog = collection->getIndexCatalog();
                             auto indexIt = indexCatalog->getIndexIterator(
@@ -645,10 +646,10 @@ private:
                                 IndexCatalog::InclusionPolicy::kReady |
                                     IndexCatalog::InclusionPolicy::kUnfinished);
 
+                            // Check and fail to downgrade if the time-series collection has a
+                            // partial, TTL index.
                             while (indexIt->more()) {
                                 auto indexEntry = indexIt->next();
-                                // Fail to downgrade if the time-series collection has a partial,
-                                // TTL index.
                                 if (indexEntry->descriptor()->isPartial()) {
                                     // TODO (SERVER-67659): Remove partial, TTL index check once
                                     // FCV 7.0 becomes last-lts.
@@ -668,6 +669,20 @@ private:
                                             IndexDescriptor::kExpireAfterSecondsFieldName));
                                 }
                             }
+
+                            // Check the time-series options for a default granularity. Fail the
+                            // downgrade if the bucketing parameters are custom values.
+                            uassert(
+                                ErrorCodes::CannotDowngrade,
+                                str::stream()
+                                    << "Cannot downgrade the cluster when there are time-series "
+                                       "collections with custom bucketing parameters. In order to "
+                                       "downgrade, the time-series collection(s) must be updated "
+                                       "with a granularity of 'seconds', 'minutes' or 'hours'. "
+                                       "First detected incompatible collection: '"
+                                    << collection->ns().getTimeseriesViewNamespace() << "'",
+                                tsOptions->getGranularity().has_value());
+
                             return true;
                         },
                         [&](const CollectionPtr& collection) {

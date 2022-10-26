@@ -19,34 +19,10 @@ const metaFieldName = 'meta';
 const collNamePrefix = 'timeseries_list_collections_';
 let collCount = 0;
 
-const getBucketMaxSpanSeconds = function(granularity) {
-    switch (granularity) {
-        case 'seconds':
-            return 60 * 60;
-        case 'minutes':
-            return 60 * 60 * 24;
-        case 'hours':
-            return 60 * 60 * 24 * 30;
-        default:
-            assert(false, 'Invalid granularity: ' + granularity);
-    }
-};
-
-const getBucketRoundingSeconds = function(granularity) {
-    switch (granularity) {
-        case 'seconds':
-            return 60;
-        case 'minutes':
-            return 60 * 60;
-        case 'hours':
-            return 60 * 60 * 24;
-        default:
-            assert(false, 'Invalid granularity: ' + granularity);
-    }
-};
-
-const bucketMaxSpanSecondsFromMinutes = getBucketMaxSpanSeconds('minutes');
-const buckeRoundingSecondsFromMinutes = getBucketRoundingSeconds('minutes');
+const bucketMaxSpanSecondsFromMinutes =
+    TimeseriesTest.getBucketMaxSpanSecondsFromGranularity('minutes');
+const buckeRoundingSecondsFromMinutes =
+    TimeseriesTest.getBucketRoundingSecondsFromGranularity('minutes');
 
 const testOptions = function(options) {
     const coll = db.getCollection(collNamePrefix + collCount++);
@@ -59,15 +35,16 @@ const testOptions = function(options) {
         Object.assign(options.timeseries, {granularity: 'seconds'});
     }
     if (!options.timeseries.hasOwnProperty('bucketMaxSpanSeconds')) {
-        Object.assign(
-            options.timeseries,
-            {bucketMaxSpanSeconds: getBucketMaxSpanSeconds(options.timeseries.granularity)});
+        Object.assign(options.timeseries, {
+            bucketMaxSpanSeconds: TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(
+                options.timeseries.granularity)
+        });
     }
     if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
-        if (!options.timeseries.hasOwnProperty('bucketRoundingSeconds')) {
-            Object.assign(
-                options.timeseries,
-                {bucketRoundingSeconds: getBucketRoundingSeconds(options.timeseries.granularity)});
+        // When we are using default 'granularity' values we won't actually set
+        // 'bucketRoundingSeconds' internally.
+        if (options.timeseries.hasOwnProperty('bucketRoundingSeconds')) {
+            delete options.timeseries.bucketRoundingSeconds;
         }
     }
 

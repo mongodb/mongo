@@ -35,32 +35,6 @@ const bucketInvalidOptionsError = ErrorCodes.InvalidOptions;
 
 const granularityTimeOptionsArr = [granularitySeconds, granularityMinutes, granularityHours];
 
-const getBucketMaxSpanSecondsFromGranularity = function(granularity) {
-    switch (granularity) {
-        case 'seconds':
-            return 60 * 60;
-        case 'minutes':
-            return 60 * 60 * 24;
-        case 'hours':
-            return 60 * 60 * 24 * 30;
-        default:
-            assert(false, 'Invalid granularity: ' + granularity);
-    }
-};
-
-const getBucketRoundingSecondsFromGranularity = function(granularity) {
-    switch (granularity) {
-        case 'seconds':
-            return 60;
-        case 'minutes':
-            return 60 * 60;
-        case 'hours':
-            return 60 * 60 * 24;
-        default:
-            assert(false, 'Invalid granularity: ' + granularity);
-    }
-};
-
 const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
     coll.drop();
     const fullTimeseriesOptions = Object.merge({timeField: timeFieldName}, secondsOptions);
@@ -116,8 +90,10 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
             timeseries: {
                 timeField: timeFieldName,
                 granularity: granularityTime,
-                bucketRoundingSeconds: getBucketRoundingSecondsFromGranularity(granularityTime),
-                bucketMaxSpanSeconds: getBucketMaxSpanSecondsFromGranularity(granularityTime)
+                bucketRoundingSeconds:
+                    TimeseriesTest.getBucketRoundingSecondsFromGranularity(granularityTime),
+                bucketMaxSpanSeconds:
+                    TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime)
             }
         }));
         collections =
@@ -126,17 +102,15 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
         collectionEntry =
             collections.find(entry => entry.name === 'system.buckets.' + coll.getName());
         assert(collectionEntry);
-        assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds,
-                  getBucketRoundingSecondsFromGranularity(granularityTime));
+        assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
         assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds,
-                  getBucketMaxSpanSecondsFromGranularity(granularityTime));
+                  TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime));
 
         collectionEntry = collections.find(entry => entry.name === coll.getName());
         assert(collectionEntry);
-        assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds,
-                  getBucketRoundingSecondsFromGranularity(granularityTime));
+        assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
         assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds,
-                  getBucketMaxSpanSecondsFromGranularity(granularityTime));
+                  TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime));
     }
 
     // Verify the create command succeeds without setting bucketRoundingSeconds and
@@ -155,17 +129,15 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
         collectionEntry =
             collections.find(entry => entry.name === 'system.buckets.' + coll.getName());
         assert(collectionEntry);
-        assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds,
-                  getBucketRoundingSecondsFromGranularity(granularityTime));
+        assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
         assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds,
-                  getBucketMaxSpanSecondsFromGranularity(granularityTime));
+                  TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime));
 
         collectionEntry = collections.find(entry => entry.name === coll.getName());
         assert(collectionEntry);
-        assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds,
-                  getBucketRoundingSecondsFromGranularity(granularityTime));
+        assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
         assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds,
-                  getBucketMaxSpanSecondsFromGranularity(granularityTime));
+                  TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime));
     }
 
     // Verify the create command succeeds without setting any field other than timeField, this
@@ -181,17 +153,15 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
 
     collectionEntry = collections.find(entry => entry.name === 'system.buckets.' + coll.getName());
     assert(collectionEntry);
-    assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds,
-              getBucketRoundingSecondsFromGranularity(granularitySeconds));
+    assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
     assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds,
-              getBucketMaxSpanSecondsFromGranularity(granularitySeconds));
+              TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularitySeconds));
 
     collectionEntry = collections.find(entry => entry.name === coll.getName());
     assert(collectionEntry);
-    assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds,
-              getBucketRoundingSecondsFromGranularity(granularitySeconds));
+    assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
     assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds,
-              getBucketMaxSpanSecondsFromGranularity(granularitySeconds));
+              TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularitySeconds));
 })();
 
 (function createTimeseriesCollectionWithInvalidOptions() {

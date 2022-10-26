@@ -25,17 +25,14 @@ const collections =
 
 const timeseriesOptions = {
     timeField: timeFieldName,
-    granularity: 'seconds'
+    granularity: 'seconds',
+    bucketMaxSpanSeconds: 3600
 };
-const extraBucketingParameters =
-    (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo()))
-    ? {bucketRoundingSeconds: 60, bucketMaxSpanSeconds: 3600}
-    : {bucketMaxSpanSeconds: 3600};
 
 const collectionOptions = [{
     name: coll.getName(),
     type: 'timeseries',
-    options: {timeseries: Object.merge(timeseriesOptions, extraBucketingParameters)},
+    options: {timeseries: timeseriesOptions},
     info: {readOnly: false},
 }];
 

@@ -291,12 +291,6 @@ let expectedChanges = [
     {"operationType": "drop", "ns": {"db": dbName, "coll": bucketsCollName}}
 ];
 
-if (FeatureFlagUtil.isEnabled(db, "TimeseriesScalabilityImprovements")) {
-    expectedChanges[0].operationDescription.timeseries.bucketRoundingSeconds = 60;
-    expectedChanges[8].stateBeforeChange.collectionOptions.timeseries.bucketRoundingSeconds = 60;
-    expectedChanges[9].stateBeforeChange.collectionOptions.timeseries.bucketRoundingSeconds = 86400;
-}
-
 if (!FeatureFlagUtil.isEnabled(db, "TimeseriesScalabilityImprovements")) {
     // Under this feature flag, buckets are created with the closed field set to false.
     // Remove closed field if the feature flag is not enabled.

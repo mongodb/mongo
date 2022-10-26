@@ -4,6 +4,32 @@ load("jstests/libs/feature_flag_util.js");
 load("jstests/aggregation/extras/utils.js");
 
 var TimeseriesTest = class {
+    static getBucketMaxSpanSecondsFromGranularity(granularity) {
+        switch (granularity) {
+            case 'seconds':
+                return 60 * 60;
+            case 'minutes':
+                return 60 * 60 * 24;
+            case 'hours':
+                return 60 * 60 * 24 * 30;
+            default:
+                assert(false, 'Invalid granularity: ' + granularity);
+        }
+    }
+
+    static getBucketRoundingSecondsFromGranularity(granularity) {
+        switch (granularity) {
+            case 'seconds':
+                return 60;
+            case 'minutes':
+                return 60 * 60;
+            case 'hours':
+                return 60 * 60 * 24;
+            default:
+                assert(false, 'Invalid granularity: ' + granularity);
+        }
+    }
+
     /**
      * Returns whether time-series bucket compression are supported.
      */
