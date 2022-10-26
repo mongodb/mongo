@@ -7513,8 +7513,6 @@ typedef enum {
     WT_VERBOSE_DEBUG_4,     /*!< Low severity messages. */
     WT_VERBOSE_DEBUG_5      /*!< Lowest severity messages. */
 } WT_VERBOSE_LEVEL;
-/*! Temporary, for compatibility. FIXME: SERVER-70652. */
-#define WT_VERBOSE_DEBUG WT_VERBOSE_DEBUG_1
 /*! @} */
 /*
  * Verbose section: END
