@@ -521,7 +521,7 @@ add_option(
     action="append",
     choices=["configure", "source"],
     const="source",
-    default=[],
+    default=build_profile.disable_warnings_as_errors,
     help=
     "Don't add a warnings-as-errors flag to compiler command lines in selected contexts; defaults to 'source' if no argument is provided",
     nargs="?",
