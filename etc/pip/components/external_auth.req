@@ -1,6 +1,7 @@
 # These are the dependencies of ldaptor
 passlib == 1.7.1
-pyOpenSSL == 22.0.0
+pyOpenSSL == 19.0.0; platform_machine == "s390x" or platform_machine == "ppc64le" # Needed for pinned cryptography package - see SERVER-70845
+pyOpenSSL == 22.0.0; platform_machine != "s390x" and platform_machine != "ppc64le"
 pyparsing == 2.4.0
 service_identity == 18.1.0
 twisted == 21.2.0
