@@ -155,6 +155,7 @@ else
 	fi
 
 	if ! expr "$f" : 'examples/c/*' > /dev/null &&
+	   ! expr "$f" : 'bench/*' > /dev/null &&
 	   ! expr "$f" : '.*cxx' > /dev/null &&
 	   ! expr "$f" : '.*cpp' > /dev/null &&
 	   ! expr "$f" : 'ext/*' > /dev/null &&
