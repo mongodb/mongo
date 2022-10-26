@@ -99,6 +99,8 @@ public:
         builder.append("filesOpenedForExternalSort", sorterFileStats.opened.loadRelaxed());
         builder.append("filesClosedForExternalSort", sorterFileStats.closed.loadRelaxed());
         builder.append("spilledRanges", sorterTracker.spilledRanges.loadRelaxed());
+        builder.append("bytesSpilledUncompressed",
+                       sorterTracker.bytesSpilledUncompressed.loadRelaxed());
         builder.append("bytesSpilled", sorterTracker.bytesSpilled.loadRelaxed());
         return builder.obj();
     }
@@ -137,6 +139,7 @@ SortOptions makeSortOptions(size_t maxMemoryUsageBytes, StringData dbName, Sorte
         .TempDir(storageGlobalParams.dbpath + "/_tmp")
         .ExtSortAllowed()
         .MaxMemoryUsageBytes(maxMemoryUsageBytes)
+        .UseMemoryPool(true)
         .FileStats(stats)
         .Tracker(&indexBulkBuilderSSS.sorterTracker)
         .DBName(dbName.toString());
@@ -743,7 +746,6 @@ public:
 
     Status insert(OperationContext* opCtx,
                   const CollectionPtr& collection,
-                  SharedBufferFragmentBuilder& pooledBuilder,
                   const BSONObj& obj,
                   const RecordId& loc,
                   const InsertDeleteOptions& options,
@@ -841,7 +843,6 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(SortedDataIndexAcc
 Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
     OperationContext* opCtx,
     const CollectionPtr& collection,
-    SharedBufferFragmentBuilder& pooledBuilder,
     const BSONObj& obj,
     const RecordId& loc,
     const InsertDeleteOptions& options,
@@ -855,7 +856,7 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
     try {
         _iam->getKeys(opCtx,
                       collection,
-                      pooledBuilder,
+                      _sorter->memPool(),
                       obj,
                       options.getKeysMode,
                       GetKeysContext::kAddingKeys,

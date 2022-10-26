@@ -94,7 +94,6 @@ public:
 
     Status insert(OperationContext* opCtx,
                   const CollectionPtr& collection,
-                  SharedBufferFragmentBuilder& pooledBuilder,
                   const BSONObj& obj,
                   const RecordId& rid,
                   const InsertDeleteOptions& options,
@@ -166,7 +165,6 @@ ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index
 Status ColumnStoreAccessMethod::BulkBuilder::insert(
     OperationContext* opCtx,
     const CollectionPtr& collection,
-    SharedBufferFragmentBuilder& pooledBuilder,
     const BSONObj& obj,
     const RecordId& rid,
     const InsertDeleteOptions& options,

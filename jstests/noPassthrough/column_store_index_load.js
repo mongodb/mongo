@@ -124,6 +124,7 @@ assert.docEq({
     filesOpenedForExternalSort: NumberLong(0),
     filesClosedForExternalSort: NumberLong(0),
     spilledRanges: NumberLong(0),
+    bytesSpilledUncompressed: NumberLong(0),
     bytesSpilled: NumberLong(0),
 },
              statsAfterInMemoryBuild.indexBulkBuilder);

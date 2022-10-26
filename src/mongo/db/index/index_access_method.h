@@ -213,7 +213,6 @@ public:
          */
         virtual Status insert(OperationContext* opCtx,
                               const CollectionPtr& collection,
-                              SharedBufferFragmentBuilder& pooledBuilder,
                               const BSONObj& obj,
                               const RecordId& loc,
                               const InsertDeleteOptions& options,

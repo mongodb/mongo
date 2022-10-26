@@ -479,16 +479,14 @@ public:
         return deserialize(buf, settings.keyStringVersion);
     }
 
+    // It is illegal to call this function on a value that is backed by a buffer that is shared
+    // elsewhere. The SharedBufferFragment cannot accurately report memory usage per individual
+    // Value, so we require the sorter to look at the SharedBufferFragmentBuilder's memory usage in
+    // aggregate and free unused memory periodically.
     int memUsageForSorter() const {
-        // Ideally we want to always use the buffer capacity as a more accurate measure of memory
-        // usage here. But when built using the PooledBuilder we cannot do that as the buffer is
-        // shared between many instances we have to use the size() as an approximation of memory
-        // use. There might be a chunk at the end of the buffer that's not used by any KeyString and
-        // that memory will be unaccounted for unfortunately.
-        // When the PooledBuilder is used this buffer will always be shared as the
-        // SharedBufferFragmentBuilder will keep a reference. If it is not shared we've used either
-        // the Heap or Static builder and want to report the whole memory allocation in the buffer.
-        return sizeof(Value) + (_buffer.isShared() ? _buffer.size() : _buffer.underlyingCapacity());
+        invariant(!_buffer.isShared(),
+                  "Cannot obtain memory usage from shared buffer on KeyString::Value");
+        return sizeof(Value) + _buffer.underlyingCapacity();
     }
 
     Value getOwned() const {

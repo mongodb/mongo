@@ -126,6 +126,11 @@ struct SortOptions {
     // If set, allows us to observe aggregate Sorter behaviors.
     SorterTracker* sorterTracker;
 
+    // When set, this sorter will own a memory pool that callers should used to allocate memory for
+    // the keys we are sorting. If enabled, any values returned by memUsageForSorter() will be
+    // ignored.
+    bool useMemPool;
+
     // If set to true and sorted data fits into memory, sorted data will be moved into iterator
     // instead of copying.
     bool moveSortedDataIntoIterator;
@@ -136,6 +141,7 @@ struct SortOptions {
           extSortAllowed(false),
           sorterFileStats(nullptr),
           sorterTracker(nullptr),
+          useMemPool(false),
           moveSortedDataIntoIterator(false) {}
 
     // Fluent API to support expressions like SortOptions().Limit(1000).ExtSortAllowed(true)
@@ -177,6 +183,11 @@ struct SortOptions {
 
     SortOptions& MoveSortedDataIntoIterator(bool newMoveSortedDataIntoIterator = true) {
         moveSortedDataIntoIterator = newMoveSortedDataIntoIterator;
+        return *this;
+    }
+
+    SortOptions& UseMemoryPool(bool usePool) {
+        useMemPool = usePool;
         return *this;
     }
 };
@@ -386,6 +397,11 @@ public:
 
     PersistedState persistDataForShutdown();
 
+    SharedBufferFragmentBuilder& memPool() {
+        invariant(_memPool);
+        return _memPool.get();
+    }
+
 protected:
     virtual void spill() = 0;
 
@@ -397,6 +413,8 @@ protected:
     std::shared_ptr<File> _file;
 
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
+
+    boost::optional<SharedBufferFragmentBuilder> _memPool;
 };
 
 
@@ -624,7 +642,7 @@ private:
     // be given to the Iterator in done().
     std::streamoff _fileStartOffset;
 
-    boost::optional<std::string> _dbName;
+    SortOptions _opts;
 };
 }  // namespace mongo
 

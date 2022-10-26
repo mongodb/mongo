@@ -32,6 +32,7 @@
 #include "mongo/util/shared_buffer.h"
 
 #include <functional>
+#include <numeric>
 
 namespace mongo {
 
@@ -43,7 +44,7 @@ class SharedBufferFragment {
 public:
     SharedBufferFragment() : _offset(0), _size(0) {}
     explicit SharedBufferFragment(SharedBuffer buffer, size_t size)
-        : _buffer(std::move(buffer)), _offset(0), _size(size) {}
+        : SharedBufferFragment(std::move(buffer), 0, size) {}
     explicit SharedBufferFragment(SharedBuffer buffer, ptrdiff_t offset, size_t size)
         : _buffer(std::move(buffer)), _offset(offset), _size(size) {}
 
@@ -86,10 +87,14 @@ private:
     size_t _size;
 };
 
-
 /**
  * Builder of SharedBufferFragment where multiple fragments are using different parts of the same
- * underlying buffer. Can only build one fragment at a time
+ * underlying buffer or multiple buffers. Can only build one fragment at a time.
+ *
+ * Warning: This builder will hold references to all allocated buffers and will not release them
+ * until freeUnused() is called. Memory is not reused. This means that failing to call this function
+ * will result in an unbounded amount of memory usage for the lifetime of the builder. Even after
+ * this builder is destructed, SharedBufferFragments can prevent memory from being freed.
  */
 class SharedBufferFragmentBuilder {
 public:
@@ -98,6 +103,9 @@ public:
     SharedBufferFragmentBuilder(
         size_t blockSize, GrowStrategy growStrategy = DoubleGrowStrategy(kDefaultMaxBlockSize))
         : _offset(0), _blockSize(blockSize), _growStrategy(growStrategy) {}
+
+    SharedBufferFragmentBuilder(SharedBufferFragmentBuilder&& other) = default;
+    SharedBufferFragmentBuilder& operator=(SharedBufferFragmentBuilder&& other) = default;
 
     struct ConstantGrowStrategy {
         size_t operator()(size_t current) const {
@@ -119,13 +127,20 @@ public:
     // May only be called if we are not currently building a fragment
     SharedBufferFragmentBuilder& start(size_t initialSize) {
         invariant(!_inUse);
+        if (!_buffer.isShared()) {
+            // Since there are no fragments sharing with this buffer, we can reset the offset to 0
+            // to reuse unused space.
+            _offset = 0;
+        }
+
         if (_buffer.capacity() < (_offset + initialSize)) {
-            // If capacity is 0, then this is our initial allocation and we should not use the grow
-            // strategy
+            // If the capacity is 0, this is our initial allocation and we should not use the grow
+            // strategy.
             if (_buffer.capacity() > 0)
                 _blockSize = _growStrategy(_blockSize);
+
             size_t allocSize = std::max(_blockSize, initialSize);
-            _buffer = SharedBuffer::allocate(allocSize);
+            _buffer = _alloc(std::move(_buffer), allocSize);
             _offset = 0;
         }
         _inUse = true;
@@ -138,18 +153,18 @@ public:
         invariant(_inUse);
         auto currentCapacity = capacity();
         if (currentCapacity < size) {
-            _blockSize = _growStrategy(_blockSize);
+            // If the capacity is 0, this is our initial allocation and we should not use the grow
+            // strategy.
+            if (currentCapacity > 0) {
+                _blockSize = _growStrategy(_blockSize);
+            }
             size_t allocSize = std::max(_blockSize, size);
 
-            // If nothing else is using the internal buffer it would be safe to use realloc. But as
-            // this potentially is a large buffer realloc would need copy all of it as it doesn't
-            // know how much is actually used. So we create a new buffer in all cases and reset the
-            // offset to 0. We only need to copy the memory of the fragment we are currently
-            // building.
-            auto newBuffer = SharedBuffer::allocate(allocSize);
-            if (_buffer)
-                memcpy(newBuffer.get(), _buffer.get() + _offset, currentCapacity);
-            _buffer = std::move(newBuffer);
+            if (_buffer) {
+                _buffer = _realloc(std::move(_buffer), _offset, currentCapacity, allocSize);
+            } else {
+                _buffer = _alloc(std::move(_buffer), allocSize);
+            }
             _offset = 0;
         }
     }
@@ -191,13 +206,74 @@ public:
         return _inUse;
     }
 
+    // Returns the memory used by all allocated buffers that are being tracked.
+    size_t memUsage() {
+        return _memUsage;
+    }
+
+    // Frees all unreferenced buffers except for the most recently allocated one. The caller must
+    // ensure that no references to any shared buffers remain to maintain useful memory usage
+    // information.
+    void freeUnused() {
+        if (_activeBuffers.empty()) {
+            return;
+        }
+
+        // Normally all buffers are expected to no longer be shared and can be freed immediately,
+        // however, the last buffer may still be shared with the owning SharedBufferFragmentBuilder.
+        auto it = std::remove_if(_activeBuffers.begin(), _activeBuffers.end(), [](auto&& buf) {
+            return !buf.isShared();
+        });
+        _memUsage -= std::accumulate(it, _activeBuffers.end(), 0, [](size_t sum, auto&& buf) {
+            return sum + buf.capacity();
+        });
+        _activeBuffers.erase(it, _activeBuffers.end());
+    }
+
 private:
+    SharedBuffer _alloc(SharedBuffer&& existing, size_t allocSize) {
+        return _realloc(std::move(existing), 0, 0, allocSize);
+    }
+
+    SharedBuffer _realloc(SharedBuffer&& existing,
+                          size_t offset,
+                          size_t existingSize,
+                          size_t newSize) {
+        // If nothing else is using the internal buffer it would be safe to use realloc. But as
+        // this potentially is a large buffer realloc would need copy all of it as it doesn't
+        // know how much is actually used. So we create a new buffer in all cases
+        auto newBuffer = SharedBuffer::allocate(newSize);
+        _memUsage += newSize;
+
+        // When existingSize is 0 we may be in an initial alloc().
+        if (existing && existingSize) {
+            memcpy(newBuffer.get(), existing.get() + offset, existingSize);
+        }
+
+        // If this buffer is actively used somewhere, we'll need to keep a reference to it for
+        // tracking memory usage since there may be other fragments that are also holding onto a
+        // reference. Otherwise, we let it get freed. Callers will have to take care to clean up
+        // these shared references regularly using freeUnused().
+        if (existing.isShared()) {
+            _activeBuffers.push_back(std::move(existing));
+        } else {
+            _memUsage -= existing.capacity();
+        }
+        return newBuffer;
+    }
+
+    // The current working buffer of this builder.
     SharedBuffer _buffer;
     ptrdiff_t _offset;
     size_t _blockSize;
     GrowStrategy _growStrategy;
     bool _inUse{false};
-};
 
+    // This is a list of old buffers that may still be in use by other fragments. Counts towards
+    // total memory usage and buffers must be freed by calling using freeUnused() when buffers are
+    // no longer needed.
+    std::vector<SharedBuffer> _activeBuffers;
+    size_t _memUsage = 0;
+};
 
 }  // namespace mongo

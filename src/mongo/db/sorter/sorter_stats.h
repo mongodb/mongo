@@ -34,6 +34,7 @@ namespace mongo {
 struct SorterTracker {
     AtomicWord<long long> spilledRanges;
     AtomicWord<long long> bytesSpilled;
+    AtomicWord<long long> bytesSpilledUncompressed;
 };
 
 /**
@@ -44,6 +45,7 @@ public:
     SorterFileStats(SorterTracker* sorterTracker);
 
     void addSpilledDataSize(long long data);
+    void addSpilledDataSizeUncompressed(long long data);
 
     AtomicWord<long long> opened;
     AtomicWord<long long> closed;

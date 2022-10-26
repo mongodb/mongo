@@ -44,7 +44,6 @@
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
@@ -61,14 +60,7 @@ IndexBuildBlock::IndexBuildBlock(const NamespaceString& nss,
                                  const BSONObj& spec,
                                  IndexBuildMethod method,
                                  boost::optional<UUID> indexBuildUUID)
-    : _nss(nss),
-      _spec(spec.getOwned()),
-      _method(method),
-      _buildUUID(indexBuildUUID),
-      _pooledBuilder(
-          gOperationMemoryPoolBlockInitialSizeKB.loadRelaxed() * static_cast<size_t>(1024),
-          SharedBufferFragmentBuilder::DoubleGrowStrategy(
-              gOperationMemoryPoolBlockMaxSizeKB.loadRelaxed() * static_cast<size_t>(1024))) {}
+    : _nss(nss), _spec(spec.getOwned()), _method(method), _buildUUID(indexBuildUUID) {}
 
 void IndexBuildBlock::keepTemporaryTables() {
     if (_indexBuildInterceptor) {
