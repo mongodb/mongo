@@ -6,6 +6,7 @@ selector:
   # Currently, the test suite is only used for verify the override implemented by inject_security_token.js.
   - jstests/core/basic8.js
   - jstests/core/count.js
+  - jstests/core/all.js
 
 executor:
   archive:

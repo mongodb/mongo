@@ -586,7 +586,7 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
     }
 
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::setIndexIsMultikey", nss.ns(), [&] {
-        const NamespaceStringOrUUID nsOrUUID(nss.db().toString(), collectionUUID);
+        const NamespaceStringOrUUID nsOrUUID(nss.dbName(), collectionUUID);
         boost::optional<AutoGetCollection> autoColl;
         try {
             autoColl.emplace(opCtx, nsOrUUID, MODE_IX);
