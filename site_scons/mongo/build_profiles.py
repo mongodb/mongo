@@ -17,6 +17,7 @@ class BuildProfile:
     CCACHE: Optional[str]
     NINJA_PREFIX: str
     VARIANT_DIR: Any
+    disable_warnings_as_errors: Optional[List]
 
 
 BUILD_PROFILES = {
@@ -34,6 +35,7 @@ BUILD_PROFILES = {
             CCACHE=None,
             NINJA_PREFIX="build",
             VARIANT_DIR=mongo_generators.default_variant_dir_generator,
+            disable_warnings_as_errors=[],
         ),
     # This build has fast runtime speed & fast build time at the cost of debuggability.
     "fast":
@@ -52,6 +54,7 @@ BUILD_PROFILES = {
             CCACHE="ccache",
             NINJA_PREFIX="fast",
             VARIANT_DIR="fast",
+            disable_warnings_as_errors=[],
         ),
     # This build has fast runtime speed & debuggability at the cost of build time.
     "opt":
@@ -70,6 +73,7 @@ BUILD_PROFILES = {
             CCACHE="ccache",
             NINJA_PREFIX="opt",
             VARIANT_DIR="opt",
+            disable_warnings_as_errors=[],
         ),
     # This build leverages santizers & is the suggested build profile to use for development.
     "san":
@@ -88,6 +92,7 @@ BUILD_PROFILES = {
             CCACHE="ccache",
             NINJA_PREFIX="san",
             VARIANT_DIR="san",
+            disable_warnings_as_errors=[],
         ),
 
     #These options are the preferred settings for compiledb to generating compile_commands.json
@@ -107,5 +112,6 @@ BUILD_PROFILES = {
             CCACHE=None,
             NINJA_PREFIX="build",
             VARIANT_DIR=mongo_generators.default_variant_dir_generator,
+            disable_warnings_as_errors=['source'],
         ),
 }
