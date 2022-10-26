@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -2609,6 +2610,12 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     std::shared_ptr<ReplIndexBuildState> replState,
     const boost::optional<RecordId>& resumeAfterRecordId) {
     // Collection scan and insert into index.
+
+    // The collection scan phase of an index build is marked as low priority in order to reduce
+    // impact on user operations. Other steps of the index builds such as the draining phase have
+    // normal priority because index builds are required to eventually catch-up with concurrent
+    // writers. Otherwise we risk never finishing the index build.
+    SetTicketAquisitionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
     {
         indexBuildsSSS.scanCollection.addAndFetch(1);
 
@@ -2639,6 +2646,11 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
 
 void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    // The collection scan phase of an index build is marked as low priority in order to reduce
+    // impact on user operations. Other steps of the index builds such as the draining phase have
+    // normal priority because index builds are required to eventually catch-up with concurrent
+    // writers. Otherwise we risk never finishing the index build.
+    SetTicketAquisitionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
     {
         Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
