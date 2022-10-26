@@ -381,6 +381,13 @@ read:
                 goto skip_evict;
 
             /*
+             * Don't evict if we are operating in a transaction on a checkpoint cursor. Eviction
+             * would use the cursor's snapshot, which won't be correct.
+             */
+            if (F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT))
+                goto skip_evict;
+
+            /*
              * Forcibly evict pages that are too big.
              */
             if (force_attempts < 10 && __evict_force_check(session, ref)) {
