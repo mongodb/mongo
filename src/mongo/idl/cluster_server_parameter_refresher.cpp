@@ -64,6 +64,7 @@ StatusWith<TenantIdMap<std::vector<BSONObj>>> getClusterParametersFromConfigServ
     // Attempt to retrieve cluster parameter documents from the config server.
     // exhaustiveFindOnConfig makes up to 3 total attempts if it receives a retriable error before
     // giving up.
+    // TODO SERVER-70664 Optimize this retrieval with new getAllClusterParameters command.
     LOGV2_DEBUG(6226404, 3, "Retrieving cluster server parameters from config server");
     auto configServers = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto swTenantIds = getTenantsWithConfigDbsOnShard(opCtx, configServers.get());

@@ -31,6 +31,7 @@
 
 #include "mongo/idl/cluster_server_parameter_common.h"
 
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands/list_databases_for_all_tenants_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/multitenancy_gen.h"
@@ -41,7 +42,7 @@
 namespace mongo {
 
 StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
-    OperationContext* opCtx, Shard* shard) {
+    OperationContext* opCtx, Shard* shard, executor::TaskExecutor* executor) {
     if (!gMultitenancySupport) {
         return std::set<boost::optional<TenantId>>{boost::none};
     }
@@ -51,29 +52,83 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
     listDbCommand.setFilter(BSON("name"_sd
                                  << "config"));
     listDbCommand.setNameOnly(true);
-    auto swListDbResponse = shard->runCommand(opCtx,
-                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                              NamespaceString::kAdminDb.toString(),
-                                              listDbCommand.toBSON(BSONObj()),
-                                              Shard::RetryPolicy::kIdempotent);
-    if (!swListDbResponse.isOK()) {
-        return swListDbResponse.getStatus();
-    }
-    auto databases = swListDbResponse.getValue().response["databases"_sd].Array();
-    LOGV2_DEBUG(6831301, 2, "ListDatabasesForAllTenants finished", "response"_attr = databases);
     std::set<boost::optional<TenantId>> tenantIds;
-    std::transform(databases.begin(),
-                   databases.end(),
-                   std::inserter(tenantIds, tenantIds.end()),
-                   [](const BSONElement& elem) -> boost::optional<TenantId> {
-                       auto tenantElem = elem.Obj()["tenantId"_sd];
-                       if (tenantElem.eoo()) {
-                           return boost::none;
-                       } else {
-                           // Tenant field is non-empty, put real tenant ID
-                           return TenantId(tenantElem.OID());
-                       }
-                   });
+    if (executor) {
+        auto swHost = shard->getTargeter()->findHost(
+            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+        if (!swHost.isOK()) {
+            return swHost.getStatus();
+        }
+        auto host = std::move(swHost.getValue());
+        executor::RemoteCommandRequest request(
+            host, NamespaceString::kAdminDb.toString(), listDbCommand.toBSON(BSONObj()), opCtx);
+
+        executor::RemoteCommandResponse response =
+            Status(ErrorCodes::InternalError, "Internal error running command");
+
+        auto swCallbackHandle = executor->scheduleRemoteCommand(
+            request, [&response](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+                response = args.response;
+            });
+        if (!swCallbackHandle.isOK()) {
+            return swCallbackHandle.getStatus();
+        }
+
+        // Block until the command is carried out
+        executor->wait(swCallbackHandle.getValue());
+        if (!response.isOK()) {
+            return response.status;
+        }
+        std::vector<BSONElement> databases;
+        response.data["databases"_sd].Obj().elems(databases);
+        LOGV2_DEBUG(6831302,
+                    2,
+                    "ListDatabasesForAllTenants w/ special executor finished",
+                    "response"_attr = databases);
+
+        std::transform(databases.begin(),
+                       databases.end(),
+                       std::inserter(tenantIds, tenantIds.end()),
+                       [](const BSONElement& elem) -> boost::optional<TenantId> {
+                           auto tenantElem = elem.Obj()["tenantId"_sd];
+                           if (tenantElem.eoo()) {
+                               return boost::none;
+                           } else {
+                               // Tenant field is non-empty, put real tenant ID
+                               return TenantId(tenantElem.OID());
+                           }
+                       });
+    } else {
+        auto swListDbResponse =
+            shard->runCommand(opCtx,
+                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                              NamespaceString::kAdminDb.toString(),
+                              listDbCommand.toBSON(BSONObj()),
+                              Shard::RetryPolicy::kIdempotent);
+        if (!swListDbResponse.isOK()) {
+            return swListDbResponse.getStatus();
+        }
+        std::vector<BSONElement> databases =
+            swListDbResponse.getValue().response["databases"_sd].Array();
+        LOGV2_DEBUG(6831301,
+                    2,
+                    "ListDatabasesForAllTenants w/ default executor finished",
+                    "response"_attr = databases);
+
+        std::transform(databases.begin(),
+                       databases.end(),
+                       std::inserter(tenantIds, tenantIds.end()),
+                       [](const BSONElement& elem) -> boost::optional<TenantId> {
+                           auto tenantElem = elem.Obj()["tenantId"_sd];
+                           if (tenantElem.eoo()) {
+                               return boost::none;
+                           } else {
+                               // Tenant field is non-empty, put real tenant ID
+                               return TenantId(tenantElem.OID());
+                           }
+                       });
+    }
+
     return tenantIds;
 }
 

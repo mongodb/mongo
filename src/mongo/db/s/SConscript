@@ -360,6 +360,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/transaction/transaction_api',
         '$BUILD_DIR/mongo/db/vector_clock_mongod',
         '$BUILD_DIR/mongo/executor/network_interface',
+        '$BUILD_DIR/mongo/idl/cluster_server_parameter_common',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/common_s',
@@ -783,6 +784,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/commands/cluster_server_parameter_commands_invocation',
         '$BUILD_DIR/mongo/db/commands/set_feature_compatibility_version_idl',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/pipeline/document_source_mock',
@@ -795,6 +797,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/db/transaction/transaction',
         '$BUILD_DIR/mongo/db/transaction/transaction_api',
+        '$BUILD_DIR/mongo/idl/cluster_server_parameter_common',
         '$BUILD_DIR/mongo/util/version_impl',
         'config_server_test_fixture',
         'sharding_commands_d',

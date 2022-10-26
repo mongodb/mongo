@@ -30,11 +30,17 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
 
+/**
+ * Get all tenants which have non-empty config databases (<tenantId>_config) existing on the given
+ * shard. If executor is specified, the remote command will run using that executor. Otherwise, the
+ * default executor will be used.
+ */
 StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
-    OperationContext* opCtx, Shard* shard);
+    OperationContext* opCtx, Shard* shard, executor::TaskExecutor* executor = nullptr);
 
 }  // namespace mongo

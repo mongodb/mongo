@@ -661,28 +661,34 @@ private:
      * Given a vector of cluster parameters in disk format, sets them locally.
      */
     void _setClusterParametersLocally(OperationContext* opCtx,
+                                      const boost::optional<TenantId>& tenantId,
                                       const std::vector<BSONObj>& parameters);
 
     /**
      * Gets the cluster parameters set on the shard and then saves them locally.
      */
-    void _pullClusterParametersFromNewShard(OperationContext* opCtx,
-                                            RemoteCommandTargeter* targeter);
+    void _pullClusterParametersFromNewShard(OperationContext* opCtx, Shard* shard);
 
     /**
-     * Clean all possible leftover cluster parameters on the new added shard and sets the ones
-     * stored on the config server.
+     * Remove all existing cluster parameters set on the shard.
      */
-    void _pushClusterParametersToNewShard(OperationContext* opCtx,
-                                          RemoteCommandTargeter* targeter,
-                                          const std::vector<BSONObj>& clusterParameters);
+    void _removeAllClusterParametersFromShard(OperationContext* opCtx, Shard* shard);
+
+    /**
+     * Remove all existing cluster parameters on the new added shard and sets the ones stored on the
+     * config server.
+     */
+    void _pushClusterParametersToNewShard(
+        OperationContext* opCtx,
+        Shard* shard,
+        const TenantIdMap<std::vector<BSONObj>>& allClusterParameters);
 
     /**
      * Determines whether to absorb the cluster parameters on the newly added shard (if we're
      * converting from a replica set to a sharded cluster) or set the cluster parameters stored on
      * the config server in the newly added shard.
      */
-    void _standardizeClusterParameters(OperationContext* opCtx, RemoteCommandTargeter* targeter);
+    void _standardizeClusterParameters(OperationContext* opCtx, Shard* shard);
 
 
     /**
