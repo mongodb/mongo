@@ -42,6 +42,9 @@
 namespace mongo {
 namespace transport {
 
+/** Transitional for differential benchmarking of ServiceExecutorSynchronous refactor */
+#define TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE 0
+
 /**
  * Creates a fresh worker thread for each top-level scheduled task. Any tasks
  * scheduled during the execution of that top-level task as it runs on such a

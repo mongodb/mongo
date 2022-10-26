@@ -37,10 +37,14 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_manager.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/mock_service_executor.h"
 #include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -48,8 +52,27 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/processinfo.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
+
 namespace mongo::transport {
 namespace {
+
+/** For troubleshooting the benchmark. */
+constexpr bool enableInstrumentation = false;
+
+/** Benchmarks can't do this with command line flags like unit tests can. */
+void initializeInstrumentation() {
+    if constexpr (!enableInstrumentation)
+        return;
+    std::array components = {
+        std::pair{logv2::LogComponent::kExecutor, logv2::LogSeverity::Debug(4)},
+        std::pair{logv2::LogComponent::kNetwork, logv2::LogSeverity::Debug(4)},
+    };
+    for (auto&& [comp, sev] : components)
+        logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(comp, sev);
+    for (auto&& [comp, sev] : components)
+        invariant(logv2::shouldLog(comp, sev));
+}
 
 Status makeClosedSessionError() {
     return Status{ErrorCodes::SocketException, "Session is closed"};
@@ -103,204 +126,215 @@ private:
     ReactorHandle _mockReactor = std::make_unique<NoopReactor>();
 };
 
-Message makeMessageWithBenchmarkRunNumber(int runNumber) {
-    OpMsgBuilder builder;
-    builder.setBody(BSON("ping" << 1 << "benchmarkRunNumber" << runNumber));
-    Message request = builder.finish();
-    OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
-    return request;
-}
-
-std::shared_ptr<CallbackMockSession> makeSession(Message message) {
-    auto session = std::make_shared<CallbackMockSession>();
-    session = std::make_shared<CallbackMockSession>();
-    session->endCb = [] {};
-    session->waitForDataCb = [&] { return Status::OK(); };
-    session->sourceMessageCb = [&, message] { return StatusWith<Message>(message); };
-    session->sinkMessageCb = [&](Message message) {
-        if (OpMsg::parse(message).body["benchmarkRunNumber"].numberInt() > 0)
-            return Status::OK();
-        return makeClosedSessionError();
-    };
-    session->asyncWaitForDataCb = [&] { return Future<void>::makeReady(); };
-    return session;
-}
-
-class SessionWorkflowFixture : public benchmark::Fixture {
+/**
+ * Coordinate between a mock Session and ServiceEntryPoint to implement
+ * a prescribed number of exhaust rounds.
+ */
+class MockCoordinator {
 public:
-    Future<DbResponse> handleRequest(const Message& request) {
-        DbResponse response;
-        response.response = request;
+    MockCoordinator(ServiceContext* sc, int rounds) : _sc{sc}, _rounds{rounds} {}
 
-        BSONObj obj = OpMsg::parse(request).body;
-
-        // Check "benchmarkRunNumber" field for how many times to run in exhaust
-        if (obj["benchmarkRunNumber"].numberInt() > 0) {
-            BSONObjBuilder bsonBuilder;
-            bsonBuilder.append(obj.firstElement());
-            bsonBuilder.append("benchmarkRunNumber", obj["benchmarkRunNumber"].numberInt() - 1);
-            BSONObj newObj = bsonBuilder.obj();
-
-            response.response = request;
-            response.nextInvocation = newObj;
-            response.shouldRunAgainForExhaust = true;
+    class Session : public CallbackMockSession {
+    public:
+        explicit Session(MockCoordinator* mc) : _mc{mc} {
+            LOGV2_DEBUG(7015130, 3, "MockCoordinator::Session ctor");
+        }
+        ~Session() {
+            LOGV2_DEBUG(7015131, 3, "MockCoordinator::Session dtor");
         }
 
-        return Future<DbResponse>::makeReady(StatusWith<DbResponse>(response));
+        void end() override {
+            _observeEnd.promise.emplaceValue();
+        }
+        Status waitForData() noexcept override {
+            return Status::OK();
+        }
+        Status sinkMessage(Message) noexcept override {
+            return Status::OK();
+        }
+        Future<void> asyncWaitForData() noexcept override {
+            return {};
+        }
+        StatusWith<Message> sourceMessage() noexcept override {
+            LOGV2_DEBUG(7015132, 3, "sourceMessage", "rounds"_attr = _rounds);
+            if (!_rounds)
+                return makeClosedSessionError();
+            return _request;
+        }
+
+        /** Return a future that is ready when this session is ended. */
+        Future<void> observeEnd() {
+            return std::move(_observeEnd.future);
+        }
+
+        int& rounds() {
+            return _rounds;
+        }
+
+    private:
+        static Message _makeRequest() {
+            Message request = [&] {
+                OpMsgBuilder builder;
+                builder.beginBody().append("ping", 1);
+                return builder.finish();
+            }();
+            OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
+            return request;
+        }
+
+        MockCoordinator* _mc;
+        Message _request = _makeRequest();
+        int _rounds = _mc->_rounds;
+        PromiseAndFuture<void> _observeEnd;
+    };
+
+    class Sep : public MockServiceEntryPoint {
+    public:
+        explicit Sep(MockCoordinator* mc) : MockServiceEntryPoint{mc->_sc}, _mc{mc} {}
+
+        void derivedOnClientDisconnect(Client*) override {}
+
+        void onEndSession(const SessionHandle& session) override {}
+
+        Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                         const Message& request) noexcept override {
+            DbResponse response;
+            response.response = request;
+
+            auto session = _mc->opCtxToSession(opCtx);
+            invariant(session);
+            if (int& rounds = session->rounds(); --rounds) {
+                response.nextInvocation = BSONObjBuilder{}.append("ping", 1).obj();
+                response.shouldRunAgainForExhaust = true;
+            }
+            return Future{std::move(response)};
+        }
+
+    private:
+        MockCoordinator* _mc;
+    };
+
+    Session* opCtxToSession(OperationContext* opCtx) const {
+        return dynamic_cast<Session*>(opCtx->getClient()->session().get());
     }
 
-    void commonSetUp() {
-        serviceCtx = [] {
-            auto serviceContext = ServiceContext::make();
-            auto serviceContextPtr = serviceContext.get();
-            setGlobalServiceContext(std::move(serviceContext));
-            return serviceContextPtr;
-        }();
-        invariant(serviceCtx);
-        serviceCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
 
-        auto uniqueSep = std::make_unique<MockServiceEntryPoint>(serviceCtx);
-        uniqueSep->handleRequestCb = [&](OperationContext*, const Message& request) {
-            return handleRequest(request);
-        };
-        uniqueSep->onEndSessionCb = [&](const SessionHandle&) {};
-        uniqueSep->derivedOnClientDisconnectCb = [&](Client*) {};
-        sep = uniqueSep.get();
+    std::shared_ptr<Session> makeSession() {
+        return std::make_shared<Session>(this);
+    }
 
-        serviceCtx->setServiceEntryPoint(std::move(uniqueSep));
-        serviceCtx->setTransportLayer(std::make_unique<TransportLayerMockWithReactor>());
+    std::unique_ptr<Sep> makeServiceEntryPoint() {
+        auto p = std::make_unique<Sep>(this);
+        _sep = &*p;
+        return p;
+    }
+
+    Sep* serviceEntryPoint() {
+        return _sep;
+    }
+
+private:
+    ServiceContext* _sc;
+    int _rounds = 0;
+    Sep* _sep = nullptr;
+};
+
+class SessionWorkflowBm : public benchmark::Fixture {
+public:
+    SessionWorkflowBm() {
+        initializeInstrumentation();
+        LOGV2_DEBUG(7015133, 3, "SessionWorkflowBm ctor");
     }
 
     void SetUp(benchmark::State& state) override {
-        // Call SetUp on only one thread
-        if (state.thread_index != 0)
+        LOGV2_DEBUG(7015134, 3, "SetUp", "configuredThreads"_attr = _configuredThreads);
+        if (_configuredThreads++)
             return;
-        commonSetUp();
-        makeSessionCb = makeSession;
-        invariant(sep->start());
+
+        size_t argIndex = 0;
+        int exhaustRounds = state.range(argIndex++);
+        int dedicatedThread = state.range(argIndex++);
+        int reserved = state.range(argIndex++);
+
+        LOGV2_DEBUG(7015135,
+                    3,
+                    "SetUp (first)",
+                    "exhaustRounds"_attr = exhaustRounds,
+                    "dedicatedThread"_attr = dedicatedThread,
+                    "reserved"_attr = reserved);
+
+#if TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE
+        _savedDefaultReserved.emplace(ServiceExecutorSynchronous::defaultReserved, reserved);
+#endif
+        _savedUseDedicated.emplace(gInitialUseDedicatedThread, dedicatedThread);
+
+        setGlobalServiceContext(ServiceContext::make());
+        auto sc = getGlobalServiceContext();
+        invariant(sc);
+        sc->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+
+        _coordinator = std::make_unique<MockCoordinator>(sc, exhaustRounds + 1);
+        sc->setServiceEntryPoint(_coordinator->makeServiceEntryPoint());
+        sc->setTransportLayer(std::make_unique<TransportLayerMockWithReactor>());
+        LOGV2_DEBUG(7015136, 3, "About to start sep");
+        invariant(_coordinator->serviceEntryPoint()->start());
     }
 
     void TearDown(benchmark::State& state) override {
-        if (state.thread_index != 0)
+        LOGV2_DEBUG(7015137, 3, "TearDown", "configuredThreads"_attr = _configuredThreads);
+        if (--_configuredThreads)
             return;
-        invariant(sep->shutdownAndWait(Seconds{10}));
+        LOGV2_DEBUG(7015138, 3, "TearDown (last)");
+
+        invariant(_coordinator->serviceEntryPoint()->shutdownAndWait(Seconds{10}));
         setGlobalServiceContext({});
+        _savedDefaultReserved.reset();
+        _savedUseDedicated.reset();
     }
 
-    void benchmarkScheduleNewLoop(benchmark::State& state) {
-        int64_t totalExhaustRounds = state.range(0);
-
+    void run(benchmark::State& state) {
         for (auto _ : state) {
-            auto session = makeSessionCb(makeMessageWithBenchmarkRunNumber(totalExhaustRounds));
+            LOGV2_DEBUG(7015139, 3, "run: iteration start");
+            auto sep = _coordinator->serviceEntryPoint();
+            invariant(sep);
+            auto session = _coordinator->makeSession();
+            invariant(session);
+            Future<void> ended = session->observeEnd();
             sep->startSession(std::move(session));
-
-            invariant(sep->waitForNoSessions(Seconds{1}));
+            ended.get();
         }
+        LOGV2_DEBUG(7015140, 3, "run: all iterations finished");
+        invariant(_coordinator->serviceEntryPoint()->waitForNoSessions(Seconds{1}));
     }
 
-    ServiceContext* serviceCtx;
-    MockServiceEntryPoint* sep;
-    std::function<std::shared_ptr<CallbackMockSession>(Message)> makeSessionCb;
-};
-
-template <bool useDedicatedThread>
-class DedicatedThreadOverrideFixture : public SessionWorkflowFixture {
-    ScopedValueOverride<bool> _svo{gInitialUseDedicatedThread, useDedicatedThread};
-};
-
-using SessionWorkflowWithBorrowedThreads = DedicatedThreadOverrideFixture<false>;
-using SessionWorkflowWithDedicatedThreads = DedicatedThreadOverrideFixture<true>;
-
-enum class StageToStop {
-    kDefault,
-    kSource,
-    kProcess,
-    kSink,
-};
-
-class SingleThreadSessionWorkflow : public SessionWorkflowFixture {
-public:
-    void initializeMockExecutor(benchmark::State& state) {
-        serviceExecutor = std::make_unique<MockServiceExecutor>();
-        serviceExecutor->runOnDataAvailableCb = [&](const SessionHandle& session,
-                                                    OutOfLineExecutor::Task callback) {
-            serviceExecutor->schedule(
-                [callback = std::move(callback)](Status status) { callback(status); });
-        };
-        serviceExecutor->getRunningThreadsCb = [&] { return 0; };
-        serviceExecutor->scheduleTaskCb = [&](OutOfLineExecutor::Task task) { task(Status::OK()); };
-    }
-
-    void SetUp(benchmark::State& state) override {
-        invariant(state.threads == 1, "Environment must be single threaded");
-        auto stopAt = static_cast<StageToStop>(state.range(1));
-
-        commonSetUp();
-
-        // Configure SEP to use mock executor
-        sep->configureServiceExecutorContextCb = [&](ServiceContext::UniqueClient& client, bool) {
-            auto seCtx =
-                std::make_unique<ServiceExecutorContext>([&] { return serviceExecutor.get(); });
-            stdx::lock_guard lk(*client);
-            ServiceExecutorContext::set(&*client, std::move(seCtx));
-        };
-        initializeMockExecutor(state);
-
-        // Change callbacks so that the benchmark stops at the right stage
-        if (stopAt == StageToStop::kProcess)
-            sep->handleRequestCb = [&, stopAt](OperationContext* opCtx, const Message& request) {
-                if (OpMsg::parse(request).body["benchmarkRunNumber"].numberInt() > 0)
-                    return handleRequest(request);
-                return Future<DbResponse>::makeReady(makeClosedSessionError());
-            };
-        makeSessionCb = [stopAt](Message message) {
-            auto session = makeSession(message);
-            if (stopAt == StageToStop::kSource)
-                session->sourceMessageCb = [&, message] {
-                    return StatusWith<Message>(makeClosedSessionError());
-                };
-            return session;
-        };
-    }
-
-    std::unique_ptr<MockServiceExecutor> serviceExecutor;
+private:
+    int _configuredThreads = 0;
+    boost::optional<ScopedValueOverride<size_t>> _savedDefaultReserved;
+    boost::optional<ScopedValueOverride<bool>> _savedUseDedicated;
+    std::unique_ptr<MockCoordinator> _coordinator;
 };
 
 const int64_t benchmarkThreadMax = ProcessInfo::getNumAvailableCores() * 2;
 
-BENCHMARK_DEFINE_F(SessionWorkflowWithDedicatedThreads, MultiThreadScheduleNewLoop)
-(benchmark::State& state) {
-    benchmarkScheduleNewLoop(state);
-}
-BENCHMARK_REGISTER_F(SessionWorkflowWithDedicatedThreads, MultiThreadScheduleNewLoop)
-    ->ArgNames({"Exhaust"})
-    ->Arg(0)
-    ->Arg(1)
-    ->ThreadRange(1, benchmarkThreadMax);
-
-BENCHMARK_DEFINE_F(SessionWorkflowWithBorrowedThreads, MultiThreadScheduleNewLoop)
-(benchmark::State& state) {
-    benchmarkScheduleNewLoop(state);
-}
-BENCHMARK_REGISTER_F(SessionWorkflowWithBorrowedThreads, MultiThreadScheduleNewLoop)
-    ->ArgNames({"Exhaust"})
-    ->Arg(0)
-    ->Arg(1)
-    ->ThreadRange(1, benchmarkThreadMax);
-
-template <typename... E>
-auto enumToArgs(E... e) {
-    return std::vector<int64_t>{static_cast<int64_t>(e)...};
+BENCHMARK_DEFINE_F(SessionWorkflowBm, Loop)(benchmark::State& state) {
+    run(state);
 }
 
-BENCHMARK_DEFINE_F(SingleThreadSessionWorkflow, SingleThreadScheduleNewLoop)
-(benchmark::State& state) {
-    benchmarkScheduleNewLoop(state);
-}
-BENCHMARK_REGISTER_F(SingleThreadSessionWorkflow, SingleThreadScheduleNewLoop)
-    ->ArgNames({"Exhaust", "Stage to stop"})
-    ->ArgsProduct({{0},
-                   enumToArgs(StageToStop::kSource, StageToStop::kProcess, StageToStop::kSink)});
+BENCHMARK_REGISTER_F(SessionWorkflowBm, Loop)->Apply([](auto* b) {
+    b->ArgNames({"ExhaustRounds", "DedicatedThread", "ReservedThreads"});
+    for (int exhaust : {0, 1, 8}) {
+        for (int isDedicatedThread : {0, 1}) {
+            std::vector<int> res{0};
+#if TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE
+            if (isDedicatedThread == 1)
+                res = {0, 1, 4, 16};
+#endif
+            for (int reserved : res)
+                b->Args({exhaust, isDedicatedThread, reserved});
+        }
+    }
+    b->ThreadRange(1, benchmarkThreadMax);
+});
 
 }  // namespace
 }  // namespace mongo::transport
