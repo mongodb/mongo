@@ -132,12 +132,28 @@ public:
 
     /**
      * Information of a Bucket that got closed while performing an operation on this BucketCatalog.
+     * The object is move-only--when it is destructed, it will notify the BucketCatalog that we are
+     * done compressing the bucket (or have decided not to) and it can forget about the bucket's
+     * state, making it eligible for reopening.
      */
-    struct ClosedBucket {
+    class ClosedBucket {
+    public:
+        ClosedBucket() = default;
+        ~ClosedBucket();
+        ClosedBucket(
+            BucketCatalog*, const OID&, const std::string&, boost::optional<uint32_t>, bool);
+        ClosedBucket(ClosedBucket&&);
+        ClosedBucket& operator=(ClosedBucket&&);
+        ClosedBucket(const ClosedBucket&) = delete;
+        ClosedBucket& operator=(const ClosedBucket&) = delete;
+
         OID bucketId;
         std::string timeField;
         boost::optional<uint32_t> numMeasurements;
         bool eligibleForReopening = false;
+
+    private:
+        BucketCatalog* _bucketCatalog = nullptr;
     };
     using ClosedBuckets = std::vector<ClosedBucket>;
 
@@ -239,7 +255,14 @@ public:
     /**
      * Return type for the insert function. See insert() for more information.
      */
-    struct InsertResult {
+    class InsertResult {
+    public:
+        InsertResult() = default;
+        InsertResult(InsertResult&&) = default;
+        InsertResult& operator=(InsertResult&&) = default;
+        InsertResult(const InsertResult&) = delete;
+        InsertResult& operator=(const InsertResult&) = delete;
+
         std::shared_ptr<WriteBatch> batch;
         ClosedBuckets closedBuckets;
         stdx::variant<std::monostate, OID, BSONObj> candidate;
@@ -390,17 +413,19 @@ public:
 
 protected:
     enum class BucketState {
-        // Bucket can be inserted into, and does not have an outstanding prepared commit
+        // Bucket can be inserted into, and does not have an outstanding prepared commit.
         kNormal,
         // Bucket can be inserted into, and has a prepared commit outstanding.
         kPrepared,
-        // Bucket can no longer be inserted into, does not have an outstanding prepared
-        // commit.
+        // Bucket can no longer be inserted into, does not have an outstanding prepared commit.
         kCleared,
-        // Bucket can no longer be inserted into, but still has an outstanding
-        // prepared commit. Any writer other than the one who prepared the
-        // commit should receive a WriteConflictException.
+        // Bucket can no longer be inserted into, but still has an outstanding prepared commit. Any
+        // writer other than the one who prepared the commit should receive a
+        // WriteConflictException.
         kPreparedAndCleared,
+        // Bucket can no longer be inserted into, and is effectively closed, but has an outstanding
+        // compression operation pending, so it is also not eligible for reopening.
+        kPendingCompression,
     };
 
     struct BucketMetadata {
@@ -713,6 +738,12 @@ protected:
         void setNamespace(const NamespaceString& ns);
 
         /**
+         * Sets the rollover action, to determine what to do with a bucket when all measurements
+         * have been committed.
+         */
+        void setRolloverAction(RolloverAction action);
+
+        /**
          * Determines if the schema for an incoming measurement is incompatible with those already
          * stored in the bucket.
          *
@@ -937,9 +968,19 @@ protected:
     void _waitToCommitBatch(Stripe* stripe, const std::shared_ptr<WriteBatch>& batch);
 
     /**
+     * Mode to signal to '_removeBucket' what's happening to the bucket, and how to handle the
+     * bucket state change.
+     */
+    enum class RemovalMode {
+        kClose,    // Normal closure, pending compression
+        kArchive,  // Archive bucket, no state change
+        kAbort,    // Bucket is being cleared, possibly due to error, erase state
+    };
+
+    /**
      * Removes the given bucket from the bucket catalog's internal data structures.
      */
-    void _removeBucket(Stripe* stripe, WithLock stripeLock, Bucket* bucket, bool archiving);
+    void _removeBucket(Stripe* stripe, WithLock stripeLock, Bucket* bucket, RemovalMode mode);
 
     /**
      * Archives the given bucket, minimizing the memory footprint but retaining the necessary
@@ -982,6 +1023,12 @@ protected:
                 Bucket* bucket,
                 std::shared_ptr<WriteBatch> batch,
                 const Status& status);
+
+    /**
+     * Records that compression for the given bucket has been completed, and the BucketCatalog can
+     * forget about the bucket.
+     */
+    void _compressionDone(const OID& bucketId);
 
     /**
      * Adds the bucket to a list of idle buckets to be expired at a later date.

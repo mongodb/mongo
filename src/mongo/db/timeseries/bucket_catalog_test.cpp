@@ -208,14 +208,14 @@ void BucketCatalogTest::_testMeasurementSchema(
             timestampedDoc.appendElements(doc);
 
             auto pre = _getExecutionStat(_ns1, kNumSchemaChanges);
-            auto result = _bucketCatalog
-                              ->insert(_opCtx,
-                                       _ns1,
-                                       _getCollator(_ns1),
-                                       _getTimeseriesOptions(_ns1),
-                                       timestampedDoc.obj(),
-                                       BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
-                              .getValue();
+            ASSERT(_bucketCatalog
+                       ->insert(_opCtx,
+                                _ns1,
+                                _getCollator(_ns1),
+                                _getTimeseriesOptions(_ns1),
+                                timestampedDoc.obj(),
+                                BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
+                       .isOK());
             auto post = _getExecutionStat(_ns1, kNumSchemaChanges);
 
             if (firstMember) {
@@ -1329,7 +1329,7 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
         ASSERT_OK(_bucketCatalog->prepareCommit(batch));
         _bucketCatalog->finish(batch, {});
 
-        return result.getValue().closedBuckets;
+        return std::move(result.getValue().closedBuckets);
     };
 
     // Ensure we start out with no buckets archived or closed due to memory pressure.

@@ -54,7 +54,7 @@ public:
 
     bool cannotAccessBucket(Bucket* bucket) {
         if (hasBeenCleared(bucket)) {
-            _removeBucket(&_stripes[bucket->stripe()], withLock, bucket, false);
+            _removeBucket(&_stripes[bucket->stripe()], withLock, bucket, RemovalMode::kAbort);
             return true;
         } else {
             return false;
@@ -72,7 +72,8 @@ public:
                              bucket->id(),
                              ReturnClearedBuckets::kNo);
         ASSERT(b == nullptr);
-        _removeBucket(&_stripes[_getStripeNumber(bucketKey)], withLock, bucket, false);
+        _removeBucket(
+            &_stripes[_getStripeNumber(bucketKey)], withLock, bucket, RemovalMode::kAbort);
     }
 
     WithLock withLock = WithLock::withoutLock();
@@ -318,6 +319,70 @@ TEST_F(BucketCatalogStateManagerTest, HasBeenClearedToleratesGapsInRegistry) {
     ASSERT_TRUE(hasBeenCleared(bucket1));
     ASSERT_TRUE(hasBeenCleared(bucket2));
 }
+
+TEST_F(BucketCatalogStateManagerTest, ArchivingBucketPreservesState) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+
+    auto bucket = createBucket(info1);
+    auto bucketId = bucket->id();
+
+    _archiveBucket(&_stripes[info1.stripe], WithLock::withoutLock(), bucket);
+    ASSERT(_bucketStateManager.getBucketState(bucketId) == BucketState::kNormal);
+}
+
+TEST_F(BucketCatalogStateManagerTest, AbortingBatchRemovesBucketState) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+
+    auto bucket = createBucket(info1);
+    auto bucketId = bucket->id();
+
+    auto stats = _getExecutionStats(info1.key.ns);
+    auto batch = std::make_shared<WriteBatch>(BucketHandle{bucketId, info1.stripe}, 0, stats);
+
+    _abort(&_stripes[info1.stripe], WithLock::withoutLock(), batch, Status::OK());
+    ASSERT(_bucketStateManager.getBucketState(bucketId) == boost::none);
+}
+
+TEST_F(BucketCatalogStateManagerTest, ClosingBucketGoesThroughPendingCompressionState) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+
+    auto bucket = createBucket(info1);
+    auto bucketId = bucket->id();
+
+    ASSERT(_bucketStateManager.getBucketState(bucketId).value() == BucketState::kNormal);
+
+    auto stats = _getExecutionStats(info1.key.ns);
+    auto batch = std::make_shared<WriteBatch>(BucketHandle{bucketId, info1.stripe}, 0, stats);
+    ASSERT(batch->claimCommitRights());
+    ASSERT_OK(prepareCommit(batch));
+    ASSERT(_bucketStateManager.getBucketState(bucketId).value() == BucketState::kPrepared);
+
+    {
+        // Fool the system by marking the bucket for closure, then finish the batch so it detects
+        // this and closes the bucket.
+        bucket->setRolloverAction(RolloverAction::kHardClose);
+        CommitInfo commitInfo{};
+        auto closedBucket = finish(batch, commitInfo);
+        ASSERT(closedBucket.has_value());
+        ASSERT_EQ(closedBucket.value().bucketId, bucketId);
+
+        // Bucket should now be in pending compression state.
+        ASSERT(_bucketStateManager.getBucketState(bucketId).has_value());
+        ASSERT(_bucketStateManager.getBucketState(bucketId).value() ==
+               BucketState::kPendingCompression);
+
+        // This should prevent us from reinitializing the state as if we were reopening the bucket.
+        ASSERT_FALSE(_bucketStateManager.initializeBucketState(bucketId, boost::none));
+    }
+
+    // Destructing the 'ClosedBucket' struct should report it compressed should remove it from the
+    // catalog.
+    ASSERT(_bucketStateManager.getBucketState(bucketId) == boost::none);
+}
+
 
 }  // namespace
 }  // namespace mongo
