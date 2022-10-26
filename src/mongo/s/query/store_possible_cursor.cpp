@@ -77,7 +77,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         std::shared_ptr<executor::TaskExecutor> executor,
                                         ClusterCursorManager* cursorManager,
                                         PrivilegeVector privileges,
-                                        TailableModeEnum tailableMode) {
+                                        TailableModeEnum tailableMode,
+                                        boost::optional<BSONObj> routerSort) {
     if (!cmdResult["ok"].trueValue() || !cmdResult.hasField("cursor")) {
         return cmdResult;
     }
@@ -104,14 +105,22 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     auto& remoteCursor = params.remotes.back();
     remoteCursor.setShardId(shardId.toString());
     remoteCursor.setHostAndPort(server);
-    remoteCursor.setCursorResponse(CursorResponse(incomingCursorResponse.getValue().getNSS(),
-                                                  incomingCursorResponse.getValue().getCursorId(),
-                                                  {}));
+    remoteCursor.setCursorResponse(
+        CursorResponse(incomingCursorResponse.getValue().getNSS(),
+                       incomingCursorResponse.getValue().getCursorId(),
+                       {}, /* batch */
+                       incomingCursorResponse.getValue().getNumReturnedSoFar(),
+                       incomingCursorResponse.getValue().getPostBatchResumeToken(),
+                       incomingCursorResponse.getValue().getWriteConcernError(),
+                       incomingCursorResponse.getValue().getVarsField()));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = tailableMode;
     params.lsid = opCtx->getLogicalSessionId();
     params.txnNumber = opCtx->getTxnNumber();
     params.originatingPrivileges = std::move(privileges);
+    if (routerSort) {
+        params.sortToApplyOnRouter = *routerSort;
+    }
 
     if (TransactionRouter::get(opCtx)) {
         params.isAutoCommit = false;
@@ -137,7 +146,13 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     CurOp::get(opCtx)->debug().cursorid = clusterCursorId.getValue();
 
     CursorResponse outgoingCursorResponse(
-        requestedNss, clusterCursorId.getValue(), incomingCursorResponse.getValue().getBatch());
+        requestedNss,
+        clusterCursorId.getValue(),
+        incomingCursorResponse.getValue().getBatch(),
+        incomingCursorResponse.getValue().getNumReturnedSoFar(),
+        incomingCursorResponse.getValue().getPostBatchResumeToken(),
+        incomingCursorResponse.getValue().getWriteConcernError(),
+        incomingCursorResponse.getValue().getVarsField());
     return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 }
 

@@ -68,6 +68,7 @@ function insertAndValidateChanges(coll, changeStream) {
         assert(timestampCmp(changeList[i].clusterTime, changeList[i + 1].clusterTime) <= 0,
                "Change timestamps are not monotonically increasing: " + tojson(changeList));
     }
+    // TODO SERVER-70084 update this test to check PSCs work with mixed (4.4/4.2) clusters.
 
     return changeStream.getResumeToken();
 }

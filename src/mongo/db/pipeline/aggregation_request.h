@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/runtime_constants_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
@@ -62,6 +63,7 @@ public:
     static constexpr StringData kAllowDiskUseName = "allowDiskUse"_sd;
     static constexpr StringData kHintName = "hint"_sd;
     static constexpr StringData kExchangeName = "exchange"_sd;
+    static constexpr StringData kPassthroughToShardName = "$_passthroughToShard"_sd;
     static constexpr StringData kRuntimeConstants = "runtimeConstants"_sd;
     static constexpr StringData kUse44SortKeys = "use44SortKeys"_sd;
     static constexpr StringData kUseNewUpsert = "useNewUpsert"_sd;
@@ -231,6 +233,10 @@ public:
         return _isMapReduceCommand;
     }
 
+    boost::optional<ShardId> getPassthroughToShard() const {
+        return _passthroughToShard;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -307,6 +313,10 @@ public:
         _isMapReduceCommand = isMapReduce;
     }
 
+    void setPassthroughToShard(boost::optional<ShardId> shardId) {
+        _passthroughToShard = shardId;
+    }
+
 private:
     // Required fields.
     const NamespaceString _nss;
@@ -367,5 +377,7 @@ private:
 
     // True when an aggregation was invoked by the MapReduce command.
     bool _isMapReduceCommand = false;
+
+    boost::optional<ShardId> _passthroughToShard;
 };
 }  // namespace mongo

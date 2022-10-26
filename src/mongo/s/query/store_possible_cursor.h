@@ -72,6 +72,8 @@ class TaskExecutor;
  * @ cursorManager the ClusterCursorManager on which to register the resulting ClusterClientCursor
  * @ privileges the PrivilegeVector of privileges needed for the original command, to be used for
  * auth checking by GetMore
+ * @ routerSort the sort to apply on the router. With only one cursor this shouldn't be common, but
+ * is needed to set up change stream post-batch resume tokens correctly for per shard cursors.
  */
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const ShardId& shardId,
@@ -81,7 +83,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         std::shared_ptr<executor::TaskExecutor> executor,
                                         ClusterCursorManager* cursorManager,
                                         PrivilegeVector privileges,
-                                        TailableModeEnum tailableMode = TailableModeEnum::kNormal);
+                                        TailableModeEnum tailableMode = TailableModeEnum::kNormal,
+                                        boost::optional<BSONObj> routerSort = boost::none);
 
 /**
  * Convenience function which extracts all necessary information from the passed RemoteCursor, and

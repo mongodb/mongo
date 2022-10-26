@@ -150,6 +150,8 @@ bool AsyncResultsMerger::remotesExhausted() const {
 
 bool AsyncResultsMerger::_remotesExhausted(WithLock) const {
     for (const auto& remote : _remotes) {
+        // If any remote has been invalidated, we must force the batch-building code to make another
+        // attempt to retrieve more results. This will (correctly) throw via _assertNotInvalidated.
         if (!remote.exhausted()) {
             return false;
         }

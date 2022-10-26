@@ -202,9 +202,21 @@ assert.eq(latestChange.fullDocument, null);
 assertCreateCollection(db, coll.getName());
 assert.commandWorked(coll.insert({_id: "fullDocument is lookup 2"}));
 
-// Confirm that the next entry's post-image is null since new collection has a different
+// Confirm that the update's post-image is null since new collection has a different
 // UUID.
-latestChange = cst.getOneChange(cursorBeforeDrop);
+const cursorOldUUID = cst.startWatchingChanges({
+    collection: coll,
+    pipeline: [
+        {$changeStream: {fullDocument: "updateLookup", resumeAfter: deleteDocResumePoint}},
+        {$match: {operationType: "update"}}
+    ],
+    aggregateOptions: {cursor: {batchSize: 0}}
+});
+
+// The next entry is the 'update' operation. Confirm that the next entry's post-image is null
+// because the original collection (i.e. the collection that the 'update' was applied to) has
+// been dropped and the new incarnation of the collection has a different UUID.
+latestChange = cst.getOneChange(cursorOldUUID);
 assert.eq(latestChange.operationType, "update");
 assert(latestChange.hasOwnProperty("fullDocument"));
 assert.eq(latestChange.fullDocument, null);

@@ -279,14 +279,17 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         routingInfo,
         involvedNamespaces,
         hasChangeStream,
-        liteParsedPipeline.allowedToPassthroughFromMongos());
+        liteParsedPipeline.allowedToPassthroughFromMongos(),
+        request.getPassthroughToShard().has_value());
 
     if (!expCtx) {
         // When the AggregationTargeter chooses a "passthrough" policy, it does not call the
         // 'pipelineBuilder' function, so we never get an expression context. Because this is a
         // passthrough, we only need a bare minimum expression context anyway.
         invariant(targeter.policy ==
-                  cluster_aggregation_planner::AggregationTargeter::kPassthrough);
+                      cluster_aggregation_planner::AggregationTargeter::kPassthrough ||
+                  targeter.policy ==
+                      cluster_aggregation_planner::AggregationTargeter::kSpecificShardOnly);
         expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, namespaces.executionNss);
     }
 
@@ -339,6 +342,40 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     privileges,
                     result,
                     hasChangeStream);
+            }
+            case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
+                kSpecificShardOnly: {
+                // Mark expCtx as tailable and await data so CCC behaves accordingly.
+                expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
+
+                uassert(6273801,
+                        "per shard cursor pipeline must contain $changeStream",
+                        hasChangeStream);
+
+                // Make sure the rest of the pipeline can be pushed down.
+                auto pipeline = request.getPipeline();
+                std::vector<BSONObj> nonChangeStreamPart(pipeline.begin() + 1, pipeline.end());
+                LiteParsedPipeline nonChangeStreamLite(request.getNamespaceString(),
+                                                       nonChangeStreamPart);
+                uassert(6273802,
+                        "$_passthroughToShard specified with a stage that is not allowed to "
+                        "passthrough from mongos",
+                        nonChangeStreamLite.allowedToPassthroughFromMongos());
+                ShardId shardId = *request.getPassthroughToShard();
+                uassert(6273803,
+                        "$_passthroughToShard not supported for queries against config replica set",
+                        shardId != ShardRegistry::kConfigServerShardId);
+
+                return cluster_aggregation_planner::runPipelineOnSpecificShardOnly(
+                    expCtx,
+                    namespaces,
+                    boost::none,
+                    request.getExplain(),
+                    request.serializeToCommandObj(),
+                    privileges,
+                    shardId,
+                    true,
+                    result);
             }
 
                 MONGO_UNREACHABLE;

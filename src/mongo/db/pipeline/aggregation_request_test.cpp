@@ -61,7 +61,8 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
         "needsMerge: true, bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: "
         "{batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, readConcern: {level: 'linearizable'}, "
         "$queryOptions: {$readPreference: 'nearest'}, exchange: {policy: "
-        "'roundrobin', consumers:NumberInt(2)}, isMapReduceCommand: true}");
+        "'roundrobin', consumers:NumberInt(2)}, isMapReduceCommand: true, $_passthroughToShard: "
+        "{shard: 'foo'}}");
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.shouldAllowDiskUse());
@@ -499,6 +500,20 @@ TEST(AggregationRequestTest, ShouldRejectInvalidWriteConcern) {
         fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, writeConcern: 'invalid'}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
+
+TEST(AggregationRequestTest, ShouldRejectInvalidPassthroughToShard) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$changeStream: {}}], cursor: {}, passthroughToShard: {foo: 'f'}}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
+    const BSONObj inputBson2 =
+        fromjson("{pipeline: [{$changeStream: {}}], cursor: {}, passthroughToShard: {shard: 5}}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson2).getStatus());
+    const BSONObj inputBson3 =
+        fromjson("{pipeline: [{$changeStream: {}}], cursor: {}, passthroughToShard: {}}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson3).getStatus());
+}
+
 //
 // Ignore fields parsed elsewhere.
 //

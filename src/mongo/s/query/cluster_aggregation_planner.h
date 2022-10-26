@@ -81,12 +81,14 @@ struct AggregationTargeter {
         boost::optional<CachedCollectionRoutingInfo> routingInfo,
         stdx::unordered_set<NamespaceString> involvedNamespaces,
         bool hasChangeStream,
-        bool allowedToPassthrough);
+        bool allowedToPassthrough,
+        bool perShardCursor);
 
     enum TargetingPolicy {
         kPassthrough,
         kMongosRequired,
         kAnyShard,
+        kSpecificShardOnly,
     } policy;
 
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
@@ -123,6 +125,21 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                 const PrivilegeVector& privileges,
                                 BSONObjBuilder* result,
                                 bool hasChangeStream);
+
+/**
+ * Similar to runPipelineOnPrimaryShard but allows $changeStreams. Intended for use by per shard
+ * $changeStream cursors. Note: if forPerShardCursor is true shard versions will not be added to the
+ * request sent to mongod.
+ */
+Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      const ClusterAggregate::Namespaces& namespaces,
+                                      boost::optional<DatabaseVersion> dbVersion,
+                                      boost::optional<ExplainOptions::Verbosity> explain,
+                                      Document serializedCommand,
+                                      const PrivilegeVector& privileges,
+                                      ShardId shardId,
+                                      bool forPerShardCursor,
+                                      BSONObjBuilder* out);
 
 }  // namespace cluster_aggregation_planner
 }  // namespace mongo

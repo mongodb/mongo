@@ -301,7 +301,7 @@ public:
                     auto* expCtx = exec->getExpCtx().get();
                     // Note that "needsMerge" implies a find or aggregate operation, which should
                     // always have a non-NULL 'expCtx' value.
-                    BSONObj obj = cursor->needsMerge()
+                    BSONObj obj = cursor->needsMerge() || (expCtx && expCtx->forPerShardCursor)
                         ? doc.toBsonWithMetaData(expCtx->sortKeyFormat)
                         : doc.toBson();
 

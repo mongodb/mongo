@@ -180,8 +180,9 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                                                                pipelineBuilder,
                                                                routingInfo,
                                                                involvedNamespaces,
-                                                               false,  // hasChangeStream
-                                                               true);  // allowedToPassthrough
+                                                               false,   // hasChangeStream
+                                                               true,    // allowedToPassthrough
+                                                               false);  // perShardCursor
     try {
         switch (targeter.policy) {
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kPassthrough: {
@@ -225,6 +226,14 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                     &tempResults,
                     false));  // hasChangeStream
                 break;
+            }
+
+            case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
+                kSpecificShardOnly: {
+                // It should not be possible to pass $_passthroughToShard to a map reduce command.
+                uasserted(
+                    6900300,
+                    "It shouldn't be possible to $_passthroughToShard in a map reduce command.");
             }
         }
     } catch (DBException& e) {

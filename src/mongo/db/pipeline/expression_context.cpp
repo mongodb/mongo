@@ -69,6 +69,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     // has the 'useNewUpsert' flag set, can use the new upsertSupplied mechanism for $merge.
     // TODO SERVER-44884: Remove this flag after we branch for 4.5.
     useNewUpsert = request.getUseNewUpsert() || !request.isFromMongos();
+    forPerShardCursor = request.getPassthroughToShard().has_value();
 
     if (request.getIsMapReduceCommand()) {
         // mapReduce command JavaScript invocation is only subject to the server global

@@ -177,6 +177,31 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
+        } else if (kPassthroughToShardName == fieldName) {
+            if (elem.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream()
+                            << fieldName << " must be an object, not a " << typeName(elem.type())};
+            }
+            for (auto&& innerElem : elem.Obj()) {
+                if (innerElem.fieldName() != "shard"_sd) {
+                    return {ErrorCodes::FailedToParse,
+                            str::stream() << fieldName << "." << innerElem.fieldName()
+                                          << " is an unexpected field"};
+                }
+            }
+            auto shardIdElem = elem["shard"_sd];
+            if (shardIdElem.eoo()) {
+                return {ErrorCodes::FailedToParse,
+                        str::stream()
+                            << fieldName
+                            << ".shard was missing. Must specify a shard to pass through to"};
+            } else if (shardIdElem.type() != BSONType::String) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << fieldName << ".shard must be a string, not a "
+                                      << typeName(shardIdElem.type())};
+            }
+            request.setPassthroughToShard(ShardId(shardIdElem.String()));
         } else if (bypassDocumentValidationCommandOption() == fieldName) {
             request.setBypassDocumentValidation(elem.trueValue());
         } else if (WriteConcernOptions::kWriteConcernField == fieldName) {
@@ -334,6 +359,9 @@ Document AggregationRequest::serializeToCommandObj() const {
         {kUse44SortKeys, _use44SortKeys ? Value(true) : Value()},
         {kUseNewUpsert, _useNewUpsert ? Value(true) : Value()},
         {kIsMapReduceCommand, _isMapReduceCommand ? Value(true) : Value()},
-    };
+        {kPassthroughToShardName,
+         _passthroughToShard.has_value()
+             ? Value(Document{{"shard", _passthroughToShard->toString()}})
+             : Value()}};
 }
 }  // namespace mongo
