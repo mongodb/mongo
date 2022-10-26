@@ -25,11 +25,7 @@ const mongosColl = mongosDB.getCollection(collName);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.name);
-// TODO (SERVER-69237): Use a regular collection once pre-images are always available in the
-// OpObserver. Currently, the pre-images are not available in the test cases involving array
-// updates.
-assert.commandWorked(
-    mongosDB.createCollection(collName, {changeStreamPreAndPostImages: {enabled: true}}));
+assert.commandWorked(mongosDB.createCollection(collName));
 const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
 
 assert.commandWorked(

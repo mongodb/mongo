@@ -253,7 +253,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
             WriteUnitOfWork wuow(_opCtx.get());
             const bool indexesAffected = true;
             OpDebug* opDebug = nullptr;
-            CollectionUpdateArgs args;
+            CollectionUpdateArgs args{oldDoc.value()};
             collection_internal::updateDocument(
                 _opCtx.get(),
                 *collection,
@@ -304,7 +304,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
             WriteUnitOfWork wuow(_opCtx.get());
             const bool indexesAffected = true;
             OpDebug* opDebug = nullptr;
-            CollectionUpdateArgs args;
+            CollectionUpdateArgs args{oldDoc.value()};
             auto newDocResult =
                 collection_internal::updateDocumentWithDamages(_opCtx.get(),
                                                                *collection,

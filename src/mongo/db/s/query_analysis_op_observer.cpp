@@ -91,12 +91,12 @@ void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdat
     }
 
     if (analyze_shard_key::supportsPersistingSampledQueries() && args.updateArgs->sampleId &&
-        args.updateArgs->preImageDoc && opCtx->writesAreReplicated()) {
+        opCtx->writesAreReplicated()) {
         analyze_shard_key::QueryAnalysisWriter::get(opCtx)
             .addDiff(*args.updateArgs->sampleId,
                      args.coll->ns(),
                      args.coll->uuid(),
-                     *args.updateArgs->preImageDoc,
+                     args.updateArgs->preImageDoc,
                      args.updateArgs->updatedDoc)
             .getAsync([](auto) {});
     }

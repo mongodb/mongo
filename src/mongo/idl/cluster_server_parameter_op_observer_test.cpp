@@ -76,7 +76,10 @@ public:
 
     void doUpdate(const NamespaceString& nss, BSONObj updatedDoc) {
         // Actual UUID doesn't matter, just use any...
-        CollectionUpdateArgs updateArgs;
+        const auto criteria = updatedDoc["_id"].wrap();
+        const auto preImageDoc = criteria;
+        CollectionUpdateArgs updateArgs{preImageDoc};
+        updateArgs.criteria = criteria;
         updateArgs.update = BSON("$set" << updatedDoc);
         updateArgs.updatedDoc = updatedDoc;
         auto opCtx = cc().makeOperationContext();

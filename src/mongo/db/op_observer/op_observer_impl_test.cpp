@@ -913,12 +913,15 @@ TEST_F(OpObserverTest, SingleStatementUpdateTestIncludesTenantId) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
-    CollectionUpdateArgs updateArgs;
+    const auto criteria = BSON("_id" << 0);
+    // Create a fake preImageDoc; the tested code path does not care about this value.
+    const auto preImageDoc = criteria;
+    CollectionUpdateArgs updateArgs{preImageDoc};
+    updateArgs.criteria = criteria;
     updateArgs.updatedDoc = BSON("_id" << 0 << "data"
                                        << "x");
     updateArgs.update = BSON("$set" << BSON("data"
                                             << "x"));
-    updateArgs.criteria = BSON("_id" << 0);
 
     auto opCtx = cc().makeOperationContext();
     WriteUnitOfWork wuow(opCtx.get());
@@ -1272,13 +1275,16 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
                                      << "y"));
     opObserver().onInserts(opCtx(), *autoColl1, inserts1.begin(), inserts1.end(), false);
 
-    CollectionUpdateArgs updateArgs2;
+    const auto criteria = BSON("_id" << 0);
+    // Create a fake preImageDoc; the tested code path does not care about this value.
+    const auto preImageDoc = criteria;
+    CollectionUpdateArgs updateArgs2{preImageDoc};
+    updateArgs2.criteria = criteria;
     updateArgs2.stmtIds = {1};
     updateArgs2.updatedDoc = BSON("_id" << 0 << "data"
                                         << "y");
     updateArgs2.update = BSON("$set" << BSON("data"
                                              << "y"));
-    updateArgs2.criteria = BSON("_id" << 0);
     OplogUpdateEntryArgs update2(&updateArgs2, *autoColl2);
     opObserver().onUpdate(opCtx(), update2);
 
@@ -1797,22 +1803,26 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
 
-    CollectionUpdateArgs updateArgs1;
+    const auto criteria1 = BSON("_id" << 0);
+    const auto preImageDoc1 = criteria1;
+    CollectionUpdateArgs updateArgs1{preImageDoc1};
+    updateArgs1.criteria = criteria1;
     updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
                                         << "x");
     updateArgs1.update = BSON("$set" << BSON("data"
                                              << "x"));
-    updateArgs1.criteria = BSON("_id" << 0);
     OplogUpdateEntryArgs update1(&updateArgs1, *autoColl1);
 
-    CollectionUpdateArgs updateArgs2;
+    const auto criteria2 = BSON("_id" << 1);
+    const auto preImageDoc2 = criteria2;
+    CollectionUpdateArgs updateArgs2{preImageDoc2};
+    updateArgs2.criteria = criteria2;
     updateArgs2.stmtIds = {1};
     updateArgs2.updatedDoc = BSON("_id" << 1 << "data"
                                         << "y");
     updateArgs2.update = BSON("$set" << BSON("data"
                                              << "y"));
-    updateArgs2.criteria = BSON("_id" << 1);
     OplogUpdateEntryArgs update2(&updateArgs2, *autoColl2);
 
     opObserver().onUpdate(opCtx(), update1);
@@ -1852,22 +1862,26 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
     AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
 
-    CollectionUpdateArgs updateArgs1;
+    const auto criteria1 = BSON("_id" << 0);
+    const auto preImageDoc1 = criteria1;
+    CollectionUpdateArgs updateArgs1{preImageDoc1};
+    updateArgs1.criteria = criteria1;
     updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
                                         << "x");
     updateArgs1.update = BSON("$set" << BSON("data"
                                              << "x"));
-    updateArgs1.criteria = BSON("_id" << 0);
     OplogUpdateEntryArgs update1(&updateArgs1, *autoColl1);
 
-    CollectionUpdateArgs updateArgs2;
+    const auto criteria2 = BSON("_id" << 1);
+    const auto preImageDoc2 = criteria2;
+    CollectionUpdateArgs updateArgs2{preImageDoc2};
+    updateArgs2.criteria = criteria2;
     updateArgs2.stmtIds = {1};
     updateArgs2.updatedDoc = BSON("_id" << 1 << "data"
                                         << "y");
     updateArgs2.update = BSON("$set" << BSON("data"
                                              << "y"));
-    updateArgs2.criteria = BSON("_id" << 1);
     OplogUpdateEntryArgs update2(&updateArgs2, *autoColl2);
 
     opObserver().onUpdate(opCtx(), update1);
@@ -2037,13 +2051,16 @@ public:
 
 protected:
     void testRetryableFindAndModifyUpdateRequestingPostImageHasNeedsRetryImage() {
-        CollectionUpdateArgs updateArgs;
+        NamespaceString nss = {boost::none /* tenantId */, "test", "coll"};
+        const auto criteria = BSON("_id" << 0);
+        const auto preImageDoc = criteria;
+        CollectionUpdateArgs updateArgs{preImageDoc};
+        updateArgs.criteria = criteria;
         updateArgs.stmtIds = {0};
         updateArgs.updatedDoc = BSON("_id" << 0 << "data"
                                            << "x");
         updateArgs.update = BSON("$set" << BSON("data"
                                                 << "x"));
-        updateArgs.criteria = BSON("_id" << 0);
         updateArgs.storeDocOption = CollectionUpdateArgs::StoreDocOption::PostImage;
 
         AutoGetCollection autoColl(opCtx(), nss, MODE_IX);
@@ -2066,13 +2083,15 @@ protected:
     }
 
     void testRetryableFindAndModifyUpdateRequestingPreImageHasNeedsRetryImage() {
-        CollectionUpdateArgs updateArgs;
-        updateArgs.stmtIds = {0};
-        updateArgs.preImageDoc = BSON("_id" << 0 << "data"
+        NamespaceString nss = {boost::none, "test", "coll"};
+        const auto criteria = BSON("_id" << 0);
+        const auto preImageDoc = BSON("_id" << 0 << "data"
                                             << "y");
+        CollectionUpdateArgs updateArgs{preImageDoc};
+        updateArgs.criteria = criteria;
+        updateArgs.stmtIds = {0};
         updateArgs.update = BSON("$set" << BSON("data"
                                                 << "x"));
-        updateArgs.criteria = BSON("_id" << 0);
         updateArgs.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
 
         AutoGetCollection autoColl(opCtx(), nss, MODE_IX);
@@ -2350,14 +2369,8 @@ protected:
                 }
                 break;
         }
-        update->updateArgs->preImageDoc = boost::none;
-        if (testCase.imageType == StoreDocOption::PreImage || testCase.changeStreamImagesEnabled) {
-            update->updateArgs->preImageDoc = BSON("_id" << 0 << "preImage" << true);
-        }
-        update->updateArgs->updatedDoc = BSON("_id" << 0 << "postImage" << true);
-        update->updateArgs->update =
-            BSON("$set" << BSON("postImage" << true) << "$unset" << BSON("preImage" << 1));
-        update->updateArgs->criteria = BSON("_id" << 0);
+        update->updateArgs->updatedDoc = kPostImageDoc;
+        update->updateArgs->update = kUpdate;
         update->updateArgs->storeDocOption = testCase.imageType;
     }
 
@@ -2374,7 +2387,7 @@ protected:
             repl::ImageEntry imageEntry =
                 getImageEntryFromSideCollection(opCtx, *updateOplogEntry.getSessionId());
             const BSONObj& expectedImage = testCase.imageType == StoreDocOption::PreImage
-                ? update.updateArgs->preImageDoc.value()
+                ? update.updateArgs->preImageDoc
                 : update.updateArgs->updatedDoc;
             ASSERT_BSONOBJ_EQ(expectedImage, imageEntry.getImage());
             ASSERT(imageEntry.getImageKind() == updateOplogEntry.getNeedsRetryImage());
@@ -2387,8 +2400,8 @@ protected:
                 ASSERT(imageEntry.getImageKind() == repl::RetryImageEnum::kPostImage);
             }
 
-            // If 'updateOplogEntry' has opTime T, opTime T-1 must be reserved for potential forged
-            // noop oplog entry for the pre/postImage written to the side collection.
+            // If 'updateOplogEntry' has opTime T, opTime T-1 must be reserved for potential
+            // forged noop oplog entry for the pre/postImage written to the side collection.
             const Timestamp forgeNoopTimestamp = updateOplogEntry.getTimestamp() - 1;
             ASSERT_FALSE(findByTimestamp(oplogs, forgeNoopTimestamp));
         } else {
@@ -2412,7 +2425,7 @@ protected:
             ChangeStreamPreImageId preImageId(
                 _uuid, updateOplogEntry.getOpTime().getTimestamp(), 0);
             ChangeStreamPreImage preImage = getChangeStreamPreImage(opCtx, preImageId, &container);
-            const BSONObj& expectedImage = update.updateArgs->preImageDoc.value();
+            const BSONObj& expectedImage = update.updateArgs->preImageDoc;
             ASSERT_BSONOBJ_EQ(expectedImage, preImage.getPreImage());
             ASSERT_EQ(updateOplogEntry.getWallClockTime(), preImage.getOperationTime());
         }
@@ -2442,6 +2455,12 @@ protected:
 
     const NamespaceString _nss{boost::none, "test", "coll"};
     const UUID _uuid = UUID::gen();
+
+    const BSONObj kCriteria = BSON("_id" << 0);
+    const BSONObj kPreImageDoc = BSON("_id" << 0 << "preImage" << true);
+    const BSONObj kPostImageDoc = BSON("_id" << 0 << "postImage" << true);
+    const BSONObj kUpdate =
+        BSON("$set" << BSON("postImage" << true) << "$unset" << BSON("preImage" << 1));
 };
 
 TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
@@ -2468,9 +2487,11 @@ TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
         }
 
         // Phase 2: Call the code we're testing.
+        CollectionUpdateArgs updateArgs{kPreImageDoc};
+        updateArgs.criteria = kCriteria;
+
         WriteUnitOfWork wuow(opCtx);
         AutoGetCollection locks(opCtx, _nss, MODE_IX);
-        CollectionUpdateArgs updateArgs;
         OplogUpdateEntryArgs updateEntryArgs(&updateArgs, *locks);
         initializeOplogUpdateEntryArgs(opCtx, testCase, &updateEntryArgs);
         opObserver.onUpdate(opCtx, updateEntryArgs);
@@ -2514,7 +2535,8 @@ TEST_F(OnUpdateOutputsTest, TestFundamentalTransactionOnUpdateOutputs) {
         // Phase 2: Call the code we're testing.
         WriteUnitOfWork wuow(opCtx);
         AutoGetCollection locks(opCtx, _nss, MODE_IX);
-        CollectionUpdateArgs updateArgs;
+        CollectionUpdateArgs updateArgs{kPreImageDoc};
+        updateArgs.criteria = kCriteria;
         OplogUpdateEntryArgs updateEntryArgs(&updateArgs, *locks);
         initializeOplogUpdateEntryArgs(opCtx, testCase, &updateEntryArgs);
 
@@ -2539,9 +2561,10 @@ struct InsertTestCase {
     int numDocsToInsert;
 };
 TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
-    // Create a registry that only registers the Impl. It can be challenging to call methods on the
-    // Impl directly. It falls into cases where `ReservedTimes` is expected to be instantiated. Due
-    // to strong encapsulation, we use the registry that managers the `ReservedTimes` on our behalf.
+    // Create a registry that only registers the Impl. It can be challenging to call methods on
+    // the Impl directly. It falls into cases where `ReservedTimes` is expected to be instantiated.
+    // Due to strong encapsulation, we use the registry that managers the `ReservedTimes` on our
+    // behalf.
     OpObserverRegistry opObserver;
     opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
 
@@ -2606,8 +2629,8 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
             ASSERT_EQ(opCtx->getTxnNumber().value(), entry.getTxnNumber().value());
             ASSERT_EQ(1, entry.getStatementIds().size());
             ASSERT_EQ(StmtId(opIdx), entry.getStatementIds()[0]);
-            // When we insert multiple documents in retryable writes, each insert will "link" back
-            // to the previous insert. This code verifies that C["prevOpTime"] -> B and
+            // When we insert multiple documents in retryable writes, each insert will "link"
+            // back to the previous insert. This code verifies that C["prevOpTime"] -> B and
             // B["prevOpTime"] -> A.
             Timestamp expectedPrevWriteOpTime = Timestamp(0, 0);
             if (opIdx > 0) {
@@ -2764,8 +2787,8 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
 
         for (size_t doc = 0; doc < docsToBeBatched; doc++) {
-            // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
-            // of setting of `documentKey` on the delete for sharding purposes.
+            // This test does not call `OpObserver::aboutToDelete`. That method has the
+            // side-effect of setting of `documentKey` on the delete for sharding purposes.
             // `OpObserverImpl::onDelete` asserts its existence.
             repl::documentKeyDecoration(opCtx).emplace(docsToDelete[doc]["_id"].wrap(),
                                                        boost::none);
@@ -2776,10 +2799,11 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
 
         wuow.commit();
 
-        // Retrieve the oplog entries. We expect 'docsToBeBatched' oplog entries because of previous
-        // iteration of this loop that exercised previous batch sizes.
+        // Retrieve the oplog entries. We expect 'docsToBeBatched' oplog entries because of
+        // previous iteration of this loop that exercised previous batch sizes.
         std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, docsToBeBatched);
-        // Entries in ascending timestamp order, so fetch the last one at the back of the vector.
+        // Entries in ascending timestamp order, so fetch the last one at the back of the
+        // vector.
         auto lastOplogEntry = oplogs.back();
         auto lastOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.back()));
 
@@ -2801,8 +2825,8 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     }
 }
 
-// Verifies that a WriteUnitOfWork with groupOplogEntries=true constisting of an insert, an update
-// and a delete replicates as a single applyOps.
+// Verifies that a WriteUnitOfWork with groupOplogEntries=true constisting of an insert, an
+// update and a delete replicates as a single applyOps.
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
     // Setup.
     auto opCtxRaii = cc().makeOperationContext();
@@ -2836,10 +2860,12 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
     }
     // (2) Update
     {
-        CollectionUpdateArgs collUpdateArgs;
+        const auto criteria = BSON("_id" << 2);
+        const auto preImageDoc = criteria;
+        CollectionUpdateArgs collUpdateArgs{preImageDoc};
+        collUpdateArgs.criteria = criteria;
         collUpdateArgs.update = BSON("fieldToUpdate"
                                      << "valueToUpdate");
-        collUpdateArgs.criteria = BSON("_id" << 2);
         auto args = OplogUpdateEntryArgs(&collUpdateArgs, *autoColl);
         opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, args);
     }
@@ -2852,8 +2878,8 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
     auto lastOplogEntry = oplogs.back();
     auto lastOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.back()));
 
-    // The batch consists of an applyOps, whose array contains the three writes issued within the
-    // WUOW.
+    // The batch consists of an applyOps, whose array contains the three writes issued within
+    // the WUOW.
     ASSERT(lastOplogEntryParsed.getCommandType() == OplogEntry::CommandType::kApplyOps);
     std::vector<repl::OplogEntry> innerEntries;
     repl::ApplyOps::extractOperationsTo(
@@ -2923,10 +2949,12 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
     }
     // (2) Update
     {
-        CollectionUpdateArgs collUpdateArgs;
+        const auto criteria = BSON("_id" << 2);
+        const auto preImageDoc = criteria;
+        CollectionUpdateArgs collUpdateArgs{preImageDoc};
+        collUpdateArgs.criteria = criteria;
         collUpdateArgs.update = BSON("fieldToUpdate"
                                      << "valueToUpdate");
-        collUpdateArgs.criteria = BSON("_id" << 2);
         auto args = OplogUpdateEntryArgs(&collUpdateArgs, *autoColl);
         opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, args);
     }
@@ -2939,8 +2967,8 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
     auto lastOplogEntry = oplogs.back();
     auto lastOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.back()));
 
-    // The batch consists of an applyOps, whose array contains the three writes issued within the
-    // WUOW.
+    // The batch consists of an applyOps, whose array contains the three writes issued within
+    // the WUOW.
     ASSERT(lastOplogEntryParsed.getCommandType() == OplogEntry::CommandType::kApplyOps);
     std::vector<repl::OplogEntry> innerEntries;
     repl::ApplyOps::extractOperationsTo(
@@ -3027,8 +3055,8 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
     }
     wuow.commit();
 
-    // Retrieve the oplog entries, implicitly asserting that there's exactly one entry in the whole
-    // oplog.
+    // Retrieve the oplog entries, implicitly asserting that there's exactly one entry in the
+    // whole oplog.
     std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
     auto lastOplogEntry = oplogs.back();
     auto lastOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.back()));
@@ -3142,8 +3170,8 @@ protected:
             ASSERT(imageEntry.getImageKind() == repl::RetryImageEnum::kPreImage);
             ASSERT_BSONOBJ_EQ(_deletedDoc, imageEntry.getImage());
 
-            // If 'deleteOplogEntry' has opTime T, opTime T-1 must be reserved for potential forged
-            // noop oplog entry for the preImage written to the side collection.
+            // If 'deleteOplogEntry' has opTime T, opTime T-1 must be reserved for potential
+            // forged noop oplog entry for the preImage written to the side collection.
             const Timestamp forgeNoopTimestamp = deleteOplogEntry.getTimestamp() - 1;
             ASSERT_FALSE(findByTimestamp(oplogs, forgeNoopTimestamp));
         } else {
@@ -3383,8 +3411,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
                         << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 
-    // This should be the implicit commit oplog entry, indicated by the absence of the 'partialTxn'
-    // field.
+    // This should be the implicit commit oplog entry, indicated by the absence of the
+    // 'partialTxn' field.
     oExpected =
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
@@ -3402,22 +3430,26 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
     AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
 
-    CollectionUpdateArgs updateArgs1;
+    const auto criteria1 = BSON("_id" << 0);
+    const auto preImageDoc1 = criteria1;
+    CollectionUpdateArgs updateArgs1{preImageDoc1};
+    updateArgs1.criteria = criteria1;
     updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
                                         << "x");
     updateArgs1.update = BSON("$set" << BSON("data"
                                              << "x"));
-    updateArgs1.criteria = BSON("_id" << 0);
     OplogUpdateEntryArgs update1(&updateArgs1, *autoColl1);
 
-    CollectionUpdateArgs updateArgs2;
+    const auto criteria2 = BSON("_id" << 1);
+    const auto preImageDoc2 = criteria2;
+    CollectionUpdateArgs updateArgs2{preImageDoc2};
+    updateArgs2.criteria = criteria2;
     updateArgs2.stmtIds = {1};
     updateArgs2.updatedDoc = BSON("_id" << 1 << "data"
                                         << "y");
     updateArgs2.update = BSON("$set" << BSON("data"
                                              << "y"));
-    updateArgs2.criteria = BSON("_id" << 1);
     OplogUpdateEntryArgs update2(&updateArgs2, *autoColl2);
 
     opObserver().onUpdate(opCtx(), update1);
@@ -3449,8 +3481,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
                         << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
-    // This should be the implicit commit oplog entry, indicated by the absence of the 'partialTxn'
-    // field.
+    // This should be the implicit commit oplog entry, indicated by the absence of the
+    // 'partialTxn' field.
     oExpected =
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "u"
@@ -3503,8 +3535,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
                                      << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
-    // This should be the implicit commit oplog entry, indicated by the absence of the 'partialTxn'
-    // field.
+    // This should be the implicit commit oplog entry, indicated by the absence of the
+    // 'partialTxn' field.
     oExpected = oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                                << "d"
                                                                << "ns" << nss2.toString() << "ui"
@@ -3595,22 +3627,26 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
     AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
 
-    CollectionUpdateArgs updateArgs1;
+    const auto criteria1 = BSON("_id" << 0);
+    const auto preImageDoc1 = criteria1;
+    CollectionUpdateArgs updateArgs1{preImageDoc1};
+    updateArgs1.criteria = criteria1;
     updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
                                         << "x");
     updateArgs1.update = BSON("$set" << BSON("data"
                                              << "x"));
-    updateArgs1.criteria = BSON("_id" << 0);
     OplogUpdateEntryArgs update1(&updateArgs1, *autoColl1);
 
-    CollectionUpdateArgs updateArgs2;
+    const auto criteria2 = BSON("_id" << 1);
+    const auto preImageDoc2 = criteria2;
+    CollectionUpdateArgs updateArgs2{preImageDoc2};
+    updateArgs2.criteria = criteria2;
     updateArgs2.stmtIds = {1};
     updateArgs2.updatedDoc = BSON("_id" << 1 << "data"
                                         << "y");
     updateArgs2.update = BSON("$set" << BSON("data"
                                              << "y"));
-    updateArgs2.criteria = BSON("_id" << 1);
     OplogUpdateEntryArgs update2(&updateArgs2, *autoColl2);
 
     opObserver().onUpdate(opCtx(), update1);
@@ -4005,9 +4041,9 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedPackingTest) {
     ASSERT_EQ(insertEntry.getObject()["prepare"].boolean(), true);
 
     // If we are only going to write a single prepare oplog entry, but we have reserved multiple
-    // oplog slots, at T=1 and T=2, for example, then the 'prepare' oplog entry should be written at
-    // T=2 i.e. the last reserved slot.  In this case, the 'startOpTime' of the transaction should
-    // also be set to T=2, not T=1. We verify that below.
+    // oplog slots, at T=1 and T=2, for example, then the 'prepare' oplog entry should be
+    // written at T=2 i.e. the last reserved slot.  In this case, the 'startOpTime' of the
+    // transaction should also be set to T=2, not T=1. We verify that below.
     const auto startOpTime = prepareOpTime;
 
     const auto prepareTimestamp = prepareOpTime.getTimestamp();
@@ -4056,8 +4092,9 @@ class OpObserverLargeTransactionTest : public OpObserverTransactionTest {
 private:
     repl::ReplSettings createReplSettings() override {
         repl::ReplSettings settings;
-        // We need an oplog comfortably large enough to hold an oplog entry that exceeds the BSON
-        // size limit.  Otherwise we will get the wrong error code when trying to write one.
+        // We need an oplog comfortably large enough to hold an oplog entry that exceeds the
+        // BSON size limit.  Otherwise we will get the wrong error code when trying to write
+        // one.
         settings.setOplogSizeBytes(BSONObjMaxInternalSize + 2 * 1024 * 1024);
         settings.setReplSetString("mySet/node1:12345");
         return settings;
@@ -4065,15 +4102,15 @@ private:
 };
 
 // Tests that a large transaction may be committed.  This test creates a transaction with two
-// operations that together are just big enough to exceed the size limit, which should result in a
-// two oplog entry transaction.
+// operations that together are just big enough to exceed the size limit, which should result in
+// a two oplog entry transaction.
 TEST_F(OpObserverLargeTransactionTest, LargeTransactionCreatesMultipleOplogEntries) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
-    // This size is crafted such that two operations of this size are not too big to fit in a single
-    // oplog entry, but two operations plus oplog overhead are too big to fit in a single oplog
-    // entry.
+    // This size is crafted such that two operations of this size are not too big to fit in a
+    // single oplog entry, but two operations plus oplog overhead are too big to fit in a single
+    // oplog entry.
     constexpr size_t kHalfTransactionSize = BSONObjMaxInternalSize / 2 - 175;
     std::unique_ptr<uint8_t[]> halfTransactionData(new uint8_t[kHalfTransactionSize]());
     auto operation1 = repl::DurableOplogEntry::makeInsertOperation(
@@ -4129,8 +4166,8 @@ TEST_F(OpObserverTest, OnRollbackInvalidatesDefaultRWConcernCache) {
     ASSERT_EQ(Timestamp(10, 20), *origCachedDefaults.getUpdateOpTime());
     ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *origCachedDefaults.getUpdateWallClockTime());
 
-    // Change the mock's defaults, but don't invalidate the cache yet. The cache should still return
-    // the original defaults.
+    // Change the mock's defaults, but don't invalidate the cache yet. The cache should still
+    // return the original defaults.
     {
         RWConcernDefault newDefaults;
         newDefaults.setUpdateOpTime(Timestamp(50, 20));

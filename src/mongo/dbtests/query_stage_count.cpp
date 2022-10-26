@@ -124,7 +124,7 @@ public:
     void update(const RecordId& oldrecordId, const BSONObj& newDoc) {
         WriteUnitOfWork wunit(&_opCtx);
         BSONObj oldDoc = _coll->getRecordStore()->dataFor(&_opCtx, oldrecordId).releaseToBson();
-        CollectionUpdateArgs args;
+        CollectionUpdateArgs args{oldDoc};
         collection_internal::updateDocument(
             &_opCtx,
             _coll,

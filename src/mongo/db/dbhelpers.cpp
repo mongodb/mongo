@@ -384,7 +384,7 @@ bool Helpers::findByIdAndNoopUpdate(OperationContext* opCtx,
     // BSONObj because that's a second way OpObserverImpl::onUpdate() detects and ignores no-op
     // updates.
     repl::UnreplicatedWritesBlock uwb(opCtx);
-    CollectionUpdateArgs args;
+    CollectionUpdateArgs args(snapshottedDoc.value());
     args.criteria = idQuery;
     args.update = BSONObj();
     collection_internal::updateDocument(

@@ -3184,14 +3184,14 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
         "storeFindAndModifyImagesInSideCollection", true);
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
     CollectionWriter collection(_opCtx, autoColl);
+    const auto criteria = BSON("_id" << 0);
     const auto newObj = BSON("_id" << 0 << "a" << 1 << "b" << 1);
-    CollectionUpdateArgs args;
+    CollectionUpdateArgs args{oldObj};
+    args.criteria = criteria;
     args.stmtIds = {1};
-    args.preImageDoc = oldObj;
     args.updatedDoc = newObj;
     args.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
     args.update = BSON("$set" << BSON("b" << 1));
-    args.criteria = BSON("_id" << 0);
     args.retryableWrite = true;
 
     {
@@ -3242,14 +3242,14 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
     ASSERT_EQUALS(mmb::Document::kInPlaceEnabled, doc.getCurrentInPlaceMode());
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
     CollectionWriter collection(_opCtx, autoColl);
+    const auto criteria = BSON("_id" << 0);
     const auto newObj = BSON("_id" << 0 << "a" << 0);
-    CollectionUpdateArgs args;
+    CollectionUpdateArgs args{oldObj};
+    args.criteria = criteria;
     args.stmtIds = {1};
-    args.preImageDoc = oldObj;
     args.updatedDoc = newObj;
     args.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
     args.update = BSON("$set" << BSON("a" << 0));
-    args.criteria = BSON("_id" << 0);
     args.retryableWrite = true;
 
     {

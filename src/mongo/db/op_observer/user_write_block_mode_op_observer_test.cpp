@@ -85,7 +85,10 @@ protected:
 
         UserWriteBlockModeOpObserver opObserver;
         std::vector<InsertStatement> inserts;
-        CollectionUpdateArgs collectionUpdateArgs;
+        const auto criteria = BSON("_id" << 0);
+        const auto preImageDoc = criteria;
+        CollectionUpdateArgs collectionUpdateArgs{preImageDoc};
+        collectionUpdateArgs.criteria = criteria;
         collectionUpdateArgs.source =
             fromMigrate ? OperationSource::kFromMigrate : OperationSource::kStandard;
         OplogUpdateEntryArgs updateArgs(&collectionUpdateArgs, *autoColl);

@@ -447,9 +447,9 @@ void updateSessionEntry(OperationContext* opCtx,
                           << "session "_sd << sessionId << ", transaction "_sd << txnNum);
     }
 
-    CollectionUpdateArgs args;
-    args.update = updateMod;
+    CollectionUpdateArgs args{originalDoc};
     args.criteria = toUpdateIdDoc;
+    args.update = updateMod;
 
     // Specify indexesAffected = false because the sessions collection has two indexes: {_id: 1} and
     // {parentLsid: 1, _id.txnNumber: 1, _id: 1}, and none of the fields are mutable.

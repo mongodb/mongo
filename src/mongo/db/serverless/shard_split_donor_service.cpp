@@ -961,7 +961,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                                opCtx->recoveryUnit()->getSnapshotId(), originalStateDocBson);
                            invariant(!originalRecordId.isNull());
 
-                           CollectionUpdateArgs args;
+                           CollectionUpdateArgs args{originalSnapshot.value()};
                            args.criteria = BSON("_id" << uuid);
                            args.oplogSlots = {oplogSlot};
                            args.update = updatedStateDocBson;

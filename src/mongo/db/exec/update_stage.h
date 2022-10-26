@@ -165,14 +165,18 @@ private:
     void prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
 
     /**
-     * Returns true if the owning shard under the current key pattern would change as a result of
-     * the update, or if the destined recipient under the new shard key pattern from resharding
-     * would change as a result of the update, and returns false otherwise.
+     * Performs checks on whether the existing or new shard key fields would change the owning
+     * shard, including whether the owning shard under the current key pattern would change as a
+     * result of the update, or if the destined recipient under the new shard key pattern from
+     * resharding would change as a result of the update.
+     *
+     * Throws if the updated document does not have all of the shard key fields or no longer belongs
+     * to this shard.
      *
      * Accepting a 'newObjCopy' parameter is a performance enhancement for updates which weren't
      * performed in-place to avoid rendering a full copy of the updated document multiple times.
      */
-    bool checkUpdateChangesShardKeyFields(const boost::optional<BSONObj>& newObjCopy,
+    void checkUpdateChangesShardKeyFields(const boost::optional<BSONObj>& newObjCopy,
                                           const Snapshotted<BSONObj>& oldObj);
 
     /**
@@ -182,17 +186,14 @@ private:
      * doc no longer belongs to this shard, this means that one or more shard key field values have
      * been updated to a value belonging to a chunk that is not owned by this shard. We cannot apply
      * this update atomically.
-     *
-     * If the update changes shard key fields but the new shard key remains on the same node,
-     * returns true. If the update does not change shard key fields, returns false.
      */
-    bool wasExistingShardKeyUpdated(const ShardingWriteRouter& shardingWriteRouter,
-                                    const BSONObj& newObj,
-                                    const Snapshotted<BSONObj>& oldObj);
+    void checkUpdateChangesExistingShardKey(const ShardingWriteRouter& shardingWriteRouter,
+                                            const BSONObj& newObj,
+                                            const Snapshotted<BSONObj>& oldObj);
 
-    bool wasReshardingKeyUpdated(const ShardingWriteRouter& shardingWriteRouter,
-                                 const BSONObj& newObj,
-                                 const Snapshotted<BSONObj>& oldObj);
+    void checkUpdateChangesReshardingKey(const ShardingWriteRouter& shardingWriteRouter,
+                                         const BSONObj& newObj,
+                                         const Snapshotted<BSONObj>& oldObj);
 
     // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
     WorkingSetID _idRetrying;

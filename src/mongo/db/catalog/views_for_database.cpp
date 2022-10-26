@@ -323,9 +323,9 @@ Status ViewsForDatabase::_upsertIntoCatalog(OperationContext* opCtx,
             return status;
         }
     } else {
-        CollectionUpdateArgs args;
-        args.update = viewObj;
+        CollectionUpdateArgs args(oldView.value());
         args.criteria = BSON("_id" << NamespaceStringUtil::serialize(view.name()));
+        args.update = viewObj;
 
         collection_internal::updateDocument(opCtx,
                                             systemViews,

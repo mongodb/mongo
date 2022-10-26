@@ -588,11 +588,12 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
     // Simulate an update notification on the `config.collection_critical_sections` collection, that
     // is what a secondary node would receive when the primary node enters the commit phase of the
     // critical section.
+    auto preImageDoc = doc.toBSON();
     doc.setBlockReads(true);  // NOTE: This has no semantic effect as the critical section is
                               // promoted to any update event on the document!
                               // TODO (SERVER-71056): React to `blockReads` changes only.
     {
-        CollectionUpdateArgs updateArgs;
+        CollectionUpdateArgs updateArgs{preImageDoc};
         updateArgs.updatedDoc = doc.toBSON();
         OplogUpdateEntryArgs update(&updateArgs, criticalSectionColl());
 
@@ -632,6 +633,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
     // is what a secondary node would receive when the primary node enters the catch-up phase of the
     // critical section.
     auto doc = CollectionCriticalSectionDocument(collNss, collOpReason, false);
+    auto preImageDoc = doc.toBSON();
     {
         std::vector<InsertStatement> inserts;
         inserts.emplace_back(doc.toBSON());
@@ -657,7 +659,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
                               // promoted to any update event on the document!
                               // TODO (SERVER-71056): React to `blockReads` changes only.
     {
-        CollectionUpdateArgs updateArgs;
+        CollectionUpdateArgs updateArgs{preImageDoc};
         updateArgs.updatedDoc = doc.toBSON();
         OplogUpdateEntryArgs update(&updateArgs, criticalSectionColl());
 

@@ -652,7 +652,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                            return _stateDoc.toBSON();
                        }();
 
-                       CollectionUpdateArgs args;
+                       CollectionUpdateArgs args{originalSnapshot.value()};
                        args.criteria = BSON("_id" << _migrationUuid);
                        args.oplogSlots = {oplogSlot};
                        args.update = updatedStateDocBson;

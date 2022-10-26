@@ -111,13 +111,18 @@ protected:
         // invariant. This creates a confusing error log in the test output.
         test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, _opCtx.get());
 
-        CollectionUpdateArgs updateArgs;
+        const auto criteria = BSON("_id" << stateDocument.getId());
+        auto preImageDoc = defaultStateDocument();
+        preImageDoc.setState(ShardSplitDonorStateEnum::kBlocking);
+        preImageDoc.setBlockOpTime(repl::OpTime(Timestamp(1, 1), 1));
+
+        CollectionUpdateArgs updateArgs{preImageDoc.toBSON()};
+        updateArgs.criteria = criteria;
         updateArgs.stmtIds = {};
         updateArgs.updatedDoc = stateDocument.toBSON();
         updateArgs.update =
             BSON("$set" << BSON(ShardSplitDonorDocument::kStateFieldName
                                 << ShardSplitDonorState_serializer(stateDocument.getState())));
-        updateArgs.criteria = BSON("_id" << stateDocument.getId());
         AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
         OplogUpdateEntryArgs update(&updateArgs, *autoColl);
 
@@ -334,13 +339,15 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToAbortingIndexBuildsFail) {
     auto stateDocument = defaultStateDocument();
     stateDocument.setState(ShardSplitDonorStateEnum::kAbortingIndexBuilds);
 
-    CollectionUpdateArgs updateArgs;
+    const auto criteria = BSON("_id" << stateDocument.getId());
+    const auto preImageDoc = criteria;
+    CollectionUpdateArgs updateArgs{preImageDoc};
+    updateArgs.criteria = criteria;
     updateArgs.stmtIds = {};
     updateArgs.updatedDoc = stateDocument.toBSON();
     updateArgs.update =
         BSON("$set" << BSON(ShardSplitDonorDocument::kStateFieldName
                             << ShardSplitDonorState_serializer(stateDocument.getState())));
-    updateArgs.criteria = BSON("_id" << stateDocument.getId());
     AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
     OplogUpdateEntryArgs update(&updateArgs, *autoColl);
 

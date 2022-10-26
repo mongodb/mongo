@@ -815,8 +815,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         if (inRetryableInternalTransaction) {
             operation.setInitializedStatementIds(args.updateArgs->stmtIds);
             if (args.updateArgs->storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage) {
-                invariant(args.updateArgs->preImageDoc);
-                operation.setPreImage(args.updateArgs->preImageDoc->getOwned());
+                invariant(!args.updateArgs->preImageDoc.isEmpty());
+                operation.setPreImage(args.updateArgs->preImageDoc.getOwned());
                 operation.setPreImageRecordedForRetryableInternalTransaction();
                 if (args.retryableFindAndModifyLocation ==
                     RetryableFindAndModifyLocation::kSideCollection) {
@@ -835,8 +835,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         }
 
         if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection) {
-            invariant(args.updateArgs->preImageDoc);
-            operation.setPreImage(args.updateArgs->preImageDoc->getOwned());
+            invariant(!args.updateArgs->preImageDoc.isEmpty());
+            operation.setPreImage(args.updateArgs->preImageDoc.getOwned());
             operation.setChangeStreamPreImageRecordingMode(
                 ChangeStreamPreImageRecordingMode::kPreImagesCollection);
         }
@@ -877,7 +877,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             // If the oplog entry has `needsRetryImage`, copy the image into image collection.
             const BSONObj& dataImage = [&]() {
                 if (oplogEntry.getNeedsRetryImage().value() == repl::RetryImageEnum::kPreImage) {
-                    return args.updateArgs->preImageDoc.value();
+                    return args.updateArgs->preImageDoc;
                 } else {
                     return args.updateArgs->updatedDoc;
                 }
@@ -906,10 +906,10 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             args.updateArgs->source != OperationSource::kFromMigrate &&
             !args.coll->ns().isTemporaryReshardingCollection()) {
             const auto& preImageDoc = args.updateArgs->preImageDoc;
-            tassert(5868600, "PreImage must be set", preImageDoc && !preImageDoc.value().isEmpty());
+            tassert(5868600, "PreImage must be set", !preImageDoc.isEmpty());
 
             ChangeStreamPreImageId id(args.coll->uuid(), opTime.writeOpTime.getTimestamp(), 0);
-            ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc.value());
+            ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc);
 
             ChangeStreamPreImagesCollectionManager::insertPreImage(
                 opCtx, args.coll->ns().tenantId(), preImage);

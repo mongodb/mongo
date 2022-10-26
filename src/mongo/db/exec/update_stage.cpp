@@ -138,8 +138,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
     UpdateDriver* driver = _params.driver;
     CanonicalQuery* cq = _params.canonicalQuery;
 
-    // If asked to return new doc, default to the oldObj, in case nothing changes.
-    BSONObj newObj = oldObj.value();
+    const BSONObj& oldObjValue = oldObj.value();
 
     // Ask the driver to apply the mods. It may be that the driver can apply those "in
     // place", that is, some values of the old document just get adjusted without any
@@ -147,7 +146,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
     // is needed to accomodate the new bson layout of the resulting document. In any event,
     // only enable in-place mutations if the underlying storage engine offers support for
     // writing damage events.
-    _doc.reset(oldObj.value(),
+    _doc.reset(oldObjValue,
                (collection()->updateWithDamagesSupported()
                     ? mutablebson::Document::kInPlaceEnabled
                     : mutablebson::Document::kInPlaceDisabled));
@@ -191,7 +190,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
         matchDetails.requestElemMatchKey();
 
         dassert(cq);
-        verify(cq->root()->matchesBSON(oldObj.value(), &matchDetails));
+        verify(cq->root()->matchesBSON(oldObjValue, &matchDetails));
 
         std::string matchedField;
         if (matchDetails.hasElemMatchKey())
@@ -232,10 +231,13 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
         docWasModified = false;
     }
 
+    BSONObj newObj;
+
+
     if (docWasModified) {
         // Prepare to write back the modified document
         RecordId newRecordId;
-        CollectionUpdateArgs args;
+        CollectionUpdateArgs args{oldObjValue};
 
         if (!request->explain()) {
             args.stmtIds = request->getStmtIds();
@@ -245,18 +247,15 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                 auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(
                     opCtx(), collection()->ns());
                 auto collDesc = scopedCss->getCollectionDescription(opCtx());
-                args.criteria = collDesc.extractDocumentKey(newObj);
+                args.criteria = collDesc.extractDocumentKey(oldObjValue);
             } else {
-                const auto docId = newObj[idFieldName];
-                args.criteria = docId ? docId.wrap() : newObj;
+                const auto docId = oldObjValue[idFieldName];
+                args.criteria = docId ? docId.wrap() : oldObjValue;
             }
             uassert(16980,
                     "Multi-update operations require all documents to have an '_id' field",
                     !request->isMulti() || args.criteria.hasField("_id"_sd));
             args.storeDocOption = getStoreDocMode(*request);
-            if (args.storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage) {
-                args.preImageDoc = oldObj.value().getOwned();
-            }
         }
 
         // Ensure we set the type correctly
@@ -266,14 +265,12 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
 
         if (inPlace) {
             if (!request->explain()) {
-                newObj = oldObj.value();
                 const RecordData oldRec(oldObj.value().objdata(), oldObj.value().objsize());
 
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
-                if (_isUserInitiatedWrite &&
-                    checkUpdateChangesShardKeyFields(boost::none, oldObj) && !args.preImageDoc) {
-                    args.preImageDoc = oldObj.value().getOwned();
+                if (_isUserInitiatedWrite) {
+                    checkUpdateChangesShardKeyFields(boost::none /* newObj */, oldObj);
                 }
 
                 WriteUnitOfWork wunit(opCtx());
@@ -304,11 +301,9 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
             }
 
             if (!request->explain()) {
-                if (_isUserInitiatedWrite && checkUpdateChangesShardKeyFields(newObj, oldObj) &&
-                    !args.preImageDoc) {
-                    args.preImageDoc = oldObj.value().getOwned();
+                if (_isUserInitiatedWrite) {
+                    checkUpdateChangesShardKeyFields(newObj, oldObj);
                 }
-
                 WriteUnitOfWork wunit(opCtx());
                 newRecordId = collection_internal::updateDocument(opCtx(),
                                                                   collection(),
@@ -341,6 +336,13 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
     if (docWasModified || request->explain()) {
         _specificStats.nModified += _params.numStatsForDoc ? _params.numStatsForDoc(newObj) : 1;
     }
+
+    // If not modified or explaining only, then there are no changes, so default to
+    // returning oldObj.
+    if (!docWasModified || request->explain()) {
+        newObj = oldObjValue;
+    }
+    invariant(!newObj.isEmpty());
 
     return newObj;
 }
@@ -506,6 +508,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         // Ensure that the BSONObj underlying the WorkingSetMember is owned because saveState()
         // is allowed to free the memory.
         member->makeObjOwnedIfNeeded();
+        BSONObj oldObj = member->doc.value().toBson();
+        invariant(oldObj.isOwned());
 
         // Save state before making changes.
         handlePlanStageYield(expCtx(),
@@ -519,13 +523,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
                                  // yieldHandler
                                  std::terminate();
                              });
-
         // If we care about the pre-updated version of the doc, save it out here.
-        BSONObj oldObj;
         SnapshotId oldSnapshot = member->doc.snapshotId();
-        if (_params.request->shouldReturnOldDocs()) {
-            oldObj = member->doc.value().toBson().getOwned();
-        }
 
         BSONObj newObj;
 
@@ -536,8 +535,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
                 collection()->ns().ns(),
                 [&] {
                     // Do the update, get us the new version of the doc.
-                    newObj = transformAndUpdate(
-                        {oldSnapshot, member->doc.value().toBson()}, recordId, writeToOrphan);
+                    newObj = transformAndUpdate({oldSnapshot, oldObj}, recordId, writeToOrphan);
                     return PlanStage::NEED_TIME;
                 },
                 [&] {
@@ -567,7 +565,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         // Set member's obj to be the doc we want to return.
         if (_params.request->shouldReturnAnyDocs()) {
             if (_params.request->shouldReturnNewDocs()) {
-                member->resetDocument(opCtx()->recoveryUnit()->getSnapshotId(), newObj.getOwned());
+                member->resetDocument(opCtx()->recoveryUnit()->getSnapshotId(), newObj);
             } else {
                 invariant(_params.request->shouldReturnOldDocs());
                 member->resetDocument(oldSnapshot, oldObj);
@@ -722,21 +720,20 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     }
 }
 
-bool UpdateStage::wasReshardingKeyUpdated(const ShardingWriteRouter& shardingWriteRouter,
-                                          const BSONObj& newObj,
-                                          const Snapshotted<BSONObj>& oldObj) {
+void UpdateStage::checkUpdateChangesReshardingKey(const ShardingWriteRouter& shardingWriteRouter,
+                                                  const BSONObj& newObj,
+                                                  const Snapshotted<BSONObj>& oldObj) {
     const auto& collDesc = shardingWriteRouter.getCollDesc();
-    invariant(collDesc);
 
     auto reshardingKeyPattern = collDesc->getReshardingKeyIfShouldForwardOps();
     if (!reshardingKeyPattern)
-        return false;
+        return;
 
     auto oldShardKey = reshardingKeyPattern->extractShardKeyFromDoc(oldObj.value());
     auto newShardKey = reshardingKeyPattern->extractShardKeyFromDoc(newObj);
 
     if (newShardKey.binaryEqual(oldShardKey))
-        return false;
+        return;
 
     FieldRefSet shardKeyPaths(collDesc->getKeyPatternFields());
     _checkRestrictionsOnUpdatingShardKeyAreNotViolated(*collDesc, shardKeyPaths);
@@ -749,11 +746,9 @@ bool UpdateStage::wasReshardingKeyUpdated(const ShardingWriteRouter& shardingWri
             oldObj.value(), newObj, false /* upsert */, collection()->ns(), collection()->uuid()),
         "This update would cause the doc to change owning shards under the new shard key",
         oldRecipShard == newRecipShard);
-
-    return true;
 }
 
-bool UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj>& newObjCopy,
+void UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj>& newObjCopy,
                                                    const Snapshotted<BSONObj>& oldObj) {
     ShardingWriteRouter shardingWriteRouter(
         opCtx(), collection()->ns(), Grid::get(opCtx())->catalogCache());
@@ -762,7 +757,7 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj
 
     // css can be null when this is a config server.
     if (css == nullptr) {
-        return false;
+        return;
     }
 
     const auto collDesc = css->getCollectionDescription(opCtx());
@@ -771,25 +766,21 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj
     // can be expensive for larger documents, so we skip calling it when the collection isn't even
     // sharded.
     if (!collDesc.isSharded()) {
-        return false;
+        return;
     }
 
     const auto& newObj = newObjCopy ? *newObjCopy : _doc.getObject();
 
     // It is possible that both the existing and new shard keys are being updated, so we do not want
     // to short-circuit checking whether either is being modified.
-    bool existingShardKeyUpdated = wasExistingShardKeyUpdated(shardingWriteRouter, newObj, oldObj);
-    bool reshardingKeyUpdated = wasReshardingKeyUpdated(shardingWriteRouter, newObj, oldObj);
-
-    return existingShardKeyUpdated || reshardingKeyUpdated;
+    checkUpdateChangesExistingShardKey(shardingWriteRouter, newObj, oldObj);
+    checkUpdateChangesReshardingKey(shardingWriteRouter, newObj, oldObj);
 }
 
-bool UpdateStage::wasExistingShardKeyUpdated(const ShardingWriteRouter& shardingWriteRouter,
-                                             const BSONObj& newObj,
-                                             const Snapshotted<BSONObj>& oldObj) {
+void UpdateStage::checkUpdateChangesExistingShardKey(const ShardingWriteRouter& shardingWriteRouter,
+                                                     const BSONObj& newObj,
+                                                     const Snapshotted<BSONObj>& oldObj) {
     const auto& collDesc = shardingWriteRouter.getCollDesc();
-    invariant(collDesc);
-
     const auto& shardKeyPattern = collDesc->getShardKeyPattern();
 
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldObj.value());
@@ -799,7 +790,7 @@ bool UpdateStage::wasExistingShardKeyUpdated(const ShardingWriteRouter& sharding
     // Using BSONObj::binaryEqual() still allows a missing shard key field to be filled in with an
     // explicit null value.
     if (newShardKey.binaryEqual(oldShardKey)) {
-        return false;
+        return;
     }
 
     FieldRefSet shardKeyPaths(collDesc->getKeyPatternFields());
@@ -833,10 +824,6 @@ bool UpdateStage::wasExistingShardKeyUpdated(const ShardingWriteRouter& sharding
                                              collection()->uuid()),
                   "This update would cause the doc to change owning shards");
     }
-
-    // We passed all checks, so we will return that this update changes the shard key field, and
-    // the updated document will remain on the same node.
-    return true;
 }
 
 }  // namespace mongo

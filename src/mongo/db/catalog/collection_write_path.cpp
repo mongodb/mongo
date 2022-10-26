@@ -446,12 +446,6 @@ RecordId updateDocument(OperationContext* opCtx,
     if (!oldId.eoo() && SimpleBSONElementComparator::kInstance.evaluate(oldId != newDoc["_id"]))
         uasserted(13596, "in Collection::updateDocument _id mismatch");
 
-    // The preImageDoc may not be boost::none if this update was a retryable findAndModify or if
-    // the update may have changed the shard key. For non-in-place updates we always set the
-    // preImageDoc here to an owned copy of the pre-image.
-    if (!args->preImageDoc) {
-        args->preImageDoc = oldDoc.value().getOwned();
-    }
     args->changeStreamPreAndPostImagesEnabledForCollection =
         collection->isChangeStreamPreAndPostImagesEnabled();
 
@@ -485,7 +479,7 @@ RecordId updateDocument(OperationContext* opCtx,
 
         uassertStatusOK(collection->getIndexCatalog()->updateRecord(opCtx,
                                                                     collection,
-                                                                    *args->preImageDoc,
+                                                                    args->preImageDoc,
                                                                     newDoc,
                                                                     oldLocation,
                                                                     &keysInserted,
@@ -525,12 +519,6 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
     invariant(oldDoc.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
     invariant(collection->updateWithDamagesSupported());
 
-    // For in-place updates we need to grab an owned copy of the pre-image doc if pre-image
-    // recording is enabled and we haven't already set the pre-image due to this update being
-    // a retryable findAndModify or a possible update to the shard key.
-    if (!args->preImageDoc && collection->isChangeStreamPreAndPostImagesEnabled()) {
-        args->preImageDoc = oldDoc.value().getOwned();
-    }
     OplogUpdateEntryArgs onUpdateArgs(args, collection);
     const bool setNeedsRetryImageOplogField =
         args->storeDocOption != CollectionUpdateArgs::StoreDocOption::None;

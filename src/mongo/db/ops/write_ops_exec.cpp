@@ -1439,12 +1439,11 @@ Status performAtomicTimeseriesWrites(
 
         auto original = coll->docFor(opCtx, recordId);
 
-        CollectionUpdateArgs args;
+        CollectionUpdateArgs args{original.value()};
+        args.criteria = update.getQ();
         if (const auto& stmtIds = op.getStmtIds()) {
             args.stmtIds = *stmtIds;
         }
-        args.preImageDoc = original.value();
-        args.criteria = update.getQ();
         args.source = OperationSource::kTimeseriesInsert;
 
         BSONObj updated;

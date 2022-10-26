@@ -277,7 +277,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
     {
         WriteUnitOfWork wuow(opCtx);
         Snapshotted<BSONObj> oldSnap(opCtx->recoveryUnit()->getSnapshotId(), oldDoc);
-        CollectionUpdateArgs args;
+        CollectionUpdateArgs args{oldDoc};
         collection_internal::updateDocument(
             opCtx, coll, oldRecordId, oldSnap, newDoc, true, nullptr, &args);
         wuow.commit();
@@ -321,7 +321,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
     {
         WriteUnitOfWork wuow(opCtx);
         Snapshotted<BSONObj> oldSnap(opCtx->recoveryUnit()->getSnapshotId(), oldDoc);
-        CollectionUpdateArgs args;
+        CollectionUpdateArgs args{oldDoc};
         auto newDocStatus =
             collection_internal::updateDocumentWithDamages(opCtx,
                                                            coll,

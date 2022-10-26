@@ -397,7 +397,7 @@ public:
         auto newDoc = [&](const Snapshotted<BSONObj>& oldDoc) {
             return BSON("_id" << oldDoc.value()["_id"] << "foo" << limit() + 10);
         };
-        CollectionUpdateArgs args;
+        CollectionUpdateArgs args{oldDoc.value()};
         {
             WriteUnitOfWork wuow(&_opCtx);
             collection_internal::updateDocument(
