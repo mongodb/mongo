@@ -692,6 +692,44 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteMaxesOutRetriableErrorsAllo
     future.default_timed_get();
 }
 
+TEST_F(EstablishCursorsTest, MultipleRemotesAllMaxOutRetriableErrorsAllowPartialResults) {
+    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
+    std::vector<std::pair<ShardId, BSONObj>> remotes{
+        {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
+
+    // Failure to establish a cursor due to maxing out retriable errors on all three remotes
+    // returns an error, despite allowPartialResults being true.
+    auto future = launchAsync([&] {
+        auto cursors = establishCursors(operationContext(),
+                                        executor(),
+                                        _nss,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        remotes,
+                                        true);  // allowPartialResults
+        // allowPartialResults is true so ignore the fact that all remotes will haved failed
+        // to establish a cursor due to maxing out retriable errors. The cursor entry
+        // is marked as 'partialResultReturned:true', with a CursorId of 0 and no HostAndPort.
+        ASSERT_EQ(remotes.size(), cursors.size());
+        for (auto&& cursor : cursors) {
+            ASSERT(cursor.getHostAndPort().empty());
+            ASSERT(cursor.getCursorResponse().getPartialResultsReturned());
+            ASSERT_EQ(cursor.getCursorResponse().getCursorId(), CursorId{0});
+        }
+    });
+
+    // All remotes always respond with retriable errors.
+    for (auto it = remotes.begin(); it != remotes.end(); ++it) {
+        for (int i = 0; i < kMaxRetries + 1; ++i) {
+            onCommand([&](const RemoteCommandRequest& request) {
+                ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+                return Status(ErrorCodes::HostUnreachable, "host unreachable");
+            });
+        }
+    }
+
+    future.default_timed_get();
+}
+
 TEST_F(EstablishCursorsTest, InterruptedWithDanglingRemoteRequest) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{

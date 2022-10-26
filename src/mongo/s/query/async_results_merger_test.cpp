@@ -978,6 +978,60 @@ TEST_F(AsyncResultsMergerTest, KillCursorCmdHasNoTimeout) {
     killFuture.wait();
 }
 
+TEST_F(AsyncResultsMergerTest, KillBeforeNext) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // Mark the OperationContext as killed from this thread.
+    {
+        stdx::lock_guard<Client> lk(*operationContext()->getClient());
+        operationContext()->markKilled(ErrorCodes::Interrupted);
+    }
+
+    // Issue a blocking wait for the next result asynchronously on a different thread.
+    auto future = launchAsync([&]() {
+        auto nextStatus = arm->nextEvent();
+        ASSERT_EQ(nextStatus.getStatus(), ErrorCodes::Interrupted);
+    });
+
+    // Wait for the merger to be interrupted.
+    future.default_timed_get();
+
+    // Kill should complete.
+    auto killFuture = arm->kill(operationContext());
+    killFuture.wait();
+}
+
+TEST_F(AsyncResultsMergerTest, KillBeforeNextWithTwoRemotes) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // Mark the OperationContext as killed from this thread.
+    {
+        stdx::lock_guard<Client> lk(*operationContext()->getClient());
+        operationContext()->markKilled(ErrorCodes::Interrupted);
+    }
+
+    // Issue a blocking wait for the next result asynchronously on a different thread.
+    auto future = launchAsync([&]() {
+        auto nextStatus = arm->nextEvent();
+        ASSERT_EQ(nextStatus.getStatus(), ErrorCodes::Interrupted);
+    });
+
+    // Wait for the merger to be interrupted.
+    future.default_timed_get();
+
+    // Kill should complete.
+    auto killFuture = arm->kill(operationContext());
+    killFuture.wait();
+}
+
 TEST_F(AsyncResultsMergerTest, TailableBasic) {
     BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
     std::vector<RemoteCursor> cursors;
@@ -1252,6 +1306,110 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResultsOnRetriableErrorNoRetries) {
 
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
 
+    ASSERT_TRUE(arm->remotesExhausted());
+    ASSERT_TRUE(arm->ready());
+}
+
+TEST_F(AsyncResultsMergerTest, MaxTimeMSExpiredAllowPartialResultsTrue) {
+    BSONObj findCmd = BSON("find"
+                           << "testcoll"
+                           << "allowPartialResults" << true);
+    std::vector<RemoteCursor> cursors;
+    // Two shards.
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // First host returns single result.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
+    responses.emplace_back(kTestNss, CursorId(0), batch);
+    scheduleNetworkResponses(std::move(responses));
+
+    // From the second host we get a MaxTimeMSExpired error.
+    scheduleErrorResponse({ErrorCodes::MaxTimeMSExpired, "MaxTimeMSExpired"});
+
+    executor()->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(arm->partialResultsReturned());
+    ASSERT_TRUE(arm->remotesExhausted());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
+    ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
+}
+
+TEST_F(AsyncResultsMergerTest, MaxTimeMSExpiredAllowPartialResultsFalse) {
+    BSONObj findCmd = BSON("find"
+                           << "testcoll"
+                           << "allowPartialResults" << false);
+    std::vector<RemoteCursor> cursors;
+    // two shards
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // First host returns single result
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
+    responses.emplace_back(kTestNss, CursorId(0), batch);
+    scheduleNetworkResponses(std::move(responses));
+
+    // From the second host we get a MaxTimeMSExpired error.
+    scheduleErrorResponse({ErrorCodes::MaxTimeMSExpired, "MaxTimeMSExpired"});
+
+    executor()->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    auto statusWithNext = arm->nextReady();
+    ASSERT(!statusWithNext.isOK());
+    ASSERT_EQ(statusWithNext.getStatus().code(), ErrorCodes::MaxTimeMSExpired);
+    // Required to kill the 'arm' on error before destruction.
+    auto killFuture = arm->kill(operationContext());
+    killFuture.wait();
+}
+
+TEST_F(AsyncResultsMergerTest, AllowPartialResultsOnMaxTimeMSExpiredThenLateData) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', allowPartialResults: true}");
+    std::vector<RemoteCursor> cursors;
+    // two shards
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // From the first host we get a MaxTimeMSExpired error.
+    scheduleErrorResponse({ErrorCodes::MaxTimeMSExpired, "MaxTimeMSExpired"});
+
+    // Second host returns single result *after* first host times out.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
+    responses.emplace_back(kTestNss, CursorId(0), batch);
+    scheduleNetworkResponses(std::move(responses));
+
+    executor()->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(arm->partialResultsReturned());
     ASSERT_TRUE(arm->remotesExhausted());
     ASSERT_TRUE(arm->ready());
 }

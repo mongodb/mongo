@@ -270,10 +270,11 @@ void CursorEstablisher::_handleFailure(const AsyncRequestsSender::Response& resp
         return;
     }
 
-    // Retriable errors are swallowed if '_allowPartialResults' is true. Targeting shard replica
-    // sets can also throw FailedToSatisfyReadPreference, so we swallow it too.
+    // If '_allowPartialResults' is true then swallow retriable errors, maxTimeMSExpired, and
+    // FailedToSatisfyReadPreference errors we might get when targeting shard replica sets.
     bool isEligibleException = (isMongosRetriableError(status.code()) ||
-                                status.code() == ErrorCodes::FailedToSatisfyReadPreference);
+                                status.code() == ErrorCodes::FailedToSatisfyReadPreference ||
+                                status.code() == ErrorCodes::MaxTimeMSExpired);
     if (_allowPartialResults && isEligibleException) {
         // This exception is eligible to be swallowed. Add an entry with a cursorID of 0, an
         // empty HostAndPort, and which has the 'partialResultsReturned' flag set to true.

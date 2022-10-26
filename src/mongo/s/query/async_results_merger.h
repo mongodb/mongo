@@ -299,8 +299,9 @@ private:
         // The identity of the shard which the cursor belongs to.
         ShardId shardId;
 
-        // This flag is set if the connection to the remote shard was lost, or never established in
-        // the first place. Only applicable if the 'allowPartialResults' option is enabled.
+        // This flag is set if the connection to the remote shard was lost or never established in
+        // the first place or the connection is interrupted due to MaxTimeMSExpired.
+        // Only applicable if the 'allowPartialResults' option is enabled.
         bool partialResultsReturned = false;
 
         // The buffer of results that have been retrieved but not yet returned to the caller.

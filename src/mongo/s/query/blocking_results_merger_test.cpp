@@ -196,6 +196,10 @@ TEST_F(ResultsMergerTestFixture, ShouldBeInterruptibleDuringBlockingNext) {
         ASSERT_EQ(nextStatus.getStatus(), ErrorCodes::Interrupted);
     });
 
+    // Sleep to allow the blockingMerger.next() thread to started.  If the thread is not started
+    // even after the sleep, then it's the same test as ShouldBeInterruptibleBeforeBlockingNext.
+    sleepmillis(10);
+
     // Now mark the OperationContext as killed from this thread.
     {
         stdx::lock_guard<Client> lk(*operationContext()->getClient());
@@ -218,6 +222,33 @@ TEST_F(ResultsMergerTestFixture, ShouldBeInterruptibleDuringBlockingNext) {
     // schedule a response.
     runReadyCallbacks();
     future.default_timed_get();
+}
+
+TEST_F(ResultsMergerTestFixture, ShouldBeInterruptibleBeforeBlockingNext) {
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto params = makeARMParamsFromExistingCursors(std::move(cursors));
+    BlockingResultsMerger blockingMerger(
+        operationContext(), std::move(params), executor(), nullptr);
+
+    // Mark the OperationContext as killed from this thread.
+    {
+        stdx::lock_guard<Client> lk(*operationContext()->getClient());
+        operationContext()->markKilled(ErrorCodes::Interrupted);
+    }
+
+    // Issue a blocking wait for the next result asynchronously on a different thread.
+    auto future = launchAsync([&]() {
+        auto nextStatus = blockingMerger.next(operationContext());
+        ASSERT_EQ(nextStatus.getStatus(), ErrorCodes::Interrupted);
+    });
+
+    // Wait for the merger to be interrupted.
+    future.default_timed_get();
+
+    // Kill should complete.
+    blockingMerger.kill(operationContext());
 }
 
 TEST_F(ResultsMergerTestFixture, ShouldBeAbleToHandleExceptionWhenYielding) {

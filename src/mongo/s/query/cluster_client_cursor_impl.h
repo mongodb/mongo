@@ -177,6 +177,9 @@ private:
 
     // The number of batches returned by this cursor.
     std::uint64_t _nBatchesReturned = 0;
+
+    // Whether ClusterClientCursor::next() was interrupted due to MaxTimeMSExpired.
+    bool _maxTimeMSExpired = false;
 };
 
 }  // namespace mongo

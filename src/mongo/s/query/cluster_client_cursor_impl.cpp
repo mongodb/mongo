@@ -103,6 +103,7 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
     invariant(_opCtx);
     const auto interruptStatus = _opCtx->checkForInterruptNoAssert();
     if (!interruptStatus.isOK()) {
+        _maxTimeMSExpired |= (interruptStatus.code() == ErrorCodes::MaxTimeMSExpired);
         return interruptStatus;
     }
 
@@ -156,7 +157,8 @@ const PrivilegeVector& ClusterClientCursorImpl::getOriginatingPrivileges() const
 }
 
 bool ClusterClientCursorImpl::partialResultsReturned() const {
-    return _root->partialResultsReturned();
+    // We may have timed out in this layer, or within the plan tree waiting for results from shards.
+    return (_maxTimeMSExpired && _params.isAllowPartialResults) || _root->partialResultsReturned();
 }
 
 std::size_t ClusterClientCursorImpl::getNumRemotes() const {

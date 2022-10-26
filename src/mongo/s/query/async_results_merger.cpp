@@ -500,11 +500,24 @@ Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
     // Before scheduling more work, check whether the cursor has been invalidated.
     _assertNotInvalidated(lk);
 
+    // Reveal opCtx errors (such as MaxTimeMSExpired) and reflect them in the remote status.
+    invariant(_opCtx, "Cannot schedule a getMore without an OperationContext");
+    const auto interruptStatus = _opCtx->checkForInterruptNoAssert();
+    if (!interruptStatus.isOK()) {
+        for (size_t i = 0; i < _remotes.size(); ++i) {
+            if (!_remotes[i].exhausted()) {
+                _cleanUpFailedBatch(lk, interruptStatus, i);
+            }
+        }
+        return interruptStatus;
+    }
+
     // Schedule remote work on hosts for which we need more results.
     for (size_t i = 0; i < _remotes.size(); ++i) {
         auto& remote = _remotes[i];
 
         if (!remote.status.isOK()) {
+            _cleanUpFailedBatch(lk, remote.status, i);
             return remote.status;
         }
 

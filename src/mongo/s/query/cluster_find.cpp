@@ -314,13 +314,10 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
             establishCursorsOnShards({cm.dbPrimary()});
             MONGO_UNREACHABLE;
         }
-
         throw;
     }
 
-
     // Determine whether the cursor we may eventually register will be single- or multi-target.
-
     const auto cursorType = params.remotes.size() > 1
         ? ClusterCursorManager::CursorType::MultiTarget
         : ClusterCursorManager::CursorType::SingleTarget;
@@ -335,7 +332,6 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     }
 
     // Transfer the established cursors to a ClusterClientCursor.
-
     auto ccc = ClusterClientCursorImpl::make(
         opCtx, Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
 
@@ -343,16 +339,66 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     FindCommon::waitInFindBeforeMakingBatch(opCtx, query);
 
+    // If we're allowing partial results and we got MaxTimeMSExpired, then temporarily disable
+    // interrupts in the opCtx so that we can pull already-fetched data from ClusterClientCursor.
+    bool ignoringInterrupts = false;
+    if (findCommand.getAllowPartialResults() &&
+        opCtx->checkForInterruptNoAssert().code() == ErrorCodes::MaxTimeMSExpired) {
+        // MaxTimeMS is expired, but perhaps remotes not have expired their requests yet.
+        // Wait for all remote cursors to be exhausted so that we can safely disable interrupts
+        // in the opCtx.  We want to be sure that later calls to ccc->next() do not block on
+        // more data.
+
+        // Maximum number of 1ms sleeps to wait for remote cursors to be exhausted.
+        constexpr int kMaxAttempts = 10;
+        for (int remainingAttempts = kMaxAttempts; !ccc->remotesExhausted(); remainingAttempts--) {
+            if (!remainingAttempts) {
+                LOGV2_DEBUG(
+                    5746900,
+                    0,
+                    "MaxTimeMSExpired error was seen on the router, but partial results cannot be "
+                    "returned because the remotes did not give the expected MaxTimeMS error within "
+                    "kMaxAttempts.");
+                // Reveal the MaxTimeMSExpired error.
+                opCtx->checkForInterrupt();
+            }
+            stdx::this_thread::sleep_for(stdx::chrono::milliseconds(1));
+        }
+
+        // The first MaxTimeMSExpired will have called opCtx->markKilled() so any later
+        // call to opCtx->checkForInterruptNoAssert() will return an error.  We need to
+        // temporarily ignore this while we pull data from the ClusterClientCursor.
+        LOGV2_DEBUG(
+            5746901,
+            0,
+            "Attempting to return partial results because MaxTimeMS expired and the query set "
+            "AllowPartialResults. Temporarily disabling interrupts on the OperationContext "
+            "while partial results are pulled from the ClusterClientCursor.");
+        opCtx->setIgnoreInterruptsExceptForReplStateChange(true);
+        ignoringInterrupts = true;
+    }
+
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     size_t bytesBuffered = 0;
 
-    // This loop will not result in actually calling getMore against shards, but just loading
-    // results from the initial batches (that were obtained while establishing cursors) into
-    // 'results'.
+    // This loop will load enough results from the shards for a full first batch.  At first, these
+    // results come from the initial batches that were obtained when establishing cursors, but
+    // ClusterClientCursor::next will fetch further results if necessary.
     while (!FindCommon::enoughForFirstBatch(findCommand, results->size())) {
-        auto next = uassertStatusOK(ccc->next());
-
-        if (next.isEOF()) {
+        auto nextWithStatus = ccc->next();
+        if (findCommand.getAllowPartialResults() &&
+            (nextWithStatus.getStatus() == ErrorCodes::MaxTimeMSExpired)) {
+            if (ccc->remotesExhausted()) {
+                cursorState = ClusterCursorManager::CursorState::Exhausted;
+                break;
+            }
+            // Continue because there may be results waiting from other remotes.
+            continue;
+        } else {
+            // all error statuses besides permissible remote timeouts should be returned to the user
+            uassertStatusOK(nextWithStatus);
+        }
+        if (nextWithStatus.getValue().isEOF()) {
             // We reached end-of-stream. If the cursor is not tailable, then we mark it as
             // exhausted. If it is tailable, usually we keep it open (i.e. "NotExhausted") even
             // when we reach end-of-stream. However, if all the remote cursors are exhausted, there
@@ -363,7 +409,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
             break;
         }
 
-        auto nextObj = *next.getResult();
+        auto nextObj = *(nextWithStatus.getValue().getResult());
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
@@ -378,6 +424,19 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         results->push_back(std::move(nextObj));
     }
 
+    if (ignoringInterrupts) {
+        opCtx->setIgnoreInterruptsExceptForReplStateChange(false);
+        ignoringInterrupts = false;
+        LOGV2_DEBUG(5746902, 0, "Re-enabled interrupts on the OperationContext.");
+    }
+
+    // Surface any opCtx interrupts, except ignore MaxTimeMSExpired with allowPartialResults.
+    auto interruptStatus = opCtx->checkForInterruptNoAssert();
+    if (!(interruptStatus.code() == ErrorCodes::MaxTimeMSExpired &&
+          findCommand.getAllowPartialResults())) {
+        uassertStatusOK(interruptStatus);
+    }
+
     ccc->detachFromOperationContext();
 
     if (findCommand.getSingleBatch() && !ccc->isTailable()) {
@@ -390,6 +449,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     // If the caller wants to know whether the cursor returned partial results, set it here.
     if (partialResultsReturned) {
+        // Missing results can come either from the first batches or from the ccc's later batches.
         *partialResultsReturned = ccc->partialResultsReturned();
     }
 
@@ -811,6 +871,16 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         }
 
         if (!next.isOK()) {
+            if (next.getStatus() == ErrorCodes::MaxTimeMSExpired &&
+                pinnedCursor.getValue()->partialResultsReturned()) {
+                // Break to return partial results rather than return a MaxTimeMSExpired error
+                cursorState = ClusterCursorManager::CursorState::Exhausted;
+                LOGV2_DEBUG(5746903,
+                            0,
+                            "Attempting to return partial results because MaxTimeMS expired and "
+                            "the query set AllowPartialResults.");
+                break;
+            }
             return next.getStatus();
         }
 
