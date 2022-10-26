@@ -19,14 +19,16 @@ function verifyChangeCollectionEntries(
                              .toArray();
 
     // Fetch all documents from the tenant's change collection for the specified timestamp window.
-    const changeColl =
-        ChangeStreamMultitenantReplicaSetTest.getTenantConnection(connection.host, tenantId)
-            .getDB("config")
-            .system.change_collection;
     const changeCollectionEntries =
-        changeColl
-            .find({$and: [{_id: {$gt: startOplogTimestamp}}, {_id: {$lte: endOplogTimestamp}}]})
-            .toArray();
+        assert
+            .commandWorked(connection.getDB("config").runCommand({
+                find: "system.change_collection",
+                filter:
+                    {$and: [{_id: {$gt: startOplogTimestamp}}, {_id: {$lte: endOplogTimestamp}}]},
+                batchSize: 1000000,
+                $tenant: tenantId
+            }))
+            .cursor.firstBatch;
 
     // Verify that the number of documents returned by the oplog and the tenant's change collection
     // are exactly the same.
@@ -88,26 +90,37 @@ class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
     }
 
     // Returns a connection to the 'hostAddr' with 'tenantId' stamped to it for the created user.
-    static getTenantConnection(hostAddr, tenantId, createUser = {
-        user: ObjectId().str,
-        roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]
-    }) {
+    static getTenantConnection(hostAddr,
+                               tenantId,
+                               user = ObjectId().str,
+                               userRoles = [{role: 'readWriteAnyDatabase', db: 'admin'}]) {
         const tokenConn = new Mongo(hostAddr);
+
+        // This method may be called on the secondary connection, as such, enable reading on the
+        // secondary. This will be no-op on the primary.
+        tokenConn.setSecondaryOk();
+
+        const adminDb = tokenConn.getDB("admin");
 
         // Login to the root user with 'ActionType::useTenant' such that the '$tenant' can be
         // used.
-        assert(tokenConn.getDB("admin").auth("root", "pwd"));
+        assert(adminDb.auth("root", "pwd"));
 
-        // Create the user with the provided attributes.
-        assert.commandWorked(tokenConn.getDB("$external").runCommand({
-            createUser: createUser.user,
-            '$tenant': tenantId,
-            roles: createUser.roles
-        }));
+        // Create the user with the provided roles if it does not exist.
+        const existingUser =
+            assert
+                .commandWorked(adminDb.runCommand(
+                    {find: "system.users", filter: {user: user}, $tenant: tenantId}))
+                .cursor.firstBatch;
+        if (existingUser.length === 0) {
+            assert.commandWorked(
+                tokenConn.getDB("$external")
+                    .runCommand({createUser: user, '$tenant': tenantId, roles: userRoles}));
+        }
 
         // Set the provided tenant id into the security token for the user.
         tokenConn._setSecurityToken(
-            _createSecurityToken({user: createUser.user, db: '$external', tenant: tenantId}));
+            _createSecurityToken({user: user, db: '$external', tenant: tenantId}));
 
         // Logout the root user to avoid multiple authentication.
         tokenConn.getDB("admin").logout();

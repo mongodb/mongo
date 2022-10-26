@@ -1,7 +1,6 @@
 // Tests that entries are written to the change collection for collection create, drop and document
 // modification operations.
 // @tags: [
-//   featureFlagMongoStore,
 //   requires_fcv_62,
 // ]
 (function() {
@@ -12,13 +11,10 @@ load("jstests/serverless/libs/change_collection_util.js");
 // For funWithArgs.
 load('jstests/libs/parallel_shell_helpers.js');
 
-// TODO SERVER-69115 Change to a 2-node replica set.
-const replSetTest = new ChangeStreamMultitenantReplicaSetTest({nodes: 1});
+const replSetTest = new ChangeStreamMultitenantReplicaSetTest({nodes: 2});
 
 const primary = replSetTest.getPrimary();
 const secondary = replSetTest.getSecondary();
-
-const testDb = primary.getDB("test");
 
 // Hard code tenants ids such that a particular tenant can be identified deterministically.
 const firstTenantId = ObjectId("6303b6bb84305d2266d0b779");
@@ -100,16 +96,14 @@ function getLatestTimestamp() {
     verifyChangeCollectionEntries(primary, startOplogTimestamp, endOplogTimestamp, firstTenantId);
     verifyChangeCollectionEntries(primary, startOplogTimestamp, endOplogTimestamp, secondTenantId);
 
-    // TODO SERVER-69115 Uncomment this.
-    /**
-    //Wait for the replication to finish.
+    // Wait for the replication to finish.
     replSetTest.awaitReplication();
+
     // Verify that both change collections captured their respective tenant's oplog entries in
     // the secondary.
     verifyChangeCollectionEntries(secondary, startOplogTimestamp, endOplogTimestamp, firstTenantId);
-    verifyChangeCollectionEntries(secondary, startOplogTimestamp, endOplogTimestamp,
-    secondTenantId);
-    */
+    verifyChangeCollectionEntries(
+        secondary, startOplogTimestamp, endOplogTimestamp, secondTenantId);
 })();
 
 // Test that transactional writes to two different change collections are isolated and that each
@@ -168,16 +162,14 @@ function getLatestTimestamp() {
     verifyChangeCollectionEntries(primary, startOplogTimestamp, endOplogTimestamp, firstTenantId);
     verifyChangeCollectionEntries(primary, startOplogTimestamp, endOplogTimestamp, secondTenantId);
 
-    // TODO SERVER-69115 Uncomment this.
-    /**
     // Wait for the replication to finish.
     replSetTest.awaitReplication();
+
     // Verify that both change collections captured their respective tenant's 'applyOps' oplog
     // entries in the secondary.
     verifyChangeCollectionEntries(secondary, startOplogTimestamp, endOplogTimestamp, firstTenantId);
-    verifyChangeCollectionEntries(secondary, startOplogTimestamp, endOplogTimestamp,
-    secondTenantId);
-    */
+    verifyChangeCollectionEntries(
+        secondary, startOplogTimestamp, endOplogTimestamp, secondTenantId);
 })();
 
 replSetTest.stopSet();

@@ -14,6 +14,10 @@ selector:
   # without supporting multi-tenancy.
   # TODO SERVER-67267 Add 'multitenancySupport' and inject tenant into find commands.
   - jstests/change_streams/change_streams_lookup_preimage_with_chunk_migration.js
+  # TODO SERVER-70760: This test creates its own sharded cluster and uses transaction. The support
+  #                    for transaction on multi-tenancy is not fully available. Unblock this test
+  #                    after the support is available.
+  - jstests/change_streams/oplog_rewrite/change_stream_basic_match_pushdown_rewrite.js
   exclude_with_any_tags:
   ##
   # The next tags correspond to the special errors thrown by the
@@ -65,5 +69,5 @@ executor:
         enableTestCommands: 1
         featureFlagServerlessChangeStreams: true
         internalChangeStreamUseTenantIdForTesting: true
-    # TODO SERVER-69115 Set number of nodes to 2 after oplog application is working properly.
+    # TODO SERVER-67267 Set number of nodes to 2 and pass multitenancy flags to the set_parameters.
     num_nodes: 1

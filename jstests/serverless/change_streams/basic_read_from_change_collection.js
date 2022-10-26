@@ -13,8 +13,7 @@ load("jstests/serverless/libs/change_collection_util.js");
 // For assertDropAndRecreateCollection.
 load("jstests/libs/collection_drop_recreate.js");
 
-// TODO SERVER-69115 Change to a 2-node replica set.
-const replSetTest = new ChangeStreamMultitenantReplicaSetTest({nodes: 1});
+const replSetTest = new ChangeStreamMultitenantReplicaSetTest({nodes: 2});
 const primary = replSetTest.getPrimary();
 
 // Hard code tenants id such that the tenant can be identified deterministically.

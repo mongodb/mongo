@@ -14,7 +14,7 @@ load("jstests/serverless/libs/change_collection_util.js");  // For verifyChangeC
 
 const replSetTest = new ReplSetTest({nodes: 1});
 
-// TODO SERVER-69115 Remove '__TEMPORARILY_DISABLED__  tag and replace 'ReplSetTest' with
+// TODO SERVER-70704 Remove '__TEMPORARILY_DISABLED__  tag and replace 'ReplSetTest' with
 // 'ChangeStreamMultitenantReplicaSetTest'.
 replSetTest.startSet({
     setParameter: {

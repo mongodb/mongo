@@ -2,7 +2,6 @@
 // collection.
 // @tags: [
 //   requires_fcv_62,
-//   __TEMPORARILY_DISABLED__
 // ]
 
 (function() {
@@ -11,24 +10,25 @@
 load("jstests/libs/fail_point_util.js");                    // For configureFailPoint.
 load("jstests/serverless/libs/change_collection_util.js");  // For verifyChangeCollectionEntries.
 
-const replSetTest = new ReplSetTest({nodes: 1});
+const replSetTest =
+    new ReplSetTest({nodes: 1, name: "ChangeStreamMultitenantReplicaSetTest", serverless: true});
 
-// TODO SERVER-69115 Remove '__TEMPORARILY_DISABLED__ tag and replace 'ReplSetTest' with
-// 'ChangeStreamMultitenantReplicaSetTest'.
 replSetTest.startSet({
     setParameter: {
         featureFlagServerlessChangeStreams: true,
         multitenancySupport: true,
-        featureFlagMongoStore: true
+        featureFlagMongoStore: true,
+        featureFlagRequireTenantID: true
     }
 });
-
 replSetTest.initiate();
 
 let primary = replSetTest.getPrimary();
+const tenantId = ObjectId();
 
 // Enable the change stream to create the change collection.
-assert.commandWorked(primary.getDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
+assert.commandWorked(
+    primary.getDB("admin").runCommand({setChangeStreamState: 1, enabled: true, $tenant: tenantId}));
 
 // Insert a document to the collection and then capture the corresponding oplog timestamp. This
 // timestamp will be the start timestamp beyond (inclusive) which we will validate the oplog and the
@@ -44,42 +44,66 @@ const pauseCheckpointThreadFailPoint = configureFailPoint(primary, "pauseCheckpo
 pauseCheckpointThreadFailPoint.wait();
 
 // Insert a document to the collection.
-assert.commandWorked(primary.getDB("test").stockPrice.insert({_id: "mdb", price: 250}));
+assert.commandWorked(primary.getDB("test").runCommand(
+    {insert: "stockPrice", documents: [{_id: "mdb", price: 250}], $tenant: tenantId}));
 
 // Verify that the inserted document can be queried from the 'stockPrice', the 'oplog.rs', and
 // the 'system.change_collection'.
-assert.eq(primary.getDB("test").stockPrice.find({_id: "mdb", price: 250}).toArray().length, 1);
-assert.eq(primary.getDB("local")
-              .oplog.rs.find({ns: "test.stockPrice", o: {_id: "mdb", price: 250}})
-              .toArray()
-              .length,
+assert.eq(assert
+              .commandWorked(primary.getDB("test").runCommand(
+                  {find: "stockPrice", filter: {_id: "mdb", price: 250}, $tenant: tenantId}))
+              .cursor.firstBatch.length,
           1);
-assert.eq(primary.getDB("config")
-              .system.change_collection.find({ns: "test.stockPrice", o: {_id: "mdb", price: 250}})
-              .toArray()
-              .length,
+assert.eq(assert
+              .commandWorked(primary.getDB("local").runCommand(
+                  {find: "oplog.rs", filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}}}))
+              .cursor.firstBatch.length,
+          1);
+assert.eq(assert
+              .commandWorked(primary.getDB("config").runCommand({
+                  find: "system.change_collection",
+                  filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}},
+                  $tenant: tenantId
+              }))
+              .cursor.firstBatch.length,
           1);
 
 // Perform ungraceful shutdown of the primary node and do not clean the db path directory.
 replSetTest.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
 
 // Run a new mongoD instance with db path pointing to the replica set primary db directory.
-const standalone =
-    MongoRunner.runMongod({dbpath: primary.dbpath, noReplSet: true, noCleanData: true});
+const standalone = MongoRunner.runMongod({
+    setParameter: {
+        featureFlagServerlessChangeStreams: true,
+        multitenancySupport: true,
+        featureFlagMongoStore: true,
+        featureFlagRequireTenantID: true
+    },
+    dbpath: primary.dbpath,
+    noReplSet: true,
+    noCleanData: true
+});
 assert.neq(null, standalone, "Fail to restart the node as standalone");
 
 // Verify that the inserted document does not exist both in the 'stockPrice' and
 // the 'system.change_collection' but exists in the 'oplog.rs'.
-assert.eq(standalone.getDB("test").stockPrice.find({_id: "mdb", price: 250}).toArray().length, 0);
-assert.eq(standalone.getDB("local")
-              .oplog.rs.find({ns: "test.stockPrice", o: {_id: "mdb", price: 250}})
-              .toArray()
-              .length,
+assert.eq(assert
+              .commandWorked(standalone.getDB("test").runCommand(
+                  {find: "stockPrice", filter: {_id: "mdb", price: 250}, $tenant: tenantId}))
+              .cursor.firstBatch.length,
+          0);
+assert.eq(assert
+              .commandWorked(standalone.getDB("local").runCommand(
+                  {find: "oplog.rs", filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}}}))
+              .cursor.firstBatch.length,
           1);
-assert.eq(standalone.getDB("config")
-              .system.change_collection.find({ns: "test.stockPrice", o: {_id: "mdb", price: 250}})
-              .toArray()
-              .length,
+assert.eq(assert
+              .commandWorked(standalone.getDB("config").runCommand({
+                  find: "system.change_collection",
+                  filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}},
+                  $tenant: tenantId
+              }))
+              .cursor.firstBatch.length,
           0);
 
 // Stop the mongoD instance and do not clean the db directory.
@@ -88,22 +112,31 @@ MongoRunner.stopMongod(standalone, null, {noCleanData: true, skipValidation: tru
 // Start the replica set primary with the same db path.
 replSetTest.start(primary, {
     noCleanData: true,
+    serverless: true,
     setParameter: {
         featureFlagServerlessChangeStreams: true,
         multitenancySupport: true,
-        featureFlagMongoStore: true
+        featureFlagMongoStore: true,
+        featureFlagRequireTenantID: true
     }
 });
 
 primary = replSetTest.getPrimary();
 
-// Verify that the 'stockPrice' and the 'system.change_collection' now have the inserted document.
-// This document was inserted by applying oplog entries during the startup recovery.
-assert.eq(primary.getDB("test").stockPrice.find({_id: "mdb", price: 250}).toArray().length, 1);
-assert.eq(primary.getDB("config")
-              .system.change_collection.find({ns: "test.stockPrice", o: {_id: "mdb", price: 250}})
-              .toArray()
-              .length,
+// Verify that the 'stockPrice' and the 'system.change_collection' now have the inserted
+// document. This document was inserted by applying oplog entries during the startup recovery.
+assert.eq(assert
+              .commandWorked(primary.getDB("test").runCommand(
+                  {find: "stockPrice", filter: {_id: "mdb", price: 250}, $tenant: tenantId}))
+              .cursor.firstBatch.length,
+          1);
+assert.eq(assert
+              .commandWorked(primary.getDB("config").runCommand({
+                  find: "system.change_collection",
+                  filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}},
+                  $tenant: tenantId
+              }))
+              .cursor.firstBatch.length,
           1);
 
 // Get the oplog timestamp up to this point. All oplog entries upto this timestamp must exist in the
@@ -111,10 +144,9 @@ assert.eq(primary.getDB("config")
 const endTimestamp = primary.getDB("local").oplog.rs.find().toArray().at(-1).ts;
 assert(endTimestamp !== undefined);
 
-// Verify that the oplog and the change collection entries between the ['startTimestamp',
+// Verify that the oplog and the change collection entries between the ('startTimestamp',
 // 'endTimestamp'] window are exactly same and in the same order.
-// TODO SERVER-69115 Pass the tenant id to the 'verifyChangeCollectionEntries'.
-verifyChangeCollectionEntries(primary, startTimestamp, endTimestamp);
+verifyChangeCollectionEntries(primary, startTimestamp, endTimestamp, tenantId);
 
 replSetTest.stopSet();
 })();

@@ -8,6 +8,9 @@ selector:
   - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
   # TODO SERVER-68341: Implement enable/disable command for mongoQ in the serverless.
   - jstests/change_streams/projection_fakes_internal_event.js
+  # TODO SERVER-68557 This test list databases that does not work in the sharded-cluster. This test
+  #                   should be unblocked after the ticket is done.
+  - jstests/change_streams/does_not_implicitly_create_database.js
   exclude_with_any_tags:
   ##
   # The next tags correspond to the special errors thrown by the
@@ -22,6 +25,9 @@ selector:
   # This passthrough implicitly shards the accessed collections. Do not run tests that assume
   # unsharded collections.
   - assumes_unsharded_collection
+  # TODO SERVER-70760: The support for transaction in not fully available in multi-tenant sharded
+  #                    cluster. This tag should be removed after it is available.
+  - uses_transactions
 
 executor:
   archive:
@@ -64,5 +70,6 @@ executor:
     shard_options:
       mongod_options:
         set_parameters:
+        # TODO SERVER-67267 Pass multitenancy flags to the set_parameters.
           featureFlagServerlessChangeStreams: true
           internalChangeStreamUseTenantIdForTesting: true
