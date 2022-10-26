@@ -55,7 +55,7 @@ public:
 
     /**
      * Acquire the serverless lock for LockType and adds operationId to the set of
-     * instances tracked. Throws ConflictingOperationInProgress error if there is already an
+     * instances tracked. Throws ConflictingServerlessOperation error if there is already an
      * activeServerlessOperation in progress with a different namespace than operationNamespace.
      */
     void acquireLock(LockType lockType, const UUID& operationId);
