@@ -1336,11 +1336,15 @@ BucketCatalog::Bucket* BucketCatalog::_reopenBucket(Stripe* stripe,
         auto& archivedSet = setIt->second;
         if (auto bucketIt = archivedSet.find(bucket->getTime());
             bucketIt != archivedSet.end() && bucket->id() == bucketIt->second.bucketId) {
+            long long memory =
+                _marginalMemoryUsageForArchivedBucket(bucketIt->second, archivedSet.size() == 1);
             if (archivedSet.size() == 1) {
                 stripe->archivedBuckets.erase(setIt);
             } else {
                 archivedSet.erase(bucketIt);
             }
+            _memoryUsage.fetchAndSubtract(memory);
+            _numberOfActiveBuckets.fetchAndSubtract(1);
         }
     }
 
@@ -1648,11 +1652,15 @@ boost::optional<OID> BucketCatalog::_findArchivedCandidate(Stripe* stripe,
             if (state) {
                 _bucketStateManager.eraseBucketState(candidateBucket.bucketId);
             }
+            long long memory =
+                _marginalMemoryUsageForArchivedBucket(candidateBucket, archivedSet.size() == 1);
             if (archivedSet.size() == 1) {
                 stripe->archivedBuckets.erase(setIt);
             } else {
                 archivedSet.erase(it);
             }
+            _memoryUsage.fetchAndSubtract(memory);
+            _numberOfActiveBuckets.fetchAndSubtract(1);
         }
     }
 
@@ -2027,10 +2035,12 @@ public:
         }
 
         auto counts = _getBucketCounts(bucketCatalog);
+        auto numActive = bucketCatalog._numberOfActiveBuckets.load();
         BSONObjBuilder builder;
-        builder.appendNumber("numBuckets", static_cast<long long>(counts.all));
+        builder.appendNumber("numBuckets", static_cast<long long>(numActive));
         builder.appendNumber("numOpenBuckets", static_cast<long long>(counts.open));
         builder.appendNumber("numIdleBuckets", static_cast<long long>(counts.idle));
+        builder.appendNumber("numArchivedBuckets", static_cast<long long>(numActive - counts.open));
         builder.appendNumber("memoryUsage",
                              static_cast<long long>(bucketCatalog._memoryUsage.load()));
 
