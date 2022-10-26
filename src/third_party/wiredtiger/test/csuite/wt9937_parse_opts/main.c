@@ -63,6 +63,18 @@ typedef struct {
 } FICTIONAL_OPTS;
 
 /*
+ * The values in this structure map directly to the values in TEST_OPTS that we expect to be
+ * modified by this program.
+ */
+typedef struct {
+    const char *build_dir;             /* Build directory path */
+    const char *tiered_storage_source; /* Tiered storage source */
+    bool tiered_storage;               /* Configure tiered storage */
+    bool verbose;                      /* Run in verbose mode */
+    uint64_t nthreads;                 /* Number of threads */
+} SUBSET_TEST_OPTS;
+
+/*
  * This drives the testing. For each given command_line, there is a matching expected TEST_OPTS
  * structure. When argv[0] is "parse_opts", we are driving testutil_parse_opts. If argv[0] is
  * "parse_single_opt", then we are parsing some of our "own" options, put into an FICTIONAL_OPTS
@@ -71,7 +83,7 @@ typedef struct {
  */
 typedef struct {
     const char *command_line[10];
-    TEST_OPTS expected;
+    SUBSET_TEST_OPTS subset_expected;
     FICTIONAL_OPTS fiction_expected;
 } TEST_DRIVER;
 
@@ -84,61 +96,38 @@ typedef struct {
  *  - our set of "fictional" arguments.
  *
  */
-#define UNUSED_OPTS 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 static TEST_DRIVER driver[] = {
-  {{"parse_opts", "-b", "builddir", "-T", "21", NULL},
-    {NULL, NULL, {0}, NULL, (char *)"builddir", NULL, TABLE_NOT_SET, NULL, NULL, false, false,
-      false, false, 0, 0, 21, UNUSED_OPTS},
+  {{"parse_opts", "-b", "builddir", "-T", "21", NULL}, {"builddir", NULL, false, false, 21},
     {NULL, 0, 0, 0}},
 
-  {{"parse_opts", "-bbuilddir", "-T21", NULL},
-    {NULL, NULL, {0}, NULL, (char *)"builddir", NULL, TABLE_NOT_SET, NULL, NULL, false, false,
-      false, false, 0, 0, 21, UNUSED_OPTS},
+  {{"parse_opts", "-bbuilddir", "-T21", NULL}, {"builddir", NULL, false, false, 21},
     {NULL, 0, 0, 0}},
 
   /* If -PT is used, the tiered_storage source is set to dir_store, even if -Po is not used. */
-  {{"parse_opts", "-v", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"dir_store", TABLE_NOT_SET, NULL, NULL, false, false,
-      true, true, 0, 0, 0, UNUSED_OPTS},
+  {{"parse_opts", "-v", "-PT", NULL}, {NULL, "dir_store", true, true, 0}, {NULL, 0, 0, 0}},
+
+  {{"parse_opts", "-v", "-Po", "my_store", "-PT", NULL}, {NULL, "my_store", true, true, 0},
     {NULL, 0, 0, 0}},
 
-  {{"parse_opts", "-v", "-Po", "my_store", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
-      true, 0, 0, 0, UNUSED_OPTS},
-    {NULL, 0, 0, 0}},
-
-  {{"parse_opts", "-vPomy_store", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
-      true, 0, 0, 0, UNUSED_OPTS},
-    {NULL, 0, 0, 0}},
+  {{"parse_opts", "-vPomy_store", "-PT", NULL}, {NULL, "my_store", true, true, 0}, {NULL, 0, 0, 0}},
 
   /*
    * From here on, we are using some "extended" options, see previous comment. We set the argv[0] to
    * "parse_single_opt" to indicate to use the extended parsing idiom.
    */
   {{"parse_single_opt", "-vd", "-Pomy_store", "-c", "string_opt", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
-      true, 0, 0, 0, UNUSED_OPTS},
-    {(char *)"string_opt", true, false, 0}},
+    {NULL, "my_store", true, true, 0}, {(char *)"string_opt", true, false, 0}},
 
   {{"parse_single_opt", "-dv", "-Pomy_store", "-cstring_opt", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
-      true, 0, 0, 0, UNUSED_OPTS},
-    {(char *)"string_opt", true, false, 0}},
+    {NULL, "my_store", true, true, 0}, {(char *)"string_opt", true, false, 0}},
 
   {{"parse_single_opt", "-ev", "-cstring_opt", "-Pomy_store", "-PT", "-f", "22", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
-      true, 0, 0, 0, UNUSED_OPTS},
-    {(char *)"string_opt", false, true, 22}},
+    {NULL, "my_store", true, true, 0}, {(char *)"string_opt", false, true, 22}},
 
   {{"parse_single_opt", "-evd", "-Pomy_store", "-PT", "-f22", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
-      true, 0, 0, 0, UNUSED_OPTS},
-    {NULL, true, true, 22}},
+    {NULL, "my_store", true, true, 0}, {NULL, true, true, 22}},
 
-  {{"parse_single_opt", "-v", "-Pomy_store", "-PT", NULL},
-    {NULL, NULL, {0}, NULL, NULL, (char *)"my_store", TABLE_NOT_SET, NULL, NULL, false, false, true,
-      true, 0, 0, 0, UNUSED_OPTS},
+  {{"parse_single_opt", "-v", "-Pomy_store", "-PT", NULL}, {NULL, "my_store", true, true, 0},
     {NULL, false, false, 0}},
 };
 
@@ -318,8 +307,9 @@ cleanup(TEST_OPTS *opts, FICTIONAL_OPTS *fiction_opts)
 int
 main(int argc, char *argv[])
 {
-    TEST_OPTS *expect, opts;
     FICTIONAL_OPTS *fiction_expect, fiction_opts;
+    SUBSET_TEST_OPTS *subset;
+    TEST_OPTS expect, opts;
     size_t i;
     int nargs;
     char *const *cmd;
@@ -353,10 +343,22 @@ main(int argc, char *argv[])
             cmd = (char *const *)driver[i].command_line;
             for (nargs = 0; cmd[nargs] != NULL; nargs++)
                 ;
-            expect = &driver[i].expected;
+
+            /*
+             * Fill our expected test utility options array with only the subset of values we are
+             * expecting to be modified. We expect all the other values to be zeroed or NULL.
+             */
+            subset = &driver[i].subset_expected;
+            WT_CLEAR(expect);
+            expect.build_dir = (char *)subset->build_dir;
+            expect.tiered_storage_source = (char *)subset->tiered_storage_source;
+            expect.tiered_storage = subset->tiered_storage;
+            expect.verbose = subset->verbose;
+            expect.nthreads = subset->nthreads;
+
             fiction_expect = &driver[i].fiction_expected;
             check(nargs, cmd, &opts, &fiction_opts);
-            verify_expect(&opts, &fiction_opts, expect, fiction_expect);
+            verify_expect(&opts, &fiction_opts, &expect, fiction_expect);
             cleanup(&opts, &fiction_opts);
         }
     }
