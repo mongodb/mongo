@@ -155,7 +155,7 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
     auto curOp = CurOp::get(opCtx);
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     curOp->setOpDescription_inlock(queryObj);
-    curOp->setNS_inlock(nss.ns());
+    curOp->setNS_inlock(nss);
 }
 
 /**

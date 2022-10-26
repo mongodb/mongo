@@ -266,7 +266,7 @@ void writeToImageCollection(OperationContext* opCtx,
     AutoGetCollection imageCollectionRaii(
         opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
     auto curOp = CurOp::get(opCtx);
-    const std::string existingNs = curOp->getNS();
+    const auto existingNs = curOp->getNSS();
     UpdateResult res =
         Helpers::upsert(opCtx, NamespaceString::kConfigImagesNamespace, imageEntry.toBSON());
     {

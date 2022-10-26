@@ -4215,7 +4215,8 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
                    "An automatic reconfig. Used to remove a 'newlyAdded' config field for a "
                    "replica set member.");
         curOp->setOpDescription_inlock(bob.obj());
-        curOp->setNS_inlock("local.system.replset");
+        // TODO SERVER-62491 Use systemTenantId.
+        curOp->setNS_inlock(NamespaceString(boost::none, "local.system.replset"));
         curOp->ensureStarted();
     }
 

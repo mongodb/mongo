@@ -66,6 +66,10 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     virtual StatusWith<CursorResponse> runAggregation(
         OperationContext* opCtx, AggregateCommandRequest& request) const final {
         auto aggCmdObj = aggregation_request_helper::serializeToCommandObj(request);

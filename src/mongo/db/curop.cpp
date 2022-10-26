@@ -53,6 +53,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log_with_sampling.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
 #include "mongo/util/system_tick_source.h"
@@ -291,7 +292,7 @@ CurOp::~CurOp() {
 }
 
 void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
-                                       const NamespaceString& nss,
+                                       NamespaceString nss,
                                        const Command* command,
                                        BSONObj cmdObj,
                                        NetworkOp op) {
@@ -307,7 +308,7 @@ void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
     _networkOp = _debug.networkOp = op;
     _opDescription = cmdObj;
     _command = command;
-    _ns = nss.ns();
+    _nss = std::move(nss);
 }
 
 void CurOp::setMessage_inlock(StringData message) {
@@ -331,8 +332,12 @@ ProgressMeter& CurOp::setProgress_inlock(StringData message,
     return _progressMeter;
 }
 
-void CurOp::setNS_inlock(StringData ns) {
-    _ns = ns.toString();
+void CurOp::setNS_inlock(NamespaceString nss) {
+    _nss = std::move(nss);
+}
+
+void CurOp::setNS_inlock(const DatabaseName& dbName) {
+    _nss = NamespaceString(dbName);
 }
 
 TickSource::Tick CurOp::startTime() {
@@ -380,10 +385,14 @@ Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
     return _tickSource->ticksTo<Microseconds>(endTime - startTime);
 }
 
-void CurOp::enter_inlock(const char* ns, int dbProfileLevel) {
+void CurOp::enter_inlock(NamespaceString nss, int dbProfileLevel) {
     ensureStarted();
-    _ns = ns;
+    _nss = std::move(nss);
     raiseDbProfileLevel(dbProfileLevel);
+}
+
+void CurOp::enter_inlock(const DatabaseName& dbName, int dbProfileLevel) {
+    enter_inlock(NamespaceString(dbName), dbProfileLevel);
 }
 
 void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
@@ -492,6 +501,10 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     if (_dbprofile <= 0)
         return false;
     return shouldProfileAtLevel1;
+}
+
+std::string CurOp::getNS() const {
+    return NamespaceStringUtil::serialize(_nss);
 }
 
 // Failpoints after commands are logged.
@@ -637,7 +650,7 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
     }
 
     builder->append("op", logicalOpToString(_logicalOp));
-    builder->append("ns", _ns);
+    builder->append("ns", NamespaceStringUtil::serialize(_nss));
 
     // When the currentOp command is run, it returns a single response object containing all current
     // operations; this request will fail if the response exceeds the 16MB document limit. By

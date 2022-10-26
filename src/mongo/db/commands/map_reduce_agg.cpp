@@ -187,7 +187,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         // this temp collection.
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setNS_inlock(parsedMr.getNamespace().ns());
+            CurOp::get(opCtx)->setNS_inlock(parsedMr.getNamespace());
         }
 
         return true;

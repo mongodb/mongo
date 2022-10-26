@@ -913,7 +913,7 @@ Status runAggregate(OperationContext* opCtx,
                 // Set the namespace of the curop back to the view namespace so ctx records
                 // stats on this view namespace on destruction.
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                curOp->setNS_inlock(nss.ns());
+                curOp->setNS_inlock(nss);
             }
 
             return status;
@@ -1112,7 +1112,7 @@ Status runAggregate(OperationContext* opCtx,
     // create a temp collection, changing the curop namespace to the name of this temp collection.
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp->setNS_inlock(origNss.ns());
+        curOp->setNS_inlock(origNss);
     }
 
     return Status::OK();

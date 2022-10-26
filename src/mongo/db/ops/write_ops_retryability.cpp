@@ -123,7 +123,7 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
         TxnNumber txnNumber = oplog.getTxnNumber().value();
         Timestamp ts = oplog.getTimestamp();
         auto curOp = CurOp::get(opCtx);
-        const std::string existingNS = curOp->getNS();
+        const auto existingNS = curOp->getNSS();
         BSONObj imageDoc = client.findOne(NamespaceString::kConfigImagesNamespace,
                                           BSON("_id" << sessionId.toBSON()));
         {

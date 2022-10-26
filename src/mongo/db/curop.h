@@ -411,7 +411,7 @@ public:
      * thereafter. Locks the client as needed to apply the specified settings.
      */
     void setGenericOpRequestDetails(OperationContext* opCtx,
-                                    const NamespaceString& nss,
+                                    NamespaceString nss,
                                     const Command* command,
                                     BSONObj cmdObj,
                                     NetworkOp op);
@@ -449,7 +449,8 @@ public:
         return _originatingCommand;
     }
 
-    void enter_inlock(const char* ns, int dbProfileLevel);
+    void enter_inlock(NamespaceString nss, int dbProfileLevel);
+    void enter_inlock(const DatabaseName& dbName, int dbProfileLevel);
 
     /**
      * Sets the type of the current network operation.
@@ -485,9 +486,7 @@ public:
     /**
      * Gets the name of the namespace on which the current operation operates.
      */
-    std::string getNS() const {
-        return _ns;
-    }
+    std::string getNS() const;
 
     /**
      * Returns a const pointer to the UserAcquisitionStats for the current operation.
@@ -508,7 +507,7 @@ public:
      * Gets the name of the namespace on which the current operation operates.
      */
     NamespaceString getNSS() const {
-        return NamespaceString{_ns};
+        return _nss;
     }
 
     /**
@@ -802,7 +801,8 @@ public:
      * generally the Context should set this up
      * but sometimes you want to do it ahead of time
      */
-    void setNS_inlock(StringData ns);
+    void setNS_inlock(NamespaceString nss);
+    void setNS_inlock(const DatabaseName& dbName);
 
     StringData getPlanSummary() const {
         return _planSummary;
@@ -888,7 +888,7 @@ private:
 
     bool _isCommand{false};
     int _dbprofile{0};  // 0=off, 1=slow, 2=all
-    std::string _ns;
+    NamespaceString _nss;
     BSONObj _opDescription;
     BSONObj _originatingCommand;  // Used by getMore to display original command.
     OpDebug _debug;

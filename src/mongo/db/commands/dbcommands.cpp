@@ -624,7 +624,7 @@ public:
             {
                 CurOp::get(opCtx)->ensureStarted();
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setNS_inlock(dbname.db());
+                CurOp::get(opCtx)->setNS_inlock(dbname);
             }
 
             AutoGetDb autoDb(opCtx, dbname, MODE_IS);
@@ -665,8 +665,7 @@ public:
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
                     // TODO: OldClientContext legacy, needs to be removed
                     CurOp::get(opCtx)->enter_inlock(
-                        dbname.db().c_str(),
-                        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbname));
+                        dbname, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbname));
                 }
 
                 db->getStats(opCtx, &reply, cmd.getFreeStorage(), cmd.getScale());

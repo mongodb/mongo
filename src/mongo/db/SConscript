@@ -214,6 +214,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/concurrency/admission_context',
+        '$BUILD_DIR/mongo/util/namespace_string_util',
         'auth/auth',
         'auth/user_acquisition_stats',
         'prepare_conflict_tracker',

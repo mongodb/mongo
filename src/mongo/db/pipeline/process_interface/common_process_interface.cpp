@@ -47,6 +47,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/socket_utils.h"
 
 #ifndef MONGO_CONFIG_USE_RAW_LATCHES
@@ -81,11 +82,21 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
 
         stdx::lock_guard<Client> lk(*client);
 
-        // If auth is disabled, ignore the allUsers parameter.
-        if (ctxAuth->getAuthorizationManager().isAuthEnabled() &&
-            userMode == CurrentOpUserMode::kExcludeOthers &&
-            !ctxAuth->isCoauthorizedWithClient(client, lk)) {
-            continue;
+        if (ctxAuth->getAuthorizationManager().isAuthEnabled()) {
+            // If auth is disabled, ignore the allUsers parameter.
+            if (userMode == CurrentOpUserMode::kExcludeOthers &&
+                !ctxAuth->isCoauthorizedWithClient(client, lk)) {
+                continue;
+            }
+
+            // If currOp is being run for a particular tenant, ignore any ops that don't belong to
+            // it.
+            if (expCtx->ns.tenantId()) {
+                auto userName = AuthorizationSession::get(client)->getAuthenticatedUserName();
+                if (userName && userName->getTenant() != expCtx->ns.tenantId()) {
+                    continue;
+                }
+            }
         }
 
         // Ignore inactive connections unless 'idleConnections' is true.
@@ -107,7 +118,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
             cursorObj.append("host", getHostNameCachedAndPort());
             // First, extract fields which need to go at the top level out of the GenericCursor.
             auto ns = cursor.getNs();
-            cursorObj.append("ns", ns->toString());
+            cursorObj.append("ns", ns ? NamespaceStringUtil::serialize(*ns) : "");
             if (auto lsid = cursor.getLsid()) {
                 cursorObj.append("lsid", lsid->toBSON());
             }

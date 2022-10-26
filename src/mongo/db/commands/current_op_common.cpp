@@ -46,7 +46,7 @@ static const StringDataSet kCurOpCmdParams = {kAll, kOwnOps, kTruncateOps};
 }  // namespace
 
 bool CurrentOpCommandBase::run(OperationContext* opCtx,
-                               const DatabaseName&,
+                               const DatabaseName& dbName,
                                const BSONObj& cmdObj,
                                BSONObjBuilder& result) {
     // Convert the currentOp command spec into an equivalent aggregation command. This will be
@@ -111,7 +111,7 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
 
     // Pipeline is complete; create an AggregateCommandRequest for $currentOp.
     AggregateCommandRequest request(
-        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(boost::none, "admin")),
+        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(dbName.tenantId(), "admin")),
         std::move(pipeline));
 
     // Run the pipeline and obtain a CursorResponse.

@@ -103,6 +103,8 @@ generic_argument_lists:
                 forward_to_shards: true
             mayBypassWriteBlocking:
                 forward_to_shards: true
+            $tenant:
+                forward_to_shards: true
 
 
 generic_reply_field_lists:

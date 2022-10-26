@@ -648,7 +648,7 @@ WriteResult performInserts(OperationContext* opCtx,
 
     if (source != OperationSource::kTimeseriesInsert) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(wholeOp.getNamespace().ns());
+        curOp.setNS_inlock(wholeOp.getNamespace());
         curOp.setLogicalOp_inlock(LogicalOp::opInsert);
         curOp.ensureStarted();
         curOp.debug().additiveMetrics.ninserted = 0;
@@ -940,9 +940,8 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     auto& curOp = *CurOp::get(opCtx);
     if (source != OperationSource::kTimeseriesInsert) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(source == OperationSource::kTimeseriesUpdate
-                               ? ns.getTimeseriesViewNamespace().ns()
-                               : ns.ns());
+        curOp.setNS_inlock(
+            source == OperationSource::kTimeseriesUpdate ? ns.getTimeseriesViewNamespace() : ns);
         curOp.setNetworkOp_inlock(dbUpdate);
         curOp.setLogicalOp_inlock(LogicalOp::opUpdate);
         curOp.setOpDescription_inlock(op.toBSON());
@@ -1132,9 +1131,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     auto& curOp = *CurOp::get(opCtx);
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(source == OperationSource::kTimeseriesDelete
-                               ? ns.getTimeseriesViewNamespace().ns()
-                               : ns.ns());
+        curOp.setNS_inlock(
+            source == OperationSource::kTimeseriesDelete ? ns.getTimeseriesViewNamespace() : ns);
         curOp.setNetworkOp_inlock(dbDelete);
         curOp.setLogicalOp_inlock(LogicalOp::opDelete);
         curOp.setOpDescription_inlock(op.toBSON());

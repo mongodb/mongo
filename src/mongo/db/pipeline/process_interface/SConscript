@@ -25,6 +25,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/operation_time_tracker',
         '$BUILD_DIR/mongo/db/pipeline/field_path',
         '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/mongo/util/namespace_string_util',
     ],
 )
 

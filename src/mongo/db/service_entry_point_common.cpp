@@ -1972,7 +1972,7 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     curop->setOpDescription_inlock(request.body);
     curop->markCommand_inlock();
-    curop->setNS_inlock(nss.ns());
+    curop->setNS_inlock(nss);
 }
 
 Future<void> parseCommand(std::shared_ptr<HandleRequest::ExecutionContext> execContext) try {
