@@ -345,7 +345,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                request.getNamespace().coll().toString(),
                                                boost::none),
                     "Database does not exist",
-                    !request.getCollectionUUID());
+                    executionNsRoutingInfoStatus != ErrorCodes::NamespaceNotFound ||
+                        !request.getCollectionUUID());
 
             if (liteParsedPipeline.startsWithCollStats()) {
                 uassertStatusOKWithContext(executionNsRoutingInfoStatus,
