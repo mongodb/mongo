@@ -23,13 +23,22 @@ env.Library(
 )
 
 env.Library(
+    target='ticketholder_params',
+    source=['ticketholder_params.idl'],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
+
+env.Library(
     target='ticketholder',
     source=['ticketholder.cpp'],
-    LIBDEPS_PRIVATE=[
+    LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/third_party/shim_boost',
         'admission_context',
+        'ticketholder_params',
     ],
 )
 

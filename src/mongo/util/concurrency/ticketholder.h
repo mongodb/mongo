@@ -295,6 +295,14 @@ public:
         return true;
     };
 
+    std::int64_t promoted() const;
+
+    /**
+     * Returns the number of times the low priority queue is bypassed in favor of dequeuing from the
+     * normal priority queue when a ticket becomes available.
+     */
+    std::int64_t bypassed() const;
+
 private:
     // Using a shared_mutex is fine here because usual considerations for avoiding them do not apply
     // in this case:
@@ -311,13 +319,24 @@ private:
     using EnqueuerLockGuard = std::unique_lock<QueueMutex>;  // NOLINT
 
     enum class QueueType : unsigned int {
-        LowPriorityQueue = 0,
-        NormalPriorityQueue = 1,
+        kLowPriority = 0,
+        kNormalPriority = 1,
         // Exclusively used for statistics tracking. This queue should never have any processes
         // 'queued'.
-        ImmediatePriorityNoOpQueue = 2,
+        kImmediatePriority = 2,
         QueueTypeSize = 3
     };
+
+    enum class AdmissionStatus {
+        // The ticket request is successful, and the operation is ready to acquire a ticket.
+        kReadyToAcquire,
+        // There are no tickets available for the request at its given priority. The priority should
+        // be increased to allow for ticket acquisition.
+        kNeedsPromotion,
+        // An interruption occured while attempting to acquire a ticket.
+        kInterrupted,
+    };
+
     class Queue {
     public:
         Queue(PriorityTicketHolder* holder, QueueType queueType)
@@ -325,14 +344,20 @@ private:
 
         bool attemptToDequeue(const ReleaserLockGuard& releaserLock);
 
-        bool enqueue(OperationContext* interruptible,
-                     EnqueuerLockGuard& queueLock,
-                     const Date_t& until,
-                     WaitMode waitMode);
+        AdmissionStatus enqueue(OperationContext* interruptible,
+                                EnqueuerLockGuard& queueLock,
+                                const Date_t& until,
+                                WaitMode waitMode);
 
         int queuedElems() const {
             return _queuedThreads;
         }
+
+        /**
+         * Signals that a queued thread should be woken and exit the queue so it can be promoted to
+         * a higher priority queue.
+         */
+        void signalPromoteSingleOp(const ReleaserLockGuard& releaserLock);
 
         /**
          * Returns a reference to the Queue statistics that allows callers to update the statistics.
@@ -340,10 +365,7 @@ private:
         QueueStats& getStatsToUse() {
             return _stats;
         }
-        /**
-         * Returns a read-only reference to the Queue statistics.
-         */
-        const QueueStats& getStats() const {
+        const QueueStats& getStatsToUse() const {
             return _stats;
         }
 
@@ -356,6 +378,8 @@ private:
 
         int _queuedThreads{0};
         AtomicWord<int> _threadsToBeWoken{0};
+        AtomicWord<bool> _signalPromotion{false};
+
         stdx::condition_variable _cv;
         PriorityTicketHolder* _holder;
         QueueStats _stats;
@@ -400,16 +424,23 @@ private:
      */
     bool _hasToWaitForHigherPriority(const EnqueuerLockGuard& lk, QueueType queue);
 
-    /**
-     * Selects the queue to use for the current thread given the provided arguments.
-     */
-    Queue& _getQueueToUse(const AdmissionContext* admCtx);
+    QueueType _queueType(const AdmissionContext* admCtx);
+
+    Queue& _getQueue(QueueType queueType);
+    const Queue& _getQueue(QueueType queueType) const;
 
     std::array<Queue, static_cast<unsigned int>(QueueType::QueueTypeSize)> _queues;
 
     QueueMutex _queueMutex;
+
+    /**
+     * Counts the number of times normal operations are dequeued over operations queued in the low
+     * priority queue.
+     */
+    AtomicWord<std::int64_t> _lowPriorityBypassCount{0};
     AtomicWord<int> _ticketsAvailable;
     AtomicWord<int> _enqueuedElements;
+    AtomicWord<std::int64_t> _promotedElements{0};
     ServiceContext* _serviceContext;
 };
 
