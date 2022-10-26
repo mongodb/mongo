@@ -77,7 +77,6 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -159,7 +158,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
         internalQuerySlotBasedExecutionDisableLookupPushdown.load() || isMainCollectionSharded ||
         collections.isAnySecondaryNamespaceAViewOrSharded();
 
-    std::map<NamespaceString, SecondaryCollectionInfo> secondaryCollInfo;
     for (auto itr = sources.begin(); itr != sources.end();) {
         const bool isLastSource = itr->get() == sources.back().get();
 
@@ -187,31 +185,10 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
             // Note that 'lookupStage->sbeCompatible()' encodes whether the foreign collection is a
             // view.
             if (lookupStage->sbeCompatible()) {
-                // Fill out secondary collection information to assist in deciding whether we should
-                // push down any $lookup stages into SBE.
-                // TODO SERVER-67024: This should be removed once NLJ is re-enabled by default.
-                if (secondaryCollInfo.empty()) {
-                    secondaryCollInfo =
-                        fillOutSecondaryCollectionsInformation(expCtx->opCtx, collections, cq);
-                }
-
-                auto [strategy, _] = QueryPlannerAnalysis::determineLookupStrategy(
-                    lookupStage->getFromNs().toString(),
-                    lookupStage->getForeignField()->fullPath(),
-                    secondaryCollInfo,
-                    cq->getExpCtx()->allowDiskUse,
-                    cq->getCollator());
-
-                // While we do support executing NLJ in SBE, this join algorithm does not currently
-                // perform as well as executing $lookup in the classic engine, so fall back to
-                // classic unless 'gFeatureFlagSbeFull' is enabled.
-                if (strategy != EqLookupNode::LookupStrategy::kNestedLoopJoin ||
-                    feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-                    stagesForPushdown.push_back(
-                        std::make_unique<InnerPipelineStageImpl>(lookupStage, isLastSource));
-                    sources.erase(itr++);
-                    continue;
-                }
+                stagesForPushdown.push_back(
+                    std::make_unique<InnerPipelineStageImpl>(lookupStage, isLastSource));
+                sources.erase(itr++);
+                continue;
             }
             break;
         }

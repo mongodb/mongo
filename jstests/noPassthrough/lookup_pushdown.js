@@ -18,8 +18,7 @@ const JoinAlgorithm = {
 };
 
 // Standalone cases.
-const conn =
-    MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true, allowDiskUseByDefault: true}});
+const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true}});
 assert.neq(null, conn, "mongod was unable to start up");
 const name = "lookup_pushdown";
 const foreignCollName = "foreign_lookup_pushdown";
@@ -123,6 +122,8 @@ if (!checkSBEEnabled(db)) {
     return;
 }
 
+const sbeFullEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
+
 let coll = db[name];
 const localDocs = [{_id: 1, a: 2}];
 assert.commandWorked(coll.insert(localDocs));
@@ -152,12 +153,13 @@ function setLookupPushdownDisabled(value) {
             [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
 
-    // $lookup against a non-existent foreign collection should pick NLJ.
+    // $lookup against a non-existent foreign collection should pick 'NonExistentForeignCollection'.
     runTest(coll,
             [{$lookup: {from: "nonexistent", localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.NonExistentForeignCollection /* expectedJoinAlgorithm */);
 
-    // $lookup against a non-existent foreign collection should pick NLJ even when HJ is eligible.
+    // $lookup against a non-existent foreign collection should pick 'NonExistentForeignCollection'
+    // even when HJ is eligible.
     runTest(coll,
             [{$lookup: {from: "nonexistent", localField: "a", foreignField: "b", as: "out"}}],
             JoinAlgorithm.NonExistentForeignCollection /* expectedJoinAlgorithm */,
@@ -292,12 +294,19 @@ function setLookupPushdownDisabled(value) {
             JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
             null /* indexKeyPattern */,
             {allowDiskUse: true});
+
+    // Run a $lookup with 'allowDiskUse' disabled. We should use NLJ.
+    runTest(coll,
+            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+            JoinAlgorithm.NLJ /* expectedJoinAlgorithm */,
+            null /* indexKeyPattern */,
+            {allowDiskUse: false});
 }());
 
 // Verify that SBE is only used when a $lookup or a $group is present.
 (function testLookupGroupIsRequiredForPushdown() {
     // Don't execute this test case if SBE is fully enabled.
-    if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    if (sbeFullEnabled) {
         jsTestLog("Skipping test case because we are supporting SBE beyond $group and $lookup" +
                   " pushdown");
         return;
@@ -705,13 +714,18 @@ function setLookupPushdownDisabled(value) {
     // verify that the same $match, when used as a $lookup sub-pipeline, will not be lowered
     // into SBE.
     const subPipeline = [{$match: {b: 2}}];
-    if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    if (sbeFullEnabled) {
         const subPipelineExplain = foreignColl.explain().aggregate(subPipeline);
         assert(subPipelineExplain.hasOwnProperty("explainVersion"), subPipelineExplain);
         assert.eq(subPipelineExplain["explainVersion"], "2", subPipelineExplain);
     } else {
         const pipeline = [{$lookup: {from: foreignCollName, pipeline: subPipeline, as: "result"}}];
         runTest(coll, pipeline, JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
+
+        // Create multiple indexes that can be used to answer the subPipeline query. This will allow
+        // the winning plan to be cached.
+        assert.commandWorked(foreignColl.dropIndexes());
+        assert.commandWorked(foreignColl.createIndexes([{b: 1, a: 1}, {b: 1, c: 1}]));
 
         // Run the pipeline enough times to generate a cache entry for the right side in the foreign
         // collection.
@@ -735,6 +749,7 @@ function setLookupPushdownDisabled(value) {
 
         assert(planHasStage(db, cachedPlan, "FETCH"), cacheEntry);
         assert(planHasStage(db, cachedPlan, "IXSCAN"), cacheEntry);
+        assert.commandWorked(coll.dropIndexes());
     }
 }());
 
@@ -744,7 +759,7 @@ MongoRunner.stopMongod(conn);
 (function verifyPushdownLogicSbePartiallyEnabled() {
     const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true}});
     const db = conn.getDB(name);
-    if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    if (sbeFullEnabled) {
         jsTestLog("Skipping test case because SBE is fully enabled, but this test case assumes" +
                   " that it is not fully enabled");
         MongoRunner.stopMongod(conn);
