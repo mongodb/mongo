@@ -263,13 +263,17 @@ void logGetClusterParameter(
     invariant(client);
 }
 
-void logSetClusterParameter(Client* client, const BSONObj& oldValue, const BSONObj& newValue) {
+void logSetClusterParameter(Client* client,
+                            const BSONObj& oldValue,
+                            const BSONObj& newValue,
+                            const boost::optional<TenantId>&) {
     invariant(client);
 }
 
 void logUpdateCachedClusterParameter(Client* client,
                                      const BSONObj& oldValue,
-                                     const BSONObj& newValue) {
+                                     const BSONObj& newValue,
+                                     const boost::optional<TenantId>&) {
     invariant(client);
 }
 

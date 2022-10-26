@@ -424,18 +424,23 @@ void logGetClusterParameter(
     const stdx::variant<std::string, std::vector<std::string>>& requestedParameters);
 
 /**
- * Logs old and new value of cluster server parameter when it is updated via setClusterParameter.
+ * Logs old and new value of given tenant's cluster server parameter when it is updated via
+ * setClusterParameter.
  */
-void logSetClusterParameter(Client* client, const BSONObj& oldValue, const BSONObj& newValue);
+void logSetClusterParameter(Client* client,
+                            const BSONObj& oldValue,
+                            const BSONObj& newValue,
+                            const boost::optional<TenantId>& tenantId);
 
 /**
- * Logs old and new value of cluster server parameter when it gets updated in-memory in response to
- * some on-disk change. This may be due to setClusterParameter or a replication event such as
- * rollback.
+ * Logs old and new value of given tenant's cluster server parameter when it gets updated in-memory
+ * in response to some on-disk change. This may be due to setClusterParameter or a replication event
+ * such as rollback.
  */
 void logUpdateCachedClusterParameter(Client* client,
                                      const BSONObj& oldValue,
-                                     const BSONObj& newValue);
+                                     const BSONObj& newValue,
+                                     const boost::optional<TenantId>& tenantId);
 
 /**
  * Logs details of log file being rotated out to the file that is being rotated

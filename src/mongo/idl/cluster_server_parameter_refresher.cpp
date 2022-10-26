@@ -179,7 +179,8 @@ Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCt
 
             audit::logUpdateCachedClusterParameter(opCtx->getClient(),
                                                    oldClusterParameterBob.obj().getOwned(),
-                                                   updatedClusterParameterBSON);
+                                                   updatedClusterParameterBSON,
+                                                   tenantId);
 
             updatedParameters.emplace_back(
                 updatedClusterParameterBSON.removeField("clusterParameterTime"_sd));

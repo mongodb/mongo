@@ -53,23 +53,24 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     BSONObj cmdParamObj = cmd.getCommandParameter();
     StringData parameterName = cmdParamObj.firstElement().fieldName();
     ServerParameter* serverParameter = _sps->get(parameterName);
+    auto tenantId = cmd.getDbName().tenantId();
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Server parameter: '" << serverParameter->name() << "' is disabled",
             serverParameter->isEnabled());
 
-    auto [query, update] = normalizeParameter(
-        opCtx, cmdParamObj, paramTime, serverParameter, parameterName, cmd.getDbName().tenantId());
+    auto [query, update] =
+        normalizeParameter(opCtx, cmdParamObj, paramTime, serverParameter, parameterName, tenantId);
 
     BSONObjBuilder oldValueBob;
-    serverParameter->append(opCtx, &oldValueBob, parameterName.toString(), boost::none);
-    audit::logSetClusterParameter(opCtx->getClient(), oldValueBob.obj(), update);
+    serverParameter->append(opCtx, &oldValueBob, parameterName.toString(), tenantId);
+    audit::logSetClusterParameter(opCtx->getClient(), oldValueBob.obj(), update, tenantId);
 
     LOGV2_DEBUG(
         6432603, 2, "Updating cluster parameter on-disk", "clusterParameter"_attr = parameterName);
 
-    return uassertStatusOK(_dbService.updateParameterOnDisk(
-        opCtx, query, update, writeConcern, cmd.getDbName().tenantId()));
+    return uassertStatusOK(
+        _dbService.updateParameterOnDisk(opCtx, query, update, writeConcern, tenantId));
 }
 
 std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
