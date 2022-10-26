@@ -4270,7 +4270,7 @@ def doConfigure(myenv):
             # setting to allow tests to continue while we figure out
             # why we're running afoul of it.
             #
-            # TODO SERVER-52413: report_thread_leaks=0 suppresses
+            # TODO SERVER-65936: report_thread_leaks=0 suppresses
             # reporting thread leaks, which we have because we don't
             # do a clean shutdown of the ServiceContext.
             #
