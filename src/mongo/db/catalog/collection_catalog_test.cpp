@@ -1685,18 +1685,27 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCreate) {
 
     NamespaceString nss("a.b");
 
+    // Initialize the oldest timestamp to (1, 1)
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
+    });
+
     // Create collection and extract the catalogId
     createCollection(opCtx.get(), nss, Timestamp(1, 2));
     RecordId rid = catalog()->lookupCollectionByNamespace(opCtx.get(), nss)->getCatalogId();
 
     // Lookup without timestamp returns latest catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, boost::none), rid);
-    // Lookup before create returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 1)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, boost::none).id, rid);
+    // Lookup before create returns unknown if looking before oldest
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 0)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    // Lookup before create returns not exists if looking after oldest
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 1)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
     // Lookup at create returns catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 2)), rid);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 2)).id, rid);
     // Lookup after create returns catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 3)), rid);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 3)).id, rid);
 }
 
 TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingDrop) {
@@ -1705,23 +1714,35 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingDrop) {
 
     NamespaceString nss("a.b");
 
+    // Initialize the oldest timestamp to (1, 1)
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
+    });
+
     // Create and drop collection. We have a time window where the namespace exists
     createCollection(opCtx.get(), nss, Timestamp(1, 5));
     RecordId rid = catalog()->lookupCollectionByNamespace(opCtx.get(), nss)->getCatalogId();
     dropCollection(opCtx.get(), nss, Timestamp(1, 10));
 
     // Lookup without timestamp returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, boost::none), boost::none);
-    // Lookup before create returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 4)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, boost::none).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+    // Lookup before create and oldest returns unknown
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 0)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    // Lookup before create returns not exists
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 4)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
     // Lookup at create returns catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), rid);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).id, rid);
     // Lookup after create returns catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 6)), rid);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 6)).id, rid);
     // Lookup at drop returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 10)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 10)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
     // Lookup after drop returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 20)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 20)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
 }
 
 TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRename) {
@@ -1731,6 +1752,11 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRename) {
     NamespaceString from("a.b");
     NamespaceString to("a.c");
 
+    // Initialize the oldest timestamp to (1, 1)
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
+    });
+
     // Create and rename collection. We have two windows where the namespace exists but for
     // different namespaces
     createCollection(opCtx.get(), from, Timestamp(1, 5));
@@ -1738,26 +1764,37 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRename) {
     renameCollection(opCtx.get(), from, to, Timestamp(1, 10));
 
     // Lookup without timestamp on 'from' returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, boost::none), boost::none);
-    // Lookup before create returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, Timestamp(1, 4)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, boost::none).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+    // Lookup before create and oldest returns unknown
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, Timestamp(1, 0)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    // Lookup before create returns not exists
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, Timestamp(1, 4)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
     // Lookup at create returns catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, Timestamp(1, 5)), rid);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, Timestamp(1, 5)).id, rid);
     // Lookup after create returns catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, Timestamp(1, 6)), rid);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, Timestamp(1, 6)).id, rid);
     // Lookup at rename on 'from' returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, Timestamp(1, 10)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, Timestamp(1, 10)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
     // Lookup after rename on 'from' returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, Timestamp(1, 20)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(from, Timestamp(1, 20)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
 
     // Lookup without timestamp on 'to' returns catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, boost::none), rid);
-    // Lookup before rename on 'to' returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 9)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, boost::none).id, rid);
+    // Lookup before rename and oldest on 'to' returns unknown
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 0)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    // Lookup before rename on 'to' returns not exists
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 9)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
     // Lookup at rename on 'to' returns catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 10)), rid);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 10)).id, rid);
     // Lookup after rename on 'to' returns catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 20)), rid);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 20)).id, rid);
 }
 
 TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingDropCreate) {
@@ -1774,21 +1811,24 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingDropCreate) {
     RecordId rid2 = catalog()->lookupCollectionByNamespace(opCtx.get(), nss)->getCatalogId();
 
     // Lookup without timestamp returns latest catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, boost::none), rid2);
-    // Lookup before first create returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 4)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, boost::none).id, rid2);
+    // Lookup before first create returns not exists
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 4)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
     // Lookup at first create returns first catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).id, rid1);
     // Lookup after first create returns first catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 6)), rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 6)).id, rid1);
     // Lookup at drop returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 10)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 10)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
     // Lookup after drop returns none
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 13)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 13)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
     // Lookup at second create returns second catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)), rid2);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).id, rid2);
     // Lookup after second create returns second catalogId
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 20)), rid2);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 20)).id, rid2);
 }
 
 TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupEqDrop) {
@@ -1816,7 +1856,8 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupEqDrop) {
     ASSERT_TRUE(catalog()->needsCleanupForOldestTimestamp(Timestamp(1, 10)));
 
     // We can lookup the old catalogId before we advance the oldest timestamp and cleanup
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 
     // Cleanup at drop timestamp
     CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
@@ -1825,8 +1866,10 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupEqDrop) {
     // After cleanup, we cannot find the old catalogId anymore. Also verify that we don't need
     // anymore cleanup
     ASSERT_FALSE(catalog()->needsCleanupForOldestTimestamp(Timestamp(1, 10)));
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 }
 
 TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupGtDrop) {
@@ -1854,7 +1897,8 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupGtDrop) {
     ASSERT_TRUE(catalog()->needsCleanupForOldestTimestamp(Timestamp(1, 12)));
 
     // We can lookup the old catalogId before we advance the oldest timestamp and cleanup
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 
     // Cleanup after the drop timestamp
     CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
@@ -1864,8 +1908,10 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupGtDrop) {
     // After cleanup, we cannot find the old catalogId anymore. Also verify that we don't need
     // anymore cleanup
     ASSERT_FALSE(catalog()->needsCleanupForOldestTimestamp(Timestamp(1, 12)));
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 }
 
 TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupGtRecreate) {
@@ -1893,7 +1939,8 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupGtRecreate) {
     ASSERT_TRUE(catalog()->needsCleanupForOldestTimestamp(Timestamp(1, 20)));
 
     // We can lookup the old catalogId before we advance the oldest timestamp and cleanup
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 
     // Cleanup after the recreate timestamp
     CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
@@ -1903,8 +1950,10 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupGtRecreate) {
     // After cleanup, we cannot find the old catalogId anymore. Also verify that we don't need
     // anymore cleanup
     ASSERT_FALSE(catalog()->needsCleanupForOldestTimestamp(Timestamp(1, 20)));
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 }
 
 TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultiple) {
@@ -1924,10 +1973,14 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultiple) {
     dropCollection(opCtx.get(), nss, Timestamp(1, 40));
 
     // Lookup can find all four collections
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 
     // Cleanup oldest
     CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
@@ -1935,10 +1988,14 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultiple) {
     });
 
     // Lookup can find the three remaining collections
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 
     // Cleanup
     CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
@@ -1946,10 +2003,14 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultiple) {
     });
 
     // Lookup can find the two remaining collections
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 
     // Cleanup
     CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
@@ -1957,21 +2018,30 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultiple) {
     });
 
     // Lookup can find the last remaining collections
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)), boost::none);
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 
     // Cleanup
     CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
         c.cleanupForOldestTimestampAdvanced(Timestamp(1, 50));
     });
 
-    // Lookup can find no collections
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)), boost::none);
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)), boost::none);
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)), boost::none);
+    // Lookup now result in unknown as the oldest timestamp has advanced where mapping has been
+    // removed
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
 }
 
 TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultipleSingleCall) {
@@ -1991,21 +2061,30 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultipleSingleCall
     dropCollection(opCtx.get(), nss, Timestamp(1, 40));
 
     // Lookup can find all four collections
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 
     // Cleanup all
     CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
         c.cleanupForOldestTimestampAdvanced(Timestamp(1, 50));
     });
 
-    // Lookup can find no collections
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)), boost::none);
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)), boost::none);
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)), boost::none);
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)), boost::none);
+    // Lookup now result in unknown as the oldest timestamp has advanced where mapping has been
+    // removed
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 5)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 35)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
 }
 
 TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRollback) {
@@ -2032,11 +2111,16 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRollback) {
     CollectionCatalog::write(
         opCtx.get(), [&](CollectionCatalog& c) { c.cleanupForCatalogReopen(Timestamp(1, 8)); });
 
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(a, boost::none), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(b, boost::none), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(c, boost::none), boost::none);
-    ASSERT_NE(catalog()->lookupCatalogIdByNSS(d, boost::none), boost::none);
-    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(e, boost::none), boost::none);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(a, boost::none).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(b, boost::none).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(c, boost::none).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(d, boost::none).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(e, boost::none).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
 }
 
 TEST_F(CollectionCatalogTimestampTest, CollectionLifetimeTiedToStorageTransactionLifetime) {

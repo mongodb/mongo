@@ -393,14 +393,22 @@ public:
 
     /**
      * Returns the CatalogId for a given 'nss' at timestamp 'ts'.
-     *
-     * Timestamp must be in the range [oldest_timestamp, now)
-     * If 'ts' is boost::none the latest CatalogId is returned.
-     *
-     * Returns boost::none if no namespace exist at the timestamp or if 'ts' is out of range.
      */
-    boost::optional<RecordId> lookupCatalogIdByNSS(
-        const NamespaceString& nss, boost::optional<Timestamp> ts = boost::none) const;
+    struct CatalogIdLookup {
+        enum NamespaceExistence {
+            // Namespace exists at time 'ts' and catalogId set in 'id'.
+            kExists,
+            // Namespace does not exist at time 'ts'.
+            kNotExists,
+            // Namespace existence at time 'ts' is unknown. The durable catalog must be scanned to
+            // determine.
+            kUnknown
+        };
+        RecordId id;
+        NamespaceExistence result;
+    };
+    CatalogIdLookup lookupCatalogIdByNSS(const NamespaceString& nss,
+                                         boost::optional<Timestamp> ts = boost::none) const;
 
     /**
      * Iterates through the views in the catalog associated with database `dbName`, applying
@@ -765,6 +773,9 @@ private:
     // Point at which the oldest timestamp need to advance for there to be any catalogId namespace
     // that can be cleaned up
     Timestamp _lowestCatalogIdTimestampForCleanup = Timestamp::max();
+    // The oldest timestamp at which the catalog maintains catalogId mappings. Anything older than
+    // this is unknown and must be discovered by scanning the durable catalog.
+    Timestamp _oldestCatalogIdTimestampMaintained = Timestamp::max();
 
     // Map of database names to their corresponding views and other associated state.
     ViewsForDatabaseMap _viewsForDatabase;
