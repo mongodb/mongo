@@ -66,7 +66,13 @@ env.Library(
 
 env.Library(
     target='record_store_base',
-    source=['record_store.cpp', 'external_record_store.cpp'],
+    source=[
+        'external_record_store.cpp',
+        'multi_bson_stream_cursor.cpp',
+        'named_pipe_posix.cpp' if not env.TargetOSIs('windows') else [],
+        'named_pipe_windows.cpp' if env.TargetOSIs('windows') else [],
+        'record_store.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
@@ -472,6 +478,7 @@ env.Library(
 env.CppUnitTest(
     target='db_storage_test',
     source=[
+        'external_record_store_test.cpp',
         'flow_control_test.cpp',
         'historical_ident_tracker_test.cpp',
         'index_entry_comparison_test.cpp',

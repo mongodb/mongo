@@ -27,26 +27,54 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/external_record_store.h"
+#pragma once
 
-#include "mongo/db/storage/multi_bson_stream_cursor.h"
-#include "mongo/db/storage/record_store.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
-ExternalRecordStore::ExternalRecordStore(StringData ns, const VirtualCollectionOptions& vopts)
-    : RecordStore(ns, /*identName=*/ns, /*isCapped=*/false), _vopts(vopts) {}
+// This interface represents any low-level input object such as file descriptor or file handle and
+// provides methods to read data synchronously and query its state & metadata. It's modeled after
+// C++ standard library ifstream.
+//
+// TODO Define SeekableInput interface which has the seek() method.
+class StreamableInput {
+public:
+    virtual ~StreamableInput() {}
 
-/**
- * Returns a MultiBsonStreamCursor for this record store. Reverse scans are not currently supported
- * for this record store type, so if 'forward' is false this asserts.
- */
-std::unique_ptr<SeekableRecordCursor> ExternalRecordStore::getCursor(OperationContext* opCtx,
-                                                                     bool forward) const {
+    virtual const char* getPath() const = 0;
 
-    if (forward) {
-        return std::make_unique<MultiBsonStreamCursor>(getOptions());
+    void open() {
+        if (isOpen()) {
+            return;
+        }
+        doOpen();
     }
-    tasserted(6968302, "MultiBsonStreamCursor does not support reverse scans");
-    return nullptr;
-}
+
+    void close() {
+        if (isOpen()) {
+            doClose();
+        }
+        tassert(7005013, "State must be 'closed' after closing an input", !isOpen());
+    }
+
+    int read(char* data, int count) {
+        uassert(7005010, "Input must have been opened before reading", isOpen());
+        return doRead(data, count);
+    }
+
+    virtual bool isOpen() const = 0;
+
+    virtual bool isGood() const = 0;
+
+    virtual bool isEof() const = 0;
+
+    virtual bool isFailed() const = 0;
+
+protected:
+    virtual void doOpen() = 0;
+
+    virtual void doClose() = 0;
+
+    virtual int doRead(char* data, int count) = 0;
+};
 }  // namespace mongo

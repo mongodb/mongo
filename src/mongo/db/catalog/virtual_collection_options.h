@@ -40,35 +40,42 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+
 /**
  * Metadata for external data source.
  */
 struct ExternalDataSourceMetadata {
+    static constexpr auto kUrlProtocolFile = "file://"_sd;
 #ifndef _WIN32
     static constexpr auto kDefaultFileUrlPrefix = "file:///tmp/"_sd;
 #else
     static constexpr auto kDefaultFileUrlPrefix = "file:////./pipe/"_sd;
 #endif
 
-    ExternalDataSourceMetadata(StringData url, StorageTypeEnum storageType, FileTypeEnum fileType)
-        : url(url), storageType(storageType), fileType(fileType) {
+    ExternalDataSourceMetadata(const std::string& url,
+                               StorageTypeEnum storageType,
+                               FileTypeEnum fileType)
+        : storageType(storageType), fileType(fileType) {
         using namespace fmt::literals;
         uassert(6968500,
                 "File url must start with {}"_format(kDefaultFileUrlPrefix),
-                url.startsWith(kDefaultFileUrlPrefix));
+                url.find(kDefaultFileUrlPrefix.toString()) == 0);
         uassert(6968501, "Storage type must be 'pipe'", storageType == StorageTypeEnum::pipe);
         uassert(6968502, "File type must be 'bson'", fileType == FileTypeEnum::bson);
+
+        // Strip off the protocol prefix.
+        this->url = url.substr(kUrlProtocolFile.size());
     }
 
     ExternalDataSourceMetadata(const ExternalDataSourceInfo& dataSourceInfo)
-        : ExternalDataSourceMetadata(dataSourceInfo.getUrl(),
+        : ExternalDataSourceMetadata(dataSourceInfo.getUrl().toString(),
                                      dataSourceInfo.getStorageType(),
                                      dataSourceInfo.getFileType()) {}
 
     /**
      * Url for an external data source
      */
-    StringData url;
+    std::string url;
 
     /**
      * Storage type for an external data source

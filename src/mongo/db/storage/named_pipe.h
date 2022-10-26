@@ -27,26 +27,61 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/external_record_store.h"
+#pragma once
 
-#include "mongo/db/storage/multi_bson_stream_cursor.h"
-#include "mongo/db/storage/record_store.h"
+#ifndef _WIN32
+#include <fstream>
+#else
+#include <windows.h>
+#endif
+
+#include "mongo/db/storage/input_object.h"
 
 namespace mongo {
-ExternalRecordStore::ExternalRecordStore(StringData ns, const VirtualCollectionOptions& vopts)
-    : RecordStore(ns, /*identName=*/ns, /*isCapped=*/false), _vopts(vopts) {}
+class NamedPipeOutput {
+public:
+    NamedPipeOutput(const char* pipePath);
+    ~NamedPipeOutput();
+    void open();
+    int write(const char* data, int size);
+    void close();
 
-/**
- * Returns a MultiBsonStreamCursor for this record store. Reverse scans are not currently supported
- * for this record store type, so if 'forward' is false this asserts.
- */
-std::unique_ptr<SeekableRecordCursor> ExternalRecordStore::getCursor(OperationContext* opCtx,
-                                                                     bool forward) const {
+private:
+    const char* _pipePath;
+#ifndef _WIN32
+    std::ofstream _ofs;
+#else
+    HANDLE _pipe;
+    bool _isOpen;
+#endif
+};
 
-    if (forward) {
-        return std::make_unique<MultiBsonStreamCursor>(getOptions());
+class NamedPipeInput : public StreamableInput {
+public:
+    NamedPipeInput(const char* pipePath);
+    ~NamedPipeInput() override;
+    const char* getPath() const override {
+        return _pipePath;
     }
-    tasserted(6968302, "MultiBsonStreamCursor does not support reverse scans");
-    return nullptr;
-}
+    bool isOpen() const override;
+    bool isGood() const override;
+    bool isFailed() const override;
+    bool isEof() const override;
+
+protected:
+    void doOpen() override;
+    int doRead(char* data, int size) override;
+    void doClose() override;
+
+private:
+    const char* _pipePath;
+#ifndef _WIN32
+    std::ifstream _ifs;
+#else
+    HANDLE _pipe;
+    bool _isOpen : 1;
+    bool _isGood : 1;
+    bool _isEof : 1;
+#endif
+};
 }  // namespace mongo
