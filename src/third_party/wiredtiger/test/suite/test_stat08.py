@@ -36,9 +36,10 @@ class test_stat08(wttest.WiredTigerTestCase):
 
     nentries = 100000
     # Leave the cache size on the default setting to avoid filling up the cache
-    # too much and triggering unnecessary rollbacks.
+    # too much and triggering unnecessary rollbacks. But make the value fairly
+    # large to make obvious change to the statistics.
     conn_config = 'statistics=(all)'
-    entry_value = "abcde" * 40
+    entry_value = "abcde" * 400
     BYTES_READ = wiredtiger.stat.session.bytes_read
     READ_TIME = wiredtiger.stat.session.read_time
     session_stats = { BYTES_READ : "session: bytes read into cache",           \
@@ -46,6 +47,12 @@ class test_stat08(wttest.WiredTigerTestCase):
 
     def get_stat(self, stat):
         statc =  self.session.open_cursor('statistics:session', None, None)
+        val = statc[stat][2]
+        statc.close()
+        return val
+
+    def get_cstat(self, stat):
+        statc =  self.session.open_cursor('statistics:', None, None)
         val = statc[stat][2]
         statc.close()
         return val
@@ -75,16 +82,22 @@ class test_stat08(wttest.WiredTigerTestCase):
         cursor =  self.session.open_cursor('table:test_stat08', None, None)
         self.session.begin_transaction()
         txn_dirty = self.get_stat(wiredtiger.stat.session.txn_bytes_dirty)
+        cache_dirty = self.get_cstat(wiredtiger.stat.conn.cache_bytes_dirty)
         self.assertEqual(txn_dirty, 0)
+        self.assertLessEqual(txn_dirty, cache_dirty)
         # Write the entries.
-        for i in range(0, self.nentries):
+        for i in range(1, self.nentries):
+            txn_dirty_before = self.get_stat(wiredtiger.stat.session.txn_bytes_dirty)
             cursor[i] = self.entry_value
-            # Since we're using an explicit transaction, we need to commit somewhat frequently.
-            # So check the statistics and commit/restart the transaction every 200 operations.
+            txn_dirty_after = self.get_stat(wiredtiger.stat.session.txn_bytes_dirty)
+            self.assertLess(txn_dirty_before, txn_dirty_after)
+            # Since we're using an explicit transaction, we need to resolve somewhat frequently.
+            # So check the statistics and restart the transaction every 200 operations.
             if i % 200 == 0:
-                txn_dirty = self.get_stat(wiredtiger.stat.session.txn_bytes_dirty)
-                self.assertNotEqual(txn_dirty, 0)
-                self.session.commit_transaction()
+                cache_dirty_txn = self.get_cstat(wiredtiger.stat.conn.cache_bytes_dirty)
+                # Make sure the txn's dirty bytes doesn't exceed the cache.
+                self.assertLessEqual(txn_dirty_after, cache_dirty_txn)
+                self.session.rollback_transaction()
                 self.session.begin_transaction()
                 txn_dirty = self.get_stat(wiredtiger.stat.session.txn_bytes_dirty)
                 self.assertEqual(txn_dirty, 0)
