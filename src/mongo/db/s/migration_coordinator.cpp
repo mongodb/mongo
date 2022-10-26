@@ -267,7 +267,8 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
 
     auto waitForActiveQueriesToComplete = [&]() {
         AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
-        return CollectionShardingRuntime::get(opCtx, deletionTask.getNss())
+        return CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                   opCtx, deletionTask.getNss(), CSRAcquisitionMode::kShared)
             ->getOngoingQueriesCompletionFuture(deletionTask.getCollectionUuid(),
                                                 deletionTask.getRange())
             .semi();

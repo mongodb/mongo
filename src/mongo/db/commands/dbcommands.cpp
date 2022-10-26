@@ -286,9 +286,8 @@ public:
 
             AutoGetCollectionForReadCommand collection(opCtx, nss);
 
-            const auto collDesc =
-                CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
-
+            auto collDesc = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+                                ->getCollectionDescription(opCtx);
             if (collDesc.isSharded()) {
                 const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
                 uassert(ErrorCodes::BadValue,

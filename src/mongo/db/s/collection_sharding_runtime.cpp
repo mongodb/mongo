@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/collection_sharding_runtime.h"
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -74,6 +73,10 @@ boost::optional<ShardVersion> getOperationReceivedVersion(OperationContext* opCt
 
 }  // namespace
 
+CollectionShardingRuntime::ScopedCollectionShardingRuntime::ScopedCollectionShardingRuntime(
+    ScopedCollectionShardingState&& scopedCss)
+    : _scopedCss(std::move(scopedCss)) {}
+
 CollectionShardingRuntime::CollectionShardingRuntime(
     ServiceContext* service,
     NamespaceString nss,
@@ -81,18 +84,17 @@ CollectionShardingRuntime::CollectionShardingRuntime(
     : _serviceContext(service),
       _nss(std::move(nss)),
       _rangeDeleterExecutor(std::move(rangeDeleterExecutor)),
-      _stateChangeMutex(_nss.toString()),
       _metadataType(_nss.isNamespaceAlwaysUnsharded() ? MetadataType::kUnsharded
                                                       : MetadataType::kUnknown) {}
 
-CollectionShardingRuntime* CollectionShardingRuntime::get(OperationContext* opCtx,
-                                                          const NamespaceString& nss) {
-    auto* const css = CollectionShardingState::get(opCtx, nss);
-    return checked_cast<CollectionShardingRuntime*>(css);
-}
-
-CollectionShardingRuntime* CollectionShardingRuntime::get(CollectionShardingState* css) {
-    return checked_cast<CollectionShardingRuntime*>(css);
+CollectionShardingRuntime::ScopedCollectionShardingRuntime
+CollectionShardingRuntime::assertCollectionLockedAndAcquire(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
+                                                            CSRAcquisitionMode mode) {
+    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
+    return ScopedCollectionShardingRuntime(
+        ScopedCollectionShardingState::acquireScopedCollectionShardingState(
+            opCtx, nss, mode == CSRAcquisitionMode::kShared ? MODE_IS : MODE_X));
 }
 
 ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
@@ -161,8 +163,7 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx
     (void)_getMetadataWithVersionCheckAt(opCtx, boost::none);
 }
 
-void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const CSRLock&,
-                                                                 const BSONObj& reason) {
+void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const BSONObj& reason) {
     _critSec.enterCriticalSectionCatchUpPhase(reason);
 
     if (_shardVersionInRecoverOrRefresh) {
@@ -170,39 +171,30 @@ void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const CSRLock&,
     }
 }
 
-void CollectionShardingRuntime::enterCriticalSectionCommitPhase(const CSRLock&,
-                                                                const BSONObj& reason) {
+void CollectionShardingRuntime::enterCriticalSectionCommitPhase(const BSONObj& reason) {
     _critSec.enterCriticalSectionCommitPhase(reason);
 }
 
 void CollectionShardingRuntime::rollbackCriticalSectionCommitPhaseToCatchUpPhase(
-    const CSRLock&, const BSONObj& reason) {
+    const BSONObj& reason) {
     _critSec.rollbackCriticalSectionCommitPhaseToCatchUpPhase(reason);
 }
 
-void CollectionShardingRuntime::exitCriticalSection(const CSRLock&, const BSONObj& reason) {
+void CollectionShardingRuntime::exitCriticalSection(const BSONObj& reason) {
     _critSec.exitCriticalSection(reason);
 }
 
-void CollectionShardingRuntime::exitCriticalSectionNoChecks(const CSRLock&) {
+void CollectionShardingRuntime::exitCriticalSectionNoChecks() {
     _critSec.exitCriticalSectionNoChecks();
 }
 
 boost::optional<SharedSemiFuture<void>> CollectionShardingRuntime::getCriticalSectionSignal(
     OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op) {
-    auto csrLock = CSRLock::lockShared(opCtx, this);
     return _critSec.getSignal(op);
 }
 
 void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
                                                      CollectionMetadata newMetadata) {
-    const auto csrLock = CSRLock::lockExclusive(opCtx, this);
-    setFilteringMetadata_withLock(opCtx, newMetadata, csrLock);
-}
-
-void CollectionShardingRuntime::setFilteringMetadata_withLock(OperationContext* opCtx,
-                                                              CollectionMetadata newMetadata,
-                                                              const CSRLock& csrExclusiveLock) {
     invariant(!newMetadata.isSharded() || !_nss.isNamespaceAlwaysUnsharded(),
               str::stream() << "Namespace " << _nss.ns() << " must never be sharded.");
 
@@ -231,7 +223,6 @@ void CollectionShardingRuntime::setFilteringMetadata_withLock(OperationContext* 
 
 void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
                                                         bool clearMetadataManager) {
-    const auto csrLock = CSRLock::lockExclusive(opCtx, this);
     if (_shardVersionInRecoverOrRefresh) {
         _shardVersionInRecoverOrRefresh->cancellationSource.cancel();
     }
@@ -280,7 +271,8 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
         const StatusWith<SharedSemiFuture<void>> swOrphanCleanupFuture =
             [&]() -> StatusWith<SharedSemiFuture<void>> {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-            auto* const self = CollectionShardingRuntime::get(opCtx, nss);
+            auto self = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                opCtx, nss, CSRAcquisitionMode::kShared);
             stdx::lock_guard lk(self->_metadataManagerLock);
 
             // If the metadata was reset, or the collection was dropped and recreated since the
@@ -393,8 +385,6 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     const auto& receivedShardVersion =
         optReceivedShardVersion ? *optReceivedShardVersion : ShardVersion::IGNORED();
 
-    auto csrLock = CSRLock::lockShared(opCtx, this);
-
     {
         auto criticalSectionSignal = _critSec.getSignal(
             opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
@@ -479,26 +469,24 @@ size_t CollectionShardingRuntime::numberOfRangesScheduledForDeletion() const {
 
 
 void CollectionShardingRuntime::setShardVersionRecoverRefreshFuture(
-    SharedSemiFuture<void> future, CancellationSource cancellationSource, const CSRLock&) {
+    SharedSemiFuture<void> future, CancellationSource cancellationSource) {
     invariant(!_shardVersionInRecoverOrRefresh);
     _shardVersionInRecoverOrRefresh.emplace(std::move(future), std::move(cancellationSource));
 }
 
 boost::optional<SharedSemiFuture<void>>
 CollectionShardingRuntime::getShardVersionRecoverRefreshFuture(OperationContext* opCtx) {
-    auto csrLock = CSRLock::lockShared(opCtx, this);
     return _shardVersionInRecoverOrRefresh
         ? boost::optional<SharedSemiFuture<void>>(_shardVersionInRecoverOrRefresh->future)
         : boost::none;
 }
 
-void CollectionShardingRuntime::resetShardVersionRecoverRefreshFuture(const CSRLock&) {
+void CollectionShardingRuntime::resetShardVersionRecoverRefreshFuture() {
     invariant(_shardVersionInRecoverOrRefresh);
     _shardVersionInRecoverOrRefresh = boost::none;
 }
 
 boost::optional<Timestamp> CollectionShardingRuntime::getIndexVersion(OperationContext* opCtx) {
-    auto csrLock = CSRLock::lockShared(opCtx, this);
     return _globalIndexesInfo ? _globalIndexesInfo->getVersion() : boost::none;
 }
 
@@ -510,7 +498,6 @@ boost::optional<GlobalIndexesCache>& CollectionShardingRuntime::getIndexes(
 void CollectionShardingRuntime::addIndex(OperationContext* opCtx,
                                          const IndexCatalogType& index,
                                          const Timestamp& indexVersion) {
-    auto csrLock = CSRLock::lockExclusive(opCtx, this);
     if (_globalIndexesInfo) {
         _globalIndexesInfo->add(index, indexVersion);
     } else {
@@ -523,14 +510,12 @@ void CollectionShardingRuntime::addIndex(OperationContext* opCtx,
 void CollectionShardingRuntime::removeIndex(OperationContext* opCtx,
                                             const std::string& name,
                                             const Timestamp& indexVersion) {
-    auto csrLock = CSRLock::lockExclusive(opCtx, this);
     tassert(
         7019500, "Index information does not exist on CSR", _globalIndexesInfo.is_initialized());
     _globalIndexesInfo->remove(name, indexVersion);
 }
 
 void CollectionShardingRuntime::clearIndexes(OperationContext* opCtx) {
-    auto csrLock = CSRLock::lockExclusive(opCtx, this);
     _globalIndexesInfo = boost::none;
 }
 
@@ -546,18 +531,18 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
                                AutoGetCollection::Options{}.deadline(
                                    _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
-    auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-    invariant(csr->getCurrentMetadataIfKnown());
-    csr->enterCriticalSectionCatchUpPhase(csrLock, _reason);
+    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        _opCtx, _nss, CSRAcquisitionMode::kExclusive);
+    invariant(scopedCsr->getCurrentMetadataIfKnown());
+    scopedCsr->enterCriticalSectionCatchUpPhase(_reason);
 }
 
 CollectionCriticalSection::~CollectionCriticalSection() {
     UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
     AutoGetCollection autoColl(_opCtx, _nss, MODE_IX);
-    auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-    csr->exitCriticalSection(csrLock, _reason);
+    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        _opCtx, _nss, CSRAcquisitionMode::kExclusive);
+    scopedCsr->exitCriticalSection(_reason);
 }
 
 void CollectionCriticalSection::enterCommitPhase() {
@@ -567,10 +552,10 @@ void CollectionCriticalSection::enterCommitPhase() {
                                AutoGetCollection::Options{}.deadline(
                                    _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
-    auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-    invariant(csr->getCurrentMetadataIfKnown());
-    csr->enterCriticalSectionCommitPhase(csrLock, _reason);
+    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        _opCtx, _nss, CSRAcquisitionMode::kExclusive);
+    invariant(scopedCsr->getCurrentMetadataIfKnown());
+    scopedCsr->enterCriticalSectionCommitPhase(_reason);
 }
 
 }  // namespace mongo

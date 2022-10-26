@@ -202,11 +202,11 @@ void LogTransactionOperationsForShardingHandler::commit(OperationContext* opCtx,
         const auto& nss = stmt.getNss();
         auto opCtx = cc().getOperationContext();
 
-        auto csr = CollectionShardingRuntime::get(opCtx, nss);
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
+        auto scopedCss = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            opCtx, nss, CSRAcquisitionMode::kShared);
 
-        const auto clonerPtr = MigrationSourceManager::getCurrentCloner(csr, csrLock);
+        auto clonerPtr = MigrationSourceManager::getCurrentCloner(*scopedCss);
         if (!clonerPtr) {
             continue;
         }

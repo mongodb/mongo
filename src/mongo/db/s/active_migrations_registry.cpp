@@ -228,10 +228,10 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
     if (nss) {
         // Lock the collection so nothing changes while we're getting the migration report.
         AutoGetCollection autoColl(opCtx, nss.value(), MODE_IS);
-        auto csr = CollectionShardingRuntime::get(opCtx, nss.value());
-        auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
+        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            opCtx, nss.value(), CSRAcquisitionMode::kShared);
 
-        if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
+        if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
             return msm->getMigrationStatusReport();
         }
     }

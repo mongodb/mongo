@@ -110,7 +110,8 @@ public:
 
             {
                 AutoGetCollection autoColl(opCtx.get(), _outputNss, MODE_X);
-                CollectionShardingRuntime::get(opCtx.get(), _outputNss)
+                CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                    opCtx.get(), _outputNss, CSRAcquisitionMode::kExclusive)
                     ->setFilteringMetadata(
                         opCtx.get(),
                         CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));

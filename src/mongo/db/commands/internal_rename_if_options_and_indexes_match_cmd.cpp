@@ -44,7 +44,9 @@ MONGO_FAIL_POINT_DEFINE(blockBeforeInternalRenameIfOptionsAndIndexesMatch);
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead lock(opCtx, nss);
     return opCtx->writesAreReplicated() &&
-        CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx).isSharded();
+        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+            ->getCollectionDescription(opCtx)
+            .isSharded();
 }
 
 /**

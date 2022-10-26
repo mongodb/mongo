@@ -111,14 +111,13 @@ MONGO_FAIL_POINT_DEFINE(hangBeforePostMigrationCommitRefresh);
 
 }  // namespace
 
-MigrationSourceManager* MigrationSourceManager::get(CollectionShardingRuntime* csr,
-                                                    CollectionShardingRuntime::CSRLock& csrLock) {
+MigrationSourceManager* MigrationSourceManager::get(CollectionShardingRuntime& csr) {
     return msmForCsr(csr);
 }
 
 std::shared_ptr<MigrationChunkClonerSource> MigrationSourceManager::getCurrentCloner(
-    CollectionShardingRuntime* csr, CollectionShardingRuntime::CSRLock& csrLock) {
-    auto msm = get(csr, csrLock);
+    CollectionShardingRuntime& csr) {
+    auto msm = get(csr);
     if (!msm)
         return nullptr;
     return msm->_cloneDriver;
@@ -182,9 +181,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     const auto [collectionMetadata, collectionUUID] = [&] {
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IS);
-
-        auto* const csr = CollectionShardingRuntime::get(_opCtx, nss());
-        const auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            opCtx, nss(), CSRAcquisitionMode::kExclusive);
 
         const auto metadata = checkCollectionIdentity(_opCtx, nss(), _args.getEpoch(), boost::none);
 
@@ -198,7 +196,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                 "Collection is undergoing changes so moveChunk is not allowed.",
                 metadata.allowMigrations());
 
-        _scopedRegisterer.emplace(this, csr, csrLock);
+        _scopedRegisterer.emplace(this, *scopedCsr);
 
         return std::make_tuple(std::move(metadata), std::move(collectionUUID));
     }();
@@ -272,8 +270,8 @@ void MigrationSourceManager::startClone() {
                                        _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                        Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
 
-        auto* const csr = CollectionShardingRuntime::get(_opCtx, nss());
-        const auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            _opCtx, nss(), CSRAcquisitionMode::kExclusive);
 
         // Having the metadata manager registered on the collection sharding state is what indicates
         // that a chunk on that collection is being migrated to the OpObservers. With an active
@@ -473,7 +471,9 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         {
             UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
             AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
-            CollectionShardingRuntime::get(_opCtx, nss())->clearFilteringMetadata(_opCtx);
+            CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                _opCtx, nss(), CSRAcquisitionMode::kExclusive)
+                ->clearFilteringMetadata(_opCtx);
         }
         scopedGuard.dismiss();
         _cleanup(false);
@@ -510,7 +510,9 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         {
             UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
             AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
-            CollectionShardingRuntime::get(_opCtx, nss())->clearFilteringMetadata(_opCtx);
+            CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                _opCtx, nss(), CSRAcquisitionMode::kExclusive)
+                ->clearFilteringMetadata(_opCtx);
         }
         scopedGuard.dismiss();
         _cleanup(false);
@@ -626,9 +628,10 @@ CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
     auto metadata = [&] {
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
         AutoGetCollection autoColl(_opCtx, _args.getCommandParameter(), MODE_IS);
-        auto* const css = CollectionShardingRuntime::get(_opCtx, _args.getCommandParameter());
+        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            _opCtx, _args.getCommandParameter(), CSRAcquisitionMode::kShared);
 
-        const auto optMetadata = css->getCurrentMetadataIfKnown();
+        const auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "The collection's sharding state was cleared by a concurrent operation",
                 optMetadata);
@@ -653,8 +656,8 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
         // Unregister from the collection's sharding state and exit the migration critical section.
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
-        auto* const csr = CollectionShardingRuntime::get(_opCtx, nss());
-        const auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            _opCtx, nss(), CSRAcquisitionMode::kExclusive);
 
         if (_state != kCreated) {
             invariant(_cloneDriver);
@@ -742,7 +745,9 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
         // the next op to recover.
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
-        CollectionShardingRuntime::get(_opCtx, nss())->clearFilteringMetadata(_opCtx);
+        CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            _opCtx, nss(), CSRAcquisitionMode::kExclusive)
+            ->clearFilteringMetadata(_opCtx);
     }
 }
 
@@ -757,10 +762,8 @@ BSONObj MigrationSourceManager::getMigrationStatusReport() const {
         _args.getMax().value_or(BSONObj()));
 }
 
-MigrationSourceManager::ScopedRegisterer::ScopedRegisterer(
-    MigrationSourceManager* msm,
-    CollectionShardingRuntime* csr,
-    const CollectionShardingRuntime::CSRLock& csrLock)
+MigrationSourceManager::ScopedRegisterer::ScopedRegisterer(MigrationSourceManager* msm,
+                                                           CollectionShardingRuntime& csr)
     : _msm(msm) {
     invariant(nullptr == std::exchange(msmForCsr(csr), msm));
 }
@@ -768,9 +771,9 @@ MigrationSourceManager::ScopedRegisterer::ScopedRegisterer(
 MigrationSourceManager::ScopedRegisterer::~ScopedRegisterer() {
     UninterruptibleLockGuard noInterrupt(_msm->_opCtx->lockState());
     AutoGetCollection autoColl(_msm->_opCtx, _msm->_args.getCommandParameter(), MODE_IX);
-    auto csr = CollectionShardingRuntime::get(_msm->_opCtx, _msm->_args.getCommandParameter());
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_msm->_opCtx, csr);
-    invariant(_msm == std::exchange(msmForCsr(csr), nullptr));
+    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        _msm->_opCtx, _msm->_args.getCommandParameter(), CSRAcquisitionMode::kExclusive);
+    invariant(_msm == std::exchange(msmForCsr(*scopedCsr), nullptr));
 }
 
 }  // namespace mongo

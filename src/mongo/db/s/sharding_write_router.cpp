@@ -33,47 +33,48 @@ namespace mongo {
 
 ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         CatalogCache* catalogCache) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        _css = CollectionShardingState::get(opCtx, nss);
-        auto collDesc = _css->getCollectionDescription(opCtx);
+                                         CatalogCache* catalogCache)
+    : _scopedCss(CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)),
+      _collDesc(_scopedCss->getCollectionDescription(opCtx)) {
+    if (!_collDesc.isSharded()) {
+        invariant(!_collDesc.getReshardingKeyIfShouldForwardOps());
+        return;
+    }
 
-        _reshardKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
-        if (_reshardKeyPattern) {
-            _ownershipFilter = _css->getOwnershipFilter(
-                opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
-            _shardKeyPattern = ShardKeyPattern(collDesc.getKeyPattern());
+    _reshardingKeyPattern = _collDesc.getReshardingKeyIfShouldForwardOps();
+    if (_reshardingKeyPattern) {
+        _ownershipFilter = _scopedCss->getOwnershipFilter(
+            opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
 
-            const auto& reshardingFields = collDesc.getReshardingFields();
-            invariant(reshardingFields);
-            const auto& donorFields = reshardingFields->getDonorFields();
-            invariant(donorFields);
+        const auto& reshardingFields = _collDesc.getReshardingFields();
+        invariant(reshardingFields);
+        const auto& donorFields = reshardingFields->getDonorFields();
+        invariant(donorFields);
 
-            _reshardingChunkMgr = uassertStatusOK(catalogCache->getCollectionRoutingInfo(
-                opCtx, donorFields->getTempReshardingNss(), true /* allowLocks */));
+        _reshardingChunkMgr = uassertStatusOK(catalogCache->getCollectionRoutingInfo(
+            opCtx, donorFields->getTempReshardingNss(), true /* allowLocks */));
 
-            tassert(6862800,
-                    "Routing information for the temporary resharing collection is stale",
-                    _reshardingChunkMgr->isSharded());
-        }
+        tassert(6862800,
+                "Routing information for the temporary resharing collection is stale",
+                _reshardingChunkMgr->isSharded());
     }
 }
 
 boost::optional<ShardId> ShardingWriteRouter::getReshardingDestinedRecipient(
     const BSONObj& fullDocument) const {
-    if (!_reshardKeyPattern) {
+    if (!_reshardingKeyPattern) {
         return boost::none;
     }
 
     invariant(_ownershipFilter);
-    invariant(_shardKeyPattern);
     invariant(_reshardingChunkMgr);
 
-    if (!_ownershipFilter->keyBelongsToMe(_shardKeyPattern->extractShardKeyFromDoc(fullDocument))) {
+    const auto& shardKeyPattern = _collDesc.getShardKeyPattern();
+    if (!_ownershipFilter->keyBelongsToMe(shardKeyPattern.extractShardKeyFromDoc(fullDocument))) {
         return boost::none;
     }
 
-    auto shardKey = _reshardKeyPattern->extractShardKeyFromDocThrows(fullDocument);
+    auto shardKey = _reshardingKeyPattern->extractShardKeyFromDocThrows(fullDocument);
     return _reshardingChunkMgr->findIntersectingChunkWithSimpleCollation(shardKey).getShardId();
 }
 

@@ -34,7 +34,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
@@ -77,8 +76,9 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
         }
         collectionUuid.emplace(autoColl.getCollection()->uuid());
 
-        auto* const csr = CollectionShardingRuntime::get(opCtx, ns);
-        const auto optCollDescr = csr->getCurrentMetadataIfKnown();
+        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            opCtx, ns, CSRAcquisitionMode::kShared);
+        auto optCollDescr = scopedCsr->getCurrentMetadataIfKnown();
         if (!optCollDescr || !optCollDescr->isSharded()) {
             LOGV2(4416001,
                   "cleanupOrphaned skipping waiting for orphaned data cleanup because "

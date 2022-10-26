@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
+
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
@@ -36,10 +36,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
-
 namespace mongo {
 namespace resharding_metrics {
-
 namespace {
 
 boost::optional<UUID> tryGetReshardingUUID(OperationContext* opCtx, const NamespaceString& nss) {
@@ -54,8 +52,9 @@ boost::optional<UUID> tryGetReshardingUUID(OperationContext* opCtx, const Namesp
     // so this is considered acceptable.
     AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-    auto csr = CollectionShardingRuntime::get(opCtx, nss);
-    auto metadata = csr->getCurrentMetadataIfKnown();
+    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        opCtx, nss, CSRAcquisitionMode::kShared);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->isSharded()) {
         return boost::none;
     }
@@ -105,5 +104,4 @@ void onCriticalSectionError(OperationContext* opCtx, const StaleConfigInfo& info
 }
 
 }  // namespace resharding_metrics
-
 }  // namespace mongo

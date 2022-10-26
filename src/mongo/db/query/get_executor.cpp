@@ -861,7 +861,7 @@ protected:
         if (_plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             stage = std::make_unique<ShardFilterStage>(
                 _cq->getExpCtxRaw(),
-                CollectionShardingState::get(_opCtx, _cq->nss())
+                CollectionShardingState::assertCollectionLockedAndAcquire(_opCtx, _cq->nss())
                     ->getOwnershipFilter(
                         _opCtx,
                         CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup),

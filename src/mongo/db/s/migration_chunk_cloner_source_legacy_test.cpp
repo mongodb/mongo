@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
@@ -184,7 +182,8 @@ protected:
 
             AutoGetDb autoDb(operationContext(), kNss.dbName(), MODE_IX);
             Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
-            CollectionShardingRuntime::get(operationContext(), kNss)
+            CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                operationContext(), kNss, CSRAcquisitionMode::kExclusive)
                 ->setFilteringMetadata(
                     operationContext(),
                     CollectionMetadata(

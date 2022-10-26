@@ -130,9 +130,10 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
     // 'q' field belong to this shard, but those in the 'u' field do not. In this case we need to
     // throw so that MongoS can target the insert to the correct shard.
     if (_isUserInitiatedWrite) {
-        auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
-        if (css->getCollectionDescription(opCtx()).isSharded()) {
-            const auto collFilter = css->getOwnershipFilter(
+        auto scopedCss =
+            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx(), collection()->ns());
+        if (scopedCss->getCollectionDescription(opCtx()).isSharded()) {
+            auto collFilter = scopedCss->getOwnershipFilter(
                 opCtx(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
             const ShardKeyPattern& shardKeyPattern = collFilter.getShardKeyPattern();
             auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newDocument);
@@ -203,7 +204,8 @@ BSONObj UpsertStage::_produceNewDocumentForInsert() {
     FieldRefSet shardKeyPaths, immutablePaths;
 
     if (_isUserInitiatedWrite) {
-        optCollDesc = CollectionShardingState::get(opCtx(), _params.request->getNamespaceString())
+        optCollDesc = CollectionShardingState::assertCollectionLockedAndAcquire(
+                          opCtx(), _params.request->getNamespaceString())
                           ->getCollectionDescription(opCtx());
 
         // If the collection is sharded, add all fields from the shard key to the 'shardKeyPaths'

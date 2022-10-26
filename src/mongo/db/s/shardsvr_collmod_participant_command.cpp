@@ -102,7 +102,9 @@ public:
                     // operation to refresh the metadata.
                     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                     AutoGetCollection autoColl(opCtx, bucketNs, MODE_IX);
-                    CollectionShardingRuntime::get(opCtx, bucketNs)->clearFilteringMetadata(opCtx);
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                        opCtx, bucketNs, CSRAcquisitionMode::kExclusive)
+                        ->clearFilteringMetadata(opCtx);
                 }
 
                 auto service = ShardingRecoveryService::get(opCtx);

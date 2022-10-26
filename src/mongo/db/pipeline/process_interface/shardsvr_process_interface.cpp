@@ -166,7 +166,7 @@ BSONObj ShardServerProcessInterface::preparePipelineAndExplain(
 std::unique_ptr<ShardFilterer> ShardServerProcessInterface::getShardFilterer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     auto collectionFilter =
-        CollectionShardingState::get(expCtx->opCtx, expCtx->ns)
+        CollectionShardingState::assertCollectionLockedAndAcquire(expCtx->opCtx, expCtx->ns)
             ->getOwnershipFilter(
                 expCtx->opCtx,
                 CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);

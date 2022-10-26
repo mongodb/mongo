@@ -187,12 +187,10 @@ private:
      * returns true. If the update does not change shard key fields, returns false.
      */
     bool wasExistingShardKeyUpdated(const ShardingWriteRouter& shardingWriteRouter,
-                                    const ScopedCollectionDescription& collDesc,
                                     const BSONObj& newObj,
                                     const Snapshotted<BSONObj>& oldObj);
 
     bool wasReshardingKeyUpdated(const ShardingWriteRouter& shardingWriteRouter,
-                                 const ScopedCollectionDescription& collDesc,
                                  const BSONObj& newObj,
                                  const Snapshotted<BSONObj>& oldObj);
 

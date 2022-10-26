@@ -42,7 +42,8 @@ const NamespaceString kTestNss("TestDB", "TestColl");
 
 void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {
     AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);
-    CollectionShardingRuntime::get(opCtx, kTestNss)
+    CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        opCtx, kTestNss, CSRAcquisitionMode::kExclusive)
         ->setFilteringMetadata(opCtx, std::move(metadata));
 }
 

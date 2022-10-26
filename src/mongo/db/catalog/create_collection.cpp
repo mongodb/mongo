@@ -179,7 +179,8 @@ Status _createView(OperationContext* opCtx,
                           str::stream() << "Not primary while creating collection " << nss);
         }
 
-        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
+        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+            ->checkShardVersionOrThrow(opCtx);
 
         if (collectionOptions.changeStreamPreAndPostImagesOptions.getEnabled()) {
             return Status(ErrorCodes::InvalidOptions,
@@ -337,7 +338,8 @@ Status _createTimeseries(OperationContext* opCtx,
                               str::stream() << "Not primary while creating collection " << ns);
             }
 
-            CollectionShardingState::get(opCtx, bucketsNs)->checkShardVersionOrThrow(opCtx);
+            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, bucketsNs)
+                ->checkShardVersionOrThrow(opCtx);
 
             WriteUnitOfWork wuow(opCtx);
             AutoStatsTracker bucketsStatsTracker(
@@ -425,7 +427,8 @@ Status _createTimeseries(OperationContext* opCtx,
                     str::stream() << "Not primary while creating collection " << ns};
         }
 
-        CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
+        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, ns)
+            ->checkShardVersionOrThrow(opCtx);
 
         _createSystemDotViewsIfNecessary(opCtx, db);
 
@@ -542,7 +545,8 @@ Status _createCollection(
                           str::stream() << "Not primary while creating collection " << nss);
         }
 
-        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
+        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+            ->checkShardVersionOrThrow(opCtx);
 
         WriteUnitOfWork wunit(opCtx);
 

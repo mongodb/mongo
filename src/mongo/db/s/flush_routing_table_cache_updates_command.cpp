@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -49,7 +46,6 @@
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -128,9 +124,10 @@ public:
                 // inclusive of the commit (and new writes to the committed chunk) that hasn't yet
                 // propagated back to this shard. This ensures the read your own writes causal
                 // consistency guarantee.
-                auto const csr = CollectionShardingRuntime::get(opCtx, ns());
-                criticalSectionSignal =
-                    csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
+                auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                    opCtx, ns(), CSRAcquisitionMode::kShared);
+                criticalSectionSignal = scopedCsr->getCriticalSectionSignal(
+                    opCtx, ShardingMigrationCriticalSection::kWrite);
             }
 
             if (criticalSectionSignal)

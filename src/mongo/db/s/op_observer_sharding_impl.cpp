@@ -66,14 +66,7 @@ void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
     chunk.throwIfMoved();
 }
 
-bool isMigratingWithCSRLock(CollectionShardingRuntime* csr,
-                            CollectionShardingRuntime::CSRLock& csrLock,
-                            BSONObj const& docToDelete) {
-    auto cloner = MigrationSourceManager::getCurrentCloner(csr, csrLock);
-    return cloner && cloner->isDocumentInMigratingChunk(docToDelete);
-}
-
-void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
+void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss) {
     if (!nss.isNormalCollection() && nss.coll() != "system.views" &&
         !nss.isTimeseriesBucketsCollection()) {
         return;
@@ -101,9 +94,11 @@ OpObserverShardingImpl::OpObserverShardingImpl(std::unique_ptr<OplogWriter> oplo
 bool OpObserverShardingImpl::isMigrating(OperationContext* opCtx,
                                          NamespaceString const& nss,
                                          BSONObj const& docToDelete) {
-    auto csr = CollectionShardingRuntime::get(opCtx, nss);
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    return isMigratingWithCSRLock(csr, csrLock, docToDelete);
+    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        opCtx, nss, CSRAcquisitionMode::kShared);
+    auto cloner = MigrationSourceManager::getCurrentCloner(*scopedCsr);
+
+    return cloner && cloner->isDocumentInMigratingChunk(docToDelete);
 }
 
 void OpObserverShardingImpl::shardObserveAboutToDelete(OperationContext* opCtx,
@@ -123,9 +118,9 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
         return;
 
     auto* const css = shardingWriteRouter.getCss();
-    auto* const csr = CollectionShardingRuntime::get(css);
-    csr->checkShardVersionOrThrow(opCtx);
+    css->checkShardVersionOrThrow(opCtx);
 
+    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->isSharded()) {
         assertNoMovePrimaryInProgress(opCtx, nss);
@@ -144,8 +139,7 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
         return;
     }
 
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    auto cloner = MigrationSourceManager::getCurrentCloner(csr, csrLock);
+    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
     if (cloner) {
         cloner->onInsertOp(opCtx, insertedDoc, opTime);
     }
@@ -160,9 +154,9 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   const repl::OpTime& prePostImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
     auto* const css = shardingWriteRouter.getCss();
-    auto* const csr = CollectionShardingRuntime::get(css);
-    csr->checkShardVersionOrThrow(opCtx);
+    css->checkShardVersionOrThrow(opCtx);
 
+    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->isSharded()) {
         assertNoMovePrimaryInProgress(opCtx, nss);
@@ -181,8 +175,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
         return;
     }
 
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    auto cloner = MigrationSourceManager::getCurrentCloner(csr, csrLock);
+    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
     if (cloner) {
         cloner->onUpdateOp(opCtx, preImageDoc, postImageDoc, opTime, prePostImageOpTime);
     }
@@ -196,9 +189,9 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
                                                   const repl::OpTime& preImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
     auto* const css = shardingWriteRouter.getCss();
-    auto* const csr = CollectionShardingRuntime::get(css);
-    csr->checkShardVersionOrThrow(opCtx);
+    css->checkShardVersionOrThrow(opCtx);
 
+    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->isSharded()) {
         assertNoMovePrimaryInProgress(opCtx, nss);
@@ -217,9 +210,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
         return;
     }
 
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    auto cloner = MigrationSourceManager::getCurrentCloner(csr, csrLock);
-
+    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
     if (cloner && getIsMigrating(opCtx)) {
         cloner->onDeleteOp(opCtx, documentKey, opTime, preImageOpTime);
     }

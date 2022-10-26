@@ -98,9 +98,10 @@ public:
             nss,
             MODE_IS,
             AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-        auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            opCtx, nss, CSRAcquisitionMode::kShared);
 
-        const auto optMetadata = csr->getCurrentMetadataIfKnown();
+        auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
         if (!optMetadata) {
             result.append("global", "UNKNOWN");
 

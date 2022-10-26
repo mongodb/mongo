@@ -116,11 +116,9 @@ void RangeDeleterServiceTest::_setFilteringMetadataByUUID(OperationContext* opCt
     }();
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
-
-    CollectionShardingRuntime::get(opCtx, nss)->setFilteringMetadata(opCtx, metadata);
-    auto* css = CollectionShardingState::get(opCtx, nss);
-    auto& csr = *checked_cast<CollectionShardingRuntime*>(css);
-    csr.setFilteringMetadata(opCtx, metadata);
+    CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        opCtx, nss, CSRAcquisitionMode::kExclusive)
+        ->setFilteringMetadata(opCtx, metadata);
 }
 
 /**

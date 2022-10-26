@@ -322,10 +322,11 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
             auto childStage = build(fn->children[0].get());
 
-            auto css = CollectionShardingState::get(_opCtx, _collection->ns());
+            auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(
+                _opCtx, _collection->ns());
             return std::make_unique<ShardFilterStage>(
                 expCtx,
-                css->getOwnershipFilter(
+                scopedCss->getOwnershipFilter(
                     _opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup),
                 _ws,
                 std::move(childStage));

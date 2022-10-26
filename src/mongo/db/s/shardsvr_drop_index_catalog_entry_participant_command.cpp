@@ -95,11 +95,12 @@ public:
                     txnParticipant);
             {
                 AutoGetCollection coll(opCtx, ns(), LockMode::MODE_IS);
-                auto csr = CollectionShardingRuntime::get(opCtx, ns());
-                uassert(
-                    6711904,
-                    "The critical section must be taken in order to execute this command",
-                    csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite));
+                auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                    opCtx, ns(), CSRAcquisitionMode::kShared);
+                uassert(6711904,
+                        "The critical section must be taken in order to execute this command",
+                        scopedCsr->getCriticalSectionSignal(
+                            opCtx, ShardingMigrationCriticalSection::kWrite));
             }
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();

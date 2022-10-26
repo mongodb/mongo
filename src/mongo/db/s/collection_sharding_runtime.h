@@ -33,12 +33,13 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/db/s/sharding_state_lock.h"
 #include "mongo/s/global_index_cache.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
+
+enum class CSRAcquisitionMode { kShared, kExclusive };
 
 /**
  * See the comments for CollectionShardingState for more information on how this class fits in the
@@ -54,22 +55,34 @@ public:
                               NamespaceString nss,
                               std::shared_ptr<executor::TaskExecutor> rangeDeleterExecutor);
 
-    using CSRLock = ShardingStateLock<CollectionShardingRuntime>;
-
     /**
-     * Obtains the sharding runtime state for the specified collection. If it does not exist, it
-     * will be created and will remain active until the collection is dropped or unsharded.
-     *
-     * Must be called with some lock held on the specific collection being looked up and the
-     * returned pointer should never be stored.
+     * Obtains the sharding runtime for the specified collection, along with a resource lock
+     * protecting it from concurrent modifications, which will be held until the object goes out of
+     * scope.
      */
-    static CollectionShardingRuntime* get(OperationContext* opCtx, const NamespaceString& nss);
+    class ScopedCollectionShardingRuntime {
+    public:
+        ScopedCollectionShardingRuntime(ScopedCollectionShardingRuntime&&) = default;
 
-    /**
-     * Obtains the sharding runtime state from the the specified sharding collection state. The
-     * returned pointer should never be stored.
-     */
-    static CollectionShardingRuntime* get(CollectionShardingState* css);
+        CollectionShardingRuntime* operator->() const {
+            return checked_cast<CollectionShardingRuntime*>(&*_scopedCss);
+        }
+        CollectionShardingRuntime& operator*() const {
+            return checked_cast<CollectionShardingRuntime&>(*_scopedCss);
+        }
+
+    private:
+        friend class CollectionShardingRuntime;
+
+        ScopedCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss);
+
+        ScopedCollectionShardingState _scopedCss;
+    };
+    static ScopedCollectionShardingRuntime assertCollectionLockedAndAcquire(
+        OperationContext* opCtx, const NamespaceString& nss, CSRAcquisitionMode mode);
+    static ScopedCollectionShardingState acquire(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 CSRAcquisitionMode mode) = delete;
 
     const NamespaceString& nss() const override {
         return _nss;
@@ -107,10 +120,6 @@ public:
      */
     void setFilteringMetadata(OperationContext* opCtx, CollectionMetadata newMetadata);
 
-    void setFilteringMetadata_withLock(OperationContext* opCtx,
-                                       CollectionMetadata newMetadata,
-                                       const CSRLock& csrExclusiveLock);
-
     /**
      * Marks the collection's filtering metadata as UNKNOWN, meaning that all attempts to check for
      * shard version match will fail with StaleConfig errors in order to trigger an update.
@@ -135,33 +144,29 @@ public:
      *
      * Entering into the Critical Section interrupts any ongoing filtering metadata refresh.
      */
-    void enterCriticalSectionCatchUpPhase(const CSRLock&, const BSONObj& reason);
-    void enterCriticalSectionCommitPhase(const CSRLock&, const BSONObj& reason);
+    void enterCriticalSectionCatchUpPhase(const BSONObj& reason);
+    void enterCriticalSectionCommitPhase(const BSONObj& reason);
 
     /**
      * It transitions the critical section back to the catch up phase.
      */
-    void rollbackCriticalSectionCommitPhaseToCatchUpPhase(const CSRLock&, const BSONObj& reason);
+    void rollbackCriticalSectionCommitPhaseToCatchUpPhase(const BSONObj& reason);
 
     /**
-     * Method to control the collection's critical secion. Method listed below must be called with
-     * the CSRLock in exclusive mode.
-     *
-     * In this method, the CSRLock ensures concurrent access to the critical section.
+     * Method to control the collection's critical section. Methods listed below must be called with
+     * both the collection lock and CSR acquired in exclusive mode.
      */
-    void exitCriticalSection(const CSRLock&, const BSONObj& reason);
+    void exitCriticalSection(const BSONObj& reason);
 
     /**
      * Same semantics than 'exitCriticalSection' but without doing error-checking. Only meant to be
      * used when recovering the critical sections in the RecoverableCriticalSectionService.
      */
-    void exitCriticalSectionNoChecks(const CSRLock&);
+    void exitCriticalSectionNoChecks();
 
     /**
      * If the collection is currently in a critical section, returns the critical section signal to
      * be waited on. Otherwise, returns nullptr.
-     *
-     * This method internally acquires the CSRLock in MODE_IS.
      */
     boost::optional<SharedSemiFuture<void>> getCriticalSectionSignal(
         OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op);
@@ -204,29 +209,22 @@ public:
      * Initializes the shard version recover/refresh shared semifuture for other threads to wait on
      * it.
      *
-     * In this method, the CSRLock ensures concurrent access to the shared semifuture.
-     *
      * To invoke this method, the criticalSectionSignal must not be hold by a different thread.
      */
     void setShardVersionRecoverRefreshFuture(SharedSemiFuture<void> future,
-                                             CancellationSource cancellationSource,
-                                             const CSRLock&);
+                                             CancellationSource cancellationSource);
 
     /**
      * If there an ongoing shard version recover/refresh, it returns the shared semifuture to be
      * waited on. Otherwise, returns boost::none.
-     *
-     * This method internally acquires the CSRLock in MODE_IS.
      */
     boost::optional<SharedSemiFuture<void>> getShardVersionRecoverRefreshFuture(
         OperationContext* opCtx);
 
     /**
      * Resets the shard version recover/refresh shared semifuture to boost::none.
-     *
-     * In this method, the CSRLock ensures concurrent access to the shared semifuture.
      */
-    void resetShardVersionRecoverRefreshFuture(const CSRLock&);
+    void resetShardVersionRecoverRefreshFuture();
 
     /**
      * Gets an index version under a lock.
@@ -258,8 +256,6 @@ public:
     void clearIndexes(OperationContext* opCtx);
 
 private:
-    friend CSRLock;
-
     struct ShardVersionRecoverOrRefresh {
     public:
         ShardVersionRecoverOrRefresh(SharedSemiFuture<void> future,
@@ -304,13 +300,7 @@ private:
     // The executor used for deleting ranges of orphan chunks.
     std::shared_ptr<executor::TaskExecutor> _rangeDeleterExecutor;
 
-    // Object-wide ResourceMutex to protect changes to the CollectionShardingRuntime or objects held
-    // within (including the MigrationSourceManager, which is a decoration on the CSR). Use only the
-    // CSRLock to lock this mutex.
-    Lock::ResourceMutex _stateChangeMutex;
-
     // Tracks the migration critical section state for this collection.
-    // Must hold CSRLock while accessing.
     ShardingMigrationCriticalSection _critSec;
 
     // Protects state around the metadata manager below

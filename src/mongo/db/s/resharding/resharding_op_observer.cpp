@@ -71,7 +71,9 @@ void assertCanExtractShardKeyFromDocs(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       std::vector<InsertStatement>::const_iterator begin,
                                       std::vector<InsertStatement>::const_iterator end) {
-    const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
+    auto collDesc = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+                        ->getCollectionDescription(opCtx);
+
     // A user can manually create a 'db.system.resharding.' collection that isn't guaranteed to be
     // sharded outside of running reshardCollection.
     uassert(ErrorCodes::NamespaceNotSharded,

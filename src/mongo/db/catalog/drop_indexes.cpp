@@ -294,7 +294,8 @@ void dropReadyIndexes(OperationContext* opCtx,
 
     IndexCatalog* indexCatalog = collection->getIndexCatalog();
     auto collDescription =
-        CollectionShardingState::get(opCtx, collection->ns())->getCollectionDescription(opCtx);
+        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, collection->ns())
+            ->getCollectionDescription(opCtx);
 
     if (indexNames.front() == "*") {
         if (collDescription.isSharded() && !forceDropShardKeyIndex) {
@@ -366,9 +367,9 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
     try {
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
             opCtx, nss.dbName(), DSSAcquisitionMode::kShared);
+        auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
 
-        auto css = CollectionShardingState::get(opCtx, nss);
-        auto collDesc = css->getCollectionDescription(opCtx);
+        auto collDesc = scopedCss->getCollectionDescription(opCtx);
         collDesc.throwIfReshardingInProgress(nss);
 
         if (!collDesc.isSharded()) {
@@ -510,17 +511,17 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
             // abort phase, a new identical index was created.
             auto indexCatalog = collection->getWritableCollection(opCtx)->getIndexCatalog();
             for (const auto& indexName : indexNames) {
-                auto collDescription =
-                    CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
-
-                if (collDescription.isSharded()) {
+                auto collDesc =
+                    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+                        ->getCollectionDescription(opCtx);
+                if (collDesc.isSharded()) {
                     uassert(ErrorCodes::CannotDropShardKeyIndex,
                             "Cannot drop the only compatible index for this collection's shard key",
                             !isLastShardKeyIndex(opCtx,
                                                  collection->getCollection(),
                                                  indexCatalog,
                                                  indexName,
-                                                 collDescription.getKeyPattern()));
+                                                 collDesc.getKeyPattern()));
                 }
 
                 auto desc =

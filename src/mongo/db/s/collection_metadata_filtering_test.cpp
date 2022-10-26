@@ -116,8 +116,10 @@ protected:
 
         {
             AutoGetCollection autoColl(operationContext(), kNss, MODE_X);
-            CollectionShardingRuntime::get(operationContext(), kNss)
-                ->setFilteringMetadata(operationContext(), CollectionMetadata(cm, ShardId("0")));
+            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                operationContext(), kNss, CSRAcquisitionMode::kExclusive);
+            scopedCsr->setFilteringMetadata(operationContext(),
+                                            CollectionMetadata(cm, ShardId("0")));
         }
 
         _manager = std::make_shared<MetadataManager>(
@@ -154,8 +156,9 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
         ShardVersion(metadata.getShardVersion(),
                      boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
-    auto* const css = CollectionShardingState::get(operationContext(), kNss);
-    testFilterFn(css->getOwnershipFilter(
+    auto scopedCss =
+        CollectionShardingState::assertCollectionLockedAndAcquire(operationContext(), kNss);
+    testFilterFn(scopedCss->getOwnershipFilter(
         operationContext(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup));
 }
 
@@ -184,8 +187,9 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
         ShardVersion(metadata.getShardVersion(),
                      boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
-    auto* const css = CollectionShardingState::get(operationContext(), kNss);
-    testFilterFn(css->getOwnershipFilter(
+    auto scopedCss =
+        CollectionShardingState::assertCollectionLockedAndAcquire(operationContext(), kNss);
+    testFilterFn(scopedCss->getOwnershipFilter(
         operationContext(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup));
 }
 
@@ -222,8 +226,9 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
         ShardVersion(metadata.getShardVersion(),
                      boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
-    auto* const css = CollectionShardingState::get(operationContext(), kNss);
-    testFilterFn(css->getOwnershipFilter(
+    auto scopedCss =
+        CollectionShardingState::assertCollectionLockedAndAcquire(operationContext(), kNss);
+    testFilterFn(scopedCss->getOwnershipFilter(
         operationContext(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup));
 }
 

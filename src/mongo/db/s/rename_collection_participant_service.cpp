@@ -76,8 +76,9 @@ void clearFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss)
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-    auto* csr = CollectionShardingRuntime::get(opCtx, nss);
-    csr->clearFilteringMetadata(opCtx);
+    CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        opCtx, nss, CSRAcquisitionMode::kExclusive)
+        ->clearFilteringMetadata(opCtx);
 }
 
 /*
@@ -323,15 +324,17 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 {
                     Lock::DBLock dbLock(opCtx, fromNss().dbName(), MODE_IX);
                     Lock::CollectionLock collLock(opCtx, fromNss(), MODE_IX);
-                    auto* csr = CollectionShardingRuntime::get(opCtx, fromNss());
-                    csr->clearFilteringMetadataForDroppedCollection(opCtx);
+                    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                        opCtx, fromNss(), CSRAcquisitionMode::kExclusive);
+                    scopedCsr->clearFilteringMetadataForDroppedCollection(opCtx);
                 }
 
                 {
                     Lock::DBLock dbLock(opCtx, toNss().dbName(), MODE_IX);
                     Lock::CollectionLock collLock(opCtx, toNss(), MODE_IX);
-                    auto* csr = CollectionShardingRuntime::get(opCtx, toNss());
-                    csr->clearFilteringMetadata(opCtx);
+                    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                        opCtx, toNss(), CSRAcquisitionMode::kExclusive);
+                    scopedCsr->clearFilteringMetadata(opCtx);
                 }
 
                 snapshotRangeDeletionsForRename(opCtx, fromNss(), toNss());

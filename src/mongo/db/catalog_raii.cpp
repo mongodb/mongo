@@ -34,7 +34,6 @@
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -296,10 +295,10 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         // table are consistent with the read request's shardVersion.
         //
         // Note: sharding versioning for an operation has no concept of multiple collections.
-        auto css = CollectionShardingState::getSharedForLockFreeReads(opCtx, _resolvedNss);
-        css->checkShardVersionOrThrow(opCtx);
+        auto scopedCss = CollectionShardingState::acquire(opCtx, _resolvedNss);
+        scopedCss->checkShardVersionOrThrow(opCtx);
 
-        auto collDesc = css->getCollectionDescription(opCtx);
+        auto collDesc = scopedCss->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
             _coll.setShardKeyPattern(collDesc.getKeyPattern());
         }
@@ -440,8 +439,8 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
         // operation. The shardVersion will be checked later if the shard filtering metadata is
         // fetched, ensuring both that the collection description info fetched here and the routing
         // table are consistent with the read request's shardVersion.
-        auto css = CollectionShardingState::getSharedForLockFreeReads(opCtx, _collection->ns());
-        auto collDesc = css->getCollectionDescription(opCtx);
+        auto scopedCss = CollectionShardingState::acquire(opCtx, _collection->ns());
+        auto collDesc = scopedCss->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
             _collectionPtr.setShardKeyPattern(collDesc.getKeyPattern());
         }

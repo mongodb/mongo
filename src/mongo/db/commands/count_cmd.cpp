@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
@@ -38,7 +35,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/exec/count.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -48,18 +44,12 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
 namespace mongo {
 namespace {
-
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
 
 // Failpoint which causes to hang "count" cmd after acquiring the DB lock.
 MONGO_FAIL_POINT_DEFINE(hangBeforeCollectionCount);
@@ -205,7 +195,7 @@ public:
         boost::optional<ScopedCollectionFilter> rangePreserver;
         if (collection.isSharded()) {
             rangePreserver.emplace(
-                CollectionShardingState::getSharedForLockFreeReads(opCtx, nss)
+                CollectionShardingState::acquire(opCtx, nss)
                     ->getOwnershipFilter(
                         opCtx,
                         CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
@@ -281,7 +271,7 @@ public:
         boost::optional<ScopedCollectionFilter> rangePreserver;
         if (collection.isSharded()) {
             rangePreserver.emplace(
-                CollectionShardingState::getSharedForLockFreeReads(opCtx, nss)
+                CollectionShardingState::acquire(opCtx, nss)
                     ->getOwnershipFilter(
                         opCtx,
                         CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));

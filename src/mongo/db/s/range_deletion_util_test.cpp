@@ -33,6 +33,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -118,8 +119,10 @@ public:
                         boost::none);
         AutoGetDb autoDb(_opCtx, kNss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(_opCtx, kNss, MODE_IX);
-        CollectionMetadata collMetadata(std::move(cm), ShardId("dummyShardId"));
-        CollectionShardingRuntime::get(_opCtx, kNss)->setFilteringMetadata(_opCtx, collMetadata);
+        CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            _opCtx, kNss, CSRAcquisitionMode::kExclusive)
+            ->setFilteringMetadata(_opCtx,
+                                   CollectionMetadata(std::move(cm), ShardId("dummyShardId")));
     }
 
     UUID uuid() const {

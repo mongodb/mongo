@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/range_deleter_service.h"
+
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -58,7 +59,8 @@ BSONObj getShardKeyPattern(OperationContext* opCtx,
             AutoGetCollection collection(
                 opCtx, NamespaceStringOrUUID{dbName.toString(), collectionUuid}, MODE_IS);
 
-            auto optMetadata = CollectionShardingRuntime::get(opCtx, collection.getNss())
+            auto optMetadata = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                                   opCtx, collection.getNss(), CSRAcquisitionMode::kShared)
                                    ->getCurrentMetadataIfKnown();
             if (optMetadata && optMetadata->isSharded()) {
                 return optMetadata->getShardKeyPattern().toBSON();

@@ -629,7 +629,7 @@ TEST_F(
     _mockCatalogClient->setCollections({coll});
 
     auto metadata = makeShardedMetadata(opCtx, collectionUUID);
-    csr().setFilteringMetadata(opCtx, metadata);
+    csr()->setFilteringMetadata(opCtx, metadata);
 
     // The task should have been submitted successfully.
     auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
@@ -665,7 +665,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
     _mockCatalogClient->setCollections({matchingColl});
 
     auto metadata = makeShardedMetadata(opCtx, collectionUUID);
-    csr().setFilteringMetadata(opCtx, metadata);
+    csr()->setFilteringMetadata(opCtx, metadata);
 
     // The task should have been submitted successfully.
     auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);

@@ -36,8 +36,9 @@ namespace mongo {
 
 std::unique_ptr<ShardFilterer> ShardFiltererFactoryImpl::makeShardFilterer(
     OperationContext* opCtx) const {
-    auto css = CollectionShardingState::get(opCtx, _collection->ns());
-    return std::make_unique<ShardFiltererImpl>(css->getOwnershipFilter(
+    auto scopedCss =
+        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, _collection->ns());
+    return std::make_unique<ShardFiltererImpl>(scopedCss->getOwnershipFilter(
         opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
 }
 

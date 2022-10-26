@@ -220,7 +220,8 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) 
                           << nss.ns(),
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
-    CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
+    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+        ->checkShardVersionOrThrow(opCtx);
 }
 
 void recordStatsForTopCommand(OperationContext* opCtx) {
@@ -550,7 +551,6 @@ void CmdFindAndModify::Invocation::doCheckAuthorization(OperationContext* opCtx)
 void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                                            ExplainOptions::Verbosity verbosity,
                                            rpc::ReplyBuilderInterface* result) {
-
     validate(request());
     const BSONObj& cmdObj = request().toBSON(BSONObj() /* commandPassthroughFields */);
 
@@ -586,7 +586,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                 str::stream() << "database " << dbName << " does not exist",
                 collection.getDb());
 
-        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
+        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+            ->checkShardVersionOrThrow(opCtx);
 
         const auto exec = uassertStatusOK(
             getExecutorDelete(opDebug, &collection.getCollection(), &parsedDelete, verbosity));
@@ -610,7 +611,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                 str::stream() << "database " << dbName << " does not exist",
                 collection.getDb());
 
-        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
+        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+            ->checkShardVersionOrThrow(opCtx);
 
         const auto exec = uassertStatusOK(
             getExecutorUpdate(opDebug, &collection.getCollection(), &parsedUpdate, verbosity));

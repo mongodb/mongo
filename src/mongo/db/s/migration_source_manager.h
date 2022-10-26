@@ -77,17 +77,14 @@ public:
      * Retrieves the MigrationSourceManager pointer that corresponds to the given collection under
      * a CollectionShardingRuntime that has its ResourceMutex locked.
      */
-    static MigrationSourceManager* get(CollectionShardingRuntime* csr,
-                                       CollectionShardingRuntime::CSRLock& csrLock);
+    static MigrationSourceManager* get(CollectionShardingRuntime& csr);
 
     /**
      * If the currently installed migration has reached the cloning stage (i.e., after startClone),
      * returns the cloner currently in use.
-     *
-     * Must be called with a both a collection lock and the CSRLock.
      */
     static std::shared_ptr<MigrationChunkClonerSource> getCurrentCloner(
-        CollectionShardingRuntime* csr, CollectionShardingRuntime::CSRLock& csrLock);
+        CollectionShardingRuntime& csr);
 
     /**
      * Instantiates a new migration source manager with the specified migration parameters. Must be
@@ -251,9 +248,7 @@ private:
     // sharding runtime for the collection
     class ScopedRegisterer {
     public:
-        ScopedRegisterer(MigrationSourceManager* msm,
-                         CollectionShardingRuntime* csr,
-                         const CollectionShardingRuntime::CSRLock& csrLock);
+        ScopedRegisterer(MigrationSourceManager* msm, CollectionShardingRuntime& csr);
         ~ScopedRegisterer();
 
     private:

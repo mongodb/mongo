@@ -109,7 +109,8 @@ DocumentKey getDocumentKey(OperationContext* opCtx,
     // if running on standalone or primary. Skip this completely on secondaries since they are
     // not expected to have the collection metadata cached.
     if (opCtx->writesAreReplicated()) {
-        auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
+        auto collDesc = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+                            ->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
             shardKey =
                 dotted_path_support::extractElementsBasedOnTemplate(doc, collDesc.getKeyPattern())

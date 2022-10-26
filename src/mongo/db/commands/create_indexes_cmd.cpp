@@ -325,7 +325,9 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
 
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
 
-        auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
+        auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
+
+        auto collDesc = scopedCss->getCollectionDescription(opCtx);
         if (!collDesc.isSharded()) {
             if (scopedDss->isMovePrimaryInProgress()) {
                 LOGV2(4909200, "assertNoMovePrimaryInProgress", "namespace"_attr = nss.toString());
@@ -505,7 +507,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 ns,
                 MODE_IX,
                 AutoGetCollection::Options{}.expectedUUID(cmd.getCollectionUUID()));
-            CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
+            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, ns)
+                ->checkShardVersionOrThrow(opCtx);
 
             // Before potentially taking an exclusive collection lock, check if all indexes already
             // exist while holding an intent lock.

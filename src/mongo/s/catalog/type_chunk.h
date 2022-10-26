@@ -33,7 +33,6 @@
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk_base_gen.h"

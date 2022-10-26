@@ -116,7 +116,8 @@ void checkShardKeyRestrictions(OperationContext* opCtx,
                                const BSONObj& newIdxKey) {
     CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, nss);
 
-    const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
+    const auto collDesc = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+                              ->getCollectionDescription(opCtx);
     if (!collDesc.isSharded())
         return;
 
@@ -1916,26 +1917,28 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
     CollectionWriter collection(opCtx, autoColl);
 
-    const auto& ns = collection.get()->ns();
-    auto css = CollectionShardingState::get(opCtx, ns);
+    const auto& nss = collection.get()->ns();
 
-    // Disallow index builds on drop-pending namespaces (system.drop.*) if we are primary.
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getSettings().usingReplSets() &&
-        replCoord->canAcceptWritesFor(opCtx, nssOrUuid)) {
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "drop-pending collection: " << ns,
-                !ns.isDropPendingNamespace());
+    {
+        // Disallow index builds on drop-pending namespaces (system.drop.*) if we are primary.
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (replCoord->getSettings().usingReplSets() &&
+            replCoord->canAcceptWritesFor(opCtx, nssOrUuid)) {
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "drop-pending collection: " << nss,
+                    !nss.isDropPendingNamespace());
+        }
+
+        // This check is for optimization purposes only as since this lock is released after this,
+        // and is acquired again when we build the index in _setUpIndexBuild.
+        auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
+        scopedCss->checkShardVersionOrThrow(opCtx);
+        scopedCss->getCollectionDescription(opCtx).throwIfReshardingInProgress(nss);
     }
-
-    // This check is for optimization purposes only as since this lock is released after this,
-    // and is acquired again when we build the index in _setUpIndexBuild.
-    css->checkShardVersionOrThrow(opCtx);
-    css->getCollectionDescription(opCtx).throwIfReshardingInProgress(ns);
 
     std::vector<BSONObj> filteredSpecs;
     try {
-        filteredSpecs = prepareSpecListForCreate(opCtx, collection.get(), ns, specs);
+        filteredSpecs = prepareSpecListForCreate(opCtx, collection.get(), nss, specs);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -1962,7 +1965,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
             // the catalog update when it uses the timestamp from the startIndexBuild, rather than
             // the commitIndexBuild, oplog entry.
             writeConflictRetry(
-                opCtx, "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild", ns.ns(), [&] {
+                opCtx, "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild", nss.ns(), [&] {
                     WriteUnitOfWork wuow(opCtx);
                     createIndexesOnEmptyCollection(opCtx, collection, filteredSpecs, false);
                     wuow.commit();
@@ -2001,13 +2004,17 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
 
     AutoGetCollection coll(opCtx, nssOrUuid, MODE_X);
     CollectionWriter collection(opCtx, coll);
-    CollectionShardingState::get(opCtx, collection->ns())->checkShardVersionOrThrow(opCtx);
+
+    const auto& nss = collection.get()->ns();
+
+    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+        ->checkShardVersionOrThrow(opCtx);
 
     // We will not have a start timestamp if we are newly a secondary (i.e. we started as
     // primary but there was a stepdown). We will be unable to timestamp the initial catalog write,
     // so we must fail the index build. During initial sync, there is no commit timestamp set.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->canAcceptWritesFor(opCtx, collection->ns()) &&
+    if (!replCoord->canAcceptWritesFor(opCtx, nss) &&
         indexBuildOptions.applicationMode != ApplicationMode::kInitialSync) {
         uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Replication state changed while setting up the index build: "
@@ -2022,7 +2029,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         // writes a no-op just to generate an optime.
         onInitFn = [&](std::vector<BSONObj>& specs) {
             if (!(replCoord->getSettings().usingReplSets() &&
-                  replCoord->canAcceptWritesFor(opCtx, collection->ns()))) {
+                  replCoord->canAcceptWritesFor(opCtx, nss))) {
                 // Not primary.
                 return Status::OK();
             }
@@ -2052,7 +2059,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
 
             opCtx->getServiceContext()->getOpObserver()->onStartIndexBuild(
                 opCtx,
-                collection->ns(),
+                nss,
                 replState->collectionUUID,
                 replState->buildUUID,
                 replState->indexSpecs,
@@ -2066,8 +2073,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
 
     IndexBuildsManager::SetupOptions options;
     options.indexConstraints =
-        repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx,
-                                                                              collection->ns())
+        repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, nss)
         ? IndexBuildsManager::IndexConstraints::kRelax
         : IndexBuildsManager::IndexConstraints::kEnforce;
     options.protocol = replState->protocol;

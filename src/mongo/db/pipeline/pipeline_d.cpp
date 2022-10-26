@@ -27,17 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/projection_parser.h"
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/pipeline_d.h"
 
 #include "mongo/base/exact_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
@@ -84,6 +78,7 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -102,7 +97,6 @@
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 
 namespace mongo {
 
@@ -532,8 +526,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
 
     TrialStage* trialStage = nullptr;
 
-    auto css = CollectionShardingState::get(opCtx, coll->ns());
-    const auto isSharded = css->getCollectionDescription(opCtx).isSharded();
+    auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, coll->ns());
+    const bool isSharded = scopedCss->getCollectionDescription(opCtx).isSharded();
 
     // Because 'numRecords' includes orphan documents, our initial decision to optimize the $sample
     // cursor may have been mistaken. For sharded collections, build a TRIAL plan that will switch
@@ -587,7 +581,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         if (isSharded) {
             // In the sharded case, we need to use a ShardFilterer within the ARHASH plan to
             // eliminate orphans from the working set, since the stage owns the cursor.
-            maybeShardFilter = std::make_unique<ShardFiltererImpl>(css->getOwnershipFilter(
+            maybeShardFilter = std::make_unique<ShardFiltererImpl>(scopedCss->getOwnershipFilter(
                 opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
         }
 
@@ -610,7 +604,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         if (isSharded) {
             // In the sharded case, we need to add a shard-filterer stage to the backup plan to
             // eliminate orphans. The trial plan is thus SHARDING_FILTER-COLLSCAN.
-            auto collectionFilter = css->getOwnershipFilter(
+            auto collectionFilter = scopedCss->getOwnershipFilter(
                 opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
             collScanPlan = std::make_unique<ShardFilterStage>(
                 expCtx.get(), std::move(collectionFilter), ws.get(), std::move(collScanPlan));
@@ -652,7 +646,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         // Since the incoming operation is sharded, use the CSS to infer the filtering metadata for
         // the collection. We get the shard ownership filter after checking to see if the collection
         // is sharded to avoid an invariant from being fired in this call.
-        auto collectionFilter = css->getOwnershipFilter(
+        auto collectionFilter = scopedCss->getOwnershipFilter(
             opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
         // The trial plan is SHARDING_FILTER-MULTI_ITERATOR.
         auto randomCursorPlan = std::make_unique<ShardFilterStage>(

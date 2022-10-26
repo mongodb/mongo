@@ -1012,7 +1012,8 @@ public:
             const NamespaceString& bucketsNs) {
             AutoGetCollectionForRead coll(opCtx, bucketsNs);
             auto collDesc =
-                CollectionShardingState::get(opCtx, bucketsNs)->getCollectionDescription(opCtx);
+                CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, bucketsNs)
+                    ->getCollectionDescription(opCtx);
             if (collDesc.isSharded()) {
                 tassert(6102801,
                         "Sharded time-series buckets collection is missing time-series fields",

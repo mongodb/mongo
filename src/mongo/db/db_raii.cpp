@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/db_raii.h"
 
 #include "mongo/db/catalog/catalog_helper.h"
@@ -39,19 +36,17 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
+namespace mongo {
+namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeAutoGetShardVersionCheck);
 MONGO_FAIL_POINT_DEFINE(reachedAutoGetLockFreeShardConsistencyRetry);
-
-namespace mongo {
-namespace {
 
 const boost::optional<int> kDoNotChangeProfilingLevel = boost::none;
 
@@ -139,7 +134,7 @@ bool isSecondaryNssAView(OperationContext* opCtx, const NamespaceString& nss) {
  * Returns true if 'nss' is sharded. False otherwise.
  */
 bool isSecondaryNssSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    return CollectionShardingState::getSharedForLockFreeReads(opCtx, nss)
+    return CollectionShardingState::acquire(opCtx, nss)
         ->getCollectionDescription(opCtx)
         .isSharded();
 }
@@ -822,9 +817,8 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
         });
 
     if (!_autoCollForRead.getView()) {
-        auto css =
-            CollectionShardingState::getSharedForLockFreeReads(opCtx, _autoCollForRead.getNss());
-        css->checkShardVersionOrThrow(opCtx);
+        auto scopedCss = CollectionShardingState::acquire(opCtx, _autoCollForRead.getNss());
+        scopedCss->checkShardVersionOrThrow(opCtx);
     }
 }
 
@@ -884,7 +878,8 @@ OldClientContext::OldClientContext(OperationContext* opCtx,
             case dbDelete:   // path, so no need to check them here as well
                 break;
             default:
-                CollectionShardingState::get(_opCtx, nss)->checkShardVersionOrThrow(_opCtx);
+                CollectionShardingState::assertCollectionLockedAndAcquire(_opCtx, nss)
+                    ->checkShardVersionOrThrow(_opCtx);
                 break;
         }
     }

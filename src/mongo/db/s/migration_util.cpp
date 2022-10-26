@@ -425,9 +425,9 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                        AutoGetCollection autoColl(
                            opCtx, NamespaceStringOrUUID{dbName, collectionUuid}, MODE_IS);
                        optNss.emplace(autoColl.getNss());
-                       auto csr = CollectionShardingRuntime::get(opCtx, *optNss);
-                       auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-                       auto optCollDescr = csr->getCurrentMetadataIfKnown();
+                       auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                           opCtx, *optNss, CSRAcquisitionMode::kShared);
+                       auto optCollDescr = scopedCsr->getCurrentMetadataIfKnown();
 
                        if (optCollDescr) {
                            uassert(ErrorCodes::
@@ -449,7 +449,7 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                                ? CollectionShardingRuntime::kNow
                                : CollectionShardingRuntime::kDelayed;
 
-                           return csr->cleanUpRange(deletionTask.getRange(), whenToClean);
+                           return scopedCsr->cleanUpRange(deletionTask.getRange(), whenToClean);
                        }
                    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                        uasserted(
@@ -950,7 +950,9 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
 
                       {
                           AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-                          CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
+                          CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                              opCtx, nss, CSRAcquisitionMode::kExclusive)
+                              ->clearFilteringMetadata(opCtx);
                       }
 
                       asyncRecoverMigrationUntilSuccessOrStepDown(opCtx, nss);
@@ -1024,14 +1026,14 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
             auto setFilteringMetadata = [&opCtx, &currentMetadata, &doc, &cancellationToken]() {
                 AutoGetDb autoDb(opCtx, doc.getNss().dbName(), MODE_IX);
                 Lock::CollectionLock collLock(opCtx, doc.getNss(), MODE_IX);
-                auto* const csr = CollectionShardingRuntime::get(opCtx, doc.getNss());
+                auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                    opCtx, doc.getNss(), CSRAcquisitionMode::kExclusive);
 
-                auto optMetadata = csr->getCurrentMetadataIfKnown();
+                auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
                 invariant(!optMetadata);
 
-                auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
                 if (!cancellationToken.isCanceled()) {
-                    csr->setFilteringMetadata_withLock(opCtx, std::move(currentMetadata), csrLock);
+                    scopedCsr->setFilteringMetadata(opCtx, std::move(currentMetadata));
                 }
             };
 

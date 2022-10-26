@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/s/split_chunk.h"
 
 #include "mongo/base/status_with.h"
@@ -51,7 +50,6 @@
 #include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -103,8 +101,9 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
 
-    const auto metadataAfterSplit =
-        CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
+    const auto metadataAfterSplit = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                                        opCtx, nss, CSRAcquisitionMode::kShared)
+                                        ->getCurrentMetadataIfKnown();
 
     ShardId shardId = ShardingState::get(opCtx)->shardId();
 

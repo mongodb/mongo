@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -40,9 +41,9 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
     AutoGetCollection collection(opCtx, nss, MODE_IS);
 
     const auto shardId = ShardingState::get(opCtx)->shardId();
-    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-    const auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-    auto optMetadata = csr->getCurrentMetadataIfKnown();
+    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        opCtx, nss, CSRAcquisitionMode::kShared);
+    auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
 
     uassert(StaleConfigInfo(nss,
                             ShardVersion::IGNORED() /* receivedVersion */,

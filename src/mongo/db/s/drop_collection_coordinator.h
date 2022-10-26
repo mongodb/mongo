@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/db/catalog/drop_collection.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/drop_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
+
 namespace mongo {
 
 class DropCollectionCoordinator final

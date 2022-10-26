@@ -224,7 +224,8 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) 
             repl::ReplicationCoordinator::get(opCtx->getServiceContext())
                 ->canAcceptWritesFor(opCtx, nss));
 
-    CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
+    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+        ->checkShardVersionOrThrow(opCtx);
 }
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {

@@ -432,9 +432,9 @@ void ShardingRecoveryService::recoverRecoverableCriticalSections(OperationContex
     for (const auto& collName : collectionNames) {
         try {
             AutoGetCollection collLock(opCtx, collName, MODE_X);
-            auto* const csr = CollectionShardingRuntime::get(opCtx, collName);
-            auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-            csr->exitCriticalSectionNoChecks(csrLock);
+            CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                opCtx, collName, CSRAcquisitionMode::kExclusive)
+                ->exitCriticalSectionNoChecks();
         } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
             LOGV2_DEBUG(6050800,
                         2,
@@ -451,11 +451,12 @@ void ShardingRecoveryService::recoverRecoverableCriticalSections(OperationContex
         const auto& nss = doc.getNss();
         {
             AutoGetCollection collLock(opCtx, nss, MODE_X);
-            auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-            auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-            csr->enterCriticalSectionCatchUpPhase(csrLock, doc.getReason());
+            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                opCtx, nss, CSRAcquisitionMode::kExclusive);
+
+            scopedCsr->enterCriticalSectionCatchUpPhase(doc.getReason());
             if (doc.getBlockReads())
-                csr->enterCriticalSectionCommitPhase(csrLock, doc.getReason());
+                scopedCsr->enterCriticalSectionCommitPhase(doc.getReason());
 
             return true;
         }
@@ -487,8 +488,9 @@ void ShardingRecoveryService::recoverIndexesCatalog(OperationContext* opCtx) {
     for (const auto& collName : collectionNames) {
         try {
             AutoGetCollection collLock(opCtx, collName, MODE_X);
-            auto* const csr = CollectionShardingRuntime::get(opCtx, collName);
-            csr->clearIndexes(opCtx);
+            CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                opCtx, collName, CSRAcquisitionMode::kExclusive)
+                ->clearIndexes(opCtx);
         } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
             LOGV2_DEBUG(6686501,
                         2,
@@ -514,7 +516,9 @@ void ShardingRecoveryService::recoverIndexesCatalog(OperationContext* opCtx) {
             auto indexEntry = IndexCatalogType::parse(
                 IDLParserContext("recoverIndexesCatalogContext"), idx.Obj());
             AutoGetCollection collLock(opCtx, nss, MODE_X);
-            CollectionShardingRuntime::get(opCtx, nss)->addIndex(opCtx, indexEntry, indexVersion);
+            CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                opCtx, collLock->ns(), CSRAcquisitionMode::kExclusive)
+                ->addIndex(opCtx, indexEntry, indexVersion);
         }
     }
     LOGV2_DEBUG(6686502, 2, "Recovered all index versions");

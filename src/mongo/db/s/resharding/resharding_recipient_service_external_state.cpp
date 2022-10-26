@@ -43,11 +43,12 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo {
-
 namespace {
+
 const WriteConcernOptions kMajorityWriteConcern{
     WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
-}
+
+}  // namespace
 
 void ReshardingRecipientService::RecipientStateMachineExternalState::
     ensureTempReshardingCollectionExistsWithIndexes(OperationContext* opCtx,
@@ -88,7 +89,8 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
                                     std::move(collOptions)});
 
     AutoGetCollection autoColl(opCtx, metadata.getTempReshardingNss(), MODE_IX);
-    CollectionShardingRuntime::get(opCtx, metadata.getTempReshardingNss())
+    CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        opCtx, metadata.getTempReshardingNss(), CSRAcquisitionMode::kExclusive)
         ->clearFilteringMetadata(opCtx);
 }
 

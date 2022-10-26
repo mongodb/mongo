@@ -271,7 +271,8 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
     StringData shortSource = ns.coll();
 
     AutoGetCollection coll(opCtx, ns, MODE_X);
-    CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
+    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, ns)->checkShardVersionOrThrow(
+        opCtx);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns);

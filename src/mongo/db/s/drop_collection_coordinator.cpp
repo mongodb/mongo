@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -64,8 +65,9 @@ DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opC
         }();
 
         // Clear CollectionShardingRuntime entry
-        auto* csr = CollectionShardingRuntime::get(opCtx, nss);
-        csr->clearFilteringMetadataForDroppedCollection(opCtx);
+        CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            opCtx, nss, CSRAcquisitionMode::kExclusive)
+            ->clearFilteringMetadataForDroppedCollection(opCtx);
     }
 
     // Remove all range deletion task documents present on disk for the collection to drop. This is

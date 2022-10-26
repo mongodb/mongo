@@ -284,7 +284,8 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
 
     // Serialize the drop with refreshes to prevent dropping a collection and creating the same
     // nss as a view while refreshing.
-    CollectionShardingState::get(opCtx, resolvedNss)->checkShardVersionOrThrow(opCtx);
+    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, resolvedNss)
+        ->checkShardVersionOrThrow(opCtx);
 
     invariant(coll->getIndexCatalog()->numIndexesInProgress() == 0);
 

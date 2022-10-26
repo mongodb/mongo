@@ -64,26 +64,44 @@ public:
     CollectionShardingState& operator=(const CollectionShardingState&) = delete;
 
     /**
-     * Obtains the sharding state for the specified collection. If it does not exist, it will be
-     * created and will remain in memory until the collection is dropped.
-     *
-     * Must be called with some lock held on the specific collection being looked up and the
-     * returned pointer must not be stored.
+     * Obtains the sharding state for the specified collection, along with a resource lock
+     * protecting it from concurrent modifications, which will be held util the object goes out of
+     * scope.
      */
-    static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
+    class ScopedCollectionShardingState {
+    public:
+        ScopedCollectionShardingState(ScopedCollectionShardingState&&);
+
+        ~ScopedCollectionShardingState();
+
+        CollectionShardingState* operator->() const {
+            return _css;
+        }
+        CollectionShardingState& operator*() const {
+            return *_css;
+        }
+
+    private:
+        friend class CollectionShardingState;
+        friend class CollectionShardingRuntime;
+
+        ScopedCollectionShardingState(Lock::ResourceLock lock, CollectionShardingState* css);
+
+        static ScopedCollectionShardingState acquireScopedCollectionShardingState(
+            OperationContext* opCtx, const NamespaceString& nss, LockMode mode);
+
+        Lock::ResourceLock _lock;
+        CollectionShardingState* _css;
+    };
+    static ScopedCollectionShardingState assertCollectionLockedAndAcquire(
+        OperationContext* opCtx, const NamespaceString& nss);
+    static ScopedCollectionShardingState acquire(OperationContext* opCtx,
+                                                 const NamespaceString& nss);
 
     /**
      * Returns the names of the collections that have a CollectionShardingState.
      */
     static std::vector<NamespaceString> getCollectionNames(OperationContext* opCtx);
-
-    /**
-     * Obtain a pointer to the CollectionShardingState that remains safe to access without holding
-     * a collection lock. Should be called instead of the regular get() if no collection lock is
-     * held. The returned CollectionShardingState instance should not be modified!
-     */
-    static std::shared_ptr<CollectionShardingState> getSharedForLockFreeReads(
-        OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Reports all collections which have filtering information associated.
@@ -186,7 +204,7 @@ public:
     virtual void join() = 0;
 
     /**
-     * Called by the CollectionShardingState::get method once per newly cached namespace. It is
+     * Called by the CollectionShardingState::acquire method once per newly cached namespace. It is
      * invoked under a mutex and must not acquire any locks or do blocking work.
      *
      * Implementations must be thread-safe when called from multiple threads.

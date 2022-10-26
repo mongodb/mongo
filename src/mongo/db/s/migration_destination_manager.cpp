@@ -892,12 +892,11 @@ void MigrationDestinationManager::_dropLocalIndexesIfNecessary(
     const CollectionOptionsAndIndexes& collectionOptionsAndIndexes) {
     bool dropNonDonorIndexes = [&]() -> bool {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        auto* const css = CollectionShardingRuntime::get(opCtx, nss);
-        const auto optMetadata = css->getCurrentMetadataIfKnown();
-
-        // Only attempt to drop a collection's indexes if we have valid metadata and the
-        // collection is sharded.
-        if (optMetadata) {
+        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            opCtx, nss, CSRAcquisitionMode::kShared);
+        // Only attempt to drop a collection's indexes if we have valid metadata and the collection
+        // is sharded
+        if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded()) {
                 auto chunks = metadata.getChunks();
@@ -1895,7 +1894,9 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
 
     if (refreshFailed) {
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        CollectionShardingRuntime::get(opCtx, _nss)->clearFilteringMetadata(opCtx);
+        CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            opCtx, _nss, CSRAcquisitionMode::kExclusive)
+            ->clearFilteringMetadata(opCtx);
     }
 
     // Release the critical section

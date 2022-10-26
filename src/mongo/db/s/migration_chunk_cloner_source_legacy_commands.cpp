@@ -77,10 +77,10 @@ public:
                 _autoColl->getCollection());
 
         {
-            auto csr = CollectionShardingRuntime::get(opCtx, *nss);
-            auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
+            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                opCtx, *nss, CSRAcquisitionMode::kShared);
 
-            if (auto cloner = MigrationSourceManager::getCurrentCloner(csr, csrLock)) {
+            if (auto cloner = MigrationSourceManager::getCurrentCloner(*scopedCsr)) {
                 _chunkCloner = std::dynamic_pointer_cast<MigrationChunkClonerSourceLegacy,
                                                          MigrationChunkClonerSource>(cloner);
                 invariant(_chunkCloner);

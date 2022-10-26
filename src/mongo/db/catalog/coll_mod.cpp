@@ -75,9 +75,9 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
     try {
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
             opCtx, nss.dbName(), DSSAcquisitionMode::kShared);
+        auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
 
-        auto css = CollectionShardingState::get(opCtx, nss);
-        auto collDesc = css->getCollectionDescription(opCtx);
+        auto collDesc = scopedCss->getCollectionDescription(opCtx);
         collDesc.throwIfReshardingInProgress(nss);
 
         if (!collDesc.isSharded()) {
@@ -757,7 +757,8 @@ Status _collModInternal(OperationContext* opCtx,
             // If a sharded time-series collection is dropped, it's possible that a stale mongos
             // sends the request on the buckets namespace instead of the view namespace. Ensure that
             // the shardVersion is upto date before throwing an error.
-            CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
+            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+                ->checkShardVersionOrThrow(opCtx);
         }
         checkCollectionUUIDMismatch(opCtx, nss, nullptr, cmd.getCollectionUUID());
         return Status(ErrorCodes::NamespaceNotFound, "ns does not exist");

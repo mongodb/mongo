@@ -33,8 +33,6 @@
 
 namespace mongo {
 
-class ShardingWriteRouter;
-
 class OpObserverShardingImpl : public OpObserverImpl {
 public:
     OpObserverShardingImpl(std::unique_ptr<OplogWriter> oplogWriter);

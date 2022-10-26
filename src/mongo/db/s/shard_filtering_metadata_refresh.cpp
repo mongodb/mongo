@@ -302,17 +302,17 @@ void onDbVersionMismatch(OperationContext* opCtx,
  */
 bool joinCollectionPlacementVersionOperation(
     OperationContext* opCtx,
-    CollectionShardingRuntime* csr,
     boost::optional<Lock::DBLock>* dbLock,
     boost::optional<Lock::CollectionLock>* collLock,
-    boost::optional<CollectionShardingRuntime::CSRLock>* csrLock) {
+    boost::optional<CollectionShardingRuntime::ScopedCollectionShardingRuntime>* scopedCsr) {
     invariant(dbLock->has_value());
     invariant(collLock->has_value());
-    invariant(csrLock->has_value());
+    invariant(scopedCsr->has_value());
 
     if (auto critSecSignal =
-            csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite)) {
-        csrLock->reset();
+            (**scopedCsr)
+                ->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite)) {
+        scopedCsr->reset();
         collLock->reset();
         dbLock->reset();
 
@@ -322,15 +322,16 @@ bool joinCollectionPlacementVersionOperation(
         return true;
     }
 
-    if (auto inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx)) {
-        csrLock->reset();
+    if (auto inRecoverOrRefresh = (**scopedCsr)->getShardVersionRecoverRefreshFuture(opCtx)) {
+        scopedCsr->reset();
         collLock->reset();
         dbLock->reset();
 
         try {
             inRecoverOrRefresh->get(opCtx);
         } catch (const ExceptionFor<ErrorCodes::ShardVersionRefreshCanceled>&) {
-            // The ongoing refresh has finished, although it was interrupted.
+            // The ongoing refresh has finished, although it was canceled by a
+            // 'clearFilteringMetadata'.
         }
 
         return true;
@@ -372,17 +373,17 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
                 Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
                 Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
 
-                auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+                auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                    opCtx, nss, CSRAcquisitionMode::kExclusive);
 
-                auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
                 // cancellationToken needs to be checked under the CSR lock before overwriting the
                 // filtering metadata to serialize with other threads calling
                 // 'clearFilteringMetadata'
                 if (currentMetadataToInstall && !cancellationToken.isCanceled()) {
-                    csr->setFilteringMetadata_withLock(opCtx, *currentMetadataToInstall, csrLock);
+                    scopedCsr->setFilteringMetadata(opCtx, *currentMetadataToInstall);
                 }
 
-                csr->resetShardVersionRecoverRefreshFuture(csrLock);
+                scopedCsr->resetShardVersionRecoverRefreshFuture();
             });
 
             if (runRecover) {
@@ -400,12 +401,14 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
                 if (!currentMetadata.allowMigrations()) {
                     boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
                     {
-                        Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
-                        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+                        Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
+                        Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
 
-                        auto const& csr = CollectionShardingRuntime::get(opCtx, nss);
-                        auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-                        if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
+                        auto scopedCsr =
+                            CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                                opCtx, nss, CSRAcquisitionMode::kShared);
+
+                        if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
                             waitForMigrationAbort.emplace(msm->abort());
                         }
                     }
@@ -478,18 +481,17 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
             dbLock.emplace(opCtx, nss.dbName(), MODE_IS);
             collLock.emplace(opCtx, nss, MODE_IS);
 
-            auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-
             if (chunkVersionReceived) {
-                boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
-                    CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
+                boost::optional<CollectionShardingRuntime::ScopedCollectionShardingRuntime>
+                    scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                        opCtx, nss, CSRAcquisitionMode::kShared);
 
                 if (joinCollectionPlacementVersionOperation(
-                        opCtx, csr, &dbLock, &collLock, &csrLock)) {
+                        opCtx, &dbLock, &collLock, &scopedCsr)) {
                     continue;
                 }
 
-                if (auto metadata = csr->getCurrentMetadataIfKnown()) {
+                if (auto metadata = (*scopedCsr)->getCurrentMetadataIfKnown()) {
                     const auto currentCollectionPlacementVersion = metadata->getShardVersion();
                     // Don't need to remotely reload if the requested version is smaller than the
                     // known one. This means that the remote side is behind.
@@ -500,10 +502,11 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
                 }
             }
 
-            boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
-                CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+            boost::optional<CollectionShardingRuntime::ScopedCollectionShardingRuntime> scopedCsr =
+                CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                    opCtx, nss, CSRAcquisitionMode::kExclusive);
 
-            if (joinCollectionPlacementVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
+            if (joinCollectionPlacementVersionOperation(opCtx, &dbLock, &collLock, &scopedCsr)) {
                 continue;
             }
 
@@ -511,15 +514,15 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
             // and we are holding the exclusive CSR lock.
 
             // If the shard doesn't yet know its filtering metadata, recovery needs to be run
-            const bool runRecover = csr->getCurrentMetadataIfKnown() ? false : true;
+            const bool runRecover = (*scopedCsr)->getCurrentMetadataIfKnown() ? false : true;
             CancellationSource cancellationSource;
             CancellationToken cancellationToken = cancellationSource.token();
-            csr->setShardVersionRecoverRefreshFuture(
-                recoverRefreshCollectionPlacementVersion(
-                    opCtx->getServiceContext(), nss, runRecover, std::move(cancellationToken)),
-                std::move(cancellationSource),
-                *csrLock);
-            inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
+            (*scopedCsr)
+                ->setShardVersionRecoverRefreshFuture(
+                    recoverRefreshCollectionPlacementVersion(
+                        opCtx->getServiceContext(), nss, runRecover, std::move(cancellationToken)),
+                    std::move(cancellationSource));
+            inRecoverOrRefresh = (*scopedCsr)->getShardVersionRecoverRefreshFuture(opCtx);
         }
 
         try {
@@ -601,8 +604,9 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         // is in the 'system.views' collection.
         Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-        CollectionShardingRuntime::get(opCtx, nss)
-            ->setFilteringMetadata(opCtx, CollectionMetadata());
+        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            opCtx, nss, CSRAcquisitionMode::kExclusive);
+        scopedCsr->setFilteringMetadata(opCtx, CollectionMetadata());
 
         return ChunkVersion::UNSHARDED();
     }
@@ -615,23 +619,18 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         // is in the 'system.views' collection.
         Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-        auto optMetadata = CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
-
-        // We already have newer version
-        if (optMetadata) {
+        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            opCtx, nss, CSRAcquisitionMode::kShared);
+        if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded() &&
                 (cm.getVersion().isOlderOrEqualThan(metadata.getCollVersion()))) {
-                LOGV2_DEBUG(
-                    22063,
-                    1,
-                    "Skipping refresh of metadata for {namespace} {latestCollectionVersion} with "
-                    "an older {refreshedCollectionVersion}",
-                    "Skipping metadata refresh because collection already has at least as recent "
-                    "metadata",
-                    "namespace"_attr = nss,
-                    "latestCollectionVersion"_attr = metadata.getCollVersion(),
-                    "refreshedCollectionVersion"_attr = cm.getVersion());
+                LOGV2_DEBUG(22063,
+                            1,
+                            "Skipping metadata refresh because collection already is up-to-date",
+                            "namespace"_attr = nss,
+                            "latestCollectionVersion"_attr = metadata.getCollVersion(),
+                            "refreshedCollectionVersion"_attr = cm.getVersion());
                 return metadata.getShardVersion();
             }
         }
@@ -644,35 +643,26 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     // 'system.views' collection.
     Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-
-    {
-        auto optMetadata = csr->getCurrentMetadataIfKnown();
-
-        // We already have newer version
-        if (optMetadata) {
-            const auto& metadata = *optMetadata;
-            if (metadata.isSharded() &&
-                (cm.getVersion().isOlderOrEqualThan(metadata.getCollVersion()))) {
-                LOGV2_DEBUG(
-                    22064,
-                    1,
-                    "Skipping refresh of metadata for {namespace} {latestCollectionVersion} with "
-                    "an older {refreshedCollectionVersion}",
-                    "Skipping metadata refresh because collection already has at least as recent "
-                    "metadata",
-                    "namespace"_attr = nss,
-                    "latestCollectionVersion"_attr = metadata.getCollVersion(),
-                    "refreshedCollectionVersion"_attr = cm.getVersion());
-                return metadata.getShardVersion();
-            }
+    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        opCtx, nss, CSRAcquisitionMode::kExclusive);
+    if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
+        const auto& metadata = *optMetadata;
+        if (metadata.isSharded() &&
+            (cm.getVersion().isOlderOrEqualThan(metadata.getCollVersion()))) {
+            LOGV2_DEBUG(22064,
+                        1,
+                        "Skipping metadata refresh because collection already is up-to-date",
+                        "namespace"_attr = nss,
+                        "latestCollectionVersion"_attr = metadata.getCollVersion(),
+                        "refreshedCollectionVersion"_attr = cm.getVersion());
+            return metadata.getShardVersion();
         }
     }
 
     CollectionMetadata metadata(cm, shardingState->shardId());
-    const auto newShardVersion = metadata.getShardVersion();
+    auto newShardVersion = metadata.getShardVersion();
 
-    csr->setFilteringMetadata(opCtx, std::move(metadata));
+    scopedCsr->setFilteringMetadata(opCtx, std::move(metadata));
     return newShardVersion;
 }
 

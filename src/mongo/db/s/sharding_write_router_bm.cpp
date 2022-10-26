@@ -157,7 +157,8 @@ std::unique_ptr<CatalogCacheMock> createCatalogCacheMock(OperationContext* opCtx
 
     // Configuring the filtering metadata such that calls to getCollectionDescription return what we
     // want. Specifically the reshardingFields are what we use. Its specified by the chunkManager.
-    CollectionShardingRuntime::get(opCtx, kNss)
+    CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        opCtx, kNss, CSRAcquisitionMode::kExclusive)
         ->setFilteringMetadata(opCtx, CollectionMetadata(chunkManager, originatorShard));
 
     auto catalogCache = CatalogCacheMock::make();

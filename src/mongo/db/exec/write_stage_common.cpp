@@ -76,8 +76,9 @@ PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {
 bool PreWriteFilter::_documentBelongsToMe(const BSONObj& doc) {
     if (!_shardFilterer) {
         _shardFilterer = [&] {
-            const auto css{CollectionShardingState::get(_opCtx, _nss)};
-            return std::make_unique<ShardFiltererImpl>(css->getOwnershipFilter(
+            auto scopedCss =
+                CollectionShardingState::assertCollectionLockedAndAcquire(_opCtx, _nss);
+            return std::make_unique<ShardFiltererImpl>(scopedCss->getOwnershipFilter(
                 _opCtx,
                 CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup,
                 true /*supportNonVersionedOperations*/));
