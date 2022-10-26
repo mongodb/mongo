@@ -38,10 +38,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 
-namespace mongo::unittest::match::detail {
+namespace mongo::unittest::stringify {
 
-std::string lastResortFormat(const std::type_info& ti, const void* p, size_t sz) {
-    return format(FMT_STRING("[{}={}]"), demangleName(ti), hexdump(p, sz));
+std::string formatTypedObj(const std::type_info& ti, StringData s) {
+    return format(FMT_STRING("[{}={}]"), demangleName(ti), s);
 }
 
-}  // namespace mongo::unittest::match::detail
+std::string lastResortFormat(const std::type_info& ti, const void* p, size_t sz) {
+    return formatTypedObj(ti, hexdump(p, sz));
+}
+
+}  // namespace mongo::unittest::stringify

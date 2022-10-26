@@ -31,9 +31,9 @@
 
 #include <tuple>
 
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/matcher.h"
 #include "mongo/unittest/matcher_core.h"
-#include "mongo/unittest/unittest.h"
 
 /**
  * unittest-style ASSERT that an `expr` successfully matches a `matcher`.

@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/matcher_core.h"
 
 /**
@@ -151,7 +152,7 @@ public:
     explicit RelOpBase(T v) : _v{std::move(v)} {}
 
     std::string describe() const {
-        return format(FMT_STRING("{}({})"), self().name, stringifyForAssert(_v));
+        return format(FMT_STRING("{}({})"), self().name, stringify::stringifyForAssert(_v));
     }
 
     template <typename X, std::enable_if_t<stdx::is_detected_v<CanMatchOp, X>, int> = 0>
@@ -396,7 +397,7 @@ private:
         auto it = begin(x);
         std::array arr{std::get<Is>(_ms).match(*it++)...};
         bool allOk = true;
-        detail::Joiner joiner;
+        stringify::Joiner joiner;
         for (size_t i = 0; i != sizeof...(Ms); ++i) {
             if (!arr[i]) {
                 allOk = false;
@@ -556,7 +557,7 @@ public:
     MatchResult match(const Status& st) const {
         MatchResult cr = _code.match(st.code());
         MatchResult rr = _reason.match(st.reason());
-        detail::Joiner joiner;
+        stringify::Joiner joiner;
         if (!cr.message().empty())
             joiner(format(FMT_STRING("code:{}"), cr.message()));
         if (!rr.message().empty()) {

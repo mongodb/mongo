@@ -249,9 +249,9 @@ TEST(AssertThat, UnprintableValues) {
     struct Unprintable {
         int i;
     } v{123};
-    std::string lastResort = detail::lastResortFormat(typeid(v), &v, sizeof(v));
+    std::string lastResort = stringify::lastResortFormat(typeid(v), &v, sizeof(v));
     // Test that the lastResortFormat function is used for unprintable values.
-    using detail::stringifyForAssert;  // Augment ADL with the "detail" NS.
+    using stringify::stringifyForAssert;  // Augment ADL with the "detail" NS.
     ASSERT_EQ(stringifyForAssert(v), lastResort);
     // Test that a typical matcher like Eq uses it.
     ASSERT_STRING_CONTAINS(Eq(v).describe(), lastResort);

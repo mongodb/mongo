@@ -31,7 +31,7 @@
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
 
 /**
  * BSON comparison utility macro. Do not use directly.

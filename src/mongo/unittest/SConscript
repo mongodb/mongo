@@ -27,7 +27,7 @@ utEnv.Library(
         'death_test.cpp',
         'golden_test.cpp',
         'matcher.cpp',
-        'matcher_core.cpp',
+        'stringify.cpp',
         'temp_dir.cpp',
         'unittest.cpp',
     ],

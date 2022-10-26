@@ -29,11 +29,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/unittest/death_test.h"
+
 #include <fmt/format.h>
 #include <stdio.h>
 
 #include "mongo/bson/json.h"
-#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/exit_code.h"
 
