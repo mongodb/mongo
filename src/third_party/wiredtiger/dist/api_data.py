@@ -790,7 +790,8 @@ connection_runtime_config = [
         enable messages for various subsystems and operations. Options are given as a list,
         where each message type can optionally define an associated verbosity level, such as
         <code>"verbose=[evictserver,read:1,rts:0]"</code>. Verbosity levels that can be provided
-        include <code>0</code> (INFO) and <code>1</code> (DEBUG).''',
+        include <code>0</code> (INFO) and <code>1</code> through <code>5</code>, corresponding to
+        (DEBUG_1) to (DEBUG_5).''',
         type='list', choices=[
             'api',
             'backup',
