@@ -37,7 +37,7 @@ namespace mongo {
 class InternalSchemaMinLengthMatchExpression final : public InternalSchemaStrLengthMatchExpression {
 
 public:
-    InternalSchemaMinLengthMatchExpression(StringData path,
+    InternalSchemaMinLengthMatchExpression(boost::optional<StringData> path,
                                            long long strLen,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : InternalSchemaStrLengthMatchExpression(MatchType::INTERNAL_SCHEMA_MIN_LENGTH,

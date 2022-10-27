@@ -587,7 +587,7 @@ std::unique_ptr<NearStage::CoveredInterval> GeoNear2DStage::nextInterval(
     // FLAT searches need to add an additional annulus $within matcher, see above
     // TODO: Find out if this matcher is actually needed
     if (FLAT == queryCRS) {
-        docMatcher = new TwoDPtInAnnulusExpression(_fullBounds, twoDFieldName);
+        docMatcher = new TwoDPtInAnnulusExpression(_fullBounds, StringData(twoDFieldName));
     }
 
     // FetchStage owns index scan

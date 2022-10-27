@@ -39,7 +39,7 @@ namespace mongo {
  */
 class InternalSchemaFmodMatchExpression final : public LeafMatchExpression {
 public:
-    InternalSchemaFmodMatchExpression(StringData path,
+    InternalSchemaFmodMatchExpression(boost::optional<StringData> path,
                                       Decimal128 divisor,
                                       Decimal128 remainder,
                                       clonable_ptr<ErrorAnnotation> annotation = nullptr);

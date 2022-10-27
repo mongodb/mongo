@@ -41,7 +41,7 @@ public:
     using Validator = std::function<bool(int)>;
 
     InternalSchemaStrLengthMatchExpression(MatchType type,
-                                           StringData path,
+                                           boost::optional<StringData> path,
                                            long long strLen,
                                            StringData name,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr);

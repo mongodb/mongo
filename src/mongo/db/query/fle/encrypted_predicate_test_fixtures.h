@@ -104,7 +104,7 @@ public:
     void assertRewriteForOp(const EncryptedPredicate& pred,
                             BSONElement rhs,
                             std::vector<PrfBlock> allTags) {
-        auto inputExpr = T("age", rhs);
+        auto inputExpr = T("age"_sd, rhs);
         assertRewriteToTags(pred, &inputExpr, toBSONArray(std::move(allTags)));
     }
 

@@ -43,7 +43,7 @@ namespace mongo {
 class InternalSchemaNumArrayItemsMatchExpression : public ArrayMatchingMatchExpression {
 public:
     InternalSchemaNumArrayItemsMatchExpression(MatchType type,
-                                               StringData path,
+                                               boost::optional<StringData> path,
                                                long long numItems,
                                                StringData name,
                                                clonable_ptr<ErrorAnnotation> annotation = nullptr);

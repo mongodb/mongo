@@ -83,11 +83,11 @@ private:
 class GeoMatchExpression : public LeafMatchExpression {
 
 public:
-    GeoMatchExpression(StringData path,
+    GeoMatchExpression(boost::optional<StringData> path,
                        const GeoExpression* query,
                        const BSONObj& rawObj,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
-    GeoMatchExpression(StringData path,
+    GeoMatchExpression(boost::optional<StringData> path,
                        std::shared_ptr<const GeoExpression> query,
                        const BSONObj& rawObj,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
@@ -191,8 +191,10 @@ private:
 
 class GeoNearMatchExpression : public LeafMatchExpression {
 public:
-    GeoNearMatchExpression(StringData path, const GeoNearExpression* query, const BSONObj& rawObj);
-    GeoNearMatchExpression(StringData path,
+    GeoNearMatchExpression(boost::optional<StringData> path,
+                           const GeoNearExpression* query,
+                           const BSONObj& rawObj);
+    GeoNearMatchExpression(boost::optional<StringData> path,
                            std::shared_ptr<const GeoNearExpression> query,
                            const BSONObj& rawObj);
 
@@ -243,7 +245,7 @@ private:
  */
 class TwoDPtInAnnulusExpression : public LeafMatchExpression {
 public:
-    TwoDPtInAnnulusExpression(const R2Annulus& annulus, StringData twoDPath)
+    TwoDPtInAnnulusExpression(const R2Annulus& annulus, boost::optional<StringData> twoDPath)
         : LeafMatchExpression(INTERNAL_2D_POINT_IN_ANNULUS, twoDPath), _annulus(annulus) {}
 
     void serialize(BSONObjBuilder* out, bool includePath) const final {

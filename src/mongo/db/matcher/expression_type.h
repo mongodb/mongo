@@ -48,7 +48,7 @@ template <class T>
 class TypeMatchExpressionBase : public LeafMatchExpression {
 public:
     explicit TypeMatchExpressionBase(MatchType matchType,
-                                     StringData path,
+                                     boost::optional<StringData> path,
                                      ElementPath::LeafArrayBehavior leafArrBehavior,
                                      MatcherTypeSet typeSet,
                                      clonable_ptr<ErrorAnnotation> annotation = nullptr)
@@ -123,7 +123,7 @@ class TypeMatchExpression final : public TypeMatchExpressionBase<TypeMatchExpres
 public:
     static constexpr StringData kName = "$type"_sd;
 
-    TypeMatchExpression(StringData path,
+    TypeMatchExpression(boost::optional<StringData> path,
                         MatcherTypeSet typeSet,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::TYPE_OPERATOR,
@@ -177,7 +177,7 @@ class InternalSchemaTypeExpression final
 public:
     static constexpr StringData kName = "$_internalSchemaType"_sd;
 
-    InternalSchemaTypeExpression(StringData path,
+    InternalSchemaTypeExpression(boost::optional<StringData> path,
                                  MatcherTypeSet typeSet,
                                  clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_TYPE,
@@ -216,7 +216,7 @@ class InternalSchemaBinDataSubTypeExpression final : public LeafMatchExpression 
 public:
     static constexpr StringData kName = "$_internalSchemaBinDataSubType"_sd;
 
-    InternalSchemaBinDataSubTypeExpression(StringData path,
+    InternalSchemaBinDataSubTypeExpression(boost::optional<StringData> path,
                                            BinDataType binDataSubType,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : LeafMatchExpression(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE,
@@ -301,7 +301,7 @@ class InternalSchemaBinDataEncryptedTypeExpression final
 public:
     static constexpr StringData kName = "$_internalSchemaBinDataEncryptedType"_sd;
 
-    InternalSchemaBinDataEncryptedTypeExpression(StringData path,
+    InternalSchemaBinDataEncryptedTypeExpression(boost::optional<StringData> path,
                                                  MatcherTypeSet typeSet,
                                                  clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE,
@@ -372,7 +372,9 @@ public:
     static constexpr StringData kName = "$_internalSchemaBinDataFLE2EncryptedType"_sd;
 
     InternalSchemaBinDataFLE2EncryptedTypeExpression(
-        StringData path, MatcherTypeSet typeSet, clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        boost::optional<StringData> path,
+        MatcherTypeSet typeSet,
+        clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE,
                                   path,
                                   ElementPath::LeafArrayBehavior::kNoTraversal,

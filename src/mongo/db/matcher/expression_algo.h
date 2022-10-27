@@ -112,6 +112,11 @@ bool containsDependency(const OrderedPathSet& testSet, const OrderedPathSet& pre
 bool containsOverlappingPaths(const OrderedPathSet& testSet);
 
 /**
+ * Returns true if any of the paths in 'testSet' contain empty path components.
+ */
+bool containsEmptyPaths(const OrderedPathSet& testSet);
+
+/**
  * Determine if 'expr' is reliant upon any path from 'pathSet'.
  */
 bool isIndependentOf(const MatchExpression& expr, const OrderedPathSet& pathSet);

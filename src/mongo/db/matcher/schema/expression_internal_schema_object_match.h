@@ -40,7 +40,7 @@ public:
     static constexpr StringData kName = "$_internalSchemaObjectMatch"_sd;
     static constexpr int kNumChildren = 1;
 
-    InternalSchemaObjectMatchExpression(StringData path,
+    InternalSchemaObjectMatchExpression(boost::optional<StringData> path,
                                         std::unique_ptr<MatchExpression> expr,
                                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 

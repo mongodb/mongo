@@ -816,6 +816,26 @@ bool containsOverlappingPaths(const OrderedPathSet& testSet) {
     return false;
 }
 
+bool containsEmptyPaths(const OrderedPathSet& testSet) {
+    return std::any_of(testSet.begin(), testSet.end(), [](const auto& path) {
+        if (path.empty()) {
+            return true;
+        }
+
+        FieldRef fieldRef(path);
+
+        for (size_t i = 0; i < fieldRef.numParts(); ++i) {
+            if (fieldRef.getPart(i).empty()) {
+                return true;
+            }
+        }
+
+        // all non-empty
+        return false;
+    });
+}
+
+
 bool areIndependent(const OrderedPathSet& pathSet1, const OrderedPathSet& pathSet2) {
     return !containsDependency(pathSet1, pathSet2) && !containsDependency(pathSet2, pathSet1);
 }

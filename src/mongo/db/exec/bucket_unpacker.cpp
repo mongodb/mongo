@@ -273,8 +273,10 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
         maxTime = BSON("" << timeField + Seconds(bucketMaxSpanSeconds));
     }
 
-    auto minPath = std::string{kControlMinFieldNamePrefix} + matchExprPath;
-    auto maxPath = std::string{kControlMaxFieldNamePrefix} + matchExprPath;
+    const auto minPath = std::string{kControlMinFieldNamePrefix} + matchExprPath;
+    const StringData minPathStringData(minPath);
+    const auto maxPath = std::string{kControlMaxFieldNamePrefix} + matchExprPath;
+    const StringData maxPathStringData(maxPath);
 
     switch (matchExpr->matchType()) {
         case MatchExpression::EQ:
@@ -296,25 +298,29 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             // {$expr: {$eq: [...]}} that can be rewritten to use $_internalExprEq.
             if (!isTimeField) {
                 return makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                    makePredicate(
-                        MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                        MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData)),
+                    makePredicate(MatchExprPredicate<InternalExprLTEMatchExpression>(
+                                      minPathStringData, matchExprData),
+                                  MatchExprPredicate<InternalExprGTEMatchExpression>(
+                                      maxPathStringData, matchExprData)),
                     createTypeEqualityPredicate(pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
             } else if (bucketSpec.usesExtendedRange()) {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(minPath,
-                                                                       minTime.firstElement()),
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
-                                                                       maxTime.firstElement()));
+                return makePredicate(MatchExprPredicate<InternalExprLTEMatchExpression>(
+                                         minPathStringData, matchExprData),
+                                     MatchExprPredicate<InternalExprGTEMatchExpression>(
+                                         minPathStringData, minTime.firstElement()),
+                                     MatchExprPredicate<InternalExprGTEMatchExpression>(
+                                         maxPathStringData, matchExprData),
+                                     MatchExprPredicate<InternalExprLTEMatchExpression>(
+                                         maxPathStringData, maxTime.firstElement()));
             } else {
                 return makePredicate(
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(minPath,
+                    MatchExprPredicate<InternalExprLTEMatchExpression>(minPathStringData,
+                                                                       matchExprData),
+                    MatchExprPredicate<InternalExprGTEMatchExpression>(minPathStringData,
                                                                        minTime.firstElement()),
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
+                    MatchExprPredicate<InternalExprGTEMatchExpression>(maxPathStringData,
+                                                                       matchExprData),
+                    MatchExprPredicate<InternalExprLTEMatchExpression>(maxPathStringData,
                                                                        maxTime.firstElement()),
                     MatchExprPredicate<LTEMatchExpression, Value>(
                         kBucketIdFieldName,
@@ -343,22 +349,23 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             // {$expr: {$gt: [...]}} that can be rewritten to use $_internalExprGt.
             if (!isTimeField) {
                 return makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                    std::make_unique<InternalExprGTMatchExpression>(maxPath, matchExprData),
+                    std::make_unique<InternalExprGTMatchExpression>(maxPathStringData,
+                                                                    matchExprData),
                     createTypeEqualityPredicate(pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
             } else if (bucketSpec.usesExtendedRange()) {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprGTMatchExpression>(maxPath, matchExprData),
-                    MatchExprPredicate<InternalExprGTMatchExpression>(minPath,
-                                                                      minTime.firstElement()));
+                return makePredicate(MatchExprPredicate<InternalExprGTMatchExpression>(
+                                         maxPathStringData, matchExprData),
+                                     MatchExprPredicate<InternalExprGTMatchExpression>(
+                                         minPathStringData, minTime.firstElement()));
             } else {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprGTMatchExpression>(maxPath, matchExprData),
-                    MatchExprPredicate<InternalExprGTMatchExpression>(minPath,
-                                                                      minTime.firstElement()),
-                    MatchExprPredicate<GTMatchExpression, Value>(
-                        kBucketIdFieldName,
-                        constructObjectIdValue<GTMatchExpression>(matchExprData,
-                                                                  bucketMaxSpanSeconds)));
+                return makePredicate(MatchExprPredicate<InternalExprGTMatchExpression>(
+                                         maxPathStringData, matchExprData),
+                                     MatchExprPredicate<InternalExprGTMatchExpression>(
+                                         minPathStringData, minTime.firstElement()),
+                                     MatchExprPredicate<GTMatchExpression, Value>(
+                                         kBucketIdFieldName,
+                                         constructObjectIdValue<GTMatchExpression>(
+                                             matchExprData, bucketMaxSpanSeconds)));
             }
             MONGO_UNREACHABLE_TASSERT(6646904);
 
@@ -377,22 +384,23 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             // {$expr: {$gte: [...]}} that can be rewritten to use $_internalExprGte.
             if (!isTimeField) {
                 return makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                    std::make_unique<InternalExprGTEMatchExpression>(maxPath, matchExprData),
+                    std::make_unique<InternalExprGTEMatchExpression>(maxPathStringData,
+                                                                     matchExprData),
                     createTypeEqualityPredicate(pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
             } else if (bucketSpec.usesExtendedRange()) {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(minPath,
-                                                                       minTime.firstElement()));
+                return makePredicate(MatchExprPredicate<InternalExprGTEMatchExpression>(
+                                         maxPathStringData, matchExprData),
+                                     MatchExprPredicate<InternalExprGTEMatchExpression>(
+                                         minPathStringData, minTime.firstElement()));
             } else {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(minPath,
-                                                                       minTime.firstElement()),
-                    MatchExprPredicate<GTEMatchExpression, Value>(
-                        kBucketIdFieldName,
-                        constructObjectIdValue<GTEMatchExpression>(matchExprData,
-                                                                   bucketMaxSpanSeconds)));
+                return makePredicate(MatchExprPredicate<InternalExprGTEMatchExpression>(
+                                         maxPathStringData, matchExprData),
+                                     MatchExprPredicate<InternalExprGTEMatchExpression>(
+                                         minPathStringData, minTime.firstElement()),
+                                     MatchExprPredicate<GTEMatchExpression, Value>(
+                                         kBucketIdFieldName,
+                                         constructObjectIdValue<GTEMatchExpression>(
+                                             matchExprData, bucketMaxSpanSeconds)));
             }
             MONGO_UNREACHABLE_TASSERT(6646905);
 
@@ -412,22 +420,23 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             // {$expr: {$lt: [...]}} that can be rewritten to use $_internalExprLt.
             if (!isTimeField) {
                 return makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                    std::make_unique<InternalExprLTMatchExpression>(minPath, matchExprData),
+                    std::make_unique<InternalExprLTMatchExpression>(minPathStringData,
+                                                                    matchExprData),
                     createTypeEqualityPredicate(pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
             } else if (bucketSpec.usesExtendedRange()) {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprLTMatchExpression>(minPath, matchExprData),
-                    MatchExprPredicate<InternalExprLTMatchExpression>(maxPath,
-                                                                      maxTime.firstElement()));
+                return makePredicate(MatchExprPredicate<InternalExprLTMatchExpression>(
+                                         minPathStringData, matchExprData),
+                                     MatchExprPredicate<InternalExprLTMatchExpression>(
+                                         maxPathStringData, maxTime.firstElement()));
             } else {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprLTMatchExpression>(minPath, matchExprData),
-                    MatchExprPredicate<InternalExprLTMatchExpression>(maxPath,
-                                                                      maxTime.firstElement()),
-                    MatchExprPredicate<LTMatchExpression, Value>(
-                        kBucketIdFieldName,
-                        constructObjectIdValue<LTMatchExpression>(matchExprData,
-                                                                  bucketMaxSpanSeconds)));
+                return makePredicate(MatchExprPredicate<InternalExprLTMatchExpression>(
+                                         minPathStringData, matchExprData),
+                                     MatchExprPredicate<InternalExprLTMatchExpression>(
+                                         maxPathStringData, maxTime.firstElement()),
+                                     MatchExprPredicate<LTMatchExpression, Value>(
+                                         kBucketIdFieldName,
+                                         constructObjectIdValue<LTMatchExpression>(
+                                             matchExprData, bucketMaxSpanSeconds)));
             }
             MONGO_UNREACHABLE_TASSERT(6646906);
 
@@ -445,22 +454,23 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             // {$expr: {$lte: [...]}} that can be rewritten to use $_internalExprLte.
             if (!isTimeField) {
                 return makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                    std::make_unique<InternalExprLTEMatchExpression>(minPath, matchExprData),
+                    std::make_unique<InternalExprLTEMatchExpression>(minPathStringData,
+                                                                     matchExprData),
                     createTypeEqualityPredicate(pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
             } else if (bucketSpec.usesExtendedRange()) {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
-                                                                       maxTime.firstElement()));
+                return makePredicate(MatchExprPredicate<InternalExprLTEMatchExpression>(
+                                         minPathStringData, matchExprData),
+                                     MatchExprPredicate<InternalExprLTEMatchExpression>(
+                                         maxPathStringData, maxTime.firstElement()));
             } else {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
-                                                                       maxTime.firstElement()),
-                    MatchExprPredicate<LTEMatchExpression, Value>(
-                        kBucketIdFieldName,
-                        constructObjectIdValue<LTEMatchExpression>(matchExprData,
-                                                                   bucketMaxSpanSeconds)));
+                return makePredicate(MatchExprPredicate<InternalExprLTEMatchExpression>(
+                                         minPathStringData, matchExprData),
+                                     MatchExprPredicate<InternalExprLTEMatchExpression>(
+                                         maxPathStringData, maxTime.firstElement()),
+                                     MatchExprPredicate<LTEMatchExpression, Value>(
+                                         kBucketIdFieldName,
+                                         constructObjectIdValue<LTEMatchExpression>(
+                                             matchExprData, bucketMaxSpanSeconds)));
             }
             MONGO_UNREACHABLE_TASSERT(6646907);
 
@@ -599,10 +609,10 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
         if (assumeNoMixedSchemaData) {
             // We know that every field that appears in an event will also appear in the min/max.
             auto result = std::make_unique<AndMatchExpression>();
-            result->add(std::make_unique<ExistsMatchExpression>(
-                std::string{timeseries::kControlMinFieldNamePrefix} + matchExpr->path()));
-            result->add(std::make_unique<ExistsMatchExpression>(
-                std::string{timeseries::kControlMaxFieldNamePrefix} + matchExpr->path()));
+            result->add(std::make_unique<ExistsMatchExpression>(StringData(
+                std::string{timeseries::kControlMinFieldNamePrefix} + matchExpr->path())));
+            result->add(std::make_unique<ExistsMatchExpression>(StringData(
+                std::string{timeseries::kControlMaxFieldNamePrefix} + matchExpr->path())));
             return result;
         } else {
             // At time of writing, we only pass 'kError' when creating a partial index, and

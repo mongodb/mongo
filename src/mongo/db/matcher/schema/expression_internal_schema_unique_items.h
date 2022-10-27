@@ -48,7 +48,7 @@ public:
     static constexpr StringData kName = "$_internalSchemaUniqueItems"_sd;
 
     explicit InternalSchemaUniqueItemsMatchExpression(
-        StringData path, clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        boost::optional<StringData> path, clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ArrayMatchingMatchExpression(
               MatchExpression::INTERNAL_SCHEMA_UNIQUE_ITEMS, path, std::move(annotation)) {}
 

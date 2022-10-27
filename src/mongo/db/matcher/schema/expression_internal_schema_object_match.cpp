@@ -36,7 +36,7 @@ namespace mongo {
 constexpr StringData InternalSchemaObjectMatchExpression::kName;
 
 InternalSchemaObjectMatchExpression::InternalSchemaObjectMatchExpression(
-    StringData path,
+    boost::optional<StringData> path,
     std::unique_ptr<MatchExpression> expr,
     clonable_ptr<ErrorAnnotation> annotation)
     : PathMatchExpression(INTERNAL_SCHEMA_OBJECT_MATCH,

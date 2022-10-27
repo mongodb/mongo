@@ -40,7 +40,7 @@ namespace mongo {
 constexpr StringData InternalSchemaEqMatchExpression::kName;
 
 InternalSchemaEqMatchExpression::InternalSchemaEqMatchExpression(
-    StringData path, BSONElement rhs, clonable_ptr<ErrorAnnotation> annotation)
+    boost::optional<StringData> path, BSONElement rhs, clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(MatchType::INTERNAL_SCHEMA_EQ,
                           path,
                           ElementPath::LeafArrayBehavior::kNoTraversal,

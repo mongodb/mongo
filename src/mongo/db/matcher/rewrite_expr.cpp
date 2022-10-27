@@ -187,28 +187,28 @@ std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
 
     switch (comparisonOp) {
         case ExpressionCompare::EQ: {
-            matchExpr = std::make_unique<InternalExprEqMatchExpression>(fieldAndValue.fieldName(),
-                                                                        fieldAndValue);
+            matchExpr = std::make_unique<InternalExprEqMatchExpression>(
+                fieldAndValue.fieldNameStringData(), fieldAndValue);
             break;
         }
         case ExpressionCompare::GT: {
-            matchExpr = std::make_unique<InternalExprGTMatchExpression>(fieldAndValue.fieldName(),
-                                                                        fieldAndValue);
+            matchExpr = std::make_unique<InternalExprGTMatchExpression>(
+                fieldAndValue.fieldNameStringData(), fieldAndValue);
             break;
         }
         case ExpressionCompare::GTE: {
-            matchExpr = std::make_unique<InternalExprGTEMatchExpression>(fieldAndValue.fieldName(),
-                                                                         fieldAndValue);
+            matchExpr = std::make_unique<InternalExprGTEMatchExpression>(
+                fieldAndValue.fieldNameStringData(), fieldAndValue);
             break;
         }
         case ExpressionCompare::LT: {
-            matchExpr = std::make_unique<InternalExprLTMatchExpression>(fieldAndValue.fieldName(),
-                                                                        fieldAndValue);
+            matchExpr = std::make_unique<InternalExprLTMatchExpression>(
+                fieldAndValue.fieldNameStringData(), fieldAndValue);
             break;
         }
         case ExpressionCompare::LTE: {
-            matchExpr = std::make_unique<InternalExprLTEMatchExpression>(fieldAndValue.fieldName(),
-                                                                         fieldAndValue);
+            matchExpr = std::make_unique<InternalExprLTEMatchExpression>(
+                fieldAndValue.fieldNameStringData(), fieldAndValue);
             break;
         }
         default:

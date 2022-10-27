@@ -46,7 +46,7 @@ public:
     static constexpr int kNumChildren = 1;
 
     InternalSchemaMatchArrayIndexMatchExpression(
-        StringData path,
+        boost::optional<StringData> path,
         long long index,
         std::unique_ptr<ExpressionWithPlaceholder> expression,
         clonable_ptr<ErrorAnnotation> annotation = nullptr);

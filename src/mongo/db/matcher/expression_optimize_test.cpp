@@ -335,7 +335,7 @@ TEST(ExpressionOptimizeTest, NormalizeWithInAndRegexPreservesTags) {
 TEST(ExpressionOptimizeTest, NormalizeWithInPreservesCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj obj = fromjson("{'': 'string'}");
-    auto inMatchExpression = std::make_unique<InMatchExpression>("");
+    auto inMatchExpression = std::make_unique<InMatchExpression>(""_sd);
     inMatchExpression->setCollator(&collator);
     std::vector<BSONElement> equalities{obj.firstElement()};
     ASSERT_OK(inMatchExpression->setEqualities(std::move(equalities)));

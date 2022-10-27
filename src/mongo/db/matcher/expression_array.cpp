@@ -67,7 +67,9 @@ bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) cons
 // -------
 
 ElemMatchObjectMatchExpression::ElemMatchObjectMatchExpression(
-    StringData path, std::unique_ptr<MatchExpression> sub, clonable_ptr<ErrorAnnotation> annotation)
+    boost::optional<StringData> path,
+    std::unique_ptr<MatchExpression> sub,
+    clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(ELEM_MATCH_OBJECT, path, std::move(annotation)),
       _sub(std::move(sub)) {}
 
@@ -119,12 +121,14 @@ MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOpti
 // -------
 
 ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
-    StringData path, std::unique_ptr<MatchExpression> sub, clonable_ptr<ErrorAnnotation> annotation)
+    boost::optional<StringData> path,
+    std::unique_ptr<MatchExpression> sub,
+    clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path, std::move(annotation)),
       _subs(makeVector(std::move(sub))) {}
 
 ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
-    StringData path, clonable_ptr<ErrorAnnotation> annotation)
+    boost::optional<StringData> path, clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path, std::move(annotation)) {}
 
 void ElemMatchValueMatchExpression::add(std::unique_ptr<MatchExpression> sub) {
@@ -193,7 +197,7 @@ MatchExpression::ExpressionOptimizerFunc ElemMatchValueMatchExpression::getOptim
 
 // ---------
 
-SizeMatchExpression::SizeMatchExpression(StringData path,
+SizeMatchExpression::SizeMatchExpression(boost::optional<StringData> path,
                                          int size,
                                          clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(SIZE, path, std::move(annotation)), _size(size) {}

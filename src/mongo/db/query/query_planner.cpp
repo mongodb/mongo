@@ -343,6 +343,11 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
                 str::stream() << "cannot use columnstore index because the query requires paths "
                                  "which are a prefix of each other: "
                               << set_util::setToString(allFieldsReferenced)};
+    } else if (expression::containsEmptyPaths(allFieldsReferenced)) {
+        return {
+            ErrorCodes::Error{6549400},
+            str::stream() << "cannot use columnstore index because the query requires empty paths: "
+                          << set_util::setToString(allFieldsReferenced)};
     }
 
     // Ensures that hinted index is eligible for the column scan.

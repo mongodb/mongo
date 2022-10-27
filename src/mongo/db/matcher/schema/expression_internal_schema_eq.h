@@ -49,7 +49,7 @@ class InternalSchemaEqMatchExpression final : public LeafMatchExpression {
 public:
     static constexpr StringData kName = "$_internalSchemaEq"_sd;
 
-    InternalSchemaEqMatchExpression(StringData path,
+    InternalSchemaEqMatchExpression(boost::optional<StringData> path,
                                     BSONElement rhs,
                                     clonable_ptr<ErrorAnnotation> annotation = nullptr);
 

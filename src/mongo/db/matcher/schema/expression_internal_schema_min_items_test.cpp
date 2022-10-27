@@ -38,7 +38,7 @@ namespace mongo {
 namespace {
 
 TEST(InternalSchemaMinItemsMatchExpression, RejectsNonArrayElements) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 1);
+    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 1);
 
     ASSERT(!minItems.matchesBSON(BSON("a" << BSONObj())));
     ASSERT(!minItems.matchesBSON(BSON("a" << 1)));
@@ -47,40 +47,40 @@ TEST(InternalSchemaMinItemsMatchExpression, RejectsNonArrayElements) {
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, RejectsArraysWithTooFewElements) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 2);
+    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 2);
 
     ASSERT(!minItems.matchesBSON(BSON("a" << BSONArray())));
     ASSERT(!minItems.matchesBSON(BSON("a" << BSON_ARRAY(1))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, AcceptsArrayWithAtLeastMinElements) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 2);
+    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 2);
 
     ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2))));
     ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, MinItemsZeroAllowsEmptyArrays) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 0);
+    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 0);
 
     ASSERT(minItems.matchesBSON(BSON("a" << BSONArray())));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, NullArrayEntriesCountAsItems) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 1);
+    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 1);
 
     ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(BSONNULL))));
     ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(BSONNULL << 1))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, NestedArraysAreNotUnwound) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 2);
+    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 2);
 
     ASSERT(!minItems.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(1 << 2)))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, NestedArraysWorkWithDottedPaths) {
-    InternalSchemaMinItemsMatchExpression minItems("a.b", 2);
+    InternalSchemaMinItemsMatchExpression minItems("a.b"_sd, 2);
 
     ASSERT(minItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1 << 2)))));
     ASSERT(!minItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1)))));
@@ -89,7 +89,7 @@ TEST(InternalSchemaMinItemsMatchExpression, NestedArraysWorkWithDottedPaths) {
 DEATH_TEST_REGEX(InternalSchemaMinItemsMatchExpression,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400215") {
-    InternalSchemaMinItemsMatchExpression minItems("a", 2);
+    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 2);
 
     ASSERT_EQ(minItems.numChildren(), 0);
     ASSERT_THROWS_CODE(minItems.getChild(0), AssertionException, 6400215);

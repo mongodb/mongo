@@ -50,7 +50,7 @@ std::unique_ptr<MatchExpression> makeTagDisjunction(BSONArray&& tagArray) {
     auto tagElems = std::vector<BSONElement>();
     tagArray.elems(tagElems);
 
-    auto newExpr = std::make_unique<InMatchExpression>(kSafeContent);
+    auto newExpr = std::make_unique<InMatchExpression>(StringData(kSafeContent));
     newExpr->setBackingBSON(std::move(tagArray));
     uassertStatusOK(newExpr->setEqualities(std::move(tagElems)));
 

@@ -133,12 +133,12 @@ TEST_F(RangePredicateRewriteTest, MatchRangeRewrite_Stub) {
     std::vector<StringData> operators = {"$between", "$gt", "$gte", "$lte", "$lt"};
     auto payload = fromjson("{x: [1, 2, 3, 4, 5, 6, 7, 8, 9]}");
 
-#define ASSERT_REWRITE_TO_TRUE(T)                                                          \
-    {                                                                                      \
-        std::unique_ptr<MatchExpression> inputExpr = std::make_unique<T>("age", Value(0)); \
-        _predicate.isStubPayload = true;                                                   \
-        auto rewrite = _predicate.rewrite(inputExpr.get());                                \
-        ASSERT_EQ(rewrite->matchType(), MatchExpression::ALWAYS_TRUE);                     \
+#define ASSERT_REWRITE_TO_TRUE(T)                                                             \
+    {                                                                                         \
+        std::unique_ptr<MatchExpression> inputExpr = std::make_unique<T>("age"_sd, Value(0)); \
+        _predicate.isStubPayload = true;                                                      \
+        auto rewrite = _predicate.rewrite(inputExpr.get());                                   \
+        ASSERT_EQ(rewrite->matchType(), MatchExpression::ALWAYS_TRUE);                        \
     }
 
     // Rewrites that would normally go to disjunctions.

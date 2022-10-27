@@ -39,7 +39,7 @@ namespace mongo {
 namespace {
 
 TEST(InternalSchemaMinLengthMatchExpression, RejectsNonStringElements) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 1);
+    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 1);
 
     ASSERT_FALSE(minLength.matchesBSON(BSON("a" << BSONObj())));
     ASSERT_FALSE(minLength.matchesBSON(BSON("a" << 1)));
@@ -47,7 +47,7 @@ TEST(InternalSchemaMinLengthMatchExpression, RejectsNonStringElements) {
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, RejectsStringsWithTooFewChars) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 2);
+    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
 
     ASSERT_FALSE(minLength.matchesBSON(BSON("a"
                                             << "")));
@@ -56,7 +56,7 @@ TEST(InternalSchemaMinLengthMatchExpression, RejectsStringsWithTooFewChars) {
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, AcceptsStringWithAtLeastMinChars) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 2);
+    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
 
     ASSERT_TRUE(minLength.matchesBSON(BSON("a"
                                            << "ab")));
@@ -67,21 +67,21 @@ TEST(InternalSchemaMinLengthMatchExpression, AcceptsStringWithAtLeastMinChars) {
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, MinLengthZeroAllowsEmptyString) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 0);
+    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 0);
 
     ASSERT_TRUE(minLength.matchesBSON(BSON("a"
                                            << "")));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, RejectsNull) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 1);
+    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 1);
 
     ASSERT_FALSE(minLength.matchesBSON(BSON("a" << BSONNULL)));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, TreatsMultiByteCodepointAsOneCharacter) {
-    InternalSchemaMinLengthMatchExpression matchingMinLength("a", 1);
-    InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a", 2);
+    InternalSchemaMinLengthMatchExpression matchingMinLength("a"_sd, 1);
+    InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a"_sd, 2);
 
     // This string has one code point, so it should meet minimum length 1 but not minimum length 2.
     const auto testString = u8"\U0001f4a9"_as_char_ptr;
@@ -90,8 +90,8 @@ TEST(InternalSchemaMinLengthMatchExpression, TreatsMultiByteCodepointAsOneCharac
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
-    InternalSchemaMinLengthMatchExpression matchingMinLength("a", 5);
-    InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a", 6);
+    InternalSchemaMinLengthMatchExpression matchingMinLength("a"_sd, 5);
+    InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a"_sd, 6);
 
     // A test string that contains single-byte, 2-byte, 3-byte, and 4-byte code points.
     const auto testString =
@@ -108,7 +108,7 @@ TEST(InternalSchemaMinLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, DealsWithInvalidUTF8) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 1);
+    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 1);
 
     // Several kinds of invalid byte sequences listed in the Wikipedia article about UTF-8:
     // https://en.wikipedia.org/wiki/UTF-8
@@ -126,7 +126,7 @@ TEST(InternalSchemaMinLengthMatchExpression, DealsWithInvalidUTF8) {
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, NestedFieldsWorkWithDottedPaths) {
-    InternalSchemaMinLengthMatchExpression minLength("a.b", 2);
+    InternalSchemaMinLengthMatchExpression minLength("a.b"_sd, 2);
 
     ASSERT_TRUE(minLength.matchesBSON(BSON("a" << BSON("b"
                                                        << "ab"))));
@@ -137,9 +137,9 @@ TEST(InternalSchemaMinLengthMatchExpression, NestedFieldsWorkWithDottedPaths) {
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, SameMinLengthTreatedEquivalent) {
-    InternalSchemaMinLengthMatchExpression minLength1("a", 2);
-    InternalSchemaMinLengthMatchExpression minLength2("a", 2);
-    InternalSchemaMinLengthMatchExpression minLength3("a", 3);
+    InternalSchemaMinLengthMatchExpression minLength1("a"_sd, 2);
+    InternalSchemaMinLengthMatchExpression minLength2("a"_sd, 2);
+    InternalSchemaMinLengthMatchExpression minLength3("a"_sd, 3);
 
     ASSERT_TRUE(minLength1.equivalent(&minLength2));
     ASSERT_FALSE(minLength1.equivalent(&minLength3));

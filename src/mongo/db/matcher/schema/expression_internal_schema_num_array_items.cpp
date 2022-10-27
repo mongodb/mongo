@@ -35,7 +35,7 @@ namespace mongo {
 
 InternalSchemaNumArrayItemsMatchExpression::InternalSchemaNumArrayItemsMatchExpression(
     MatchType type,
-    StringData path,
+    boost::optional<StringData> path,
     long long numItems,
     StringData name,
     clonable_ptr<ErrorAnnotation> annotation)

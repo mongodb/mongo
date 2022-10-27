@@ -79,7 +79,7 @@ std::unique_ptr<MatchExpression> makePredicate(
 class LeafMatchExpression : public PathMatchExpression {
 public:
     LeafMatchExpression(MatchType matchType,
-                        StringData path,
+                        boost::optional<StringData> path,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : LeafMatchExpression(matchType,
                               path,
@@ -88,7 +88,7 @@ public:
                               std::move(annotation)) {}
 
     LeafMatchExpression(MatchType matchType,
-                        StringData path,
+                        boost::optional<StringData> path,
                         ElementPath::LeafArrayBehavior leafArrBehavior,
                         ElementPath::NonLeafArrayBehavior nonLeafArrBehavior,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr)
@@ -150,7 +150,7 @@ public:
     }
 
     ComparisonMatchExpressionBase(MatchType type,
-                                  StringData path,
+                                  boost::optional<StringData> path,
                                   Value rhs,
                                   ElementPath::LeafArrayBehavior,
                                   ElementPath::NonLeafArrayBehavior,
@@ -247,7 +247,7 @@ public:
     }
 
     ComparisonMatchExpression(MatchType type,
-                              StringData path,
+                              boost::optional<StringData> path,
                               Value rhs,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr,
                               const CollatorInterface* collator = nullptr);
@@ -261,12 +261,12 @@ class EqualityMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$eq"_sd;
 
-    EqualityMatchExpression(StringData path,
+    EqualityMatchExpression(boost::optional<StringData> path,
                             Value rhs,
                             clonable_ptr<ErrorAnnotation> annotation = nullptr,
                             const CollatorInterface* collator = nullptr)
         : ComparisonMatchExpression(EQ, path, std::move(rhs), std::move(annotation), collator) {}
-    EqualityMatchExpression(StringData path,
+    EqualityMatchExpression(boost::optional<StringData> path,
                             const BSONElement& rhs,
                             clonable_ptr<ErrorAnnotation> annotation = nullptr,
                             const CollatorInterface* collator = nullptr)
@@ -302,11 +302,11 @@ class LTEMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$lte"_sd;
 
-    LTEMatchExpression(StringData path,
+    LTEMatchExpression(boost::optional<StringData> path,
                        Value rhs,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(LTE, path, std::move(rhs), std::move(annotation)) {}
-    LTEMatchExpression(StringData path,
+    LTEMatchExpression(boost::optional<StringData> path,
                        const BSONElement& rhs,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(LTE, path, Value(rhs), std::move(annotation)) {}
@@ -341,11 +341,11 @@ class LTMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$lt"_sd;
 
-    LTMatchExpression(StringData path,
+    LTMatchExpression(boost::optional<StringData> path,
                       Value rhs,
                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(LT, path, std::move(rhs), std::move(annotation)) {}
-    LTMatchExpression(StringData path,
+    LTMatchExpression(boost::optional<StringData> path,
                       const BSONElement& rhs,
                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(LT, path, Value(rhs), std::move(annotation)) {}
@@ -384,12 +384,12 @@ class GTMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$gt"_sd;
 
-    GTMatchExpression(StringData path,
+    GTMatchExpression(boost::optional<StringData> path,
                       Value rhs,
                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(GT, path, std::move(rhs), std::move(annotation)) {}
 
-    GTMatchExpression(StringData path,
+    GTMatchExpression(boost::optional<StringData> path,
                       const BSONElement& rhs,
                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(GT, path, Value(rhs), std::move(annotation)) {}
@@ -428,11 +428,11 @@ class GTEMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$gte"_sd;
 
-    GTEMatchExpression(StringData path,
+    GTEMatchExpression(boost::optional<StringData> path,
                        Value rhs,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(GTE, path, std::move(rhs), std::move(annotation)) {}
-    GTEMatchExpression(StringData path,
+    GTEMatchExpression(boost::optional<StringData> path,
                        const BSONElement& rhs,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(GTE, path, Value(rhs), std::move(annotation)) {}
@@ -470,15 +470,17 @@ public:
     static std::unique_ptr<pcre::Regex> makeRegex(const std::string& regex,
                                                   const std::string& flags);
 
-    RegexMatchExpression(StringData path, Value e, clonable_ptr<ErrorAnnotation> annotation)
+    RegexMatchExpression(boost::optional<StringData> path,
+                         Value e,
+                         clonable_ptr<ErrorAnnotation> annotation)
         : RegexMatchExpression(path, e.getRegex(), e.getRegexFlags(), std::move(annotation)) {}
 
-    RegexMatchExpression(StringData path,
+    RegexMatchExpression(boost::optional<StringData> path,
                          const BSONElement& e,
                          clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : RegexMatchExpression(path, Value(e), annotation) {}
 
-    RegexMatchExpression(StringData path,
+    RegexMatchExpression(boost::optional<StringData> path,
                          StringData regex,
                          StringData options,
                          clonable_ptr<ErrorAnnotation> annotation = nullptr);
@@ -560,7 +562,7 @@ private:
 
 class ModMatchExpression : public LeafMatchExpression {
 public:
-    ModMatchExpression(StringData path,
+    ModMatchExpression(boost::optional<StringData> path,
                        long long divisor,
                        long long remainder,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
@@ -633,7 +635,7 @@ private:
 
 class ExistsMatchExpression : public LeafMatchExpression {
 public:
-    explicit ExistsMatchExpression(StringData path,
+    explicit ExistsMatchExpression(boost::optional<StringData> path,
                                    clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
@@ -672,7 +674,8 @@ private:
  */
 class InMatchExpression : public LeafMatchExpression {
 public:
-    explicit InMatchExpression(StringData path, clonable_ptr<ErrorAnnotation> annotation = nullptr);
+    explicit InMatchExpression(boost::optional<StringData> path,
+                               clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
@@ -805,15 +808,15 @@ public:
      * bitmask.
      */
     explicit BitTestMatchExpression(MatchType type,
-                                    StringData path,
+                                    boost::optional<StringData> path,
                                     std::vector<uint32_t> bitPositions,
                                     clonable_ptr<ErrorAnnotation> annotation);
     explicit BitTestMatchExpression(MatchType type,
-                                    StringData path,
+                                    boost::optional<StringData> path,
                                     uint64_t bitMask,
                                     clonable_ptr<ErrorAnnotation> annotation);
     explicit BitTestMatchExpression(MatchType type,
-                                    StringData path,
+                                    boost::optional<StringData> path,
                                     const char* bitMaskBinary,
                                     uint32_t bitMaskLen,
                                     clonable_ptr<ErrorAnnotation> annotation);
@@ -898,17 +901,17 @@ private:
 
 class BitsAllSetMatchExpression : public BitTestMatchExpression {
 public:
-    BitsAllSetMatchExpression(StringData path,
+    BitsAllSetMatchExpression(boost::optional<StringData> path,
                               std::vector<uint32_t> bitPositions,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : BitTestMatchExpression(BITS_ALL_SET, path, bitPositions, std::move(annotation)) {}
 
-    BitsAllSetMatchExpression(StringData path,
+    BitsAllSetMatchExpression(boost::optional<StringData> path,
                               uint64_t bitMask,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : BitTestMatchExpression(BITS_ALL_SET, path, bitMask, std::move(annotation)) {}
 
-    BitsAllSetMatchExpression(StringData path,
+    BitsAllSetMatchExpression(boost::optional<StringData> path,
                               const char* bitMaskBinary,
                               uint32_t bitMaskLen,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr)
@@ -942,17 +945,17 @@ public:
 
 class BitsAllClearMatchExpression : public BitTestMatchExpression {
 public:
-    BitsAllClearMatchExpression(StringData path,
+    BitsAllClearMatchExpression(boost::optional<StringData> path,
                                 std::vector<uint32_t> bitPositions,
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : BitTestMatchExpression(BITS_ALL_CLEAR, path, bitPositions, std::move(annotation)) {}
 
-    BitsAllClearMatchExpression(StringData path,
+    BitsAllClearMatchExpression(boost::optional<StringData> path,
                                 uint64_t bitMask,
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : BitTestMatchExpression(BITS_ALL_CLEAR, path, bitMask, std::move(annotation)) {}
 
-    BitsAllClearMatchExpression(StringData path,
+    BitsAllClearMatchExpression(boost::optional<StringData> path,
                                 const char* bitMaskBinary,
                                 uint32_t bitMaskLen,
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
@@ -986,17 +989,17 @@ public:
 
 class BitsAnySetMatchExpression : public BitTestMatchExpression {
 public:
-    BitsAnySetMatchExpression(StringData path,
+    BitsAnySetMatchExpression(boost::optional<StringData> path,
                               std::vector<uint32_t> bitPositions,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : BitTestMatchExpression(BITS_ANY_SET, path, bitPositions, std::move(annotation)) {}
 
-    BitsAnySetMatchExpression(StringData path,
+    BitsAnySetMatchExpression(boost::optional<StringData> path,
                               uint64_t bitMask,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : BitTestMatchExpression(BITS_ANY_SET, path, bitMask, std::move(annotation)) {}
 
-    BitsAnySetMatchExpression(StringData path,
+    BitsAnySetMatchExpression(boost::optional<StringData> path,
                               const char* bitMaskBinary,
                               uint32_t bitMaskLen,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr)
@@ -1030,17 +1033,17 @@ public:
 
 class BitsAnyClearMatchExpression : public BitTestMatchExpression {
 public:
-    BitsAnyClearMatchExpression(StringData path,
+    BitsAnyClearMatchExpression(boost::optional<StringData> path,
                                 std::vector<uint32_t> bitPositions,
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : BitTestMatchExpression(BITS_ANY_CLEAR, path, bitPositions, std::move(annotation)) {}
 
-    BitsAnyClearMatchExpression(StringData path,
+    BitsAnyClearMatchExpression(boost::optional<StringData> path,
                                 uint64_t bitMask,
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : BitTestMatchExpression(BITS_ANY_CLEAR, path, bitMask, std::move(annotation)) {}
 
-    BitsAnyClearMatchExpression(StringData path,
+    BitsAnyClearMatchExpression(boost::optional<StringData> path,
                                 const char* bitMaskBinary,
                                 uint32_t bitMaskLen,
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
@@ -1080,7 +1083,7 @@ class BetweenMatchExpression final : public LeafMatchExpression {
 public:
     static constexpr StringData kName = "$between"_sd;
 
-    BetweenMatchExpression(StringData path,
+    BetweenMatchExpression(boost::optional<StringData> path,
                            BSONElement rhs,
                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : LeafMatchExpression(BETWEEN, path, annotation) {

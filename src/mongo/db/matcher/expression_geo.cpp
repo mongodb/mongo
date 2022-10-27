@@ -347,7 +347,7 @@ Status GeoNearExpression::parseFrom(const BSONObj& obj) {
 /**
  * Takes ownership of the passed-in GeoExpression.
  */
-GeoMatchExpression::GeoMatchExpression(StringData path,
+GeoMatchExpression::GeoMatchExpression(boost::optional<StringData> path,
                                        const GeoExpression* query,
                                        const BSONObj& rawObj,
                                        clonable_ptr<ErrorAnnotation> annotation)
@@ -359,7 +359,7 @@ GeoMatchExpression::GeoMatchExpression(StringData path,
 /**
  * Takes shared ownership of the passed-in GeoExpression.
  */
-GeoMatchExpression::GeoMatchExpression(StringData path,
+GeoMatchExpression::GeoMatchExpression(boost::optional<StringData> path,
                                        std::shared_ptr<const GeoExpression> query,
                                        const BSONObj& rawObj,
                                        clonable_ptr<ErrorAnnotation> annotation)
@@ -477,12 +477,12 @@ std::unique_ptr<MatchExpression> GeoMatchExpression::shallowClone() const {
 // Parse-only geo expressions: geoNear (formerly known as near).
 //
 
-GeoNearMatchExpression::GeoNearMatchExpression(StringData path,
+GeoNearMatchExpression::GeoNearMatchExpression(boost::optional<StringData> path,
                                                const GeoNearExpression* query,
                                                const BSONObj& rawObj)
     : LeafMatchExpression(GEO_NEAR, path), _rawObj(rawObj), _query(query) {}
 
-GeoNearMatchExpression::GeoNearMatchExpression(StringData path,
+GeoNearMatchExpression::GeoNearMatchExpression(boost::optional<StringData> path,
                                                std::shared_ptr<const GeoNearExpression> query,
                                                const BSONObj& rawObj)
     : LeafMatchExpression(GEO_NEAR, path), _rawObj(rawObj), _query(query) {}

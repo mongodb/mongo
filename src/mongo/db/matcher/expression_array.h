@@ -46,7 +46,7 @@ namespace mongo {
 class ArrayMatchingMatchExpression : public PathMatchExpression {
 public:
     ArrayMatchingMatchExpression(MatchType matchType,
-                                 StringData path,
+                                 boost::optional<StringData> path,
                                  clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : PathMatchExpression(matchType,
                               path,
@@ -72,7 +72,7 @@ public:
 
 class ElemMatchObjectMatchExpression final : public ArrayMatchingMatchExpression {
 public:
-    ElemMatchObjectMatchExpression(StringData path,
+    ElemMatchObjectMatchExpression(boost::optional<StringData> path,
                                    std::unique_ptr<MatchExpression> sub,
                                    clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
@@ -134,10 +134,10 @@ private:
 
 class ElemMatchValueMatchExpression final : public ArrayMatchingMatchExpression {
 public:
-    ElemMatchValueMatchExpression(StringData path,
+    ElemMatchValueMatchExpression(boost::optional<StringData> path,
                                   std::unique_ptr<MatchExpression> sub,
                                   clonable_ptr<ErrorAnnotation> annotation = nullptr);
-    explicit ElemMatchValueMatchExpression(StringData path,
+    explicit ElemMatchValueMatchExpression(boost::optional<StringData> path,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     void add(std::unique_ptr<MatchExpression> sub);
@@ -196,7 +196,7 @@ private:
 
 class SizeMatchExpression : public ArrayMatchingMatchExpression {
 public:
-    SizeMatchExpression(StringData path,
+    SizeMatchExpression(boost::optional<StringData> path,
                         int size,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 

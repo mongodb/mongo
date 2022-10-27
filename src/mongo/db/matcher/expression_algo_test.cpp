@@ -969,6 +969,24 @@ TEST(ContainsOverlappingPaths, Basics) {
     ASSERT_TRUE(expression::containsOverlappingPaths({"users.address", "users.address.state"}));
 }
 
+TEST(ContainsEmptyPaths, Basics) {
+    // No empty paths.
+    ASSERT_FALSE(expression::containsEmptyPaths({}));
+    ASSERT_FALSE(expression::containsEmptyPaths({"a", "a.b"}));
+
+    // Empty paths.
+    ASSERT_TRUE(expression::containsEmptyPaths({""}));
+    ASSERT_TRUE(expression::containsEmptyPaths({"."}));
+    ASSERT_TRUE(expression::containsEmptyPaths({"a."}));
+    ASSERT_TRUE(expression::containsEmptyPaths({".a"}));
+    ASSERT_TRUE(expression::containsEmptyPaths({"a..b"}));
+    ASSERT_TRUE(expression::containsEmptyPaths({".."}));
+
+    // Mixed.
+    ASSERT_TRUE(expression::containsEmptyPaths({"a", ""}));
+    ASSERT_TRUE(expression::containsEmptyPaths({"", "a"}));
+}
+
 TEST(SplitMatchExpression, AndWithSplittableChildrenIsSplittable) {
     BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {b: 1}]}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

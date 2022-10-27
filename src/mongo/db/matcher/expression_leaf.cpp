@@ -53,14 +53,14 @@ namespace mongo {
 
 ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     MatchType type,
-    StringData path,
+    boost::optional<StringData> path,
     Value rhs,
     ElementPath::LeafArrayBehavior leafArrBehavior,
     ElementPath::NonLeafArrayBehavior nonLeafArrBehavior,
     clonable_ptr<ErrorAnnotation> annotation,
     const CollatorInterface* collator)
     : LeafMatchExpression(type, path, leafArrBehavior, nonLeafArrBehavior, std::move(annotation)),
-      _backingBSON(BSON(path << rhs)),
+      _backingBSON(BSON((path ? *path : "") << rhs)),
       _collator(collator) {
     setData(_backingBSON.firstElement());
     invariant(_rhs.type() != BSONType::EOO);
@@ -99,7 +99,7 @@ BSONObj ComparisonMatchExpressionBase::getSerializedRightHandSide() const {
 }
 
 ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
-                                                     StringData path,
+                                                     boost::optional<StringData> path,
                                                      Value rhs,
                                                      clonable_ptr<ErrorAnnotation> annotation,
                                                      const CollatorInterface* collator)
@@ -232,7 +232,7 @@ std::unique_ptr<pcre::Regex> RegexMatchExpression::makeRegex(const std::string& 
     return std::make_unique<pcre::Regex>(regex, pcre_util::flagsToOptions(flags));
 }
 
-RegexMatchExpression::RegexMatchExpression(StringData path,
+RegexMatchExpression::RegexMatchExpression(boost::optional<StringData> path,
                                            StringData regex,
                                            StringData options,
                                            clonable_ptr<ErrorAnnotation> annotation)
@@ -306,7 +306,7 @@ void RegexMatchExpression::shortDebugString(StringBuilder& debug) const {
 
 // ---------
 
-ModMatchExpression::ModMatchExpression(StringData path,
+ModMatchExpression::ModMatchExpression(boost::optional<StringData> path,
                                        long long divisor,
                                        long long remainder,
                                        clonable_ptr<ErrorAnnotation> annotation)
@@ -382,7 +382,7 @@ bool ModMatchExpression::equivalent(const MatchExpression* other) const {
 
 // ------------------
 
-ExistsMatchExpression::ExistsMatchExpression(StringData path,
+ExistsMatchExpression::ExistsMatchExpression(boost::optional<StringData> path,
                                              clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(EXISTS, path, std::move(annotation)) {}
 
@@ -417,7 +417,8 @@ bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
 
 // ----
 
-InMatchExpression::InMatchExpression(StringData path, clonable_ptr<ErrorAnnotation> annotation)
+InMatchExpression::InMatchExpression(boost::optional<StringData> path,
+                                     clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(MATCH_IN, path, std::move(annotation)),
       _eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, _collator) {}
 
@@ -647,7 +648,7 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
 // -----------
 
 BitTestMatchExpression::BitTestMatchExpression(MatchType type,
-                                               StringData path,
+                                               boost::optional<StringData> path,
                                                std::vector<uint32_t> bitPositions,
                                                clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(type, path, std::move(annotation)),
@@ -663,7 +664,7 @@ BitTestMatchExpression::BitTestMatchExpression(MatchType type,
 }
 
 BitTestMatchExpression::BitTestMatchExpression(MatchType type,
-                                               StringData path,
+                                               boost::optional<StringData> path,
                                                uint64_t bitMask,
                                                clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(type, path, std::move(annotation)), _bitMask(bitMask) {
@@ -676,7 +677,7 @@ BitTestMatchExpression::BitTestMatchExpression(MatchType type,
 }
 
 BitTestMatchExpression::BitTestMatchExpression(MatchType type,
-                                               StringData path,
+                                               boost::optional<StringData> path,
                                                const char* bitMaskBinary,
                                                uint32_t bitMaskLen,
                                                clonable_ptr<ErrorAnnotation> annotation)

@@ -39,7 +39,7 @@ namespace mongo {
 namespace {
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsNonStringElements) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a", 1);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 1);
 
     ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << BSONObj())));
     ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << 1)));
@@ -47,7 +47,7 @@ TEST(InternalSchemaMaxLengthMatchExpression, RejectsNonStringElements) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsStringsWithTooManyChars) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a", 2);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
 
     ASSERT_FALSE(maxLength.matchesBSON(BSON("a"
                                             << "abc")));
@@ -56,7 +56,7 @@ TEST(InternalSchemaMaxLengthMatchExpression, RejectsStringsWithTooManyChars) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, AcceptsStringsWithLessThanOrEqualToMax) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a", 2);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
 
     ASSERT_TRUE(maxLength.matchesBSON(BSON("a"
                                            << "ab")));
@@ -67,21 +67,21 @@ TEST(InternalSchemaMaxLengthMatchExpression, AcceptsStringsWithLessThanOrEqualTo
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, MaxLengthZeroAllowsEmptyString) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a", 0);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 0);
 
     ASSERT_TRUE(maxLength.matchesBSON(BSON("a"
                                            << "")));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsNull) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a", 1);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 1);
 
     ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << BSONNULL)));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, TreatsMultiByteCodepointAsOneCharacter) {
-    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength("a", 0);
-    InternalSchemaMaxLengthMatchExpression matchingMaxLength("a", 1);
+    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength("a"_sd, 0);
+    InternalSchemaMaxLengthMatchExpression matchingMaxLength("a"_sd, 1);
 
     // This string has one code point, so it should meet maximum length 1 but not maximum length 0.
     const auto testString = u8"\U0001f4a9"_as_char_ptr;
@@ -90,8 +90,8 @@ TEST(InternalSchemaMaxLengthMatchExpression, TreatsMultiByteCodepointAsOneCharac
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
-    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength("a", 4);
-    InternalSchemaMaxLengthMatchExpression matchingMaxLength("a", 5);
+    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength("a"_sd, 4);
+    InternalSchemaMaxLengthMatchExpression matchingMaxLength("a"_sd, 5);
 
     // A test string that contains single-byte, 2-byte, 3-byte, and 4-byte codepoints.
     const auto testString =
@@ -108,7 +108,7 @@ TEST(InternalSchemaMaxLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, DealsWithInvalidUTF8) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a", 1);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 1);
 
     // Several kinds of invalid byte sequences listed in the Wikipedia article about UTF-8:
     // https://en.wikipedia.org/wiki/UTF-8
@@ -126,7 +126,7 @@ TEST(InternalSchemaMaxLengthMatchExpression, DealsWithInvalidUTF8) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, NestedArraysWorkWithDottedPaths) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a.b", 2);
+    InternalSchemaMaxLengthMatchExpression maxLength("a.b"_sd, 2);
 
     ASSERT_TRUE(maxLength.matchesBSON(BSON("a" << BSON("b"
                                                        << "a"))));
@@ -137,17 +137,17 @@ TEST(InternalSchemaMaxLengthMatchExpression, NestedArraysWorkWithDottedPaths) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, SameMaxLengthTreatedEquivalent) {
-    InternalSchemaMaxLengthMatchExpression maxLength1("a", 2);
-    InternalSchemaMaxLengthMatchExpression maxLength2("a", 2);
-    InternalSchemaMaxLengthMatchExpression maxLength3("a", 3);
+    InternalSchemaMaxLengthMatchExpression maxLength1("a"_sd, 2);
+    InternalSchemaMaxLengthMatchExpression maxLength2("a"_sd, 2);
+    InternalSchemaMaxLengthMatchExpression maxLength3("a"_sd, 3);
 
     ASSERT_TRUE(maxLength1.equivalent(&maxLength2));
     ASSERT_FALSE(maxLength1.equivalent(&maxLength3));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, MinLengthAndMaxLengthAreNotEquivalent) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 2);
-    InternalSchemaMaxLengthMatchExpression maxLength("a", 2);
+    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
 
     ASSERT_FALSE(maxLength.equivalent(&minLength));
 }

@@ -42,14 +42,14 @@ namespace {
 TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesScalarElements) {
     BSONObj numberOperand = BSON("a" << 5);
 
-    InternalSchemaEqMatchExpression eqNumberOperand("a", numberOperand["a"]);
+    InternalSchemaEqMatchExpression eqNumberOperand("a"_sd, numberOperand["a"]);
     ASSERT_TRUE(eqNumberOperand.matchesBSON(BSON("a" << 5.0)));
     ASSERT_FALSE(eqNumberOperand.matchesBSON(BSON("a" << 6)));
 
     BSONObj stringOperand = BSON("a"
                                  << "str");
 
-    InternalSchemaEqMatchExpression eqStringOperand("a", stringOperand["a"]);
+    InternalSchemaEqMatchExpression eqStringOperand("a"_sd, stringOperand["a"]);
     ASSERT_TRUE(eqStringOperand.matchesBSON(BSON("a"
                                                  << "str")));
     ASSERT_FALSE(eqStringOperand.matchesBSON(BSON("a"
@@ -59,7 +59,7 @@ TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesScalarElements) {
 TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesArrayElement) {
     BSONObj operand = BSON("a" << BSON_ARRAY("b" << 5));
 
-    InternalSchemaEqMatchExpression eq("a", operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
     ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSON_ARRAY("b" << 5))));
     ASSERT_FALSE(eq.matchesBSON(BSON("a" << BSON_ARRAY(5 << "b"))));
     ASSERT_FALSE(eq.matchesBSON(BSON("a" << BSON_ARRAY("b" << 5 << 5))));
@@ -69,7 +69,7 @@ TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesArrayElement) {
 TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesNullElement) {
     BSONObj operand = BSON("a" << BSONNULL);
 
-    InternalSchemaEqMatchExpression eq("a", operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
     ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSONNULL)));
     ASSERT_FALSE(eq.matchesBSON(BSON("a" << 4)));
 }
@@ -77,7 +77,7 @@ TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesNullElement) {
 TEST(InternalSchemaEqMatchExpression, NullElementDoesNotMatchMissing) {
     BSONObj operand = BSON("a" << BSONNULL);
 
-    InternalSchemaEqMatchExpression eq("a", operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
     ASSERT_FALSE(eq.matchesBSON(BSONObj()));
     ASSERT_FALSE(eq.matchesBSON(BSON("b" << 4)));
 }
@@ -85,14 +85,14 @@ TEST(InternalSchemaEqMatchExpression, NullElementDoesNotMatchMissing) {
 TEST(InternalSchemaEqMatchExpression, NullElementDoesNotMatchUndefinedOrMissing) {
     BSONObj operand = BSON("a" << BSONNULL);
 
-    InternalSchemaEqMatchExpression eq("a", operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
     ASSERT_FALSE(eq.matchesBSON(BSONObj()));
     ASSERT_FALSE(eq.matchesBSON(fromjson("{a: undefined}")));
 }
 
 TEST(InternalSchemaEqMatchExpression, DoesNotTraverseLeafArrays) {
     BSONObj operand = BSON("a" << 5);
-    InternalSchemaEqMatchExpression eq("a", operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
     ASSERT_TRUE(eq.matchesBSON(BSON("a" << 5.0)));
     ASSERT_FALSE(eq.matchesBSON(BSON("a" << BSON_ARRAY(5))));
 }
@@ -100,7 +100,7 @@ TEST(InternalSchemaEqMatchExpression, DoesNotTraverseLeafArrays) {
 TEST(InternalSchemaEqMatchExpression, MatchesObjectsIndependentOfFieldOrder) {
     BSONObj operand = fromjson("{a: {b: 1, c: {d: 2, e: 3}}}");
 
-    InternalSchemaEqMatchExpression eq("a", operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
     ASSERT_TRUE(eq.matchesBSON(fromjson("{a: {b: 1, c: {d: 2, e: 3}}}")));
     ASSERT_TRUE(eq.matchesBSON(fromjson("{a: {c: {e: 3, d: 2}, b: 1}}")));
     ASSERT_FALSE(eq.matchesBSON(fromjson("{a: {b: 1, c: {d: 2}, e: 3}}")));
@@ -143,7 +143,7 @@ DEATH_TEST_REGEX(InternalSchemaEqMatchExpression,
                  GetChildFailsLargerThanZero,
                  "Tripwire assertion.*6400213") {
     BSONObj operand = BSON("a" << 5);
-    InternalSchemaEqMatchExpression eq("a", operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
 
     ASSERT_EQ(eq.numChildren(), 0);
     ASSERT_THROWS_CODE(eq.getChild(0), AssertionException, 6400213);

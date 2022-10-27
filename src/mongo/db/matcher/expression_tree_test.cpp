@@ -43,7 +43,7 @@ namespace mongo {
 
 TEST(NotMatchExpression, MatchesScalar) {
     auto baseOperand = BSON("$lt" << 5);
-    auto lt = std::make_unique<LTMatchExpression>("a", baseOperand["$lt"]);
+    auto lt = std::make_unique<LTMatchExpression>("a"_sd, baseOperand["$lt"]);
     auto notOp = NotMatchExpression{lt.release()};
     ASSERT(notOp.matchesBSON(BSON("a" << 6), nullptr));
     ASSERT(!notOp.matchesBSON(BSON("a" << 4), nullptr));
@@ -51,7 +51,7 @@ TEST(NotMatchExpression, MatchesScalar) {
 
 TEST(NotMatchExpression, MatchesArray) {
     auto baseOperand = BSON("$lt" << 5);
-    auto lt = std::make_unique<LTMatchExpression>("a", baseOperand["$lt"]);
+    auto lt = std::make_unique<LTMatchExpression>("a"_sd, baseOperand["$lt"]);
     auto notOp = NotMatchExpression{lt.release()};
     ASSERT(notOp.matchesBSON(BSON("a" << BSON_ARRAY(6)), nullptr));
     ASSERT(!notOp.matchesBSON(BSON("a" << BSON_ARRAY(4)), nullptr));
@@ -61,7 +61,7 @@ TEST(NotMatchExpression, MatchesArray) {
 
 TEST(NotMatchExpression, ElemMatchKey) {
     auto baseOperand = BSON("$lt" << 5);
-    auto lt = std::make_unique<LTMatchExpression>("a", baseOperand["$lt"]);
+    auto lt = std::make_unique<LTMatchExpression>("a"_sd, baseOperand["$lt"]);
     auto notOp = NotMatchExpression{lt.release()};
     auto details = MatchDetails{};
     details.requestElemMatchKey();
@@ -77,7 +77,7 @@ TEST(NotMatchExpression, ElemMatchKey) {
 TEST(NotMatchExpression, SetCollatorPropagatesToChild) {
     auto baseOperand = BSON("a"
                             << "string");
-    auto eq = std::make_unique<EqualityMatchExpression>("a", baseOperand["a"]);
+    auto eq = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand["a"]);
     auto notOp = NotMatchExpression{eq.release()};
     auto collator = CollatorInterfaceMock{CollatorInterfaceMock::MockType::kAlwaysEqual};
     notOp.setCollator(&collator);
@@ -90,7 +90,7 @@ DEATH_TEST_REGEX(NotMatchExpression,
                  GetChildFailsIndexLargerThanOne,
                  "Tripwire assertion.*6400210") {
     auto baseOperand = BSON("$lt" << 5);
-    auto lt = std::make_unique<LTMatchExpression>("a", baseOperand["$lt"]);
+    auto lt = std::make_unique<LTMatchExpression>("a"_sd, baseOperand["$lt"]);
     auto notOp = NotMatchExpression{lt.release()};
 
     ASSERT_EQ(notOp.numChildren(), 1);
@@ -116,9 +116,9 @@ TEST(AndOp, MatchesElementThreeClauses) {
     auto notMatch3 = BSON("a"
                           << "r");
 
-    auto sub1 = std::make_unique<LTMatchExpression>("a", baseOperand1["$lt"]);
-    auto sub2 = std::make_unique<GTMatchExpression>("a", baseOperand2["$gt"]);
-    auto sub3 = std::make_unique<RegexMatchExpression>("a", "1", "");
+    auto sub1 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand1["$lt"]);
+    auto sub2 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand2["$gt"]);
+    auto sub3 = std::make_unique<RegexMatchExpression>("a"_sd, "1", "");
 
     auto andOp = AndMatchExpression{};
     andOp.add(std::move(sub1));
@@ -133,7 +133,7 @@ TEST(AndOp, MatchesElementThreeClauses) {
 
 TEST(AndOp, MatchesSingleClause) {
     auto baseOperand = BSON("$ne" << 5);
-    auto eq = std::make_unique<EqualityMatchExpression>("a", baseOperand["$ne"]);
+    auto eq = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand["$ne"]);
     auto ne = std::make_unique<NotMatchExpression>(eq.release());
 
     auto andOp = AndMatchExpression{};
@@ -150,9 +150,9 @@ TEST(AndOp, MatchesThreeClauses) {
     auto baseOperand2 = BSON("$lt" << 10);
     auto baseOperand3 = BSON("$lt" << 100);
 
-    auto sub1 = std::make_unique<GTMatchExpression>("a", baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a", baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<LTMatchExpression>("b", baseOperand3["$lt"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<LTMatchExpression>("b"_sd, baseOperand3["$lt"]);
 
     auto andOp = AndMatchExpression{};
     andOp.add(std::move(sub1));
@@ -170,8 +170,8 @@ TEST(AndOp, ElemMatchKey) {
     auto baseOperand1 = BSON("a" << 1);
     auto baseOperand2 = BSON("b" << 2);
 
-    auto sub1 = std::make_unique<EqualityMatchExpression>("a", baseOperand1["a"]);
-    auto sub2 = std::make_unique<EqualityMatchExpression>("b", baseOperand2["b"]);
+    auto sub1 = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand1["a"]);
+    auto sub2 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand2["b"]);
 
     auto andOp = AndMatchExpression{};
     andOp.add(std::move(sub1));
@@ -194,9 +194,9 @@ DEATH_TEST_REGEX(AndOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire assert
     auto baseOperand2 = BSON("$lt" << 10);
     auto baseOperand3 = BSON("$lt" << 100);
 
-    auto sub1 = std::make_unique<GTMatchExpression>("a", baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a", baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<LTMatchExpression>("b", baseOperand3["$lt"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<LTMatchExpression>("b"_sd, baseOperand3["$lt"]);
 
     auto andOp = AndMatchExpression{};
     andOp.add(std::move(sub1));
@@ -215,7 +215,7 @@ TEST(OrOp, NoClauses) {
 
 TEST(OrOp, MatchesSingleClause) {
     auto baseOperand = BSON("$ne" << 5);
-    auto eq = std::make_unique<EqualityMatchExpression>("a", baseOperand["$ne"]);
+    auto eq = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand["$ne"]);
     auto ne = std::make_unique<NotMatchExpression>(eq.release());
 
     auto orOp = OrMatchExpression{};
@@ -230,8 +230,8 @@ TEST(OrOp, MatchesSingleClause) {
 TEST(OrOp, MatchesTwoClauses) {
     auto clauseObj1 = fromjson("{i: 5}");
     auto clauseObj2 = fromjson("{'i.a': 6}");
-    auto clause1 = std::make_unique<EqualityMatchExpression>("i", clauseObj1["i"]);
-    auto clause2 = std::make_unique<EqualityMatchExpression>("i.a", clauseObj2["i.a"]);
+    auto clause1 = std::make_unique<EqualityMatchExpression>("i"_sd, clauseObj1["i"]);
+    auto clause2 = std::make_unique<EqualityMatchExpression>("i.a"_sd, clauseObj2["i.a"]);
 
     auto filter = OrMatchExpression{};
     filter.add(std::move(clause1));
@@ -262,9 +262,9 @@ TEST(OrOp, MatchesThreeClauses) {
     auto baseOperand1 = BSON("$gt" << 10);
     auto baseOperand2 = BSON("$lt" << 0);
     auto baseOperand3 = BSON("b" << 100);
-    auto sub1 = std::make_unique<GTMatchExpression>("a", baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a", baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<EqualityMatchExpression>("b", baseOperand3["b"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand3["b"]);
 
     auto orOp = OrMatchExpression{};
     orOp.add(std::move(sub1));
@@ -283,8 +283,8 @@ TEST(OrOp, MatchesThreeClauses) {
 TEST(OrOp, ElemMatchKey) {
     auto baseOperand1 = BSON("a" << 1);
     auto baseOperand2 = BSON("b" << 2);
-    auto sub1 = std::make_unique<EqualityMatchExpression>("a", baseOperand1["a"]);
-    auto sub2 = std::make_unique<EqualityMatchExpression>("b", baseOperand2["b"]);
+    auto sub1 = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand1["a"]);
+    auto sub2 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand2["b"]);
 
     auto orOp = OrMatchExpression{};
     orOp.add(std::move(sub1));
@@ -305,9 +305,9 @@ DEATH_TEST_REGEX(OrOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire asserti
     auto baseOperand1 = BSON("$gt" << 10);
     auto baseOperand2 = BSON("$lt" << 0);
     auto baseOperand3 = BSON("b" << 100);
-    auto sub1 = std::make_unique<GTMatchExpression>("a", baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a", baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<EqualityMatchExpression>("b", baseOperand3["b"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand3["b"]);
 
     auto orOp = OrMatchExpression{};
     orOp.add(std::move(sub1));
@@ -326,7 +326,7 @@ TEST(NorOp, NoClauses) {
 
 TEST(NorOp, MatchesSingleClause) {
     auto baseOperand = BSON("$ne" << 5);
-    auto eq = std::make_unique<EqualityMatchExpression>("a", baseOperand["$ne"]);
+    auto eq = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand["$ne"]);
     auto ne = std::make_unique<NotMatchExpression>(eq.release());
 
     auto norOp = NorMatchExpression{};
@@ -343,9 +343,9 @@ TEST(NorOp, MatchesThreeClauses) {
     auto baseOperand2 = BSON("$lt" << 0);
     auto baseOperand3 = BSON("b" << 100);
 
-    auto sub1 = std::make_unique<GTMatchExpression>("a", baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a", baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<EqualityMatchExpression>("b", baseOperand3["b"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand3["b"]);
 
     auto norOp = NorMatchExpression{};
     norOp.add(std::move(sub1));
@@ -364,8 +364,8 @@ TEST(NorOp, MatchesThreeClauses) {
 TEST(NorOp, ElemMatchKey) {
     auto baseOperand1 = BSON("a" << 1);
     auto baseOperand2 = BSON("b" << 2);
-    auto sub1 = std::make_unique<EqualityMatchExpression>("a", baseOperand1["a"]);
-    auto sub2 = std::make_unique<EqualityMatchExpression>("b", baseOperand2["b"]);
+    auto sub1 = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand1["a"]);
+    auto sub2 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand2["b"]);
 
     auto norOp = NorMatchExpression{};
     norOp.add(std::move(sub1));
@@ -386,8 +386,8 @@ TEST(NorOp, ElemMatchKey) {
 TEST(NorOp, Equivalent) {
     auto baseOperand1 = BSON("a" << 1);
     auto baseOperand2 = BSON("b" << 2);
-    auto sub1 = EqualityMatchExpression{"a", baseOperand1["a"]};
-    auto sub2 = EqualityMatchExpression{"b", baseOperand2["b"]};
+    auto sub1 = EqualityMatchExpression{"a"_sd, baseOperand1["a"]};
+    auto sub2 = EqualityMatchExpression{"b"_sd, baseOperand2["b"]};
 
     auto e1 = NorMatchExpression{};
     e1.add(sub1.shallowClone());
@@ -405,9 +405,9 @@ DEATH_TEST_REGEX(NorOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire assert
     auto baseOperand2 = BSON("$lt" << 0);
     auto baseOperand3 = BSON("b" << 100);
 
-    auto sub1 = std::make_unique<GTMatchExpression>("a", baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a", baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<EqualityMatchExpression>("b", baseOperand3["b"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand3["b"]);
 
     auto norOp = NorMatchExpression{};
     norOp.add(std::move(sub1));

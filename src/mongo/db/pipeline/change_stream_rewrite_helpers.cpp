@@ -624,8 +624,8 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
                 static const std::vector<std::string> oplogFields = {"o.diff.d", "o.$unset"};
                 auto rewrittenEquality = std::make_unique<OrMatchExpression>();
                 for (auto&& oplogField : oplogFields) {
-                    rewrittenEquality->add(
-                        std::make_unique<ExistsMatchExpression>(oplogField + "." + fieldName));
+                    rewrittenEquality->add(std::make_unique<ExistsMatchExpression>(
+                        StringData(oplogField + "." + fieldName)));
                 }
                 return rewrittenEquality;
             };
@@ -1066,7 +1066,8 @@ std::unique_ptr<MatchExpression> matchRewriteNs(
         matchRewriteGenericNamespace(expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */);
     tassert(5554105, "Unexpected rewrite failure", dropDbNsRewrite);
     auto andDropDbNsRewrite = std::make_unique<AndMatchExpression>(std::move(dropDbNsRewrite));
-    andDropDbNsRewrite->add(std::make_unique<EqualityMatchExpression>("o.dropDatabase", Value(1)));
+    andDropDbNsRewrite->add(
+        std::make_unique<EqualityMatchExpression>("o.dropDatabase"_sd, Value(1)));
     cmdCases->add(std::move(andDropDbNsRewrite));
 
     // Create the final namespace filter for {op: 'c'} operations.

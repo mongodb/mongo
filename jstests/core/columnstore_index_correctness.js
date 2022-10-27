@@ -40,6 +40,62 @@ const coll = db.columnstore_index_correctness;
            "Exclusive projection cannot use column scan " + tojson(explain));
 })();
 
+// Run a query that tests SERVER-65494 (columnstore index shouldn't make us choke on empty paths).
+(function testEmptyPaths() {
+    const docs = [];
+    for (let i = 0; i < 20; ++i) {
+        docs.push({
+            x: i,
+            "": {"": i + 1, nonEmptyChild: i + 2},
+            nonEmptyParent: {"": {"": i + 3, nonEmptyChild: i + 4}},
+            nonEmptyArray: [{"": i + 5}]
+        });
+    }
+    coll.drop();
+    assert.commandWorked(coll.insertMany(docs));
+    assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
+
+    const projection = {_id: 0, x: 1};
+    const probeRecord = docs[docs.length / 2];
+
+    const filters = [
+        {"": probeRecord[""]},
+        {".": probeRecord[""][""]},
+        {".nonEmptyChild": probeRecord[""]["nonEmptyChild"]},
+        {"nonEmptyParent": probeRecord["nonEmptyParent"]},
+        {"nonEmptyParent.": probeRecord["nonEmptyParent"][""]},
+        {"nonEmptyParent..": probeRecord["nonEmptyParent"][""][""]},
+        {"nonEmptyParent..nonEmptyChild": probeRecord["nonEmptyParent"][""]["nonEmptyChild"]},
+        {"nonEmptyArray": probeRecord["nonEmptyArray"]},
+        {"nonEmptyArray.": probeRecord["nonEmptyArray"][0][""]},
+        {"nonEmptyArray.0": probeRecord["nonEmptyArray"][0]},
+        {"nonEmptyArray.0.": probeRecord["nonEmptyArray"][0][""]},
+    ];
+
+    for (let filter of filters) {
+        const trueResult = coll.find(filter, projection).hint({$natural: 1}).toArray();
+
+        // Note that we intentionally don't hint or validate that the columnstore index is
+        // being used. This is because we just care that the index doesn't cause these queries
+        // to choke (we actually expect them to redirect to collection scan).
+
+        const result = coll.find(filter, projection).toArray();
+        assert.eq(result.length,
+                  trueResult.length,
+                  `Expected find to return ${trueResult.length} record(s) for filter:
+      ${tojson(filter)}`);
+
+        if (result.length > 0) {
+            // Logically, the array cases should return results, but they don't with collscan.
+            // We just care that the behavior matches so keep the validation less brittle here.
+            assert(
+                documentEq(result[0],
+                           trueResult[0],
+                           `Incorrect result for filter ${tojson(filter)}: ${tojson(result[0])}`));
+        }
+    }
+})();
+
 // Multiple tests in this file use the same dataset. Intentionally not using _id as the unique
 // identifier, to avoid getting IDHACK plans when we query by it.
 const docs = [

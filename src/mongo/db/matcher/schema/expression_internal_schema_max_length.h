@@ -37,7 +37,7 @@ namespace mongo {
 class InternalSchemaMaxLengthMatchExpression final : public InternalSchemaStrLengthMatchExpression {
 
 public:
-    InternalSchemaMaxLengthMatchExpression(StringData path,
+    InternalSchemaMaxLengthMatchExpression(boost::optional<StringData> path,
                                            long long strLen,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : InternalSchemaStrLengthMatchExpression(MatchType::INTERNAL_SCHEMA_MAX_LENGTH,

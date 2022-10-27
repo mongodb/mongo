@@ -44,15 +44,18 @@ namespace mongo {
 class PathMatchExpression : public MatchExpression {
 public:
     PathMatchExpression(MatchType matchType,
-                        StringData path,
+                        boost::optional<StringData> path,
                         ElementPath::LeafArrayBehavior leafArrBehavior,
                         ElementPath::NonLeafArrayBehavior nonLeafArrayBehavior,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : MatchExpression(matchType, std::move(annotation)),
-          _elementPath(path, leafArrBehavior, nonLeafArrayBehavior) {}
+          _elementPath(path ? boost::optional<ElementPath>(
+                                  ElementPath(*path, leafArrBehavior, nonLeafArrayBehavior))
+                            : boost::none) {}
 
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final {
-        MatchableDocument::IteratorHolder cursor(doc, &_elementPath);
+        invariant(_elementPath);
+        MatchableDocument::IteratorHolder cursor(doc, &*_elementPath);
         while (cursor->more()) {
             ElementIterator::Context e = cursor->next();
             if (!matchesSingleElement(e.element(), details)) {
@@ -66,12 +69,25 @@ public:
         return false;
     }
 
+    /**
+     * Gets the path that the expression applies to. Note that this returns an empty string for
+     * empty path as well as no path cases. optPath() should be preferred in order to
+     * distinguish between the two.
+     */
     StringData path() const override final {
-        return _elementPath.fieldRef().dottedField();
+        return _elementPath ? _elementPath->fieldRef().dottedField() : "";
     }
 
     const FieldRef* fieldRef() const override final {
-        return &(_elementPath.fieldRef());
+        return _elementPath ? &(_elementPath->fieldRef()) : nullptr;
+    }
+
+    /**
+     * Gets the path that the expression applies to. If the expression does not apply to a specific
+     * path, returns boost::none.
+     */
+    boost::optional<StringData> optPath() const {
+        return _elementPath ? boost::optional<StringData>(path()) : boost::none;
     }
 
     /**
@@ -79,7 +95,8 @@ public:
      * that there's no lifetime requirements for the string which 'path' points into.
      */
     void setPath(StringData path) {
-        _elementPath.reset(path);
+        invariant(_elementPath);
+        _elementPath->reset(path);
     }
 
     /**
@@ -89,6 +106,10 @@ public:
      * element).
      */
     void applyRename(const StringMap<std::string>& renameList) {
+        if (!_elementPath) {
+            return;
+        }
+
         size_t renamesFound = 0u;
         std::string rewrittenPath;
         for (const auto& rename : renameList) {
@@ -99,7 +120,7 @@ public:
             }
 
             FieldRef prefixToRename(rename.first);
-            const auto& pathFieldRef = _elementPath.fieldRef();
+            const auto& pathFieldRef = _elementPath->fieldRef();
             if (prefixToRename.isPrefixOf(pathFieldRef)) {
                 // Get the 'pathTail' by chopping off the 'prefixToRename' path components from the
                 // beginning of the 'pathFieldRef' path.
@@ -140,6 +161,7 @@ public:
 
 private:
     // ElementPath holds a FieldRef, which owns the underlying path string.
-    ElementPath _elementPath;
+    // May be boost::none if this MatchExpression does not apply to a specific path.
+    boost::optional<ElementPath> _elementPath;
 };
 }  // namespace mongo

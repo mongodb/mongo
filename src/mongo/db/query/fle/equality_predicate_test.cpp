@@ -97,8 +97,8 @@ protected:
 
 TEST_F(EqualityPredicateRewriteTest, Equality_NoFFP) {
     std::unique_ptr<MatchExpression> input =
-        std::make_unique<EqualityMatchExpression>("ssn", Value(5));
-    auto expected = EqualityMatchExpression("ssn", Value(5));
+        std::make_unique<EqualityMatchExpression>("ssn"_sd, Value(5));
+    auto expected = EqualityMatchExpression("ssn"_sd, Value(5));
 
     auto result = _predicate.rewrite(input.get());
     ASSERT(result == nullptr);
@@ -121,7 +121,7 @@ TEST_F(EqualityPredicateRewriteTest, In_NoFFP) {
 }
 
 TEST_F(EqualityPredicateRewriteTest, Equality_Basic) {
-    auto input = EqualityMatchExpression("ssn", Value(5));
+    auto input = EqualityMatchExpression("ssn"_sd, Value(5));
     std::vector<PrfBlock> tags = {{1}, {2}, {3}};
 
     _predicate.setEncryptedTags({"ssn", 5}, tags);

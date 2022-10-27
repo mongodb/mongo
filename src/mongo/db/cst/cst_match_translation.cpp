@@ -76,8 +76,8 @@ std::unique_ptr<MatchExpression> translateNot(const UserFieldname& fieldName,
                                               const CNode& argument) {
     // $not can accept a regex or an object expression.
     if (auto regex = stdx::get_if<UserRegex>(&argument.payload)) {
-        auto regexExpr =
-            std::make_unique<RegexMatchExpression>(fieldName, regex->pattern, regex->flags);
+        auto regexExpr = std::make_unique<RegexMatchExpression>(
+            StringData(fieldName), regex->pattern, regex->flags);
         return std::make_unique<NotMatchExpression>(std::move(regexExpr));
     }
 
@@ -89,7 +89,8 @@ std::unique_ptr<MatchExpression> translateNot(const UserFieldname& fieldName,
 
 std::unique_ptr<MatchExpression> translateExists(const CNode::Fieldname& fieldName,
                                                  const CNode& argument) {
-    auto root = std::make_unique<ExistsMatchExpression>(stdx::get<UserFieldname>(fieldName));
+    auto root =
+        std::make_unique<ExistsMatchExpression>(StringData(stdx::get<UserFieldname>(fieldName)));
     if (stdx::visit(OverloadedVisitor{[&](const UserLong& userLong) { return userLong != 0; },
                                       [&](const UserDouble& userDbl) { return userDbl != 0; },
                                       [&](const UserDecimal& userDc) {
@@ -171,14 +172,15 @@ std::unique_ptr<MatchExpression> translatePathExpression(const UserFieldname& fi
             case KeyFieldname::existsExpr:
                 return translateExists(fieldName, argument);
             case KeyFieldname::type:
-                return std::make_unique<TypeMatchExpression>(fieldName,
+                return std::make_unique<TypeMatchExpression>(StringData(fieldName),
                                                              getMatcherTypeSet(argument));
             case KeyFieldname::matchMod: {
                 const auto divisor =
                     stdx::get<CNode::ArrayChildren>(argument.payload)[0].numberInt();
                 const auto remainder =
                     stdx::get<CNode::ArrayChildren>(argument.payload)[1].numberInt();
-                return std::make_unique<ModMatchExpression>(fieldName, divisor, remainder);
+                return std::make_unique<ModMatchExpression>(
+                    StringData(fieldName), divisor, remainder);
             }
             default:
                 MONGO_UNREACHABLE;
