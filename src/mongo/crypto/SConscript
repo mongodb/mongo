@@ -138,7 +138,7 @@ env.CppUnitTest(
         'aead_encryption_test.cpp',
         'encryption_fields_util_test.cpp',
         'encryption_fields_validation_test.cpp',
-        'jwt_test.cpp',
+        'jwt_test.cpp' if ssl_provider == 'openssl' else [],
         'fle_crypto_test.cpp',
         'fle_crypto_test_vectors.cpp',
         'mechanism_scram_test.cpp',
@@ -150,7 +150,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/secure_allocator',
-        '$BUILD_DIR/mongo/util/net/openssl_init' if ssl_provider == 'openssl' else '',
+        '$BUILD_DIR/mongo/util/net/openssl_init' if ssl_provider == 'openssl' else [],
         'aead_encryption',
         'encrypted_field_config',
         'fle_crypto',
@@ -162,15 +162,31 @@ env.CppUnitTest(
 env.Library(
     target='jwt',
     source=[
-        'jwt_types.idl',
         'jwk_manager.cpp',
+        'jwt_types.idl',
+        'jws_validated_token.cpp',
+        'jws_validator_{}.cpp'.format(ssl_provider),
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        "$BUILD_DIR/mongo/client/sasl_client",
+        '$BUILD_DIR/mongo/client/sasl_client',
         '$BUILD_DIR/mongo/util/net/http_client_impl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
+
+if ssl_provider == 'openssl':
+    env.CppUnitTest(
+        target='jws_validator_test',
+        source=[
+            'jws_validator_test.cpp',
+            'jws_validated_token_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/util/net/openssl_init',
+            'jwt',
+        ],
+    )

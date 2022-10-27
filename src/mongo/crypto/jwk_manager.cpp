@@ -30,6 +30,7 @@
 #include "mongo/crypto/jwk_manager.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/crypto/jws_validator.h"
 #include "mongo/crypto/jwt_types_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
@@ -40,6 +41,8 @@
 namespace mongo::crypto {
 namespace {
 constexpr auto kMinKeySizeBytes = 2048 >> 3;
+using SharedValidator = std::shared_ptr<JWSValidator>;
+using SharedMap = std::map<std::string, SharedValidator>;
 
 // Strip insignificant leading zeroes to determine the key's true size.
 StringData reduceInt(StringData value) {
@@ -63,9 +66,37 @@ JWKManager::JWKManager(StringData source) : _keyURI(source) {
     cdr.readInto<StringData>(&str);
 
     BSONObj data = fromjson(str);
+    _setAndValidateKeys(data);
+}
 
-    auto keys = JWKSet::parse(IDLParserContext("JWKSet"), data);
-    for (const auto& key : keys.getKeys()) {
+JWKManager::JWKManager(BSONObj keys) {
+    _setAndValidateKeys(keys);
+}
+
+const BSONObj& JWKManager::getKey(StringData keyId) const {
+    auto it = _keyMaterial.find(keyId.toString());
+    uassert(ErrorCodes::NoSuchKey,
+            str::stream() << "Unknown key '" << keyId << "'",
+            it != _keyMaterial.end());
+    return it->second;
+}
+
+SharedValidator JWKManager::getValidator(StringData keyId) const {
+    auto it = _validators->find(keyId.toString());
+
+    // TODO: SERVER-71195, refresh keys from the endpoint and try to get the validator again.
+    // If still no key is found throw a uassert.
+    uassert(ErrorCodes::NoSuchKey,
+            str::stream() << "Unknown key '" << keyId << "'",
+            it != _validators->end());
+    return it->second;
+}
+
+void JWKManager::_setAndValidateKeys(const BSONObj& keys) {
+    _validators = std::make_shared<SharedMap>();
+    auto keysParsed = JWKSet::parse(IDLParserContext("JWKSet"), keys);
+
+    for (const auto& key : keysParsed.getKeys()) {
         auto JWK = JWK::parse(IDLParserContext("JWK"), key);
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Only RSA key types are accepted at this time",
@@ -95,15 +126,13 @@ JWKManager::JWKManager(StringData source) : _keyURI(source) {
 
         LOGV2_DEBUG(6766000, 5, "Loaded JWK Key", "kid"_attr = RSAKey.getKeyId());
         _keyMaterial.insert({keyId, key.copy()});
-    }
-}
 
-const BSONObj& JWKManager::getKey(StringData keyId) const {
-    auto it = _keyMaterial.find(keyId.toString());
-    uassert(ErrorCodes::NoSuchKey,
-            str::stream() << "Unknown key '" << keyId << "'",
-            it != _keyMaterial.end());
-    return it->second;
+        auto swValidator = JWSValidator::create(JWK.getType(), key);
+        uassertStatusOK(swValidator.getStatus());
+        SharedValidator shValidator = std::move(swValidator.getValue());
+
+        _validators->insert({keyId, shValidator});
+    }
 }
 
 }  // namespace mongo::crypto

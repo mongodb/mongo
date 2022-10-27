@@ -27,41 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/bson/json.h"
-#include "mongo/crypto/jwk_manager.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/net/http_client.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 
 namespace mongo::crypto {
-namespace {
 
-constexpr auto source = "https://mongodbcorp.okta.com/oauth2/ausfgfhg2j9rtr0nT297/v1/keys"_sd;
+class JWSValidator {
+public:
+    virtual ~JWSValidator() = default;
 
-TEST(JWKManager, parseJWKSetBasicFromSource) {
-    auto httpClient = HttpClient::createWithoutConnectionPool();
-    httpClient->setHeaders({"Accept: */*"});
+    /**
+     * Validate the provided payload/signature pair
+     * using the algorithm provided.
+     * In practice, this will be:
+     * validate('RS256', 'headerb64url.bodyb64url', 'signatureoctets')
+     */
+    virtual Status validate(StringData algorithm,
+                            StringData payload,
+                            StringData signature) const = 0;
 
-    DataBuilder getJWKs = httpClient->get(source);
+    /**
+     * Instantiate a new JWSValidator for the given
+     * key type (e.g. 'RSA') and JWK key data.
+     * Returns, for example, JWSValidatorOpenSSLRSA
+     */
+    static StatusWith<std::unique_ptr<JWSValidator>> create(StringData algorithm,
+                                                            const BSONObj& key);
+};
 
-    ConstDataRange cdr = getJWKs.getCursor();
-    StringData str;
-    cdr.readInto<StringData>(&str);
-
-    BSONObj data = fromjson(str);
-    JWKManager manager(source);
-
-    for (const auto& key : data["keys"_sd].Obj()) {
-        auto keyFromKid = manager.getKey(key["kid"_sd].str());
-        ASSERT_BSONOBJ_EQ(key.Obj(), keyFromKid);
-    }
-
-    for (const auto& key : data["keys"_sd].Obj()) {
-        ASSERT(manager.getValidator(key["kid"_sd].str()));
-    }
-}
-
-}  // namespace
 }  // namespace mongo::crypto

@@ -27,41 +27,54 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/bson/json.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/jwk_manager.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/net/http_client.h"
+#include "mongo/crypto/jwt_types_gen.h"
 
 namespace mongo::crypto {
-namespace {
 
-constexpr auto source = "https://mongodbcorp.okta.com/oauth2/ausfgfhg2j9rtr0nT297/v1/keys"_sd;
+class JWSValidatedToken {
+public:
+    JWSValidatedToken() = delete;
 
-TEST(JWKManager, parseJWKSetBasicFromSource) {
-    auto httpClient = HttpClient::createWithoutConnectionPool();
-    httpClient->setHeaders({"Accept: */*"});
+    /**
+     * Constructs an instance by parsing a JWS Compact Serialization,
+     * extracting key name and signature type from the header,
+     * and selecting an appropriate key from the key manager.
+     * Upon completion, header and body payloads
+     * and parsed structs are available.
+     */
+    JWSValidatedToken(const JWKManager& keyMgr, StringData token);
 
-    DataBuilder getJWKs = httpClient->get(source);
+    /**
+     * Validates token is not expired or issued on a later date,
+     * verifies it has a validator matching its keyId and finally
+     * it calls validate from the validator, returning the status.
+     */
+    Status validate(const JWKManager& keyMgr) const;
 
-    ConstDataRange cdr = getJWKs.getCursor();
-    StringData str;
-    cdr.readInto<StringData>(&str);
+    // General read-only accessors.
+    const BSONObj& getHeaderBSON() const {
+        return _headerBSON;
+    };
+    const JWSHeader& getHeader() const {
+        return _header;
+    };
+    const BSONObj& getBodyBSON() const {
+        return _bodyBSON;
+    };
+    const JWT& getBody() const {
+        return _body;
+    };
 
-    BSONObj data = fromjson(str);
-    JWKManager manager(source);
+private:
+    BSONObj _headerBSON;
+    JWSHeader _header;
+    BSONObj _bodyBSON;
+    JWT _body;
+    std::string _originalToken;
+};
 
-    for (const auto& key : data["keys"_sd].Obj()) {
-        auto keyFromKid = manager.getKey(key["kid"_sd].str());
-        ASSERT_BSONOBJ_EQ(key.Obj(), keyFromKid);
-    }
-
-    for (const auto& key : data["keys"_sd].Obj()) {
-        ASSERT(manager.getValidator(key["kid"_sd].str()));
-    }
-}
-
-}  // namespace
 }  // namespace mongo::crypto
