@@ -33,7 +33,7 @@ env.Library(
 env.Library(
     target='ticketholder',
     source=['ticketholder.cpp'],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/third_party/shim_boost',
