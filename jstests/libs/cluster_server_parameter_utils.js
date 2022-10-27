@@ -116,6 +116,9 @@ function setupSharded(st) {
     shards.forEach(function(shard) {
         setupReplicaSet(shard);
     });
+
+    // Wait for FCV to fully replicate on all shards before performing test commands.
+    st.awaitReplicationOnShards();
 }
 
 // Upserts config.clusterParameters document with w:majority via setClusterParameter.
