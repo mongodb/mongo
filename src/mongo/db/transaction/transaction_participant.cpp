@@ -170,10 +170,6 @@ auto performReadWithNoTimestampDBDirectClient(OperationContext* opCtx, Callable&
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
 
     DBDirectClient client(opCtx);
-    // If the 'opCtx' is marked as "in multi document transaction", the read done by 'callable'
-    // would acquire the global lock in the IX mode. That upconvert would require a flow control
-    // ticket to be obtained.
-    FlowControl::Bypass flowControlBypass(opCtx);
     return callable(&client);
 }
 
@@ -201,11 +197,6 @@ struct ActiveTransactionHistory {
 ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                                                        const LogicalSessionId& lsid,
                                                        bool fetchOplogEntries) {
-    // FlowControl is only impacted when a MODE_IX global lock is acquired. If we are in a
-    // multi-document transaction, we must acquire a MODE_IX global lock. Prevent obtaining a flow
-    // control ticket while in a mutli-document transaction.
-    FlowControl::Bypass flowControlBypass(opCtx);
-
     // Storage engine operations require at a least global MODE_IS lock. In multi-document
     // transactions, storage opeartions require at least a global MODE_IX lock. Prevent lock
     // upgrading in the case of a multi-document transaction.

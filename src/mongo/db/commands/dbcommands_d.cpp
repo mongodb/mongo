@@ -154,10 +154,6 @@ protected:
         const ProfileCmdRequest& request) const final {
         const auto profilingLevel = request.getCommandParameter();
 
-        // The system.profile collection is non-replicated, so writes to it do not cause
-        // replication lag. As such, they should be excluded from Flow Control.
-        opCtx->setShouldParticipateInFlowControl(false);
-
         // An invalid profiling level (outside the range [0, 2]) represents a request to read the
         // current profiling level. Similarly, if the request does not include a filter, we only
         // need to read the current filter, if any. If we're not changing either value, then we can
@@ -168,7 +164,8 @@ protected:
         // Accessing system.profile collection should not conflict with oplog application.
         ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
             opCtx->lockState());
-        AutoGetDb ctx(opCtx, dbName, dbMode);
+        NamespaceString nss{dbName, NamespaceString::kSystemDotProfileCollectionName};
+        AutoGetCollection ctx(opCtx, nss, dbMode);
         Database* db = ctx.getDb();
 
         // Fetches the database profiling level + filter or the server default if the db does not

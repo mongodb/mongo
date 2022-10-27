@@ -52,6 +52,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -457,7 +458,8 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
 
 void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->shouldParticipateInFlowControl());
+    invariant(opCtx->lockState()->getAdmissionPriority() == AdmissionContext::Priority::kImmediate,
+              "Replica Set state changes are critical to the cluster and should not be throttled");
 
     if (_oplogBuffer) {
         _oplogBuffer->exitDrainMode();
@@ -466,7 +468,8 @@ void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* 
 
 OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isRSTLExclusive());
-    invariant(!opCtx->shouldParticipateInFlowControl());
+    invariant(opCtx->lockState()->getAdmissionPriority() == AdmissionContext::Priority::kImmediate,
+              "Replica Set state changes are critical to the cluster and should not be throttled");
 
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     mongoDSessionCatalog->onStepUp(opCtx);
@@ -685,8 +688,8 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     OperationContext* opCtx, const LastVote& lastVote) {
     BSONObj lastVoteObj = lastVote.toBSON();
 
-    // Writes that are part of elections should not be throttled.
-    invariant(!opCtx->shouldParticipateInFlowControl());
+    invariant(opCtx->lockState()->getAdmissionPriority() == AdmissionContext::Priority::kImmediate,
+              "Writes that are part of elections should not be throttled");
 
     try {
         // If we are casting a vote in a new election immediately after stepping down, we
@@ -849,7 +852,10 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
     // available, which may have to wait for the ticket refresher to run, which in turn blocks
     // on the repl _mutex to check whether we are primary or not: this is a deadlock because
     // stepdown already holds the repl _mutex!
-    FlowControl::Bypass flowControlBypass(opCtx);
+    // As opCtx does not expose a method to allow skipping flow control on purpose we mark the
+    // operation as having Immediate priority. This will skip flow control and ticket acquisition.
+    // It is fine to do this since the system is essentially shutting down at this point.
+    SetTicketAquisitionPriorityForLock priority(opCtx, AdmissionContext::Priority::kImmediate);
 
     // Tell the system to stop updating the oplogTruncateAfterPoint asynchronously and to go
     // back to using last applied to update repl's durable timestamp instead of the truncate

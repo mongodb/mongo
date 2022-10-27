@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_command.h"
@@ -59,8 +60,10 @@ private:
         status = parsedArgs.initialize(cmdObj);
         uassertStatusOK(status);
 
-        // Any writes that occur as part of an election should not be subject to Flow Control.
-        opCtx->setShouldParticipateInFlowControl(false);
+        // Operations that are part of Replica Set elections are crucial to the stability of the
+        // cluster. Marking it as having Immediate priority will make it skip ticket acquisition and
+        // Flow Control.
+        SetTicketAquisitionPriorityForLock priority(opCtx, AdmissionContext::Priority::kImmediate);
         ReplSetRequestVotesResponse response;
         status = ReplicationCoordinator::get(opCtx)->processReplSetRequestVotes(
             opCtx, parsedArgs, &response);

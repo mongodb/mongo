@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/last_vote.h"
@@ -97,8 +98,9 @@ private:
 
 TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
     auto opCtx = makeOpCtx();
-    // Methods that do writes as part of elections expect Flow Control to be disabled.
-    opCtx->setShouldParticipateInFlowControl(false);
+    // Methods that do writes as part of elections expect the admission priority to be Immediate.
+    SetTicketAquisitionPriorityForLock priority(opCtx.get(),
+                                                AdmissionContext::Priority::kImmediate);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})
@@ -120,8 +122,9 @@ TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
 
 TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithOldTerm) {
     auto opCtx = makeOpCtx();
-    // Methods that do writes as part of elections expect Flow Control to be disabled.
-    opCtx->setShouldParticipateInFlowControl(false);
+    // Methods that do writes as part of elections expect the admission priority to be Immediate.
+    SetTicketAquisitionPriorityForLock priority(opCtx.get(),
+                                                AdmissionContext::Priority::kImmediate);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})
@@ -143,8 +146,9 @@ TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithOldTerm) {
 
 TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithEqualTerm) {
     auto opCtx = makeOpCtx();
-    // Methods that do writes as part of elections expect Flow Control to be disabled.
-    opCtx->setShouldParticipateInFlowControl(false);
+    // Methods that do writes as part of elections expect the admission priority to be Immediate.
+    SetTicketAquisitionPriorityForLock priority(opCtx.get(),
+                                                AdmissionContext::Priority::kImmediate);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})

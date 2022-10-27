@@ -188,6 +188,11 @@ public:
                         // returns false.
     };
 
+    struct GlobalLockSkipOptions {
+        bool skipFlowControlTicket = false;
+        bool skipRSTLLock = false;
+    };
+
     /**
      * Global lock.
      *
@@ -211,8 +216,13 @@ public:
         GlobalLock(OperationContext* opCtx,
                    LockMode lockMode,
                    Date_t deadline,
+                   InterruptBehavior behavior);
+
+        GlobalLock(OperationContext* opCtx,
+                   LockMode lockMode,
+                   Date_t deadline,
                    InterruptBehavior behavior,
-                   bool skipRSTLLock = false);
+                   GlobalLockSkipOptions skipOptions);
 
         GlobalLock(GlobalLock&&);
 
@@ -289,6 +299,8 @@ public:
             : GlobalLock(opCtx, MODE_S, deadline, behavior) {}
     };
 
+    using DBLockSkipOptions = GlobalLockSkipOptions;
+
     /**
      * Database lock.
      *
@@ -308,8 +320,14 @@ public:
         DBLock(OperationContext* opCtx,
                const DatabaseName& dbName,
                LockMode mode,
-               Date_t deadline = Date_t::max(),
-               bool skipGlobalAndRSTLLocks = false);
+               Date_t deadline = Date_t::max());
+
+        DBLock(OperationContext* opCtx,
+               const DatabaseName& dbName,
+               LockMode mode,
+               Date_t deadline,
+               DBLockSkipOptions skipOptions);
+
         DBLock(DBLock&&);
         ~DBLock();
 

@@ -148,7 +148,11 @@ public:
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(5),
                                     Lock::InterruptBehavior::kLeaveUnlocked,
-                                    true /* skipRSTLLock */);
+                                    [] {
+                                        Lock::GlobalLockSkipOptions options;
+                                        options.skipRSTLLock = true;
+                                        return options;
+                                    }());
                 if (lk.isLocked()) {
                     boost::optional<Timestamp> ts =
                         StorageInterface::get(getGlobalServiceContext())

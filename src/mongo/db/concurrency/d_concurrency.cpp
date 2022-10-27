@@ -124,13 +124,21 @@ bool Lock::ResourceMutex::isAtLeastReadLocked(Locker* locker) {
 Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
                              LockMode lockMode,
                              Date_t deadline,
+                             InterruptBehavior behavior)
+    : GlobalLock(opCtx, lockMode, deadline, behavior, GlobalLockSkipOptions{}) {}
+
+Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
+                             LockMode lockMode,
+                             Date_t deadline,
                              InterruptBehavior behavior,
-                             bool skipRSTLLock)
+                             GlobalLockSkipOptions options)
     : _opCtx(opCtx),
       _interruptBehavior(behavior),
-      _skipRSTLLock(skipRSTLLock),
+      _skipRSTLLock(options.skipRSTLLock),
       _isOutermostLock(!opCtx->lockState()->isLocked()) {
-    _opCtx->lockState()->getFlowControlTicket(_opCtx, lockMode);
+    if (!options.skipFlowControlTicket) {
+        _opCtx->lockState()->getFlowControlTicket(_opCtx, lockMode);
+    }
 
     try {
         if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
@@ -155,7 +163,7 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
         });
 
         _result = LOCK_INVALID;
-        if (skipRSTLLock) {
+        if (options.skipRSTLLock) {
             _takeGlobalLockOnly(lockMode, deadline);
         } else {
             _takeGlobalAndRSTLLocks(lockMode, deadline);
@@ -212,16 +220,22 @@ void Lock::GlobalLock::_unlock() {
 Lock::DBLock::DBLock(OperationContext* opCtx,
                      const DatabaseName& dbName,
                      LockMode mode,
+                     Date_t deadline)
+    : DBLock(opCtx, dbName, mode, deadline, DBLockSkipOptions{}) {}
+
+Lock::DBLock::DBLock(OperationContext* opCtx,
+                     const DatabaseName& dbName,
+                     LockMode mode,
                      Date_t deadline,
-                     bool skipGlobalAndRSTLLocks)
+                     DBLockSkipOptions options)
     : _id(RESOURCE_DATABASE, dbName), _opCtx(opCtx), _result(LOCK_INVALID), _mode(mode) {
 
-    if (!skipGlobalAndRSTLLocks) {
-        _globalLock.emplace(opCtx,
-                            isSharedLockMode(_mode) ? MODE_IS : MODE_IX,
-                            deadline,
-                            InterruptBehavior::kThrow);
-    }
+    _globalLock.emplace(opCtx,
+                        isSharedLockMode(_mode) ? MODE_IS : MODE_IX,
+                        deadline,
+                        InterruptBehavior::kThrow,
+                        std::move(options));
+
     massert(28539, "need a valid database name", !dbName.db().empty());
 
     _opCtx->lockState()->lock(_opCtx, _id, _mode, deadline);

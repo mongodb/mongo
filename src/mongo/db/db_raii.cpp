@@ -933,8 +933,11 @@ bool AutoGetCollectionForReadCommandMaybeLockFree::isAnySecondaryNamespaceAViewO
 AutoReadLockFree::AutoReadLockFree(OperationContext* opCtx, Date_t deadline)
     : _catalogStash(opCtx),
       _lockFreeReadsBlock(opCtx),
-      _globalLock(
-          opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, true /* skipRSTLLock */) {
+      _globalLock(opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, [] {
+          Lock::GlobalLockSkipOptions options;
+          options.skipRSTLLock = true;
+          return options;
+      }()) {
     // The catalog will be stashed inside the CollectionCatalogStasher.
     FakeCollection fakeColl;
     acquireCollectionAndConsistentSnapshot(
@@ -958,8 +961,11 @@ AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
                                                    Date_t deadline)
     : _catalogStash(opCtx),
       _lockFreeReadsBlock(opCtx),
-      _globalLock(
-          opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, true /* skipRSTLLock */) {
+      _globalLock(opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, [] {
+          Lock::GlobalLockSkipOptions options;
+          options.skipRSTLLock = true;
+          return options;
+      }()) {
     // The catalog will be stashed inside the CollectionCatalogStasher.
     FakeCollection fakeColl;
     acquireCollectionAndConsistentSnapshot(

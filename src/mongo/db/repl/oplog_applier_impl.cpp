@@ -39,6 +39,7 @@
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
@@ -315,10 +316,10 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
 
-        // This code path gets used during elections, so it should not be subject to Flow Control.
-        // It is safe to exclude this operation context from Flow Control here because this code
-        // path only gets used on secondaries or on a node transitioning to primary.
-        opCtx.setShouldParticipateInFlowControl(false);
+        // The oplog applier is crucial for stability of the replica set. As a result we mark it as
+        // having Immediate priority. This makes the operation skip ticket acquisition and flow
+        // control.
+        SetTicketAquisitionPriorityForLock priority(&opCtx, AdmissionContext::Priority::kImmediate);
 
         // For pausing replication in tests.
         if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
@@ -430,9 +431,10 @@ void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
             invariant(status);
             auto opCtx = cc().makeOperationContext();
 
-            // This code path is only executed on secondaries and initial syncing nodes, so it is
-            // safe to exclude any writes from Flow Control.
-            opCtx->setShouldParticipateInFlowControl(false);
+            // Oplog writes are crucial to the stability of the replica set. We mark the operations
+            // as having Immediate priority so that it skips ticket acquisition and flow control.
+            SetTicketAquisitionPriorityForLock priority(opCtx.get(),
+                                                        AdmissionContext::Priority::kImmediate);
 
             UnreplicatedWritesBlock uwb(opCtx.get());
             ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
@@ -586,9 +588,12 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 
                     auto opCtx = cc().makeOperationContext();
 
-                    // This code path is only executed on secondaries and initial syncing nodes, so
-                    // it is safe to exclude any writes from Flow Control.
-                    opCtx->setShouldParticipateInFlowControl(false);
+                    // Applying an Oplog batch is crucial to the stability of the Replica Set. We
+                    // mark it as having Immediate priority so that it skips ticket acquisition and
+                    // flow control.
+                    SetTicketAquisitionPriorityForLock priority(
+                        opCtx.get(), AdmissionContext::Priority::kImmediate);
+
                     opCtx->setEnforceConstraints(false);
 
                     status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {

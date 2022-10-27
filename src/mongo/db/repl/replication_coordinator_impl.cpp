@@ -3234,7 +3234,11 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
                             MODE_IS,
                             Date_t::now() + Milliseconds(5),
                             Lock::InterruptBehavior::kLeaveUnlocked,
-                            true /* skipRSTLLock */);
+                            [] {
+                                Lock::GlobalLockSkipOptions options;
+                                options.skipRSTLLock = true;
+                                return options;
+                            }());
         if (lk.isLocked()) {
             lastStableRecoveryTimestamp = _storage->getLastStableRecoveryTimestamp(_service);
         } else {

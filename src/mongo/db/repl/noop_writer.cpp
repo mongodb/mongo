@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -135,7 +136,10 @@ Status NoopWriter::startWritingPeriodicNoops(OpTime lastKnownOpTime) {
     invariant(!_noopRunner);
     _noopRunner =
         std::make_unique<PeriodicNoopRunner>(_writeInterval, [this](OperationContext* opCtx) {
-            opCtx->setShouldParticipateInFlowControl(false);
+            // Noop writes are critical for the cluster stability, so we mark it as having Immediate
+            // priority. As a result it will skip both flow control and normal ticket acquisition.
+            SetTicketAquisitionPriorityForLock priority(opCtx,
+                                                        AdmissionContext::Priority::kImmediate);
             _writeNoop(opCtx);
         });
     return Status::OK();

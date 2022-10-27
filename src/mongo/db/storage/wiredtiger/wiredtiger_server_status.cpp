@@ -63,8 +63,13 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
                         LockMode::MODE_IS,
                         Date_t::now(),
                         Lock::InterruptBehavior::kLeaveUnlocked,
-                        // Replication state change does not affect the following operation.
-                        true /* skipRSTLLock */);
+                        // Replication state change does not affect the following operation and we
+                        // don't need a flow control ticket.
+                        [] {
+                            Lock::GlobalLockSkipOptions options;
+                            options.skipRSTLLock = true;
+                            return options;
+                        }());
     if (!lk.isLocked()) {
         LOGV2_DEBUG(3088800, 2, "Failed to retrieve wiredTiger statistics");
         return BSONObj();

@@ -212,11 +212,12 @@ public:
             auto state = UserWriteBlockState::kUnknown;
             // Try to lock. If we fail (i.e. lock is already held in write mode), don't read the
             // GlobalUserWriteBlockState and set the userWriteBlockMode field to kUnknown.
-            Lock::GlobalLock lk(opCtx,
-                                MODE_IS,
-                                Date_t::now(),
-                                Lock::InterruptBehavior::kLeaveUnlocked,
-                                true /* skipRSTLLock */);
+            Lock::GlobalLock lk(
+                opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked, [] {
+                    Lock::GlobalLockSkipOptions options;
+                    options.skipRSTLLock = true;
+                    return options;
+                }());
             if (!lk.isLocked()) {
                 LOGV2_DEBUG(6345700, 2, "Failed to retrieve user write block state");
             } else {
@@ -258,11 +259,12 @@ public:
             }
 
             // Try to get the lock. If it's already locked, immediately return null timestamp.
-            Lock::GlobalLock lk(opCtx,
-                                MODE_IS,
-                                Date_t::now(),
-                                Lock::InterruptBehavior::kLeaveUnlocked,
-                                true /* skipRSTLLock */);
+            Lock::GlobalLock lk(
+                opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked, [] {
+                    Lock::GlobalLockSkipOptions options;
+                    options.skipRSTLLock = true;
+                    return options;
+                }());
             if (!lk.isLocked()) {
                 LOGV2_DEBUG(
                     6294100, 2, "Failed to get global lock for oplog server status section");

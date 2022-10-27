@@ -89,12 +89,6 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
     const string dbName(nsToDatabase(CurOp::get(opCtx)->getNS()));
 
-    auto origFlowControl = opCtx->shouldParticipateInFlowControl();
-
-    // The system.profile collection is non-replicated, so writes to it do not cause
-    // replication lag. As such, they should be excluded from Flow Control.
-    opCtx->setShouldParticipateInFlowControl(false);
-
     // Set the opCtx to be only interruptible for replication state changes. This is needed
     // because for some operations that are already marked as killed due to errors such as
     // operation time exceeding maxTimeMS, we still want to output the profiler entry. Thus
@@ -108,13 +102,11 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     }
 
     // IX lock acquisitions beyond this block will not be related to writes to system.profile.
-    ON_BLOCK_EXIT([opCtx, origFlowControl] {
-        opCtx->setIgnoreInterruptsExceptForReplStateChange(false);
-        opCtx->setShouldParticipateInFlowControl(origFlowControl);
-    });
+    ON_BLOCK_EXIT([opCtx] { opCtx->setIgnoreInterruptsExceptForReplStateChange(false); });
 
     try {
-        const auto dbProfilingNS = NamespaceString(dbName, "system.profile");
+        const auto dbProfilingNS =
+            NamespaceString(dbName, NamespaceString::kSystemDotProfileCollectionName);
         AutoGetCollection autoColl(opCtx, dbProfilingNS, MODE_IX);
         Database* const db = autoColl.getDb();
         if (!db) {
@@ -140,7 +132,6 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         auto coll =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, dbProfilingNS);
 
-        invariant(!opCtx->shouldParticipateInFlowControl());
         WriteUnitOfWork wuow(opCtx);
         OpDebug* const nullOpDebug = nullptr;
         uassertStatusOK(collection_internal::insertDocument(
@@ -160,9 +151,9 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
 Status createProfileCollection(OperationContext* opCtx, Database* db) {
     invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_IX));
-    invariant(!opCtx->shouldParticipateInFlowControl());
 
-    const auto dbProfilingNS = NamespaceString(db->name(), "system.profile");
+    const auto dbProfilingNS =
+        NamespaceString(db->name(), NamespaceString::kSystemDotProfileCollectionName);
 
     // Checking the collection exists must also be done in the WCE retry loop. Only retrying
     // collection creation would endlessly throw errors because the collection exists: must check

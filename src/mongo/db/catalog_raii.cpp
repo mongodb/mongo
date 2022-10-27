@@ -173,7 +173,17 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
                      const DatabaseName& dbName,
                      LockMode mode,
                      Date_t deadline)
-    : _dbName(dbName), _dbLock(opCtx, dbName, mode, deadline), _db([&] {
+    : AutoGetDb(opCtx, dbName, mode, deadline, [] {
+          Lock::GlobalLockSkipOptions options;
+          return options;
+      }()) {}
+
+AutoGetDb::AutoGetDb(OperationContext* opCtx,
+                     const DatabaseName& dbName,
+                     LockMode mode,
+                     Date_t deadline,
+                     Lock::DBLockSkipOptions options)
+    : _dbName(dbName), _dbLock(opCtx, dbName, mode, deadline, std::move(options)), _db([&] {
           auto databaseHolder = DatabaseHolder::get(opCtx);
           return databaseHolder->getDb(opCtx, dbName);
       }()) {
@@ -224,22 +234,46 @@ CollectionNamespaceOrUUIDLock::CollectionNamespaceOrUUIDLock(OperationContext* o
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nsOrUUID,
                                      LockMode modeColl,
-                                     Options options) {
+                                     Options options)
+    : _autoDb([&] {
+          auto& deadline = options._deadline;
+
+          invariant(!opCtx->isLockFreeReadsOp());
+
+          // Acquire the global/RSTL and all the database locks (may or may not be multiple
+          // databases).
+
+          Lock::DBLockSkipOptions dbLockOptions;
+          dbLockOptions.skipRSTLLock = false;
+          dbLockOptions.skipFlowControlTicket = [&nsOrUUID] {
+              const auto& maybeNss = nsOrUUID.nss();
+
+              if (maybeNss) {
+                  const auto& nss = *maybeNss;
+                  bool notReplicated = !nss.isReplicated();
+                  // TODO: Improve comment
+                  //
+                  // If the 'opCtx' is in a multi document transaction, pure reads on the
+                  // transaction session collections would acquire the global lock in the IX mode
+                  // and acquire a flow control ticket.
+                  bool isTransactionCollection =
+                      nss == NamespaceString::kSessionTransactionsTableNamespace ||
+                      nss == NamespaceString::kTransactionCoordinatorsNamespace;
+                  return notReplicated || isTransactionCollection;
+              }
+              return false;
+          }();
+          // TODO SERVER-67817 Use NamespaceStringOrUUID::db() instead.
+          return AutoGetDb(opCtx,
+                           nsOrUUID.nss() ? nsOrUUID.nss()->dbName() : *nsOrUUID.dbName(),
+                           isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
+                           deadline,
+                           std::move(dbLockOptions));
+      }()) {
 
     auto& viewMode = options._viewMode;
     auto& deadline = options._deadline;
     auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
-
-    invariant(!opCtx->isLockFreeReadsOp());
-
-    // Acquire the global/RSTL and all the database locks (may or may not be multiple
-    // databases).
-
-    // TODO SERVER-67817 Use NamespaceStringOrUUID::db() instead.
-    _autoDb.emplace(opCtx,
-                    nsOrUUID.nss() ? nsOrUUID.nss()->dbName() : *nsOrUUID.dbName(),
-                    isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
-                    deadline);
 
     // Out of an abundance of caution, force operations to acquire new snapshots after
     // acquiring exclusive collection locks. Operations that hold MODE_X locks make an
@@ -273,7 +307,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
     _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
     checkCollectionUUIDMismatch(opCtx, _resolvedNss, _coll, options._expectedUUID);
-    verifyDbAndCollection(opCtx, modeColl, nsOrUUID, _resolvedNss, _coll, _autoDb->getDb());
+    verifyDbAndCollection(opCtx, modeColl, nsOrUUID, _resolvedNss, _coll, _autoDb.getDb());
     for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
         auto secondaryResolvedNss =
             catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
@@ -394,11 +428,11 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
                                                      RestoreFromYieldFn restoreFromYield,
                                                      Options options)
     : _lockFreeReadsBlock(opCtx),
-      _globalLock(opCtx,
-                  MODE_IS,
-                  options._deadline,
-                  Lock::InterruptBehavior::kThrow,
-                  true /* skipRSTLLock */) {
+      _globalLock(opCtx, MODE_IS, options._deadline, Lock::InterruptBehavior::kThrow, [] {
+          Lock::GlobalLockSkipOptions options;
+          options.skipRSTLLock = true;
+          return options;
+      }()) {
 
     auto& viewMode = options._viewMode;
 

@@ -94,9 +94,9 @@ void JournalFlusher::run() {
         _uniqueCtx.emplace(tc->makeOperationContext());
 
         // Updates to a non-replicated collection, oplogTruncateAfterPoint, are made by this thread.
-        // Non-replicated writes will not contribute to replication lag and can be safely excluded
-        // from Flow Control.
-        _uniqueCtx->get()->setShouldParticipateInFlowControl(false);
+        // As this operation is critical for data durability we mark it as having Immediate priority
+        // to skip ticket and flow control.
+        _uniqueCtx.get()->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
         // The journal flusher should not conflict with the setFCV command.
         _uniqueCtx->get()->lockState()->setShouldConflictWithSetFeatureCompatibilityVersion(false);

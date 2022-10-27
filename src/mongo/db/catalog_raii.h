@@ -54,6 +54,13 @@ namespace mongo {
 class AutoGetDb {
     AutoGetDb(const AutoGetDb&) = delete;
     AutoGetDb& operator=(const AutoGetDb&) = delete;
+    friend class AutoGetCollection;
+
+    AutoGetDb(OperationContext* opCtx,
+              const DatabaseName& dbName,
+              LockMode mode,
+              Date_t deadline,
+              Lock::DBLockSkipOptions options);
 
 public:
     AutoGetDb(OperationContext* opCtx,
@@ -207,14 +214,14 @@ public:
      * Returns the database, or nullptr if it didn't exist.
      */
     Database* getDb() const {
-        return _autoDb->getDb();
+        return _autoDb.getDb();
     }
 
     /**
      * Returns the database, creating it if it does not exist.
      */
     Database* ensureDbExists(OperationContext* opCtx) {
-        return _autoDb->ensureDbExists(opCtx);
+        return _autoDb.ensureDbExists(opCtx);
     }
 
     /**
@@ -252,7 +259,7 @@ public:
 protected:
     // Ordering matters, the _collLocks should destruct before the _autoGetDb releases the
     // rstl/global/database locks.
-    boost::optional<AutoGetDb> _autoDb;
+    AutoGetDb _autoDb;
     std::vector<CollectionNamespaceOrUUIDLock> _collLocks;
 
     CollectionPtr _coll = nullptr;

@@ -216,7 +216,6 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                                             WriteConcernOptions::kNoTimeout},
                         &unusedWCResult));
 
-                    FlowControl::Bypass flowControlBypass(opCtx);
                     auto coordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
 
                     LOGV2(22452,

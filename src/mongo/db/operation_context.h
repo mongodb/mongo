@@ -106,14 +106,6 @@ public:
     OperationContext(Client* client, OperationIdSlot&& opIdSlot);
     virtual ~OperationContext();
 
-    bool shouldParticipateInFlowControl() const {
-        return _shouldParticipateInFlowControl;
-    }
-
-    void setShouldParticipateInFlowControl(bool target) {
-        _shouldParticipateInFlowControl = target;
-    }
-
     /**
      * Interface for durability.  Caller DOES NOT own pointer.
      */
@@ -803,7 +795,6 @@ private:
 
     bool _writesAreReplicated = true;
     bool _shouldIncrementLatencyStats = true;
-    bool _shouldParticipateInFlowControl = true;
     bool _inMultiDocumentTransaction = false;
     bool _isStartingMultiDocumentTransaction = false;
     bool _ignoreInterruptsExceptForReplStateChange = false;

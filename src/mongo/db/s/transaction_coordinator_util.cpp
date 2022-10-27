@@ -204,7 +204,6 @@ Future<repl::OpTime> persistParticipantsList(
         [&scheduler, lsid, txnNumberAndRetryCounter, participants] {
             return scheduler.scheduleWork(
                 [lsid, txnNumberAndRetryCounter, participants](OperationContext* opCtx) {
-                    FlowControl::Bypass flowControlBypass(opCtx);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx,
                         lsid,
@@ -443,7 +442,6 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
         [&scheduler, lsid, txnNumberAndRetryCounter, participants, decision] {
             return scheduler.scheduleWork(
                 [lsid, txnNumberAndRetryCounter, participants, decision](OperationContext* opCtx) {
-                    FlowControl::Bypass flowControlBypass(opCtx);
                     // Do not acquire a storage ticket in order to avoid unnecessary serialization
                     // with other prepared transactions that are holding a storage ticket
                     // themselves; see SERVER-60682.
@@ -643,7 +641,6 @@ Future<void> deleteCoordinatorDoc(txn::AsyncWorkScheduler& scheduler,
                         [&scheduler, lsid, txnNumberAndRetryCounter] {
                             return scheduler.scheduleWork([lsid, txnNumberAndRetryCounter](
                                                               OperationContext* opCtx) {
-                                FlowControl::Bypass flowControlBypass(opCtx);
                                 getTransactionCoordinatorWorkerCurOpRepository()->set(
                                     opCtx,
                                     lsid,

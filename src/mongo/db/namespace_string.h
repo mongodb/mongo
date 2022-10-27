@@ -91,6 +91,9 @@ public:
     // Name for the change stream change collection.
     static constexpr StringData kChangeCollectionName = "system.change_collection"_sd;
 
+    // Name for the profile collection
+    static constexpr StringData kSystemDotProfileCollectionName = "system.profile"_sd;
+
     // Names of privilege document collections
     static constexpr StringData kSystemUsers = "system.users"_sd;
     static constexpr StringData kSystemRoles = "system.roles"_sd;
@@ -453,7 +456,7 @@ public:
         return db() == kLocalDb;
     }
     bool isSystemDotProfile() const {
-        return coll() == "system.profile";
+        return coll() == kSystemDotProfileCollectionName;
     }
     bool isSystemDotViews() const {
         return coll() == kSystemDotViewsCollectionName;
