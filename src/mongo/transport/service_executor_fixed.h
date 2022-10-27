@@ -68,10 +68,6 @@ public:
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
 
-    void schedule(Task task) override;
-
-    void runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback) override;
-
     size_t getRunningThreads() const override;
 
     void appendStats(BSONObjBuilder* bob) const override;
@@ -81,6 +77,8 @@ public:
      * It is forbidden to invoke this method outside scheduled tasks.
      */
     int getRecursionDepthForExecutorThread() const;
+
+    std::unique_ptr<TaskRunner> makeTaskRunner() override;
 
 private:
     enum class State { kNotStarted, kRunning, kStopping, kStopped };
@@ -94,6 +92,10 @@ private:
         SessionHandle session;
         Task onCompletionCallback;
     };
+
+    void _schedule(Task task);
+
+    void _runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback);
 
     const std::string& _name() const;
 

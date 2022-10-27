@@ -42,12 +42,23 @@ public:
         return startCb();
     }
 
-    void schedule(Task task) override {
-        return scheduleTaskCb(std::move(task));
-    }
+    std::unique_ptr<TaskRunner> makeTaskRunner() override {
+        class Runner : public TaskRunner {
+        public:
+            explicit Runner(MockServiceExecutor* p) : _p{p} {}
 
-    void runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback) override {
-        runOnDataAvailableCb(session, std::move(onCompletionCallback));
+            void schedule(Task task) override {
+                return _p->scheduleTaskCb(std::move(task));
+            }
+
+            void runOnDataAvailable(SessionHandle session, Task onCompletionCallback) override {
+                _p->runOnDataAvailableCb(session, std::move(onCompletionCallback));
+            }
+
+        private:
+            MockServiceExecutor* _p;
+        };
+        return std::make_unique<Runner>(this);
     }
 
     Status shutdown(Milliseconds timeout) override {

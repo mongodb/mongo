@@ -186,7 +186,7 @@ Status ServiceExecutorReserved::shutdown(Milliseconds timeout) {
                  "reserved executor couldn't shutdown all worker threads within time limit.");
 }
 
-void ServiceExecutorReserved::schedule(Task task) {
+void ServiceExecutorReserved::_schedule(Task task) {
     if (!_stillRunning.load()) {
         task(Status(ErrorCodes::ShutdownInProgress, "Executor is not running"));
         return;
@@ -228,9 +228,43 @@ void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {
     subbob.append(kClientsWaiting, statlet.waiting);
 }
 
-void ServiceExecutorReserved::runOnDataAvailable(const SessionHandle& session,
-                                                 Task onCompletionCallback) {
-    scheduleCallbackOnDataAvailable(session, std::move(onCompletionCallback), this);
+/**
+ * Schedules task immediately, on the assumption that The task will block to
+ * receive the next message and we don't mind blocking on this dedicated
+ * worker thread.
+ */
+void ServiceExecutorReserved::_runOnDataAvailable(const SessionHandle& session, Task task) {
+    invariant(session);
+    _schedule([this, session, callback = std::move(task)](Status status) {
+        yieldIfAppropriate();
+        if (!status.isOK()) {
+            callback(std::move(status));
+            return;
+        }
+        callback(session->waitForData());
+    });
+}
+
+auto ServiceExecutorReserved::makeTaskRunner() -> std::unique_ptr<TaskRunner> {
+    iassert(ErrorCodes::ShutdownInProgress, "Executor is not running", _stillRunning.load());
+
+    /** Schedules on this. */
+    class ForwardingTaskRunner : public TaskRunner {
+    public:
+        explicit ForwardingTaskRunner(ServiceExecutorReserved* e) : _e{e} {}
+
+        void schedule(Task task) override {
+            _e->_schedule(std::move(task));
+        }
+
+        void runOnDataAvailable(std::shared_ptr<Session> session, Task task) override {
+            _e->_runOnDataAvailable(std::move(session), std::move(task));
+        }
+
+    private:
+        ServiceExecutorReserved* _e;
+    };
+    return std::make_unique<ForwardingTaskRunner>(this);
 }
 
 }  // namespace transport

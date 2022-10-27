@@ -42,31 +42,37 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/out_of_line_executor.h"
 
-namespace mongo {
-namespace transport {
+namespace mongo::transport {
 
 extern bool gInitialUseDedicatedThread;
 
 /*
  * This is the interface for all ServiceExecutors.
  */
-class ServiceExecutor : public OutOfLineExecutor {
+class ServiceExecutor {
 public:
+    using Task = OutOfLineExecutor::Task;
+
+    class TaskRunner : public OutOfLineExecutor {
+    public:
+        /**
+         * Awaits the availability of incoming data for the specified session. On success, it will
+         * schedule the callback on current executor. Otherwise, it will invoke the callback with a
+         * non-okay status on the caller thread.
+         */
+        virtual void runOnDataAvailable(std::shared_ptr<Session> session, Task task) = 0;
+    };
+
     static void shutdownAll(ServiceContext* serviceContext, Date_t deadline);
 
     virtual ~ServiceExecutor() = default;
+
+    virtual std::unique_ptr<TaskRunner> makeTaskRunner() = 0;
 
     /*
      * Starts the ServiceExecutor. This may create threads even if no tasks are scheduled.
      */
     virtual Status start() = 0;
-
-    /*
-     * Awaits the availability of incoming data for the specified session. On success, it will
-     * schedule the callback on current executor. Otherwise, it will invoke the callback with a
-     * non-okay status on the caller thread.
-     */
-    virtual void runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback) = 0;
 
     /*
      * Stops and joins the ServiceExecutor. Any outstanding tasks will not be executed, and any
@@ -78,14 +84,10 @@ public:
 
     virtual size_t getRunningThreads() const = 0;
 
-    /*
-     * Appends statistics about task scheduling to a BSONObjBuilder for serverStatus output.
-     */
+    /** Appends statistics about task scheduling to a BSONObjBuilder for serverStatus output. */
     virtual void appendStats(BSONObjBuilder* bob) const = 0;
 
-    /**
-     * Yield if we have more threads than cores.
-     */
+    /** Yield if this executor controls more threads than we have cores. */
     void yieldIfAppropriate() const;
 };
 
@@ -191,6 +193,4 @@ public:
     size_t limitExempt = 0;
 };
 
-}  // namespace transport
-
-}  // namespace mongo
+}  // namespace mongo::transport

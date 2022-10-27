@@ -157,20 +157,4 @@ Status launchServiceWorkerThread(unique_function<void()> task) {
     return Status::OK();
 }
 
-void scheduleCallbackOnDataAvailable(const SessionHandle& session,
-                                     unique_function<void(Status)> callback,
-                                     ServiceExecutor* executor) {
-    invariant(session);
-    executor->schedule([session, callback = std::move(callback), executor](Status status) {
-        executor->yieldIfAppropriate();
-
-        if (!status.isOK()) {
-            callback(std::move(status));
-            return;
-        }
-
-        callback(session->waitForData());
-    });
-}
-
 }  // namespace mongo::transport

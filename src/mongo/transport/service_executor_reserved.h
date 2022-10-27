@@ -59,18 +59,21 @@ public:
 
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
-    void schedule(Task task) override;
 
     size_t getRunningThreads() const override {
         return _numRunningWorkerThreads.loadRelaxed();
     }
 
-    void runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback) override;
-
     void appendStats(BSONObjBuilder* bob) const override;
+
+    std::unique_ptr<TaskRunner> makeTaskRunner() override;
 
 private:
     Status _startWorker();
+
+    void _schedule(Task task);
+
+    void _runOnDataAvailable(const SessionHandle& session, Task task);
 
     static thread_local std::deque<Task> _localWorkQueue;
     static thread_local int64_t _localThreadIdleCounter;

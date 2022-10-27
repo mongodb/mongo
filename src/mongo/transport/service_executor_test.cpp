@@ -32,6 +32,7 @@
 
 #include "boost/optional.hpp"
 #include <algorithm>
+#include <asio.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
@@ -43,8 +44,10 @@
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/matcher.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -52,13 +55,13 @@
 #include "mongo/util/future.h"
 #include "mongo/util/scopeguard.h"
 
-#include <asio.hpp>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
 namespace mongo::transport {
 namespace {
+
+namespace m = unittest::match;
 
 constexpr auto kWorkerThreadRunTime = Milliseconds{1000};
 // Run time + generous scheduling time slice
@@ -154,16 +157,15 @@ TEST_F(ServiceExecutorSynchronousTest, BasicTaskRuns) {
     ServiceExecutorSynchronous executor(getGlobalServiceContext());
     ASSERT_OK(executor.start());
     PromiseAndFuture<void> pf;
-    executor.schedule([&](Status st) { pf.promise.setFrom(st); });
+    auto runner = executor.makeTaskRunner();
+    runner->schedule([&](Status st) { pf.promise.setFrom(st); });
     ASSERT_DOES_NOT_THROW(pf.future.get());
     ASSERT_OK(executor.shutdown(kShutdownTime));
 }
 
-TEST_F(ServiceExecutorSynchronousTest, ScheduleFailsBeforeStartup) {
-    ServiceExecutorSynchronous executor(getGlobalServiceContext());
-    PromiseAndFuture<void> pf;
-    executor.schedule([&](Status s) { pf.promise.setFrom(s); });
-    ASSERT_THROWS(pf.future.get(), DBException);
+TEST_F(ServiceExecutorSynchronousTest, MakeTaskRunnerFailsBeforeStartup) {
+    ServiceExecutorSynchronous executor{getGlobalServiceContext()};
+    ASSERT_THROWS(executor.makeTaskRunner(), DBException);
 }
 
 class ServiceExecutorFixedTest : public unittest::Test {
@@ -202,18 +204,17 @@ public:
     };
 };
 
-TEST_F(ServiceExecutorFixedTest, ScheduleFailsBeforeStartup) {
+TEST_F(ServiceExecutorFixedTest, MakeTaskRunnerFailsBeforeStartup) {
     Handle handle;
-    PromiseAndFuture<void> pf;
-    handle->schedule([&](Status s) { pf.promise.setFrom(s); });
-    ASSERT_THROWS(pf.future.get(), DBException);
+    ASSERT_THROWS(handle->makeTaskRunner(), DBException);
 }
 
 TEST_F(ServiceExecutorFixedTest, BasicTaskRuns) {
     Handle handle;
     handle.start();
+    auto runner = handle->makeTaskRunner();
     PromiseAndFuture<void> pf;
-    handle->schedule([&](Status s) { pf.promise.setFrom(s); });
+    runner->schedule([&](Status s) { pf.promise.setFrom(s); });
     ASSERT_DOES_NOT_THROW(pf.future.get());
 }
 
@@ -221,9 +222,9 @@ TEST_F(ServiceExecutorFixedTest, ShutdownTimeLimit) {
     unittest::Barrier mayReturn(2);
     Handle handle;
     handle.start();
-
+    auto runner = handle->makeTaskRunner();
     PromiseAndFuture<void> pf;
-    handle->schedule([&](Status st) {
+    runner->schedule([&](Status st) {
         pf.promise.setFrom(st);
         mayReturn.countDownAndWait();
     });
@@ -239,10 +240,11 @@ TEST_F(ServiceExecutorFixedTest, ScheduleSucceedsBeforeShutdown) {
     PromiseAndFuture<void> pf;
     Handle handle;
     handle.start();
+    auto runner = handle->makeTaskRunner();
 
     // The executor accepts the work, but hasn't used the underlying pool yet.
-    JoinThread scheduleClient{[&] { handle->schedule([&](Status s) { pf.promise.setFrom(s); }); }};
-    (*failpoint)->waitForTimesEntered(1);
+    JoinThread scheduleClient{[&] { runner->schedule([&](Status s) { pf.promise.setFrom(s); }); }};
+    (*failpoint)->waitForTimesEntered(failpoint->initialTimesEntered() + 1);
 
     // Trigger an immediate shutdown which will not affect the task we have accepted.
     ASSERT_NOT_OK(handle->shutdown(Milliseconds{0}));
@@ -258,10 +260,10 @@ TEST_F(ServiceExecutorFixedTest, ScheduleSucceedsBeforeShutdown) {
 TEST_F(ServiceExecutorFixedTest, ScheduleFailsAfterShutdown) {
     Handle handle;
     handle.start();
-
+    auto runner = handle->makeTaskRunner();
     ASSERT_OK(handle->shutdown(kShutdownTime));
     PromiseAndFuture<void> pf;
-    handle->schedule([&](Status s) { pf.promise.setFrom(s); });
+    runner->schedule([&](Status s) { pf.promise.setFrom(s); });
     ASSERT_THROWS(pf.future.get(), ExceptionFor<ErrorCodes::ServiceExecutorInShutdown>);
 }
 
@@ -274,12 +276,13 @@ TEST_F(ServiceExecutorFixedTest, RunTaskAfterWaitingForData) {
 
         Handle handle;
         handle.start();
+        auto runner = handle->makeTaskRunner();
 
         const auto signallingThreadId = stdx::this_thread::get_id();
 
         AtomicWord<bool> ranOnDataAvailable{false};
 
-        handle->runOnDataAvailable(session, [&](Status) {
+        runner->runOnDataAvailable(session, [&](Status) {
             ranOnDataAvailable.store(true);
             ASSERT(stdx::this_thread::get_id() != signallingThreadId);
             barrier.countDownAndWait();
@@ -303,7 +306,7 @@ TEST_F(ServiceExecutorFixedTest, StartAndShutdownAreDeterministic) {
         {
             FailPointEnableBlock failpoint("hangAfterServiceExecutorFixedExecutorThreadsStart");
             handle.start();
-            failpoint->waitForTimesEntered(kExecutorThreads);
+            failpoint->waitForTimesEntered(failpoint.initialTimesEntered() + kExecutorThreads);
         }
 
         // Since destroying ServiceExecutorFixed is blocking, spawn a thread to issue the
@@ -315,7 +318,7 @@ TEST_F(ServiceExecutorFixedTest, StartAndShutdownAreDeterministic) {
             FailPointEnableBlock failpoint(
                 "hangBeforeServiceExecutorFixedLastExecutorThreadReturns");
             shutdownThread = monitor.spawn([&] { handle.join(); });
-            failpoint->waitForTimesEntered(1);
+            failpoint->waitForTimesEntered(failpoint.initialTimesEntered() + 1);
         }
         shutdownThread.join();
     });

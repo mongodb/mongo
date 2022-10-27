@@ -173,7 +173,7 @@ ServiceExecutorSynchronous* ServiceExecutorSynchronous::get(ServiceContext* ctx)
     return ref.get();
 }
 
-void ServiceExecutorSynchronous::schedule(Task task) {
+void ServiceExecutorSynchronous::_schedule(Task task) {
     _sharedState->schedule(std::move(task));
 }
 
@@ -191,10 +191,33 @@ void ServiceExecutorSynchronous::appendStats(BSONObjBuilder* bob) const {
         .append("clientsWaitingForData", 0);
 }
 
-void ServiceExecutorSynchronous::runOnDataAvailable(const SessionHandle& session, Task task) {
+void ServiceExecutorSynchronous::_runOnDataAvailable(const SessionHandle& session, Task task) {
     invariant(session);
     yieldIfAppropriate();
-    schedule(std::move(task));
+    _schedule(std::move(task));
+}
+
+auto ServiceExecutorSynchronous::makeTaskRunner() -> std::unique_ptr<TaskRunner> {
+    if (!_sharedState->isRunning())
+        iassert(Status(ErrorCodes::ShutdownInProgress, "Executor is not running"));
+
+    /** Schedules on this. */
+    class ForwardingTaskRunner : public TaskRunner {
+    public:
+        explicit ForwardingTaskRunner(ServiceExecutorSynchronous* e) : _e{e} {}
+
+        void schedule(Task task) override {
+            _e->_schedule(std::move(task));
+        }
+
+        void runOnDataAvailable(std::shared_ptr<Session> session, Task task) override {
+            _e->_runOnDataAvailable(std::move(session), std::move(task));
+        }
+
+    private:
+        ServiceExecutorSynchronous* _e;
+    };
+    return std::make_unique<ForwardingTaskRunner>(this);
 }
 
 }  // namespace mongo::transport

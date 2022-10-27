@@ -381,7 +381,7 @@ void ServiceExecutorFixed::_checkForShutdown() {
     reactor->stop();
 }
 
-void ServiceExecutorFixed::schedule(Task task) {
+void ServiceExecutorFixed::_schedule(Task task) {
     {
         auto lk = stdx::unique_lock(_mutex);
         if (_state != State::kRunning) {
@@ -403,8 +403,8 @@ size_t ServiceExecutorFixed::getRunningThreads() const {
     return _stats->threadsRunning();
 }
 
-void ServiceExecutorFixed::runOnDataAvailable(const SessionHandle& session,
-                                              Task onCompletionCallback) {
+void ServiceExecutorFixed::_runOnDataAvailable(const SessionHandle& session,
+                                               Task onCompletionCallback) {
     invariant(session);
     yieldIfAppropriate();
 
@@ -422,17 +422,19 @@ void ServiceExecutorFixed::runOnDataAvailable(const SessionHandle& session,
     lk.unlock();
 
     auto anchor = shared_from_this();
-    session->asyncWaitForData().thenRunOn(anchor).getAsync([this, anchor, it](Status status) {
-        // Remove our waiter from the list.
-        auto lk = stdx::unique_lock(_mutex);
-        auto waiter = std::exchange(*it, {});
-        _waiters.erase(it);
-        _stats->waitersEnded.fetchAndAdd(1);
-        lk.unlock();
+    session->asyncWaitForData()
+        .thenRunOn(makeTaskRunner())
+        .getAsync([this, anchor, it](Status status) {
+            // Remove our waiter from the list.
+            auto lk = stdx::unique_lock(_mutex);
+            auto waiter = std::exchange(*it, {});
+            _waiters.erase(it);
+            _stats->waitersEnded.fetchAndAdd(1);
+            lk.unlock();
 
-        waiter.session = nullptr;
-        waiter.onCompletionCallback(std::move(status));
-    });
+            waiter.session = nullptr;
+            waiter.onCompletionCallback(std::move(status));
+        });
 }
 
 void ServiceExecutorFixed::appendStats(BSONObjBuilder* bob) const {
@@ -448,6 +450,28 @@ void ServiceExecutorFixed::appendStats(BSONObjBuilder* bob) const {
 int ServiceExecutorFixed::getRecursionDepthForExecutorThread() const {
     invariant(_executorContext);
     return _executorContext->getRecursionDepth();
+}
+
+auto ServiceExecutorFixed::makeTaskRunner() -> std::unique_ptr<TaskRunner> {
+    iassert(ErrorCodes::ShutdownInProgress, "Executor is not running", _state == State::kRunning);
+
+    /** Schedules on this. */
+    class ForwardingTaskRunner : public TaskRunner {
+    public:
+        explicit ForwardingTaskRunner(ServiceExecutorFixed* e) : _e{e} {}
+
+        void schedule(Task task) override {
+            _e->_schedule(std::move(task));
+        }
+
+        void runOnDataAvailable(std::shared_ptr<Session> session, Task task) override {
+            _e->_runOnDataAvailable(std::move(session), std::move(task));
+        }
+
+    private:
+        ServiceExecutorFixed* _e;
+    };
+    return std::make_unique<ForwardingTaskRunner>(this);
 }
 
 }  // namespace mongo::transport

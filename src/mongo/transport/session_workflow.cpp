@@ -387,6 +387,14 @@ public:
         return ServiceExecutorContext::get(client())->getServiceExecutor();
     }
 
+    std::shared_ptr<ServiceExecutor::TaskRunner> taskRunner() {
+        auto exec = executor();
+        // Allows switching the executor between iterations of the workflow.
+        if (MONGO_unlikely(!_taskRunner.source || _taskRunner.source != exec))
+            _taskRunner = {exec->makeTaskRunner(), exec};
+        return _taskRunner.runner;
+    }
+
     bool isTLS() const {
 #ifdef MONGO_CONFIG_SSL
         return SSLPeerInfo::forSession(session()).isTLS;
@@ -398,6 +406,11 @@ public:
 private:
     class WorkItem;
 
+    struct RunnerAndSource {
+        std::shared_ptr<ServiceExecutor::TaskRunner> runner;
+        ServiceExecutor* source = nullptr;
+    };
+
     /** Alias: refers to this Impl, but holds a ref to the enclosing workflow. */
     std::shared_ptr<Impl> shared_from_this() {
         return {_workflow->shared_from_this(), this};
@@ -406,6 +419,7 @@ private:
     SessionWorkflow* const _workflow;
     ServiceContext* const _serviceContext;
     ServiceEntryPoint* const _sep;
+    RunnerAndSource _taskRunner;
 
     AtomicWord<bool> _isTerminated{false};
     ClientStrandPtr _clientStrand;
@@ -640,9 +654,9 @@ void SessionWorkflow::Impl::scheduleNewLoop(Status status) try {
         // Start our loop again with a new stack.
         if (_nextWork) {
             // If we're in exhaust, we're not expecting more data.
-            executor()->schedule(std::move(cb));
+            taskRunner()->schedule(std::move(cb));
         } else {
-            executor()->runOnDataAvailable(session(), std::move(cb));
+            taskRunner()->runOnDataAvailable(session(), std::move(cb));
         }
     } catch (const DBException& ex) {
         LOGV2_WARNING_OPTIONS(22993,
@@ -720,6 +734,7 @@ void SessionWorkflow::Impl::cleanupExhaustResources() {
 
 void SessionWorkflow::Impl::cleanupSession(const Status& status) {
     LOGV2_DEBUG(5127900, 2, "Ending session", "error"_attr = status);
+    _taskRunner = {};
     cleanupExhaustResources();
     _sep->onClientDisconnect(client());
 }

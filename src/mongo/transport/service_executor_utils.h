@@ -37,13 +37,4 @@ namespace mongo::transport {
 
 Status launchServiceWorkerThread(unique_function<void()> task);
 
-/**
- * The default implementation for "ServiceExecutor::runOnDataAvailable()", which blocks the caller
- * thread until data is available for reading. On success, it schedules "callback" on "executor".
- * Other implementations (e.g., "ServiceExecutorFixed") may provide asynchronous variants.
- */
-void scheduleCallbackOnDataAvailable(const SessionHandle& session,
-                                     unique_function<void(Status)> callback,
-                                     ServiceExecutor* executor);
-
 }  // namespace mongo::transport
