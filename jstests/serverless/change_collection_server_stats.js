@@ -63,8 +63,7 @@ const estimatedToBeRemovedDocsSize = changeCollection.find()
 assert.gt(estimatedToBeRemovedDocsSize, 0);
 
 // Set the 'expireAfterSeconds' to 'kExpireAfterSeconds'.
-// TODO SERVER-69511 Use 'tenantConn' instead of 'primary' to set the 'expireAfterSeconds'.
-assert.commandWorked(adminDb.runCommand(
+assert.commandWorked(tenantConn.adminCommand(
     {setClusterParameter: {changeStreams: {expireAfterSeconds: kExpireAfterSeconds}}}));
 
 // Ensure purging job deletes the expired oplog entries about insertion into test collection.

@@ -118,8 +118,9 @@ const citiesChangeCollectionSecondary =
     citiesTenantConnSecondary.getDB("config").system.change_collection;
 
 // Set the 'expireAfterSeconds' to 'kExpireAfterSeconds'.
-// TODO SERVER-69511 Use tenants connections instead of 'primary' to set 'expireAfterSeconds'.
-assert.commandWorked(primary.getDB("admin").runCommand(
+assert.commandWorked(stocksTenantConnPrimary.getDB("admin").runCommand(
+    {setClusterParameter: {changeStreams: {expireAfterSeconds: kExpireAfterSeconds}}}));
+assert.commandWorked(citiesTenantConnPrimary.getDB("admin").runCommand(
     {setClusterParameter: {changeStreams: {expireAfterSeconds: kExpireAfterSeconds}}}));
 
 // Get tenants respective collections for testing.

@@ -117,8 +117,7 @@ int64_t getExpireAfterSeconds(const TenantId& tenantId) {
         clusterParameters->get<ClusterParameterWithStorage<ChangeStreamsClusterParameterStorage>>(
             "changeStreams");
 
-    // TODO SERVER-69511 Pass 'tenantId' instead of 'boost::none'.
-    auto expireAfterSeconds = changeStreamsParam->getValue(boost::none).getExpireAfterSeconds();
+    auto expireAfterSeconds = changeStreamsParam->getValue(tenantId).getExpireAfterSeconds();
     invariant(expireAfterSeconds > 0);
     return expireAfterSeconds;
 }
