@@ -755,11 +755,11 @@ Status CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseNam
     return status;
 }
 
-std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              Timestamp readTimestamp) const {
+CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                Timestamp readTimestamp) const {
     if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
-        return nullptr;
+        return CollectionPtr();
     }
 
     // Check if the storage transaction already has this collection instantiated.
@@ -767,7 +767,7 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
     auto lookupResult = uncommittedCatalogUpdates.lookupCollection(opCtx, nss);
     if (lookupResult.found && !lookupResult.newColl) {
         invariant(isCollectionCompatible(lookupResult.collection, readTimestamp));
-        return lookupResult.collection;
+        return CollectionPtr(lookupResult.collection.get(), CollectionPtr::NoYieldTag{});
     }
 
     // Try to find a catalog entry matching 'readTimestamp'.
@@ -775,7 +775,7 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
     if (!catalogEntry) {
         // TODO SERVER-70150: no entry found, mapping might be incorrect due to speculative inserts
         // after startup. Scan durable catalog to confirm.
-        return nullptr;
+        return CollectionPtr();
     }
 
     auto latestCollection = _lookupCollectionByUUID(*catalogEntry->metadata->options.uuid);
@@ -783,7 +783,7 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
     // Return the in-memory Collection instance if it is compatible with the read timestamp.
     if (isCollectionCompatible(latestCollection, readTimestamp)) {
         uncommittedCatalogUpdates.openCollection(opCtx, latestCollection);
-        return latestCollection;
+        return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
     }
 
     // Use the shared collection state from the latest Collection in the in-memory collection
@@ -792,7 +792,7 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
         _createCompatibleCollection(opCtx, latestCollection, readTimestamp, catalogEntry.get());
     if (compatibleCollection) {
         uncommittedCatalogUpdates.openCollection(opCtx, compatibleCollection);
-        return compatibleCollection;
+        return CollectionPtr(compatibleCollection.get(), CollectionPtr::NoYieldTag{});
     }
 
     // There is no state in-memory that matches the catalog entry. Try to instantiate a new
@@ -800,8 +800,9 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
     auto newCollection = _createNewPITCollection(opCtx, readTimestamp, catalogEntry.get());
     if (newCollection) {
         uncommittedCatalogUpdates.openCollection(opCtx, newCollection);
+        return CollectionPtr(newCollection.get(), CollectionPtr::NoYieldTag{});
     }
-    return newCollection;
+    return CollectionPtr();
 }
 
 boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(

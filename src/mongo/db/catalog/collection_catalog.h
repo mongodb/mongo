@@ -196,13 +196,15 @@ public:
     Status reloadViews(OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
-     * Returns the collection instance representative of 'entry' at the provided read timestamp.
+     * Returns the collection pointer representative of 'nss' at the provided read timestamp. The
+     * returned collection instance is only valid while the storage snapshot is open and becomes
+     * invalidated when the snapshot is closed.
      *
      * Returns nullptr when reading from a point-in-time where the collection did not exist.
      */
-    std::shared_ptr<Collection> openCollection(OperationContext* opCtx,
-                                               const NamespaceString& nss,
-                                               Timestamp readTimestamp) const;
+    CollectionPtr openCollection(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 Timestamp readTimestamp) const;
 
     /**
      * Returns a shared_ptr to a drop pending index if it's found and not expired.
