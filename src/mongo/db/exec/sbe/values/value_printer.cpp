@@ -164,6 +164,9 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
         case TypeTags::classicMatchExpresion:
             stream << "classicMatchExpression";
             break;
+        case TypeTags::csiCell:
+            stream << "csiCell";
+            break;
         default:
             stream << "unknown tag";
             break;
@@ -486,6 +489,9 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             break;
         case TypeTags::classicMatchExpresion:
             stream << "ClassicMatcher(" << getClassicMatchExpressionView(val)->toString() << ")";
+            break;
+        case TypeTags::csiCell:
+            stream << "CsiCell(" << getCsiCellView(val) << ")";
             break;
         default:
             MONGO_UNREACHABLE;

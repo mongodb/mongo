@@ -69,6 +69,7 @@ class TimeZoneDatabase;
 class JsFunction;
 
 namespace sbe {
+
 /**
  * Trivially copyable variation on a tuple theme. This allow us to return tuples through registers.
  */
@@ -93,6 +94,7 @@ using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 namespace value {
 class SortSpec;
 class MakeObjSpec;
+struct CsiCell;
 
 static constexpr size_t kNewUUIDLength = 16;
 
@@ -119,8 +121,13 @@ enum class TypeTags : uint8_t {
     MinKey,
     MaxKey,
 
+    // Pointer to a struct with data necessary to read values from a columnstore index cell. The
+    // values of this type are fully owned by the column_scan stage and are never created, cloned or
+    // destroyed by SBE.
+    csiCell,
+
     // Special marker
-    EndOfShallowValues = MaxKey,
+    EndOfShallowValues = csiCell,
 
     // Heap values
     NumberDecimal,
@@ -1240,6 +1247,10 @@ inline IndexBounds* getIndexBoundsView(Value val) noexcept {
 
 inline MatchExpression* getClassicMatchExpressionView(Value val) noexcept {
     return reinterpret_cast<MatchExpression*>(val);
+}
+
+inline sbe::value::CsiCell* getCsiCellView(Value val) noexcept {
+    return reinterpret_cast<sbe::value::CsiCell*>(val);
 }
 
 /**

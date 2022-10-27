@@ -721,6 +721,15 @@ def read_as_integer(pmem, size):
         gdb.selected_inferior().read_memory(pmem, size).tobytes(), \
         sys.byteorder)
 
+def read_as_integer_signed(pmem, size):
+    """Read 'size' bytes at 'pmem' as an integer."""
+    # We assume the same platform for the debugger and the debuggee (thus, 'sys.byteorder'). If
+    # this becomes a problem look into whether it's possible to determine the byteorder of the
+    # inferior.
+    return int.from_bytes(
+        gdb.selected_inferior().read_memory(pmem, size).tobytes(),
+        sys.byteorder,
+        signed = True)
 
 class SbeCodeFragmentPrinter(object):
     """
@@ -803,7 +812,7 @@ class SbeCodeFragmentPrinter(object):
                 args = 'arg: ' + str(read_as_integer(cur_op, int_size))
                 cur_op += int_size
             elif op_name in ['jmp', 'jmpTrue', 'jmpNothing']:
-                offset = read_as_integer(cur_op, int_size)
+                offset = read_as_integer_signed(cur_op, int_size)
                 cur_op += int_size
                 args = 'offset: ' + str(offset) + ', target: ' + hex(cur_op + offset)
             elif op_name in ['pushConstVal', 'getFieldImm']:
@@ -838,7 +847,8 @@ class SbeCodeFragmentPrinter(object):
                 cur_op += uint8_size
                 args = \
                     'Instruction::Constants: ' + str(const_enum) + \
-                    ", offset: " + str(read_as_integer(cur_op, int_size))
+                    ", offset: " + str(read_as_integer_signed(cur_op, int_size))
+                cur_op += int_size
             elif op_name in ['applyClassicMatcher']:
                 args = 'MatchExpression* ' + hex(read_as_integer(cur_op, ptr_size))
                 cur_op += ptr_size
@@ -855,6 +865,10 @@ class SbeCodeFragmentPrinter(object):
                 day_of_week = read_as_integer(cur_op, day_of_week_size)
                 cur_op += day_of_week_size
                 args += ', dayOfWeek: ' + str(day_of_week)
+            elif op_name in ['traverseCsiCellValues', 'traverseCsiCellTypes']:
+                offset = read_as_integer_signed(cur_op, int_size)
+                cur_op += int_size
+                args = 'lambda at: ' + hex(cur_op + offset)
 
             yield hex(op_addr), '{} ({})'.format(op_name, args)
 

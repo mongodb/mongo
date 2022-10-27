@@ -40,6 +40,7 @@
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/columnar.h"
 #include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
@@ -118,6 +119,8 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,   // traversePImm
     -2,  // traverseF
     0,   // traverseFImm
+    0,   // traverseCsiCellValues
+    0,   // traverseCsiCellTypes
     -2,  // setField
     0,   // getArraySize
 
@@ -269,6 +272,13 @@ std::string CodeFragment::toString() const {
                 auto offset = readFromMemory<int>(pcPointer);
                 pcPointer += sizeof(offset);
                 ss << "k: " << Instruction::toStringConstants(k) << ", offset: " << offset;
+                break;
+            }
+            case Instruction::traverseCsiCellValues:
+            case Instruction::traverseCsiCellTypes: {
+                auto offset = readFromMemory<int>(pcPointer);
+                pcPointer += sizeof(offset);
+                ss << "offset: " << offset;
                 break;
             }
             case Instruction::fillEmptyImm: {
@@ -681,6 +691,34 @@ void CodeFragment::appendTraverseF(int codePosition, Instruction::Constants k) {
     offset += writeToMemory(offset, codeOffset);
 }
 
+void CodeFragment::appendTraverseCellValues(int codePosition) {
+    Instruction i;
+    i.tag = Instruction::traverseCsiCellValues;
+    adjustStackSimple(i);
+
+    auto size = sizeof(Instruction) + sizeof(codePosition);
+    auto offset = allocateSpace(size);
+
+    int codeOffset = codePosition - _instrs.size();
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, codeOffset);
+}
+
+void CodeFragment::appendTraverseCellTypes(int codePosition) {
+    Instruction i;
+    i.tag = Instruction::traverseCsiCellTypes;
+    adjustStackSimple(i);
+
+    auto size = sizeof(Instruction) + sizeof(codePosition);
+    auto offset = allocateSpace(size);
+
+    int codeOffset = codePosition - _instrs.size();
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, codeOffset);
+}
+
 void CodeFragment::appendTypeMatch(uint32_t mask) {
     Instruction i;
     i.tag = Instruction::typeMatchImm;
@@ -1025,6 +1063,18 @@ void ByteCode::traverseF(const CodeFragment* code, int64_t position, bool compar
     }
 }
 
+bool ByteCode::runLambdaPredicate(const CodeFragment* code, int64_t position) {
+    runLambdaInternal(code, position);
+    auto [retOwn, retTag, retVal] = getFromStack(0);
+    popStack();
+
+    bool isTrue = (retTag == value::TypeTags::Boolean) && value::bitcastTo<bool>(retVal);
+    if (retOwn) {
+        value::releaseValue(retTag, retVal);
+    }
+    return isTrue;
+}
+
 void ByteCode::traverseFInArray(const CodeFragment* code, int64_t position, bool compareArray) {
     auto [ownInput, tagInput, valInput] = getFromStack(0);
 
@@ -1037,16 +1087,7 @@ void ByteCode::traverseFInArray(const CodeFragment* code, int64_t position, bool
          enumerator.advance()) {
         auto [elemTag, elemVal] = enumerator.getViewOfValue();
         pushStack(false, elemTag, elemVal);
-        runLambdaInternal(code, position);
-        auto [retOwn, retTag, retVal] = getFromStack(0);
-        popStack();
-
-        bool isTrue = (retTag == value::TypeTags::Boolean) && value::bitcastTo<bool>(retVal);
-        if (retOwn) {
-            value::releaseValue(retTag, retVal);
-        }
-
-        if (isTrue) {
+        if (runLambdaPredicate(code, position)) {
             pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
             return;
         }
@@ -1063,6 +1104,123 @@ void ByteCode::traverseFInArray(const CodeFragment* code, int64_t position, bool
     }
 
     pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
+}
+
+void ByteCode::traverseCsiCellValues(const CodeFragment* code, int64_t position) {
+    auto [ownCsiCell, tagCsiCell, valCsiCell] = getFromStack(0);
+    invariant(!ownCsiCell);
+    popStack();
+
+    invariant(tagCsiCell == value::TypeTags::csiCell);
+    auto csiCell = value::getCsiCellView(valCsiCell);
+    bool isTrue = false;
+
+    // If there are no doubly-nested arrays, we can avoid parsing the array info and use the simple
+    // cursor over all values in the cell.
+    if (!csiCell->splitCellView->hasDoubleNestedArrays) {
+        SplitCellView::Cursor<value::ColumnStoreEncoder> cellCursor =
+            csiCell->splitCellView->subcellValuesGenerator<value::ColumnStoreEncoder>(
+                csiCell->encoder);
+
+        while (cellCursor.hasNext() && !isTrue) {
+            const auto& val = cellCursor.nextValue();
+            pushStack(false, val->first, val->second);
+            isTrue = runLambdaPredicate(code, position);
+        }
+    } else {
+        SplitCellView::CursorWithArrayDepth<value::ColumnStoreEncoder> cellCursor{
+            csiCell->pathDepth,
+            csiCell->splitCellView->firstValuePtr,
+            csiCell->splitCellView->arrInfo,
+            csiCell->encoder};
+
+        while (cellCursor.hasNext() && !isTrue) {
+            const auto& val = cellCursor.nextValue();
+
+            if (val.depthWithinDirectlyNestedArraysOnPath > 0 || val.depthAtLeaf > 1) {
+                // The value is too deep.
+                continue;
+            }
+
+            if (val.isObject) {
+                continue;
+            } else {
+                pushStack(false, val.value->first, val.value->second);
+                isTrue = runLambdaPredicate(code, position);
+            }
+        }
+    }
+    pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(isTrue));
+}
+
+void ByteCode::traverseCsiCellTypes(const CodeFragment* code, int64_t position) {
+    using namespace value;
+
+    auto [ownCsiCell, tagCsiCell, valCsiCell] = getFromStack(0);
+    invariant(!ownCsiCell);
+    popStack();
+
+    invariant(tagCsiCell == TypeTags::csiCell);
+    auto csiCell = getCsiCellView(valCsiCell);
+
+    // When traversing cell types cannot use the simple cursor even if the cell doesn't contain
+    // doubly-nested arrays because must report types of objects and arrays and for that need to
+    // parse the array info.
+    SplitCellView::CursorWithArrayDepth<ColumnStoreEncoder> cellCursor{
+        csiCell->pathDepth,
+        csiCell->splitCellView->firstValuePtr,
+        csiCell->splitCellView->arrInfo,
+        csiCell->encoder};
+
+    // The dummy array/object are needed when running lambda on the type on non-empty arrays and
+    // objects. We allocate them on the stack because these values are only used in the scope of
+    // this traversal and discarded after evaluating the lambda.
+    const auto dummyArray = Array{};
+    const auto dummyObject = Object{};
+
+    bool shouldProcessArray = true;
+    bool isTrue = false;
+    while (cellCursor.hasNext() && !isTrue) {
+        const auto& val = cellCursor.nextValue();
+
+        if (val.depthWithinDirectlyNestedArraysOnPath > 0) {
+            // There is nesting on the path.
+            continue;
+        }
+
+        if (val.depthAtLeaf > 0) {
+            // Empty arrays are stored in columnstore cells as values and don't require special
+            // handling. All other arrays can be detected when their first value is seen. To apply
+            // the lambda to the leaf array type we inject a "fake" array here as the caller should
+            // only look at the returned type. Note, that we might still need to process the values
+            // inside the array.
+            if (shouldProcessArray) {
+                shouldProcessArray = false;
+
+                pushStack(false, TypeTags::Array, bitcastFrom<const Array*>(&dummyArray));
+                isTrue = runLambdaPredicate(code, position);
+                if (isTrue) {
+                    break;
+                }
+            }
+
+            if (val.depthAtLeaf > 1) {
+                // The value is inside a nested array at the leaf.
+                continue;
+            }
+        } else {
+            shouldProcessArray = true;
+        }
+
+        // Apply lambda to the types of values at the leaf.
+        if (val.isObject) {
+            pushStack(false, TypeTags::Object, bitcastFrom<const Object*>(&dummyObject));
+        } else {
+            pushStack(false, val.value->first, val.value->second);
+        }
+        isTrue = runLambdaPredicate(code, position);
+    }
+    pushStack(false, TypeTags::Boolean, bitcastFrom<bool>(isTrue));
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
@@ -5635,6 +5793,22 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
                     traverseF(code, codePosition, k == Instruction::True ? true : false);
 
+                    break;
+                }
+                case Instruction::traverseCsiCellValues: {
+                    auto offset = readFromMemory<int>(pcPointer);
+                    pcPointer += sizeof(offset);
+                    auto codePosition = pcPointer - code->instrs().data() + offset;
+
+                    traverseCsiCellValues(code, codePosition);
+                    break;
+                }
+                case Instruction::traverseCsiCellTypes: {
+                    auto offset = readFromMemory<int>(pcPointer);
+                    pcPointer += sizeof(offset);
+                    auto codePosition = pcPointer - code->instrs().data() + offset;
+
+                    traverseCsiCellTypes(code, codePosition);
                     break;
                 }
                 case Instruction::setField: {

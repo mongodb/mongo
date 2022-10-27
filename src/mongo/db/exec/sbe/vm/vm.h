@@ -284,6 +284,11 @@ struct Instruction {
         traversePImm,
         traverseF,  // traverse filter paths
         traverseFImm,
+        // Iterates over values in column index cells. Skips values from nested arrays.
+        traverseCsiCellValues,
+        // Iterates the column index cell and returns values representing the types of cell's
+        // content, including arrays and nested objects. Skips contents of nested arrays.
+        traverseCsiCellTypes,
         setField,
         getArraySize,  // number of elements
 
@@ -445,6 +450,10 @@ struct Instruction {
                 return "traverseF";
             case traverseFImm:
                 return "traverseFImm";
+            case traverseCsiCellValues:
+                return "traverseCsiCellValues";
+            case traverseCsiCellTypes:
+                return "traverseCsiCellTypes";
             case setField:
                 return "setField";
             case getArraySize:
@@ -761,6 +770,14 @@ public:
         appendSimpleInstruction(Instruction::traverseF);
     }
     void appendTraverseF(int codePosition, Instruction::Constants k);
+    void appendTraverseCellValues() {
+        appendSimpleInstruction(Instruction::traverseCsiCellValues);
+    }
+    void appendTraverseCellValues(int codePosition);
+    void appendTraverseCellTypes() {
+        appendSimpleInstruction(Instruction::traverseCsiCellTypes);
+    }
+    void appendTraverseCellTypes(int codePosition);
     void appendSetField() {
         appendSimpleInstruction(Instruction::setField);
     }
@@ -977,6 +994,11 @@ private:
     void traverseF(const CodeFragment* code);
     void traverseF(const CodeFragment* code, int64_t position, bool compareArray);
     void traverseFInArray(const CodeFragment* code, int64_t position, bool compareArray);
+
+    bool runLambdaPredicate(const CodeFragment* code, int64_t position);
+    void traverseCsiCellValues(const CodeFragment* code, int64_t position);
+    void traverseCsiCellTypes(const CodeFragment* code, int64_t position);
+
     FastTuple<bool, value::TypeTags, value::Value> setField();
 
     FastTuple<bool, value::TypeTags, value::Value> getArraySize(value::TypeTags tag,

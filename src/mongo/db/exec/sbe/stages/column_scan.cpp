@@ -353,40 +353,15 @@ void ColumnScanStage::readParentsIntoObj(StringData path,
 }
 
 // The result of the filter predicate will be the same regardless of sparseness or sub objects,
-// therefore we don't look at the parents and don't consult the row store.
-bool ColumnScanStage::checkFilter(CellView cell, size_t filterIndex, const PathValue& path) {
+// therefore we don't look at the parents and don't consult the row store. The filter expression for
+// each path should incorporate cell traversal of the cell passed to it.
+bool ColumnScanStage::checkFilter(CellView cell, size_t filterIndex, FieldIndex numPathParts) {
     auto splitCellView = SplitCellView::parse(cell);
+    value::CsiCell csiCell{&splitCellView, &_encoder, numPathParts};
+    _filterInputAccessors[filterIndex].reset(value::TypeTags::csiCell,
+                                             sbe::value::bitcastFrom<const void*>(&csiCell));
 
-    if (!splitCellView.hasDoubleNestedArrays) {
-        // When there are no doubly-nested arrays, we can read all of the values using a simple
-        // cursor.
-        SplitCellView::Cursor<value::ColumnStoreEncoder> cellCursor =
-            splitCellView.subcellValuesGenerator<value::ColumnStoreEncoder>(&_encoder);
-
-        while (cellCursor.hasNext()) {
-            const auto& val = cellCursor.nextValue();
-
-            _filterInputAccessors[filterIndex].reset(val->first, val->second);
-            if (_bytecode.runPredicate(_filterExprsCode[filterIndex].get())) {
-                return true;
-            }
-        }
-    } else {
-        SplitCellView::CursorWithArrayDepth<value::ColumnStoreEncoder> cellCursor{
-            splitCellView.firstValuePtr, splitCellView.arrInfo, &_encoder};
-
-        while (cellCursor.hasNext()) {
-            auto [val, depth] = cellCursor.nextValue();
-            if (depth > 0)
-                continue;
-
-            _filterInputAccessors[filterIndex].reset(val->first, val->second);
-            if (_bytecode.runPredicate(_filterExprsCode[filterIndex].get())) {
-                return true;
-            }
-        }
-    }
-    return false;
+    return _bytecode.runPredicate(_filterExprsCode[filterIndex].get());
 }
 
 RowId ColumnScanStage::findNextRowIdForFilteredColumns() {
@@ -425,14 +400,14 @@ RowId ColumnScanStage::findNextRowIdForFilteredColumns() {
             targetRowId = result->rid;
         }
 
-        if (!checkFilter(result->value, _nextUnmatched, cursor.path())) {
+        if (!checkFilter(result->value, _nextUnmatched, cursor.numPathParts())) {
             // Advance the column until find a match and restart at this new record ID.
             do {
                 result = cursor.next();
                 if (!result) {
                     return ColumnStore::kNullRowId;
                 }
-            } while (!checkFilter(result->value, _nextUnmatched, cursor.path()));
+            } while (!checkFilter(result->value, _nextUnmatched, cursor.numPathParts()));
             matchedSinceAdvance = 0;
             invariant(result->rid > targetRowId);
             targetRowId = result->rid;

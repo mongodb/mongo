@@ -32,7 +32,7 @@
 #include <vector>
 
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/storage/column_store.h"
 
 namespace mongo::sbe::value {

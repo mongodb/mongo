@@ -1962,6 +1962,15 @@ TEST(SplitMatchExpressionForColumns, SupportsTypeSpecificPredicates) {
         << splitUp.at("falcon")->toString();
     ASSERT(residual == nullptr);
 }
+TEST(SplitMatchExpressionForColumns, SupportsExistsTrue) {
+    ParsedMatchExpression existsPredicate("{albatross: {$exists: true}}");
+    auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(existsPredicate.get());
+    ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+    ASSERT(splitUp.contains("albatross"));
+    ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::EXISTS)
+        << splitUp.at("albatross")->toString();
+    ASSERT(residual == nullptr);
+}
 
 TEST(SplitMatchExpressionForColumns, DoesNotSupportExistsFalse) {
     ParsedMatchExpression existsPredicate("{albatross: {$exists: false}}");
@@ -2090,19 +2099,66 @@ TEST(SplitMatchExpressionForColumns, DoesNotSupportCertainInEdgeCases) {
     }
 }
 
-TEST(SplitMatchExpressionForColumns, DoesNotSupportQueriesForTypeObject) {
-    ParsedMatchExpression objectFilter("{albatross: {$type: 'object'}}");
-    auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(objectFilter.get());
-    ASSERT_EQ(splitUp.size(), 0) << splitUp.size();
-    assertMatchesEqual(objectFilter, residual);
+TEST(SplitMatchExpressionForColumns, SupportsTypePredicatesInt) {
+    ParsedMatchExpression intFilter("{albatross: {$type: 'int'}}");
+    auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(intFilter.get());
+    ASSERT_GT(splitUp.size(), 0);
+    ASSERT(splitUp.contains("albatross"));
+    ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::TYPE_OPERATOR)
+        << splitUp.at("albatross")->toString();
+    ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+    ASSERT(residual == nullptr);
 }
 
-// This may be workable. But until we can prove it we'll disallow {$type: "array"}.
-TEST(SplitMatchExpressionForColumns, DoesNotSupportQueriesForTypeArray) {
+TEST(SplitMatchExpressionForColumns, SupportsTypePredicatesNumber) {
+    ParsedMatchExpression numberFilter("{albatross: {$type: 'number'}}");
+    auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(numberFilter.get());
+    ASSERT_GT(splitUp.size(), 0);
+    ASSERT(splitUp.contains("albatross"));
+    ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::TYPE_OPERATOR)
+        << splitUp.at("albatross")->toString();
+    ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+    ASSERT(residual == nullptr);
+}
+
+TEST(SplitMatchExpressionForColumns, SupportsTypePredicatesMultiple) {
+    ParsedMatchExpression stringFilter("{albatross: {$type: ['string', 'double']}}");
+    auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(stringFilter.get());
+    ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+    ASSERT(splitUp.contains("albatross"));
+    ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::TYPE_OPERATOR)
+        << splitUp.at("albatross")->toString();
+    ASSERT(residual == nullptr);
+}
+
+TEST(SplitMatchExpressionForColumns, SupportsTypePredicatesNull) {
+    ParsedMatchExpression nullFilter("{albatross: {$type: 'null'}}");
+    auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(nullFilter.get());
+    ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+    ASSERT(splitUp.contains("albatross"));
+    ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::TYPE_OPERATOR)
+        << splitUp.at("albatross")->toString();
+    ASSERT(residual == nullptr);
+}
+
+TEST(SplitMatchExpressionForColumns, SupportsTypePredicatesObject) {
+    ParsedMatchExpression objectFilter("{albatross: {$type: 'object'}}");
+    auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(objectFilter.get());
+    ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+    ASSERT(splitUp.contains("albatross"));
+    ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::TYPE_OPERATOR)
+        << splitUp.at("albatross")->toString();
+    ASSERT(residual == nullptr);
+}
+
+TEST(SplitMatchExpressionForColumns, SupportsTypePredicatesArray) {
     ParsedMatchExpression arrayFilter("{albatross: {$type: 'array'}}");
     auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(arrayFilter.get());
-    ASSERT_EQ(splitUp.size(), 0) << splitUp.size();
-    assertMatchesEqual(arrayFilter, residual);
+    ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+    ASSERT(splitUp.contains("albatross"));
+    ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::TYPE_OPERATOR)
+        << splitUp.at("albatross")->toString();
+    ASSERT(residual == nullptr);
 }
 
 TEST(SplitMatchExpressionForColumns, DoesNotSupportNotQueries) {

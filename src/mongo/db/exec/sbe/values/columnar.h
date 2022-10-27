@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/config.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/column_store_encoder.h"
 #include "mongo/db/storage/column_store.h"
 
@@ -82,7 +81,20 @@ struct MockTranslatedCell {
     }
 };
 
-/*
+namespace value {
+/**
+ * This struct is used to pass columnstore index cell data to the SBE VM in csiCell value type. The
+ * values of this type are fully owned by the column_scan stage and are never created, cloned or
+ * destroyed by SBE.
+ */
+struct CsiCell {
+    SplitCellView* splitCellView = nullptr;
+    sbe::value::ColumnStoreEncoder* encoder = nullptr;
+    FieldIndex pathDepth = 0;
+};
+}  // namespace value
+
+/**
  * Adds translated cell to an object. This must not be called on an object
  * which has a structure that is incompatible with the structure described in the cell.
  */

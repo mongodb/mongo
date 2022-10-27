@@ -722,79 +722,93 @@ std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::Slot
     return exprLower.optimize(abt);
 }
 
-EvalExpr generatePerColumnFilterExpr(StageBuilderState& state,
-                                     const MatchExpression* me,
-                                     sbe::value::SlotId inputSlot) {
-    auto inputVar = sbe::EVariable{inputSlot};
-
+std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& state,
+                                                             const MatchExpression* me,
+                                                             const sbe::EVariable& inputVar) {
     switch (me->matchType()) {
         // These are always safe since they will never match documents missing their field, or where
         // the element is an object or array.
         case MatchExpression::REGEX:
-            return generateRegexExpr(
-                state, checked_cast<const RegexMatchExpression*>(me), inputVar);
+            return generateRegexExpr(state, checked_cast<const RegexMatchExpression*>(me), inputVar)
+                .extractExpr();
         case MatchExpression::MOD:
-            return generateModExpr(state, checked_cast<const ModMatchExpression*>(me), inputVar);
+            return generateModExpr(state, checked_cast<const ModMatchExpression*>(me), inputVar)
+                .extractExpr();
         case MatchExpression::BITS_ALL_SET:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AllSet,
-                                       inputVar);
+                                       inputVar)
+                .extractExpr();
         case MatchExpression::BITS_ALL_CLEAR:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AllClear,
-                                       inputVar);
+                                       inputVar)
+                .extractExpr();
         case MatchExpression::BITS_ANY_SET:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AnySet,
-                                       inputVar);
+                                       inputVar)
+                .extractExpr();
         case MatchExpression::BITS_ANY_CLEAR:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AnyClear,
-                                       inputVar);
-        case MatchExpression::EXISTS: {
-            uasserted(6733601, "(TODO SERVER-68743) need expr translation to enable $exists");
-        }
+                                       inputVar)
+                .extractExpr();
+        case MatchExpression::EXISTS:
+            return makeConstant(sbe::value::TypeTags::Boolean, true);
         case MatchExpression::LT:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::less,
-                                          inputVar);
+                                          inputVar)
+                .extractExpr();
         case MatchExpression::GT:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::greater,
-                                          inputVar);
+                                          inputVar)
+                .extractExpr();
         case MatchExpression::EQ:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::eq,
-                                          inputVar);
+                                          inputVar)
+                .extractExpr();
         case MatchExpression::LTE:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::lessEq,
-                                          inputVar);
+                                          inputVar)
+                .extractExpr();
         case MatchExpression::GTE:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::greaterEq,
-                                          inputVar);
+                                          inputVar)
+                .extractExpr();
         case MatchExpression::MATCH_IN: {
             auto expr = checked_cast<const InMatchExpression*>(me);
             tassert(6988583,
                     "Push-down of non-scalar values in $in is not supported.",
                     !expr->hasNonScalarOrNonEmptyValues());
-            return generateInExpr(state, expr, inputVar);
+            return generateInExpr(state, expr, inputVar).extractExpr();
         }
         case MatchExpression::TYPE_OPERATOR: {
-            uasserted(6733603, "(TODO SERVER-68743) need expr translation to enable $type");
+            const auto& expr = checked_cast<const TypeMatchExpression*>(me);
+            const MatcherTypeSet& ts = expr->typeSet();
+
+            return makeFunction(
+                "typeMatch",
+                inputVar.clone(),
+                makeConstant(sbe::value::TypeTags::NumberInt64,
+                             sbe::value::bitcastFrom<int64_t>(ts.getBSONTypeMask())));
         }
         case MatchExpression::NOT: {
-            uasserted(6733604, "(TODO SERVER-68743) need expr translation to enable $not");
+            uasserted(6733604, "(TODO SERVER-69610) need expr translation to enable $not");
         }
 
         default:
@@ -802,7 +816,23 @@ EvalExpr generatePerColumnFilterExpr(StageBuilderState& state,
                       std::string("Expression ") + me->serialize().toString() +
                           " should not be pushed down as a per-column filter");
     }
-    return {};
+    MONGO_UNREACHABLE;
+}
+
+std::unique_ptr<sbe::EExpression> generatePerColumnFilterExpr(StageBuilderState& state,
+                                                              const MatchExpression* me,
+                                                              sbe::value::SlotId inputSlot) {
+    auto lambdaFrameId = state.frameIdGenerator->generate();
+    auto lambdaParam = sbe::EVariable{lambdaFrameId, 0};
+
+    auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(
+        lambdaFrameId, generatePerColumnPredicate(state, me, lambdaParam));
+
+    auto traverseFuncName = (me->matchType() == MatchExpression::EXISTS ||
+                             me->matchType() == MatchExpression::TYPE_OPERATOR)
+        ? "traverseCsiCellTypes"
+        : "traverseCsiCellValues";
+    return makeFunction(traverseFuncName, makeVariable(inputSlot), std::move(lambdaExpr));
 }
 }  // namespace
 
@@ -854,9 +884,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         if (itFilter != csn->filtersByPath.end()) {
             auto filterInputSlot = _slotIdGenerator.generate();
 
-            auto expr = generatePerColumnFilterExpr(_state, itFilter->second.get(), filterInputSlot)
-                            .extractExpr();
-            filteredPaths.emplace_back(i, std::move(expr), filterInputSlot);
+            filteredPaths.emplace_back(
+                i,
+                generatePerColumnFilterExpr(_state, itFilter->second.get(), filterInputSlot),
+                filterInputSlot);
         }
     }
 

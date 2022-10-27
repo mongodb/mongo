@@ -567,6 +567,10 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
      InstrFn{[](size_t n) { return n == 3; }, &vm::CodeFragment::appendTraverseP, false}},
     {"traverseF",
      InstrFn{[](size_t n) { return n == 3; }, &vm::CodeFragment::appendTraverseF, false}},
+    {"traverseCsiCellValues",
+     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendTraverseCellValues, false}},
+    {"traverseCsiCellTypes",
+     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendTraverseCellTypes, false}},
     {"setField",
      InstrFn{[](size_t n) { return n == 3; }, &vm::CodeFragment::appendSetField, false}},
     {"exists", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendExists, false}},
@@ -767,6 +771,36 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
                                                                      : vm::Instruction::Int32One);
                 return code;
             }
+        } else if (_name == "traverseCsiCellValues" && _nodes[1]->as<ELocalLambda>()) {
+            auto lambda = _nodes[1]->as<ELocalLambda>();
+
+            auto body = lambda->compileBodyDirect(ctx);
+            // Jump around the body.
+            code.appendJump(body.instrs().size());
+
+            // Remember the position and append the body.
+            auto bodyPosition = code.instrs().size();
+            code.appendNoStack(std::move(body));
+
+            code.append(_nodes[0]->compileDirect(ctx));
+
+            code.appendTraverseCellValues(bodyPosition);
+            return code;
+        } else if (_name == "traverseCsiCellTypes" && _nodes[1]->as<ELocalLambda>()) {
+            auto lambda = _nodes[1]->as<ELocalLambda>();
+
+            auto body = lambda->compileBodyDirect(ctx);
+            // Jump around the body.
+            code.appendJump(body.instrs().size());
+
+            // Remember the position and append the body.
+            auto bodyPosition = code.instrs().size();
+            code.appendNoStack(std::move(body));
+
+            code.append(_nodes[0]->compileDirect(ctx));
+
+            code.appendTraverseCellTypes(bodyPosition);
+            return code;
         } else if (_name == "applyClassicMatcher") {
             tassert(6681400,
                     "First argument to applyClassicMatcher must be constant",

@@ -35,6 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/catalog/validate_results.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/ident.h"
@@ -73,7 +74,10 @@ public:
     class CursorForPath {
     public:
         CursorForPath(StringData path, std::unique_ptr<Cursor> cursor)
-            : _path(path.toString()), _cursor(std::move(cursor)) {}
+            : _path(path.toString()),
+              _numPathParts(FieldRef{_path}.numParts()),
+              _cursor(std::move(cursor)) {}
+
         boost::optional<FullCellView> next() {
             if (_eof)
                 return {};
@@ -111,6 +115,10 @@ public:
             return _path;
         }
 
+        FieldIndex numPathParts() const {
+            return _numPathParts;
+        }
+
     private:
         boost::optional<FullCellView> handleResult(boost::optional<FullCellView> res) {
             if (!res || res->path != _path) {
@@ -122,6 +130,7 @@ public:
             return res;
         }
         const PathValue _path;
+        const FieldIndex _numPathParts = 0;
         bool _eof = true;
         const std::unique_ptr<Cursor> _cursor;
     };
@@ -476,37 +485,76 @@ struct SplitCellView {
 
     template <class ValueEncoder>
     struct CursorWithArrayDepth {
-        CursorWithArrayDepth(const char* elemPtr,
+        CursorWithArrayDepth(int pathLength,
+                             const char* elemPtr,
                              const StringData& arrayInfo,
                              ValueEncoder* encoder)
             : elemPtr(elemPtr),
               end(arrayInfo.rawData()),
               encoder(encoder),
-              arrInfoReader(arrayInfo) {}
+              arrInfoReader(arrayInfo),
+              pathLength(pathLength) {
+            singleSubObject = !hasNext();
+        }
 
         bool hasNext() const {
-            return elemPtr < end;
+            return singleSubObject || elemPtr < end || arrInfoReader.moreExplicitComponents();
         }
 
         using Out = typename std::remove_reference_t<ValueEncoder>::Out;
+        struct CellValueWithMetadata {
+            Out value{};
+
+            // 'depthWithinDirectlyNestedArraysOnPath' represents nestedness of arrays along the
+            // path. That is, only arrays that are elements of other arrays are considered to be
+            // nested.
+            // Examples (considering path "x.y.z"):
+            // 1. {x: {y: {z: 42}}} -- 'depthWithinDirectlyNestedArraysOnPath' of 42 is 0.
+            // 2. {x: [{y: [{z: [42]}]}]} -- 'depthWithinDirectlyNestedArraysOnPath' of 42 is 0.
+            // 3. {x: {y: {z: [[42]]}}} -- 'depthWithinDirectlyNestedArraysOnPath' of 42 is 0.
+            // 4. {x: [[{y: {z: 42}}]]} -- 'depthWithinDirectlyNestedArraysOnPath' of 42 is 1.
+            // 5. {x: [[[{y: [[{z: 42}]]}]]]} -- 'depthWithinDirectlyNestedArraysOnPath' of 42 is 3.
+            int depthWithinDirectlyNestedArraysOnPath{0};
+
+            // 'depthAtLeaf' represents nestedness of arrays at the leaf of the path, regardless of
+            // the array structure along the path. Examples (considering path "x.y.z"):
+            // 1. {x: {y: {z: 42}}} -- 'depthAtLeaf' of "42" is 0.
+            // 2. {x: [[[[[{y: [[[{z: [42]}]]]}]]]]]} -- 'depthAtLeaf' of "42" is 1.
+            int depthAtLeaf{0};
+
+            // When 'isObject' is "true" the 'value' should be ignored. The cursor will return a
+            // single "object" value for a range of objects.
+            bool isObject{false};
+        };
         /**
          * Returns the next value with its array-nestedness level.
          */
-        std::pair<Out /*decoded value*/, int /*depth*/> nextValue() {
-            invariant(elemPtr < end, "The client should have checked 'hasNext()'");
-
-            // The expected most common case: implicit tail of values at the same depth.
+        CellValueWithMetadata nextValue() {
+            // The expected most common case: implicit tail of values at the same depths.
             if (!arrInfoReader.moreExplicitComponents()) {
-                return {decodeAndAdvance(elemPtr, *encoder), depth};
+                if (singleSubObject) {
+                    singleSubObject = false;
+                    return {Out{},
+                            depthWithinDirectlyNestedArraysOnPath,
+                            depthAtLeaf,
+                            true /* isObject */};
+                }
+                return {decodeAndAdvance(elemPtr, *encoder),
+                        depthWithinDirectlyNestedArraysOnPath,
+                        depthAtLeaf,
+                        false};
             }
 
-            // The next expected most common case: a range of values at the same depth.
+            // The next expected most common case: a range of values at the same depths.
             if (repeats > 0) {
                 repeats--;
-                return {decodeAndAdvance(elemPtr, *encoder), depth};
+                return {decodeAndAdvance(elemPtr, *encoder),
+                        depthWithinDirectlyNestedArraysOnPath,
+                        depthAtLeaf,
+                        false};
             }
 
-            // An end of a range means we have to check for structural changes and update depth.
+            // An end of a range means we have to check for structural changes and update depths.
             while (arrInfoReader.moreExplicitComponents()) {
                 switch (arrInfoReader.takeNextChar()) {
                     case '[': {
@@ -514,42 +562,57 @@ struct SplitCellView {
                         // that should be retrieved from other paths when reconstructing the
                         // record. We can ignore them as they don't contribute to the values.
                         (void)arrInfoReader.takeNumber();
-                        if (!inArray.empty() && inArray.top()) {
-                            depth++;
+
+                        if (pathDepth + 1 == pathLength) {
+                            depthAtLeaf++;
+                        } else if (!inArray.empty() && inArray.top()) {
+                            depthWithinDirectlyNestedArraysOnPath++;
                         }
                         inArray.push(true);
                         break;
                     }
                     case '|': {
                         repeats = arrInfoReader.takeNumber();
-                        return {decodeAndAdvance(elemPtr, *encoder), depth};
+                        return {decodeAndAdvance(elemPtr, *encoder),
+                                depthWithinDirectlyNestedArraysOnPath,
+                                depthAtLeaf,
+                                false};
                     }
                     case '{': {
                         // We consider as nested only the arrays that are elements of other
                         // arrays. When there is an array of objects and some of the fields of
                         // these objects are arrays, the latter aren't nested.
                         inArray.push(false);
+                        pathDepth++;
                         break;
                     }
                     case ']': {
                         invariant(inArray.size() > 0 && inArray.top());
                         inArray.pop();
-                        if (inArray.size() > 0 && inArray.top()) {
-                            invariant(depth > 0);
-                            depth--;
+
+                        if (pathDepth + 1 == pathLength) {
+                            invariant(depthAtLeaf > 0);
+                            depthAtLeaf--;
+                        } else if (inArray.size() > 0 && inArray.top()) {
+                            invariant(depthWithinDirectlyNestedArraysOnPath > 0);
+                            depthWithinDirectlyNestedArraysOnPath--;
                         }
 
                         // Closing an array implicitly closes all objects on the path between it
                         // and the previous array.
                         while (inArray.size() > 0 && !inArray.top()) {
                             inArray.pop();
+                            pathDepth--;
                         }
                         break;
                     }
                     case '+': {
-                        // Indicates elements in arrays that are objects that don't have the
-                        // path. These objects don't contribute to the cell's values, so we can
-                        // ignore them.
+                        // Indicates elements in arrays that are objects with sibling paths. These
+                        // objects don't contribute to the cell's values, so we can ignore them.
+                        // For example, for path "a.b" in
+                        // {a: [{b:41}, {c:100}, {c:100}, {b:[{c:100}, 51]}]}
+                        //     [  |     +2                {  [o
+                        // and the values are 41 and 51
                         (void)arrInfoReader.takeNumber();
                         break;
                     }
@@ -558,22 +621,40 @@ struct SplitCellView {
                         // to track this info because the nested objects don't contribute to the
                         // values in the cell.
                         (void)arrInfoReader.takeNumber();
+                        return {Out{},
+                                depthWithinDirectlyNestedArraysOnPath,
+                                depthAtLeaf,
+                                true /* isObject */};
                         break;
                     }
                 }
             }
 
             // Start consuming the implicit tail range.
-            return {decodeAndAdvance(elemPtr, *encoder), depth};
+            return {decodeAndAdvance(elemPtr, *encoder),
+                    depthWithinDirectlyNestedArraysOnPath,
+                    depthAtLeaf,
+                    false};
         }
 
         const char* elemPtr;
         const char* end;
         ValueEncoder* encoder;
         ArrInfoReader arrInfoReader;
-        int depth = 0;
+        int pathLength = 0;
+
+        int pathDepth = 0;
+
+        // Used to compute the corresponding fields in `CellValueWithMetadata`.
+        int depthWithinDirectlyNestedArraysOnPath = 0;
+        int depthAtLeaf = 0;
+
         std::stack<bool, absl::InlinedVector<bool, 64>> inArray;
         size_t repeats = 0;
+
+        // Cells with a single sub-object don't have any values and have empty array info, so we
+        // have to track their state separately.
+        bool singleSubObject = false;
     };
 
     static SplitCellView parse(CellView cell) {

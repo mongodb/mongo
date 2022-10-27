@@ -937,33 +937,6 @@ TEST_F(QueryPlannerColumnarTest, SelectsFirstFromMultipleEligibleColumnStoreInde
     })");
 }
 
-TEST_F(QueryPlannerColumnarTest, FullPredicateOption) {
-    addColumnStoreIndexAndEnableFilterSplitting(false, kIndexName);
-
-    // Filter that could be pushed down, but isn't due to the lack of the
-    // GENERATE_PER_COLUMN_FILTER flag.
-    auto predicate = fromjson(R"({
-        specialAddress: {$exists: true},
-        doNotContact: {$exists: true}
-    })");
-    runQuerySortProj(predicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
-    assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, _id: 0},
-            node: {
-                column_scan: {
-                    outputFields: ['a'],
-                    matchFields: ['specialAddress', 'doNotContact'],
-                    postAssemblyFilter: {
-                        specialAddress: {$exists: true},
-                        doNotContact: {$exists: true}
-                    }
-                }
-            }
-        }
-    })");
-}
-
 TEST_F(QueryPlannerColumnarTest, UseColumnStoreWithExactFields) {
     auto firstProj = makeProjection(fromjson(R"({"d": true, "b.c": true, "_id": false})"));
     addColumnStoreIndexAndEnableFilterSplitting(true, "first index"_sd, &firstProj);

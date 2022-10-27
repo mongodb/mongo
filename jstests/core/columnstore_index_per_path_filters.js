@@ -414,7 +414,7 @@ function runPerPathFiltersTest({docs, query, projection, expected, testDescripti
         {_id: 0, x: {no_y: 0}},
         {_id: 1, x: [[{y: 0}]]},
         {_id: 2, x: [[{y: {z: 0}}, {y: 0}]]},
-        {_id: 2, x: [[{y: {z: 0}}], [{y: 0}]]},
+        {_id: 3, x: [[{y: {z: 0}}], [{y: 0}]]},
     ];
     findXyPath(noMatch, 0, "Expected to match no docs from 'noMatch' but matched: ");
 
@@ -455,6 +455,140 @@ function runPerPathFiltersTest({docs, query, projection, expected, testDescripti
     findXyPath(valuesAndSubpaths,
                valuesAndSubpaths.length,
                "Expected to match all 'valuesAndSubpaths' but matched: ");
+})();
+
+// Check translation of MQL {$type: "null"}. NB: {$type: "null"} and {$eq: null} aren't equivalent!
+// The latter evaluates to "true" in some cases when the path is missing. Instead, matching type
+// "null" is the same as matching other scalar types, such as "double" or "string".
+(function testPerPathFilters_SupportedMatchExpressions_TypeNull() {
+    const docs = [
+        {_id: 0, x: {y: null}},
+        {_id: 1, x: {y: [null]}},
+        {_id: 2, x: {y: [42, null]}},
+        {_id: 3, x: [{y: 42}, {y: null}]},
+        {_id: 4, x: [{y: [42]}, {y: [null]}]},
+
+        // No "null" value on the path.
+        {_id: 100, x: {y: 42}},
+        {_id: 101, x: {y: [42, "str", [42]]}},
+        {_id: 102, x: [[{y: 42}]]},
+        {_id: 103, x: {y: {z: 42}}},
+
+        // "null" value is too deep.
+        {_id: 200, x: {y: [[null]]}},
+        {_id: 201, x: {y: [42, [null]]}},
+        {_id: 202, x: [{y: 42}, [{y: null}]]},
+
+        // "x.y" path is missing.
+        {_id: 300, x: {no_y: 0}},
+        {_id: 301, x: [0]},
+        {_id: 302, x: [{no_y: 0}]},
+    ];
+    runPerPathFiltersTest({
+        docs: docs,
+        query: {"x.y": {$type: "null"}},
+        projection: {_id: 1},
+        expected: [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}],
+        testDescription: "type null"
+    });
+})();
+
+// Check translation of MQL {$type: "array"}.
+(function testPerPathFilters_SupportedMatchExpressions_TypeArray() {
+    const docs = [
+        // Terminal array.
+        {_id: 0, x: {y: []}},
+        {_id: 1, x: {y: [42]}},
+        {_id: 2, x: {y: [{}]}},
+        {_id: 3, x: {y: [[]]}},
+        {_id: 4, x: {y: [null, [42], 43]}},
+        {_id: 5, x: {y: [{z: 42}]}},
+        {_id: 6, x: [{y: 42}, {y: [null, [42], 43]}]},
+
+        // No terminal array.
+        {_id: 100, x: {y: 42}},
+        {_id: 101, x: [{y: 42}, {y: null}]},
+        {_id: 102, x: [[{y: 42}, {y: null}]]},
+
+        // There is a doubly-nested array along the path.
+        {_id: 200, x: [[{y: [42]}]]},
+
+        // "x.y" path is missing
+        {_id: 300, x: {no_y: 0}},
+        {_id: 301, x: [0]},
+        {_id: 302, x: [{no_y: 0}]},
+    ];
+    runPerPathFiltersTest({
+        docs: docs,
+        query: {"x.y": {$type: "array"}},
+        projection: {_id: 1},
+        expected: [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
+        testDescription: "type array"
+    });
+})();
+
+// Check translation of MQL {$type: "object"}.
+(function testPerPathFilters_SupportedMatchExpressions_TypeObject() {
+    const docs = [
+        {_id: 0, x: {y: {}}},       // empty object is a value, no array info
+        {_id: 1, x: {y: {z: 42}}},  // sub-path, no array info, no values
+        {_id: 2, x: {y: [42, {}]}},
+        {_id: 3, x: {y: [42, {z: 42}]}},
+        {_id: 4, x: {y: [{z: 42}]}},  // terminal array: array info, no values
+        {_id: 5, x: [{y: {}}]},
+        {_id: 6, x: [{y: {z: 42}}]},  // array on path: array info, no values
+        {_id: 7, x: [{y: 42}, {no_y: 42}, {y: [42, {z: 42}]}]},
+
+        // No terminal object.
+        {_id: 100, x: {y: 42}},  // no array info, single value
+        {_id: 101, x: {y: [42, null]}},
+        {_id: 102, x: [{y: 42}, {y: null}]},
+
+        // The object is too deep.
+        {_id: 200, x: {y: [[{}]]}},
+        {_id: 201, x: {y: [[{z: 42}, 42, {z: 42}]]}},
+        {_id: 202, x: [[{y: {}}]]},
+        {_id: 203, x: [[{y: {z: 42}}], {y: 42}, [{y: {z: 42}}]]},
+
+        // "x.y" path is missing
+        {_id: 300, x: {no_y: 0}},
+        {_id: 301, x: [0]},
+        {_id: 302, x: [{no_y: 0}]},
+    ];
+    runPerPathFiltersTest({
+        docs: docs,
+        query: {"x.y": {$type: "object"}},
+        projection: {_id: 1},
+        expected: [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 7}],
+        testDescription: "type object"
+    });
+})();
+
+// Check translation of MQL {$type: ["object", "array", "double", "null]"}.
+(function testPerPathFilters_SupportedMatchExpressions_MultipleTypes() {
+    const docs = [
+        // Only one of the types is present at the single leaf.
+        {_id: 0, x: {y: 42}},         // double
+        {_id: 1, x: {y: null}},       // null
+        {_id: 2, x: {y: {z: 42}}},    // object
+        {_id: 3, x: {y: ["abcde"]}},  // array that contains neither object, double or null
+
+        // Only one of the types is present on the path.
+        {_id: 4, x: [{y: "abcde"}, {y: 42}]},
+        {_id: 5, x: [{y: "abcde"}, {y: null}]},
+        {_id: 6, x: [{y: "abcde"}, {y: {z: 42}}]},
+        {_id: 7, x: [{y: "abcde"}, {y: ["abcde"]}]},
+
+        // Neither of the types are present
+        {_id: 100, x: [{no_y: 0}, {y: "abcde"}]},
+    ];
+    runPerPathFiltersTest({
+        docs: docs,
+        query: {"x.y": {$type: ["object", "array", "double", "null"]}},
+        projection: {_id: 1},
+        expected: [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 7}],
+        testDescription: "multiple types"
+    });
 })();
 
 // Check translation of MQL $not and $ne match expressions.

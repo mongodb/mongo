@@ -152,6 +152,10 @@ private:
             return _cursor->path();
         }
 
+        FieldIndex numPathParts() const {
+            return _cursor->numPathParts();
+        }
+
         /*
          * Copies any data owned by the storage engine into a locally owned buffer.
          */
@@ -210,7 +214,7 @@ private:
 
     void readParentsIntoObj(StringData path, value::Object* out, StringDataSet* pathsReadSetOut);
 
-    bool checkFilter(CellView cell, size_t filterIndex, const PathValue& path);
+    bool checkFilter(CellView cell, size_t filterIndex, FieldIndex numPathParts);
 
     // Finds the smallest row ID such that:
     // 1) it is greater or equal to the row ID of all filtered columns cursors prior to the call;
