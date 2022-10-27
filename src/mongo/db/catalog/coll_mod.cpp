@@ -216,7 +216,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
                 serverGlobalParams.featureCompatibility)) {
             return {ErrorCodes::InvalidOptions,
                     "collMod does not support converting an index to 'unique' or to "
-                    "'prepareUnique' mode"};
+                    "'prepareUnique' mode in this FCV."};
         }
 
         if (cmdIndex.getUnique() && cmdIndex.getForceNonUnique()) {
