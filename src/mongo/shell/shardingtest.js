@@ -1149,6 +1149,13 @@ var ShardingTest = function(params) {
     };
 
     /**
+     * Waits for all operations to fully replicate on all shards.
+     */
+    this.awaitReplicationOnShards = function() {
+        this._rs.forEach(replSet => replSet.test.awaitReplication());
+    };
+
+    /**
      * Returns if there is a new feature compatibility version for the "latest" version. This must
      * be manually changed if and when there is a new feature compatibility version.
      */
