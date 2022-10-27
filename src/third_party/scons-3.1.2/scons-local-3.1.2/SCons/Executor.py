@@ -319,30 +319,30 @@ class Executor(object, with_metaclass(NoSlotsPyPy)):
         over and over), so removing the duplicates once up front should
         save the Taskmaster a lot of work.
         """
-        result = SCons.Util.UniqueList([])
+        result = []
         for target in self.get_all_targets():
             result.extend(target.children())
-        return result
+        return SCons.Util.uniquer_hashables(result)
 
     def get_all_prerequisites(self):
         """Returns all unique (order-only) prerequisites for all batches
         of this Executor.
         """
-        result = SCons.Util.UniqueList([])
+        result = []
         for target in self.get_all_targets():
             if target.prerequisites is not None:
                 result.extend(target.prerequisites)
-        return result
+        return SCons.Util.uniquer_hashables(result)
 
     def get_action_side_effects(self):
 
         """Returns all side effects for all batches of this
         Executor used by the underlying Action.
         """
-        result = SCons.Util.UniqueList([])
+        result = []
         for target in self.get_action_targets():
             result.extend(target.side_effects)
-        return result
+        return SCons.Util.uniquer_hashables(result)
 
     @SCons.Memoize.CountMethodCall
     def get_build_env(self):
