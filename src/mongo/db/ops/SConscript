@@ -79,6 +79,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/crypto/fle_fields',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 

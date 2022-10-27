@@ -45,6 +45,7 @@
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/database_name_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -138,7 +139,8 @@ public:
                    const OpMsgRequest& opMsgRequest,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
-        DatabaseName dbName(opMsgRequest.getValidatedTenantId(), opMsgRequest.getDatabase());
+        DatabaseName dbName = DatabaseNameUtil::deserialize(opMsgRequest.getValidatedTenantId(),
+                                                            opMsgRequest.getDatabase());
         const BSONObj& cmdObj = opMsgRequest.body;
         // Acquire locks. The RAII object is optional, because in the case
         // of a view, the locks need to be released.
@@ -151,7 +153,10 @@ public:
 
         CountCommandRequest request(NamespaceStringOrUUID(NamespaceString{}));
         try {
-            request = CountCommandRequest::parse(IDLParserContext("count"), opMsgRequest);
+            request = CountCommandRequest::parse(
+                IDLParserContext(
+                    "count", false /* apiStrict */, opMsgRequest.getValidatedTenantId()),
+                opMsgRequest);
         } catch (...) {
             return exceptionToStatus();
         }
@@ -234,7 +239,8 @@ public:
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, nss);
 
-        auto request = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
+        auto request = CountCommandRequest::parse(
+            IDLParserContext("count", false /* apiStrict */, dbName.tenantId()), cmdObj);
         if (shouldDoFLERewrite(request)) {
             processFLECountD(opCtx, nss, &request);
         }

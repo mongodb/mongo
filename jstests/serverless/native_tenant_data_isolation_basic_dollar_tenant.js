@@ -74,9 +74,10 @@ function runTest(featureFlagRequireTenantId) {
         const dbs = assert.commandWorked(
             adminDb.runCommand({listDatabases: 1, nameOnly: true, '$tenant': kTenant}));
         assert.eq(2, dbs.databases.length);
-        // TODO SERVER-70053: Change this check to check that we get tenantId prefixed db names.
         // The 'admin' database is not expected because we do not create a tenant user in this test.
-        const expectedDbs = [kDbName, kOtherDbName];
+        const expectedDbs = featureFlagRequireTenantId
+            ? [kDbName, kOtherDbName]
+            : [kTenant + "_" + kDbName, kTenant + "_" + kOtherDbName];
         assert(arrayEq(expectedDbs, dbs.databases.map(db => db.name)));
 
         // These databases should not be accessed with a different tenant.
@@ -381,11 +382,20 @@ function runTest(featureFlagRequireTenantId) {
         }));
         assert.eq(2, res.numIndexesAfter);
 
-        // Modyfing the index without the tenantId should not work
-        assert.commandFailed(testDb.runCommand({
+        // Modifying the index without the tenantId should not work.
+        res = testDb.runCommand({
             "collMod": kCollName,
             "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100},
-        }));
+        });
+        assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+        // TODO SERVER-70876 Uncomment out this conditional below, and remove the assertion above in
+        // favor of the assertion in the conditional.
+        /* if (featureFlagRequireTenantId) {
+            assert.commandFailedWithCode(res, 7005300);
+        } else {
+            assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+        }
+        */
 
         // Modify the index with the tenantId
         res = assert.commandWorked(testDb.runCommand({

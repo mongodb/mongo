@@ -41,6 +41,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/database_name_util.h"
 
 
 namespace mongo {
@@ -97,7 +98,8 @@ int64_t setReplyItems(OperationContext* opCtx,
             continue;
         }
 
-        ReplyItemType item(dbName.db());
+        // If setTenantId is true, always return the dbName without the tenantId
+        ReplyItemType item(setTenantId ? dbName.db() : DatabaseNameUtil::serialize(dbName));
         if (setTenantId) {
             initializeItemWithTenantId(item, dbName);
         }

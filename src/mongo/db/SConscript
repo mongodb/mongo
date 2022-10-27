@@ -214,7 +214,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/concurrency/admission_context',
-        '$BUILD_DIR/mongo/util/namespace_string_util',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'auth/auth',
         'auth/user_acquisition_stats',
         'prepare_conflict_tracker',
@@ -525,6 +525,7 @@ env.Library(
         'change_stream_state.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'server_base',
     ],
 )
@@ -776,6 +777,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'server_base',
     ],
 )
@@ -787,7 +789,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/pipeline/document_sources_idl',
-        '$BUILD_DIR/mongo/util/namespace_string_util',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'server_base',
     ],
 )
@@ -822,7 +824,7 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
         '$BUILD_DIR/mongo/rpc/rpc',
-        '$BUILD_DIR/mongo/util/namespace_string_util',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'audit',
         'coll_mod_command_idl',
         'index_commands_idl',
@@ -1727,6 +1729,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'server_base',
     ],
 )
@@ -2102,7 +2105,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/util/namespace_string_util',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'server_base',
         'service_context',
     ],

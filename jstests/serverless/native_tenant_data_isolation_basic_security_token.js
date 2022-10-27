@@ -185,8 +185,9 @@ function runTest(featureFlagRequireTenantId) {
             const dbs =
                 assert.commandWorked(tokenAdminDB.runCommand({listDatabases: 1, nameOnly: true}));
             assert.eq(3, dbs.databases.length);
-            // TODO SERVER-70053: Change this check to check that we get tenantId prefixed db names.
-            const expectedDbs = ['admin', kDbName, kOtherDbName];
+            const expectedDbs = featureFlagRequireTenantId
+                ? ["admin", kDbName, kOtherDbName]
+                : [kTenant + "_admin", kTenant + "_" + kDbName, kTenant + "_" + kOtherDbName];
             assert(arrayEq(expectedDbs, dbs.databases.map(db => db.name)));
         }
 
@@ -339,7 +340,8 @@ function runTest(featureFlagRequireTenantId) {
             tokenConn.getDB('admin').runCommand({listDatabases: 1, nameOnly: true}));
         // Only the 'admin' db exists
         assert.eq(1, dbsWithDiffToken.databases.length);
-        assert(arrayEq(['admin'], dbsWithDiffToken.databases.map(db => db.name)));
+        const expectedAdminDb = featureFlagRequireTenantId ? "admin" : kOtherTenant + "_admin";
+        assert(arrayEq([expectedAdminDb], dbsWithDiffToken.databases.map(db => db.name)));
 
         // Attempt to drop the database, then check it was not dropped.
         assert.commandWorked(tokenDB2.runCommand({dropDatabase: 1}));

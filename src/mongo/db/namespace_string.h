@@ -347,6 +347,8 @@ public:
      * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
      * namespace from disk. 'ns' is expected to contain a tenantId when running in Serverless mode.
      */
+    // TODO SERVER-70013 Move this function into NamespaceStringUtil, and delegate overlapping
+    // functionality to DatabaseNameUtil::parseDbNameFromStringExpectTenantIdInMultitenancyMode.
     static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData ns);
 
     /**

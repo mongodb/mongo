@@ -192,7 +192,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_util',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -216,7 +216,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
-        '$BUILD_DIR/mongo/util/namespace_string_util',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'query_request',
     ],
     LIBDEPS_PRIVATE=[
@@ -243,6 +243,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'hint_parser',
     ],
     LIBDEPS_PRIVATE=[

@@ -43,6 +43,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/hex.h"
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
@@ -300,9 +301,12 @@ OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,
     auto dollarTenant = parseDollarTenant(body);
     BSONObjBuilder bodyBuilder(std::move(body));
     bodyBuilder.appendElements(extraFields);
-    bodyBuilder.append("$db", dbName.db());
     if (dbName.tenantId()) {
+        // If we append $tenant, never include the prefix in $db as well.
+        bodyBuilder.append("$db", dbName.db());
         appendDollarTenant(bodyBuilder, dbName.tenantId().value(), dollarTenant);
+    } else {
+        bodyBuilder.append("$db", DatabaseNameUtil::serialize(dbName));
     }
 
     OpMsgRequest request;

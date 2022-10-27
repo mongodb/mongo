@@ -75,15 +75,15 @@ function verifyDatabaseEntries(listDatabasesOut, expectedDatabases) {
 
 // Check that command properly lists all databases created by users authenticated with a security
 // token
-function runTestCheckMultitenantDatabases(mongod, numDBs) {
-    const adminDB = mongod.getDB("admin");
-    const tokenConn = new Mongo(mongod.host);
+function runTestCheckMultitenantDatabases(primary, numDBs) {
+    const adminDB = primary.getDB("admin");
+    const tokenConn = new Mongo(primary.host);
 
     // Add a root user that is unauthorized to run the command
     assert.commandWorked(adminDB.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
 
     // Create numDBs databases, each belonging to a different tenant
-    const [tenantIds, expectedDatabases] = createMultitenantDatabases(mongod, tokenConn, numDBs);
+    const [tenantIds, expectedDatabases] = createMultitenantDatabases(primary, tokenConn, numDBs);
 
     // Check that all numDB databases were created of the proper size and include the correct
     // database entries
@@ -97,20 +97,20 @@ function runTestCheckMultitenantDatabases(mongod, numDBs) {
 }
 
 // Test correctness of filter and nameonly options
-function runTestCheckCmdOptions(mongod, tenantIds) {
-    const adminDB = mongod.getDB("admin");
+function runTestCheckCmdOptions(primary, tenantIds) {
+    const adminDB = primary.getDB("admin");
 
     // Create 4 databases to verify the correctness of filter and nameOnly
-    assert.commandWorked(mongod.getDB("jstest_list_databases_foo").createCollection("coll0", {
+    assert.commandWorked(primary.getDB("jstest_list_databases_foo").createCollection("coll0", {
         '$tenant': ObjectId(tenantIds[0])
     }));
-    assert.commandWorked(mongod.getDB("jstest_list_databases_bar").createCollection("coll0", {
+    assert.commandWorked(primary.getDB("jstest_list_databases_bar").createCollection("coll0", {
         '$tenant': ObjectId(tenantIds[1])
     }));
-    assert.commandWorked(mongod.getDB("jstest_list_databases_baz").createCollection("coll0", {
+    assert.commandWorked(primary.getDB("jstest_list_databases_baz").createCollection("coll0", {
         '$tenant': ObjectId(tenantIds[2])
     }));
-    assert.commandWorked(mongod.getDB("jstest_list_databases_zap").createCollection("coll0", {
+    assert.commandWorked(primary.getDB("jstest_list_databases_zap").createCollection("coll0", {
         '$tenant': ObjectId(tenantIds[3])
     }));
 
@@ -173,9 +173,9 @@ function runTestCheckCmdOptions(mongod, tenantIds) {
 }
 
 // Test that invalid commands fail
-function runTestInvalidCommands(mongod) {
-    const adminDB = mongod.getDB("admin");
-    const tokenConn = new Mongo(mongod.host);
+function runTestInvalidCommands(primary) {
+    const adminDB = primary.getDB("admin");
+    const tokenConn = new Mongo(primary.host);
 
     // $expr with an unbound variable in filter.
     assert.commandFailed(adminDB.runCommand(
@@ -215,7 +215,7 @@ function runTestInvalidCommands(mongod) {
 
     // Add user authenticated with security token and check that they cannot run the command
     const kTenant = ObjectId();
-    assert.commandWorked(mongod.getDB('$external').runCommand({
+    assert.commandWorked(primary.getDB('$external').runCommand({
         createUser: "unauthorizedUsr",
         '$tenant': kTenant,
         roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]
@@ -228,10 +228,23 @@ function runTestInvalidCommands(mongod) {
         ErrorCodes.Unauthorized);
 }
 
-function runTestsWithMultiTenancySupport() {
-    const mongod = MongoRunner.runMongod(
-        {auth: '', setParameter: {multitenancySupport: true, featureFlagMongoStore: true}});
-    const adminDB = mongod.getDB("admin");
+function runTestsWithMultiTenancySupport(featureFlagRequireTenantID) {
+    const rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {
+            auth: '',
+            setParameter: {
+                multitenancySupport: true,
+                featureFlagMongoStore: true,
+                featureFlagRequireTenantID: featureFlagRequireTenantID
+            }
+        }
+    });
+    rst.startSet({keyFile: 'jstests/libs/key1'});
+    rst.initiate();
+
+    const primary = rst.getPrimary();
+    const adminDB = primary.getDB('admin');
 
     // Create internal system user that is authorized to run the command
     assert.commandWorked(
@@ -239,28 +252,42 @@ function runTestsWithMultiTenancySupport() {
     assert(adminDB.auth("internalUsr", "pwd"));
 
     const numDBs = 5;
-    const tenantIds = runTestCheckMultitenantDatabases(mongod, numDBs);
-    runTestCheckCmdOptions(mongod, tenantIds);
-    runTestInvalidCommands(mongod);
+    const tenantIds = runTestCheckMultitenantDatabases(primary, numDBs);
+    runTestCheckCmdOptions(primary, tenantIds);
+    runTestInvalidCommands(primary);
 
-    MongoRunner.stopMongod(mongod);
+    rst.stopSet();
 }
 
 function runTestNoMultiTenancySupport() {
-    const mongod = MongoRunner.runMongod(
-        {auth: '', setParameter: {multitenancySupport: false, featureFlagMongoStore: true}});
-    const adminDB = mongod.getDB("admin");
+    const rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {
+            auth: '',
+            setParameter: {
+                multitenancySupport: false,
+                featureFlagMongoStore: true,
+                featureFlagRequireTenantID: false
+            }
+        }
+    });
+    rst.startSet({keyFile: 'jstests/libs/key1'});
+    rst.initiate();
+
+    const primary = rst.getPrimary();
+    const adminDB = primary.getDB('admin');
 
     assert.commandWorked(
         adminDB.runCommand({createUser: 'internalUsr', pwd: 'pwd', roles: ['__system']}));
     assert(adminDB.auth("internalUsr", "pwd"));
 
-    const cmdRes = assert.commandFailedWithCode(adminDB.runCommand({listDatabasesForAllTenants: 1}),
-                                                ErrorCodes.CommandNotSupported);
+    assert.commandFailedWithCode(adminDB.runCommand({listDatabasesForAllTenants: 1}),
+                                 ErrorCodes.CommandNotSupported);
 
-    MongoRunner.stopMongod(mongod);
+    rst.stopSet();
 }
 
-runTestsWithMultiTenancySupport();
+runTestsWithMultiTenancySupport(true);
+runTestsWithMultiTenancySupport(false);
 runTestNoMultiTenancySupport();
 }());

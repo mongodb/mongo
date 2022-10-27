@@ -86,8 +86,7 @@ function checkNsSerializedCorrectly(
         // This case represents the downgraded state where we will continue to prefix namespaces.
         const prefixedDb = kTenant + "_" + kDbName;
         assert.eq(op.ns, prefixedDb + "." + collectionName);
-        // TODO SERVER-70053 Uncomment this line.
-        // assert.eq(op.command.$db, kTenantId + "_" + dbName);
+        assert.eq(op.command.$db, kTenantId + "_" + dbName);
     }
 }
 

@@ -43,6 +43,7 @@
 #include "mongo/db/multitenancy.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/database_name_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -125,8 +126,9 @@ public:
             // If there is no database name present in the input, run validation against all the
             // databases.
             auto dbNames = validateCmdRequest.getDb()
-                ? std::vector<DatabaseName>{DatabaseName(getActiveTenant(opCtx),
-                                                         validateCmdRequest.getDb()->toString())}
+                ? std::vector<DatabaseName>{DatabaseNameUtil::deserialize(
+                      validateCmdRequest.getDbName().tenantId(),
+                      validateCmdRequest.getDb()->toString())}
                 : collectionCatalog->getAllDbNames();
 
             for (const auto& dbName : dbNames) {

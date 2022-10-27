@@ -572,9 +572,10 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const BSONObj& cmdObj) try {
     BSONObjBuilder bob(cmdObj);
-    bob.append("$db", nss.db());
+    bob.append("$db", nss.dbName().db());
     auto cmdObjWithDb = bob.obj();
-    auto parsed = DropIndexes::parse(IDLParserContext{"dropIndexes"}, cmdObjWithDb);
+    auto parsed = DropIndexes::parse(
+        IDLParserContext{"dropIndexes", false /* apiStrict */, nss.tenantId()}, cmdObjWithDb);
 
     return writeConflictRetry(opCtx, "dropIndexes", nss.db(), [opCtx, &nss, &cmdObj, &parsed] {
         AutoGetCollection collection(opCtx, nss, MODE_X);

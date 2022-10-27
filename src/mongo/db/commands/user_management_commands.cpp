@@ -80,6 +80,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/password_digest.h"
@@ -735,7 +736,7 @@ public:
             as->grantInternalAuthorization(_client.get());
         }
 
-        _dbName = DatabaseName(tenant, kAdminDB);
+        _dbName = DatabaseNameUtil::deserialize(tenant, kAdminDB);
 
         AlternativeClientRegion clientRegion(_client);
         _sessionInfo.setStartTransaction(true);

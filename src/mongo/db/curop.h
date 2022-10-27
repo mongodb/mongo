@@ -705,9 +705,7 @@ public:
      * 'opDescription' must be either an owned BSONObj or guaranteed to outlive the OperationContext
      * it is associated with.
      */
-    void setOpDescription_inlock(const BSONObj& opDescription) {
-        _opDescription = opDescription;
-    }
+    void setOpDescription_inlock(const BSONObj& opDescription);
 
     /**
      * Sets the original command object.

@@ -79,12 +79,20 @@ function runTest(featureFlagRequireTenantId) {
         }));
         assert.eq({_id: 0, a: 11, b: 1}, fad.value);
 
-        // Check that we will cannot run findAndModify on the doc when the tenantId is passed as the
-        // prefix.
-        fad = assert.commandWorked(
+        const findAndModPrefixed =
             primary.getDB(kTenant + '_myDb0')
-                .runCommand({findAndModify: "myColl0", query: {b: 1}, update: {$inc: {b: 10}}}));
-        assert.eq(null, fad.value);
+                .runCommand({findAndModify: "myColl0", query: {b: 1}, update: {$inc: {b: 10}}});
+        if (!featureFlagRequireTenantId) {
+            // Check that we do find the doc when the tenantId was passed as a prefix, only if the
+            // feature flag is not enabled. In this case, the server still accepts prefixed names,
+            // and will parse the tenant from the db name.
+            assert.commandWorked(findAndModPrefixed);
+            assert.eq({_id: 0, a: 21, b: 1}, findAndModPrefixed.value);
+        } else {
+            // assert.commandFailed(findAndModPrefixed);
+            // TODO SERVER-70876 Uncomment out the check above, and remove the check below.
+            assert.eq(null, findAndModPrefixed.value);
+        }
     }
 
     rst.stopSet();

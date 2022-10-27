@@ -59,6 +59,7 @@
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
@@ -873,7 +874,8 @@ public:
         : CommandInvocation(command),
           _command(command),
           _request(request),
-          _dbName(_request.getValidatedTenantId(), _request.getDatabase()) {}
+          _dbName(DatabaseNameUtil::deserialize(_request.getValidatedTenantId(),
+                                                _request.getDatabase())) {}
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {

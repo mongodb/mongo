@@ -34,6 +34,7 @@ global:
         - "mongo/db/logical_time.h"
         - "mongo/db/namespace_string.h"
         - "mongo/db/tenant_id.h"
+        - "mongo/util/database_name_util.h"
         - "mongo/util/namespace_string_util.h"
         - "mongo/util/uuid.h"
 
@@ -285,8 +286,8 @@ types:
         bson_serialization_type: string
         description: "A MongoDB DatabaseName"
         cpp_type: "mongo::DatabaseName"
-        serializer: "mongo::DatabaseName::toString"
-        deserializer: "mongo::DatabaseName"
+        serializer: "::mongo::DatabaseNameUtil::serialize"
+        deserializer: "::mongo::DatabaseNameUtil::deserialize"
         deserialize_with_tenant: true
 
 enums:

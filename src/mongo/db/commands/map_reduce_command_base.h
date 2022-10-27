@@ -32,6 +32,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/mr_common.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/util/database_name_util.h"
 
 namespace mongo {
 
@@ -102,7 +103,8 @@ public:
         auto explain = boost::make_optional(verbosity);
         try {
             _explainImpl(opCtx,
-                         DatabaseName(request.getValidatedTenantId(), request.getDatabase()),
+                         DatabaseNameUtil::deserialize(request.getValidatedTenantId(),
+                                                       request.getDatabase()),
                          request.body,
                          builder,
                          explain);

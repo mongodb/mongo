@@ -65,6 +65,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -231,7 +232,8 @@ public:
         Invocation(const FindCmd* definition, const OpMsgRequest& request)
             : CommandInvocation(definition),
               _request(request),
-              _dbName(_request.getValidatedTenantId(), _request.getDatabase()) {
+              _dbName(DatabaseNameUtil::deserialize(_request.getValidatedTenantId(),
+                                                    _request.getDatabase())) {
             invariant(_request.body.isOwned());
         }
 

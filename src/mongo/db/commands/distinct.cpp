@@ -59,6 +59,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/database_name_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -146,7 +147,8 @@ public:
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
-        const DatabaseName dbName(request.getValidatedTenantId(), request.getDatabase());
+        const DatabaseName dbName =
+            DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
         const BSONObj& cmdObj = request.body;
         // Acquire locks. The RAII object is optional, because in the case of a view, the locks
         // need to be released.

@@ -246,7 +246,7 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
                                                  const ExtensionsCallback& extensionsCallback,
                                                  bool isExplain,
                                                  const CollatorInterface* defaultCollator) {
-    IDLParserContext ctx("distinct");
+    IDLParserContext ctx("distinct", false /* apiStrict */, nss.tenantId());
 
     DistinctCommandRequest parsedDistinct(nss);
     try {

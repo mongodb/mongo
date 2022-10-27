@@ -2382,15 +2382,17 @@ TEST(IDLCommand, TestConcatentateWithDb) {
 }
 
 TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     IDLParserContext ctxt("root");
 
     const auto tenantId = TenantId(OID::gen());
+    const auto prefixedDb = std::string(str::stream() << tenantId.toString() << "_db");
 
     auto testDoc = BSONObjBuilder{}
                        .append(BasicConcatenateWithDbCommand::kCommandName, "coll1")
                        .append("field1", 3)
                        .append("field2", "five")
-                       .append("$db", "db")
+                       .append("$db", prefixedDb)
                        .obj();
 
     auto testStruct =
@@ -2525,16 +2527,19 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
 }
 
 TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     IDLParserContext ctxt("root");
+
+    const auto tenantId = TenantId(OID::gen());
+    const auto prefixedDb = std::string(str::stream() << tenantId.toString() << "_db");
 
     auto testDoc = BSONObjBuilder{}
                        .append(BasicConcatenateWithDbOrUUIDCommand::kCommandName, "coll1")
                        .append("field1", 3)
                        .append("field2", "five")
-                       .append("$db", "db")
+                       .append("$db", prefixedDb)
                        .obj();
 
-    const auto tenantId = TenantId(OID::gen());
     auto testStruct =
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "db"));
@@ -2595,19 +2600,21 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
 }
 
 TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     IDLParserContext ctxt("root");
 
     UUID uuid = UUID::gen();
+    const auto tenantId = TenantId(OID::gen());
+    const auto prefixedDb = std::string(str::stream() << tenantId.toString() << "_db");
 
     auto testDoc =
         BSONObjBuilder{}
             .appendElements(BSON(BasicConcatenateWithDbOrUUIDCommand::kCommandName << uuid))
             .append("field1", 3)
             .append("field2", "five")
-            .append("$db", "db")
+            .append("$db", prefixedDb)
             .obj();
 
-    const auto tenantId = TenantId(OID::gen());
     auto testStruct =
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "db"));
@@ -3985,14 +3992,14 @@ TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithMultitenancySupportOn) {
     const auto tenantId = TenantId(OID::gen());
     const auto nssWithPrefixedTenantId =
         std::string(str::stream() << tenantId.toString() << "_db.coll1");
-    auto testDoc = BSON(CommandTypeNamespaceCommand::kCommandName << nssWithPrefixedTenantId
-                                                                  << "field1" << 3 << "$db"
-                                                                  << "admin");
+    const auto prefixedAdminDb = std::string(str::stream() << tenantId.toString() << "_admin");
+
+    auto testDoc = BSON(CommandTypeNamespaceCommand::kCommandName
+                        << nssWithPrefixedTenantId << "field1" << 3 << "$db" << prefixedAdminDb);
 
     auto testStruct = CommandTypeNamespaceCommand::parse(ctxt, makeOMR(testDoc));
-    // TODO SERVER-70053: Expect tenantId to be the extracted prefix once DatabaseName uses the
-    // correct serializer/deserializer.
-    ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(boost::none, "admin"));
+
+    ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "admin"));
     // Deserialize called from parse correctly sets the tenantId field.
     ASSERT_EQUALS(testStruct.getCommandParameter(), NamespaceString(tenantId, "db.coll1"));
     assert_same_types<decltype(testStruct.getCommandParameter()), const NamespaceString&>();

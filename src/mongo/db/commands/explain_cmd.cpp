@@ -33,6 +33,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/explain_gen.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -101,7 +102,8 @@ public:
                std::unique_ptr<CommandInvocation> innerInvocation)
         : CommandInvocation(explainCommand),
           _outerRequest{&request},
-          _dbName(_outerRequest->getValidatedTenantId(), _outerRequest->getDatabase()),
+          _dbName(DatabaseNameUtil::deserialize(_outerRequest->getValidatedTenantId(),
+                                                _outerRequest->getDatabase())),
           _verbosity{std::move(verbosity)},
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)} {}

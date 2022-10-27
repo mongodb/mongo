@@ -47,6 +47,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/database_name_util.h"
 
 namespace mongo {
 namespace {
@@ -84,7 +85,8 @@ public:
         boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
         const auto aggregationRequest = aggregation_request_helper::parseFromBSON(
             opCtx,
-            DatabaseName(opMsgRequest.getValidatedTenantId(), opMsgRequest.getDatabase()),
+            DatabaseNameUtil::deserialize(opMsgRequest.getValidatedTenantId(),
+                                          opMsgRequest.getDatabase()),
             opMsgRequest.body,
             explainVerbosity,
             APIParameters::get(opCtx).getAPIStrict().value_or(false));
@@ -119,7 +121,8 @@ public:
                    PrivilegeVector privileges)
             : CommandInvocation(cmd),
               _request(request),
-              _dbName(request.getValidatedTenantId(), request.getDatabase()),
+              _dbName(DatabaseNameUtil::deserialize(request.getValidatedTenantId(),
+                                                    request.getDatabase())),
               _aggregationRequest(std::move(aggregationRequest)),
               _liteParsedPipeline(_aggregationRequest),
               _privileges(std::move(privileges)) {

@@ -66,6 +66,18 @@ namespace {
 
 auto& oplogGetMoreStats = makeServerStatusMetric<TimerStats>("repl.network.oplogGetMoresProcessed");
 
+BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
+                                         const BSONObj& cmdObj) {
+    auto db = cmdObj["$db"];
+    if (!db) {
+        return cmdObj;
+    }
+
+    auto dbName = DatabaseNameUtil::deserialize(tenantId, db.String());
+    auto newCmdObj =
+        cmdObj.addField(BSON("$db" << DatabaseNameUtil::serialize(dbName)).firstElement());
+    return newCmdObj;
+}
 }  // namespace
 
 /**
@@ -256,6 +268,10 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
 #endif
 }
 
+void CurOp::setOpDescription_inlock(const BSONObj& opDescription) {
+    _opDescription = serializeDollarDbInOpDescription(_nss.tenantId(), opDescription);
+}
+
 void CurOp::setGenericCursor_inlock(GenericCursor gc) {
     _genericCursor = std::move(gc);
 }
@@ -306,7 +322,7 @@ void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
     _isCommand = _debug.iscommand = isCommand;
     _logicalOp = _debug.logicalOp = logicalOp;
     _networkOp = _debug.networkOp = op;
-    _opDescription = cmdObj;
+    _opDescription = serializeDollarDbInOpDescription(nss.tenantId(), cmdObj);
     _command = command;
     _nss = std::move(nss);
 }
@@ -657,7 +673,6 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
     // contrast, the $currentOp aggregation stage does not have this restriction. If 'truncateOps'
     // is true, limit the size of each op to 1000 bytes. Otherwise, do not truncate.
     const boost::optional<size_t> maxQuerySize{truncateOps, 1000};
-
     appendAsObjOrString(
         "command", appendCommentField(opCtx, _opDescription), maxQuerySize, builder);
 
