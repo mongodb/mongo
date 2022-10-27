@@ -252,6 +252,11 @@ std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId, sbe::value:
     return sbe::makeE<sbe::EVariable>(frameId, slotId);
 }
 
+std::unique_ptr<sbe::EExpression> makeMoveVariable(sbe::FrameId frameId,
+                                                   sbe::value::SlotId slotId) {
+    return sbe::makeE<sbe::EVariable>(frameId, slotId, true);
+}
+
 std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
     return makeFunction(

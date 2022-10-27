@@ -4585,6 +4585,56 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTypeMatch(ArityT
     return {false, value::TypeTags::Nothing, 0};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMinMaxFromArray(ArityType arity,
+                                                                                Builtin f) {
+    invariant(arity == 1 || arity == 2);
+
+    CollatorInterface* collator = nullptr;
+    if (arity == 2) {
+        auto [collOwned, collTag, collVal] = getFromStack(1);
+        if (collTag == value::TypeTags::collator) {
+            collator = value::getCollatorView(collVal);
+        }
+    }
+
+    auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+
+    // If the argument is an array, find out the min/max value and place it in the
+    // stack. If it is Nothing or another simple type, treat it as the return value.
+    if (!value::isArray(fieldTag)) {
+        return moveFromStack(0);
+    }
+
+    value::ArrayEnumerator arrayEnum(fieldTag, fieldVal);
+    if (arrayEnum.atEnd()) {
+        // The array is empty, return Nothing.
+        return {false, sbe::value::TypeTags::Nothing, 0};
+    }
+    auto [accTag, accVal] = arrayEnum.getViewOfValue();
+    arrayEnum.advance();
+    int sign_adjust = f == Builtin::internalLeast ? -1 : +1;
+    while (!arrayEnum.atEnd()) {
+        auto [itemTag, itemVal] = arrayEnum.getViewOfValue();
+        auto [tag, val] = compare3way(itemTag, itemVal, accTag, accVal, collator);
+        if (tag == value::TypeTags::Nothing) {
+            // The comparison returns Nothing if one of the arguments is Nothing or if a sort order
+            // cannot be determined: bail out immediately and return Nothing.
+            return {false, sbe::value::TypeTags::Nothing, 0};
+        } else if (tag == value::TypeTags::NumberInt32 &&
+                   (sign_adjust * value::bitcastTo<int>(val)) > 0) {
+            accTag = itemTag;
+            accVal = itemVal;
+        }
+        arrayEnum.advance();
+    }
+    // If the array is owned by the stack, make a copy of the item, or it will become invalid after
+    // the caller clears the array from it.
+    if (fieldOwned) {
+        std::tie(accTag, accVal) = value::copyValue(accTag, accVal);
+    }
+    return {fieldOwned, accTag, accVal};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                          ArityType arity) {
     switch (f) {
@@ -4794,6 +4844,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinTypeMatch(arity);
         case Builtin::dateTrunc:
             return builtinDateTrunc(arity);
+        case Builtin::internalLeast:
+        case Builtin::internalGreatest:
+            return builtinMinMaxFromArray(arity, f);
     }
 
     MONGO_UNREACHABLE;

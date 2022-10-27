@@ -98,7 +98,7 @@ size_t EConstant::estimateSize() const {
 }
 
 std::unique_ptr<EExpression> EVariable::clone() const {
-    return _frameId ? std::make_unique<EVariable>(*_frameId, _var)
+    return _frameId ? std::make_unique<EVariable>(*_frameId, _var, _moveFrom)
                     : std::make_unique<EVariable>(_var);
 }
 
@@ -125,10 +125,16 @@ vm::CodeFragment EVariable::compileDirect(CompileCtx& ctx) const {
 std::vector<DebugPrinter::Block> EVariable::debugPrint() const {
     std::vector<DebugPrinter::Block> ret;
 
+    if (_moveFrom) {
+        ret.emplace_back("move(`"_sd);
+    }
     if (_frameId) {
         DebugPrinter::addIdentifier(ret, *_frameId, _var);
     } else {
         DebugPrinter::addIdentifier(ret, _var);
+    }
+    if (_moveFrom) {
+        ret.emplace_back("`)"_sd);
     }
 
     return ret;
@@ -521,7 +527,11 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"tsSecond", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsSecond, false}},
     {"tsIncrement", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsIncrement, false}},
     {"typeMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::typeMatch, false}},
-    {"dateTrunc", BuiltinFn{[](size_t n) { return n == 6; }, vm::Builtin::dateTrunc, false}}};
+    {"dateTrunc", BuiltinFn{[](size_t n) { return n == 6; }, vm::Builtin::dateTrunc, false}},
+    {"_internalLeast",
+     BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::internalLeast, false}},
+    {"_internalGreatest",
+     BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::internalGreatest, false}}};
 
 /**
  * The code generation function.

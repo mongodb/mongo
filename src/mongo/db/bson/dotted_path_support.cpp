@@ -145,7 +145,7 @@ BSONElement extractElementAtPathOrArrayAlongPath(const BSONObj& obj, const char*
     BSONElement sub;
 
     if (p) {
-        sub = obj.getField(std::string(path, p - path));
+        sub = obj.getField(StringData(path, p - path));
         path = p + 1;
     } else {
         sub = obj.getField(path);

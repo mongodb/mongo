@@ -1057,133 +1057,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 }
 
 namespace {
-using MakeSortKeyFn =
-    std::function<std::unique_ptr<sbe::EExpression>(sbe::value::SlotId inputSlot)>;
-
-/**
- * Given a field path, this function builds a plan stage tree that will produce the corresponding
- * sort key for that path. The 'makeSortKey' parameter is used to apply any transformations to the
- * leaf fields' values that are necessary (for example, calling collComparisonKey()).
- *
- * Note that when 'level' is 0, this function assumes that 'inputSlot' alrady contains the top-level
- * field value from the path, and thus it will forgo generating a call to getField(). When 'level'
- * is 1 or greater, this function will generate a call to getField() to read the field for that
- * level.
- */
-std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSortKeyTraversal(
-    std::unique_ptr<sbe::PlanStage> inputStage,
-    sbe::value::SlotId inputSlot,
-    const FieldPath& fp,
-    sbe::value::SortDirection direction,
-    FieldIndex level,
-    PlanNodeId planNodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    const MakeSortKeyFn& makeSortKey) {
-    invariant(level < fp.getPathLength());
-
-    const bool isLeafField = (level == fp.getPathLength() - 1u);
-
-    auto [fieldSlot, fromBranch] = [&]() {
-        if (level > 0) {
-            // Generate a call to getField() to read the field at the current level and bind it to
-            // 'fieldSlot'. According to MQL's sorting semantics, if the field doesn't exist we
-            // should use Null as the sort key.
-            auto getFieldExpr = makeFunction("getField"_sd,
-                                             sbe::makeE<sbe::EVariable>(inputSlot),
-                                             sbe::makeE<sbe::EConstant>(fp.getFieldName(level)));
-
-            if (isLeafField) {
-                // Wrapping the field access with makeFillEmptyNull() is only necessary for the
-                // leaf field. For non-leaf fields, if the field doesn't exist then Nothing will
-                // propagate through the TraverseStage and afterward it will be converted to Null
-                // by a projection (see below).
-                getFieldExpr = makeFillEmptyNull(std::move(getFieldExpr));
-            }
-
-            auto fieldSlot{slotIdGenerator->generate()};
-            return std::make_pair(
-                fieldSlot,
-                sbe::makeProjectStage(
-                    std::move(inputStage), planNodeId, fieldSlot, std::move(getFieldExpr)));
-        }
-
-        return std::make_pair(inputSlot, std::move(inputStage));
-    }();
-
-    // Generate the 'in' branch for the TraverseStage that we're about to construct.
-    auto [innerSlot, innerBranch] = [&, fieldSlot = fieldSlot, &fromBranch = fromBranch]() {
-        if (isLeafField) {
-            // Base case: Genereate a ProjectStage to evaluate the predicate.
-            auto innerSlot{slotIdGenerator->generate()};
-            return std::make_pair(innerSlot,
-                                  sbe::makeProjectStage(makeLimitCoScanTree(planNodeId),
-                                                        planNodeId,
-                                                        innerSlot,
-                                                        makeSortKey(fieldSlot)));
-        } else {
-            // Recursive case.
-            return generateSortKeyTraversal(makeLimitCoScanTree(planNodeId),
-                                            fieldSlot,
-                                            fp,
-                                            direction,
-                                            level + 1,
-                                            planNodeId,
-                                            slotIdGenerator,
-                                            makeSortKey);
-        }
-    }();
-
-    // Generate the traverse stage for the current nested level. The fold expression uses
-    // well-ordered comparison (cmp3w) to produce the minimum element (if 'direction' is
-    // Ascending) or the maximum element (if 'direction' is Descending).
-    auto traverseSlot{slotIdGenerator->generate()};
-    auto outputSlot{slotIdGenerator->generate()};
-    auto op = (direction == sbe::value::SortDirection::Ascending) ? sbe::EPrimBinary::less
-                                                                  : sbe::EPrimBinary::greater;
-
-    auto outputStage = sbe::makeS<sbe::TraverseStage>(
-        std::move(fromBranch),
-        std::move(innerBranch),
-        fieldSlot,
-        traverseSlot,
-        innerSlot,
-        sbe::makeSV(),
-        sbe::makeE<sbe::EIf>(makeBinaryOp(op,
-                                          makeBinaryOp(sbe::EPrimBinary::cmp3w,
-                                                       makeVariable(innerSlot),
-                                                       makeVariable(traverseSlot)),
-                                          makeConstant(sbe::value::TypeTags::NumberInt64,
-                                                       sbe::value::bitcastFrom<int64_t>(0))),
-                             makeVariable(innerSlot),
-                             makeVariable(traverseSlot)),
-        nullptr,
-        planNodeId,
-        1);
-
-    // According to MQL's sorting semantics, when a leaf field is an empty array we should use
-    // Undefined as the sort key, and when a non-leaf field is an empty array or doesn't exist
-    // we should use Null as the sort key.
-    return {outputSlot,
-            sbe::makeProjectStage(std::move(outputStage),
-                                  planNodeId,
-                                  outputSlot,
-                                  isLeafField ? makeFillEmptyUndefined(makeVariable(traverseSlot))
-                                              : makeFillEmptyNull(makeVariable(traverseSlot)))};
-}
-
 /**
  * Given a field path, this function will return an expression that will be true if evaluating the
  * field path involves array traversal at any level of the path (including the leaf field).
  */
-std::unique_ptr<sbe::EExpression> generateArrayCheckForSortHelper(
+std::unique_ptr<sbe::EExpression> generateArrayCheckForSort(
     std::unique_ptr<sbe::EExpression> inputExpr,
     const FieldPath& fp,
     FieldIndex level,
     sbe::value::FrameIdGenerator* frameIdGenerator) {
     invariant(level < fp.getPathLength());
 
-    auto fieldExpr = makeFillEmptyNull(makeFunction(
-        "getField"_sd, std::move(inputExpr), sbe::makeE<sbe::EConstant>(fp.getFieldName(level))));
+    auto fieldExpr = makeFillEmptyNull(
+        makeFunction("getField"_sd, std::move(inputExpr), makeConstant(fp.getFieldName(level))));
 
     if (level == fp.getPathLength() - 1u) {
         return makeFunction("isArray"_sd, std::move(fieldExpr));
@@ -1194,28 +1080,79 @@ std::unique_ptr<sbe::EExpression> generateArrayCheckForSortHelper(
             sbe::makeEs(std::move(fieldExpr)),
             makeBinaryOp(sbe::EPrimBinary::logicOr,
                          makeFunction("isArray"_sd, makeVariable(frameId, 0)),
-                         generateArrayCheckForSortHelper(
+                         generateArrayCheckForSort(
                              makeVariable(frameId, 0), fp, level + 1, frameIdGenerator)));
     }
 }
 
 /**
- * Given a field path and a slot that holds the top-level field's value from that path, this
- * function will return an expression that will be true if evaluating the field path involves array
- * traversal at any level of the path (including the leaf field).
+ * Given a field path, this function recursively builds an expression tree that will produce the
+ * corresponding sort key for that path.
  */
-std::unique_ptr<sbe::EExpression> generateArrayCheckForSort(
-    sbe::value::SlotId inputSlot,
+std::unique_ptr<sbe::EExpression> generateSortTraverse(
+    const sbe::EVariable& inputVar,
+    bool isAscending,
+    boost::optional<sbe::value::SlotId> collatorSlot,
     const FieldPath& fp,
+    size_t level,
     sbe::value::FrameIdGenerator* frameIdGenerator) {
-    if (fp.getPathLength() == 1) {
-        return makeFunction("isArray"_sd, makeVariable(inputSlot));
-    } else {
-        return makeBinaryOp(
-            sbe::EPrimBinary::logicOr,
-            makeFunction("isArray"_sd, makeVariable(inputSlot)),
-            generateArrayCheckForSortHelper(makeVariable(inputSlot), fp, 1, frameIdGenerator));
+    using namespace std::literals;
+
+    invariant(level < fp.getPathLength());
+
+    StringData helperFn = isAscending ? "_internalLeast"_sd : "_internalGreatest"_sd;
+    auto collatorArg =
+        collatorSlot ? makeVariable(*collatorSlot) : makeConstant(sbe::value::TypeTags::Nothing, 0);
+
+    // Generate an expression to read a sub-field at the current nested level.
+    auto fieldExpr =
+        makeFunction("getField"_sd, inputVar.clone(), makeConstant(fp.getFieldName(level)));
+
+    if (level == fp.getPathLength() - 1) {
+        // For the last level, we can just return the field slot without the need for a
+        // traverse expression.
+        auto frameId = frameIdGenerator->generate();
+        return sbe::makeE<sbe::ELocalBind>(
+            frameId,
+            sbe::makeEs(std::move(fieldExpr)),
+            sbe::makeE<sbe::EIf>(
+                makeFillEmptyFalse(makeFunction("isArray"_sd, makeVariable(frameId, 0))),
+                // According to MQL's sorting semantics, when a leaf field is an empty array we
+                // should use Undefined as the sort key.
+                makeFillEmptyUndefined(
+                    makeFunction(helperFn, makeMoveVariable(frameId, 0), std::move(collatorArg))),
+                makeFillEmptyNull(makeMoveVariable(frameId, 0))));
     }
+
+    // Prepare a lambda expression that will navigate to the next component of the field path.
+    auto lambdaFrameId = frameIdGenerator->generate();
+    auto lambdaExpr =
+        sbe::makeE<sbe::ELocalLambda>(lambdaFrameId,
+                                      generateSortTraverse(sbe::EVariable{lambdaFrameId, 0},
+                                                           isAscending,
+                                                           collatorSlot,
+                                                           fp,
+                                                           level + 1,
+                                                           frameIdGenerator));
+
+    // Generate the traverse expression for the current nested level.
+    // Be sure to invoke the least/greatest fold expression only if the current nested level is an
+    // array.
+    auto frameId = frameIdGenerator->generate();
+    return sbe::makeE<sbe::ELocalBind>(
+        frameId,
+        sbe::makeEs(
+            std::move(fieldExpr),
+            makeFunction("traverseP",
+                         makeVariable(frameId, 0),
+                         std::move(lambdaExpr),
+                         makeConstant(sbe::value::TypeTags::NumberInt32, 1) /* maxDepth */)),
+        // According to MQL's sorting semantics, when a non-leaf field is an empty array or
+        // doesn't exist we should use Null as the sort key.
+        makeFillEmptyNull(sbe::makeE<sbe::EIf>(
+            makeFillEmptyFalse(makeFunction("isArray"_sd, makeVariable(frameId, 0))),
+            makeFunction(helperFn, makeMoveVariable(frameId, 1), std::move(collatorArg)),
+            makeMoveVariable(frameId, 1))));
 }
 }  // namespace
 
@@ -1260,31 +1197,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     sbe::value::SlotVector orderBy;
     std::vector<sbe::value::SortDirection> direction;
+    sbe::value::SlotId outputSlotId = outputs.get(kResult);
 
     if (!hasPartsWithCommonPrefix) {
         // Handle the case where we are using kResult and there are no common prefixes.
         sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projectMap;
 
         orderBy.reserve(sortPattern.size());
-        for (const auto& part : sortPattern) {
-            // Get the top-level field for this sort part. If the field doesn't exist, according to
-            // MQL's sorting semantics we should use Null.
-            auto getFieldExpr = makeFillEmptyNull(
-                makeFunction("getField"_sd,
-                             makeVariable(outputs.get(kResult)),
-                             sbe::makeE<sbe::EConstant>(part.fieldPath->getFieldName(0))));
 
-            auto fieldSlot{_slotIdGenerator.generate()};
-            projectMap.emplace(fieldSlot, std::move(getFieldExpr));
-
-            orderBy.push_back(fieldSlot);
-            direction.push_back(part.isAscending ? sbe::value::SortDirection::Ascending
-                                                 : sbe::value::SortDirection::Descending);
-        }
-
-        stage =
-            sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projectMap), root->nodeId());
-
+        // Sorting has a limitation where only one of the sort patterns can involve arrays.
+        // If there are at least two sort patterns, check the data for this possibility.
         auto failOnParallelArrays = [&]() -> std::unique_ptr<mongo::sbe::EExpression> {
             auto parallelArraysError = sbe::makeE<sbe::EFail>(
                 ErrorCodes::BadValue, "cannot sort with keys that are parallel arrays");
@@ -1296,32 +1218,32 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             } else if (sortPattern.size() == 2) {
                 // If the sort pattern has two parts, we can generate a simpler expression to
                 // perform the "parallel arrays" check.
-                auto makeIsNotArrayCheck = [&](sbe::value::SlotId slot, const FieldPath& fp) {
-                    return makeNot(generateArrayCheckForSort(slot, fp, &_frameIdGenerator));
+                auto makeIsNotArrayCheck = [&](const FieldPath& fp) {
+                    return makeNot(generateArrayCheckForSort(
+                        makeVariable(outputSlotId), fp, 0 /* level */, &_frameIdGenerator));
                 };
 
-                return makeBinaryOp(
-                    sbe::EPrimBinary::logicOr,
-                    makeIsNotArrayCheck(orderBy[0], *sortPattern[0].fieldPath),
-                    makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                 makeIsNotArrayCheck(orderBy[1], *sortPattern[1].fieldPath),
-                                 std::move(parallelArraysError)));
+                return makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                    makeIsNotArrayCheck(*sortPattern[0].fieldPath),
+                                    makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                 makeIsNotArrayCheck(*sortPattern[1].fieldPath),
+                                                 std::move(parallelArraysError)));
             } else {
                 // If the sort pattern has three or more parts, we generate an expression to
                 // perform the "parallel arrays" check that works (and scales well) for an
                 // arbitrary number of sort pattern parts.
-                auto makeIsArrayCheck = [&](sbe::value::SlotId slot, const FieldPath& fp) {
+                auto makeIsArrayCheck = [&](const FieldPath& fp) {
                     return makeBinaryOp(sbe::EPrimBinary::cmp3w,
-                                        generateArrayCheckForSort(slot, fp, &_frameIdGenerator),
+                                        generateArrayCheckForSort(
+                                            makeVariable(outputSlotId), fp, 0, &_frameIdGenerator),
                                         makeConstant(sbe::value::TypeTags::Boolean, false));
                 };
 
-                auto numArraysExpr = makeIsArrayCheck(orderBy[0], *sortPattern[0].fieldPath);
+                auto numArraysExpr = makeIsArrayCheck(*sortPattern[0].fieldPath);
                 for (size_t idx = 1; idx < sortPattern.size(); ++idx) {
-                    numArraysExpr =
-                        makeBinaryOp(sbe::EPrimBinary::add,
-                                     std::move(numArraysExpr),
-                                     makeIsArrayCheck(orderBy[idx], *sortPattern[idx].fieldPath));
+                    numArraysExpr = makeBinaryOp(sbe::EPrimBinary::add,
+                                                 std::move(numArraysExpr),
+                                                 makeIsArrayCheck(*sortPattern[idx].fieldPath));
                 }
 
                 return makeBinaryOp(
@@ -1340,30 +1262,32 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                           std::move(failOnParallelArrays));
         }
 
-        for (size_t idx = 0; idx < orderBy.size(); ++idx) {
-            auto makeSortKey = [&](sbe::value::SlotId inputSlot) {
-                return !collatorSlot ? makeVariable(inputSlot)
-                                     : makeFunction("collComparisonKey"_sd,
-                                                    makeVariable(inputSlot),
-                                                    makeVariable(*collatorSlot));
-            };
+        sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> sortExpressions;
 
-            // Call generateSortKeyTraversal() to build a series of TraverseStages that will
-            // traverse this part's field path and produce the corresponding sort key. We pass
-            // in the 'makeSortKey' lambda, which will be applied on each leaf field's value
-            // to apply the current collation (if there is one).
-            sbe::value::SlotId sortKeySlot;
-            std::tie(sortKeySlot, stage) = generateSortKeyTraversal(std::move(stage),
-                                                                    orderBy[idx],
-                                                                    *sortPattern[idx].fieldPath,
-                                                                    direction[idx],
-                                                                    0,
-                                                                    root->nodeId(),
-                                                                    &_slotIdGenerator,
-                                                                    makeSortKey);
+        for (const auto& part : sortPattern) {
+            std::unique_ptr<sbe::EExpression> sortExpr =
+                generateSortTraverse(sbe::EVariable{outputSlotId},
+                                     part.isAscending,
+                                     collatorSlot,
+                                     *part.fieldPath,
+                                     0,
+                                     &_frameIdGenerator);
 
-            orderBy[idx] = sortKeySlot;
+            // Apply the transformation required by the collation, if specified.
+            if (collatorSlot) {
+                sortExpr = makeFunction(
+                    "collComparisonKey"_sd, std::move(sortExpr), makeVariable(*collatorSlot));
+            }
+            sbe::value::SlotId sortKeySlot = _slotIdGenerator.generate();
+            sortExpressions.emplace(sortKeySlot, std::move(sortExpr));
+
+            orderBy.push_back(sortKeySlot);
+            direction.push_back(part.isAscending ? sbe::value::SortDirection::Ascending
+                                                 : sbe::value::SortDirection::Descending);
         }
+        stage = sbe::makeS<sbe::ProjectStage>(
+            std::move(stage), std::move(sortExpressions), root->nodeId());
+
     } else {
         // Handle the case where two or more parts of the sort pattern have a common prefix.
         orderBy = _slotIdGenerator.generateMultiple(1);
@@ -1378,17 +1302,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         // generateSortKey() will handle the parallel arrays check and sort key traversal for us,
         // so we don't need to generate our own sort key traversal logic in the SBE plan.
-        stage =
-            sbe::makeProjectStage(std::move(stage),
-                                  root->nodeId(),
-                                  orderBy[0],
-                                  collatorSlot ? makeFunction("generateSortKey",
-                                                              std::move(sortSpecExpr),
-                                                              makeVariable(outputs.get(kResult)),
-                                                              makeVariable(*collatorSlot))
-                                               : makeFunction("generateSortKey",
-                                                              std::move(sortSpecExpr),
-                                                              makeVariable(outputs.get(kResult))));
+        stage = sbe::makeProjectStage(std::move(stage),
+                                      root->nodeId(),
+                                      orderBy[0],
+                                      collatorSlot ? makeFunction("generateSortKey",
+                                                                  std::move(sortSpecExpr),
+                                                                  makeVariable(outputSlotId),
+                                                                  makeVariable(*collatorSlot))
+                                                   : makeFunction("generateSortKey",
+                                                                  std::move(sortSpecExpr),
+                                                                  makeVariable(outputSlotId)));
     }
 
     // Slots for sort stage to forward to parent stage. Values in these slots are not used during
