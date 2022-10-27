@@ -472,6 +472,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
       --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars
+      --variables-files=etc/scons/scons_experimental_scheduler.vars
       --cxx-std=20
     compile_variant: *enterprise-rhel80-dynamic-v4gcc-cxx20-debug-experimental
 
@@ -486,6 +487,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
       --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
+      --variables-files=etc/scons/scons_experimental_scheduler.vars
       --cxx-std=20
     compile_variant: *enterprise-rhel80-dynamic-v4clang-cxx20-debug-experimental
 
