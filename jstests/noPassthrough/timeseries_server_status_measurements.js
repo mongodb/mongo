@@ -72,7 +72,7 @@ for (let i = 0; i < numMeasurements; i++) {
     const doc = assert.commandWorked(db.runCommand({serverStatus: 1}));
     batch.push(doc);
 }
-assert.commandWorked(coll.insertMany(batch));
+assert.commandWorked(coll.insertMany(batch, {ordered: false}));
 
 checkBucketSize();
 MongoRunner.stopMongod(conn);

@@ -41,7 +41,7 @@ function clearLog() {
 }
 
 function addEnoughForMultipleBatches(collection) {
-    collection.insertMany([...Array(10000).keys()].map(x => ({_id: x})));
+    collection.insertMany([...Array(10000).keys()].map(x => ({_id: x})), {ordered: false});
 }
 
 // Name for a collection which takes multiple batches to check and which shouldn't be modified
@@ -49,7 +49,7 @@ function addEnoughForMultipleBatches(collection) {
 const multiBatchSimpleCollName = "dbcheck-simple-collection";
 const multiBatchSimpleCollSize = 10000;
 replSet.getPrimary().getDB(dbName)[multiBatchSimpleCollName].insertMany(
-    [...Array(10000).keys()].map(x => ({_id: x})));
+    [...Array(10000).keys()].map(x => ({_id: x})), {ordered: false});
 
 function dbCheckCompleted(db) {
     return db.currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] === undefined;
@@ -253,7 +253,7 @@ function concurrentTestConsistent() {
     let db = primary.getDB(dbName);
 
     // Add enough documents that dbCheck will take a few seconds.
-    db[collName].insertMany([...Array(10000).keys()].map(x => ({i: x})));
+    db[collName].insertMany([...Array(10000).keys()].map(x => ({i: x})), {ordered: false});
 
     assert.commandWorked(db.runCommand({"dbCheck": collName}));
 
@@ -388,7 +388,8 @@ function testDbCheckParameters() {
         // Insert nDocs, each of which being slightly larger than 1MB, and then run dbCheck with
         // maxBytesPerBatch := 1MB
         const nDocs = 5;
-        coll.insertMany([...Array(nDocs).keys()].map(x => ({a: 'a'.repeat(1024 * 1024)})));
+        coll.insertMany([...Array(nDocs).keys()].map(x => ({a: 'a'.repeat(1024 * 1024)})),
+                        {ordered: false});
         const maxBytesPerBatch = 1024 * 1024;
         assert.commandWorked(db.getSiblingDB("maxBytesPerBatch").runCommand({
             dbCheck: coll.getName(),

@@ -43,7 +43,8 @@ function insertLeftoverChunks(configDB, uuid) {
         newChunk.uuid = otherCollectionUUID;
         chunksToInsert.push(newChunk);
     });
-    assert.commandWorked(configDB.getCollection("chunks").insertMany(chunksToInsert));
+    assert.commandWorked(
+        configDB.getCollection("chunks").insertMany(chunksToInsert, {ordered: false}));
 }
 
 let st = new ShardingTest({mongos: 1, shards: 1});

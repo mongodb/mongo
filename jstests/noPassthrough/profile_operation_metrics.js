@@ -1184,7 +1184,7 @@ const operations = [
             for (let i = 1; i < 10; i++) {
                 docs.push({_id: i, a: i});
             }
-            db.capped.insertMany(docs);
+            db.capped.insertMany(docs, {ordered: false});
             assert.eq(db.capped.find({_id: 0}).itcount(), 1);
         },
         profileFilter: {op: 'insert', 'command.insert': 'capped'},
@@ -1241,7 +1241,7 @@ const operations = [
             for (let i = 11; i < 20; i++) {
                 docs.push({_id: i, a: i});
             }
-            db.capped.insertMany(docs);
+            db.capped.insertMany(docs, {ordered: false});
             assert.eq(db.capped.find({a: 9}).itcount(), 0);
             assert.eq(db.capped.find({a: 10}).itcount(), 1);
         },

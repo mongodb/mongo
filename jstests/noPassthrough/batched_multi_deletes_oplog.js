@@ -27,8 +27,8 @@ function validateBatchedDeletesOplogDocsPerBatch(conn) {
         db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
 
     coll.drop();
-    assert.commandWorked(
-        coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024)}))));
+    assert.commandWorked(coll.insertMany(
+        [...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024)})), {ordered: false}));
 
     assert.eq(collCount, coll.find().itcount());
     assert.commandWorked(coll.deleteMany({_id: {$gte: 0}}));
@@ -68,7 +68,8 @@ function validateBatchedDeletesOplogBatchAbove16MB(conn) {
         db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
 
     coll.drop();
-    assert.commandWorked(coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x}))));
+    assert.commandWorked(
+        coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x})), {ordered: false}));
 
     assert.eq(collCount, coll.find().itcount());
     assert.commandWorked(coll.deleteMany({_id: {$gte: 0}}));

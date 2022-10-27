@@ -142,7 +142,7 @@ function testUpdateRouting({updates, nModified, shardsTargetedCount}) {
             temperature: 20,
         },
     ];
-    assert.commandWorked(testColl.insertMany(data));
+    assert.commandWorked(testColl.insertMany(data, {ordered: false}));
 })();
 
 (function defineChunks() {

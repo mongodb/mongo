@@ -128,7 +128,7 @@ function setUpCollection(data) {
         collName,
         {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
     let collection = db.getCollection(collName);
-    assert.commandWorked(collection.insertMany(data));
+    assert.commandWorked(collection.insertMany(data, {ordered: false}));
     let result = assert.commandWorked(collection.validate());
     assert(result.valid, tojson(result));
     assert(result.warnings.length == 0, tojson(result));

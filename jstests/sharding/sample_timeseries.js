@@ -125,7 +125,7 @@ function setUpTestColl(generateAdditionalData) {
             temperature: 20,
         },
     ];
-    assert.commandWorked(testColl.insertMany(data));
+    assert.commandWorked(testColl.insertMany(data), {ordered: false});
 
     let expectedDocs = data.reduce((acc, measure, i) => {
         acc[measure._id] = {
@@ -371,11 +371,11 @@ function insertAdditionalData(sparselyPackBucket) {
         }
 
         // Insert all documents for a city.
-        assert.commandWorked(testColl.insertMany(docs));
+        assert.commandWorked(testColl.insertMany(docs, {ordered: false}));
 
         // Insert any orphan documents.
         if (orphanDocs.length > 0) {
-            assert.commandWorked(otherShardDB[collName].insertMany(orphanDocs));
+            assert.commandWorked(otherShardDB[collName].insertMany(orphanDocs, {ordered: false}));
         }
     }
     return expectedDocs;

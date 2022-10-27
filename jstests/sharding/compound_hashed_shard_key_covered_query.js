@@ -80,8 +80,8 @@ for (let i = 0; i < 100; i++) {
 // documents. We then run a 'find' command by connecting to mongos and validate that the orphan
 // documents are correctly rejected.
 const shard1DB = st.rs1.getPrimary().getDB(kDbName);
-assert.commandWorked(shard1DB.coll.insertMany(validDocs));
-assert.commandWorked(shard1DB.coll.insertMany(orphanDocs));
+assert.commandWorked(shard1DB.coll.insertMany(validDocs, {ordered: false}));
+assert.commandWorked(shard1DB.coll.insertMany(orphanDocs, {ordered: false}));
 // We do not project 'b' so that the query can be covered.
 for (let validDoc of validDocs) {
     delete validDoc.b;

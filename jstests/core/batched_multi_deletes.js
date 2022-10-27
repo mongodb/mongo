@@ -24,7 +24,8 @@ function populateAndMassDelete(queryPredicate) {
     const collCount = 94321;  // Intentionally not a multiple of batchedDeletesTargetBatchDocs.
 
     coll.drop();
-    assert.commandWorked(coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: x}))));
+    assert.commandWorked(
+        coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: x})), {ordered: false}));
 
     assert.eq(collCount, coll.countDocuments({}));
 

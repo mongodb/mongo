@@ -32,7 +32,8 @@ function validateTargetDocsPerBatch() {
 
         coll.drop();
         assert.commandWorked(
-            coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(10)}))));
+            coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(10)})),
+                            {ordered: false}));
 
         assert.commandWorked(
             db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
@@ -68,7 +69,8 @@ function validateTargetBatchTimeMS() {
 
         coll.drop();
         assert.commandWorked(
-            coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(10)}))));
+            coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(10)})),
+                            {ordered: false}));
 
         assert.commandWorked(
             db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: targetBatchTimeMS}));
@@ -119,7 +121,8 @@ function validateTargetStagedDocsBytes() {
 
         coll.drop();
         assert.commandWorked(coll.insertMany(
-            [...Array(collCount).keys()].map(x => ({a: "a".repeat(docPaddingBytes)}))));
+            [...Array(collCount).keys()].map(x => ({a: "a".repeat(docPaddingBytes)})),
+            {ordered: false}));
 
         // batchedDeletesTargetStagedDocsBytes := 0 means no limit.
         const expectedBatches =

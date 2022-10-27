@@ -26,7 +26,7 @@ const docs = [
     {_id: 3, x: 1, y: [{b: 5}, {b: [1, 2, {c: 5}]}, {c: 7}]},
     {_id: 4, x: 1, y: [{b: {c: 1}}]}
 ];
-assert.commandWorked(coll.insertMany(docs));
+assert.commandWorked(coll.insertMany(docs, {ordered: false}));
 
 // Test the explain output for a scan on two columns: one nested and one top-level.
 (function testScanOnTwoColumns() {

@@ -35,7 +35,8 @@ coll.insertMany(
                                   "metadata": {"sensorId": testCount, "type": "temperature"},
                                   "timestamp": ISODate(),
                                   "temp": i
-                              })));
+                              })),
+    {ordered: false});
 let res = coll.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 0);
@@ -56,7 +57,8 @@ coll.insertMany(
                                   "metadata": {"sensorId": testCount, "type": "temperature"},
                                   "timestamp": ISODate(),
                                   "temp": i
-                              })));
+                              })),
+    {ordered: false});
 bucket.updateOne({"meta.sensorId": testCount}, {"$set": {"control.min.timestamp": ISODate()}});
 res = coll.validate();
 assert(res.valid, tojson(res));

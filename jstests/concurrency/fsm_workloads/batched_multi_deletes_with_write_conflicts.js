@@ -100,7 +100,7 @@ var $config = (function() {
             // Create array of (subsetSize * numInsertSubsets) docs, by repeating the
             // subsetTemplates baseInsertSize times.
             const docs = Array(this.subsetSize).fill(subsetTemplates).flat();
-            assert.commandWorked(coll.insertMany(docs));
+            assert.commandWorked(coll.insertMany(docs, {ordered: false}));
 
             // Do batched delete.
             const deleteResult = coll.deleteMany({deleter_tid: this.tid, delete_query_match: true});

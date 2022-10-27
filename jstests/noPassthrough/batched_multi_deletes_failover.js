@@ -113,7 +113,7 @@ function runTest(failoverFn, clustered, expectNetworkErrorOnDelete) {
 
     const docs = [...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024), b: 2 * x}));
 
-    assert.commandWorked(coll.insertMany(docs));
+    assert.commandWorked(coll.insertMany(docs, {ordered: false}));
 
     // Create secondary indexes.
     assert.commandWorked(coll.createIndex({a: 1, b: -1}));

@@ -24,8 +24,8 @@ assertDropCollection(testDB, collName);
 
 const collCount = 50002;  // Intentionally not a multiple of the default batch size.
 
-assert.commandWorked(
-    coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024)}))));
+assert.commandWorked(coll.insertMany(
+    [...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024)})), {ordered: false}));
 
 assert.commandWorked(testDB.setProfilingLevel(2));
 

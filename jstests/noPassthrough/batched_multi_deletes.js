@@ -21,8 +21,9 @@ function validateBatchedDeletes(conn) {
 
     function validateDeletion(db, coll, docsPerBatch) {
         coll.drop();
-        assert.commandWorked(coll.insertMany(
-            [...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024)}))));
+        assert.commandWorked(
+            coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024)})),
+                            {ordered: false}));
 
         const serverStatusBatchesBefore = db.serverStatus()['batchedDeletes']['batches'];
         const serverStatusDocsBefore = db.serverStatus()['batchedDeletes']['docs'];
@@ -41,8 +42,8 @@ function validateBatchedDeletes(conn) {
     }
 
     coll.drop();
-    assert.commandWorked(
-        coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024)}))));
+    assert.commandWorked(coll.insertMany(
+        [...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024)})), {ordered: false}));
 
     // For consistent results, don't enforce the targetBatchTimeMS and targetStagedDocBytes.
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));

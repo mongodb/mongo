@@ -72,6 +72,6 @@ for (let i = 0; i < numMeasurements; i++) {
     const doc = {_id: i, [timeFieldName]: ISODate(), value: "a".repeat(measurementValueLength)};
     batch.push(doc);
 }
-assert.commandWorked(coll.insertMany(batch));
+assert.commandWorked(coll.insertMany(batch), {ordered: false});
 checkAverageBucketSize();
 }());

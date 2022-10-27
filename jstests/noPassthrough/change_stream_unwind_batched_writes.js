@@ -63,8 +63,8 @@ function runTest(conn) {
         db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
 
     // Populate the collection, then open a change stream, then mass-delete the collection.
-    assert.commandWorked(
-        coll.insertMany([...Array(totalNumDocs).keys()].map(x => ({_id: x, txt: "a" + x}))));
+    assert.commandWorked(coll.insertMany(
+        [...Array(totalNumDocs).keys()].map(x => ({_id: x, txt: "a" + x})), {ordered: false}));
     const changeStreamCursor = coll.watch();
     const serverStatusBatchesBefore = db.serverStatus()['batchedDeletes']['batches'];
     const serverStatusDocsBefore = db.serverStatus()['batchedDeletes']['docs'];
