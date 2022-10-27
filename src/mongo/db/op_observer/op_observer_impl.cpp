@@ -2001,9 +2001,9 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     // entries.
     const auto applyOpsOplogSlotAndOperationAssignment = transactionOperations->getApplyOpsInfo(
         oplogSlots,
-        /*prepare=*/false,
         getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
-        getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes());
+        getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
+        /*prepare=*/false);
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
 
     // Log in-progress entries for the transaction along with the implicit commit.
@@ -2074,9 +2074,9 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     // more consistent with our treatment of multi-doc transactions.
     const auto applyOpsOplogSlotAndOperationAssignment =
         batchedOps->getApplyOpsInfo(oplogSlots,
-                                    /*prepare=*/false,
                                     getMaxNumberOfBatchedOperationsInSingleOplogEntry(),
-                                    getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes());
+                                    getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes(),
+                                    /*prepare=*/false);
 
     // TODO(SERVER-70572): Remove this restriction once multi-oplog batched writes are supported.
     // Before SERVER-70765, we relied on packTransactionStatementsForApplyOps() to check if the
@@ -2136,9 +2136,9 @@ OpObserverImpl::preTransactionPrepare(OperationContext* opCtx,
                                       TransactionOperations* transactionOperations) {
     auto applyOpsOplogSlotAndOperationAssignment = transactionOperations->getApplyOpsInfo(
         reservedSlots,
-        /*prepare=*/true,
         getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
-        getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes());
+        getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
+        /*prepare=*/true);
     auto* statements = transactionOperations->getMutableOperationsForOpObserver();
     writeChangeStreamPreImagesForTransaction(
         opCtx, *statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);

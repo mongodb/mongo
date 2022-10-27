@@ -132,9 +132,9 @@ public:
      * transaction.
      */
     ApplyOpsInfo getApplyOpsInfo(const std::vector<OplogSlot>& oplogSlots,
-                                 bool prepare,
-                                 boost::optional<std::size_t> oplogEntryCountLimit,
-                                 boost::optional<std::size_t> oplogEntrySizeLimitBytes) const;
+                                 std::size_t oplogEntryCountLimit,
+                                 std::size_t oplogEntrySizeLimitBytes,
+                                 bool prepare) const;
 
     /**
      * Returns pointer to vector of operations for integrating with

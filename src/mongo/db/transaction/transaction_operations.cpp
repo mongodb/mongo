@@ -52,25 +52,21 @@ namespace {
 std::vector<BSONObj> packOperationsIntoApplyOps(
     std::vector<repl::ReplOperation>::const_iterator operationsBegin,
     std::vector<repl::ReplOperation>::const_iterator operationsEnd,
-    boost::optional<std::size_t> oplogEntryCountLimit,
-    boost::optional<std::size_t> oplogEntrySizeLimitBytes) {
+    std::size_t oplogEntryCountLimit,
+    std::size_t oplogEntrySizeLimitBytes) {
     std::vector<BSONObj> operations;
     std::size_t totalOperationsSize{0};
     for (auto operationIter = operationsBegin; operationIter != operationsEnd; ++operationIter) {
         const auto& operation = *operationIter;
 
-        if (oplogEntryCountLimit) {
-            if (operations.size() == *oplogEntryCountLimit) {
-                break;
-            }
+        if (operations.size() == oplogEntryCountLimit) {
+            break;
         }
-        if (oplogEntrySizeLimitBytes) {
-            if ((operations.size() > 0 &&
-                 (totalOperationsSize +
-                      repl::DurableOplogEntry::getDurableReplOperationSize(operation) >
-                  *oplogEntrySizeLimitBytes))) {
-                break;
-            }
+        if ((operations.size() > 0 &&
+             (totalOperationsSize +
+                  repl::DurableOplogEntry::getDurableReplOperationSize(operation) >
+              oplogEntrySizeLimitBytes))) {
+            break;
         }
 
         auto serializedOperation = operation.toBSON();
@@ -180,9 +176,9 @@ TransactionOperations::CollectionUUIDs TransactionOperations::getCollectionUUIDs
 
 TransactionOperations::ApplyOpsInfo TransactionOperations::getApplyOpsInfo(
     const std::vector<OplogSlot>& oplogSlots,
-    bool prepare,
-    boost::optional<std::size_t> oplogEntryCountLimit,
-    boost::optional<std::size_t> oplogEntrySizeLimitBytes) const {
+    std::size_t oplogEntryCountLimit,
+    std::size_t oplogEntrySizeLimitBytes,
+    bool prepare) const {
     const auto& operations = _transactionOperations;
     if (operations.empty()) {
         return {{}, /*numberOfOplogSlotsUsed=*/0};

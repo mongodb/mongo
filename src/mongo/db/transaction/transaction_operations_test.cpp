@@ -34,6 +34,9 @@
 namespace mongo {
 namespace {
 
+constexpr auto kOplogEntryCountLimit = std::numeric_limits<std::size_t>::max();
+constexpr auto kOplogEntrySizeLimitBytes = static_cast<std::size_t>(BSONObjMaxUserSize);
+
 TEST(TransactionOperationsTest, Basic) {
     TransactionOperations ops;
     ASSERT(ops.isEmpty());
@@ -208,9 +211,9 @@ TEST(TransactionOperationsTest, GetCollectionUUIDsIgnoresNoopOperations) {
 TEST(TransactionOperationsTest, GetApplyOpsInfoEmptyOps) {
     TransactionOperations ops;
     auto info = ops.getApplyOpsInfo(/*oplogSlots=*/{},
-                                    /*prepare=*/false,
-                                    /*oplogEntryCountLimit=*/boost::none,
-                                    /*oplogEntrySizeLimitBytes=*/boost::none);
+                                    kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
     ASSERT_EQ(info.applyOpsEntries.size(), 0);
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 0);
 }
@@ -222,9 +225,9 @@ DEATH_TEST(TransactionOperationsTest,
     TransactionOperations::TransactionOperation op;
     ASSERT_OK(ops.addOperation(op));
     ops.getApplyOpsInfo(/*oplogSlots=*/{},
-                        /*prepare=*/false,
-                        /*oplogEntryCountLimit=*/boost::none,
-                        /*oplogEntrySizeLimitBytes=*/boost::none);
+                        kOplogEntryCountLimit,
+                        kOplogEntrySizeLimitBytes,
+                        /*prepare=*/false);
 }
 
 TEST(TransactionOperationsTest, GetApplyOpsInfoReturnsOneEntryContainingTwoOperations) {
@@ -249,9 +252,9 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoReturnsOneEntryContainingTwoOpera
     oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
 
     auto info = ops.getApplyOpsInfo(oplogSlots,
-                                    /*prepare=*/false,
-                                    /*oplogEntryCountLimit=*/boost::none,
-                                    /*oplogEntrySizeLimitBytes=*/boost::none);
+                                    kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 1U);
     ASSERT_EQ(info.applyOpsEntries.size(), 1U);
@@ -285,9 +288,9 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationCountLimit) {
     // Restrict each applyOps entry to holding at most one operation.
     auto info = ops.getApplyOpsInfo(
         oplogSlots,
-        /*prepare=*/false,
         /*oplogEntryCountLimit=*/1U,
-        /*oplogEntrySizeLimitBytes=*/static_cast<std::size_t>(BSONObjMaxUserSize));
+        /*oplogEntrySizeLimitBytes=*/static_cast<std::size_t>(BSONObjMaxUserSize),
+        /*prepare=*/false);
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 2U);
@@ -327,10 +330,10 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationSizeLimit) {
     // Restrict each applyOps entry to holding at most one operation.
     auto info = ops.getApplyOpsInfo(
         oplogSlots,
-        /*prepare=*/false,
         /*oplogEntryCountLimit=*/100U,
         /*oplogEntrySizeLimitBytes=*/repl::DurableOplogEntry::getDurableReplOperationSize(op1) +
-            TransactionOperations::ApplyOpsInfo::kBSONArrayElementOverhead);
+            TransactionOperations::ApplyOpsInfo::kBSONArrayElementOverhead,
+        /*prepare=*/false);
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 2U);
@@ -366,9 +369,9 @@ DEATH_TEST(TransactionOperationsTest,
     oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
 
     ops.getApplyOpsInfo(oplogSlots,
-                        /*prepare=*/false,
-                        /*oplogEntryCountLimit=*/boost::none,
-                        /*oplogEntrySizeLimitBytes=*/boost::none);
+                        kOplogEntryCountLimit,
+                        kOplogEntrySizeLimitBytes,
+                        /*prepare=*/false);
 }
 
 TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsPreImageSlotBeforeOperation) {
@@ -390,9 +393,9 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsPreImageSlotBeforeOperatio
     oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
 
     auto info = ops.getApplyOpsInfo(oplogSlots,
-                                    /*prepare=*/false,
-                                    /*oplogEntryCountLimit=*/boost::none,
-                                    /*oplogEntrySizeLimitBytes=*/boost::none);
+                                    kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 1U);
@@ -417,9 +420,9 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsLastOplogSlotForPrepare) {
     oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
 
     auto info = ops.getApplyOpsInfo(oplogSlots,
-                                    /*prepare=*/true,
-                                    /*oplogEntryCountLimit=*/boost::none,
-                                    /*oplogEntrySizeLimitBytes=*/boost::none);
+                                    kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/true);
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 1U);
     ASSERT_EQ(info.applyOpsEntries.size(), 1U);
