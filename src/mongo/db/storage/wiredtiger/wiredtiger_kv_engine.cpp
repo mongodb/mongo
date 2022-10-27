@@ -437,7 +437,28 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
         // If MongoDB startup fails, there may be clues from the previous run still left in the WT
         // log files that can provide some insight into how the system got into a bad state. When
         // testing is enabled, keep around some of these files for investigative purposes.
-        ss << "debug_mode=(table_logging=true,checkpoint_retention=4),";
+        //
+        // We strive to keep 4 minutes of logs. Increase the retention for tests that take
+        // checkpoints more often.
+        const double fourMinutesInSeconds = 240.0;
+        int ckptsPerFourMinutes;
+        if (storageGlobalParams.checkpointDelaySecs <= 0.0) {
+            ckptsPerFourMinutes = 1;
+        } else {
+            ckptsPerFourMinutes =
+                static_cast<int>(fourMinutesInSeconds / storageGlobalParams.checkpointDelaySecs);
+        }
+
+        if (ckptsPerFourMinutes < 1) {
+            LOGV2_WARNING(8423377,
+                          "Unexpected value for checkpoint retention",
+                          "checkpointDelaySecs"_attr = storageGlobalParams.checkpointDelaySecs,
+                          "ckptsPerFourMinutes"_attr = ckptsPerFourMinutes);
+            ckptsPerFourMinutes = 1;
+        }
+
+        ss << fmt::format("debug_mode=(table_logging=true,checkpoint_retention={}),",
+                          ckptsPerFourMinutes);
     }
     if (gWiredTigerStressConfig) {
         ss << "timing_stress_for_test=[history_store_checkpoint_delay,checkpoint_slow],";
