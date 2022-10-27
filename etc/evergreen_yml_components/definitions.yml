@@ -2088,14 +2088,13 @@ functions:
       permissions: public-read
       display_name: SCons stdout log
 
-# Deprecating in favor of the SCons expanded metrics.
-#  - *f_expansions_write
-#  - command: subprocess.exec
-#    params:
-#      continue_on_err: true
-#      binary: bash
-#      args:
-#      - "./src/evergreen/scons_splunk.sh"
+  - *f_expansions_write
+  - command: subprocess.exec
+    params:
+      continue_on_err: true
+      binary: bash
+      args:
+      - "./src/evergreen/scons_splunk.sh"
 
   "send scons cedar report":
     - command: subprocess.exec
