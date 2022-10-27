@@ -87,13 +87,13 @@ TEST(WiredTigerCApiTest, RollbackToStable40) {
     const std::string table_cfg("key_format=i,value_format=S,log=(enabled=false)");
     ret = session->create(session, uri.c_str(), table_cfg.c_str());
     ASSERT_OK(wtRCToStatus(ret, session))
-        << fmt::format("failed to create table {} with config", uri, table_cfg);
+        << fmt::format("failed to create table {} with config {}", uri, table_cfg);
 
     // Pin oldest and stable to timestamps 10.
     ret = conn->set_timestamp(
         conn, fmt::format("oldest_timestamp={:x},stable_timestamp={:x}", 10, 10).c_str());
     ASSERT_OK(wtRCToStatus(ret, session))
-        << fmt::format("failed to set oldest and stable timestamps to {} (hex: {})", 10, 10);
+        << fmt::format("failed to set oldest and stable timestamps to {} (hex: {:x})", 10, 10);
 
     ret = session->open_cursor(session, uri.c_str(), nullptr, nullptr, &cursor);
     ASSERT_OK(wtRCToStatus(ret, session)) << "failed to open cursor to insert initial set of keys";
@@ -170,7 +170,9 @@ TEST(WiredTigerCApiTest, RollbackToStable40) {
 
         ret = session->commit_transaction(session, fmt::format("commit_timestamp={:x}", i).c_str());
         ASSERT_OK(wtRCToStatus(ret, session)) << fmt::format(
-            "failed to commit transaction for updating middle key (update counter: {})", i);
+            "failed to commit transaction for updating middle key (update counter: {} (hex: {:x}))",
+            i,
+            i);
     }
 
     // With this checkpoint, all the updates in the history store are persisted to disk.
