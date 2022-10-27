@@ -332,6 +332,7 @@ env.CppUnitTest(
         'network_interface_mock_test_fixture.cpp',
         'network_interface_tl_test.cpp',
         'scoped_task_executor_test.cpp',
+        'split_timer_test.cpp',
         'task_executor_cursor_test.cpp',
         'thread_pool_task_executor_test.cpp',
     ],

@@ -22,12 +22,12 @@ const sleepMillisBetweenQueries = 100;
 const errorAllowance = 0.9;
 
 const expectedFields = [
-    "totalElapsedMillis",
-    "activeElapsedMillis",
-    "sourceWorkElapsedMillis",
-    "processWorkElapsedMillis",
-    "sendResponseElapsedMillis",
-    "finalizeElapsedMillis",
+    "totalMillis",
+    "activeMillis",
+    "receiveWorkMillis",
+    "processWorkMillis",
+    "sendResponseMillis",
+    "finalizeMillis",
 ];
 
 function getSlowLogAndCount(conn) {
@@ -75,14 +75,16 @@ function runTest(conn) {
 
     // Do some sanity checks over the actual contents of the log.
     const slowLoopObj = JSON.parse(logAndCount.log);
+    jsTest.log(slowLoopObj);
+    let elapsedObj = slowLoopObj.attr.elapsed;
     expectedFields.forEach((expectedField) => {
-        assert(slowLoopObj.attr[expectedField] !== null,
+        assert(expectedField in elapsedObj,
                "Expected to find field but couldn't: " + expectedField);
     });
-    let totalElapsed = slowLoopObj.attr.totalElapsedMillis;
-    let activeElapsed = slowLoopObj.attr.activeElapsedMillis;
-    let sourceWorkElapsed = slowLoopObj.attr.sourceWorkElapsedMillis;
-    let processWorkElapsed = slowLoopObj.attr.processWorkElapsedMillis;
+    let totalElapsed = elapsedObj.totalMillis;
+    let activeElapsed = elapsedObj.activeMillis;
+    let sourceWorkElapsed = elapsedObj.receiveWorkMillis;
+    let processWorkElapsed = elapsedObj.processWorkMillis;
     assert.gte(
         sourceWorkElapsed,
         sleepMillisBetweenQueries * errorAllowance,

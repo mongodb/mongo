@@ -42,6 +42,7 @@
 #include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/traffic_recorder.h"
+#include "mongo/executor/split_timer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -61,14 +62,167 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_peer_info.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 
 namespace mongo {
 namespace transport {
 namespace {
+
 MONGO_FAIL_POINT_DEFINE(doNotSetMoreToCome);
 MONGO_FAIL_POINT_DEFINE(beforeCompressingExhaustResponse);
+
+namespace metrics_detail {
+
+/** Applies X(id) for each SplitId */
+#define EXPAND_TIME_SPLIT_IDS(X) \
+    X(started)                   \
+    X(receivedWork)              \
+    X(processedWork)             \
+    X(sentResponse)              \
+    X(done)                      \
+    /**/
+
+/**
+ * Applies X(id, startSplit, endSplit) for each IntervalId.
+ *
+ * This table defines the intervals of a per-command `SessionWorkflow` loop
+ * iteration as reported to a `SplitTimer`. The splits are time points, and the
+ * `intervals` are durations between notable pairs of them.
+ *
+ *  [started]
+ *  |   [receivedWork]
+ *  |   |   [processedWork]
+ *  |   |   |   [sentResponse]
+ *  |   |   |   |   [done]
+ *  |<------------->|  total
+ *  |   |<--------->|  active
+ *  |<->|   |   |   |  receivedWork
+ *  |   |<->|   |   |  processWork
+ *  |   |   |<->|   |  sendResponse
+ *  |   |   |   |<->|  finalize
+ */
+#define EXPAND_INTERVAL_IDS(X)                   \
+    X(total, started, done)                      \
+    X(active, receivedWork, done)                \
+    X(receiveWork, started, receivedWork)        \
+    X(processWork, receivedWork, processedWork)  \
+    X(sendResponse, processedWork, sentResponse) \
+    X(finalize, sentResponse, done)              \
+    /**/
+
+#define X_ID(id, ...) id,
+enum class IntervalId : size_t { EXPAND_INTERVAL_IDS(X_ID) };
+enum class TimeSplitId : size_t { EXPAND_TIME_SPLIT_IDS(X_ID) };
+#undef X_ID
+
+/** Trait for the count of the elements in a packed enum. */
+template <typename T>
+static constexpr size_t enumExtent = 0;
+
+#define X_COUNT(...) +1
+template <>
+constexpr inline size_t enumExtent<IntervalId> = EXPAND_INTERVAL_IDS(X_COUNT);
+template <>
+constexpr inline size_t enumExtent<TimeSplitId> = EXPAND_TIME_SPLIT_IDS(X_COUNT);
+#undef X_COUNT
+
+struct TimeSplitDef {
+    TimeSplitId id;
+    StringData name;
+};
+
+struct IntervalDef {
+    IntervalId id;
+    StringData name;
+    TimeSplitId start;
+    TimeSplitId end;
+};
+
+constexpr inline auto timeSplitDefs = std::array{
+#define X(id) TimeSplitDef{TimeSplitId::id, #id ""_sd},
+    EXPAND_TIME_SPLIT_IDS(X)
+#undef X
+};
+
+constexpr inline auto intervalDefs = std::array{
+#define X(id, start, end) \
+    IntervalDef{IntervalId::id, #id "Millis"_sd, TimeSplitId::start, TimeSplitId::end},
+    EXPAND_INTERVAL_IDS(X)
+#undef X
+};
+
+#undef EXPAND_TIME_SPLIT_IDS
+#undef EXPAND_INTERVAL_IDS
+
+struct SplitTimerPolicy {
+    using TimeSplitIdType = TimeSplitId;
+    using IntervalIdType = IntervalId;
+
+    static constexpr size_t numTimeSplitIds = enumExtent<TimeSplitIdType>;
+    static constexpr size_t numIntervalIds = enumExtent<IntervalIdType>;
+
+    template <typename E>
+    static constexpr size_t toIdx(E e) {
+        return static_cast<size_t>(e);
+    }
+
+    static constexpr StringData getName(IntervalIdType iId) {
+        return intervalDefs[toIdx(iId)].name;
+    }
+
+    static constexpr TimeSplitIdType getStartSplit(IntervalIdType iId) {
+        return intervalDefs[toIdx(iId)].start;
+    }
+
+    static constexpr TimeSplitIdType getEndSplit(IntervalIdType iId) {
+        return intervalDefs[toIdx(iId)].end;
+    }
+
+    static constexpr StringData getName(TimeSplitIdType tsId) {
+        return timeSplitDefs[toIdx(tsId)].name;
+    }
+
+    void onStart(SplitTimer<SplitTimerPolicy>* splitTimer) {
+        splitTimer->notify(TimeSplitIdType::started);
+    }
+
+    void onFinish(SplitTimer<SplitTimerPolicy>* splitTimer) {
+        splitTimer->notify(TimeSplitIdType::done);
+        auto t = splitTimer->getSplitInterval(IntervalIdType::active);
+        if (MONGO_likely(!t || *t < Milliseconds{serverGlobalParams.slowMS.load()}))
+            return;
+        BSONObjBuilder bob;
+        splitTimer->appendIntervals(bob);
+        LOGV2(6983000, "Slow SessionWorkflow loop", "elapsed"_attr = bob.obj());
+    }
+
+    Timer makeTimer() {
+        return Timer{};
+    }
+};
+
+class SessionWorkflowMetrics {
+public:
+    void start() {
+        _t.emplace();
+    }
+    void received() {
+        _t->notify(TimeSplitId::receivedWork);
+    }
+    void processed() {
+        _t->notify(TimeSplitId::processedWork);
+    }
+    void sent() {
+        _t->notify(TimeSplitId::sentResponse);
+    }
+    void finish() {
+        _t.reset();
+    }
+
+private:
+    boost::optional<SplitTimer<SplitTimerPolicy>> _t;
+};
+}  // namespace metrics_detail
 
 /**
  * Given a request and its already generated response, checks for exhaust flags. If exhaust is
@@ -146,153 +300,8 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
     }
     return false;
 }
+
 }  // namespace
-
-
-/**
- * Acts as a split timer which captures times elapsed at various points throughout a single
- * SessionWorkflow loop. The SessionWorkflow loop itself is expected to (1) construct this object
- * when timing should begin, and (2) call this object's `notifySplit` function at appropriate times
- * throughout the workflow.
- */
-class SessionWorkflowMetrics {
-    /**
-     * NOTE: when updating these, ensure:
-     *   - These are all contiguous.
-     *   - NumEntries is the highest constant.
-     *   - The public constexprs are up to date.
-     *   - The ranges in logSlowLoop are still correct.
-     */
-    using Started_T = std::integral_constant<size_t, 0>;
-    using SourcedWork_T = std::integral_constant<size_t, 1>;
-    using ProcessedWork_T = std::integral_constant<size_t, 2>;
-    using SentResponse_T = std::integral_constant<size_t, 3>;
-    using Done_T = std::integral_constant<size_t, 4>;
-    using NumEntries_T = std::integral_constant<size_t, 5>;
-    static constexpr NumEntries_T NumEntries{};
-
-public:
-    /**
-     * These constants act as tags for moments in a single SessionWorkflow loop.
-     */
-    static constexpr Started_T Started{};
-    static constexpr SourcedWork_T SourcedWork{};
-    static constexpr ProcessedWork_T ProcessedWork{};
-    static constexpr SentResponse_T SentResponse{};
-    static constexpr Done_T Done{};
-
-    template <typename Split_T>
-    struct SplitInRange {
-        static constexpr bool value = Split_T::value >= Started && Split_T::value < NumEntries;
-    };
-
-    SessionWorkflowMetrics() {
-        _splits[Started] = Microseconds{0};
-    }
-
-    SessionWorkflowMetrics(SessionWorkflowMetrics&& other) {
-        *this = std::move(other);
-    }
-    SessionWorkflowMetrics& operator=(SessionWorkflowMetrics&& other) {
-        if (&other == this) {
-            return *this;
-        }
-
-        _isFinalized = other._isFinalized;
-        _timer = std::move(other._timer);
-        _splits = std::move(other._splits);
-
-        // The moved-from object should avoid extraneous logging.
-        other._isFinalized = true;
-
-        return *this;
-    }
-
-    ~SessionWorkflowMetrics() {
-        finalize();
-    }
-
-    /**
-     * Captures the elapsed time and associates it with `split`. A second call with the same `split`
-     * will overwrite the previous. It is expected that this gets called for all splits other than
-     * Start and Done.
-     */
-    template <typename Split_T, typename std::enable_if_t<SplitInRange<Split_T>::value, int> = 0>
-    void notifySplit(Split_T split) {
-        _splits[split] = _timer.elapsed();
-    }
-
-    /**
-     * If not already finalized, captures the elapsed time for the `Done` Split and outputs metrics
-     * as a log if the criteria for logging is met. Calling `finalize` explicitly is not required
-     * because it is invoked by the destructor, however an early call can be done if this object's
-     * destruction needs to be defered for any reason.
-     */
-    void finalize() {
-        if (_isFinalized)
-            return;
-        _isFinalized = true;
-        notifySplit(Done);
-
-        auto activeTime = microsBetween(SourcedWork, SentResponse).value_or(Microseconds{0});
-        if (MONGO_unlikely(durationCount<Milliseconds>(activeTime) >=
-                           serverGlobalParams.slowMS.load())) {
-            logSlowLoop();
-        }
-    }
-
-private:
-    bool _isFinalized{false};
-    Timer _timer{};
-    std::array<boost::optional<Microseconds>, NumEntries> _splits{};
-
-    /**
-     * Returns the time elapsed between the two splits corresponding to `startIdx` and `endIdx`.
-     * The split time for `startIdx` is assumed to have happened before the split at `endIdx`.
-     * Both `startIdx` and `endIdx` are assumed to have had captured times. If not, an optional with
-     * no value will be returned.
-     */
-    boost::optional<Microseconds> microsBetween(size_t startIdx, size_t endIdx) const {
-        auto atEnd = _splits[endIdx];
-        auto atStart = _splits[startIdx];
-        if (!atStart || !atEnd)
-            return {};
-        return *atEnd - *atStart;
-    }
-
-    /**
-     * Appends an attribute to `attr` corresponding to a range. Returns whether a negative range was
-     * encountered.
-     */
-    template <size_t N>
-    bool addAttr(const char (&name)[N],
-                 size_t startIdx,
-                 size_t endIdx,
-                 logv2::DynamicAttributes& attr) {
-        if (auto optTime = microsBetween(startIdx, endIdx)) {
-            attr.add(name, duration_cast<Milliseconds>(*optTime));
-            return *optTime < Microseconds{0};
-        }
-        return false;
-    }
-
-    void logSlowLoop() {
-        bool neg = false;
-        logv2::DynamicAttributes attr;
-
-        neg |= addAttr("totalElapsed", Started, Done, attr);
-        neg |= addAttr("activeElapsed", SourcedWork, Done, attr);
-        neg |= addAttr("sourceWorkElapsed", Started, SourcedWork, attr);
-        neg |= addAttr("processWorkElapsed", SourcedWork, ProcessedWork, attr);
-        neg |= addAttr("sendResponseElapsed", ProcessedWork, SentResponse, attr);
-        neg |= addAttr("finalizeElapsed", SentResponse, Done, attr);
-        if (neg) {
-            attr.add("note", "Negative time range found. This indicates something went wrong.");
-        }
-
-        LOGV2(6983000, "Slow SessionWorkflow loop", attr);
-    }
-};
 
 class SessionWorkflow::Impl {
 public:
@@ -404,7 +413,7 @@ private:
     std::unique_ptr<WorkItem> _work;
     std::unique_ptr<WorkItem> _nextWork; /**< created by exhaust responses */
 
-    boost::optional<SessionWorkflowMetrics> _metrics{};
+    metrics_detail::SessionWorkflowMetrics _metrics;
 };
 
 class SessionWorkflow::Impl::WorkItem {
@@ -654,7 +663,7 @@ void SessionWorkflow::Impl::startNewLoop(const Status& executorStatus) {
         return;
     }
 
-    _metrics = SessionWorkflowMetrics();
+    _metrics.start();
 
     makeReadyFutureWith([this] {
         if (_nextWork) {
@@ -662,18 +671,18 @@ void SessionWorkflow::Impl::startNewLoop(const Status& executorStatus) {
         } else {
             receiveMessage();
         }
-        _metrics->notifySplit(SessionWorkflowMetrics::SourcedWork);
+        _metrics.received();
         return processMessage();
     })
         .then([this] {
-            _metrics->notifySplit(SessionWorkflowMetrics::ProcessedWork);
+            _metrics.processed();
             if (_work->hasOut()) {
                 sendMessage();
-                _metrics->notifySplit(SessionWorkflowMetrics::SentResponse);
+                _metrics.sent();
             }
         })
         .getAsync([this, anchor = shared_from_this()](Status status) {
-            _metrics = {};
+            _metrics.finish();
             scheduleNewLoop(std::move(status));
         });
 }
