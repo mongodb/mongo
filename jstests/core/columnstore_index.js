@@ -53,8 +53,9 @@ let getCSIUsageCount = function(collection) {
         collection
             .aggregate([{$indexStats: {}}, {$match: {$expr: {$eq: ["$key", {$literal: csIdx}]}}}])
             .toArray();
-    assert.eq(csi.length, 1);
-    return csi[0].accesses.ops;
+    return csi.reduce((accum, s) => {
+        return accum + s.accesses.ops;
+    }, 0);
 };
 
 // Test index stats have sensible usage count values for column store indexes.
@@ -63,7 +64,9 @@ assert.eq(getCSIUsageCount(coll), usageCount);
 const res = coll.aggregate([{"$project": {"a": 1, _id: 0}}, {"$match": {a: 1}}]);
 assert.eq(res.itcount(), 1);
 usageCount++;
-assert.eq(getCSIUsageCount(coll), usageCount);
+// on sharded collections, each matching shard will reply "1", meaning
+// we could get a correct usage total greater than 1.
+assert.gte(getCSIUsageCount(coll), usageCount);
 
 // Test collStats have sensible values for column store indexes
 const cs = coll.aggregate([{$collStats: {storageStats: {}}}]).next();
