@@ -230,24 +230,30 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
         .then([cancelTimeoutSource, donorMtab, recipientMtab](std::vector<Status> results) mutable {
             cancelTimeoutSource.cancel();
             auto resultIter = results.begin();
-            const auto donorMtabStatus = donorMtab ? *resultIter++ : Status::OK();
-            const auto recipientMtabStatus = recipientMtab ? *resultIter : Status::OK();
-            if (!donorMtabStatus.isOK()) {
-                donorMtab->recordTenantMigrationError(donorMtabStatus);
-                LOGV2(5519301,
-                      "Received error while waiting on donor access blocker",
-                      "error"_attr = donorMtabStatus);
+
+            if (donorMtab) {
+                auto donorMtabStatus = *resultIter++;
+                if (!donorMtabStatus.isOK()) {
+                    donorMtab->recordTenantMigrationError(donorMtabStatus);
+                    LOGV2(5519301,
+                          "Received error while waiting on donor access blocker",
+                          "error"_attr = donorMtabStatus);
+                    return donorMtabStatus;
+                }
             }
-            if (!recipientMtabStatus.isOK()) {
-                recipientMtab->recordTenantMigrationError(recipientMtabStatus);
-                LOGV2(5519302,
-                      "Received error while waiting on recipient access blocker",
-                      "error"_attr = recipientMtabStatus);
-                if (donorMtabStatus.isOK()) {
+
+            if (recipientMtab) {
+                auto recipientMtabStatus = *resultIter;
+                if (!recipientMtabStatus.isOK()) {
+                    recipientMtab->recordTenantMigrationError(recipientMtabStatus);
+                    LOGV2(5519302,
+                          "Received error while waiting on recipient access blocker",
+                          "error"_attr = recipientMtabStatus);
                     return recipientMtabStatus;
                 }
             }
-            return donorMtabStatus;
+
+            return Status::OK();
         })
         .onError<ErrorCodes::CallbackCanceled>(
             [cancelTimeoutSource,
