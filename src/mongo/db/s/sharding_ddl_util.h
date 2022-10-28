@@ -203,9 +203,21 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   const std::vector<ShardId>& shardIds,
                                                   std::shared_ptr<executor::TaskExecutor> executor,
-                                                  const OperationSessionInfo& osi);
+                                                  const OperationSessionInfo& osi,
+                                                  bool fromMigrate);
 
 BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to);
+
+/**
+ * Drops the specified collection or returns without error if the collection has already been
+ * dropped. A particular incarnation of the collection can be dropped by specifying its UUID.
+ *
+ * This functions assumes the collection being dropped doesn't have any two-phase index builds
+ * active on it.
+ */
+void ensureCollectionDroppedNoChangeEvent(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const boost::optional<UUID>& uuid = boost::none);
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

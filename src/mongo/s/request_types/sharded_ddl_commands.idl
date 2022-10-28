@@ -335,6 +335,11 @@ commands:
         api_version: ""
         cpp_name: ShardsvrDropCollectionParticipant
         strict: false
+        fields:
+            fromMigrate: 
+                type: bool 
+                description: "Whether the drop comes as a result of an interrupted migration process."
+                optional: true
 
     _shardsvrRenameCollection:
         command_name: _shardsvrRenameCollection

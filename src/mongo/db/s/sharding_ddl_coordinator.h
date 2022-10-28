@@ -352,7 +352,7 @@ protected:
         }
     }
 
-    // lazily acqiure Logical Session ID and a txn number
+    // lazily acquire Logical Session ID and a txn number
     void _updateSession(OperationContext* opCtx) {
         auto newDoc = [&] {
             stdx::lock_guard lk{_docMutex};

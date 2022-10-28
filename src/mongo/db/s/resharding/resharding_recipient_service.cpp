@@ -52,6 +52,7 @@
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/shard_key_util.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/write_block_bypass.h"
@@ -829,7 +830,7 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
         opCtx.get(), _metadata.getReshardingUUID(), _metadata.getSourceUUID(), _donorShards);
 
     if (aborted) {
-        resharding::data_copy::ensureCollectionDropped(
+        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(
             opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
     }
 }

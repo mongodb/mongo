@@ -52,8 +52,12 @@ public:
     /**
      * Locally drops a collection, cleans its CollectionShardingRuntime metadata and refreshes the
      * catalog cache.
+     * The oplog entry associated with the drop collection will be generated with the fromMigrate
+     * flag.
      */
-    static DropReply dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss);
+    static void dropCollectionLocally(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      bool fromMigrate);
 
 private:
     StringData serializePhase(const Phase& phase) const override {

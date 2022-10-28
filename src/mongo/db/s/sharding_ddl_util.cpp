@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
@@ -625,8 +626,11 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   const std::vector<ShardId>& shardIds,
                                                   std::shared_ptr<executor::TaskExecutor> executor,
-                                                  const OperationSessionInfo& osi) {
-    const ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
+                                                  const OperationSessionInfo& osi,
+                                                  bool fromMigrate) {
+    ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
+    dropCollectionParticipant.setFromMigrate(fromMigrate);
+
     const auto cmdObj =
         CommandHelpers::appendMajorityWriteConcern(dropCollectionParticipant.toBSON({}));
 
@@ -638,6 +642,30 @@ BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const Nam
     return BSON("command"
                 << "rename"
                 << "from" << from.toString() << "to" << to.toString());
+}
+
+void ensureCollectionDroppedNoChangeEvent(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const boost::optional<UUID>& uuid) {
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
+    writeConflictRetry(opCtx,
+                       "mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent",
+                       nss.toString(),
+                       [&] {
+                           AutoGetCollection coll(opCtx, nss, MODE_X);
+                           if (!coll || (uuid && coll->uuid() != uuid)) {
+                               // If the collection doesn't exist or exists with a different UUID,
+                               // then the requested collection has been dropped already.
+                               return;
+                           }
+
+                           WriteUnitOfWork wuow(opCtx);
+                           uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(
+                               opCtx, nss, {} /* dropOpTime */, true /* markFromMigrate */));
+                           wuow.commit();
+                       });
 }
 }  // namespace sharding_ddl_util
 }  // namespace mongo

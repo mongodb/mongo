@@ -43,6 +43,7 @@
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/session_catalog_migration.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -68,28 +69,6 @@ void ensureCollectionExists(OperationContext* opCtx,
         coll.ensureDbExists(opCtx)->createCollection(opCtx, nss, options);
         wuow.commit();
     });
-}
-
-void ensureCollectionDropped(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             const boost::optional<UUID>& uuid) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
-
-    writeConflictRetry(
-        opCtx, "resharding::data_copy::ensureCollectionDropped", nss.toString(), [&] {
-            AutoGetCollection coll(opCtx, nss, MODE_X);
-            if (!coll || (uuid && coll->uuid() != uuid)) {
-                // If the collection doesn't exist or exists with a different UUID, then the
-                // requested collection has been dropped already.
-                return;
-            }
-
-            WriteUnitOfWork wuow(opCtx);
-            uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(
-                opCtx, nss, {} /* dropOpTime */, true /* markFromMigrate */));
-            wuow.commit();
-        });
 }
 
 void ensureOplogCollectionsDropped(OperationContext* opCtx,
@@ -118,11 +97,11 @@ void ensureOplogCollectionsDropped(OperationContext* opCtx,
 
         // Drop the conflict stash collection for this donor.
         auto stashNss = getLocalConflictStashNamespace(sourceUUID, donor.getShardId());
-        ensureCollectionDropped(opCtx, stashNss);
+        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(opCtx, stashNss);
 
         // Drop the oplog buffer collection for this donor.
         auto oplogBufferNss = getLocalOplogBufferNamespace(sourceUUID, donor.getShardId());
-        ensureCollectionDropped(opCtx, oplogBufferNss);
+        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(opCtx, oplogBufferNss);
     }
 }
 

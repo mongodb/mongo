@@ -30,6 +30,7 @@
 #include "mongo/db/s/drop_collection_coordinator.h"
 
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/range_deletion_util.h"
@@ -46,8 +47,9 @@
 
 namespace mongo {
 
-DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
-                                                           const NamespaceString& nss) {
+void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      bool fromMigrate) {
 
     boost::optional<UUID> collectionUUID;
     {
@@ -97,9 +99,15 @@ DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opC
         }
     }
 
-    DropReply result;
-    uassertStatusOK(dropCollection(
-        opCtx, nss, &result, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+    DropReply unused;
+    if (fromMigrate)
+        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(opCtx, nss, collectionUUID);
+    else
+        uassertStatusOK(
+            dropCollection(opCtx,
+                           nss,
+                           &unused,
+                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
 
 
     // Force the refresh of the catalog cache to purge outdated information
@@ -110,8 +118,6 @@ DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opC
     // Ensures the remove of range deletions and the refresh of the catalog cache will be waited for
     // majority at the end of the command
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-
-    return result;
 }
 
 ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
@@ -210,13 +216,23 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                     participants.end());
 
                 sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-                    opCtx, nss(), participants, **executor, getCurrentSession());
+                    opCtx,
+                    nss(),
+                    participants,
+                    **executor,
+                    getCurrentSession(),
+                    false /*fromMigrate*/);
 
                 // The sharded collection must be dropped on the primary shard after it has been
                 // dropped on all of the other shards to ensure it can only be re-created as
                 // unsharded with a higher optime than all of the drops.
                 sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-                    opCtx, nss(), {primaryShardId}, **executor, getCurrentSession());
+                    opCtx,
+                    nss(),
+                    {primaryShardId},
+                    **executor,
+                    getCurrentSession(),
+                    false /*fromMigrate*/);
 
                 sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(opCtx, nss(), boost::none);
 

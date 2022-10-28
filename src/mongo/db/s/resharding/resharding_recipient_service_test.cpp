@@ -47,6 +47,7 @@
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
@@ -267,7 +268,8 @@ public:
                                 const ReshardingRecipientDocument& recipientDoc) {
         CollectionOptions options;
         options.uuid = recipientDoc.getSourceUUID();
-        resharding::data_copy::ensureCollectionDropped(opCtx, recipientDoc.getSourceNss());
+        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(opCtx,
+                                                                       recipientDoc.getSourceNss());
         resharding::data_copy::ensureCollectionExists(opCtx, recipientDoc.getSourceNss(), options);
     }
 
@@ -275,7 +277,8 @@ public:
                                         const ReshardingRecipientDocument& recipientDoc) {
         CollectionOptions options;
         options.uuid = recipientDoc.getReshardingUUID();
-        resharding::data_copy::ensureCollectionDropped(opCtx, recipientDoc.getTempReshardingNss());
+        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(
+            opCtx, recipientDoc.getTempReshardingNss());
         resharding::data_copy::ensureCollectionExists(
             opCtx, recipientDoc.getTempReshardingNss(), options);
     }

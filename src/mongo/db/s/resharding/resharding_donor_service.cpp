@@ -52,6 +52,7 @@
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/write_block_bypass.h"
@@ -823,7 +824,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
         // Allow bypassing user write blocking. The check has already been performed on the
         // db-primary shard's ReshardCollectionCoordinator.
         WriteBlockBypass::get(opCtx.get()).set(true);
-        resharding::data_copy::ensureCollectionDropped(
+        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
     }
 
