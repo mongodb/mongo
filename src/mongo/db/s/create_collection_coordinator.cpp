@@ -59,6 +59,11 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+MONGO_FAIL_POINT_DEFINE(failAtCommitCreateCollectionCoordinator);
+
+
 namespace mongo {
 namespace {
 
@@ -342,8 +347,8 @@ void broadcastDropCollection(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const std::shared_ptr<executor::TaskExecutor>& executor,
                              const OperationSessionInfo& osi) {
-    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     const ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     // Remove primary shard from participants
@@ -351,7 +356,7 @@ void broadcastDropCollection(OperationContext* opCtx,
                        participants.end());
 
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss, participants, executor, osi);
+        opCtx, nss, participants, executor, osi, true /* fromMigrate */);
 }
 
 /**
@@ -872,6 +877,12 @@ void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
 
 void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
     LOGV2_DEBUG(5277906, 2, "Create collection _commit", "namespace"_attr = nss());
+
+    if (MONGO_unlikely(failAtCommitCreateCollectionCoordinator.shouldFail())) {
+        LOGV2_DEBUG(6960301, 2, "About to hit failAtCommitCreateCollectionCoordinator fail point");
+        uasserted(ErrorCodes::InterruptedAtShutdown,
+                  "failAtCommitCreateCollectionCoordinator fail point");
+    }
 
     // Upsert Chunks.
     _doc = _updateSession(opCtx, _doc);

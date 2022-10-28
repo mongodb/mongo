@@ -76,7 +76,10 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 
             try {
-                DropCollectionCoordinator::dropCollectionLocally(opCtx, ns());
+                bool fromMigrate =
+                    request().getFromMigrate() ? request().getFromMigrate().value() : false;
+
+                DropCollectionCoordinator::dropCollectionLocally(opCtx, ns(), fromMigrate);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 LOGV2_DEBUG(5280920,
                             1,

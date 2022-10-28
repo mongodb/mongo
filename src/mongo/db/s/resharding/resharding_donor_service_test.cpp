@@ -53,6 +53,7 @@
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/unittest/death_test.h"
@@ -161,7 +162,8 @@ public:
     void createSourceCollection(OperationContext* opCtx, const ReshardingDonorDocument& donorDoc) {
         CollectionOptions options;
         options.uuid = donorDoc.getSourceUUID();
-        resharding::data_copy::ensureCollectionDropped(opCtx, donorDoc.getSourceNss());
+        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(opCtx,
+                                                                       donorDoc.getSourceNss());
         resharding::data_copy::ensureCollectionExists(opCtx, donorDoc.getSourceNss(), options);
     }
 
@@ -169,7 +171,8 @@ public:
                                              const ReshardingDonorDocument& donorDoc) {
         CollectionOptions options;
         options.uuid = donorDoc.getReshardingUUID();
-        resharding::data_copy::ensureCollectionDropped(opCtx, donorDoc.getTempReshardingNss());
+        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(
+            opCtx, donorDoc.getTempReshardingNss());
         resharding::data_copy::ensureCollectionExists(
             opCtx, donorDoc.getTempReshardingNss(), options);
     }
