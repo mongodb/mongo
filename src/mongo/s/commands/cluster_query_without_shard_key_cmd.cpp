@@ -183,7 +183,7 @@ public:
                 // Return the first response that contains a matching document.
                 if (cursorResponse.getBatch().size() > 0) {
                     res.setTargetDoc(cursorResponse.releaseBatch().front().getOwned());
-                    res.setShardId(arsRes.shardId);
+                    res.setShardId(boost::optional<mongo::StringData>(arsRes.shardId));
                     break;
                 }
             }

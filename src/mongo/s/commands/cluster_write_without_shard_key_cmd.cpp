@@ -100,7 +100,7 @@ public:
                     opCtx->inMultiDocumentTransaction());
 
             const auto writeCmd = request().getWriteCmd();
-            const auto shardId = request().getShardId();
+            const auto shardId = ShardId(request().getShardId().toString());
             LOGV2(6962400,
                   "Running write phase for a write without a shard key.",
                   "clientWriteRequest"_attr = writeCmd,

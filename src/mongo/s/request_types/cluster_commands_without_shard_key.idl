@@ -45,7 +45,7 @@ structs:
         optional: true
       shardId: 
         description: "The shard id of the target shard."
-        type: shard_id
+        type: string
         optional: true
   clusterWriteWithoutShardKeyResponse: 
     description: "The response for the '_clusterWriteWithoutShardKeyFind' command."
@@ -86,7 +86,7 @@ commands:
         type: object
       shardId:
         description: "The shard id of the target shard for the write."
-        type: shard_id
+        type: string
       targetDocId:
         description: "The _id value of the target document"
         type: object
