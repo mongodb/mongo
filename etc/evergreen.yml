@@ -1157,9 +1157,9 @@ functions:
             # python path as 'C:\python\python_version'
             python_loc=$(cygpath -w $python_loc)
             venv_dir="$(cygpath -w "$venv_dir")"
-            "$virtualenv_loc" --python "$python_loc" --system-site-packages "$venv_dir"
+            "$virtualenv_loc" --python "$python_loc" "$venv_dir"
           else
-            "$python_loc" -m venv --system-site-packages "$venv_dir"
+            "$python_loc" -m venv "$venv_dir"
           fi
 
           export VIRTUAL_ENV_DISABLE_PROMPT=yes
