@@ -104,6 +104,7 @@ selector:
   - multiversion_incompatible
   - backport_required_multiversion
   - replica_sets_multiversion_backport_required_multiversion
+  - disabled_for_fcv_6_1_upgrade
   roots:
   - jstests/replsets/*.js
 test_kind: js_test
