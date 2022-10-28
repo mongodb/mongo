@@ -938,6 +938,31 @@ server_parameters:
     default:
         expr: false
 
+  internalQueryEnableTelemetry:
+    description: "Knob to enable telemetry collection."
+    set_at: [ startup, runtime ]
+    cpp_varname: "queryTelemetryEnabled"
+    cpp_vartype: bool
+    default:
+      expr: false
+
+  internalQueryConfigureTelemetryCacheSize:
+    description: "Knob to configure the maximum cache size for telemetry collection."
+    set_at: [ startup, runtime ]
+    cpp_varname: "queryTelemetryCacheSize"
+    cpp_vartype: AtomicWord<int>
+    default: 5000
+
+  internalQueryConfigureTelemetrySamplingPercentage:
+    description: "Knob to configure the percentage of queries that are sampled for telemetry."
+    set_at: [ startup, runtime ]
+    cpp_varname: "queryTelemetrySamplingPercentage"
+    cpp_vartype: AtomicDouble
+    default: 0.7
+    validator:
+        gt: 0.0
+        lte: 1.0
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'
