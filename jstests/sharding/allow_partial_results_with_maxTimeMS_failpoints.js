@@ -70,7 +70,9 @@ function runQueryWithTimeout(doAllowPartialResults, timeout) {
     });
 }
 
-const ampleTimeMS = 10 * runtimeMillis(() => runQueryWithTimeout(true, 999999999));
+// Set ampleTimeMS to at least two seconds, plus ten times the basic query runtime.
+// This timeout will provide ample time for our queries to run to completion.
+const ampleTimeMS = 2000 + 10 * runtimeMillis(() => runQueryWithTimeout(true, 999999999));
 print("ampleTimeMS: " + ampleTimeMS);
 
 // Try to fetch all the data in one batch, with ample time allowed.
