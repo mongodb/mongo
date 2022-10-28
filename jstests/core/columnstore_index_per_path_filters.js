@@ -902,13 +902,10 @@ function testInExpr(test) {
     const columnScanStages = getSbePlanStages(explain, "columnscan");
     assert.gt(columnScanStages.length, 0, `Could not find 'columnscan' stage: ${tojson(explain)}`);
 
-    if (columnScanStages.length > 1) {
-        // The test is being run in sharded environment and the state per shard would depend on
-        // how the data gets distributed.
-        jsTestLog("Skipping testPerPathFilters_ExecutionStats in sharded environment.");
-        return;
-    }
-
+    // There might be multiple columnscan stages, e.g. when running in sharded environment. We'll
+    // check the stats on the first available stage because we only care about the upper bounds to
+    // sanity check the perf and most of the test suites would have a single stage and provide the
+    // necessary coverage.
     const columns = columnScanStages[0].columns;
     assertArrayEq({
         actual: columnScanStages[0].paths,
@@ -929,16 +926,16 @@ function testInExpr(test) {
     // equal to the number of documents docsCount (NB: in non-filtered search the number of "next"
     // calls is close to k*docsCount where k is the number of paths).
     assert.eq(_id.numNexts, 0, 'Should not iterate on non-filtered column');
-    assert.eq(x.numNexts + y.numNexts, docsCount, 'Total count of "next" calls');
+    assert.lte(x.numNexts + y.numNexts, docsCount, 'Total count of "next" calls');
 
     // The columns with higher selectivity should be preferred by the zig-zag search for driving the
     // "next" calls. Due to the regularity of data in this test (if "y" matched "x" would match as
-    // well), after the first match "y" column completely takes over.
-    assert.gt(y.numNexts, 0.9 * docsCount, 'high selectivity should drive "next" calls');
+    // well), after the first match "y" column would completely take over.
+    assert.lte(x.numNexts, 0.01 * docsCount, 'High selectivity filter should drive "next" calls');
 
     // We seek into each column to set up the cursors, after that seeks into _id should only happen
     // on full match, and seeks into x or y should only happen on partial matches.
-    assert.eq(_id.numSeeks, 1 + expectedToMatchCount, "Seeks into the _id column");
+    assert.lte(_id.numSeeks, 1 + expectedToMatchCount, "Seeks into the _id column");
     assert.lt(x.numSeeks + y.numSeeks,
               2 * expectedToMatchCount,
               "Number of seeks in filtered columns should be small");
