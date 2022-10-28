@@ -2272,7 +2272,7 @@ buildvariants:
       canaries: none
       atlas_setup: M60-repl
       use_custom_build: true
-      infrastructure_provisioning: graviton-replica
+      infrastructure_provisioning: workload_client
       platform: linux
       project_dir: *project_dir
       storageEngine: wiredTiger
