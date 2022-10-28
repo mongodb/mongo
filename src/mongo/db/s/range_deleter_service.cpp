@@ -280,28 +280,31 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
 }
 
 void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx) {
-    if (disableResumableRangeDeleter.load()) {
-        _state = kDown;
-        return;
-    }
-
-    LOGV2(6834800, "Resubmitting range deletion tasks");
-
-    ServiceContext* serviceContext = opCtx->getServiceContext();
 
     _stepUpCompletedFuture =
         ExecutorFuture<void>(_executor)
-            .then([serviceContext, this] {
+            .then([serviceContext = opCtx->getServiceContext(), this] {
                 ThreadClient tc("ResubmitRangeDeletionsOnStepUp", serviceContext);
-                {
-                    stdx::lock_guard<Client> lk(*tc.get());
-                    tc->setSystemOperationKillableByStepdown(lk);
-                }
-                auto opCtx = tc->makeOperationContext();
-                opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-                ScopedRangeDeleterLock rangeDeleterLock(opCtx.get());
-                DBDirectClient client(opCtx.get());
+                {
+                    auto lock = _acquireMutexUnconditionally();
+                    if (_state != kInitializing) {
+                        return;
+                    }
+                    _initOpCtxHolder = tc->makeOperationContext();
+                }
+
+                ON_BLOCK_EXIT([this] {
+                    auto lock = _acquireMutexUnconditionally();
+                    _initOpCtxHolder.reset();
+                });
+
+                auto opCtx{_initOpCtxHolder.get()};
+
+                LOGV2(6834800, "Resubmitting range deletion tasks");
+
+                ScopedRangeDeleterLock rangeDeleterLock(opCtx);
+                DBDirectClient client(opCtx);
 
                 int nRescheduledTasks = 0;
 
@@ -372,6 +375,15 @@ void RangeDeleterService::_stopService(bool joinExecutor) {
         return;
     }
 
+    {
+        auto lock = _acquireMutexUnconditionally();
+        _state = kDown;
+        if (_initOpCtxHolder) {
+            stdx::lock_guard<Client> lk(*_initOpCtxHolder->getClient());
+            _initOpCtxHolder->markKilled(ErrorCodes::Interrupted);
+        }
+    }
+
     // Join the thread spawned on step-up to resume range deletions
     _stepUpCompletedFuture.getNoThrow().ignore();
 
@@ -391,8 +403,6 @@ void RangeDeleterService::_stopService(bool joinExecutor) {
 
     // Clear range deletion tasks map in order to notify potential waiters on completion futures
     _rangeDeletionTasks.clear();
-
-    _state = kDown;
 }
 
 void RangeDeleterService::onStepDown() {

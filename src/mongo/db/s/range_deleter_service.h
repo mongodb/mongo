@@ -194,6 +194,8 @@ private:
 
     // Future markes as ready when the state changes to "up"
     SemiFuture<void> _stepUpCompletedFuture;
+    // Operation context used for initialization
+    ServiceContext::UniqueOperationContext _initOpCtxHolder;
 
     /* Acquire mutex only if service is up (for "user" operation) */
     [[nodiscard]] stdx::unique_lock<Latch> _acquireMutexFailIfServiceNotUp() {
