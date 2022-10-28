@@ -58,7 +58,7 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 void dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
     bool knownNss = [&]() {
         try {
-            DropCollectionCoordinator::dropCollectionLocally(opCtx, nss);
+            DropCollectionCoordinator::dropCollectionLocally(opCtx, nss, false /* fromMigrate */);
             return true;
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             return false;

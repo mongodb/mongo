@@ -60,16 +60,6 @@ void ensureCollectionExists(OperationContext* opCtx,
                             const CollectionOptions& options);
 
 /**
- * Drops the specified collection or returns without error if the collection has already been
- * dropped. A particular incarnation of the collection can be dropped by specifying its UUID.
- *
- * This functions assumes the collection being dropped doesn't have any two-phase index builds
- * active on it.
- */
-void ensureCollectionDropped(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             const boost::optional<UUID>& uuid = boost::none);
-/**
  * Removes documents from the oplog applier progress and transaction applier progress collections
  * that are associated with an in-progress resharding operation. Also drops all oplog buffer
  * collections and conflict stash collections that are associated with the in-progress resharding
