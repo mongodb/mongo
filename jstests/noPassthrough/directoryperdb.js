@@ -54,7 +54,7 @@ const checkDirRemoved = function(dbName, dbDirPath) {
         },
         "dbpath contained '" + dbName +
             "' directory when it should have been removed:" + tojson(listFiles(dbDirPath)),
-        10 * 1000);  // The periodic task to run data table cleanup runs once a second.
+        20 * 1000);  // The periodic task to run data table cleanup runs once a second.
 };
 
 const db = m.getDB(dbname);
