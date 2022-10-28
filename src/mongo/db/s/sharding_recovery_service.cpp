@@ -333,7 +333,8 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& reason,
-    const WriteConcernOptions& writeConcern) {
+    const WriteConcernOptions& writeConcern,
+    bool throwIfReasonDiffers) {
     LOGV2_DEBUG(5656606,
                 3,
                 "Releasing recoverable critical section",
@@ -371,8 +372,21 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ReleaseRecoverableCS"), bsonObj);
 
+        const bool isDifferentReason = collCSDoc.getReason().woCompare(reason) != 0;
+        if (MONGO_unlikely(!throwIfReasonDiffers && isDifferentReason)) {
+            LOGV2_DEBUG(7019701,
+                        2,
+                        "Impossible to release recoverable critical section since it was taken by "
+                        "another operation with different reason",
+                        "namespace"_attr = nss,
+                        "callerReason"_attr = reason,
+                        "storedReason"_attr = collCSDoc.getReason(),
+                        "writeConcern"_attr = writeConcern);
+            return;
+        }
+
         invariant(
-            collCSDoc.getReason().woCompare(reason) == 0,
+            !isDifferentReason,
             str::stream() << "Trying to release a critical for namespace " << nss << " and reason "
                           << reason
                           << " but it is already taken by another operation with different reason "

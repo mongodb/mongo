@@ -531,7 +531,9 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                             // A previous request already created and committed the collection
                             // but there was a stepdown after the commit.
-                            _releaseCriticalSections(opCtx);
+                            // The critical section might have been taken by a migration, we force
+                            // to skip the invariant check and we do nothing in case it was taken.
+                            _releaseCriticalSections(opCtx, false /* throwIfReasonDiffers */);
 
                             _result = createCollectionResponseOpt;
                             return;
@@ -992,11 +994,16 @@ void CreateCollectionCoordinator::_promoteCriticalSectionsToBlockReads(
     }
 }
 
-void CreateCollectionCoordinator::_releaseCriticalSections(OperationContext* opCtx) {
+void CreateCollectionCoordinator::_releaseCriticalSections(OperationContext* opCtx,
+                                                           bool throwIfReasonDiffers) {
     // TODO SERVER-68084 call ShardingRecoveryService without the try/catch block.
     try {
         ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
-            opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+            opCtx,
+            originalNss(),
+            _critSecReason,
+            ShardingCatalogClient::kMajorityWriteConcern,
+            throwIfReasonDiffers);
     } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
         // Ignore the error (when it is raised, we can assume that no critical section for the view
         // was previously acquired).
@@ -1005,7 +1012,11 @@ void CreateCollectionCoordinator::_releaseCriticalSections(OperationContext* opC
     if (!_timeseriesNssResolvedByCommandHandler()) {
         const auto bucketsNamespace = originalNss().makeTimeseriesBucketsNamespace();
         ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
-            opCtx, bucketsNamespace, _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+            opCtx,
+            bucketsNamespace,
+            _critSecReason,
+            ShardingCatalogClient::kMajorityWriteConcern,
+            throwIfReasonDiffers);
     }
 }
 

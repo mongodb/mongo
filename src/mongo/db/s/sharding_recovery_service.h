@@ -93,11 +93,15 @@ public:
      * responsability of the caller to properly set the filtering information on the primary node.
      *
      * Do nothing if the collection critical section is not taken for that nss and reason.
+     *
+     * Throw an invariant in case the collection critical section is already taken by another
+     * operation with a different reason unless the flag 'throwIfReasonDiffers' is set to false.
      */
     void releaseRecoverableCriticalSection(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const BSONObj& reason,
-                                           const WriteConcernOptions& writeConcern);
+                                           const WriteConcernOptions& writeConcern,
+                                           bool throwIfReasonDiffers = true);
 
     /**
      * Recover all sharding related in memory states from disk.

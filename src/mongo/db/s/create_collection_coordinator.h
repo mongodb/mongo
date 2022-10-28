@@ -99,7 +99,7 @@ private:
 
     void _promoteCriticalSectionsToBlockReads(OperationContext* opCtx) const;
 
-    void _releaseCriticalSections(OperationContext* opCtx);
+    void _releaseCriticalSections(OperationContext* opCt, bool throwIfReasonDiffers = true);
 
     /**
      * Ensures the collection is created locally and has the appropiate shard index.
