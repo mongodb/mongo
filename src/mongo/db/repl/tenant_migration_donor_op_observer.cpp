@@ -272,7 +272,7 @@ void TenantMigrationDonorOpObserver::onInserts(OperationContext* opCtx,
 
 void TenantMigrationDonorOpObserver::onUpdate(OperationContext* opCtx,
                                               const OplogUpdateEntryArgs& args) {
-    if (args.nss == NamespaceString::kTenantMigrationDonorsNamespace &&
+    if (args.coll->ns() == NamespaceString::kTenantMigrationDonorsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto donorStateDoc =
             tenant_migration_access_blocker::parseDonorStateDocument(args.updateArgs->updatedDoc);

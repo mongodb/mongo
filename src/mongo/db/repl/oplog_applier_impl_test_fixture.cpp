@@ -262,7 +262,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
     _opObserver->onUpdateFn = [&](OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
         applyOpCalled = true;
         checkOpCtx(opCtx);
-        ASSERT_EQUALS(targetNss, args.nss);
+        ASSERT_EQUALS(targetNss, args.coll->ns());
         return Status::OK();
     };
 

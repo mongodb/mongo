@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/write_stage_common.h"
 
+#include "mongo/base/shim.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/exec/working_set.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/redaction.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
@@ -131,6 +133,11 @@ bool ensureStillMatches(const CollectionPtr& collection,
         member->makeObjOwnedIfNeeded();
     }
     return true;
+}
+
+bool isRetryableWrite(OperationContext* opCtx) {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(write_stage_common::isRetryableWrite);
+    return w(opCtx);
 }
 
 }  // namespace write_stage_common

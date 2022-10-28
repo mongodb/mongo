@@ -165,7 +165,7 @@ public:
     }
 
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override {
-        if (args.nss != _stateDocumentNss) {
+        if (args.coll->ns() != _stateDocumentNss) {
             return;
         }
 

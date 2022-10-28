@@ -67,10 +67,10 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         return;
     }
 
-    audit::logUpdateOperation(opCtx->getClient(), args.nss, args.updateArgs->updatedDoc);
+    audit::logUpdateOperation(opCtx->getClient(), args.coll->ns(), args.updateArgs->updatedDoc);
 
     AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "u", args.nss, args.updateArgs->update, &args.updateArgs->criteria);
+        ->logOp(opCtx, "u", args.coll->ns(), args.updateArgs->update, &args.updateArgs->criteria);
 }
 
 void AuthOpObserver::aboutToDelete(OperationContext* opCtx,

@@ -85,7 +85,7 @@ void RangeDeleterServiceOpObserver::onInserts(OperationContext* opCtx,
 
 void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
                                              const OplogUpdateEntryArgs& args) {
-    if (args.nss == NamespaceString::kRangeDeletionNamespace) {
+    if (args.coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         const bool pendingFieldIsRemoved = [&] {
             return update_oplog_entry::isFieldRemovedByUpdate(
                        args.updateArgs->update, RangeDeletionTask::kPendingFieldName) ==

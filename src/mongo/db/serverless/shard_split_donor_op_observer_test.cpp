@@ -118,7 +118,8 @@ protected:
             BSON("$set" << BSON(ShardSplitDonorDocument::kStateFieldName
                                 << ShardSplitDonorState_serializer(stateDocument.getState())));
         updateArgs.criteria = BSON("_id" << stateDocument.getId());
-        OplogUpdateEntryArgs update(&updateArgs, _nss, stateDocument.getId());
+        AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
+        OplogUpdateEntryArgs update(&updateArgs, *autoColl);
 
         WriteUnitOfWork wuow(_opCtx.get());
         _observer->onUpdate(_opCtx.get(), update);
@@ -340,7 +341,8 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToAbortingIndexBuildsFail) {
         BSON("$set" << BSON(ShardSplitDonorDocument::kStateFieldName
                             << ShardSplitDonorState_serializer(stateDocument.getState())));
     updateArgs.criteria = BSON("_id" << stateDocument.getId());
-    OplogUpdateEntryArgs update(&updateArgs, _nss, stateDocument.getId());
+    AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
+    OplogUpdateEntryArgs update(&updateArgs, *autoColl);
 
     auto update_lambda = [&]() {
         WriteUnitOfWork wuow(_opCtx.get());

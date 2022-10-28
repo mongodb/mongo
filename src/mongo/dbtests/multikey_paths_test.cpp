@@ -254,8 +254,9 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
             const bool indexesAffected = true;
             OpDebug* opDebug = nullptr;
             CollectionUpdateArgs args;
-            collection->updateDocument(
+            collection_internal::updateDocument(
                 _opCtx.get(),
+                *collection,
                 record->id,
                 oldDoc,
                 BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3)),
@@ -305,14 +306,15 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
             OpDebug* opDebug = nullptr;
             CollectionUpdateArgs args;
             auto newDocResult =
-                collection->updateDocumentWithDamages(_opCtx.get(),
-                                                      record->id,
-                                                      oldDoc,
-                                                      damagesOutput.damageSource.get(),
-                                                      damagesOutput.damages,
-                                                      indexesAffected,
-                                                      opDebug,
-                                                      &args);
+                collection_internal::updateDocumentWithDamages(_opCtx.get(),
+                                                               *collection,
+                                                               record->id,
+                                                               oldDoc,
+                                                               damagesOutput.damageSource.get(),
+                                                               damagesOutput.damages,
+                                                               indexesAffected,
+                                                               opDebug,
+                                                               &args);
             ASSERT_TRUE(newDocResult.getValue().woCompare(newDoc) == 0);
             ASSERT_TRUE(newDocResult.isOK());
             wuow.commit();

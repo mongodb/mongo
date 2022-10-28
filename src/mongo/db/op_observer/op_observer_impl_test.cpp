@@ -160,7 +160,7 @@ class OpObserverTest : public ServiceContextMongoDTest {
 protected:
     explicit OpObserverTest(Options options = {}) : ServiceContextMongoDTest(std::move(options)) {}
 
-    void setUp() override {
+    virtual void setUp() override {
         // Set up mongod.
         ServiceContextMongoDTest::setUp();
 
@@ -223,6 +223,7 @@ protected:
     }
 
     void resetOplogAndTransactions(OperationContext* opCtx) const {
+        reset(opCtx, nss);
         reset(opCtx, NamespaceString::kRsOplogNamespace);
         reset(opCtx, NamespaceString::kSessionTransactionsTableNamespace);
         reset(opCtx, NamespaceString::kConfigImagesNamespace);
@@ -915,11 +916,12 @@ TEST_F(OpObserverTest, SingleStatementUpdateTestIncludesTenantId) {
     updateArgs.update = BSON("$set" << BSON("data"
                                             << "x"));
     updateArgs.criteria = BSON("_id" << 0);
-    OplogUpdateEntryArgs update(&updateArgs, nss, uuid);
 
     auto opCtx = cc().makeOperationContext();
     WriteUnitOfWork wuow(opCtx.get());
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+    AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
+    OplogUpdateEntryArgs update(&updateArgs, *autoColl);
 
     OpObserverRegistry opObserver;
     opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
@@ -1089,8 +1091,6 @@ DEATH_TEST_REGEX_F(OpObserverTest,
 class OpObserverTxnParticipantTest : public OpObserverTest {
 public:
     void setUp() override {
-        OpObserverTest::setUp();
-
         _opCtx = cc().makeOperationContext();
         _opObserver.emplace(std::make_unique<OplogWriterImpl>());
         _times.emplace(opCtx());
@@ -1179,6 +1179,7 @@ private:
 class OpObserverTransactionTest : public OpObserverTxnParticipantTest {
 protected:
     void setUp() override {
+        OpObserverTest::setUp();
         OpObserverTxnParticipantTest::setUp();
         OpObserverTxnParticipantTest::setUpNonRetryableTransaction();
     }
@@ -1276,7 +1277,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     updateArgs2.update = BSON("$set" << BSON("data"
                                              << "y"));
     updateArgs2.criteria = BSON("_id" << 0);
-    OplogUpdateEntryArgs update2(&updateArgs2, nss2, uuid2);
+    OplogUpdateEntryArgs update2(&updateArgs2, *autoColl2);
     opObserver().onUpdate(opCtx(), update2);
 
     opObserver().aboutToDelete(opCtx(),
@@ -1791,6 +1792,10 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
+    WriteUnitOfWork wuow(opCtx());
+    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
+
     CollectionUpdateArgs updateArgs1;
     updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
@@ -1798,7 +1803,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     updateArgs1.update = BSON("$set" << BSON("data"
                                              << "x"));
     updateArgs1.criteria = BSON("_id" << 0);
-    OplogUpdateEntryArgs update1(&updateArgs1, nss1, uuid1);
+    OplogUpdateEntryArgs update1(&updateArgs1, *autoColl1);
 
     CollectionUpdateArgs updateArgs2;
     updateArgs2.stmtIds = {1};
@@ -1807,11 +1812,8 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     updateArgs2.update = BSON("$set" << BSON("data"
                                              << "y"));
     updateArgs2.criteria = BSON("_id" << 1);
-    OplogUpdateEntryArgs update2(&updateArgs2, nss2, uuid2);
+    OplogUpdateEntryArgs update2(&updateArgs2, *autoColl2);
 
-    WriteUnitOfWork wuow(opCtx());
-    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
-    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().onUpdate(opCtx(), update1);
     opObserver().onUpdate(opCtx(), update2);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
@@ -1845,6 +1847,10 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
+    WriteUnitOfWork wuow(opCtx());
+    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
+
     CollectionUpdateArgs updateArgs1;
     updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
@@ -1852,7 +1858,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
     updateArgs1.update = BSON("$set" << BSON("data"
                                              << "x"));
     updateArgs1.criteria = BSON("_id" << 0);
-    OplogUpdateEntryArgs update1(&updateArgs1, nss1, uuid1);
+    OplogUpdateEntryArgs update1(&updateArgs1, *autoColl1);
 
     CollectionUpdateArgs updateArgs2;
     updateArgs2.stmtIds = {1};
@@ -1861,11 +1867,8 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
     updateArgs2.update = BSON("$set" << BSON("data"
                                              << "y"));
     updateArgs2.criteria = BSON("_id" << 1);
-    OplogUpdateEntryArgs update2(&updateArgs2, nss2, uuid2);
+    OplogUpdateEntryArgs update2(&updateArgs2, *autoColl2);
 
-    WriteUnitOfWork wuow(opCtx());
-    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
-    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().onUpdate(opCtx(), update1);
     opObserver().onUpdate(opCtx(), update2);
 
@@ -2029,11 +2032,14 @@ public:
         OpObserverTxnParticipantTest::tearDown();
     }
 
+    void setUp() override {
+        OpObserverTest::setUp();
+        auto opCtx = cc().makeOperationContext();
+        reset(opCtx.get(), nss, uuid);
+    }
+
 protected:
     void testRetryableFindAndModifyUpdateRequestingPostImageHasNeedsRetryImage() {
-        NamespaceString nss = {boost::none, "test", "coll"};
-        const auto uuid = UUID::gen();
-
         CollectionUpdateArgs updateArgs;
         updateArgs.stmtIds = {0};
         updateArgs.updatedDoc = BSON("_id" << 0 << "data"
@@ -2042,10 +2048,11 @@ protected:
                                                 << "x"));
         updateArgs.criteria = BSON("_id" << 0);
         updateArgs.storeDocOption = CollectionUpdateArgs::StoreDocOption::PostImage;
-        OplogUpdateEntryArgs update(&updateArgs, nss, uuid);
+
+        AutoGetCollection autoColl(opCtx(), nss, MODE_IX);
+        OplogUpdateEntryArgs update(&updateArgs, *autoColl);
         update.retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
 
-        AutoGetDb autoDb(opCtx(), nss.dbName(), MODE_X);
         opObserver().onUpdate(opCtx(), update);
         commit();
 
@@ -2062,9 +2069,6 @@ protected:
     }
 
     void testRetryableFindAndModifyUpdateRequestingPreImageHasNeedsRetryImage() {
-        NamespaceString nss = {boost::none, "test", "coll"};
-        const auto uuid = UUID::gen();
-
         CollectionUpdateArgs updateArgs;
         updateArgs.stmtIds = {0};
         updateArgs.preImageDoc = BSON("_id" << 0 << "data"
@@ -2073,10 +2077,11 @@ protected:
                                                 << "x"));
         updateArgs.criteria = BSON("_id" << 0);
         updateArgs.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
-        OplogUpdateEntryArgs update(&updateArgs, nss, uuid);
+
+        AutoGetCollection autoColl(opCtx(), nss, MODE_IX);
+        OplogUpdateEntryArgs update(&updateArgs, *autoColl);
         update.retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
 
-        AutoGetDb autoDb(opCtx(), nss.dbName(), MODE_X);
         opObserver().onUpdate(opCtx(), update);
         commit();
 
@@ -2093,8 +2098,7 @@ protected:
     }
 
     void testRetryableFindAndModifyDeleteHasNeedsRetryImage() {
-        NamespaceString nss = {boost::none, "test", "coll"};
-        const auto uuid = UUID::gen();
+
 
         AutoGetDb autoDb(opCtx(), nss.dbName(), MODE_X);
         const auto deletedDoc = BSON("_id" << 0 << "data"
@@ -2118,6 +2122,9 @@ protected:
         finish();
     }
 
+    NamespaceString nss = {boost::none, "test", "coll"};
+    UUID uuid = UUID::gen();
+
     virtual void commit() = 0;
 
     virtual void finish() {}
@@ -2129,6 +2136,7 @@ class OpObserverRetryableFindAndModifyOutsideTransactionTest
     : public OpObserverRetryableFindAndModifyTest {
 public:
     void setUp() override {
+        OpObserverRetryableFindAndModifyTest::setUp();
         OpObserverTxnParticipantTest::setUp();
         OpObserverTxnParticipantTest::setUpRetryableWrite();
     }
@@ -2163,6 +2171,7 @@ class OpObserverRetryableFindAndModifyInsideUnpreparedRetryableInternalTransacti
     : public OpObserverRetryableFindAndModifyTest {
 public:
     void setUp() override {
+        OpObserverRetryableFindAndModifyTest::setUp();
         OpObserverTxnParticipantTest::setUp();
         OpObserverTxnParticipantTest::setUpRetryableInternalTransaction();
     }
@@ -2199,6 +2208,7 @@ class OpObserverRetryableFindAndModifyInsidePreparedRetryableInternalTransaction
     : public OpObserverRetryableFindAndModifyTest {
 public:
     void setUp() override {
+        OpObserverRetryableFindAndModifyTest::setUp();
         OpObserverTxnParticipantTest::setUp();
         OpObserverTxnParticipantTest::setUpRetryableInternalTransaction();
     }
@@ -2339,6 +2349,7 @@ protected:
                     WriteUnitOfWork wuow(opCtx);
                     auto reservedSlots = repl::getNextOpTimes(opCtx, 3);
                     update->updateArgs->oplogSlots = reservedSlots;
+                    wuow.commit();
                 }
                 break;
         }
@@ -2410,6 +2421,12 @@ protected:
         }
     }
 
+    void setUp() override {
+        OpObserverTest::setUp();
+        auto opCtx = cc().makeOperationContext();
+        reset(opCtx.get(), _nss, _uuid);
+    }
+
     std::vector<UpdateTestCase> _cases = {
         // Regular updates.
         {kNonFaM, kChangeStreamImagesDisabled, kNotRetryable, 1},
@@ -2454,12 +2471,11 @@ TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
         }
 
         // Phase 2: Call the code we're testing.
-        CollectionUpdateArgs updateArgs;
-        OplogUpdateEntryArgs updateEntryArgs(&updateArgs, _nss, _uuid);
-        initializeOplogUpdateEntryArgs(opCtx, testCase, &updateEntryArgs);
-
         WriteUnitOfWork wuow(opCtx);
         AutoGetCollection locks(opCtx, _nss, MODE_IX);
+        CollectionUpdateArgs updateArgs;
+        OplogUpdateEntryArgs updateEntryArgs(&updateArgs, *locks);
+        initializeOplogUpdateEntryArgs(opCtx, testCase, &updateEntryArgs);
         opObserver.onUpdate(opCtx, updateEntryArgs);
         wuow.commit();
 
@@ -2499,12 +2515,12 @@ TEST_F(OnUpdateOutputsTest, TestFundamentalTransactionOnUpdateOutputs) {
         }
 
         // Phase 2: Call the code we're testing.
-        CollectionUpdateArgs updateArgs;
-        OplogUpdateEntryArgs updateEntryArgs(&updateArgs, _nss, _uuid);
-        initializeOplogUpdateEntryArgs(opCtx, testCase, &updateEntryArgs);
-
         WriteUnitOfWork wuow(opCtx);
         AutoGetCollection locks(opCtx, _nss, MODE_IX);
+        CollectionUpdateArgs updateArgs;
+        OplogUpdateEntryArgs updateEntryArgs(&updateArgs, *locks);
+        initializeOplogUpdateEntryArgs(opCtx, testCase, &updateEntryArgs);
+
         opObserver.onUpdate(opCtx, updateEntryArgs);
         commitUnpreparedTransaction<OpObserverRegistry>(opCtx, opObserver);
         wuow.commit();
@@ -2827,7 +2843,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
         collUpdateArgs.update = BSON("fieldToUpdate"
                                      << "valueToUpdate");
         collUpdateArgs.criteria = BSON("_id" << 2);
-        auto args = OplogUpdateEntryArgs(&collUpdateArgs, _nss, autoColl->uuid());
+        auto args = OplogUpdateEntryArgs(&collUpdateArgs, *autoColl);
         opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, args);
     }
 
@@ -2914,7 +2930,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
         collUpdateArgs.update = BSON("fieldToUpdate"
                                      << "valueToUpdate");
         collUpdateArgs.criteria = BSON("_id" << 2);
-        auto args = OplogUpdateEntryArgs(&collUpdateArgs, autoColl->ns(), autoColl->uuid());
+        auto args = OplogUpdateEntryArgs(&collUpdateArgs, *autoColl);
         opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, args);
     }
 
@@ -3539,6 +3555,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
+    WriteUnitOfWork wuow(opCtx());
+    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
+
     CollectionUpdateArgs updateArgs1;
     updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
@@ -3546,7 +3566,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
     updateArgs1.update = BSON("$set" << BSON("data"
                                              << "x"));
     updateArgs1.criteria = BSON("_id" << 0);
-    OplogUpdateEntryArgs update1(&updateArgs1, nss1, uuid1);
+    OplogUpdateEntryArgs update1(&updateArgs1, *autoColl1);
 
     CollectionUpdateArgs updateArgs2;
     updateArgs2.stmtIds = {1};
@@ -3555,11 +3575,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
     updateArgs2.update = BSON("$set" << BSON("data"
                                              << "y"));
     updateArgs2.criteria = BSON("_id" << 1);
-    OplogUpdateEntryArgs update2(&updateArgs2, nss2, uuid2);
+    OplogUpdateEntryArgs update2(&updateArgs2, *autoColl2);
 
-    WriteUnitOfWork wuow(opCtx());
-    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
-    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().onUpdate(opCtx(), update1);
     opObserver().onUpdate(opCtx(), update2);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
@@ -3734,6 +3751,9 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
+    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
+
     CollectionUpdateArgs updateArgs1;
     updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
@@ -3741,7 +3761,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
     updateArgs1.update = BSON("$set" << BSON("data"
                                              << "x"));
     updateArgs1.criteria = BSON("_id" << 0);
-    OplogUpdateEntryArgs update1(&updateArgs1, nss1, uuid1);
+    OplogUpdateEntryArgs update1(&updateArgs1, *autoColl1);
 
     CollectionUpdateArgs updateArgs2;
     updateArgs2.stmtIds = {1};
@@ -3750,10 +3770,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
     updateArgs2.update = BSON("$set" << BSON("data"
                                              << "y"));
     updateArgs2.criteria = BSON("_id" << 1);
-    OplogUpdateEntryArgs update2(&updateArgs2, nss2, uuid2);
+    OplogUpdateEntryArgs update2(&updateArgs2, *autoColl2);
 
-    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
-    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().onUpdate(opCtx(), update1);
     opObserver().onUpdate(opCtx(), update2);
 

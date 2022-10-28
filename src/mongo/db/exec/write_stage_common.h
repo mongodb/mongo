@@ -96,5 +96,11 @@ bool ensureStillMatches(const CollectionPtr& collection,
                         WorkingSet* ws,
                         WorkingSetID id,
                         const CanonicalQuery* cq);
+
+/**
+ * Returns true if we are running retryable write or retryable internal multi-document transaction.
+ */
+bool isRetryableWrite(OperationContext* opCtx);
+
 }  // namespace write_stage_common
 }  // namespace mongo

@@ -62,15 +62,14 @@ enum class RetryableFindAndModifyLocation {
 struct OplogUpdateEntryArgs {
     CollectionUpdateArgs* updateArgs;
 
-    NamespaceString nss;
-    UUID uuid;
+    const CollectionPtr& coll;
 
     // Specifies the pre-image recording option for retryable "findAndModify" commands.
     RetryableFindAndModifyLocation retryableFindAndModifyLocation =
         RetryableFindAndModifyLocation::kNone;
 
-    OplogUpdateEntryArgs(CollectionUpdateArgs* updateArgs, NamespaceString nss, UUID uuid)
-        : updateArgs(updateArgs), nss(std::move(nss)), uuid(std::move(uuid)) {}
+    OplogUpdateEntryArgs(CollectionUpdateArgs* updateArgs, const CollectionPtr& coll)
+        : updateArgs(updateArgs), coll(coll) {}
 };
 
 struct OplogDeleteEntryArgs {

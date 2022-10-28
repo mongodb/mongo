@@ -327,13 +327,14 @@ Status ViewsForDatabase::_upsertIntoCatalog(OperationContext* opCtx,
         args.update = viewObj;
         args.criteria = BSON("_id" << NamespaceStringUtil::serialize(view.name()));
 
-        systemViews->updateDocument(opCtx,
-                                    id,
-                                    oldView,
-                                    viewObj,
-                                    true /* indexesAffected */,
-                                    &CurOp::get(opCtx)->debug(),
-                                    &args);
+        collection_internal::updateDocument(opCtx,
+                                            systemViews,
+                                            id,
+                                            oldView,
+                                            viewObj,
+                                            true /* indexesAffected */,
+                                            &CurOp::get(opCtx)->debug(),
+                                            &args);
     }
 
     return Status::OK();

@@ -33,6 +33,7 @@
 #include "mongo/db/dbhelpers.h"
 
 #include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/btree_access_method.h"
@@ -386,7 +387,8 @@ bool Helpers::findByIdAndNoopUpdate(OperationContext* opCtx,
     CollectionUpdateArgs args;
     args.criteria = idQuery;
     args.update = BSONObj();
-    collection->updateDocument(opCtx, recordId, snapshottedDoc, result, false, nullptr, &args);
+    collection_internal::updateDocument(
+        opCtx, collection, recordId, snapshottedDoc, result, false, nullptr, &args);
 
     return true;
 }

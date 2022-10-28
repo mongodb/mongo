@@ -177,32 +177,9 @@ public:
         unimplementedTasserted();
     }
 
-    RecordId updateDocument(OperationContext* opCtx,
-                            const RecordId& oldLocation,
-                            const Snapshotted<BSONObj>& oldDoc,
-                            const BSONObj& newDoc,
-                            bool indexesAffected,
-                            OpDebug* opDebug,
-                            CollectionUpdateArgs* args) const final {
-        unimplementedTasserted();
-        return RecordId();
-    }
-
     bool updateWithDamagesSupported() const final {
         unimplementedTasserted();
         return false;
-    }
-
-    StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
-                                                  const RecordId& loc,
-                                                  const Snapshotted<BSONObj>& oldDoc,
-                                                  const char* damageSource,
-                                                  const mutablebson::DamageVector& damages,
-                                                  bool indexesAffected,
-                                                  OpDebug* opDebug,
-                                                  CollectionUpdateArgs* args) const final {
-        unimplementedTasserted();
-        return Status(ErrorCodes::UnknownError, "unknown");
     }
 
     Status truncate(OperationContext* opCtx) final {

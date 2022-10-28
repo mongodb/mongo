@@ -715,8 +715,8 @@ TEST_F(TenantOplogApplierTest, ApplyUpdate_Success) {
     bool onUpdateCalled = false;
     _opObserver->onUpdateFn = [&](OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
         onUpdateCalled = true;
-        ASSERT_EQUALS(nss, args.nss);
-        ASSERT_EQUALS(uuid, args.uuid);
+        ASSERT_EQUALS(nss, args.coll->ns());
+        ASSERT_EQUALS(uuid, args.coll->uuid());
     };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();

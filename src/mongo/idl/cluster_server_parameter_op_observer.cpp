@@ -73,12 +73,12 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
 void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
                                                 const OplogUpdateEntryArgs& args) {
     auto updatedDoc = args.updateArgs->updatedDoc;
-    if (!isConfigNamespace(args.nss) || args.updateArgs->update.isEmpty()) {
+    if (!isConfigNamespace(args.coll->ns()) || args.updateArgs->update.isEmpty()) {
         return;
     }
 
     ClusterServerParameterInitializer::get(opCtx)->updateParameter(
-        opCtx, updatedDoc, kOplog, args.nss.dbName().tenantId());
+        opCtx, updatedDoc, kOplog, args.coll->ns().dbName().tenantId());
 }
 
 void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,

@@ -330,7 +330,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
     const bool needsSpecialHandling = !updateDoc.isEmpty() &&
         (update_oplog_entry::extractUpdateType(updateDoc) !=
          update_oplog_entry::UpdateType::kReplacement);
-    if (needsSpecialHandling && args.nss == NamespaceString::kShardConfigCollectionsNamespace) {
+    if (needsSpecialHandling &&
+        args.coll->ns() == NamespaceString::kShardConfigCollectionsNamespace) {
         // Notification of routing table changes are only needed on secondaries
         if (isStandaloneOrPrimary(opCtx)) {
             return;
@@ -383,7 +384,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         }
     }
 
-    if (needsSpecialHandling && args.nss == NamespaceString::kShardConfigDatabasesNamespace) {
+    if (needsSpecialHandling &&
+        args.coll->ns() == NamespaceString::kShardConfigDatabasesNamespace) {
         // Notification of routing table changes are only needed on secondaries
         if (isStandaloneOrPrimary(opCtx)) {
             return;
@@ -422,7 +424,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         }
     }
 
-    if (needsSpecialHandling && args.nss == NamespaceString::kRangeDeletionNamespace) {
+    if (needsSpecialHandling && args.coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         if (!isStandaloneOrPrimary(opCtx))
             return;
 
@@ -442,7 +444,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         }
     }
 
-    if (args.nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
+    if (args.coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace &&
         !recoverable_critical_section_util::inRecoveryMode(opCtx)) {
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
@@ -468,11 +470,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
     }
 
     auto metadata = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                        opCtx, args.nss, CSRAcquisitionMode::kShared)
+                        opCtx, args.coll->ns(), CSRAcquisitionMode::kShared)
                         ->getCurrentMetadataIfKnown();
     if (metadata && metadata->isSharded()) {
         incrementChunkOnInsertOrUpdate(opCtx,
-                                       args.nss,
+                                       args.coll->ns(),
                                        *metadata->getChunkManager(),
                                        args.updateArgs->updatedDoc,
                                        args.updateArgs->updatedDoc.objsize(),

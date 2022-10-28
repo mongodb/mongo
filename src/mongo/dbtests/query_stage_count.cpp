@@ -124,13 +124,15 @@ public:
         WriteUnitOfWork wunit(&_opCtx);
         BSONObj oldDoc = _coll->getRecordStore()->dataFor(&_opCtx, oldrecordId).releaseToBson();
         CollectionUpdateArgs args;
-        _coll->updateDocument(&_opCtx,
-                              oldrecordId,
-                              Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),
-                              newDoc,
-                              true,
-                              nullptr,
-                              &args);
+        collection_internal::updateDocument(
+            &_opCtx,
+            _coll,
+            oldrecordId,
+            Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),
+            newDoc,
+            true,
+            nullptr,
+            &args);
         wunit.commit();
     }
 

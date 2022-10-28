@@ -79,8 +79,9 @@ public:
         CollectionUpdateArgs updateArgs;
         updateArgs.update = BSON("$set" << updatedDoc);
         updateArgs.updatedDoc = updatedDoc;
-        OplogUpdateEntryArgs entryArgs(&updateArgs, nss, UUID::gen());
         auto opCtx = cc().makeOperationContext();
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
+        OplogUpdateEntryArgs entryArgs(&updateArgs, *autoColl);
         observer.onUpdate(opCtx.get(), entryArgs);
     }
 

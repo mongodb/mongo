@@ -89,10 +89,10 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
 void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
                                             const OplogUpdateEntryArgs& args) {
     if (args.updateArgs->source != OperationSource::kFromMigrate) {
-        _checkWriteAllowed(opCtx, args.nss);
+        _checkWriteAllowed(opCtx, args.coll->ns());
     }
 
-    if (args.nss == NamespaceString::kUserWritesCriticalSectionsNamespace &&
+    if (args.coll->ns() == NamespaceString::kUserWritesCriticalSectionsNamespace &&
         !user_writes_recoverable_critical_section_util::inRecoveryMode(opCtx)) {
         const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
             IDLParserContext("UserWriteBlockOpObserver"), args.updateArgs->updatedDoc);

@@ -33,6 +33,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -628,13 +629,14 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                        args.oplogSlots = {oplogSlot};
                        args.update = updatedStateDocBson;
 
-                       collection->updateDocument(opCtx,
-                                                  originalRecordId,
-                                                  originalSnapshot,
-                                                  updatedStateDocBson,
-                                                  false,
-                                                  nullptr /* OpDebug* */,
-                                                  &args);
+                       collection_internal::updateDocument(opCtx,
+                                                           *collection,
+                                                           originalRecordId,
+                                                           originalSnapshot,
+                                                           updatedStateDocBson,
+                                                           false,
+                                                           nullptr /* OpDebug* */,
+                                                           &args);
 
                        wuow.commit();
 

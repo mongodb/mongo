@@ -278,7 +278,8 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
         WriteUnitOfWork wuow(opCtx);
         Snapshotted<BSONObj> oldSnap(opCtx->recoveryUnit()->getSnapshotId(), oldDoc);
         CollectionUpdateArgs args;
-        coll->updateDocument(opCtx, oldRecordId, oldSnap, newDoc, true, nullptr, &args);
+        collection_internal::updateDocument(
+            opCtx, coll, oldRecordId, oldSnap, newDoc, true, nullptr, &args);
         wuow.commit();
     }
     auto indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
@@ -321,14 +322,16 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
         WriteUnitOfWork wuow(opCtx);
         Snapshotted<BSONObj> oldSnap(opCtx->recoveryUnit()->getSnapshotId(), oldDoc);
         CollectionUpdateArgs args;
-        auto newDocStatus = coll->updateDocumentWithDamages(opCtx,
-                                                            oldRecordId,
-                                                            oldSnap,
-                                                            damagesOutput.damageSource.get(),
-                                                            damagesOutput.damages,
-                                                            true,
-                                                            nullptr,
-                                                            &args);
+        auto newDocStatus =
+            collection_internal::updateDocumentWithDamages(opCtx,
+                                                           coll,
+                                                           oldRecordId,
+                                                           oldSnap,
+                                                           damagesOutput.damageSource.get(),
+                                                           damagesOutput.damages,
+                                                           true,
+                                                           nullptr,
+                                                           &args);
         ASSERT_OK(newDocStatus);
         ASSERT_BSONOBJ_EQ(newDoc, newDocStatus.getValue());
         wuow.commit();

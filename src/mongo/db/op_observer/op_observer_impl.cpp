@@ -196,9 +196,9 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                            const OplogUpdateEntryArgs& args,
                            MutableOplogEntry* oplogEntry,
                            OplogWriter* oplogWriter) {
-    oplogEntry->setTid(args.nss.tenantId());
-    oplogEntry->setNss(args.nss);
-    oplogEntry->setUuid(args.uuid);
+    oplogEntry->setTid(args.coll->ns().tenantId());
+    oplogEntry->setNss(args.coll->ns());
+    oplogEntry->setUuid(args.coll->uuid());
 
     repl::OplogLink oplogLink;
     oplogWriter->appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, args.updateArgs->stmtIds);
@@ -779,14 +779,15 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     failCollectionUpdates.executeIf(
         [&](const BSONObj&) {
             uasserted(40654,
-                      str::stream() << "failCollectionUpdates failpoint enabled, namespace: "
-                                    << args.nss.ns() << ", update: " << args.updateArgs->update
-                                    << " on document with " << args.updateArgs->criteria);
+                      str::stream()
+                          << "failCollectionUpdates failpoint enabled, namespace: "
+                          << args.coll->ns().ns() << ", update: " << args.updateArgs->update
+                          << " on document with " << args.updateArgs->criteria);
         },
         [&](const BSONObj& data) {
             // If the failpoint specifies no collection or matches the existing one, fail.
             auto collElem = data["collectionNS"];
-            return !collElem || args.nss.ns() == collElem.String();
+            return !collElem || args.coll->ns().ns() == collElem.String();
         });
 
     // Do not log a no-op operation; see SERVER-21738
@@ -798,7 +799,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
 
-    ShardingWriteRouter shardingWriteRouter(opCtx, args.nss, Grid::get(opCtx)->catalogCache());
+    ShardingWriteRouter shardingWriteRouter(
+        opCtx, args.coll->ns(), Grid::get(opCtx)->catalogCache());
 
     OpTimeBundle opTime;
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
@@ -806,7 +808,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 
     if (inBatchedWrite) {
         auto operation = MutableOplogEntry::makeUpdateOperation(
-            args.nss, args.uuid, args.updateArgs->update, args.updateArgs->criteria);
+            args.coll->ns(), args.coll->uuid(), args.updateArgs->update, args.updateArgs->criteria);
         operation.setDestinedRecipient(
             shardingWriteRouter.getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
@@ -816,7 +818,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
 
         auto operation = MutableOplogEntry::makeUpdateOperation(
-            args.nss, args.uuid, args.updateArgs->update, args.updateArgs->criteria);
+            args.coll->ns(), args.coll->uuid(), args.updateArgs->update, args.updateArgs->criteria);
 
         if (inRetryableInternalTransaction) {
             operation.setInitializedStatementIds(args.updateArgs->stmtIds);
@@ -900,15 +902,15 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection &&
             !opTime.writeOpTime.isNull() &&
             args.updateArgs->source != OperationSource::kFromMigrate &&
-            !args.nss.isTemporaryReshardingCollection()) {
+            !args.coll->ns().isTemporaryReshardingCollection()) {
             const auto& preImageDoc = args.updateArgs->preImageDoc;
             tassert(5868600, "PreImage must be set", preImageDoc && !preImageDoc.value().isEmpty());
 
-            ChangeStreamPreImageId id(args.uuid, opTime.writeOpTime.getTimestamp(), 0);
+            ChangeStreamPreImageId id(args.coll->uuid(), opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc.value());
 
             ChangeStreamPreImagesCollectionManager::insertPreImage(
-                opCtx, args.nss.tenantId(), preImage);
+                opCtx, args.coll->ns().tenantId(), preImage);
         }
 
         SessionTxnRecord sessionTxnRecord;
@@ -917,10 +919,10 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         onWriteOpCompleted(opCtx, args.updateArgs->stmtIds, sessionTxnRecord);
     }
 
-    if (args.nss != NamespaceString::kSessionTransactionsTableNamespace) {
+    if (args.coll->ns() != NamespaceString::kSessionTransactionsTableNamespace) {
         if (args.updateArgs->source != OperationSource::kFromMigrate) {
             shardObserveUpdateOp(opCtx,
-                                 args.nss,
+                                 args.coll->ns(),
                                  args.updateArgs->preImageDoc,
                                  args.updateArgs->updatedDoc,
                                  opTime.writeOpTime,
@@ -930,19 +932,19 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         }
     }
 
-    if (args.nss.coll() == "system.js") {
+    if (args.coll->ns().coll() == "system.js") {
         Scope::storedFuncMod(opCtx);
-    } else if (args.nss.isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, args.nss.dbName()).ignore();
-    } else if (args.nss == NamespaceString::kSessionTransactionsTableNamespace &&
+    } else if (args.coll->ns().isSystemDotViews()) {
+        CollectionCatalog::get(opCtx)->reloadViews(opCtx, args.coll->ns().dbName()).ignore();
+    } else if (args.coll->ns() == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
         mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx,
                                                                      args.updateArgs->updatedDoc);
-    } else if (args.nss == NamespaceString::kConfigSettingsNamespace) {
+    } else if (args.coll->ns() == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
             opCtx, args.updateArgs->updatedDoc["_id"], args.updateArgs->updatedDoc);
-    } else if (args.nss.isTimeseriesBucketsCollection()) {
+    } else if (args.coll->ns().isTimeseriesBucketsCollection()) {
         if (args.updateArgs->source != OperationSource::kTimeseriesInsert) {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
             bucketCatalog.clear(args.updateArgs->updatedDoc["_id"].OID());

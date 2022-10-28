@@ -89,8 +89,7 @@ protected:
         collectionUpdateArgs.source =
             fromMigrate ? OperationSource::kFromMigrate : OperationSource::kStandard;
         auto uuid = UUID::gen();
-        OplogUpdateEntryArgs updateArgs(&collectionUpdateArgs, nss, uuid);
-        updateArgs.nss = nss;
+        OplogUpdateEntryArgs updateArgs(&collectionUpdateArgs, *autoColl);
         OplogDeleteEntryArgs deleteArgs;
         deleteArgs.fromMigrate = fromMigrate;
         if (shouldSucceed) {

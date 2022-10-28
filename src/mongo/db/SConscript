@@ -992,6 +992,7 @@ env.Library(
         'query_exec',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/ops/write_ops',
         'record_id_helpers',

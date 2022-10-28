@@ -22,10 +22,10 @@ corresponding data.
 The authoritative routing table is stored in a set of unsharded collections in the config database
 on the config server replica set. The schemas of the relevant collections are:
 
-* [**config.databases**](https://docs.mongodb.com/manual/reference/config-database/#config.databases)
-* [**config.collections**](https://docs.mongodb.com/manual/reference/config-database/#config.collections)
-* [**config.chunks**](https://docs.mongodb.com/manual/reference/config-database/#config.chunks)
-* [**config.shards**](https://docs.mongodb.com/manual/reference/config-database/#config.shards)
+* [**config.databases**](https://www.mongodb.com/docs/manual/reference/config-database/#mongodb-data-config.databases)
+* [**config.collections**](https://www.mongodb.com/docs/manual/reference/config-database/#mongodb-data-config.collections)
+* [**config.chunks**](https://www.mongodb.com/docs/manual/reference/config-database/#mongodb-data-config.chunks)
+* [**config.shards**](https://www.mongodb.com/docs/manual/reference/config-database/#mongodb-data-config.shards)
 
 #### Code references
 

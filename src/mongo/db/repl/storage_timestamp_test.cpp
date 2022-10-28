@@ -3303,14 +3303,16 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
     args.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
     args.update = BSON("$set" << BSON("b" << 1));
     args.criteria = BSON("_id" << 0);
+    args.retryableWrite = true;
 
     {
         auto cursor = collection->getCursor(_opCtx);
         auto record = cursor->next();
         invariant(record);
         WriteUnitOfWork wuow(_opCtx);
-        collection->updateDocument(
+        collection_internal::updateDocument(
             _opCtx,
+            collection.get(),
             record->id,
             Snapshotted<BSONObj>(_opCtx->recoveryUnit()->getSnapshotId(), oldObj),
             newObj,
@@ -3359,6 +3361,7 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
     args.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
     args.update = BSON("$set" << BSON("a" << 0));
     args.criteria = BSON("_id" << 0);
+    args.retryableWrite = true;
 
     {
         Snapshotted<BSONObj> objSnapshot(_opCtx->recoveryUnit()->getSnapshotId(), oldObj);
@@ -3366,8 +3369,8 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
         auto record = cursor->next();
         invariant(record);
         WriteUnitOfWork wuow(_opCtx);
-        const auto statusWith = collection->updateDocumentWithDamages(
-            _opCtx, record->id, objSnapshot, source, damages, false, nullptr, &args);
+        const auto statusWith = collection_internal::updateDocumentWithDamages(
+            _opCtx, *autoColl, record->id, objSnapshot, source, damages, false, nullptr, &args);
         wuow.commit();
         ASSERT_OK(statusWith.getStatus());
     }

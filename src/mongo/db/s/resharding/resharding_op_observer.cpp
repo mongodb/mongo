@@ -206,7 +206,7 @@ void ReshardingOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    if (args.nss == NamespaceString::kDonorReshardingOperationsNamespace) {
+    if (args.coll->ns() == NamespaceString::kDonorReshardingOperationsNamespace) {
         // Primaries and secondaries should execute pinning logic when observing changes to the
         // donor resharding document.
         _doPin(opCtx);
@@ -218,7 +218,7 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
         return;
     }
 
-    if (args.nss == NamespaceString::kConfigReshardingOperationsNamespace) {
+    if (args.coll->ns() == NamespaceString::kConfigReshardingOperationsNamespace) {
         auto newCoordinatorDoc = ReshardingCoordinatorDocument::parse(
             IDLParserContext("reshardingCoordinatorDoc"), args.updateArgs->updatedDoc);
         opCtx->recoveryUnit()->onCommit([opCtx, newCoordinatorDoc = std::move(newCoordinatorDoc)](
@@ -241,9 +241,10 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
                            "error"_attr = redact(ex.toStatus()));
             }
         });
-    } else if (args.nss.isTemporaryReshardingCollection()) {
+    } else if (args.coll->ns().isTemporaryReshardingCollection()) {
         const std::vector<InsertStatement> updateDoc{InsertStatement{args.updateArgs->updatedDoc}};
-        assertCanExtractShardKeyFromDocs(opCtx, args.nss, updateDoc.begin(), updateDoc.end());
+        assertCanExtractShardKeyFromDocs(
+            opCtx, args.coll->ns(), updateDoc.begin(), updateDoc.end());
     }
 }
 

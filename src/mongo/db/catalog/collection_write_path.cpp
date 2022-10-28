@@ -29,6 +29,7 @@
 
 #include "mongo/db/catalog/collection_write_path.h"
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -67,6 +68,34 @@ MONGO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
 
 // This fail point introduces corruption to documents during insert.
 MONGO_FAIL_POINT_DEFINE(corruptDocumentOnInsert);
+
+bool compareSafeContentElem(const BSONObj& oldDoc, const BSONObj& newDoc) {
+    if (newDoc.hasField(kSafeContent) != oldDoc.hasField(kSafeContent)) {
+        return false;
+    }
+    if (!newDoc.hasField(kSafeContent)) {
+        return true;
+    }
+
+    return newDoc.getField(kSafeContent).binaryEqual(oldDoc.getField(kSafeContent));
+}
+
+std::vector<OplogSlot> reserveOplogSlotsForRetryableFindAndModify(OperationContext* opCtx,
+                                                                  const CollectionPtr& collection) {
+    // For retryable findAndModify running in a multi-document transaction, we will reserve the
+    // oplog entries when the transaction prepares or commits without prepare.
+    if (opCtx->inMultiDocumentTransaction()) {
+        return {};
+    }
+
+    // We reserve oplog slots here, expecting the slot with the greatest timestmap (say TS) to be
+    // used as the oplog timestamp. Tenant migrations and resharding will forge no-op image oplog
+    // entries and set the timestamp for these synthetic entries to be TS - 1.
+    auto oplogInfo = LocalOplogInfo::get(opCtx);
+    auto slots = oplogInfo->getNextOpTimes(opCtx, 2);
+    uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(slots.back().getTimestamp()));
+    return slots;
+}
 
 Status insertDocumentsImpl(OperationContext* opCtx,
                            const CollectionPtr& collection,
@@ -363,6 +392,198 @@ Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSON
             return !collElem || ns.ns() == collElem.str();
         });
     return s;
+}
+
+RecordId updateDocument(OperationContext* opCtx,
+                        const CollectionPtr& collection,
+                        const RecordId& oldLocation,
+                        const Snapshotted<BSONObj>& oldDoc,
+                        const BSONObj& newDoc,
+                        bool indexesAffected,
+                        OpDebug* opDebug,
+                        CollectionUpdateArgs* args) {
+    {
+        auto status = collection->checkValidationAndParseResult(opCtx, newDoc);
+        if (!status.isOK()) {
+            if (validationLevelOrDefault(collection->getCollectionOptions().validationLevel) ==
+                ValidationLevelEnum::strict) {
+                uassertStatusOK(status);
+            }
+            // moderate means we have to check the old doc
+            auto oldDocStatus = collection->checkValidationAndParseResult(opCtx, oldDoc.value());
+            if (oldDocStatus.isOK()) {
+                // transitioning from good -> bad is not ok
+                uassertStatusOK(status);
+            }
+            // bad -> bad is ok in moderate mode
+        }
+    }
+
+    auto& validationSettings = DocumentValidationSettings::get(opCtx);
+    if (collection->getCollectionOptions().encryptedFieldConfig &&
+        !validationSettings.isSchemaValidationDisabled() &&
+        !validationSettings.isSafeContentValidationDisabled()) {
+
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "New document and old document both need to have " << kSafeContent
+                              << " field.",
+                compareSafeContentElem(oldDoc.value(), newDoc));
+    }
+
+    dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
+    invariant(oldDoc.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
+    invariant(newDoc.isOwned());
+
+    if (collection->needsCappedLock()) {
+        Lock::ResourceLock heldUntilEndOfWUOW{
+            opCtx, ResourceId(RESOURCE_METADATA, collection->ns()), MODE_X};
+    }
+
+    SnapshotId sid = opCtx->recoveryUnit()->getSnapshotId();
+
+    BSONElement oldId = oldDoc.value()["_id"];
+    if (!oldId.eoo() && SimpleBSONElementComparator::kInstance.evaluate(oldId != newDoc["_id"]))
+        uasserted(13596, "in Collection::updateDocument _id mismatch");
+
+    // The preImageDoc may not be boost::none if this update was a retryable findAndModify or if
+    // the update may have changed the shard key. For non-in-place updates we always set the
+    // preImageDoc here to an owned copy of the pre-image.
+    if (!args->preImageDoc) {
+        args->preImageDoc = oldDoc.value().getOwned();
+    }
+    args->changeStreamPreAndPostImagesEnabledForCollection =
+        collection->isChangeStreamPreAndPostImagesEnabled();
+
+    OplogUpdateEntryArgs onUpdateArgs(args, collection);
+    const bool setNeedsRetryImageOplogField =
+        args->storeDocOption != CollectionUpdateArgs::StoreDocOption::None;
+    if (args->oplogSlots.empty() && setNeedsRetryImageOplogField && args->retryableWrite) {
+        onUpdateArgs.retryableFindAndModifyLocation =
+            RetryableFindAndModifyLocation::kSideCollection;
+        // If the update is part of a retryable write and we expect to be storing the pre- or
+        // post-image in a side collection, then we must reserve oplog slots in advance. We
+        // expect to use the reserved oplog slots as follows, where TS is the greatest
+        // timestamp of 'oplogSlots':
+        // TS - 1: Tenant migrations and resharding will forge no-op image oplog entries and set
+        //         the entry timestamps to TS - 1.
+        // TS:     The timestamp given to the update oplog entry.
+        args->oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx, collection);
+    } else {
+        // Retryable findAndModify commands should not reserve oplog slots before entering this
+        // function since tenant migrations and resharding rely on always being able to set
+        // timestamps of forged pre- and post- image entries to timestamp of findAndModify - 1.
+        invariant(!(args->retryableWrite && setNeedsRetryImageOplogField));
+    }
+
+    uassertStatusOK(collection->getRecordStore()->updateRecord(
+        opCtx, oldLocation, newDoc.objdata(), newDoc.objsize()));
+
+    if (indexesAffected) {
+        int64_t keysInserted = 0;
+        int64_t keysDeleted = 0;
+
+        uassertStatusOK(collection->getIndexCatalog()->updateRecord(opCtx,
+                                                                    collection,
+                                                                    *args->preImageDoc,
+                                                                    newDoc,
+                                                                    oldLocation,
+                                                                    &keysInserted,
+                                                                    &keysDeleted));
+
+        if (opDebug) {
+            opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
+            opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+            // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
+            if (!opCtx->inMultiDocumentTransaction()) {
+                opCtx->recoveryUnit()->onRollback([opDebug, keysInserted, keysDeleted]() {
+                    opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
+                    opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
+                });
+            }
+        }
+    }
+
+    invariant(sid == opCtx->recoveryUnit()->getSnapshotId());
+    args->updatedDoc = newDoc;
+
+    opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
+
+    return oldLocation;
+}
+
+StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
+                                              const CollectionPtr& collection,
+                                              const RecordId& loc,
+                                              const Snapshotted<BSONObj>& oldDoc,
+                                              const char* damageSource,
+                                              const mutablebson::DamageVector& damages,
+                                              bool indexesAffected,
+                                              OpDebug* opDebug,
+                                              CollectionUpdateArgs* args) {
+    dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
+    invariant(oldDoc.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
+    invariant(collection->updateWithDamagesSupported());
+
+    // For in-place updates we need to grab an owned copy of the pre-image doc if pre-image
+    // recording is enabled and we haven't already set the pre-image due to this update being
+    // a retryable findAndModify or a possible update to the shard key.
+    if (!args->preImageDoc && collection->isChangeStreamPreAndPostImagesEnabled()) {
+        args->preImageDoc = oldDoc.value().getOwned();
+    }
+    OplogUpdateEntryArgs onUpdateArgs(args, collection);
+    const bool setNeedsRetryImageOplogField =
+        args->storeDocOption != CollectionUpdateArgs::StoreDocOption::None;
+    if (args->oplogSlots.empty() && setNeedsRetryImageOplogField && args->retryableWrite) {
+        onUpdateArgs.retryableFindAndModifyLocation =
+            RetryableFindAndModifyLocation::kSideCollection;
+        // If the update is part of a retryable write and we expect to be storing the pre- or
+        // post-image in a side collection, then we must reserve oplog slots in advance. We
+        // expect to use the reserved oplog slots as follows, where TS is the greatest
+        // timestamp of 'oplogSlots':
+        // TS - 1: Tenant migrations and resharding will forge no-op image oplog entries and set
+        //         the entry timestamps to TS - 1.
+        // TS:     The timestamp given to the update oplog entry.
+        args->oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx, collection);
+    } else {
+        // Retryable findAndModify commands should not reserve oplog slots before entering this
+        // function since tenant migrations and resharding rely on always being able to set
+        // timestamps of forged pre- and post- image entries to timestamp of findAndModify - 1.
+        invariant(!(args->retryableWrite && setNeedsRetryImageOplogField));
+    }
+
+    RecordData oldRecordData(oldDoc.value().objdata(), oldDoc.value().objsize());
+    StatusWith<RecordData> recordData = collection->getRecordStore()->updateWithDamages(
+        opCtx, loc, oldRecordData, damageSource, damages);
+    if (!recordData.isOK())
+        return recordData.getStatus();
+    BSONObj newDoc = std::move(recordData.getValue()).releaseToBson().getOwned();
+
+    args->updatedDoc = newDoc;
+    args->changeStreamPreAndPostImagesEnabledForCollection =
+        collection->isChangeStreamPreAndPostImagesEnabled();
+
+    if (indexesAffected) {
+        int64_t keysInserted = 0;
+        int64_t keysDeleted = 0;
+
+        uassertStatusOK(collection->getIndexCatalog()->updateRecord(
+            opCtx, collection, oldDoc.value(), args->updatedDoc, loc, &keysInserted, &keysDeleted));
+
+        if (opDebug) {
+            opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
+            opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+            // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
+            if (!opCtx->inMultiDocumentTransaction()) {
+                opCtx->recoveryUnit()->onRollback([opDebug, keysInserted, keysDeleted]() {
+                    opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
+                    opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
+                });
+            }
+        }
+    }
+
+    opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
+    return newDoc;
 }
 
 }  // namespace collection_internal

@@ -191,39 +191,7 @@ public:
         Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off,
         CheckRecordId checkRecordId = CheckRecordId::Off) const final;
 
-    /**
-     * Updates the document @ oldLocation with newDoc.
-     *
-     * If the document fits in the old space, it is put there; if not, it is moved.
-     * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
-     * success.
-     * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
-     * @return the post update location of the doc (may or may not be the same as oldLocation)
-     */
-    RecordId updateDocument(OperationContext* opCtx,
-                            const RecordId& oldLocation,
-                            const Snapshotted<BSONObj>& oldDoc,
-                            const BSONObj& newDoc,
-                            bool indexesAffected,
-                            OpDebug* opDebug,
-                            CollectionUpdateArgs* args) const final;
-
     bool updateWithDamagesSupported() const final;
-
-    /**
-     * Illegal to call if updateWithDamagesSupported() returns false.
-     * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
-     * success.
-     * Returns the contents of the updated document.
-     */
-    StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
-                                                  const RecordId& loc,
-                                                  const Snapshotted<BSONObj>& oldDoc,
-                                                  const char* damageSource,
-                                                  const mutablebson::DamageVector& damages,
-                                                  bool indexesAffected,
-                                                  OpDebug* opDebug,
-                                                  CollectionUpdateArgs* args) const final;
 
     // -----------
 

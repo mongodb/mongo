@@ -85,6 +85,8 @@ struct CollectionUpdateArgs {
     StoreDocOption storeDocOption = StoreDocOption::None;
     bool changeStreamPreAndPostImagesEnabledForCollection = false;
 
+    bool retryableWrite = false;
+
     // Set if OpTimes were reserved for the update ahead of time.
     std::vector<OplogSlot> oplogSlots;
 };
@@ -347,40 +349,8 @@ public:
                                 StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off,
                                 CheckRecordId checkRecordId = CheckRecordId::Off) const = 0;
 
-    /**
-     * Updates the document @ oldLocation with newDoc.
-     *
-     * If the document fits in the old space, it is put there; if not, it is moved.
-     * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
-     * success.
-     * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
-     * @return the post update location of the doc (may or may not be the same as oldLocation)
-     */
-    virtual RecordId updateDocument(OperationContext* opCtx,
-                                    const RecordId& oldLocation,
-                                    const Snapshotted<BSONObj>& oldDoc,
-                                    const BSONObj& newDoc,
-                                    bool indexesAffected,
-                                    OpDebug* opDebug,
-                                    CollectionUpdateArgs* args) const = 0;
-
     virtual bool updateWithDamagesSupported() const = 0;
 
-    /**
-     * Illegal to call if updateWithDamagesSupported() returns false.
-     * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
-     * success.
-     *
-     * Returns the contents of the updated document on success.
-     */
-    virtual StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
-                                                          const RecordId& loc,
-                                                          const Snapshotted<BSONObj>& oldDoc,
-                                                          const char* damageSource,
-                                                          const mutablebson::DamageVector& damages,
-                                                          bool indexesAffected,
-                                                          OpDebug* opDebug,
-                                                          CollectionUpdateArgs* args) const = 0;
 
     // -----------
 

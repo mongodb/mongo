@@ -33,6 +33,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/mutable/algorithm.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -260,6 +261,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
         // Ensure we set the type correctly
         args.source = writeToOrphan ? OperationSource::kFromMigrate : request->source();
 
+        args.retryableWrite = write_stage_common::isRetryableWrite(opCtx());
+
         if (inPlace) {
             if (!request->explain()) {
                 newObj = oldObj.value();
@@ -274,14 +277,15 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
 
                 WriteUnitOfWork wunit(opCtx());
                 newObj = uassertStatusOK(
-                    collection()->updateDocumentWithDamages(opCtx(),
-                                                            recordId,
-                                                            oldObj,
-                                                            source,
-                                                            _damages,
-                                                            driver->modsAffectIndices(),
-                                                            _params.opDebug,
-                                                            &args));
+                    collection_internal::updateDocumentWithDamages(opCtx(),
+                                                                   collection(),
+                                                                   recordId,
+                                                                   oldObj,
+                                                                   source,
+                                                                   _damages,
+                                                                   driver->modsAffectIndices(),
+                                                                   _params.opDebug,
+                                                                   &args));
                 invariant(oldObj.snapshotId() == opCtx()->recoveryUnit()->getSnapshotId());
                 wunit.commit();
             }
@@ -305,13 +309,14 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                 }
 
                 WriteUnitOfWork wunit(opCtx());
-                newRecordId = collection()->updateDocument(opCtx(),
-                                                           recordId,
-                                                           oldObj,
-                                                           newObj,
-                                                           driver->modsAffectIndices(),
-                                                           _params.opDebug,
-                                                           &args);
+                newRecordId = collection_internal::updateDocument(opCtx(),
+                                                                  collection(),
+                                                                  recordId,
+                                                                  oldObj,
+                                                                  newObj,
+                                                                  driver->modsAffectIndices(),
+                                                                  _params.opDebug,
+                                                                  &args);
                 invariant(oldObj.snapshotId() == opCtx()->recoveryUnit()->getSnapshotId());
                 wunit.commit();
             }

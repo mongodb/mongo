@@ -208,7 +208,7 @@ void TenantMigrationRecipientOpObserver::onInserts(
 
 void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                                                   const OplogUpdateEntryArgs& args) {
-    if (args.nss == NamespaceString::kTenantMigrationRecipientsNamespace &&
+    if (args.coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto recipientStateDoc = TenantMigrationRecipientDocument::parse(
             IDLParserContext("recipientStateDoc"), args.updateArgs->updatedDoc);

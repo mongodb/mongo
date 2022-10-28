@@ -34,6 +34,7 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
@@ -399,7 +400,8 @@ public:
         CollectionUpdateArgs args;
         {
             WriteUnitOfWork wuow(&_opCtx);
-            coll->updateDocument(&_opCtx, *it, oldDoc, newDoc(oldDoc), false, nullptr, &args);
+            collection_internal::updateDocument(
+                &_opCtx, coll, *it, oldDoc, newDoc(oldDoc), false, nullptr, &args);
             wuow.commit();
         }
         exec->restoreState(&coll);
@@ -417,7 +419,8 @@ public:
             oldDoc = coll->docFor(&_opCtx, *it);
             {
                 WriteUnitOfWork wuow(&_opCtx);
-                coll->updateDocument(&_opCtx, *it++, oldDoc, newDoc(oldDoc), false, nullptr, &args);
+                collection_internal::updateDocument(
+                    &_opCtx, coll, *it++, oldDoc, newDoc(oldDoc), false, nullptr, &args);
                 wuow.commit();
             }
         }

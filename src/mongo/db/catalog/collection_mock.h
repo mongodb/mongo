@@ -160,28 +160,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    RecordId updateDocument(OperationContext* opCtx,
-                            const RecordId& oldLocation,
-                            const Snapshotted<BSONObj>& oldDoc,
-                            const BSONObj& newDoc,
-                            bool indexesAffected,
-                            OpDebug* opDebug,
-                            CollectionUpdateArgs* args) const {
-        MONGO_UNREACHABLE;
-    }
-
     bool updateWithDamagesSupported() const {
-        MONGO_UNREACHABLE;
-    }
-
-    StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
-                                                  const RecordId& loc,
-                                                  const Snapshotted<BSONObj>& oldDoc,
-                                                  const char* damageSource,
-                                                  const mutablebson::DamageVector& damages,
-                                                  bool indexesAffected,
-                                                  OpDebug* opDebug,
-                                                  CollectionUpdateArgs* args) const {
         MONGO_UNREACHABLE;
     }
 

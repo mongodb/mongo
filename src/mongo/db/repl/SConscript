@@ -1494,6 +1494,7 @@ env.Library(
         'tenant_migration_utils',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
         "$BUILD_DIR/mongo/db/catalog/local_oplog_info",
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
         "$BUILD_DIR/mongo/db/index_builds_coordinator_interface",

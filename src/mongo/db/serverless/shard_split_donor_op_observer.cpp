@@ -334,7 +334,7 @@ void ShardSplitDonorOpObserver::onInserts(OperationContext* opCtx,
 
 void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
                                          const OplogUpdateEntryArgs& args) {
-    if (args.nss != NamespaceString::kShardSplitDonorsNamespace ||
+    if (args.coll->ns() != NamespaceString::kShardSplitDonorsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }

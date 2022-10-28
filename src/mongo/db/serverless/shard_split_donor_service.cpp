@@ -29,7 +29,9 @@
 
 
 #include "mongo/db/serverless/shard_split_donor_service.h"
+
 #include "mongo/client/streamable_replica_set_monitor.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
@@ -964,13 +966,14 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                            args.oplogSlots = {oplogSlot};
                            args.update = updatedStateDocBson;
 
-                           collection->updateDocument(opCtx,
-                                                      originalRecordId,
-                                                      originalSnapshot,
-                                                      updatedStateDocBson,
-                                                      false,
-                                                      nullptr /* OpDebug* */,
-                                                      &args);
+                           collection_internal::updateDocument(opCtx,
+                                                               *collection,
+                                                               originalRecordId,
+                                                               originalSnapshot,
+                                                               updatedStateDocBson,
+                                                               false,
+                                                               nullptr /* OpDebug* */,
+                                                               &args);
 
                            return oplogSlot;
                        }();

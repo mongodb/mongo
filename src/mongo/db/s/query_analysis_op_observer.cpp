@@ -74,13 +74,13 @@ void QueryAnalysisOpObserver::onInserts(OperationContext* opCtx,
 
 void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis()) {
-        if (args.nss == NamespaceString::kConfigQueryAnalyzersNamespace) {
+        if (args.coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
             const auto& updatedDoc = args.updateArgs->updatedDoc;
             opCtx->recoveryUnit()->onCommit([opCtx, updatedDoc](boost::optional<Timestamp>) {
                 analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationUpdate(
                     updatedDoc);
             });
-        } else if (args.nss == MongosType::ConfigNS) {
+        } else if (args.coll->ns() == MongosType::ConfigNS) {
             const auto& updatedDoc = args.updateArgs->updatedDoc;
             opCtx->recoveryUnit()->onCommit([opCtx, updatedDoc](boost::optional<Timestamp>) {
                 analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerUpdate(

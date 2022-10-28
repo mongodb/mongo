@@ -100,7 +100,7 @@ void FreeMonOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void FreeMonOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    if (args.nss != NamespaceString::kServerConfigurationNamespace) {
+    if (args.coll->ns() != NamespaceString::kServerConfigurationNamespace) {
         return;
     }
 

@@ -137,7 +137,7 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void ConfigServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    if (args.nss != NamespaceString::kConfigsvrShardsNamespace) {
+    if (args.coll->ns() != NamespaceString::kConfigsvrShardsNamespace) {
         return;
     }
 

@@ -85,5 +85,39 @@ Status insertDocument(OperationContext* opCtx,
  */
 Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSONObj& firstDoc);
 
+/**
+ * Updates the document @ oldLocation with newDoc.
+ *
+ * If the document fits in the old space, it is put there; if not, it is moved.
+ * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
+ * success.
+ * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
+ * @return the post update location of the doc (may or may not be the same as oldLocation)
+ */
+RecordId updateDocument(OperationContext* opCtx,
+                        const CollectionPtr& collection,
+                        const RecordId& oldLocation,
+                        const Snapshotted<BSONObj>& oldDoc,
+                        const BSONObj& newDoc,
+                        bool indexesAffected,
+                        OpDebug* opDebug,
+                        CollectionUpdateArgs* args);
+
+/**
+ * Illegal to call if collection->updateWithDamagesSupported() returns false.
+ * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
+ * success.
+ * Returns the contents of the updated document.
+ */
+StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
+                                              const CollectionPtr& collection,
+                                              const RecordId& loc,
+                                              const Snapshotted<BSONObj>& oldDoc,
+                                              const char* damageSource,
+                                              const mutablebson::DamageVector& damages,
+                                              bool indexesAffected,
+                                              OpDebug* opDebug,
+                                              CollectionUpdateArgs* args);
+
 }  // namespace collection_internal
 }  // namespace mongo
