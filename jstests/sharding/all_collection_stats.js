@@ -49,7 +49,16 @@ for (let i = 0; i < 20; i++) {
         if (dbName + "." + coll === ns) {
             assert.eq(data.host, expectedResults[0].host);
             assert.eq(data.shard, expectedResults[0].shard);
-            assert.eq(tojson(data.storageStats), tojson(expectedResults[0].storageStats));
+            assert.eq(data.storageStats.size, expectedResults[0].storageStats.size);
+            assert.eq(data.storageStats.count, expectedResults[0].storageStats.count);
+            assert.eq(data.storageStats.avgObjSize, expectedResults[0].storageStats.avgObjSize);
+            assert.eq(data.storageStats.storageSize, expectedResults[0].storageStats.storageSize);
+            assert.eq(data.storageStats.freeStorageSize,
+                      expectedResults[0].storageStats.freeStorageSize);
+            assert.eq(data.storageStats.nindexes, expectedResults[0].storageStats.nindexes);
+            assert.eq(data.storageStats.totalIndexSize,
+                      expectedResults[0].storageStats.totalIndexSize);
+            assert.eq(data.storageStats.totalSize, expectedResults[0].storageStats.totalSize);
             exists = true;
             break;
         }
