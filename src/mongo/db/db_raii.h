@@ -33,6 +33,8 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -195,24 +197,14 @@ private:
  * Same as AutoGetCollectionForRead above except does not take collection, database or rstl locks.
  * Takes the global lock and may take the PBWM, same as AutoGetCollectionForRead. Ensures a
  * consistent in-memory and on-disk view of the storage catalog.
+ *
+ * This implementation does not use the PIT catalog.
  */
-class AutoGetCollectionForReadLockFree {
+class AutoGetCollectionForReadLockFreeLegacy {
 public:
-    AutoGetCollectionForReadLockFree(OperationContext* opCtx,
-                                     const NamespaceStringOrUUID& nsOrUUID,
-                                     AutoGetCollection::Options = {});
-
-    explicit operator bool() const {
-        return static_cast<bool>(getCollection());
-    }
-
-    const Collection* operator->() const {
-        return getCollection().get();
-    }
-
-    const CollectionPtr& operator*() const {
-        return getCollection();
-    }
+    AutoGetCollectionForReadLockFreeLegacy(OperationContext* opCtx,
+                                           const NamespaceStringOrUUID& nsOrUUID,
+                                           AutoGetCollection::Options = {});
 
     const CollectionPtr& getCollection() const {
         return _autoGetCollectionForReadBase->getCollection();
@@ -226,11 +218,6 @@ public:
         return _autoGetCollectionForReadBase->getNss();
     }
 
-    /**
-     * Indicates whether any namespace in 'secondaryNssOrUUIDs' is a view or sharded.
-     *
-     * The secondary namespaces won't be checked if getCollection() returns nullptr.
-     */
     bool isAnySecondaryNamespaceAViewOrSharded() const {
         return _secondaryNssIsAViewOrSharded;
     }
@@ -269,6 +256,112 @@ private:
 
     boost::optional<AutoGetCollectionForReadBase<AutoGetCollectionLockFree, EmplaceHelper>>
         _autoGetCollectionForReadBase;
+};
+
+/**
+ * Same as AutoGetCollectionForRead above except does not take collection, database or rstl locks.
+ * Takes the global lock and may take the PBWM, same as AutoGetCollectionForRead. Ensures a
+ * consistent in-memory and on-disk view of the storage catalog.
+ *
+ * This implementation uses the point-in-time (PIT) catalog.
+ */
+class AutoGetCollectionForReadLockFreePITCatalog {
+public:
+    AutoGetCollectionForReadLockFreePITCatalog(OperationContext* opCtx,
+                                               const NamespaceStringOrUUID& nsOrUUID,
+                                               AutoGetCollection::Options options = {})
+        : _impl(opCtx, nsOrUUID, std::move(options)) {}
+
+    const CollectionPtr& getCollection() const {
+        return _impl.getCollection();
+    }
+
+    const ViewDefinition* getView() const {
+        return _impl.getView();
+    }
+
+    const NamespaceString& getNss() const {
+        return _impl.getNss();
+    }
+
+    bool isAnySecondaryNamespaceAViewOrSharded() const {
+        return _impl.isAnySecondaryNamespaceAViewOrSharded();
+    }
+
+private:
+    // TODO (SERVER-68271): Replace with new implementation using the PIT catalog.
+    AutoGetCollectionForReadLockFreeLegacy _impl;
+};
+
+/**
+ * Same as AutoGetCollectionForRead above except does not take collection, database or rstl locks.
+ * Takes the global lock and may take the PBWM, same as AutoGetCollectionForRead. Ensures a
+ * consistent in-memory and on-disk view of the storage catalog.
+ */
+class AutoGetCollectionForReadLockFree {
+public:
+    AutoGetCollectionForReadLockFree(OperationContext* opCtx,
+                                     const NamespaceStringOrUUID& nsOrUUID,
+                                     AutoGetCollection::Options = {});
+
+    explicit operator bool() const {
+        return static_cast<bool>(getCollection());
+    }
+
+    const Collection* operator->() const {
+        return getCollection().get();
+    }
+
+    const CollectionPtr& operator*() const {
+        return getCollection();
+    }
+
+    const CollectionPtr& getCollection() const {
+        return stdx::visit(
+            OverloadedVisitor{
+                [](auto&& impl) -> const CollectionPtr& { return impl.getCollection(); },
+                [](stdx::monostate) -> const CollectionPtr& { MONGO_UNREACHABLE; },
+            },
+            _impl);
+    }
+
+    const ViewDefinition* getView() const {
+        return stdx::visit(
+            OverloadedVisitor{[](auto&& impl) { return impl.getView(); },
+                              [](stdx::monostate) -> const ViewDefinition* { MONGO_UNREACHABLE; }},
+            _impl);
+    }
+
+    const NamespaceString& getNss() const {
+        return stdx::visit(
+            OverloadedVisitor{[](auto&& impl) -> const NamespaceString& { return impl.getNss(); },
+                              [](stdx::monostate) -> const NamespaceString& { MONGO_UNREACHABLE; }},
+            _impl);
+    }
+
+    /**
+     * Indicates whether any namespace in 'secondaryNssOrUUIDs' is a view or sharded.
+     *
+     * The secondary namespaces won't be checked if getCollection() returns nullptr.
+     */
+    bool isAnySecondaryNamespaceAViewOrSharded() const {
+        return stdx::visit(
+            OverloadedVisitor{
+                [](auto&& impl) { return impl.isAnySecondaryNamespaceAViewOrSharded(); },
+                [](stdx::monostate) -> bool { MONGO_UNREACHABLE; }},
+            _impl);
+    }
+
+private:
+    // If the gPointInTimeCatalogLookups feature flag is enabled, this will contain an instance of
+    // AutoGetCollectionForReadLockFreePITCatalog. Otherwise, it will contain an instance of
+    // AutoGetCollectionForReadLockFreeLegacy. Note that stdx::monostate is required for default
+    // construction, since these other types are not movable, but after construction, the value
+    // should never be set to stdx::monostate.
+    stdx::variant<stdx::monostate,
+                  AutoGetCollectionForReadLockFreeLegacy,
+                  AutoGetCollectionForReadLockFreePITCatalog>
+        _impl;
 };
 
 /**
