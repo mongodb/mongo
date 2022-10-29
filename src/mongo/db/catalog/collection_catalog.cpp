@@ -1615,12 +1615,15 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
 
     // TODO SERVER-68674: Remove feature flag check.
     if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() && isDropPending) {
-        auto ident = coll->getSharedIdent()->getIdent();
-        LOGV2_DEBUG(6825300, 1, "Registering drop pending collection ident", "ident"_attr = ident);
+        if (auto sharedIdent = coll->getSharedIdent(); sharedIdent) {
+            auto ident = sharedIdent->getIdent();
+            LOGV2_DEBUG(
+                6825300, 1, "Registering drop pending collection ident", "ident"_attr = ident);
 
-        auto it = _dropPendingCollection.find(ident);
-        invariant(it == _dropPendingCollection.end());
-        _dropPendingCollection[ident] = coll;
+            auto it = _dropPendingCollection.find(ident);
+            invariant(it == _dropPendingCollection.end());
+            _dropPendingCollection[ident] = coll;
+        }
     }
 
     _orderedCollections.erase(dbIdPair);

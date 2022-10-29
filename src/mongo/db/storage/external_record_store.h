@@ -33,16 +33,8 @@
 #include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/errno_util.h"
 
 namespace mongo {
-namespace {
-inline std::string getErrorMessage(StringData op, const std::string& path) {
-    using namespace fmt::literals;
-    return "Failed to {} {}: {}"_format(op, path, errorMessage(lastSystemError()));
-}
-}  // namespace
-
 class ExternalRecordStore : public RecordStore {
 public:
     ExternalRecordStore(StringData ns, const VirtualCollectionOptions& vopts);

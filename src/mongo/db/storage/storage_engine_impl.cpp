@@ -971,10 +971,12 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
 
         audit::logDropCollection(opCtx->getClient(), coll->ns());
 
-        Status result = catalog::dropCollection(
-            opCtx, coll->ns(), coll->getCatalogId(), coll->getSharedIdent());
-        if (!result.isOK() && firstError.isOK()) {
-            firstError = result;
+        if (auto sharedIdent = coll->getSharedIdent()) {
+            Status result =
+                catalog::dropCollection(opCtx, coll->ns(), coll->getCatalogId(), sharedIdent);
+            if (!result.isOK() && firstError.isOK()) {
+                firstError = result;
+            }
         }
 
         CollectionCatalog::get(opCtx)->dropCollection(

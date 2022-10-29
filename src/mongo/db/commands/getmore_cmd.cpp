@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/external_data_source_scope_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_manager.h"
@@ -484,6 +485,10 @@ public:
             // Inherit properties like readConcern and maxTimeMS from our originating cursor.
             setUpOperationContextStateForGetMore(
                 opCtx, *cursorPin.getCursor(), _cmd, disableAwaitDataFailpointActive);
+
+            // Update opCtx of the decorated ExternalDataSourceScopeGuard object so that it can drop
+            // virtual collections in the new 'opCtx'.
+            ExternalDataSourceScopeGuard::updateOperationContext(cursorPin.getCursor(), opCtx);
 
             // On early return, typically due to a failed assertion, delete the cursor.
             ScopeGuard cursorDeleter([&] { cursorPin.deleteUnderlying(); });

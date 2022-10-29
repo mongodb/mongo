@@ -55,6 +55,7 @@ public:
     using DBClientBase::find;
     using DBClientBase::insert;
     using DBClientBase::remove;
+    using DBClientBase::runCommand;
     using DBClientBase::update;
 
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,

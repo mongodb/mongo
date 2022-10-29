@@ -35,8 +35,8 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/external_data_source_scope_guard.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -46,7 +46,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 
 namespace mongo {
@@ -202,18 +202,20 @@ public:
             CommandHelpers::handleMarkKillOnClientDisconnect(
                 opCtx, !Pipeline::aggHasWriteStage(_request.body));
 
-            // TODO SERVER-69687 Create a virtual collection per each used external data source.
-            for (auto&& [collName, dataSources] : _usedExternalDataSources) {
-                VirtualCollectionOptions vopts(dataSources);
-            }
-
+            // Create virtual collections and drop them when aggregate command is done. Conceptually
+            // ownership of virtual collections are moved to runAggregate() function together with
+            // 'dropVcollGuard' so that it can clean up virtual collections when it's done with
+            // them. ExternalDataSourceScopeGuard will take care of the situation when any
+            // collection could not be created.
+            ExternalDataSourceScopeGuard dropVcollGuard(opCtx, _usedExternalDataSources);
             uassertStatusOK(runAggregate(opCtx,
                                          _aggregationRequest.getNamespace(),
                                          _aggregationRequest,
                                          _liteParsedPipeline,
                                          _request.body,
                                          _privileges,
-                                         reply));
+                                         reply,
+                                         std::move(dropVcollGuard)));
 
             // The aggregate command's response is unstable when 'explain' or 'exchange' fields are
             // set.
@@ -231,14 +233,16 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
-
+            // See run() method for details.
+            ExternalDataSourceScopeGuard dropVcollGuard(opCtx, _usedExternalDataSources);
             uassertStatusOK(runAggregate(opCtx,
                                          _aggregationRequest.getNamespace(),
                                          _aggregationRequest,
                                          _liteParsedPipeline,
                                          _request.body,
                                          _privileges,
-                                         result));
+                                         result,
+                                         std::move(dropVcollGuard)));
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

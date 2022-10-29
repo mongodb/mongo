@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/external_record_store.h"
 
@@ -43,8 +44,9 @@ VirtualCollectionImpl::VirtualCollectionImpl(OperationContext* opCtx,
                                              std::unique_ptr<ExternalRecordStore> recordStore)
     : _nss(nss),
       _options(options),
-      _recordStore(std::move(recordStore)),
-      _collator(CollectionImpl::parseCollation(opCtx, nss, options.collation)) {
+      _shared(std::make_shared<SharedState>(
+          std::move(recordStore), CollectionImpl::parseCollation(opCtx, nss, options.collation))),
+      _indexCatalog(std::make_unique<IndexCatalogImpl>()) {
     tassert(6968503,
             "Cannot create _id index for a virtual collection",
             options.autoIndexId == CollectionOptions::NO && options.idIndex.isEmpty());
@@ -56,17 +58,5 @@ std::shared_ptr<Collection> VirtualCollectionImpl::make(OperationContext* opCtx,
                                                         const VirtualCollectionOptions& vopts) {
     return std::make_shared<VirtualCollectionImpl>(
         opCtx, nss, options, std::make_unique<ExternalRecordStore>(nss.ns(), vopts));
-}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> VirtualCollectionImpl::makePlanExecutor(
-    OperationContext* opCtx,
-    const CollectionPtr& yieldableCollection,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    ScanDirection scanDirection,
-    const boost::optional<RecordId>& resumeAfterRecordId) const {
-    // TODO SERVER-69683 Implement this function when implementing MultiBsonStreamCursor since
-    // we can scan when it's done. We don't support scan yet.
-    unimplementedTasserted();
-    return nullptr;
 }
 }  // namespace mongo

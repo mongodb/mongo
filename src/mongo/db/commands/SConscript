@@ -789,6 +789,7 @@ env.CppUnitTest(
     target="db_commands_test",
     source=[
         "create_indexes_test.cpp",
+        "external_data_source_commands_test.cpp",
         "index_filter_commands_test.cpp",
         "fle_compact_test.cpp",
         "list_collections_filter_test.cpp",
@@ -819,7 +820,9 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
+        "$BUILD_DIR/mongo/db/storage/record_store_base",
         '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/util/version_impl',
         "cluster_server_parameter_commands_invocation",
         "core",
         "create_command",

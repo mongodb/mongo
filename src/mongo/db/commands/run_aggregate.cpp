@@ -42,6 +42,7 @@
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/commands/external_data_source_scope_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
@@ -659,7 +660,7 @@ Status runAggregate(OperationContext* opCtx,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result) {
-    return runAggregate(opCtx, nss, request, {request}, cmdObj, privileges, result);
+    return runAggregate(opCtx, nss, request, {request}, cmdObj, privileges, result, {});
 }
 
 Status runAggregate(OperationContext* opCtx,
@@ -668,7 +669,8 @@ Status runAggregate(OperationContext* opCtx,
                     const LiteParsedPipeline& liteParsedPipeline,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
-                    rpc::ReplyBuilderInterface* result) {
+                    rpc::ReplyBuilderInterface* result,
+                    ExternalDataSourceScopeGuard externalDataSourceGuard) {
 
     // Perform some validations on the LiteParsedPipeline and request before continuing with the
     // aggregation command.
@@ -1021,6 +1023,8 @@ Status runAggregate(OperationContext* opCtx,
             p.deleteUnderlying();
         }
     });
+    auto extDataSrcGuard =
+        std::make_shared<ExternalDataSourceScopeGuard>(std::move(externalDataSourceGuard));
     for (auto&& exec : execs) {
         ClientCursorParams cursorParams(
             std::move(exec),
@@ -1038,6 +1042,10 @@ Status runAggregate(OperationContext* opCtx,
 
         pin->incNBatches();
         cursors.emplace_back(pin.getCursor());
+        // All cursors share the ownership to 'extDataSrcGuard' and if the last cursor is destroyed,
+        // 'extDataSrcGuard' is also destroyed and created virtual collections are dropped by the
+        // destructor of ExternalDataSourceScopeGuard.
+        ExternalDataSourceScopeGuard::get(pin.getCursor()) = extDataSrcGuard;
         pins.emplace_back(std::move(pin));
     }
 

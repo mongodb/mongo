@@ -8,10 +8,7 @@
 const conn = MongoRunner.runMongod({setParameter: {enableComputeMode: true}});
 const db = conn.getDB(jsTestName());
 
-const kDefaultUrlPrefix = (() => {
-    return assert.commandWorked(db.hostInfo()).os.type == "Windows" ? "file:////./pipe/"
-                                                                    : "file:///tmp/";
-})();
+const kUrlProtocolFile = "file://";
 
 // Empty option
 assert.throwsWithCode(() => {
@@ -29,7 +26,7 @@ assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
         $_externalDataSources: [{
             collName: "coll",
-            dataSources: [{url: kDefaultUrlPrefix + "name1", storageType: "pipe"}]
+            dataSources: [{url: kUrlProtocolFile + "name1", storageType: "pipe"}]
         }]
     });
 }, 40414);
@@ -40,7 +37,7 @@ assert.throwsWithCode(() => {
         $_externalDataSources: [{
             collName: "coll",
             dataSources:
-                [{url: kDefaultUrlPrefix + "name1", storageType: "pipe", fileType: "unknown"}]
+                [{url: kUrlProtocolFile + "name1", storageType: "pipe", fileType: "unknown"}]
         }]
     });
 }, ErrorCodes.BadValue);
@@ -48,9 +45,8 @@ assert.throwsWithCode(() => {
 // No storage type
 assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
-        $_externalDataSources: [
-            {collName: "coll", dataSources: [{url: kDefaultUrlPrefix + "name1", fileType: "bson"}]}
-        ]
+        $_externalDataSources:
+            [{collName: "coll", dataSources: [{url: kUrlProtocolFile + "name1", fileType: "bson"}]}]
     });
 }, 40414);
 
@@ -60,7 +56,7 @@ assert.throwsWithCode(() => {
         $_externalDataSources: [{
             collName: "coll",
             dataSources:
-                [{url: kDefaultUrlPrefix + "name1", storageType: "unknown", fileType: "bson"}]
+                [{url: kUrlProtocolFile + "name1", storageType: "unknown", fileType: "bson"}]
         }]
     });
 }, ErrorCodes.BadValue);
@@ -78,20 +74,22 @@ assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
         $_externalDataSources: [{
             collName: "coll",
-            dataSources: [{url: "http:///name1", storageType: "pipe", fileType: "bson"}]
+            dataSources: [{url: "http://abc.com/name1", storageType: "pipe", fileType: "bson"}]
         }]
     });
 }, 6968500);
 
+// The source namespace is not an external data source
 assert.throwsWithCode(() => {
     db.unknown.aggregate([{$match: {a: 1}}], {
         $_externalDataSources: [{
             collName: "coll",
-            dataSources: [{url: kDefaultUrlPrefix + "name1", storageType: "pipe", fileType: "bson"}]
+            dataSources: [{url: kUrlProtocolFile + "name1", storageType: "pipe", fileType: "bson"}]
         }]
     });
 }, 7039003);
 
+// $lookup's 'from' collection is not an external data source
 assert.throwsWithCode(() => {
     db.coll.aggregate(
         [
@@ -102,19 +100,20 @@ assert.throwsWithCode(() => {
             $_externalDataSources: [{
                 collName: "coll",
                 dataSources:
-                    [{url: kDefaultUrlPrefix + "name1", storageType: "pipe", fileType: "bson"}]
+                    [{url: kUrlProtocolFile + "name1", storageType: "pipe", fileType: "bson"}]
             }]
         });
 }, 7039004);
 
-assert.doesNotThrow(() => {
+// Non-existing external data source
+assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
         $_externalDataSources: [{
             collName: "coll",
-            dataSources: [{url: kDefaultUrlPrefix + "name1", storageType: "pipe", fileType: "bson"}]
+            dataSources: [{url: kUrlProtocolFile + "name1", storageType: "pipe", fileType: "bson"}]
         }]
     });
-});
+}, ErrorCodes.FileNotOpen);
 
 MongoRunner.stopMongod(conn);
 })();

@@ -29,46 +29,33 @@
 
 #pragma once
 
-#include <cstdint>
-#include <fmt/format.h>
 #include <string>
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-
 /**
  * Metadata for external data source.
  */
 struct ExternalDataSourceMetadata {
     static constexpr auto kUrlProtocolFile = "file://"_sd;
-#ifndef _WIN32
-    static constexpr auto kDefaultFileUrlPrefix = "file:///tmp/"_sd;
-#else
-    static constexpr auto kDefaultFileUrlPrefix = "file:////./pipe/"_sd;
-#endif
 
-    ExternalDataSourceMetadata(const std::string& url,
-                               StorageTypeEnum storageType,
-                               FileTypeEnum fileType)
-        : storageType(storageType), fileType(fileType) {
-        using namespace fmt::literals;
+    ExternalDataSourceMetadata(StringData urlStr,
+                               StorageTypeEnum storageTypeEnum,
+                               FileTypeEnum fileTypeEnum)
+        : url(urlStr), storageType(storageTypeEnum), fileType(fileTypeEnum) {
         uassert(6968500,
-                "File url must start with {}"_format(kDefaultFileUrlPrefix),
-                url.find(kDefaultFileUrlPrefix.toString()) == 0);
+                "File url must start with {}"_format(kUrlProtocolFile),
+                urlStr.startsWith(kUrlProtocolFile));
         uassert(6968501, "Storage type must be 'pipe'", storageType == StorageTypeEnum::pipe);
         uassert(6968502, "File type must be 'bson'", fileType == FileTypeEnum::bson);
-
-        // Strip off the protocol prefix.
-        this->url = url.substr(kUrlProtocolFile.size());
     }
 
     ExternalDataSourceMetadata(const ExternalDataSourceInfo& dataSourceInfo)
-        : ExternalDataSourceMetadata(dataSourceInfo.getUrl().toString(),
+        : ExternalDataSourceMetadata(dataSourceInfo.getUrl(),
                                      dataSourceInfo.getStorageType(),
                                      dataSourceInfo.getFileType()) {}
 

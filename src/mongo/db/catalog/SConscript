@@ -508,6 +508,7 @@ env.Library(
 env.Library(
     target='catalog_helpers',
     source=[
+        "$BUILD_DIR/mongo/db/commands/external_data_source_scope_guard.cpp",
         'capped_utils.cpp',
         'coll_mod_index.cpp',
         'coll_mod.cpp',

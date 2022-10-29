@@ -31,9 +31,12 @@
 #include "named_pipe.h"
 
 #include <fmt/format.h>
+#include <string>
+#include <system_error>
 
-#include "mongo/db/storage/external_record_store.h"
+#include "mongo/db/storage/io_error_message.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/errno_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -41,14 +44,20 @@
 namespace mongo {
 using namespace fmt::literals;
 
-NamedPipeOutput::NamedPipeOutput(const char* pipePath)
-    : _pipePath(pipePath),
-      _pipe(CreateNamedPipeA(
-          pipePath, PIPE_ACCESS_OUTBOUND, (PIPE_TYPE_BYTE | PIPE_WAIT), 1, 0, 0, 0, nullptr)),
+NamedPipeOutput::NamedPipeOutput(const std::string& pipeRelativePath)
+    : _pipeAbsolutePath(kDefaultPipePath + pipeRelativePath),
+      _pipe(CreateNamedPipeA(_pipeAbsolutePath.c_str(),
+                             PIPE_ACCESS_OUTBOUND,
+                             (PIPE_TYPE_BYTE | PIPE_WAIT),
+                             1,          // nMaxInstances
+                             0,          // nOutBufferSize
+                             0,          // nInBufferSize
+                             0,          // nDefaultTimeOut
+                             nullptr)),  // lpSecurityAttributes
       _isOpen(false) {
     uassert(7005006,
             "Failed to create a named pipe, error={}"_format(
-                getErrorMessage("CreateNamedPipe", _pipePath)),
+                getErrorMessage("CreateNamedPipe", _pipeAbsolutePath)),
             _pipe != INVALID_HANDLE_VALUE);
 }
 
@@ -64,7 +73,7 @@ void NamedPipeOutput::open() {
     if (!res) {
         LOGV2_ERROR(7005007,
                     "Failed to connect a named pipe",
-                    "error"_attr = getErrorMessage("ConnectNamedPipe", _pipePath));
+                    "error"_attr = getErrorMessage("ConnectNamedPipe", _pipeAbsolutePath));
         return;
     }
     _isOpen = true;
@@ -83,7 +92,7 @@ int NamedPipeOutput::write(const char* data, int size) {
     if (!res || size != nWritten) {
         LOGV2_ERROR(7005008,
                     "Failed to write to a named pipe",
-                    "error"_attr = getErrorMessage("write", _pipePath));
+                    "error"_attr = getErrorMessage("write", _pipeAbsolutePath));
         return -1;
     }
 
@@ -102,8 +111,8 @@ void NamedPipeOutput::close() {
     }
 }
 
-NamedPipeInput::NamedPipeInput(const char* pipePath)
-    : _pipePath(pipePath),
+NamedPipeInput::NamedPipeInput(const std::string& pipeRelativePath)
+    : _pipeAbsolutePath(kDefaultPipePath + pipeRelativePath),
       _pipe(INVALID_HANDLE_VALUE),
       _isOpen(false),
       _isGood(false),
@@ -114,7 +123,8 @@ NamedPipeInput::~NamedPipeInput() {
 }
 
 void NamedPipeInput::doOpen() {
-    _pipe = CreateFileA(_pipePath, GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+    _pipe =
+        CreateFileA(_pipeAbsolutePath.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
     if (_pipe == INVALID_HANDLE_VALUE) {
         return;
     }
