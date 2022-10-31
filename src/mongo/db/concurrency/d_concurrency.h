@@ -121,6 +121,13 @@ public:
 
         static std::string getName(ResourceId resourceId);
 
+        /**
+         * Each instantiation of this class allocates a new ResourceId.
+         */
+        ResourceId getRid() const {
+            return _rid;
+        }
+
         bool isExclusivelyLocked(Locker* locker);
 
         bool isAtLeastReadLocked(Locker* locker);
@@ -128,13 +135,6 @@ public:
     private:
         friend class Lock::SharedLock;
         friend class Lock::ExclusiveLock;
-
-        /**
-         * Each instantiation of this class allocates a new ResourceId.
-         */
-        ResourceId rid() const {
-            return _rid;
-        }
 
         const ResourceId _rid;
     };
@@ -151,7 +151,7 @@ public:
          * Interruptible lock acquisition.
          */
         ExclusiveLock(OperationContext* opCtx, Locker* locker, ResourceMutex mutex)
-            : ResourceLock(opCtx, locker, mutex.rid(), MODE_X) {}
+            : ResourceLock(opCtx, locker, mutex.getRid(), MODE_X) {}
 
         using ResourceLock::lock;
 
@@ -177,7 +177,7 @@ public:
          * Interruptible lock acquisition.
          */
         SharedLock(OperationContext* opCtx, Locker* locker, ResourceMutex mutex)
-            : ResourceLock(opCtx, locker, mutex.rid(), MODE_IS) {}
+            : ResourceLock(opCtx, locker, mutex.getRid(), MODE_IS) {}
     };
 
     /**
