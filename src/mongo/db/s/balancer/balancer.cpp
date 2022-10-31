@@ -281,7 +281,7 @@ Balancer::Balancer()
           std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)),
       _commandScheduler(std::make_unique<BalancerCommandsSchedulerImpl>()),
       _defragmentationPolicy(std::make_unique<BalancerDefragmentationPolicyImpl>(
-          _clusterStats.get(), _random, [this]() { _onActionsStreamPolicyStateUpdate(); })),
+          _clusterStats.get(), [this]() { _onActionsStreamPolicyStateUpdate(); })),
       _clusterChunksResizePolicy(std::make_unique<ClusterChunksResizePolicyImpl>(
           [this] { _onActionsStreamPolicyStateUpdate(); })) {}
 
