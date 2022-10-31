@@ -65,11 +65,6 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 rollbackTest.transitionToSteadyStateOperations();
 
 // Make sure the collections get flagged properly again during rollback.
-assert(checkLog.checkContainsWithCountJson(
-    rollbackNode, 6679402, {"nss": "test.standard", "timeField": "time"}, 0));
-assert(checkLog.checkContainsWithCountJson(
-    rollbackNode, 6679402, {"nss": "test.extended", "timeField": "time"}, 2));
-
 assert.eq(1, getExtendedRangeCount(rollbackNode));
 
 rollbackTest.stop();
