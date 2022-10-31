@@ -1,5 +1,6 @@
 """SCons metrics."""
 import re
+import os
 from typing import Optional, NamedTuple, List, Pattern, AnyStr
 
 from buildscripts.util.cedar_report import CedarMetric, CedarTestReport
@@ -105,7 +106,7 @@ class SconsMetrics:  # pylint: disable=too-many-instance-attributes
             self.total_command_execution_time = self._parse_float(
                 TOTAL_COMMAND_EXECUTION_TIME_REGEX, self.raw_report)
 
-        if cache_debug_log_file:
+        if os.path.exists(cache_debug_log_file):
             with open(cache_debug_log_file, "r") as fh:
                 self.final_cache_hit_ratio = self._parse_float(CACHE_HIT_RATIO_REGEX, fh.read())
         else:
