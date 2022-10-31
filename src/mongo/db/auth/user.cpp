@@ -66,8 +66,8 @@ SHA256Block computeDigest(const UserName& name) {
 
 }  // namespace
 
-User::User(const UserName& name)
-    : _name(name), _isInvalidated(false), _digest(computeDigest(_name)) {}
+User::User(UserRequest request)
+    : _request(std::move(request)), _isInvalidated(false), _digest(computeDigest(_request.name)) {}
 
 template <>
 User::SCRAMCredentials<SHA1Block>& User::CredentialData::scram<SHA1Block>() {
@@ -201,10 +201,10 @@ void User::reportForUsersInfo(BSONObjBuilder* builder,
                               bool showCredentials,
                               bool showPrivileges,
                               bool showAuthenticationRestrictions) const {
-    builder->append(kIdFieldName, _name.getUnambiguousName());
+    builder->append(kIdFieldName, getName().getUnambiguousName());
     UUID::fromCDR(ConstDataRange(_id)).appendToBuilder(builder, kUserIdFieldName);
-    builder->append(kUserFieldName, _name.getUser());
-    builder->append(kDbFieldName, _name.getDB());
+    builder->append(kUserFieldName, getName().getUser());
+    builder->append(kDbFieldName, getName().getDB());
 
     BSONArrayBuilder mechanismNamesBuilder(builder->subarrayStart(kMechanismsFieldName));
     for (const StringData& mechanism : _credentials.toMechanismsVector()) {

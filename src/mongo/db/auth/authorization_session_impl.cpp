@@ -210,8 +210,10 @@ void AuthorizationSessionImpl::startContractTracking() {
 }
 
 Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
-                                                     const UserName& userName,
+                                                     const UserRequest& userRequest,
                                                      boost::optional<Date_t> expirationTime) try {
+    const auto& userName = userRequest.name;
+
     // Check before we start to reveal as little as possible. Note that we do not need the lock
     // because only the Client thread can mutate _authenticatedUser.
     if (_authenticatedUser) {
@@ -253,7 +255,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
     }
 
     AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
-    auto user = uassertStatusOK(authzManager->acquireUser(opCtx, userName));
+    auto user = uassertStatusOK(authzManager->acquireUser(opCtx, userRequest));
 
     auto restrictionStatus = user->validateRestrictions(opCtx);
     if (!restrictionStatus.isOK()) {

@@ -71,7 +71,7 @@ public:
     void startContractTracking() override {}
 
     Status addAndAuthorizeUser(OperationContext*,
-                               const UserName&,
+                               const UserRequest&,
                                boost::optional<Date_t>) override {
         UASSERT_NOT_IMPLEMENTED;
     }

@@ -103,7 +103,6 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
     AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
 
     UserHandle user;
-
     const auto swUser = [&] {
         ScopedCallbackTimer timer([&](Microseconds elapsed) {
             LOGV2(6788603,
@@ -111,7 +110,7 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
                   "metric"_attr = "sasl_acquireUser",
                   "micros"_attr = elapsed.count());
         });
-        return authManager->acquireUser(opCtx, userName);
+        return authManager->acquireUser(opCtx, UserRequest(userName, boost::none));
     }();
 
     if (!swUser.isOK()) {

@@ -199,6 +199,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/commands/authentication_commands',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/global_settings',

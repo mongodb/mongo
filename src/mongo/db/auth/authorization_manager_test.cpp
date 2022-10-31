@@ -140,7 +140,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
                                                                              << "admin"))),
                                                      BSONObj()));
 
-    auto swu = authzManager->acquireUser(opCtx.get(), UserName("v2read", "test"));
+    auto swu = authzManager->acquireUser(opCtx.get(), {{"v2read", "test"}, boost::none});
     ASSERT_OK(swu.getStatus());
     auto v2read = std::move(swu.getValue());
     ASSERT_EQUALS(UserName("v2read", "test"), v2read->getName());
@@ -153,7 +153,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     ASSERT(testDBPrivilege.getActions().contains(ActionType::find));
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
 
-    swu = authzManager->acquireUser(opCtx.get(), UserName("v2cluster", "admin"));
+    swu = authzManager->acquireUser(opCtx.get(), {{"v2cluster", "admin"}, boost::none});
     ASSERT_OK(swu.getStatus());
     auto v2cluster = std::move(swu.getValue());
     ASSERT_EQUALS(UserName("v2cluster", "admin"), v2cluster->getName());
@@ -169,24 +169,19 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
 
 #ifdef MONGO_CONFIG_SSL
 TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
-    setX509PeerInfo(session,
-                    SSLPeerInfo(buildX509Name(),
-                                boost::none,
-                                {RoleName("read", "test"), RoleName("readWrite", "test")}));
+    std::set<RoleName> roles({{"read", "test"}, {"readWrite", "test"}});
+    UserRequest request(UserName("CN=mongodb.com", "$external"), roles);
 
-    auto swu = authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"));
+    auto swu = authzManager->acquireUser(opCtx.get(), request);
     ASSERT_OK(swu.getStatus());
     auto x509User = std::move(swu.getValue());
     ASSERT(x509User.isValid());
 
-    stdx::unordered_set<RoleName> expectedRoles{RoleName("read", "test"),
-                                                RoleName("readWrite", "test")};
-    RoleNameIterator roles = x509User->getRoles();
-    stdx::unordered_set<RoleName> acquiredRoles;
-    while (roles.more()) {
-        acquiredRoles.insert(roles.next());
+    std::set<RoleName> gotRoles;
+    for (auto it = x509User->getRoles(); it.more();) {
+        gotRoles.emplace(it.next());
     }
-    ASSERT_TRUE(expectedRoles == acquiredRoles);
+    ASSERT_TRUE(roles == gotRoles);
 
     const User::ResourcePrivilegeMap& privileges = x509User->getPrivileges();
     ASSERT_FALSE(privileges.empty());
@@ -202,14 +197,16 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
                                 {RoleName("read", "test"), RoleName("write", "test")}));
 
     ASSERT_NOT_OK(
-        authzManager->acquireUser(opCtx.get(), UserName("CN=10gen.com", "$external")).getStatus());
+        authzManager->acquireUser(opCtx.get(), {{"CN=10gen.com", "$external"}, boost::none})
+            .getStatus());
 }
 
 TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
     setX509PeerInfo(session, {});
 
-    ASSERT_NOT_OK(authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"))
-                      .getStatus());
+    ASSERT_NOT_OK(
+        authzManager->acquireUser(opCtx.get(), {{"CN=mongodb.com", "$external"}, boost::none})
+            .getStatus());
 }
 
 #endif
@@ -240,7 +237,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
                                                          << "insert")))),
         BSONObj()));
 
-    auto swu = authzManager->acquireUser(opCtx.get(), UserName("myUser", "test"));
+    auto swu = authzManager->acquireUser(opCtx.get(), {{"myUser", "test"}, boost::none});
     ASSERT_OK(swu.getStatus());
     auto myUser = std::move(swu.getValue());
     ASSERT_EQUALS(UserName("myUser", "test"), myUser->getName());
@@ -317,14 +314,12 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
     std::vector<UserHandle> checkedOutUsers;
     checkedOutUsers.reserve(userDocs.size());
     for (const auto& userDoc : userDocs) {
-        auto swUser = authzManager->acquireUser(
-            opCtx.get(),
-            UserName(userDoc.getStringField(kUserFieldName), userDoc.getStringField(kDbFieldName)));
+        const UserName userName(userDoc.getStringField(kUserFieldName),
+                                userDoc.getStringField(kDbFieldName));
+        auto swUser = authzManager->acquireUser(opCtx.get(), {userName, boost::none});
         ASSERT_OK(swUser.getStatus());
         auto user = std::move(swUser.getValue());
-        ASSERT_EQUALS(
-            UserName(userDoc.getStringField(kUserFieldName), userDoc.getStringField(kDbFieldName)),
-            user->getName());
+        ASSERT_EQUALS(userName, user->getName());
         ASSERT(user.isValid());
 
         RoleNameIterator cachedUserRoles = user->getRoles();
@@ -364,14 +359,12 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
     // Retrieve all users from the cache and verify that only the external ones contain the newly
     // added role.
     for (const auto& userDoc : userDocs) {
-        auto swUser = authzManager->acquireUser(
-            opCtx.get(),
-            UserName(userDoc.getStringField(kUserFieldName), userDoc.getStringField(kDbFieldName)));
+        const UserName userName(userDoc.getStringField(kUserFieldName),
+                                userDoc.getStringField(kDbFieldName));
+        auto swUser = authzManager->acquireUser(opCtx.get(), {userName, boost::none});
         ASSERT_OK(swUser.getStatus());
         auto user = std::move(swUser.getValue());
-        ASSERT_EQUALS(
-            UserName(userDoc.getStringField(kUserFieldName), userDoc.getStringField(kDbFieldName)),
-            user->getName());
+        ASSERT_EQUALS(userName, user->getName());
         ASSERT(user.isValid());
 
         RoleNameIterator cachedUserRolesIt = user->getRoles();

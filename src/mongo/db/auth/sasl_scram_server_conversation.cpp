@@ -213,7 +213,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
                   "metric"_attr = "acquireUser",
                   "micros"_attr = elapsed.count());
         });
-        return authManager->acquireUser(opCtx, user);
+        return authManager->acquireUser(opCtx, UserRequest(user, boost::none));
     }();
 
     if (!swUser.isOK()) {

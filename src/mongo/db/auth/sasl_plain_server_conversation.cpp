@@ -135,8 +135,7 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
                   "metric"_attr = "plain_acquireUser",
                   "micros"_attr = elapsed.count());
         });
-        return authManager->acquireUser(
-            opCtx, UserName(ServerMechanismBase::_principalName, _authenticationDatabase));
+        return authManager->acquireUser(opCtx, getUserRequest());
     }();
 
     if (!swUser.isOK()) {

@@ -205,10 +205,10 @@ SaslReply doSaslStep(OperationContext* opCtx,
     }
 
     if (mechanism.isSuccess()) {
-        UserName userName(mechanism.getPrincipalName(), mechanism.getAuthenticationDatabase());
+        auto request = mechanism.getUserRequest();
         auto expirationTime = mechanism.getExpirationTime();
         uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                            ->addAndAuthorizeUser(opCtx, userName, expirationTime));
+                            ->addAndAuthorizeUser(opCtx, request, expirationTime));
 
         if (!serverGlobalParams.quiet.load()) {
             auto attrs = makeLogAttributes();

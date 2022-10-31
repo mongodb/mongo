@@ -40,6 +40,7 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/authentication_session.h"
+#include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/commands.h"
@@ -136,6 +137,33 @@ public:
 } cmdLogout;
 
 #ifdef MONGO_CONFIG_SSL
+}  // namespace
+
+UserRequest getX509UserRequest(OperationContext* opCtx, UserRequest request) {
+    std::shared_ptr<transport::Session> session;
+    if (opCtx && opCtx->getClient()) {
+        session = opCtx->getClient()->session();
+    }
+
+    if (!allowRolesFromX509Certificates || !session || request.roles) {
+        return request;
+    }
+
+    auto& sslPeerInfo = SSLPeerInfo::forSession(session);
+    if (sslPeerInfo.roles.empty() ||
+        (sslPeerInfo.subjectName.toString() != request.name.getUser())) {
+        return request;
+    }
+
+    // In order to be hashable, the role names must be converted from unordered_set to a set.
+    request.roles = std::set<RoleName>();
+    std::copy(sslPeerInfo.roles.begin(),
+              sslPeerInfo.roles.end(),
+              std::inserter(*request.roles, request.roles->begin()));
+    return request;
+}
+
+namespace {
 constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."_sd;
 
 /**
@@ -159,7 +187,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
             "No verified subject name available from client",
             !clientName.empty());
 
-    auto user = [&] {
+    UserName userName = ([&] {
         if (session->getUserName().empty()) {
             auto user = UserName(clientName.toString(), session->getDatabase().toString());
             session->updateUserName(user, true /* isMechX509 */);
@@ -170,7 +198,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
                     session->getUserName() == clientName.toString());
             return UserName(session->getUserName().toString(), session->getDatabase().toString());
         }
-    }();
+    })();
 
     uassert(ErrorCodes::ProtocolError,
             "SSL support is required for the MONGODB-X509 mechanism.",
@@ -186,7 +214,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     uassert(ErrorCodes::ProtocolError,
             "X.509 authentication must always use the $external database.",
-            user.getDB() == kExternalDB);
+            userName.getDB() == kExternalDB);
 
     auto isInternalClient = [&]() -> bool {
         return opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient;
@@ -194,11 +222,12 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     const auto clusterAuthMode = ClusterAuthMode::get(opCtx->getServiceContext());
 
+    auto request = getX509UserRequest(opCtx, UserRequest(userName, boost::none));
     auto authorizeExternalUser = [&] {
         uassert(ErrorCodes::BadValue,
                 kX509AuthenticationDisabledMessage,
                 !isX509AuthDisabled(opCtx->getServiceContext()));
-        uassertStatusOK(authorizationSession->addAndAuthorizeUser(opCtx, user, boost::none));
+        uassertStatusOK(authorizationSession->addAndAuthorizeUser(opCtx, request, boost::none));
     };
 
     if (sslConfiguration->isClusterMember(clientName)) {

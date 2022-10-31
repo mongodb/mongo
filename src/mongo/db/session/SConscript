@@ -155,6 +155,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/api_parameters',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/auth/user',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         'logical_session_id_helpers',

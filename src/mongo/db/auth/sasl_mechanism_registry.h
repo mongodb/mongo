@@ -220,6 +220,13 @@ public:
     virtual boost::optional<unsigned int> currentStep() const = 0;
     virtual boost::optional<unsigned int> totalSteps() const = 0;
 
+    /**
+     * Create a UserRequest to send to AuthorizationSession.
+     */
+    virtual UserRequest getUserRequest() const {
+        return UserRequest(UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none);
+    }
+
 protected:
     /**
      * Mechanism provided step implementation.
