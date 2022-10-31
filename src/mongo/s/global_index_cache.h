@@ -40,25 +40,23 @@ using IndexCatalogTypeMap = StringMap<IndexCatalogType>;
 
 class GlobalIndexesCache {
 public:
-    GlobalIndexesCache(boost::optional<Timestamp> indexVersion, IndexCatalogTypeMap&& indexes)
-        : _indexVersion(indexVersion), _indexes(indexes) {}
+    GlobalIndexesCache(CollectionIndexes collectionIndexes, IndexCatalogTypeMap&& indexes)
+        : _collectionIndexes(std::move(collectionIndexes)), _indexes(std::move(indexes)) {}
 
     bool empty() const;
 
-    boost::optional<Timestamp> getVersion() const;
+    CollectionIndexes getCollectionIndexes() const;
 
     size_t numIndexes() const;
 
     bool contains(const StringData& name) const;
 
-    void add(const IndexCatalogType& index, const Timestamp& indexVersion);
+    void add(const IndexCatalogType& index, const CollectionIndexes& collectionIndexes);
 
-    void remove(const StringData& name, const Timestamp& indexVersion);
-
-    void clear();
+    void remove(const StringData& name, const CollectionIndexes& collectionIndexes);
 
 private:
-    boost::optional<Timestamp> _indexVersion;
+    CollectionIndexes _collectionIndexes;
     IndexCatalogTypeMap _indexes;
 };
 

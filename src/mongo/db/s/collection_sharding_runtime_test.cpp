@@ -611,8 +611,7 @@ TEST_F(CollectionShardingRuntimeWithCatalogTest, TestGlobalIndexesCache) {
         opCtx, kTestNss, "x_1", BSON("x" << 1), BSONObj(), uuid(), indexVersion, boost::none);
 
     ASSERT_EQ(true, csr()->getIndexes(opCtx).is_initialized());
-    ASSERT_EQ(indexVersion, *csr()->getIndexes(opCtx)->getVersion());
-    ASSERT_EQ(indexVersion, *csr()->getIndexVersion(opCtx));
+    ASSERT_EQ(CollectionIndexes(uuid(), indexVersion), *csr()->getCollectionIndexes(opCtx));
 }
 }  // namespace
 }  // namespace mongo

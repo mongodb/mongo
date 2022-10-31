@@ -37,8 +37,8 @@ bool GlobalIndexesCache::empty() const {
     return _indexes.empty();
 }
 
-boost::optional<Timestamp> GlobalIndexesCache::getVersion() const {
-    return _indexVersion;
+CollectionIndexes GlobalIndexesCache::getCollectionIndexes() const {
+    return _collectionIndexes;
 }
 
 size_t GlobalIndexesCache::numIndexes() const {
@@ -49,19 +49,25 @@ bool GlobalIndexesCache::contains(const StringData& name) const {
     return _indexes.contains(name);
 }
 
-void GlobalIndexesCache::add(const IndexCatalogType& index, const Timestamp& indexVersion) {
-    _indexVersion.emplace(indexVersion);
+void GlobalIndexesCache::add(const IndexCatalogType& index,
+                             const CollectionIndexes& collectionIndexes) {
+    tassert(7019900,
+            str::stream()
+                << "Cannot add global index with different uuid than is in the GlobalIndexesCache.",
+            collectionIndexes.uuid() == _collectionIndexes.uuid());
+    _collectionIndexes = collectionIndexes;
     _indexes.emplace(index.getName(), index);
 }
 
-void GlobalIndexesCache::remove(const StringData& name, const Timestamp& indexVersion) {
-    _indexVersion.emplace(indexVersion);
+void GlobalIndexesCache::remove(const StringData& name,
+                                const CollectionIndexes& collectionIndexes) {
+    tassert(
+        7019901,
+        str::stream()
+            << "Cannot remove global index with different uuid than is in the GlobalIndexesCache.",
+        collectionIndexes.uuid() == _collectionIndexes.uuid());
+    _collectionIndexes = collectionIndexes;
     _indexes.erase(name);
-}
-
-void GlobalIndexesCache::clear() {
-    _indexVersion = boost::none;
-    _indexes.clear();
 }
 
 AtomicWord<uint64_t> ComparableIndexVersion::_disambiguatingSequenceNumSource{1ULL};

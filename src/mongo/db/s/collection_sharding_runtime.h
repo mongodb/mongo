@@ -229,7 +229,7 @@ public:
     /**
      * Gets an index version under a lock.
      */
-    boost::optional<Timestamp> getIndexVersion(OperationContext* opCtx);
+    boost::optional<CollectionIndexes> getCollectionIndexes(OperationContext* opCtx);
 
     /**
      * Gets the index list under a lock.
@@ -241,17 +241,17 @@ public:
      */
     void addIndex(OperationContext* opCtx,
                   const IndexCatalogType& index,
-                  const Timestamp& indexVersion);
+                  const CollectionIndexes& collectionIndexes);
 
     /**
      * Removes an index from the shard-role index info under a lock.
      */
     void removeIndex(OperationContext* opCtx,
                      const std::string& name,
-                     const Timestamp& indexVersion);
+                     const CollectionIndexes& collectionIndexes);
 
     /**
-     * Clears the shard-role index info and set the indexVersion to boost::none.
+     * Clears the shard-role index info and set the collectionIndexes to boost::none.
      */
     void clearIndexes(OperationContext* opCtx);
 

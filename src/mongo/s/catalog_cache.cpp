@@ -963,9 +963,7 @@ CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
         }
 
         return LookupResult(
-            OptionalGlobalIndexesInfo(GlobalIndexesCache(
-                indexVersion ? boost::make_optional(indexVersion->indexVersion()) : boost::none,
-                std::move(newIndexesMap))),
+            OptionalGlobalIndexesInfo(GlobalIndexesCache(*indexVersion, std::move(newIndexesMap))),
             std::move(newComparableVersion));
     } catch (const DBException& ex) {
         LOGV2_FOR_CATALOG_REFRESH(6686304,
