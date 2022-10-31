@@ -278,7 +278,7 @@ void CurOp::setGenericCursor_inlock(GenericCursor gc) {
 
 void CurOp::_finishInit(OperationContext* opCtx, CurOpStack* stack) {
     _stack = stack;
-    _tickSource = SystemTickSource::get();
+    _tickSource = globalSystemTickSource();
 
     if (opCtx) {
         _stack->push(opCtx, this);

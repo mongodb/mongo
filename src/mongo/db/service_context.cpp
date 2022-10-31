@@ -100,7 +100,7 @@ void setGlobalServiceContext(ServiceContext::UniqueServiceContext&& serviceConte
 
 ServiceContext::ServiceContext()
     : _opIdRegistry(UniqueOperationIdRegistry::create()),
-      _tickSource(std::make_unique<SystemTickSource>()),
+      _tickSource(makeSystemTickSource()),
       _fastClockSource(std::make_unique<SystemClockSource>()),
       _preciseClockSource(std::make_unique<SystemClockSource>()) {}
 

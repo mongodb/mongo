@@ -51,7 +51,7 @@ void updateQueueStatsOnRelease(ServiceContext* serviceContext,
     queueStats.totalFinishedProcessing.fetchAndAddRelaxed(1);
     auto startTime = admCtx->getStartProcessingTime();
     auto tickSource = serviceContext->getTickSource();
-    auto delta = tickSource->spanTo<Microseconds>(startTime, tickSource->getTicks());
+    auto delta = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTime);
     queueStats.totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
 }
 
@@ -163,7 +163,7 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(Operat
     auto currentWaitTime = tickSource->getTicks();
     auto updateQueuedTime = [&]() {
         auto oldWaitTime = std::exchange(currentWaitTime, tickSource->getTicks());
-        auto waitDelta = tickSource->spanTo<Microseconds>(oldWaitTime, currentWaitTime).count();
+        auto waitDelta = tickSource->ticksTo<Microseconds>(currentWaitTime - oldWaitTime).count();
         queueStats.totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta);
     };
     queueStats.totalAddedQueue.fetchAndAddRelaxed(1);

@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/system_tick_source.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
@@ -38,35 +38,53 @@
 namespace mongo {
 namespace {
 
-TEST(TickSourceTest, TicksToDurationConversion) {
-    TickSourceMock<Seconds> tsSecs;
-    tsSecs.reset(1);
-    ASSERT_EQ(tsSecs.ticksTo<Seconds>(tsSecs.getTicks()).count(), 1);
-    ASSERT_EQ(tsSecs.ticksTo<Milliseconds>(tsSecs.getTicks()).count(), 1000);
-    ASSERT_EQ(tsSecs.ticksTo<Microseconds>(tsSecs.getTicks()).count(), 1000 * 1000);
+namespace m = unittest::match;
 
-    TickSourceMock<Milliseconds> tsMillis;
-    tsMillis.reset(1);
-    ASSERT_EQ(tsMillis.ticksTo<Milliseconds>(tsMillis.getTicks()).count(), 1);
-    ASSERT_EQ(tsMillis.ticksTo<Microseconds>(tsMillis.getTicks()).count(), 1000);
-
-    TickSourceMock<Microseconds> tsMicros;
-    tsMicros.reset(1);
-    ASSERT_EQ(tsMicros.ticksTo<Microseconds>(tsMicros.getTicks()).count(), 1);
+template <typename SourceDuration, typename OutDuration>
+auto tickToDuration(int ticks) {
+    TickSourceMock<SourceDuration> ts;
+    ts.reset(ticks);
+    return ts.template ticksTo<OutDuration>(ts.getTicks()).count();
 }
 
-TEST(TickSourceTest, SpansToDurationConversion) {
-    TickSourceMock<Seconds> tsSecs;
-    tsSecs.reset(0);
-    TickSource::Tick zero = tsSecs.getTicks();
-    tsSecs.reset(10);
-    TickSource::Tick ten = tsSecs.getTicks();
-    ASSERT_EQ(tsSecs.spanTo<Seconds>(zero, ten).count(), 10);
-    ASSERT_EQ(tsSecs.spanTo<Seconds>(ten, zero).count(), 0);
-    ASSERT_EQ(tsSecs.spanTo<Milliseconds>(zero, ten).count(), 10 * 1000);
-    ASSERT_EQ(tsSecs.spanTo<Milliseconds>(ten, zero).count(), 0);
-    ASSERT_EQ(tsSecs.spanTo<Microseconds>(zero, ten).count(), 10 * 1000 * 1000);
-    ASSERT_EQ(tsSecs.spanTo<Microseconds>(ten, zero).count(), 0);
+TEST(TickSourceTest, TicksToDurationConversion) {
+    ASSERT_EQ((tickToDuration<Seconds, Seconds>(1)), 1);
+    ASSERT_EQ((tickToDuration<Seconds, Milliseconds>(1)), 1'000);
+    ASSERT_EQ((tickToDuration<Seconds, Microseconds>(1)), 1'000'000);
+    ASSERT_EQ((tickToDuration<Milliseconds, Milliseconds>(1)), 1);
+    ASSERT_EQ((tickToDuration<Milliseconds, Microseconds>(1)), 1'000);
+    ASSERT_EQ((tickToDuration<Microseconds, Microseconds>(1)), 1);
+}
+
+TEST(SystemTickSourceTest, TicksPerSecond) {
+    ASSERT_EQ(makeSystemTickSource()->getTicksPerSecond(), 1'000'000'000);
+}
+
+TEST(SystemTickSourceTest, GetTicks) {
+    auto ts = makeSystemTickSource();
+    auto t0 = ts->getTicks();
+    for (int reps = 20; reps--;) {
+        static constexpr Milliseconds delay{200};
+        static constexpr Milliseconds err{20};
+        sleepFor(delay);
+        auto t1 = ts->getTicks();
+        ASSERT_THAT(ts->ticksTo<Milliseconds>(t1 - t0),
+                    m::AllOf(m::Ge(delay - err), m::Le(delay + err)));
+        t0 = t1;
+    }
+}
+
+TEST(SystemTickSourceTest, Monotonic) {
+    auto ts = makeSystemTickSource();
+    auto t0 = ts->getTicks();
+    std::vector<TickSource::Tick> samples;
+    samples.reserve(1'000'000);
+    do {
+        samples.clear();
+        for (size_t i = 0; i < 1'000'000; ++i)
+            samples.push_back(ts->getTicks());
+        ASSERT_TRUE(std::is_sorted(samples.begin(), samples.end()));
+    } while (ts->ticksTo<Milliseconds>(ts->getTicks() - t0) < Seconds{5});
 }
 }  // namespace
 }  // namespace mongo
