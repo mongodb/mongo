@@ -65,9 +65,8 @@ repl::OpTime _logOp(OperationContext* opCtx,
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setNss(nss);
-    if (uuid) {
-        oplogEntry.setUuid(*uuid);
-    }
+    oplogEntry.setTid(nss.tenantId());
+    oplogEntry.setUuid(uuid);
     oplogEntry.setObject(obj);
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
     return writeConflictRetry(
@@ -241,7 +240,8 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
 
     // Get rid of generic command fields.
     for (const auto& elem : obj) {
-        if (!isGenericArgument(elem.fieldNameStringData())) {
+        const auto& fieldName = elem.fieldNameStringData();
+        if (!isGenericArgument(fieldName)) {
             builder.append(elem);
         }
     }
@@ -251,11 +251,17 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
     // If the dbCheck argument is a string, this is the per-collection form.
     if (toParse["dbCheck"].type() == BSONType::String) {
         return singleCollectionRun(
-            opCtx, dbName, DbCheckSingleInvocation::parse(IDLParserContext(""), toParse));
+            opCtx,
+            dbName,
+            DbCheckSingleInvocation::parse(
+                IDLParserContext("", false /*apiStrict*/, dbName.tenantId()), toParse));
     } else {
         // Otherwise, it's the database-wide form.
         return fullDatabaseRun(
-            opCtx, dbName, DbCheckAllInvocation::parse(IDLParserContext(""), toParse));
+            opCtx,
+            dbName,
+            DbCheckAllInvocation::parse(
+                IDLParserContext("", false /*apiStrict*/, dbName.tenantId()), toParse));
     }
 }
 

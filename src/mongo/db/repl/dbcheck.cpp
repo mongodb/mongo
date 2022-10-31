@@ -434,12 +434,11 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
     if (!opCtx->writesAreReplicated()) {
         opTime = entry.getOpTime();
     }
-    auto type = OplogEntries_parse(IDLParserContext("type"), cmd.getStringField("type"));
-    IDLParserContext ctx("o");
-
+    const auto type = OplogEntries_parse(IDLParserContext("type"), cmd.getStringField("type"));
+    const IDLParserContext ctx("o", false /*apiStrict*/, entry.getTid());
     switch (type) {
         case OplogEntriesEnum::Batch: {
-            auto invocation = DbCheckOplogBatch::parse(ctx, cmd);
+            const auto invocation = DbCheckOplogBatch::parse(ctx, cmd);
             return dbCheckBatchOnSecondary(opCtx, opTime, invocation);
         }
         case OplogEntriesEnum::Collection: {
