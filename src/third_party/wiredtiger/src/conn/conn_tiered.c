@@ -48,7 +48,7 @@ __tier_storage_remove_local(WT_SESSION_IMPL *session)
             break;
 
         __wt_seconds(session, &now);
-        __wt_tiered_get_drop_local(session, now, &entry);
+        __wt_tiered_get_remove_local(session, now, &entry);
         if (entry == NULL)
             break;
         WT_ERR(__wt_tiered_name(
@@ -211,15 +211,15 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
             /*
              * After successful flushing, push a work unit to perform whatever post-processing the
              * shared storage wants to do for this object. Note that this work unit is unrelated to
-             * the drop local work unit below. They do not need to be in any order and do not
+             * the remove local work unit below. They do not need to be in any order and do not
              * interfere with each other.
              */
             WT_ERR(__wt_tiered_put_flush_finish(session, tiered, id));
             /*
-             * After successful flushing, push a work unit to drop the local object in the future.
+             * After successful flushing, push a work unit to remove the local object in the future.
              * The object will be removed locally after the local retention period expires.
              */
-            WT_ERR(__wt_tiered_put_drop_local(session, tiered, id));
+            WT_ERR(__wt_tiered_put_remove_local(session, tiered, id));
         }
     }
 

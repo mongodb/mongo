@@ -185,25 +185,25 @@ __wt_tiered_get_flush(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entryp)
 }
 
 /*
- * __wt_tiered_get_drop_local --
- *     Get a drop local work unit if it is less than the time given. The caller is responsible for
+ * __wt_tiered_get_remove_local --
+ *     Get a remove local work unit if it is less than the time given. The caller is responsible for
  *     freeing the work unit.
  */
 void
-__wt_tiered_get_drop_local(WT_SESSION_IMPL *session, uint64_t now, WT_TIERED_WORK_UNIT **entryp)
+__wt_tiered_get_remove_local(WT_SESSION_IMPL *session, uint64_t now, WT_TIERED_WORK_UNIT **entryp)
 {
-    __wt_tiered_pop_work(session, WT_TIERED_WORK_DROP_LOCAL, now, entryp);
+    __wt_tiered_pop_work(session, WT_TIERED_WORK_REMOVE_LOCAL, now, entryp);
     return;
 }
 
 /*
- * __wt_tiered_get_drop_shared --
- *     Get a drop shared work unit. The caller is responsible for freeing the work unit.
+ * __wt_tiered_get_remove_shared --
+ *     Get a remove shared work unit. The caller is responsible for freeing the work unit.
  */
 void
-__wt_tiered_get_drop_shared(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entryp)
+__wt_tiered_get_remove_shared(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entryp)
 {
-    __wt_tiered_pop_work(session, WT_TIERED_WORK_DROP_SHARED, 0, entryp);
+    __wt_tiered_pop_work(session, WT_TIERED_WORK_REMOVE_SHARED, 0, entryp);
     return;
 }
 
@@ -225,17 +225,17 @@ __wt_tiered_put_flush_finish(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32
 }
 
 /*
- * __wt_tiered_put_drop_local --
- *     Add a drop local work unit for the given ID to the queue.
+ * __wt_tiered_put_remove_local --
+ *     Add a remove local work unit for the given ID to the queue.
  */
 int
-__wt_tiered_put_drop_local(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
+__wt_tiered_put_remove_local(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
 {
     WT_TIERED_WORK_UNIT *entry;
     uint64_t now;
 
     WT_RET(__wt_calloc_one(session, &entry));
-    entry->type = WT_TIERED_WORK_DROP_LOCAL;
+    entry->type = WT_TIERED_WORK_REMOVE_LOCAL;
     entry->id = id;
     WT_ASSERT(session, tiered->bstorage != NULL);
     __wt_seconds(session, &now);
@@ -247,16 +247,16 @@ __wt_tiered_put_drop_local(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t
 }
 
 /*
- * __wt_tiered_put_drop_shared --
- *     Add a drop shared work unit for the given ID to the queue.
+ * __wt_tiered_put_remove_shared --
+ *     Add a remove shared work unit for the given ID to the queue.
  */
 int
-__wt_tiered_put_drop_shared(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
+__wt_tiered_put_remove_shared(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
 {
     WT_TIERED_WORK_UNIT *entry;
 
     WT_RET(__wt_calloc_one(session, &entry));
-    entry->type = WT_TIERED_WORK_DROP_SHARED;
+    entry->type = WT_TIERED_WORK_REMOVE_SHARED;
     entry->id = id;
     entry->tiered = tiered;
     __wt_tiered_push_work(session, entry);
