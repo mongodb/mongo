@@ -27,21 +27,6 @@ def main(scons_stdout_log_file: str, scons_cache_debug_log_file: str,
     scons_cache_debug_log_file = os.path.abspath(scons_cache_debug_log_file)
     cedar_report_file = os.path.abspath(cedar_report_file)
 
-    # This is a special file which must be available to use scons cache in evergreen. Here
-    # we are assuming that if this file is not present then this a static host which
-    # can not use scons cache in evergreen so therefore we will disable colleting cache metrics.
-    # Otherwise we assume the cache is available and if the cache log file is not found,
-    # something is not right and we exit with failure.
-    if not os.path.exists('/etc/mongodb-build-system-id'):
-        print(
-            "System is a static host and not connected to AWS cache dir. Skipping scons cache metrics."
-        )
-        scons_cache_debug_log_file = None
-    else:
-        if not os.path.exists(scons_cache_debug_log_file):
-            print(f"Could not find SCons cache debug log file '{scons_cache_debug_log_file}'.")
-            sys.exit(1)
-
     if not os.path.exists(scons_stdout_log_file):
         print(f"Could not find SCons stdout log file '{scons_stdout_log_file}'.")
         sys.exit(1)
