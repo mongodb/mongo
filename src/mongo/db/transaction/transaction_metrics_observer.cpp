@@ -188,7 +188,7 @@ void TransactionMetricsObserver::onTransactionOperation(OperationContext* opCtx,
         if (storageStats) {
             CurOp::get(opCtx)->debug().storageStats = storageStats;
             if (!_singleTransactionStats.getOpDebug()->storageStats) {
-                _singleTransactionStats.getOpDebug()->storageStats = storageStats->clone();
+                _singleTransactionStats.getOpDebug()->storageStats = storageStats->getCopy();
             } else {
                 *_singleTransactionStats.getOpDebug()->storageStats += *storageStats;
             }
