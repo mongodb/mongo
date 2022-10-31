@@ -62,21 +62,21 @@ Example \c wtperf configuration files can be found in the
 
 There are also a number of command line arguments that can be passed
 to \c wtperf:
-@par <code>-C config</code>
+@par \c -C config
 Specify configuration strings for the ::wiredtiger_open function.
 This argument is additive to the \c conn_config parameter in the
 configuration file.
-@par <code>-h directory</code>
+@par \c -h directory
 Specify a database home directory.  The default is \c ./WT_TEST.
-@par <code>-m monitor_directory</code>
+@par \c -m monitor_directory
 Specify a directory for all monitoring related files.
 The default is the database home directory.
-@par <code>-O config_file</code>
+@par \c -O config_file
 Specify the configuration file to run.
-@par <code>-o config</code>
+@par \c -o config
 Specify configuration strings for the \c wtperf program.
 This argument will override settings in the configuration file.
-@par <code>-T config</code>
+@par \c -T config
 Specify configuration strings for the WT_SESSION::create function.
 This argument is additive to the \c table_config parameter in the
 configuration file.
