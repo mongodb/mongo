@@ -545,10 +545,10 @@ public:
                 const auto& findCommand = cq->getFindCommandRequest();
                 auto viewAggregationCommand =
                     uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
-
-                BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                    opCtx,
-                    OpMsgRequest::fromDBAndBody(_dbName.db(), std::move(viewAggregationCommand)));
+                auto aggRequest =
+                    OpMsgRequestBuilder::create(_dbName, std::move(viewAggregationCommand));
+                aggRequest.validatedTenancyScope = _request.validatedTenancyScope;
+                BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, aggRequest);
                 auto status = getStatusFromCommandResult(aggResult);
                 if (status.code() == ErrorCodes::InvalidPipelineOperator) {
                     uasserted(ErrorCodes::InvalidPipelineOperator,

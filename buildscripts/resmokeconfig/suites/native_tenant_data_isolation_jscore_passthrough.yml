@@ -7,6 +7,9 @@ selector:
   - jstests/core/basic8.js
   - jstests/core/count.js
   - jstests/core/all.js
+  - jstests/core/timeseries/timeseries_internal_bucket_geo_within.js
+  - jstests/core/timeseries/bucket_granularity.js
+  - jstests/core/timeseries/timeseries_graph_lookup.js
 
 executor:
   archive:

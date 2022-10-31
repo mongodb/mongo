@@ -495,12 +495,12 @@ bool NamespaceString::isSystemStatsCollection() const {
 }
 
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
-    return {db(), kTimeseriesBucketsCollectionPrefix.toString() + coll()};
+    return {dbName(), kTimeseriesBucketsCollectionPrefix.toString() + coll()};
 }
 
 NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
     invariant(isTimeseriesBucketsCollection(), ns());
-    return {db(), coll().substr(kTimeseriesBucketsCollectionPrefix.size())};
+    return {dbName(), coll().substr(kTimeseriesBucketsCollectionPrefix.size())};
 }
 
 bool NamespaceString::isImplicitlyReplicated() const {
