@@ -195,8 +195,6 @@ public:
                      size_t rightChildResult) {
         // Specifically always including children.
         return computeHashSeq<45>(std::hash<ProjectionName>()(node.getScanProjectionName()),
-                                  std::hash<bool>()(node.hasLeftIntervals()),
-                                  std::hash<bool>()(node.hasRightIntervals()),
                                   leftChildResult,
                                   rightChildResult);
     }

@@ -282,17 +282,20 @@ IndexingAvailability::IndexingAvailability(GroupIdType scanGroupId,
                                            ProjectionName scanProjection,
                                            std::string scanDefName,
                                            const bool eqPredsOnly,
+                                           const bool hasProperInterval,
                                            opt::unordered_set<std::string> satisfiedPartialIndexes)
     : _scanGroupId(scanGroupId),
       _scanProjection(std::move(scanProjection)),
       _scanDefName(std::move(scanDefName)),
       _eqPredsOnly(eqPredsOnly),
-      _satisfiedPartialIndexes(std::move(satisfiedPartialIndexes)) {}
+      _satisfiedPartialIndexes(std::move(satisfiedPartialIndexes)),
+      _hasProperInterval(hasProperInterval) {}
 
 bool IndexingAvailability::operator==(const IndexingAvailability& other) const {
     return _scanGroupId == other._scanGroupId && _scanProjection == other._scanProjection &&
         _scanDefName == other._scanDefName && _eqPredsOnly == other._eqPredsOnly &&
-        _satisfiedPartialIndexes == other._satisfiedPartialIndexes;
+        _satisfiedPartialIndexes == other._satisfiedPartialIndexes &&
+        _hasProperInterval == other._hasProperInterval;
 }
 
 GroupIdType IndexingAvailability::getScanGroupId() const {
@@ -325,6 +328,14 @@ bool IndexingAvailability::getEqPredsOnly() const {
 
 void IndexingAvailability::setEqPredsOnly(const bool value) {
     _eqPredsOnly = value;
+}
+
+bool IndexingAvailability::hasProperInterval() const {
+    return _hasProperInterval;
+}
+
+void IndexingAvailability::setHasProperInterval(const bool hasProperInterval) {
+    _hasProperInterval = hasProperInterval;
 }
 
 CollectionAvailability::CollectionAvailability(opt::unordered_set<std::string> scanDefSet)

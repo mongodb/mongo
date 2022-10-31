@@ -120,7 +120,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|   |           p1\n"
         "|   |           p2\n"
         "|   |       indexingAvailability: \n"
-        "|   |           [groupId: 0, scanProjection: p1, scanDefName: test]\n"
+        "|   |           [groupId: 0, scanProjection: p1, scanDefName: test, hasProperInterval]\n"
         "|   |       collectionAvailability: \n"
         "|   |           test\n"
         "|   |       distributionAvailability: \n"
@@ -146,7 +146,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|   |           p1\n"
         "|   |           p2\n"
         "|   |       indexingAvailability: \n"
-        "|   |           [groupId: 0, scanProjection: p1, scanDefName: test]\n"
+        "|   |           [groupId: 0, scanProjection: p1, scanDefName: test, hasProperInterval]\n"
         "|   |       collectionAvailability: \n"
         "|   |           test\n"
         "|   |       distributionAvailability: \n"
@@ -738,7 +738,7 @@ TEST(PhysRewriter, FilterIndexing) {
             "|   |       root\n"
             "|   RefBlock: \n"
             "|       Variable [root]\n"
-            "RIDIntersect [root, hasLeftIntervals]\n"
+            "RIDIntersect [root]\n"
             "|   Scan [c1]\n"
             "|       BindBlock:\n"
             "|           [root]\n"
@@ -3212,7 +3212,7 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|   |           pa\n"
         "|   |           root\n"
         "|   |       indexingAvailability: \n"
-        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1]\n"
+        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1, hasProperInterval]\n"
         "|   |       collectionAvailability: \n"
         "|   |           c1\n"
         "|   |       distributionAvailability: \n"
@@ -3240,7 +3240,7 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|   |           pa\n"
         "|   |           root\n"
         "|   |       indexingAvailability: \n"
-        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1]\n"
+        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1, hasProperInterval]\n"
         "|   |       collectionAvailability: \n"
         "|   |           c1\n"
         "|   |       distributionAvailability: \n"
@@ -5930,7 +5930,7 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
     ABT optimized = rootNode;
     phaseManager.getHints()._disableYieldingTolerantPlans = false;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(10, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(10, 17, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate an intersection plan, with predicates repeated on the Seek side.
     ASSERT_EXPLAIN_V2Compact(
@@ -5963,16 +5963,16 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
         "|       Variable [rid_0]\n"
         "MergeJoin []\n"
         "|   |   |   Condition\n"
-        "|   |   |       rid_0 = rid_3\n"
+        "|   |   |       rid_0 = rid_5\n"
         "|   |   Collation\n"
         "|   |       Ascending\n"
         "|   Union []\n"
         "|   |   BindBlock:\n"
-        "|   |       [rid_3]\n"
+        "|   |       [rid_5]\n"
         "|   |           Source []\n"
         "|   Evaluation []\n"
         "|   |   BindBlock:\n"
-        "|   |       [rid_3]\n"
+        "|   |       [rid_5]\n"
         "|   |           Variable [rid_0]\n"
         "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: {[Const "
         "[2], Const [2]]}]\n"

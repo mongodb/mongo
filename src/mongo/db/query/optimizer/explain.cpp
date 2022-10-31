@@ -1277,8 +1277,6 @@ public:
         printer.separator(" [")
             .fieldName("scanProjectionName", ExplainVersion::V3)
             .print(node.getScanProjectionName());
-        printBooleanFlag(printer, "hasLeftIntervals", node.hasLeftIntervals());
-        printBooleanFlag(printer, "hasRightIntervals", node.hasRightIntervals());
 
         printer.separator("]");
         nodeCEPropsPrint(printer, n, node);
@@ -1767,6 +1765,7 @@ public:
                 .fieldName("scanDefName")
                 .print(prop.getScanDefName());
             printBooleanFlag(printer, "eqPredsOnly", prop.getEqPredsOnly());
+            printBooleanFlag(printer, "hasProperInterval", prop.hasProperInterval());
             printer.separator("]");
 
             if (!prop.getSatisfiedPartialIndexes().empty()) {

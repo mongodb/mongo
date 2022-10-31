@@ -189,8 +189,7 @@ public:
         if (node.getArraySize() == 0) {
             nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
 
-            physNode =
-                make<LimitSkipNode>(properties::LimitSkipRequirement{0, 0}, std::move(physNode));
+            physNode = make<LimitSkipNode>(LimitSkipRequirement{0, 0}, std::move(physNode));
             nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
 
             for (const ProjectionName& boundProjName : node.binder().names()) {
@@ -208,8 +207,7 @@ public:
         } else {
             nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
 
-            physNode =
-                make<LimitSkipNode>(properties::LimitSkipRequirement{1, 0}, std::move(physNode));
+            physNode = make<LimitSkipNode>(LimitSkipRequirement{1, 0}, std::move(physNode));
             nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
 
             const ProjectionName valueScanProj = _prefixId.getNextId("valueScan");
@@ -710,7 +708,21 @@ public:
             return;
         }
         const bool isIndex = indexReqTarget == IndexReqTarget::Index;
-        if (isIndex && (!node.hasLeftIntervals() || !node.hasRightIntervals())) {
+
+        const GroupIdType leftGroupId =
+            node.getLeftChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+        const GroupIdType rightGroupId =
+            node.getRightChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+
+        const LogicalProps& leftLogicalProps = _memo.getLogicalProps(leftGroupId);
+        const LogicalProps& rightLogicalProps = _memo.getLogicalProps(rightGroupId);
+
+        const bool hasProperIntervalLeft =
+            getPropertyConst<IndexingAvailability>(leftLogicalProps).hasProperInterval();
+        const bool hasProperIntervalRight =
+            getPropertyConst<IndexingAvailability>(rightLogicalProps).hasProperInterval();
+
+        if (isIndex && (!hasProperIntervalLeft || !hasProperIntervalRight)) {
             // We need to have proper intervals on both sides.
             return;
         }
@@ -728,14 +740,6 @@ public:
                     break;
             }
         }
-
-        const GroupIdType leftGroupId =
-            node.getLeftChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
-        const GroupIdType rightGroupId =
-            node.getRightChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
-
-        const LogicalProps& leftLogicalProps = _memo.getLogicalProps(leftGroupId);
-        const LogicalProps& rightLogicalProps = _memo.getLogicalProps(rightGroupId);
 
         const CEType intersectedCE =
             getPropertyConst<CardinalityEstimate>(_logicalProps).getEstimate();
@@ -1660,9 +1664,9 @@ void addImplementers(const Metadata& metadata,
                      const QueryHints& hints,
                      const RIDProjectionsMap& ridProjections,
                      PrefixId& prefixId,
-                     const properties::PhysProps& physProps,
+                     const PhysProps& physProps,
                      PhysQueueAndImplPos& queue,
-                     const properties::LogicalProps& logicalProps,
+                     const LogicalProps& logicalProps,
                      const OrderPreservingABTSet& logicalNodes,
                      const PathToIntervalFn& pathToInterval) {
     ImplementationVisitor visitor(metadata,

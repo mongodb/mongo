@@ -941,8 +941,6 @@ struct SplitRequirementsResult {
     PartialSchemaRequirements _rightReqs;
 
     bool _hasFieldCoverage = true;
-    bool _hasLeftIntervals = false;
-    bool _hasRightIntervals = false;
 };
 
 /**
@@ -981,7 +979,6 @@ static SplitRequirementsResult splitRequirements(
 
     size_t index = 0;
     for (const auto& [key, req] : reqMap) {
-        const bool fullyOpenInterval = isFullyOpen.at(index);
 
         if (((1ull << index) & mask) != 0) {
             bool addedToLeft = false;
@@ -1005,7 +1002,7 @@ static SplitRequirementsResult splitRequirements(
                 // We cannot return index values if our interval can possibly contain Null. Instead,
                 // we remove the output binding for the left side, and return the value from the
                 // right (seek) side.
-                if (!fullyOpenInterval) {
+                if (!isFullyOpen.at(index)) {
                     addRequirement(
                         leftReqs, key, boost::none /*boundProjectionName*/, req.getIntervals());
                     addedToLeft = true;
@@ -1018,9 +1015,6 @@ static SplitRequirementsResult splitRequirements(
             }
 
             if (addedToLeft) {
-                if (!fullyOpenInterval) {
-                    result._hasLeftIntervals = true;
-                }
                 if (indexFieldPrefixMapForScanDef) {
                     if (auto pathPtr = key._path.cast<PathGet>(); pathPtr != nullptr &&
                         indexFieldPrefixMapForScanDef->count(pathPtr->name()) == 0) {
@@ -1033,9 +1027,6 @@ static SplitRequirementsResult splitRequirements(
             }
         } else if (isIndex || !req.getIsPerfOnly()) {
             addRequirement(rightReqs, key, req.getBoundProjectionName(), req.getIntervals());
-            if (!fullyOpenInterval) {
-                result._hasRightIntervals = true;
-            }
         }
         index++;
     }
@@ -1141,10 +1132,13 @@ struct ExploreConvert<SargableNode> {
                 continue;
             }
 
-            if (isIndex && (!splitResult._hasLeftIntervals || !splitResult._hasRightIntervals)) {
-                // Reject. Must have at least one proper interval on either side.
+            // Reject. Must have at least one proper interval on either side.
+            if (isIndex &&
+                (!hasProperIntervals(splitResult._leftReqs) ||
+                 !hasProperIntervals(splitResult._rightReqs))) {
                 continue;
             }
+
             if (!splitResult._hasFieldCoverage) {
                 // Reject rewrite. No suitable indexes.
                 continue;
@@ -1196,11 +1190,8 @@ struct ExploreConvert<SargableNode> {
                                      isIndex ? IndexReqTarget::Index : IndexReqTarget::Seek,
                                      scanDelegator);
 
-            ABT newRoot = make<RIDIntersectNode>(scanProjectionName,
-                                                 splitResult._hasLeftIntervals,
-                                                 splitResult._hasRightIntervals,
-                                                 std::move(leftChild),
-                                                 std::move(rightChild));
+            ABT newRoot = make<RIDIntersectNode>(
+                scanProjectionName, std::move(leftChild), std::move(rightChild));
 
             const auto& result = ctx.addNode(newRoot, false /*substitute*/);
             for (const MemoLogicalNodeId nodeId : result.second) {
@@ -1290,14 +1281,27 @@ void reorderAgainstRIDIntersectNode(ABT::reference_type aboveNode,
     }
 
     const RIDIntersectNode& node = *belowNode.cast<RIDIntersectNode>();
-    if (node.hasLeftIntervals() && hasLeftRef) {
+    const GroupIdType groupIdLeft =
+        node.getLeftChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+    const bool hasProperIntervalLeft =
+        properties::getPropertyConst<properties::IndexingAvailability>(
+            ctx.getMemo().getLogicalProps(groupIdLeft))
+            .hasProperInterval();
+    if (hasProperIntervalLeft && hasLeftRef) {
         defaultReorder<AboveNode,
                        RIDIntersectNode,
                        DefaultChildAccessor,
                        LeftChildAccessor,
                        false /*substitute*/>(aboveNode, belowNode, ctx);
     }
-    if (node.hasRightIntervals() && hasRightRef) {
+
+    const GroupIdType groupIdRight =
+        node.getRightChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+    const bool hasProperIntervalRight =
+        properties::getPropertyConst<properties::IndexingAvailability>(
+            ctx.getMemo().getLogicalProps(groupIdRight))
+            .hasProperInterval();
+    if (hasProperIntervalRight && hasRightRef) {
         defaultReorder<AboveNode,
                        RIDIntersectNode,
                        DefaultChildAccessor,
