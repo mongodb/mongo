@@ -14,7 +14,7 @@ let output = '';
 jsTestLog('Inserting docs:');
 show(docs);
 coll.insert(docs);
-print(`Collection count: ${coll.count()}`);
+print(`Collection count: ${coll.find().itcount()}`);
 
 for (const leaf of leafs()) {
     // TODO SERVER-67550 Equality to null does not match undefined, in Bonsai.

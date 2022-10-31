@@ -1612,6 +1612,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     // This is the regular path for when we have a CanonicalQuery.
     std::unique_ptr<CanonicalQuery> cq(parsedDelete->releaseParsedQuery());
 
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "delete command is not eligible for bonsai",
+            !isEligibleForBonsai(*cq, opCtx, collection));
+
     // Transfer the explain verbosity level into the expression context.
     cq->getExpCtx()->explain = verbosity;
 
@@ -1803,6 +1807,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     // This is the regular path for when we have a CanonicalQuery.
     std::unique_ptr<CanonicalQuery> cq(parsedUpdate->releaseParsedQuery());
+
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "update command is not eligible for bonsai",
+            !isEligibleForBonsai(*cq, opCtx, collection));
 
     std::unique_ptr<projection_ast::Projection> projection;
     if (!request->getProj().isEmpty()) {
@@ -2128,6 +2136,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     const auto skip = request.getSkip().value_or(0);
     const auto limit = request.getLimit().value_or(0);
+
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "count command is not eligible for bonsai",
+            !isEligibleForBonsai(*cq, opCtx, collection));
 
     if (!collection) {
         // Treat collections that do not exist as empty collections. Note that the explain reporting
@@ -2608,6 +2620,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     const auto yieldPolicy = opCtx->inMultiDocumentTransaction()
         ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
         : PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
+
+    // Assert that not eligible for bonsai
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "distinct command is not eligible for bonsai",
+            !isEligibleForBonsai(*parsedDistinct->getQuery(), opCtx, collection));
 
     if (!collection) {
         // Treat collections that do not exist as empty collections.

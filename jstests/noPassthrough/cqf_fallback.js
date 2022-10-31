@@ -338,6 +338,57 @@ assertNotSupportedByBonsai({find: "invalidView", filter: {b: 4}}, false);
 // Test only expression should also fail.
 assertNotSupportedByBonsai({find: "invalidView", filter: {$alwaysFalse: 1}}, true);
 
+// Unsupported commands.
+assertNotSupportedByBonsai({count: coll.getName()}, false);
+assertNotSupportedByBonsai({delete: coll.getName(), deletes: [{q: {}, limit: 1}]}, false);
+assertNotSupportedByBonsai({distinct: coll.getName(), key: "a"}, false);
+assertNotSupportedByBonsai({findAndModify: coll.getName(), update: {$inc: {a: 1}}}, false);
+assertNotSupportedByBonsai({
+    mapReduce: "c",
+    map: function() {
+        emit(this.a, this._id);
+    },
+    reduce: function(_key, vals) {
+        return Array.sum(vals);
+    },
+    out: coll.getName()
+},
+                           false);
+assertNotSupportedByBonsai({update: coll.getName(), updates: [{q: {}, u: {$inc: {a: 1}}}]}, false);
+
+// Pipeline with an ineligible stage and an eligible prefix that could be pushed down to the
+// find layer should not use Bonsai.
+assertNotSupportedByBonsai({
+    aggregate: coll.getName(),
+    pipeline: [{$match: {a: {$gt: 1}}}, {$bucketAuto: {groupBy: "$a", buckets: 5}}],
+    cursor: {}
+},
+                           false);
+
+// Pipeline with an CQF-eligible sub-pipeline.
+// Note: we have to use a failpoint to determine whether we used the CQF codepath because the
+// explain output does not have enough information to deduce the query framework for the
+// subpipeline.
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: 'failConstructingBonsaiExecutor', 'mode': 'alwaysOn'}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+assert.commandWorked(db.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [{
+        $graphLookup: {
+            from: coll.getName(),
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "b",
+            as: "c"
+        }
+    }],
+    cursor: {},
+}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: 'failConstructingBonsaiExecutor', 'mode': 'off'}));
+
 MongoRunner.stopMongod(conn);
 
 // Restart the mongod and verify that we never use the bonsai optimizer if the feature flag is not

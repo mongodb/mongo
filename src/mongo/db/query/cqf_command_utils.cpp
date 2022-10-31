@@ -737,7 +737,7 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
         !request.getReadOnce() && !request.getShowRecordId() && !request.getTerm();
 
     // Early return to avoid unnecessary work of walking the input expression.
-    if (!commandOptionsEligible) {
+    if (!commandOptionsEligible || !cq.useCqfIfEligible()) {
         return false;
     }
 

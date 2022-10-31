@@ -363,6 +363,8 @@ public:
             // execution tree with an EOFStage.
             const auto& collection = ctx->getCollection();
 
+            cq->setUseCqfIfEligible(true);
+
             // Get the execution plan for the query.
             bool permitYield = true;
             auto exec =
@@ -572,6 +574,8 @@ public:
                 // execution to assume read data will not be needed again and need not be cached.
                 opCtx->recoveryUnit()->setReadOnce(true);
             }
+
+            cq->setUseCqfIfEligible(true);
 
             // Get the execution plan for the query.
             bool permitYield = true;

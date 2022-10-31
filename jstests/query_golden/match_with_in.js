@@ -28,7 +28,7 @@ const docs = [
 jsTestLog('Inserting docs:');
 show(docs);
 assert.commandWorked(coll.insert(docs));
-print(`Collection count: ${coll.count()}`);
+print(`Collection count: ${coll.find().itcount()}`);
 
 const runTest = (filter) => {
     const pipeline = [{$match: filter}];
