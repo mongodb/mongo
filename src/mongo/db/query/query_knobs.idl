@@ -939,14 +939,6 @@ server_parameters:
     default:
         expr: false
 
-  internalQueryEnableTelemetry:
-    description: "Knob to enable telemetry collection."
-    set_at: [ startup, runtime ]
-    cpp_varname: "queryTelemetryEnabled"
-    cpp_vartype: bool
-    default:
-      expr: false
-
   internalQueryConfigureTelemetrySamplingRate:
     description: "The maximum number of queries per second that are sampled for query telemetry.
       If the rate of queries goes above this number, then rate limiting will kick in, and any
