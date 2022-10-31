@@ -47,4 +47,36 @@ std::shared_ptr<const ErrorExtraInfo> AsyncRPCErrorInfo::parse(const BSONObj& ob
 
 void AsyncRPCErrorInfo::serialize(BSONObjBuilder* bob) const {}
 
+namespace async_rpc {
+
+Status unpackRPCStatus(Status status) {
+    invariant(status == ErrorCodes::RemoteCommandExecutionError);
+    auto errorInfo = status.extraInfo<AsyncRPCErrorInfo>();
+    if (errorInfo->isLocal()) {
+        return errorInfo->asLocal();
+    }
+    invariant(errorInfo->isRemote());
+    auto remoteError = errorInfo->asRemote();
+    Status out = remoteError.getRemoteCommandResult();
+    if (out.isOK()) {
+        out = remoteError.getRemoteCommandWriteConcernError();
+    }
+    if (out.isOK()) {
+        out = remoteError.getRemoteCommandFirstWriteError();
+    }
+    return out;
+}
+
+Status unpackRPCStatusIgnoringWriteConcernAndWriteErrors(Status status) {
+    invariant(status == ErrorCodes::RemoteCommandExecutionError);
+    auto errorInfo = status.extraInfo<AsyncRPCErrorInfo>();
+    if (errorInfo->isLocal()) {
+        return errorInfo->asLocal();
+    }
+    invariant(errorInfo->isRemote());
+    auto remoteError = errorInfo->asRemote();
+    return remoteError.getRemoteCommandResult();
+}
+
+}  // namespace async_rpc
 }  // namespace mongo

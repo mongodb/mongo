@@ -262,7 +262,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/rpc/command_status',
         'async_rpc_error_info',
         'remote_command',
@@ -341,6 +340,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/repl/hello_command',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/s/mongos_server_parameters',
         'async_rpc',
         'connection_pool_executor',

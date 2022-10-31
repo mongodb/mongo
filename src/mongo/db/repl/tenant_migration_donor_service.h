@@ -255,15 +255,6 @@ public:
             const CancellationToken& token);
 
         /**
-         * Sends the given command to the recipient replica set.
-         */
-        ExecutorFuture<void> _sendCommandToRecipient(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor,
-            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const BSONObj& cmdObj,
-            const CancellationToken& token);
-
-        /**
          * Sends the recipientSyncData command to the recipient replica set.
          */
         ExecutorFuture<void> _sendRecipientSyncDataCommand(

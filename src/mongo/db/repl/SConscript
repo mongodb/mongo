@@ -1488,6 +1488,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/fetcher',
+        '$BUILD_DIR/mongo/executor/async_rpc',
         'primary_only_service',
         'tenant_migration_access_blocker',
         'tenant_migration_statistics',

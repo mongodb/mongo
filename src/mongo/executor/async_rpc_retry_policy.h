@@ -31,12 +31,21 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 #include <string>
 
 namespace mongo::async_rpc {
+
+template <auto Start, auto End, auto Inc, class F>
+constexpr void constexprFor(F&& f) {
+    if constexpr (Start < End) {
+        f(std::integral_constant<decltype(Start), Start>());
+        constexprFor<Start + Inc, End, Inc>(f);
+    }
+}
 class RetryPolicy {
 public:
     virtual ~RetryPolicy() = default;
@@ -52,7 +61,9 @@ public:
      */
     virtual Milliseconds getNextRetryDelay() = 0;
 
-    virtual BSONObj toBSON() const = 0;
+    virtual BSONObj toBSON() const {
+        return {};
+    };
 };
 
 class NeverRetryPolicy : public RetryPolicy {
@@ -70,4 +81,26 @@ public:
                     << "NeverRetryPolicy");
     }
 };
+
+namespace helpers {
+/** Returns true if the given status is in any of the given ErrorCategories. */
+template <ErrorCategory... cats>
+bool isAnyCategory(Status status) {
+    return (ErrorCodes::isA<cats>(status) || ...);
+}
+}  // namespace helpers
+
+template <ErrorCategory... Categories>
+class RetryWithBackoffOnErrorCategories : public RetryPolicy {
+public:
+    RetryWithBackoffOnErrorCategories(Backoff backoff) : _backoff{backoff} {}
+    bool recordAndEvaluateRetry(Status status) override {
+        return helpers::isAnyCategory<Categories...>(status);
+    }
+    Milliseconds getNextRetryDelay() override final {
+        return _backoff.nextSleep();
+    }
+    Backoff _backoff;
+};
+
 }  // namespace mongo::async_rpc
