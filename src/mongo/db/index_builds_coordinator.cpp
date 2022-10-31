@@ -2615,7 +2615,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     // impact on user operations. Other steps of the index builds such as the draining phase have
     // normal priority because index builds are required to eventually catch-up with concurrent
     // writers. Otherwise we risk never finishing the index build.
-    SetTicketAquisitionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
+    SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
     {
         indexBuildsSSS.scanCollection.addAndFetch(1);
 
@@ -2650,7 +2650,7 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     // impact on user operations. Other steps of the index builds such as the draining phase have
     // normal priority because index builds are required to eventually catch-up with concurrent
     // writers. Otherwise we risk never finishing the index build.
-    SetTicketAquisitionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
+    SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
     {
         Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);

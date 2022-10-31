@@ -421,16 +421,15 @@ public:
 };
 
 /**
- * RAII-style class to set the priority for the ticket acquisition mechanism when acquiring a global
+ * RAII-style class to set the priority for the ticket admission mechanism when acquiring a global
  * lock.
  */
-class SetTicketAquisitionPriorityForLock {
+class SetAdmissionPriorityForLock {
 public:
-    SetTicketAquisitionPriorityForLock(const SetTicketAquisitionPriorityForLock&) = delete;
-    SetTicketAquisitionPriorityForLock& operator=(const SetTicketAquisitionPriorityForLock&) =
-        delete;
-    explicit SetTicketAquisitionPriorityForLock(OperationContext* opCtx,
-                                                AdmissionContext::Priority priority)
+    SetAdmissionPriorityForLock(const SetAdmissionPriorityForLock&) = delete;
+    SetAdmissionPriorityForLock& operator=(const SetAdmissionPriorityForLock&) = delete;
+    explicit SetAdmissionPriorityForLock(OperationContext* opCtx,
+                                         AdmissionContext::Priority priority)
         : _opCtx(opCtx), _originalPriority(opCtx->lockState()->getAdmissionPriority()) {
         uassert(ErrorCodes::IllegalOperation,
                 "It is illegal for an operation to demote a high priority to a lower priority "
@@ -440,7 +439,7 @@ public:
         _opCtx->lockState()->setAdmissionPriority(priority);
     }
 
-    ~SetTicketAquisitionPriorityForLock() {
+    ~SetAdmissionPriorityForLock() {
         _opCtx->lockState()->setAdmissionPriority(_originalPriority);
     }
 

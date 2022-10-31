@@ -722,10 +722,10 @@ public:
                 // internal clients (see checkAuthForGetMore).
                 curOp->debug().isReplOplogGetMore = true;
 
-                // We do not want to take tickets for internal (replication) oplog reads. Stalling
-                // on ticket acquisition can cause complicated deadlocks. Primaries may depend on
-                // data reaching secondaries in order to proceed; and secondaries may get stalled
-                // replicating because of an inability to acquire a read ticket.
+                // We do not want to wait to take tickets for internal (replication) oplog reads.
+                // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
+                // depend on data reaching secondaries in order to proceed; and secondaries may get
+                // stalled replicating because of an inability to acquire a read ticket.
                 opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
             }
 

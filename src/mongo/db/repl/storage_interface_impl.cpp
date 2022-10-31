@@ -1483,9 +1483,8 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
 void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
                                                                    bool primaryOnly) {
     // Waiting for oplog writes to be visible in the oplog does not use any storage engine resources
-    // and must skip ticket acquisition to avoid deadlocks with updating oplog visibility.
-    SetTicketAquisitionPriorityForLock setTicketAquisition(opCtx,
-                                                           AdmissionContext::Priority::kImmediate);
+    // and must not wait for ticket acquisition to avoid deadlocks with updating oplog visibility.
+    SetAdmissionPriorityForLock setTicketAquisition(opCtx, AdmissionContext::Priority::kImmediate);
 
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
     if (primaryOnly &&
@@ -1501,8 +1500,7 @@ void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
                                                 bool orderedCommit) {
     // Setting the oplog visibility does not use any storage engine resources and must skip ticket
     // acquisition to avoid deadlocks with updating oplog visibility.
-    SetTicketAquisitionPriorityForLock setTicketAquisition(opCtx,
-                                                           AdmissionContext::Priority::kImmediate);
+    SetAdmissionPriorityForLock setTicketAquisition(opCtx, AdmissionContext::Priority::kImmediate);
 
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
     fassert(28557,

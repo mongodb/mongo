@@ -1244,20 +1244,19 @@ TEST_F(LockerImplTest, SetTicketAcquisitionForLockRAIIType) {
     ASSERT_TRUE(opCtx->lockState()->shouldWaitForTicket());
 
     {
-        SetTicketAquisitionPriorityForLock setTicketAquisition(
-            opCtx.get(), AdmissionContext::Priority::kImmediate);
+        SetAdmissionPriorityForLock setTicketAquisition(opCtx.get(),
+                                                        AdmissionContext::Priority::kImmediate);
         ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
     }
 
     ASSERT_TRUE(opCtx->lockState()->shouldWaitForTicket());
 
-    // If ticket acquisitions are disabled on the lock state, the RAII type has no effect.
     opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
     ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
 
     {
-        SetTicketAquisitionPriorityForLock setTicketAquisition(
-            opCtx.get(), AdmissionContext::Priority::kImmediate);
+        SetAdmissionPriorityForLock setTicketAquisition(opCtx.get(),
+                                                        AdmissionContext::Priority::kImmediate);
         ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
     }
 

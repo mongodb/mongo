@@ -317,9 +317,9 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         OperationContext& opCtx = *opCtxPtr;
 
         // The oplog applier is crucial for stability of the replica set. As a result we mark it as
-        // having Immediate priority. This makes the operation skip ticket acquisition and flow
-        // control.
-        SetTicketAquisitionPriorityForLock priority(&opCtx, AdmissionContext::Priority::kImmediate);
+        // having Immediate priority. This makes the operation skip waiting for ticket acquisition
+        // and flow control.
+        SetAdmissionPriorityForLock priority(&opCtx, AdmissionContext::Priority::kImmediate);
 
         // For pausing replication in tests.
         if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
@@ -432,9 +432,10 @@ void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
             auto opCtx = cc().makeOperationContext();
 
             // Oplog writes are crucial to the stability of the replica set. We mark the operations
-            // as having Immediate priority so that it skips ticket acquisition and flow control.
-            SetTicketAquisitionPriorityForLock priority(opCtx.get(),
-                                                        AdmissionContext::Priority::kImmediate);
+            // as having Immediate priority so that it skips waiting for ticket acquisition and flow
+            // control.
+            SetAdmissionPriorityForLock priority(opCtx.get(),
+                                                 AdmissionContext::Priority::kImmediate);
 
             UnreplicatedWritesBlock uwb(opCtx.get());
             ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
@@ -589,10 +590,10 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                     auto opCtx = cc().makeOperationContext();
 
                     // Applying an Oplog batch is crucial to the stability of the Replica Set. We
-                    // mark it as having Immediate priority so that it skips ticket acquisition and
-                    // flow control.
-                    SetTicketAquisitionPriorityForLock priority(
-                        opCtx.get(), AdmissionContext::Priority::kImmediate);
+                    // mark it as having Immediate priority so that it skips waiting for ticket
+                    // acquisition and flow control.
+                    SetAdmissionPriorityForLock priority(opCtx.get(),
+                                                         AdmissionContext::Priority::kImmediate);
 
                     opCtx->setEnforceConstraints(false);
 

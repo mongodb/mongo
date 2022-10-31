@@ -339,8 +339,7 @@ void ReplicationCoordinatorImpl::ElectionState::_writeLastVoteForMyElection(
         // Any operation that occurs as part of an election process is critical to the operation of
         // the cluster. We mark the operation as having Immediate priority to skip ticket
         // acquisition and flow control.
-        SetTicketAquisitionPriorityForLock priority(opCtx.get(),
-                                                    AdmissionContext::Priority::kImmediate);
+        SetAdmissionPriorityForLock priority(opCtx.get(), AdmissionContext::Priority::kImmediate);
 
         LOGV2(6015300,
               "Storing last vote document in local storage for my election",

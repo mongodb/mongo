@@ -137,9 +137,9 @@ Status NoopWriter::startWritingPeriodicNoops(OpTime lastKnownOpTime) {
     _noopRunner =
         std::make_unique<PeriodicNoopRunner>(_writeInterval, [this](OperationContext* opCtx) {
             // Noop writes are critical for the cluster stability, so we mark it as having Immediate
-            // priority. As a result it will skip both flow control and normal ticket acquisition.
-            SetTicketAquisitionPriorityForLock priority(opCtx,
-                                                        AdmissionContext::Priority::kImmediate);
+            // priority. As a result it will skip both flow control and waiting for ticket
+            // acquisition.
+            SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kImmediate);
             _writeNoop(opCtx);
         });
     return Status::OK();

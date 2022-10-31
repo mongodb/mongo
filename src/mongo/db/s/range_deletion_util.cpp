@@ -322,7 +322,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                             const ChunkRange& range) {
     suspendRangeDeletion.pauseWhileSet(opCtx);
 
-    SetTicketAquisitionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
+    SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
 
     bool allDocsRemoved = false;
     // Delete all batches in this range unless a stepdown error occurs. Do not yield the
