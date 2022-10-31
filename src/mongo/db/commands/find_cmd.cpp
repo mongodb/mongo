@@ -65,6 +65,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/fail_point.h"
 
