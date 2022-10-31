@@ -11,7 +11,6 @@ env = env.Clone()
 env.Library(
     target='sharding_api_d',
     source=[
-        'balancer_stats_registry.cpp',
         'collection_metadata.cpp',
         'collection_sharding_state_factory_standalone.cpp',
         'collection_sharding_state.cpp',
@@ -36,10 +35,21 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/write_block_bypass',
+    ],
+)
+
+env.Library(
+    target='balancer_stats_registry',
+    source=[
+        'balancer_stats_registry.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
+        '$BUILD_DIR/mongo/db/shard_role',
+        '$BUILD_DIR/mongo/s/grid',
     ],
 )
 
@@ -228,6 +238,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/transaction/transaction_operations',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/future_util',
+        'balancer_stats_registry',
         'sharding_catalog',
         'sharding_logging',
     ],
@@ -550,6 +561,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_initialization',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/s/startup_initialization',
+        'balancer_stats_registry',
         'forwardable_operation_metadata',
         'sharding_catalog',
         'sharding_logging',

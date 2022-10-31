@@ -303,9 +303,14 @@ void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx
 
                 LOGV2(6834800, "Resubmitting range deletion tasks");
 
-                ScopedRangeDeleterLock rangeDeleterLock(opCtx);
-                DBDirectClient client(opCtx);
+                // The Scoped lock is needed to serialize with concurrent range deletions
+                ScopedRangeDeleterLock rangeDeleterLock(opCtx, MODE_S);
+                // The collection lock is needed to serialize with donors trying to
+                // schedule local range deletions by updating the 'pending' field
+                AutoGetCollection rangeDeletionLock(
+                    opCtx, NamespaceString::kRangeDeletionNamespace, MODE_S);
 
+                DBDirectClient client(opCtx);
                 int nRescheduledTasks = 0;
 
                 // (1) register range deletion tasks marked as "processing"

@@ -584,7 +584,7 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
     const auto query = getQueryFilterForRangeDeletionTask(collectionUuid, range);
     try {
         PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-        ScopedRangeDeleterLock rangeDeleterLock(opCtx, collectionUuid);
+        ScopedRangeDeleterLock rangeDeleterLock(opCtx, LockMode::MODE_IX);
         // The DBDirectClient will not retry WriteConflictExceptions internally while holding an X
         // mode lock, so we need to retry at this level.
         writeConflictRetry(
