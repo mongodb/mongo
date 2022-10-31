@@ -61,14 +61,12 @@ static bool inmem;
 #define MODIFY_RECORD_FILE_ID 2
 #define MAX_RECORD_FILES 3
 
-#define ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
 #define ENV_CONFIG_DEF \
     "create,log=(file_max=10M,enabled),statistics=(all),statistics_log=(json,on_close,wait=1)"
 #define ENV_CONFIG_TXNSYNC                                                                        \
     "create,log=(file_max=10M,enabled),"                                                          \
     "transaction_sync=(enabled,method=none),statistics=(all),statistics_log=(json,on_close,wait=" \
     "1)"
-#define ENV_CONFIG_REC "log=(recover=on),statistics=(all),statistics_log=(json,on_close,wait=1)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their
@@ -326,7 +324,7 @@ fill_db(uint32_t nth)
     else
         strcpy(envconf, ENV_CONFIG_TXNSYNC);
     if (compat)
-        strcat(envconf, ENV_CONFIG_COMPAT);
+        strcat(envconf, TESTUTIL_ENV_CONFIG_COMPAT);
 
     testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
@@ -396,7 +394,7 @@ recover_and_verify(uint32_t nthreads)
     bool columnar_table, fatal;
 
     printf("Open database, run recovery and verify content\n");
-    testutil_check(wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn));
+    testutil_check(wiredtiger_open(NULL, NULL, TESTUTIL_ENV_CONFIG_REC, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->open_cursor(session, col_uri, NULL, NULL, &col_cursor));
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &row_cursor));
