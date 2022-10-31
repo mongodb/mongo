@@ -261,6 +261,7 @@ env.Library(
         'query_feature_flags.idl',
         'query_knobs.idl',
         'sbe_plan_cache_on_parameter_change.cpp',
+        'telemetry_util.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
