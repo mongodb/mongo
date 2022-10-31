@@ -29,9 +29,14 @@
 
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 
+#include "mongo/db/pipeline/abt/utils.h"
+#include "mongo/db/query/cost_model/cost_estimator.h"
+#include "mongo/db/query/cost_model/cost_model_manager.h"
+#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/unittest/unittest.h"
 
 
@@ -96,4 +101,60 @@ IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFi
     return IndexDefinition{std::move(idxCollSpec), isMultiKey};
 }
 
+std::unique_ptr<CostingInterface> makeCosting() {
+    return std::make_unique<cost_model::CostEstimator>(
+        cost_model::CostModelManager().getDefaultCoefficients());
+}
+
+OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
+                                 PrefixId& prefixId,
+                                 Metadata metadata,
+                                 DebugInfo debugInfo,
+                                 QueryHints queryHints) {
+    return OptPhaseManager{std::move(phaseSet),
+                           prefixId,
+                           false /*requireRID*/,
+                           std::move(metadata),
+                           std::make_unique<HeuristicCE>(),
+                           makeCosting(),
+                           defaultConvertPathToInterval,
+                           ConstEval::constFold,
+                           std::move(debugInfo),
+                           std::move(queryHints)};
+}
+
+OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
+                                 PrefixId& prefixId,
+                                 Metadata metadata,
+                                 std::unique_ptr<CEInterface> ceDerivation,
+                                 DebugInfo debugInfo,
+                                 QueryHints queryHints) {
+    return OptPhaseManager{std::move(phaseSet),
+                           prefixId,
+                           false /*requireRID*/,
+                           std::move(metadata),
+                           std::move(ceDerivation),
+                           makeCosting(),
+                           defaultConvertPathToInterval,
+                           ConstEval::constFold,
+                           std::move(debugInfo),
+                           std::move(queryHints)};
+}
+
+OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
+                                           PrefixId& prefixId,
+                                           Metadata metadata,
+                                           DebugInfo debugInfo,
+                                           QueryHints queryHints) {
+    return OptPhaseManager{std::move(phaseSet),
+                           prefixId,
+                           true /*requireRID*/,
+                           std::move(metadata),
+                           std::make_unique<HeuristicCE>(),
+                           makeCosting(),
+                           defaultConvertPathToInterval,
+                           ConstEval::constFold,
+                           std::move(debugInfo),
+                           std::move(queryHints)};
+}
 }  // namespace mongo::optimizer

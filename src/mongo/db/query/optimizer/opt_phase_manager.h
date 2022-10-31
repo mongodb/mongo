@@ -77,11 +77,6 @@ public:
 
     OptPhaseManager(PhaseSet phaseSet,
                     PrefixId& prefixId,
-                    Metadata metadata,
-                    DebugInfo debugInfo,
-                    QueryHints queryHints = {});
-    OptPhaseManager(PhaseSet phaseSet,
-                    PrefixId& prefixId,
                     bool requireRID,
                     Metadata metadata,
                     std::unique_ptr<CEInterface> ceDerivation,

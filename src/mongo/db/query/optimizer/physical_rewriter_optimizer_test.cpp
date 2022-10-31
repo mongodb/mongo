@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/ce_hinted.h"
-#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
@@ -66,7 +65,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"p2"}}, std::move(filter2Node));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -271,7 +270,7 @@ TEST(PhysRewriter, GroupBy) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"c"}}, std::move(filterANode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -341,7 +340,7 @@ TEST(PhysRewriter, GroupBy1) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pb"}}, std::move(groupByNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -413,7 +412,7 @@ TEST(PhysRewriter, Unwind) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"a", "b"}},
                                   std::move(filterBNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -491,7 +490,7 @@ TEST(PhysRewriter, DuplicateFilter) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode2));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -552,7 +551,7 @@ TEST(PhysRewriter, FilterCollation) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pb"}}, std::move(limitSkipNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -608,7 +607,7 @@ TEST(PhysRewriter, EvalCollation) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -663,7 +662,7 @@ TEST(PhysRewriter, FilterEvalCollation) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -719,7 +718,7 @@ TEST(PhysRewriter, FilterIndexing) {
 
     {
         PrefixId prefixId;
-        OptPhaseManager phaseManager(
+        auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
             prefixId,
             {{{"c1",
@@ -762,7 +761,7 @@ TEST(PhysRewriter, FilterIndexing) {
 
     {
         PrefixId prefixId;
-        OptPhaseManager phaseManager(
+        auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
              OptPhase::MemoExplorationPhase,
              OptPhase::MemoImplementationPhase},
@@ -804,7 +803,7 @@ TEST(PhysRewriter, FilterIndexing) {
 
     {
         PrefixId prefixId;
-        OptPhaseManager phaseManager(
+        auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
              OptPhase::MemoExplorationPhase,
              OptPhase::MemoImplementationPhase},
@@ -868,7 +867,7 @@ TEST(PhysRewriter, FilterIndexing1) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"p1"}}, std::move(filterNode));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -933,7 +932,7 @@ TEST(PhysRewriter, FilterIndexing2) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -1013,7 +1012,7 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode2));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -1131,7 +1130,7 @@ TEST(PhysRewriter, FilterIndexing3) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -1186,7 +1185,7 @@ TEST(PhysRewriter, FilterIndexing3MultiKey) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -1280,7 +1279,7 @@ TEST(PhysRewriter, FilterIndexing4) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(filterDNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -1388,7 +1387,7 @@ TEST(PhysRewriter, FilterIndexing5) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa", "pb"}},
                                   std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -1478,7 +1477,7 @@ TEST(PhysRewriter, FilterIndexing6) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa", "pb"}},
                                   std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -1541,7 +1540,7 @@ TEST(PhysRewriter, FilterIndexingStress) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(result));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -1641,7 +1640,7 @@ TEST(PhysRewriter, FilterIndexingVariable) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -1737,7 +1736,7 @@ TEST(PhysRewriter, FilterIndexingMaxKey) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode2));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -1805,7 +1804,7 @@ TEST(PhysRewriter, SargableProjectionRenames) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(evalNode2));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
@@ -1867,7 +1866,7 @@ TEST(PhysRewriter, SargableAcquireProjection) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(evalNode));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
@@ -1933,17 +1932,13 @@ TEST(PhysRewriter, FilterReorder) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(result));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1", createScanDef({}, {})}}},
         std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
-        {} /*pathToInterval*/,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -2028,21 +2023,17 @@ TEST(PhysRewriter, CoveredScan) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef(
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
         std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
-        {} /*pathToInterval*/,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -2100,7 +2091,7 @@ TEST(PhysRewriter, EvalIndexing) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(collationNode));
 
     {
-        OptPhaseManager phaseManager(
+        auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
              OptPhase::MemoExplorationPhase,
              OptPhase::MemoImplementationPhase},
@@ -2133,7 +2124,7 @@ TEST(PhysRewriter, EvalIndexing) {
 
     {
         // Index and collation node have incompatible ops.
-        OptPhaseManager phaseManager(
+        auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
              OptPhase::MemoExplorationPhase,
              OptPhase::MemoImplementationPhase},
@@ -2192,7 +2183,7 @@ TEST(PhysRewriter, EvalIndexing1) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -2262,7 +2253,7 @@ TEST(PhysRewriter, EvalIndexing2) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa2"}},
                                   std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::ConstEvalPre,
          OptPhase::PathFuse,
          OptPhase::MemoSubstitutionPhase,
@@ -2347,12 +2338,11 @@ TEST(PhysRewriter, MultiKeyIndex) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef(
                {},
@@ -2360,9 +2350,6 @@ TEST(PhysRewriter, MultiKeyIndex) {
                 {"index2",
                  makeIndexDefinition("b", CollationOp::Descending, false /*isMultiKey*/)}})}}},
         std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
-        {} /*pathToInterval*/,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     {
@@ -2571,7 +2558,7 @@ TEST(PhysRewriter, CompoundIndex1) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterDNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -2656,7 +2643,7 @@ TEST(PhysRewriter, CompoundIndex2) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -2743,7 +2730,7 @@ TEST(PhysRewriter, CompoundIndex3) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -2830,12 +2817,11 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterBNode));
 
     // Create the following indexes: {a:1, c:1, {name: 'index1'}}, and {b:1, d:1, {name: 'index2'}}
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef(
                {},
@@ -2848,9 +2834,6 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
                                   {makeNonMultikeyIndexPath("d"), CollationOp::Ascending}},
                                  false /*isMultiKey*/}}})}}},
         std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
-        {} /*pathToInterval*/,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -2905,7 +2888,7 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode2));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -2980,7 +2963,7 @@ TEST(PhysRewriter, IndexBoundsIntersect1) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -3048,7 +3031,7 @@ TEST(PhysRewriter, IndexBoundsIntersect2) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -3122,7 +3105,7 @@ TEST(PhysRewriter, IndexBoundsIntersect3) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -3201,7 +3184,7 @@ TEST(PhysRewriter, IndexResidualReq) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -3321,7 +3304,7 @@ TEST(PhysRewriter, IndexResidualReq1) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(collationNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -3404,7 +3387,7 @@ TEST(PhysRewriter, IndexResidualReq2) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterBNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -3483,18 +3466,13 @@ TEST(PhysRewriter, ElemMatchIndex) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}},
-        std::make_unique<HeuristicCE>(),
-        std::make_unique<DefaultCosting>(),
-        defaultConvertPathToInterval,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3567,22 +3545,17 @@ TEST(PhysRewriter, ElemMatchIndex1) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode2));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef({},
                          {{"index1",
                            makeCompositeIndexDefinition(
                                {{"b", CollationOp::Ascending, true /*isMultiKey*/},
                                 {"a", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
-        std::make_unique<HeuristicCE>(),
-        std::make_unique<DefaultCosting>(),
-        defaultConvertPathToInterval,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3650,21 +3623,16 @@ TEST(PhysRewriter, ElemMatchIndexNoArrays) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef(
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, false /*multiKey*/)}})}}},
-        std::make_unique<HeuristicCE>(),
-        std::make_unique<DefaultCosting>(),
-        defaultConvertPathToInterval,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3720,22 +3688,17 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef({},
                          {{"index1",
                            makeCompositeIndexDefinition(
                                {{"b", CollationOp::Ascending, true /*isMultiKey*/},
                                 {"a", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
-        std::make_unique<HeuristicCE>(),
-        std::make_unique<DefaultCosting>(),
-        defaultConvertPathToInterval,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3840,12 +3803,11 @@ TEST(PhysRewriter, ObjectElemMatchBounds) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef(
                {},
@@ -3855,10 +3817,6 @@ TEST(PhysRewriter, ObjectElemMatchBounds) {
                                  true /*isMultiKey*/}}}
 
                )}}},
-        std::make_unique<HeuristicCE>(),
-        std::make_unique<DefaultCosting>(),
-        defaultConvertPathToInterval,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3928,21 +3886,16 @@ TEST(PhysRewriter, NestedElemMatch) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"coll1",
            createScanDef(
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, true /*isMultiKey*/)}})}}},
-        std::make_unique<HeuristicCE>(),
-        std::make_unique<DefaultCosting>(),
-        defaultConvertPathToInterval,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4049,12 +4002,11 @@ TEST(PhysRewriter, PathObj) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager{
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef({},
                          {{"index1",
@@ -4062,13 +4014,8 @@ TEST(PhysRewriter, PathObj) {
                                {{"a", CollationOp::Ascending, false /*isMultiKey*/},
                                 {"b", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
         std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
-        // The path-to-interval callback is important for this test.
-        // We want to confirm PathObj becomes an interval.
-        defaultConvertPathToInterval,
-        ConstEval::constFold,
         DebugInfo{true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
-        {} /*hints*/};
+        {} /*hints*/);
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
@@ -4139,7 +4086,7 @@ TEST(PhysRewriter, ArrayConstantIndex) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(filterNode2));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -4244,7 +4191,7 @@ TEST(PhysRewriter, ArrayConstantNoIndex) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(filterNode2));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -4306,7 +4253,7 @@ TEST(PhysRewriter, ParallelScan) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -4368,7 +4315,7 @@ TEST(PhysRewriter, HashPartitioning) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pc"}}, std::move(groupByNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -4452,12 +4399,11 @@ TEST(PhysRewriter, IndexPartitioning) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pc"}}, std::move(groupByNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef(
                {},
@@ -4471,9 +4417,6 @@ TEST(PhysRewriter, IndexPartitioning) {
                {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("b"))})}},
          5 /*numberOfPartitions*/},
         std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
-        {} /*pathToInterval*/,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4573,12 +4516,11 @@ TEST(PhysRewriter, IndexPartitioning1) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pc"}}, std::move(groupByNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef(
                {},
@@ -4598,9 +4540,6 @@ TEST(PhysRewriter, IndexPartitioning1) {
                {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("c"))})}},
          5 /*numberOfPartitions*/},
         std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
-        {} /*pathToInterval*/,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4653,7 +4592,7 @@ TEST(PhysRewriter, LocalGlobalAgg) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa", "pc"}},
                                   std::move(groupByNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -4731,7 +4670,7 @@ TEST(PhysRewriter, LocalGlobalAgg1) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pc"}}, std::move(groupByNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -4786,7 +4725,7 @@ TEST(PhysRewriter, LocalLimitSkip) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(limitSkipNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -4920,7 +4859,7 @@ TEST(PhysRewriter, CollationLimit) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(limitSkipNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -5061,7 +5000,7 @@ TEST(PhysRewriter, PartialIndex1) {
     ASSERT_TRUE(conversionResult);
     ASSERT_FALSE(conversionResult->_retainPredicate);
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -5142,7 +5081,7 @@ TEST(PhysRewriter, PartialIndex2) {
     ASSERT_TRUE(conversionResult);
     ASSERT_FALSE(conversionResult->_retainPredicate);
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -5222,7 +5161,7 @@ TEST(PhysRewriter, PartialIndexReject) {
     ASSERT_TRUE(conversionResult);
     ASSERT_FALSE(conversionResult->_retainPredicate);
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -5287,17 +5226,12 @@ TEST(PhysRewriter, RequireRID) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManagerRequireRID(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        true /*requireRID*/,
         {{{"c1", createScanDef({}, {})}}},
-        std::make_unique<HeuristicCE>(),
-        std::make_unique<DefaultCosting>(),
-        {} /*pathToInterval*/,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -5342,17 +5276,12 @@ TEST(PhysRewriter, RequireRID1) {
                                   std::move(filterNode));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManagerRequireRID(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        true /*requireRID*/,
         {{{"c1", createScanDef({}, {})}}},
-        std::make_unique<HeuristicCE>(),
-        std::make_unique<DefaultCosting>(),
-        {} /*pathToInterval*/,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -5410,7 +5339,7 @@ TEST(PhysRewriter, UnionRewrite) {
                                   std::move(unionNode));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -5479,7 +5408,7 @@ TEST(PhysRewriter, JoinRewrite) {
                                   std::move(joinNode));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -5554,7 +5483,7 @@ TEST(PhysRewriter, JoinRewrite1) {
                                   std::move(joinNode));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -5609,7 +5538,7 @@ TEST(PhysRewriter, RootInterval) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -5663,7 +5592,7 @@ TEST(PhysRewriter, EqMemberSargable) {
 
     {
         PrefixId prefixId;
-        OptPhaseManager phaseManager(
+        auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase},
             prefixId,
             {{{"c1",
@@ -5711,7 +5640,7 @@ TEST(PhysRewriter, EqMemberSargable) {
 
     {
         PrefixId prefixId;
-        OptPhaseManager phaseManager(
+        auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
              OptPhase::MemoExplorationPhase,
              OptPhase::MemoImplementationPhase},
@@ -5811,7 +5740,7 @@ TEST(PhysRewriter, IndexSubfieldCovered) {
                                   std::move(filterNode3));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
@@ -5895,12 +5824,11 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(filterNode2));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef(
                {},
@@ -5909,9 +5837,6 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
                                                {"a", CollationOp::Ascending, false /*isMultiKey*/}},
                                               false /*isMultiKey*/)}})}}},
         std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
-        {} /*pathToInterval*/,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -5988,12 +5913,11 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(filterNode2));
 
     PrefixId prefixId;
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            createScanDef(
                {},
@@ -6001,9 +5925,6 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
                 {"index2",
                  makeIndexDefinition("b", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
         std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
-        {} /*pathToInterval*/,
-        ConstEval::constFold,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;

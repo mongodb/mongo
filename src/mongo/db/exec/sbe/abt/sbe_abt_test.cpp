@@ -31,12 +31,12 @@
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
-#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
+#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::optimizer {
@@ -379,8 +379,10 @@ TEST_F(NodeSBE, Lower1) {
                                                           true /*hasRID*/),
                                       prefixId);
 
-    OptPhaseManager phaseManager(
-        OptPhaseManager::getAllRewritesSet(), prefixId, {{}}, DebugInfo::kDefaultForTests);
+    auto phaseManager = makePhaseManager(OptPhaseManager::getAllRewritesSet(),
+                                         prefixId,
+                                         {{{"test", createScanDef({}, {})}}},
+                                         DebugInfo::kDefaultForTests);
 
     phaseManager.optimize(tree);
     auto env = VariableEnvironment::build(tree);
@@ -464,15 +466,10 @@ TEST_F(NodeSBE, RequireRID) {
                                                    true /*hasRID*/),
                                prefixId);
 
-    OptPhaseManager phaseManager(OptPhaseManager::getAllRewritesSet(),
-                                 prefixId,
-                                 true /*requireRID*/,
-                                 {{{"test", createScanDef({}, {})}}},
-                                 std::make_unique<HeuristicCE>(),
-                                 std::make_unique<DefaultCosting>(),
-                                 {} /*pathToInterval*/,
-                                 ConstEval::constFold,
-                                 DebugInfo::kDefaultForTests);
+    auto phaseManager = makePhaseManagerRequireRID(OptPhaseManager::getAllRewritesSet(),
+                                                   prefixId,
+                                                   {{{"test", createScanDef({}, {})}}},
+                                                   DebugInfo::kDefaultForTests);
 
     phaseManager.optimize(tree);
     auto env = VariableEnvironment::build(tree);

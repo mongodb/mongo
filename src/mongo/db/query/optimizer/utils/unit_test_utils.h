@@ -31,6 +31,7 @@
 
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 
@@ -92,5 +93,38 @@ IndexDefinition makeIndexDefinition(FieldNameType fieldName,
                                     bool isMultiKey = true);
 IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFields,
                                              bool isMultiKey = true);
+
+/**
+ * A convenience factory function to create costing.
+ */
+std::unique_ptr<CostingInterface> makeCosting();
+
+/**
+ * A convenience factory function to create OptPhaseManager for unit tests.
+ */
+OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
+                                 PrefixId& prefixId,
+                                 Metadata metadata,
+                                 DebugInfo debugInfo,
+                                 QueryHints queryHints = {});
+
+/**
+ * A convenience factory function to create OptPhaseManager for unit tests with CE hints.
+ */
+OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
+                                 PrefixId& prefixId,
+                                 Metadata metadata,
+                                 std::unique_ptr<CEInterface> ceDerivation,
+                                 DebugInfo debugInfo,
+                                 QueryHints queryHints = {});
+
+/**
+ * A convenience factory function to create OptPhaseManager for unit tests which requires RID.
+ */
+OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
+                                           PrefixId& prefixId,
+                                           Metadata metadata,
+                                           DebugInfo debugInfo,
+                                           QueryHints queryHints = {});
 
 }  // namespace mongo::optimizer

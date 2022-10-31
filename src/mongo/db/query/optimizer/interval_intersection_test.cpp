@@ -56,12 +56,12 @@ std::string optimizedQueryPlan(const std::string& query,
     ABT translated =
         translatePipeline(metadata, "[{$match: " + query + "}]", scanDefName, prefixId);
 
-    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase,
-                                  OptPhase::MemoExplorationPhase,
-                                  OptPhase::MemoImplementationPhase},
-                                 prefixId,
-                                 metadata,
-                                 DebugInfo::kDefaultForTests);
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase,
+                                          OptPhase::MemoExplorationPhase,
+                                          OptPhase::MemoImplementationPhase},
+                                         prefixId,
+                                         metadata,
+                                         DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;
     phaseManager.getHints()._disableScan = true;
