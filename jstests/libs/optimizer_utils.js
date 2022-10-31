@@ -90,6 +90,35 @@ function getPlanSkeleton(node, options = {}) {
     }
 }
 
+/**
+ * Recur into every object and array; return any subtree that matches 'predicate'.
+ * Only calls 'predicate' on objects: not arrays or scalars.
+ *
+ * This is completely ignorant of the structure of a query: for example if there
+ * are literals match the predicate, it will also match those.
+ */
+function findSubtrees(tree, predicate) {
+    let result = [];
+    const visit = subtree => {
+        if (typeof subtree === 'object' && subtree != null) {
+            if (Array.isArray(subtree)) {
+                for (const child of subtree) {
+                    visit(child);
+                }
+            } else {
+                if (predicate(subtree)) {
+                    result.push(subtree);
+                }
+                for (const key of Object.keys(subtree)) {
+                    visit(subtree[key]);
+                }
+            }
+        }
+    };
+    visit(tree);
+    return result;
+}
+
 function prettyInterval(compoundInterval) {
     // Takes an array of intervals, each one applying to one component of a compound index key.
     // Try to format it as a string.
@@ -143,6 +172,11 @@ function prettyExpression(expr) {
             const right = prettyExpression(expr.right);
             const op = prettyOp(expr.op);
             return `(${left} ${op} ${right})`;
+        }
+        case 'UnaryOp': {
+            const op = prettyOp(expr.op);
+            const input = prettyExpression(expr.input);
+            return `(${op} ${input})`;
         }
         default:
             return tojson(expr);

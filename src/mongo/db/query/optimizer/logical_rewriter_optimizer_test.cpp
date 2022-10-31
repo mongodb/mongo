@@ -1564,7 +1564,7 @@ TEST(LogicalRewriter, RemoveNoopFilter) {
         latest);
 }
 
-TEST(LogicalRewriter, NotPushdownToplevel) {
+TEST(LogicalRewriter, NotPushdownToplevelSuccess) {
     using namespace properties;
     PrefixId prefixId;
 
@@ -1603,8 +1603,68 @@ TEST(LogicalRewriter, NotPushdownToplevel) {
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
-    // TODO SERVER-70224 We remove the Traverse nodes, and combine the Not ... Eq into Neq.
-    // For now we only remove Traverse nodes.
+    // We remove the Traverse nodes, and combine the Not ... Eq into Neq.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathGet [b]\n"
+        "|   PathCompare [Neq]\n"
+        "|   Const [3]\n"
+        "Scan [coll]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        latest);
+}
+
+TEST(LogicalRewriter, NotPushdownToplevelFailureMultikey) {
+    using namespace properties;
+    PrefixId prefixId;
+
+    ABT scanNode = make<ScanNode>("scan_0", "coll");
+
+    ABT abEq3 = make<PathGet>(
+        "a",
+        make<PathTraverse>(
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)),
+                                             PathTraverse::kSingleLevel)),
+            PathTraverse::kSingleLevel));
+    ABT filterNode = make<FilterNode>(
+        make<UnaryOp>(Operations::Not, make<EvalFilter>(abEq3, make<Variable>("scan_0"))),
+        std::move(scanNode));
+
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"scan_0"}},
+                                  std::move(filterNode));
+
+    auto phaseManager = makePhaseManager(
+        {OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
+        prefixId,
+        Metadata{{
+            {"coll",
+             createScanDef(
+                 {},
+                 {{"index1",
+                   IndexDefinition{// collation
+                                   {{makeIndexPath(FieldPathType{"a", "b"}, true /*isMultiKey*/),
+                                     CollationOp::Ascending}},
+                                   true /*isMultiKey*/,
+                                   {DistributionType::Centralized},
+                                   {} /*partialReqMap*/}}})},
+        }},
+        DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // Because the index is multikey, we don't remove the Traverse nodes,
+    // which prevents us from pushing down the Not.
     ASSERT_EXPLAIN_V2(
         "Root []\n"
         "|   |   projections: \n"
@@ -1616,9 +1676,76 @@ TEST(LogicalRewriter, NotPushdownToplevel) {
         "|   EvalFilter []\n"
         "|   |   Variable [scan_0]\n"
         "|   PathGet [a]\n"
+        "|   PathTraverse [1]\n"
         "|   PathGet [b]\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [3]\n"
+        "Scan [coll]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        latest);
+}
+
+TEST(LogicalRewriter, NotPushdownComposeM) {
+    using namespace unit_test_abt_literals;
+    using namespace properties;
+
+    ABT rootNode =
+        NodeBuilder{}
+            .root("scan_0")
+            .filter(_unary("Not",
+                           _evalf(_composem(
+                                      // A ComposeM where both args can be negated.
+                                      _composem(_get("a", _cmp("Eq", "2"_cint64)),
+                                                _get("b", _cmp("Eq", "3"_cint64))),
+                                      // A ComposeM where only one arg can be negated.
+                                      _composem(_get("c", _cmp("Eq", "4"_cint64)),
+                                                _get("d", _traverse1(_cmp("Eq", "5"_cint64))))),
+                                  "scan_0"_var)))
+            .finish(_scan("scan_0", "coll"));
+
+    PrefixId prefixId;
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         Metadata{{{"coll", createScanDef({}, {})}}},
+                                         DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // We should push the Not down as far as possible, so that some leaves become Neq.
+    // Leaves with a Traverse in the way residualize a Not instead.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathComposeA []\n"
+        "|   |   |   PathLambda []\n"
+        "|   |   |   LambdaAbstraction [tmp_bool_0]\n"
+        "|   |   |   UnaryOp [Not]\n"
+        "|   |   |   EvalFilter []\n"
+        "|   |   |   |   Variable [tmp_bool_0]\n"
+        "|   |   |   PathGet [d]\n"
+        "|   |   |   PathTraverse [1]\n"
+        "|   |   |   PathCompare [Eq]\n"
+        "|   |   |   Const [5]\n"
+        "|   |   PathGet [c]\n"
+        "|   |   PathCompare [Neq]\n"
+        "|   |   Const [4]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathGet [b]\n"
+        "|   |   PathCompare [Neq]\n"
+        "|   |   Const [3]\n"
+        "|   PathGet [a]\n"
+        "|   PathCompare [Neq]\n"
+        "|   Const [2]\n"
         "Scan [coll]\n"
         "    BindBlock:\n"
         "        [scan_0]\n"
@@ -1673,8 +1800,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaSuccess) {
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
-    // TODO SERVER-70224 All the Traverses should be eliminated, and the Not ... Eq combined as Neq.
-    // For now we only remove the Traverse nodes.
+    // All the Traverses should be eliminated, and the Not ... Eq combined as Neq.
     ASSERT_EXPLAIN_V2(
         "Root []\n"
         "|   |   projections: \n"
@@ -1685,13 +1811,8 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaSuccess) {
         "|   EvalFilter []\n"
         "|   |   Variable [scan_0]\n"
         "|   PathGet [a]\n"
-        "|   PathLambda []\n"
-        "|   LambdaAbstraction [match_0_not_0]\n"
-        "|   UnaryOp [Not]\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [match_0_not_0]\n"
         "|   PathGet [b]\n"
-        "|   PathCompare [Eq]\n"
+        "|   PathCompare [Neq]\n"
         "|   Const [2]\n"
         "Sargable [Complete]\n"
         "|   |   |   |   |   requirementsMap: \n"
@@ -1764,9 +1885,8 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaKeepOuterTraverse) {
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
-    // TODO SERVER-70224 The inner Traverses should be eliminated, and the Not ... Eq combined as
-    // Neq. We have to keep the outer traverse since 'a' is multikey. (Until SERVER-70224, we only
-    // remove Traverse nodes.)
+    // The inner Traverses should be eliminated, and the Not ... Eq combined as Neq.
+    // We have to keep the outer traverse since 'a' is multikey.
     ASSERT_EXPLAIN_V2(
         "Root []\n"
         "|   |   projections: \n"
@@ -1779,13 +1899,8 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaKeepOuterTraverse) {
         "|   PathGet [a]\n"
         "|   PathTraverse [1]\n"
         "|   PathComposeM []\n"
-        "|   |   PathLambda []\n"
-        "|   |   LambdaAbstraction [match_0_not_0]\n"
-        "|   |   UnaryOp [Not]\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [match_0_not_0]\n"
         "|   |   PathGet [b]\n"
-        "|   |   PathCompare [Eq]\n"
+        "|   |   PathCompare [Neq]\n"
         "|   |   Const [2]\n"
         "|   PathComposeA []\n"
         "|   |   PathObj []\n"
@@ -1806,6 +1921,62 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaKeepOuterTraverse) {
         "|   |   BindBlock:\n"
         "|   RefBlock: \n"
         "|       Variable [scan_0]\n"
+        "Scan [coll]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        latest);
+}
+
+TEST(LogicalRewriter, NotPushdownUnderLambdaFailsWithFreeVar) {
+    using namespace mongo::optimizer::unit_test_abt_literals;
+    // When we eliminate a Not, we can't eliminate the Lambda [x] if it would leave free
+    // occurrences of 'x'.
+
+    ABT rootNode =
+        NodeBuilder{}
+            .root("scan_0")
+            .filter(_evalf(
+                _get("a",
+                     // We can eliminate the Not by combining with Eq.
+                     _plambda(_lambda("x",
+                                      _unary("Not",
+                                             _evalf(
+                                                 // But the bound variable 'x' has more than one
+                                                 // occurrence, so we can't eliminate the lambda.
+                                                 _cmp("Eq", "x"_var),
+                                                 "x"_var))))),
+                "scan_0"_var))
+            .finish(_scan("scan_0", "coll"));
+
+    PrefixId prefixId;
+    auto phaseManager = makePhaseManager({OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         Metadata{{
+                                             {"coll", createScanDef({}, {})},
+                                         }},
+                                         DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // The Not should be gone: combined into Neq.
+    // But the Lambda [x] should still be there, because 'x' is still used.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathLambda []\n"
+        "|   LambdaAbstraction [x]\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [x]\n"
+        "|   PathCompare [Neq]\n"
+        "|   Variable [x]\n"
         "Scan [coll]\n"
         "    BindBlock:\n"
         "        [scan_0]\n"

@@ -53,7 +53,7 @@ struct Definition {
 };
 
 struct CollectedInfo;
-using DefinitionsMap = opt::unordered_map<ProjectionName, Definition, ProjectionName::Hasher>;
+using DefinitionsMap = ProjectionNameMap<Definition>;
 
 struct VariableCollectorResult {
     // The Variables referenced by the subtree.
@@ -87,6 +87,11 @@ public:
      * by the subtree and locally-defined Variables.
      */
     static VariableCollectorResult getVariables(const ABT& n);
+
+    /**
+     * Call 'func' on each Variable in the subtree.
+     */
+    static void walkVariables(const ABT& n, std::function<void(const Variable&)> func);
 
     ~VariableEnvironment();
 

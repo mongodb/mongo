@@ -65,8 +65,10 @@ using ProjectionName = StrongStringAlias<ProjectionNameAliasTag>;
 using ProjectionNameSet = opt::unordered_set<ProjectionName, ProjectionName::Hasher>;
 using ProjectionNameOrderedSet = std::set<ProjectionName>;
 using ProjectionNameVector = std::vector<ProjectionName>;
-using ProjectionRenames =
-    opt::unordered_map<ProjectionName, ProjectionName, ProjectionName::Hasher>;
+
+template <typename T>
+using ProjectionNameMap = opt::unordered_map<ProjectionName, T, ProjectionName::Hasher>;
+using ProjectionRenames = ProjectionNameMap<ProjectionName>;
 
 // Map from scanDefName to rid projection name.
 using RIDProjectionsMap = opt::unordered_map<std::string, ProjectionName>;
@@ -90,7 +92,7 @@ public:
     const ProjectionNameVector& getVector() const;
 
 private:
-    opt::unordered_map<ProjectionName, size_t, ProjectionName::Hasher> _map;
+    ProjectionNameMap<size_t> _map;
     ProjectionNameVector _vector;
 };
 

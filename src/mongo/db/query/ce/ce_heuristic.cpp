@@ -34,6 +34,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo::ce {
+namespace {
 namespace cascades = optimizer::cascades;
 namespace properties = optimizer::properties;
 
@@ -157,10 +158,16 @@ SelectivityType intervalSel(const IntervalRequirement& interval, const CEType in
     return sel;
 }
 
+SelectivityType negationSel(SelectivityType sel) {
+    return 1.0 - sel;
+}
+
 SelectivityType operationSel(const Operations op, const CEType inputCard) {
     switch (op) {
         case Operations::Eq:
             return equalitySel(inputCard);
+        case Operations::Neq:
+            return negationSel(equalitySel(inputCard));
         case Operations::EqMember:
             // Reached when the query has $in. We don't handle it yet.
             return kDefaultFilterSel;
@@ -592,6 +599,7 @@ private:
     const Metadata& _metadata;
     const Memo& _memo;
 };
+}  // namespace
 
 CEType HeuristicCE::deriveCE(const Metadata& metadata,
                              const Memo& memo,
@@ -600,5 +608,4 @@ CEType HeuristicCE::deriveCE(const Metadata& metadata,
     CEType card = CEHeuristicTransport::derive(metadata, memo, logicalNodeRef);
     return card;
 }
-
 }  // namespace mongo::ce

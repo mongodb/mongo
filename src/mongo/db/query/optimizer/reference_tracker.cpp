@@ -35,9 +35,7 @@
 namespace mongo::optimizer {
 
 struct CollectedInfo {
-    using VarRefsMap = opt::unordered_map<ProjectionName,
-                                          opt::unordered_map<const Variable*, bool>,
-                                          ProjectionName::Hasher>;
+    using VarRefsMap = ProjectionNameMap<opt::unordered_map<const Variable*, bool>>;
 
     /**
      * All resolved variables so far, regardless of visibility in the ABT.
@@ -54,10 +52,7 @@ struct CollectedInfo {
      * ABT. Maps from projection name to all Variable instances referencing that name. Variables
      * move from 'freeVars' to 'useMap' when they are resolved.
      */
-    opt::unordered_map<ProjectionName,
-                       std::vector<std::reference_wrapper<const Variable>>,
-                       ProjectionName::Hasher>
-        freeVars;
+    ProjectionNameMap<std::vector<std::reference_wrapper<const Variable>>> freeVars;
 
     /**
      * Maps from a node to the definitions (projections) available for use in its ancestor nodes.
@@ -788,5 +783,15 @@ bool VariableEnvironment::isLastRef(const Variable& var) const {
 VariableCollectorResult VariableEnvironment::getVariables(const ABT& n) {
     return VariableCollector::collect(n);
 }
+
+void VariableEnvironment::walkVariables(const ABT& n, std::function<void(const Variable&)> func) {
+    // TODO SERVER-71530 consider passing the lambda into the transport, to avoid building a vector.
+    VariableCollectorResult collected = VariableEnvironment::getVariables(n);
+
+    for (auto&& var : collected._variables) {
+        func(var.get());
+    }
+}
+
 
 }  // namespace mongo::optimizer
