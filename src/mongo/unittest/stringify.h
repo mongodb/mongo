@@ -91,6 +91,11 @@ using HasBeginEndOp =
 template <typename T>
 constexpr bool IsSequence = stdx::is_detected_v<HasBeginEndOp, T>;
 
+template <typename T>
+using IsTupleOp = decltype(std::tuple_size<T>::value);
+template <typename T>
+constexpr bool IsTuple = stdx::is_detected_v<IsTupleOp, T>;
+
 class Joiner {
 public:
     template <typename T>
@@ -117,6 +122,18 @@ std::string doSequence(const T& seq) {
     return format(FMT_STRING("[{}]"), std::string{joiner});
 }
 
+template <typename T, size_t... Is>
+std::string doTuple(const T& tup, std::index_sequence<Is...>) {
+    Joiner joiner;
+    (joiner(std::get<Is>(tup)), ...);
+    return format(FMT_STRING("({})"), std::string{joiner});
+}
+
+template <typename T>
+std::string doTuple(const T& tup) {
+    return doTuple(tup, std::make_index_sequence<std::tuple_size_v<T>>{});
+}
+
 /**
  * The default stringifyForAssert implementation.
  * Encodes the steps by which we determine how to print an object.
@@ -134,6 +151,8 @@ std::string stringifyForAssert(const T& x) {
         return doFormat(static_cast<const void*>(x));
     } else if constexpr (IsSequence<T>) {
         return doSequence(x);
+    } else if constexpr (IsTuple<T>) {
+        return doTuple(x);
     } else if constexpr (std::is_enum_v<T>) {
         return formatTypedObj(typeid(T), doFormat(static_cast<std::underlying_type_t<T>>(x)));
     } else {
