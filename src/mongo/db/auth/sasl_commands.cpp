@@ -184,9 +184,9 @@ SaslReply doSaslStep(OperationContext* opCtx,
     }
 
     if (mechanism.isSuccess()) {
-        UserName userName(mechanism.getPrincipalName(), mechanism.getAuthenticationDatabase());
+        auto request = mechanism.getUserRequest();
         uassertStatusOK(
-            AuthorizationSession::get(opCtx->getClient())->addAndAuthorizeUser(opCtx, userName));
+            AuthorizationSession::get(opCtx->getClient())->addAndAuthorizeUser(opCtx, request));
 
         if (!serverGlobalParams.quiet.load()) {
             auto attrs = makeLogAttributes();

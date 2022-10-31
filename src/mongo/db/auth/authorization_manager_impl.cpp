@@ -68,7 +68,8 @@ namespace mongo {
 namespace {
 
 std::shared_ptr<UserHandle> createSystemUserHandle() {
-    auto user = std::make_shared<UserHandle>(User(UserName("__system", "local")));
+    UserRequest request(UserName("__system", "local"), boost::none);
+    auto user = std::make_shared<UserHandle>(User(std::move(request)));
 
     ActionSet allActions;
     allActions.addAllActions();
@@ -284,29 +285,6 @@ bool appliesToAuthzData(StringData op, const NamespaceString& nss, const BSONObj
     }
 }
 
-/**
- * Returns true if roles for this user were provided by the client, and can be obtained from
- * the connection.
- */
-bool shouldUseRolesFromConnection(OperationContext* opCtx, const UserName& userName) {
-#ifdef MONGO_CONFIG_SSL
-    if (!opCtx || !opCtx->getClient() || !opCtx->getClient()->session()) {
-        return false;
-    }
-
-    if (!allowRolesFromX509Certificates) {
-        return false;
-    }
-
-    auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
-    return sslPeerInfo.subjectName.toString() == userName.getUser() &&
-        userName.getDB() == "$external"_sd && !sslPeerInfo.roles.empty();
-#else
-    return false;
-#endif
-}
-
-
 std::unique_ptr<AuthorizationManager> authorizationManagerCreateImpl(
     ServiceContext* serviceContext) {
     return std::make_unique<AuthorizationManagerImpl>(serviceContext,
@@ -494,28 +472,16 @@ MONGO_FAIL_POINT_DEFINE(authUserCacheSleep);
 }  // namespace
 
 StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* opCtx,
-                                                             const UserName& userName) try {
+                                                             const UserRequest& request) try {
+    const auto& userName = request.name;
+
     auto systemUser = internalSecurity.getUser();
     if (userName == (*systemUser)->getName()) {
+        uassert(ErrorCodes::OperationFailed,
+                "Attempted to acquire system user with predefined roles",
+                request.roles == boost::none);
         return *systemUser;
     }
-
-    UserRequest request(userName, boost::none);
-
-#ifdef MONGO_CONFIG_SSL
-    // Clients connected via TLS may present an X.509 certificate which contains an authorization
-    // grant. If this is the case, the roles must be provided to the external state, for expansion
-    // into privileges.
-    if (shouldUseRolesFromConnection(opCtx, userName)) {
-        auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
-        request.roles = std::set<RoleName>();
-
-        // In order to be hashable, the role names must be converted from unordered_set to a set.
-        std::copy(sslPeerInfo.roles.begin(),
-                  sslPeerInfo.roles.end(),
-                  std::inserter(*request.roles, request.roles->begin()));
-    }
-#endif
 
     if (authUserCacheBypass.shouldFail()) {
         // Bypass cache and force a fresh load of the user.
@@ -559,7 +525,7 @@ StatusWith<UserHandle> AuthorizationManagerImpl::reacquireUser(OperationContext*
 
     // Make a good faith effort to acquire an up-to-date user object, since the one
     // we've cached is marked "out-of-date."
-    auto swUserHandle = acquireUser(opCtx, userName);
+    auto swUserHandle = acquireUser(opCtx, user->getUserRequest());
     if (!swUserHandle.isOK()) {
         return swUserHandle.getStatus();
     }
@@ -645,6 +611,18 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
             }
         }
 
+        // Find UserRequests for UserNames we need to pin if they exist in the cache.
+        std::map<UserName, UserRequest> pinNow;
+        _userCache.peekLatestCachedIf([&](const UserRequest& request, const User& user) {
+            if (std::any_of(usersToPin.begin(), usersToPin.end(), [&](const auto& userName) {
+                    return user.getName() == userName;
+                })) {
+                pinNow.emplace(request.name, request);
+            }
+            // Don't need any output vector.
+            return false;
+        });
+
         for (const auto& userName : usersToPin) {
             if (std::any_of(pinnedUsers.begin(), pinnedUsers.end(), [&](const auto& user) {
                     return user->getName() == userName;
@@ -652,7 +630,14 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
                 continue;
             }
 
-            auto swUser = acquireUser(opCtx.get(), userName);
+            auto request = ([&] {
+                if (auto it = pinNow.find(userName); it != pinNow.end()) {
+                    return it->second;
+                }
+                return UserRequest(userName, boost::none);
+            })();
+
+            auto swUser = acquireUser(opCtx.get(), request);
 
             if (swUser.isOK()) {
                 LOGV2_DEBUG(20232, 2, "Pinned user", "user"_attr = userName);

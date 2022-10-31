@@ -111,7 +111,7 @@ public:
                                            << "db"
                                            << "test"))),
             BSONObj()));
-        ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), un));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), {un, boost::none}));
         return authzSession->lookupUser(un);
     }
 
@@ -126,7 +126,7 @@ public:
                                            << "db"
                                            << "admin"))),
             BSONObj()));
-        ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), un));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), {un, boost::none}));
         return authzSession->lookupUser(un);
     }
 };

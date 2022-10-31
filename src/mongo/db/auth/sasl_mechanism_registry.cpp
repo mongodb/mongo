@@ -103,7 +103,7 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
     AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
 
     UserHandle user;
-    const auto swUser = authManager->acquireUser(opCtx, userName);
+    const auto swUser = authManager->acquireUser(opCtx, UserRequest(userName, boost::none));
     if (!swUser.isOK()) {
         auto& status = swUser.getStatus();
         if (status.code() == ErrorCodes::UserNotFound) {

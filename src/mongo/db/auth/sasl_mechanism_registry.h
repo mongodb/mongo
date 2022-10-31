@@ -206,6 +206,10 @@ public:
         return Status::OK();
     }
 
+    virtual UserRequest getUserRequest() const {
+        return UserRequest(UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none);
+    }
+
 protected:
     /**
      * Mechanism provided step implementation.

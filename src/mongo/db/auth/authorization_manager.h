@@ -305,14 +305,14 @@ public:
                                             std::vector<BSONObj>* result) = 0;
 
     /**
-     * Returns a Status or UserHandle for the given userName. If the user cache already has a
+     * Returns a Status or UserHandle for the given userRequest. If the user cache already has a
      * user object for this user, it returns a handle from the cache, otherwise it reads the
-     * user document from disk or LDAP - this may block for a long time.
+     * user document from the AuthzManagerExternalState - this may block for a long time.
      *
      * The returned user may be invalid by the time the caller gets access to it.
      */
     virtual StatusWith<UserHandle> acquireUser(OperationContext* opCtx,
-                                               const UserName& userName) = 0;
+                                               const UserRequest& userRequest) = 0;
 
     /**
      * Validate the ID associated with a known user while refreshing session cache.

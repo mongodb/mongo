@@ -60,7 +60,8 @@ public:
         NetworkInterfaceIntegrationFixture::setUp();
 
         // Setup an internal user so that we can use it for external auth
-        auto user = std::make_shared<UserHandle>(User(UserName("__system", "local")));
+        UserRequest systemLocal(UserName("__system"_sd, "local"_sd), boost::none);
+        auto user = std::make_shared<UserHandle>(User(systemLocal));
 
         internalSecurity.setUser(user);
 

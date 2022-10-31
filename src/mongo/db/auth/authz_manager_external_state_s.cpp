@@ -118,7 +118,7 @@ StatusWith<User> AuthzManagerExternalStateMongos::getUserObject(OperationContext
         return status;
     }
 
-    User user(userReq.name);
+    User user(userReq);
     V2UserDocumentParser dp;
     dp.setTenantId(getActiveTenant(opCtx));
     status = dp.initializeUserFromUserDocument(userDoc, &user);
