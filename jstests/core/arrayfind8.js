@@ -5,8 +5,9 @@
 (function() {
 "use strict";
 
-const coll = db.jstests_arrayfind8;
-coll.drop();
+const collNamePrefix = 'jstests_arrayfind8_';
+let collCount = 0;
+let coll;
 
 // May be changed during the test.
 let currentIndexSpec = {a: 1};
@@ -55,6 +56,8 @@ function checkMatch(bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatch
  * @param additionalConstraints - additional query parameters not generated from @param subQuery
  */
 function checkQuery(subQuery, bothMatch, elemMatch, nonElemMatch, additionalConstraints) {
+    const collNameSuffix = collCount++;
+    coll = db.getCollection(collNamePrefix + 'noindex_' + collNameSuffix);
     coll.drop();
     additionalConstraints = additionalConstraints || {};
 
@@ -86,7 +89,8 @@ function checkQuery(subQuery, bothMatch, elemMatch, nonElemMatch, additionalCons
 
     // Check matching and index bounds for a single key index.
 
-    assert.eq(coll.drop(), true);
+    coll = db.getCollection(collNamePrefix + 'index_' + collNameSuffix);
+    coll.drop();
     insertValueIfNotNull(bothMatch);
     insertValueIfNotNull(elemMatch);
     // The nonElemMatch document is not tested here, as it will often make the index multikey.
