@@ -2105,7 +2105,20 @@ DbResponse makeCommandResponse(std::shared_ptr<HandleRequest::ExecutionContext> 
         }
     }
 
-    dbResponse.response = replyBuilder->done();
+    try {
+        dbResponse.response = replyBuilder->done();
+    } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>& ex) {
+        // Create a new reply builder as subsequently calling any methods on a builder after
+        // 'done()' results in undefined behavior.
+        auto errorReplyBuilder = execContext->getReplyBuilder();
+        BSONObjBuilder metadataBob;
+        BSONObjBuilder extraFieldsBuilder;
+        appendClusterAndOperationTime(
+            opCtx, &extraFieldsBuilder, &metadataBob, LogicalTime::kUninitialized);
+        generateErrorResponse(
+            opCtx, errorReplyBuilder, ex.toStatus(), metadataBob.obj(), extraFieldsBuilder.obj());
+        dbResponse.response = errorReplyBuilder->done();
+    }
     CurOp::get(opCtx)->debug().responseLength = dbResponse.response.header().dataLen();
 
     return dbResponse;
