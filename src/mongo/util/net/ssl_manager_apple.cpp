@@ -1675,11 +1675,12 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
     // The cipher will be presented as a number.
     ::SSLCipherSuite cipher;
     uassertOSStatusOK(::SSLGetNegotiatedCipher(ssl, &cipher));
-
-    LOGV2_INFO(6723803,
-               "Accepted TLS connection from peer",
-               "peerSubjectName"_attr = peerSubjectName,
-               "cipher"_attr = cipher);
+    if (!serverGlobalParams.quiet.load()) {
+        LOGV2_INFO(6723803,
+                   "Accepted TLS connection from peer",
+                   "peerSubjectName"_attr = peerSubjectName,
+                   "cipher"_attr = cipher);
+    }
 
     // Server side.
     if (remoteHost.empty()) {
