@@ -9,14 +9,11 @@ selector:
   - jstests/core/nan.js
   # TODO SERVER-67506
   - jstests/core/arrayfind5.js
-  # TODO SERVER-23229 on classic which is fixed by SERVER-67548 in CQF.
+  # TODO SERVER-67550
   - jstests/aggregation/bugs/groupMissing.js
   - jstests/core/null_query_semantics.js
   # TODO SERVER-70142 Populate planSummary field which is shown in output of $currentOp.
   - jstests/core/currentop_cursors.js
-  # TODO SERVER-67517
-  - jstests/core/field_name_empty.js
-  - jstests/core/field_name_validation.js
   # TODO SERVER-67639
   - jstests/core/index_stats.js
   # TODO SERVER-67640

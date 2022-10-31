@@ -496,7 +496,7 @@ private:
     void addValue(sbe::value::TypeTags tag, sbe::value::Value val, const bool append = false) {
         if (!_initialized) {
             _initialized = true;
-            _canAppend = !_nextFieldName.empty();
+            _canAppend = _nextFieldName.has_value();
             if (_canAppend) {
                 std::tie(_tag, _val) = sbe::value::makeNewObject();
             } else {
@@ -512,7 +512,7 @@ private:
         }
 
         if (append) {
-            uassert(6624073, "Field name is not empty", _nextFieldName.empty());
+            uassert(6624073, "Field name is not set", !_nextFieldName.has_value());
             uassert(6624349,
                     "Other printer does not contain Object",
                     tag == sbe::value::TypeTags::Object);
@@ -523,19 +523,19 @@ private:
                 addField(obj->field(i), fieldTag, fieldVal);
             }
         } else {
-            addField(_nextFieldName, tag, val);
-            _nextFieldName.clear();
+            tassert(6751700, "Missing field name to serialize", _nextFieldName);
+            addField(*_nextFieldName, tag, val);
+            _nextFieldName = boost::none;
         }
     }
 
     void addField(const std::string& fieldName, sbe::value::TypeTags tag, sbe::value::Value val) {
-        uassert(6624074, "Field name is empty", !fieldName.empty());
         uassert(6624075, "Duplicate field name", _fieldNameSet.insert(fieldName).second);
         sbe::value::getObjectView(_val)->push_back(fieldName, tag, val);
     }
 
     void reset() {
-        _nextFieldName.clear();
+        _nextFieldName = boost::none;
         _initialized = false;
         _canAppend = false;
         _tag = sbe::value::TypeTags::Nothing;
@@ -543,7 +543,8 @@ private:
         _fieldNameSet.clear();
     }
 
-    std::string _nextFieldName;
+    // Cannot assume empty means non-existent, so use optional<>.
+    boost::optional<std::string> _nextFieldName;
     bool _initialized;
     bool _canAppend;
     sbe::value::TypeTags _tag;
@@ -2263,7 +2264,7 @@ public:
         ExplainPrinter printer("PathGet");
         printer.separator(" [")
             .fieldName("path", ExplainVersion::V3)
-            .print(path.name())
+            .print(path.name().empty() ? "<empty>" : path.name())
             .separator("]")
             .setChildCount(1)
             .fieldName("input", ExplainVersion::V3)

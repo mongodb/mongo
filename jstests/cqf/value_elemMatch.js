@@ -1,11 +1,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
-if (!checkCascadesOptimizerEnabled(db)) {
-    jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
-}
+load("jstests/libs/optimizer_utils.js");  // For assertValueOnPlanPath.
 
 const t = db.cqf_value_elemMatch;
 t.drop();
@@ -26,7 +22,6 @@ for (let i = 0; i < nDocs; i++) {
 }
 
 assert.commandWorked(t.createIndex({a: 1}));
-
 {
     // Value elemMatch. Demonstrate we can use an index.
     const res =
