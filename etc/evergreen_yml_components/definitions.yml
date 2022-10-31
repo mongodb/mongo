@@ -317,7 +317,6 @@ variables:
   - enterprise-windows
   - enterprise-windows-debug-unoptimized
   - enterprise-windows-inmem
-  - enterprise-windows-required
   - enterprise-windows-wtdevelop
   - ubuntu1804-debug-asan
   - ubuntu1804-debug-ubsan
@@ -331,7 +330,7 @@ variables:
   - enterprise-macos
   - enterprise-macos-arm64
   - enterprise-rhel-80-64-bit
-  - enterprise-rhel-80-64-bit-dynamic-required
+  - enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-82-arm64
   - enterprise-rhel-90-64-bit
@@ -341,7 +340,6 @@ variables:
   - enterprise-ubuntu2004-64
   - enterprise-ubuntu2204-64
   - enterprise-windows
-  - enterprise-windows-required
 
 # List of all variants that use the packages.tgz
 - package_variants: &package_variants
@@ -446,6 +444,14 @@ functions:
   - *f_expansions_write
   - *git_get_project
   - *add_git_tag
+
+  "gen feature flags": &gen_feature_flags
+    command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/gen_feature_flags.sh"
 
   "fetch artifacts": &fetch_artifacts
     command: s3.get
@@ -2361,12 +2367,7 @@ tasks:
       display_name: Binaries
 
   - *f_expansions_write
-  - command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/gen_feature_flags.sh"
+  - *gen_feature_flags
 
   - *f_expansions_write
   - command: subprocess.exec
@@ -6775,6 +6776,7 @@ tasks:
   - func: "set up remote credentials"
   - *f_expansions_write
   - func: "configure evergreen api credentials"
+  - *gen_feature_flags
   - func: "run tests"
     vars:
       resmoke_jobs_max: 1

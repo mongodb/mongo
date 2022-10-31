@@ -906,10 +906,10 @@ buildvariants:
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
-- &enterprise-windows-required-template
+- &enterprise-windows-template
   <<: *windows_compile_variant_dependency
-  name: &enterprise-windows-required enterprise-windows-required
-  display_name: "! Enterprise Windows"
+  name: &enterprise-windows enterprise-windows
+  display_name: "* Enterprise Windows"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
@@ -917,7 +917,7 @@ buildvariants:
   - windows-vsCurrent-small
   expansions: &windows_required_expansions
     compile_variant: *windows_compile_variant_name
-    burn_in_tests_build_variant: enterprise-windows-required
+    burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
     exe: ".exe"
     content_type: application/zip
     python: '/cygdrive/c/python/python37/python.exe'
@@ -938,7 +938,6 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: audit
   - name: auth_audit_gen
-  - name: buildscripts_test
   - name: causally_consistent_jscore_txns_passthrough
     distros:
     - windows-vsCurrent-large
@@ -967,16 +966,14 @@ buildvariants:
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
-  - name: sharding_opportunistic_secondary_targeting_gen
-  - name: unittest_shell_hang_analyzer_gen
 
-- <<: *enterprise-windows-required-template
+- <<: *enterprise-windows-template
   name: &enterprise-windows-all-feature-flags-required enterprise-windows-all-feature-flags-required
   display_name: "! Enterprise Windows (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   expansions:
     <<: *windows_required_expansions
-    burn_in_tests_build_variant: enterprise-windows-required
+    burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
     exe: ".exe"
     content_type: application/zip
     python: '/cygdrive/c/python/python37/python.exe'
@@ -1004,6 +1001,7 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: audit
   - name: auth_audit_gen
+  - name: buildscripts_test
   - name: causally_consistent_jscore_txns_passthrough
     distros:
     - windows-vsCurrent-large
@@ -1031,6 +1029,8 @@ buildvariants:
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
+  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: unittest_shell_hang_analyzer_gen
 
 - name: &enterprise-windows-cxx20-debug-experimental enterprise-windows-cxx20-debug-experimental
   display_name: "~ Enterprise Windows C++20 DEBUG"
@@ -1350,16 +1350,16 @@ buildvariants:
 #          Redhat buildvariants           #
 ###########################################
 
-- &enterprise-rhel-80-64-bit-dynamic-required-template
+- &enterprise-rhel-80-64-bit-dynamic-template
   <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel-80-64-bit-dynamic-required enterprise-rhel-80-64-bit-dynamic-required
-  display_name: "! Shared Library Enterprise RHEL 8.0"
+  name: &enterprise-rhel-80-64-bit-dynamic enterprise-rhel-80-64-bit-dynamic
+  display_name: "* Shared Library Enterprise RHEL 8.0"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-dynamic-required-expansions
+  expansions: &enterprise-rhel-80-64-bit-dynamic-expansions
     <<: *linux_x86_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -1384,18 +1384,11 @@ buildvariants:
   - name: version_burn_in_gen
     variant: generate-tasks-for-version
   tasks:
-  - name: lint_fuzzer_sanity_patch
-  - name: test_api_version_compatibility
   - name: burn_in_tests_gen
-  - name: check_feature_flag_tags
-  - name: check_for_todos
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: audit
   - name: .auth
-  - name: burn_in_tags_gen
-  - name: buildscripts_test
-  - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
@@ -1405,17 +1398,6 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - rhel80-medium
-  - name: config_fuzzer_concurrency
-  - name: config_fuzzer_simulate_crash_concurrency_replication
-    distros:
-    - rhel80-large
-  - name: config_fuzzer_concurrency_replication
-    distros:
-    - rhel80-large
-  - name: config_fuzzer_jsCore
-  - name: config_fuzzer_replica_sets_jscore_passthrough
-    distros:
-    - rhel80-large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: idl_tests
@@ -1429,7 +1411,6 @@ buildvariants:
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: .multiversion_sanity_check
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
@@ -1466,20 +1447,19 @@ buildvariants:
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common
-  - name: sharding_opportunistic_secondary_targeting_gen
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .serverless
     distros:
     - rhel80-xlarge
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
+- <<: *enterprise-rhel-80-64-bit-dynamic-template
   name: &enterprise-rhel-80-64-bit-dynamic-debug-mode enterprise-rhel-80-64-bit-dynamic-debug-mode
   display_name: "Shared Library Enterprise RHEL 8.0 Debug Mode"
   cron: "0 4 * * 0" # Run once a week on sunday at 4am
   stepback: false
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
+    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
     compile_variant: *enterprise-rhel-80-64-bit-dynamic-debug-mode
     compile_flags: >-
       --ssl
@@ -1597,7 +1577,7 @@ buildvariants:
   - rhel80-small
   stepback: false
   expansions: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
-    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
+    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
@@ -1610,12 +1590,19 @@ buildvariants:
   - name: cqf_parallel
   - name: query_golden_classic
   - name: query_golden_cqf
+  - name: lint_fuzzer_sanity_patch
+  - name: test_api_version_compatibility
   - name: burn_in_tests_gen
+  - name: check_feature_flag_tags
+  - name: check_for_todos
   - name: .aggfuzzer
   - name: .aggregation
   - name: aggregation_repeat_queries
   - name: audit
   - name: .auth
+  - name: burn_in_tags_gen
+  - name: buildscripts_test
+  - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
@@ -1630,6 +1617,17 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - rhel80-medium
+  - name: config_fuzzer_concurrency
+  - name: config_fuzzer_simulate_crash_concurrency_replication
+    distros:
+    - rhel80-large
+  - name: config_fuzzer_concurrency_replication
+    distros:
+    - rhel80-large
+  - name: config_fuzzer_jsCore
+  - name: config_fuzzer_replica_sets_jscore_passthrough
+    distros:
+    - rhel80-large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: feature_flag_multiversion_gen
@@ -1643,6 +1641,7 @@ buildvariants:
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
+  - name: .multiversion_sanity_check
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
@@ -1682,6 +1681,7 @@ buildvariants:
   - name: .sharding .common
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .serverless
+  - name: sharding_opportunistic_secondary_targeting_gen
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
@@ -1698,7 +1698,7 @@ buildvariants:
   - rhel80-small
   stepback: false
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
+    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
@@ -2580,10 +2580,10 @@ buildvariants:
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
-- &rhel80-debug-aubsan-lite-required-template
+- &rhel80-debug-aubsan-lite-template
   <<: *linux_debug_aubsan_compile_variant_dependency
-  name: &rhel80-debug-aubsan-lite-required rhel80-debug-aubsan-lite-required
-  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
+  name: &rhel80-debug-aubsan-lite rhel80-debug-aubsan-lite
+  display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
@@ -2609,7 +2609,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_txns
 
-- <<: *rhel80-debug-aubsan-lite-required-template
+- <<: *rhel80-debug-aubsan-lite-template
   name: &rhel80-debug-aubsan-lite-all-feature-flags-required rhel80-debug-aubsan-lite-all-feature-flags-required
   display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
@@ -3207,7 +3207,7 @@ buildvariants:
   tasks:
   - name: win_shared_scons_cache_pruning
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
+- <<: *enterprise-rhel-80-64-bit-dynamic-template
   name: &commit-queue commit-queue
   display_name: "~ Commit Queue"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -3277,7 +3277,7 @@ buildvariants:
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (Classic Engine)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
+    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
     jstestfuzz_num_generated_files: 20
     jstestfuzz_concurrent_num_files: 5
     target_resmoke_time: 30

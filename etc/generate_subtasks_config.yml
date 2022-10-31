@@ -44,7 +44,7 @@ build_variant_large_distro_exceptions:
   - rhel80-debug-asan
   - rhel80-debug-asan-all-feature-flags
   - rhel80-debug-asan-classic-engine
-  - rhel80-debug-aubsan-lite-required
+  - rhel80-debug-aubsan-lite
   - rhel80-debug-suggested
   - rhel80-debug-ubsan
   - rhel80-debug-ubsan-all-feature-flags

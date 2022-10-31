@@ -11,7 +11,7 @@ patch_aliases:
     variant_tags: []
     task_tags: []
   - alias: "hourly"
-    variant: "^(enterprise-rhel-62-64-bit-dynamic-required|enterprise-windows-required|linux-64-debug|ubuntu1804-debug-aubsan-lite|enterprise-rhel-70-64-bit|enterprise-windows|ubuntu1604-debug|macos-debug|windows-debug )$"
+    variant: "^(enterprise-windows-all-feature-flags-required|linux-64-debug|ubuntu1804-debug-aubsan-lite|enterprise-rhel-70-64-bit|ubuntu1604-debug|macos-debug|windows-debug )$"
     task: ".*"
     variant_tags: []
     task_tags: []
@@ -21,7 +21,7 @@ patch_aliases:
     variant_tags: []
     task_tags: []
   - alias: "required"
-    variant: "^(.*-required$|enterprise-rhel-62-64-bit-dynamic-required|enterprise-windows-required|linux-64-debug|ubuntu1804-debug-aubsan-lite)$"
+    variant: "^(.*-required$|linux-64-debug|ubuntu1804-debug-aubsan-lite)$"
     task: ".*"
     variant_tags: []
     task_tags: []
