@@ -85,6 +85,7 @@ typedef struct {
     bool preserve;             /* Don't remove files on exit */
     bool tiered_storage;       /* Configure tiered storage */
     bool verbose;              /* Run in verbose mode */
+    bool tiered_begun;         /* Tiered storage ready */
     uint64_t nrecords;         /* Number of records */
     uint64_t nops;             /* Number of operations */
     uint64_t nthreads;         /* Number of threads */
@@ -92,13 +93,16 @@ typedef struct {
     uint64_t n_read_threads;   /* Number of read threads */
     uint64_t n_write_threads;  /* Number of write threads */
 
+    uint64_t tiered_flush_interval_us; /* Microseconds between flush_tier calls */
+    uint64_t tiered_flush_next_us;     /* Next tiered flush in epoch microseconds */
+
     /*
      * Fields commonly shared within a test program. The test cleanup function will attempt to
      * automatically free and close non-null resources.
      */
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    bool running;
+    volatile bool running; /* Whether to stop */
     char *uri;
     volatile uint64_t next_threadid;
     uint64_t unique_id;
@@ -386,6 +390,8 @@ void testutil_copy_data(const char *);
 void testutil_copy_file(WT_SESSION *, const char *);
 void testutil_copy_if_exists(WT_SESSION *, const char *);
 void testutil_create_backup_directory(const char *);
+int testutil_general_event_handler(
+  WT_EVENT_HANDLER *, WT_CONNECTION *, WT_SESSION *, WT_EVENT_TYPE, void *);
 void testutil_make_work_dir(const char *);
 void testutil_modify_apply(WT_ITEM *, WT_ITEM *, WT_MODIFY *, int, uint8_t);
 void testutil_parse_begin_opt(int, char *const *, const char *, TEST_OPTS *);
@@ -397,6 +403,10 @@ void testutil_progress(TEST_OPTS *, const char *);
 #ifndef _WIN32
 void testutil_sleep_wait(uint32_t, pid_t);
 #endif
+void testutil_tiered_begin(TEST_OPTS *);
+void testutil_tiered_flush_complete(TEST_OPTS *, WT_SESSION *, void *);
+void testutil_tiered_sleep(TEST_OPTS *, WT_SESSION *, uint32_t, bool *);
+uint64_t testutil_time_us(WT_SESSION *);
 void testutil_wiredtiger_open(
   TEST_OPTS *, const char *, WT_EVENT_HANDLER *, WT_CONNECTION **, bool);
 void testutil_work_dir_from_path(char *, size_t, const char *);

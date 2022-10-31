@@ -80,7 +80,11 @@ main(int argc, char *argv[])
     while ((ch = __wt_getopt(progname, argc, argv, "BC:c:Dh:k:l:mn:pr:s:T:t:vW:xX")) != EOF)
         switch (ch) {
         case 'B':
-            g.tiered = true;
+            /*
+             * WT-FIXME-9961: The parsing of this and other common options should be done within
+             * test utility code.
+             */
+            g.opts.tiered_storage = true;
             break;
         case 'c':
             g.checkpoint_name = __wt_optarg;
@@ -209,7 +213,7 @@ main(int argc, char *argv[])
             if (ttype == MIX) {
                 g.cookies[i].type = (table_type)((i % MAX_TABLE_TYPE) + 1);
                 /* LSM is not supported with tiered storage. Just use ROW. */
-                if (g.tiered && g.cookies[i].type == LSM)
+                if (g.opts.tiered_storage && g.cookies[i].type == LSM)
                     g.cookies[i].type = ROW;
             } else
                 g.cookies[i].type = ttype;
@@ -217,7 +221,7 @@ main(int argc, char *argv[])
               g.cookies[i].uri, sizeof(g.cookies[i].uri), "%s%04d", URI_BASE, g.cookies[i].id));
         }
 
-        g.running = 1;
+        g.opts.running = true;
 
         if ((ret = wt_connect(config_open)) != 0) {
             (void)log_print_err("Connection failed", ret, 1);
@@ -238,7 +242,7 @@ main(int argc, char *argv[])
 
         start_threads();
         ret = start_workers();
-        g.running = 0;
+        g.opts.running = false;
         end_threads();
         if (ret != 0) {
             (void)log_print_err("Start workers failed", ret, 1);
@@ -252,6 +256,7 @@ run_complete:
             (void)log_print_err("Shutdown failed", ret, 1);
             break;
         }
+        g.opts.conn = NULL;
     }
     if (g.logfp != NULL)
         (void)fclose(g.logfp);
@@ -323,7 +328,7 @@ wt_connect(const char *config_open)
     /*
      * If we are using tiered add in the extension and tiered storage configuration.
      */
-    if (g.tiered) {
+    if (g.opts.tiered_storage) {
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/bucket", g.home));
         testutil_make_work_dir(buf);
         strcat(config, TIER_CFG);
@@ -333,6 +338,16 @@ wt_connect(const char *config_open)
     fflush(stdout);
     if ((ret = wiredtiger_open(g.home, &event_handler, config, &g.conn)) != 0)
         return (log_print_err("wiredtiger_open", ret, 1));
+
+    if (g.opts.tiered_storage) {
+        /* testutil_tiered_begin needs the connection. */
+        g.opts.conn = g.conn;
+
+        /* Set up a random delay for the first flush. */
+        set_flush_tier_delay(&rnd);
+        testutil_tiered_begin(&g.opts);
+    }
+
     return (0);
 }
 
@@ -364,7 +379,7 @@ wt_shutdown(void)
 static void
 cleanup(bool remove_dir)
 {
-    g.running = 0;
+    g.opts.running = false;
     g.ntables_created = 0;
 
     if (remove_dir)
@@ -432,7 +447,7 @@ int
 log_print_err_worker(const char *func, int line, const char *m, int e, int fatal)
 {
     if (fatal) {
-        g.running = 0;
+        g.opts.running = false;
         g.status = e;
     }
     fprintf(stderr, "%s: %s,%d: %s: %s\n", progname, func, line, m, wiredtiger_strerror(e));

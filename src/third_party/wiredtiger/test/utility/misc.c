@@ -410,6 +410,19 @@ testutil_sleep_wait(uint32_t seconds, pid_t pid)
 #endif
 
 /*
+ * testutil_time_us --
+ *     Return the number of microseconds since the epoch.
+ */
+uint64_t
+testutil_time_us(WT_SESSION *session)
+{
+    struct timespec ts;
+
+    __wt_epoch((WT_SESSION_IMPL *)session, &ts);
+    return ((uint64_t)ts.tv_sec * WT_MILLION + (uint64_t)ts.tv_nsec / WT_THOUSAND);
+}
+
+/*
  * dcalloc --
  *     Call calloc, dying on failure.
  */
