@@ -61,6 +61,11 @@ struct ClusterPipelineCommandD {
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
     }
 
+    static void checkCanExplainHere(OperationContext* opCtx) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "Cannot explain a cluster aggregate command on a mongod");
+    }
+
     static AggregateCommandRequest parseAggregationRequest(
         OperationContext* opCtx,
         const OpMsgRequest& opMsgRequest,

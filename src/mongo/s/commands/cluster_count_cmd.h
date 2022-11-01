@@ -209,7 +209,7 @@ public:
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
-        Impl::checkCanRunHere(opCtx);
+        Impl::checkCanExplainHere(opCtx);
 
         const BSONObj& cmdObj = request.body;
 

@@ -52,6 +52,10 @@ struct ClusterFindCmdS {
     static void checkCanRunHere(OperationContext* opCtx) {
         // Can always run on a mongos.
     }
+
+    static void checkCanExplainHere(OperationContext* opCtx) {
+        // Can always run on a mongos.
+    }
 };
 ClusterFindCmdBase<ClusterFindCmdS> clusterFindCmdS;
 
