@@ -48,3 +48,35 @@ structs:
     inline_chained_structs: true
     chained_structs:
       QueryAnalyzerConfiguration: configuration
+
+  SampledReadCommand:
+    description: "The command object for a sampled read query."
+    strict: false
+    fields:
+      filter:
+        type: object
+        description: "The filter for the read."
+      collation:
+        type: object
+        description: "The collation for the read."
+
+  SampledReadQueryDocument:
+    description: "Represents a document storing a sampled read query."
+    strict: false
+    fields:
+      _id:
+        type: uuid
+        description: "The unique sample id for the read."
+        cpp_name: sampleId
+      ns:
+        type: namespacestring
+        description: "The namespace of the collection for the read."
+      collectionUuid:
+        type: uuid
+        description: "The UUID of the collection for the read."
+      cmdName:
+        type: SampledReadCommandName
+        description: "The command name for the read."
+      cmd:
+        type: object
+        description: "The command object for the read."

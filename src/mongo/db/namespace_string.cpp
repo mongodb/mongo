@@ -195,6 +195,9 @@ const NamespaceString NamespaceString::kGlobalIndexClonerNamespace(
 const NamespaceString NamespaceString::kConfigQueryAnalyzersNamespace(NamespaceString::kConfigDb,
                                                                       "queryAnalyzers");
 
+const NamespaceString NamespaceString::kConfigSampledQueriesNamespace(NamespaceString::kConfigDb,
+                                                                      "sampledQueries");
+
 NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
     if (!gMultitenancySupport) {
         return NamespaceString(boost::none, ns);

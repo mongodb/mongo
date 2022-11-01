@@ -142,6 +142,7 @@
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/query_analysis_op_observer.h"
+#include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/s/rename_collection_participant_service.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
@@ -856,6 +857,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     auto catalog = std::make_unique<StatsCatalog>(serviceContext, std::move(cacheLoader));
     StatsCatalog::set(serviceContext, std::move(catalog));
 
+    if (analyze_shard_key::supportsPersistingSampledQueriesIgnoreFCV()) {
+        analyze_shard_key::QueryAnalysisWriter::get(serviceContext).onStartup();
+    }
+
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
     startupOpCtx.reset();
@@ -1312,6 +1317,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     if (auto lsc = LogicalSessionCache::get(serviceContext)) {
         LOGV2(4784903, "Shutting down the LogicalSessionCache");
         lsc->joinOnShutDown();
+    }
+
+    if (analyze_shard_key::supportsPersistingSampledQueriesIgnoreFCV()) {
+        LOGV2(7047303, "Shutting down the QueryAnalysisWriter");
+        analyze_shard_key::QueryAnalysisWriter::get(serviceContext).onShutdown();
     }
 
     // Shutdown the TransportLayer so that new connections aren't accepted

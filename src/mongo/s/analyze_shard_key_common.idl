@@ -40,6 +40,15 @@ enums:
       kFull: "full"
       kOff: "off"
 
+  SampledReadCommandName:
+    description: "The command name of a sampled read query."
+    type: string
+    values:
+      kFind: "find"
+      kAggregate: "aggregate"
+      kCount: "count"
+      kDistinct: "distinct"
+
 structs:
   QueryAnalyzerConfiguration:
     description: "The query analyzer configuration for a collection as configured via the

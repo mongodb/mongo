@@ -85,3 +85,45 @@ server_parameters:
         default: 2
         validator:
             gte: 1
+    queryAnalysisWriterIntervalSecs:
+        description: The interval in seconds at which sampled queries are written to disk.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gQueryAnalysisWriterIntervalSecs
+        default: 90
+        validator:
+            gt: 0
+    queryAnalysisWriterMaxMemoryUsageBytes:
+        description: The maximum amount of memory in bytes that the writer is allowed to use for
+                     buffering sampled queries and diffs combined.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gQueryAnalysisWriterMaxMemoryUsageBytes
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+    queryAnalysisWriterMaxBatchSize:
+        description: The maximum number of sampled queries to write to disk at once.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gQueryAnalysisWriterMaxBatchSize
+        default: 100000
+        validator:
+            gt: 0
+    queryAnalysisWriterMinThreadPoolSize:
+        description: The minimum number of threads in the writer's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gQueryAnalysisWriterMinThreadPoolSize
+        default: 0
+        validator:
+            gte: 0
+    queryAnalysisWriterMaxThreadPoolSize:
+        description: The maximum number of threads in the writer's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gQueryAnalysisWriterMaxThreadPoolSize
+        default: 8
+        validator:
+            gte: 1

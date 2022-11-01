@@ -273,6 +273,9 @@ public:
     // Namespace used for storing query analyzer settings.
     static const NamespaceString kConfigQueryAnalyzersNamespace;
 
+    // Namespace used for storing sampled queries.
+    static const NamespaceString kConfigSampledQueriesNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */
