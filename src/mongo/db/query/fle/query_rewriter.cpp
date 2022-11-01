@@ -40,12 +40,15 @@ public:
         : queryRewriter(queryRewriter), exprRewrites(exprRewrites){};
 
     std::unique_ptr<Expression> postVisit(Expression* exp) {
-        if (auto rewrite = exprRewrites.find(typeid(*exp)); rewrite != exprRewrites.end()) {
-            auto expr = rewrite->second(queryRewriter, exp);
-            if (expr != nullptr) {
-                didRewrite = true;
+        if (auto rewriteEntry = exprRewrites.find(typeid(*exp));
+            rewriteEntry != exprRewrites.end()) {
+            for (auto& rewrite : rewriteEntry->second) {
+                auto expr = rewrite(queryRewriter, exp);
+                if (expr != nullptr) {
+                    didRewrite = true;
+                    return expr;
+                }
             }
-            return expr;
         }
         return nullptr;
     }
@@ -109,13 +112,17 @@ std::unique_ptr<MatchExpression> QueryRewriter::_rewrite(MatchExpression* expr) 
             return nullptr;
         }
         default: {
-            if (auto rewrite = _matchRewrites.find(expr->matchType());
-                rewrite != _matchRewrites.end()) {
-                auto rewritten = rewrite->second(this, expr);
-                if (rewritten != nullptr) {
-                    _rewroteLastExpression = true;
+            if (auto rewriteEntry = _matchRewrites.find(expr->matchType());
+                rewriteEntry != _matchRewrites.end()) {
+                for (auto& rewrite : rewriteEntry->second) {
+                    auto rewritten = rewrite(this, expr);
+                    // Only one rewrite can be applied to an expression, so return as soon as a
+                    // rewrite returns something other than nullptr.
+                    if (rewritten != nullptr) {
+                        _rewroteLastExpression = true;
+                        return rewritten;
+                    }
                 }
-                return rewritten;
             }
             return nullptr;
         }
