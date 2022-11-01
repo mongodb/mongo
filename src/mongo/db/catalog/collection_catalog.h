@@ -736,15 +736,6 @@ private:
                                  const NamespaceString& to,
                                  boost::optional<Timestamp> ts);
 
-    // TODO SERVER-70150: Make private again
-public:
-    // Inserts a catalogId for namespace at given Timestamp. Used after scanning the durable catalog
-    // for a correct mapping at the given timestamp.
-    void _insertCatalogIdForNSSAfterScan(const NamespaceString& nss,
-                                         boost::optional<RecordId> catalogId,
-                                         Timestamp ts);
-
-private:
     // Helper to calculate if a namespace needs to be marked for cleanup for a set of timestamped
     // catalogIds
     void _markNamespaceForCatalogIdCleanupIfNeeded(const NamespaceString& nss,
