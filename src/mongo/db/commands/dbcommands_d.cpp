@@ -248,6 +248,10 @@ public:
         return Status::OK();
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
              const BSONObj& jsobj,

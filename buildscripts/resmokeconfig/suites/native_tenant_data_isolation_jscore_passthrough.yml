@@ -10,6 +10,15 @@ selector:
   - jstests/core/timeseries/timeseries_internal_bucket_geo_within.js
   - jstests/core/timeseries/bucket_granularity.js
   - jstests/core/timeseries/timeseries_graph_lookup.js
+  - jstests/core/hello_response_validation.js  # Test cmd: hello, ismaster
+  - jstests/core/currentop_cursors.js          # Test cmd: currentOp
+  - jstests/core/tcp_fastopen.js               # Test cmd: serverStatus
+  - jstests/core/views/views_coll_stats.js     # Test cmd: collStats
+  - jstests/core/list_commands.js              # Test cmd: listCommands
+  - jstests/core/dbstats.js                    # Test cmd: dbStats, serverStatus
+  - jstests/core/filemd5.js                    # Test cmd: filemd5
+  - jstests/core/txns/many_txns.js             # Test cmd: getParameter
+  - jstests/core/txns/create_collection.js     # Test cmd: configureFailPoint
 
 executor:
   archive:
@@ -17,6 +26,7 @@ executor:
   config:
     shell_options:
       eval: |
+        testingReplication = true;
         load('jstests/libs/override_methods/inject_security_token.js');
   fixture:
     class: ReplicaSetFixture

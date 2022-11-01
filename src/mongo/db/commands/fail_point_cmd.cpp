@@ -93,6 +93,10 @@ public:
         return Status::OK();
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     std::string help() const override {
         return "modifies the settings of a fail point";
     }
