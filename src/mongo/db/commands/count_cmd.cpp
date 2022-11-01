@@ -44,6 +44,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/database_name_util.h"
 
@@ -247,6 +248,15 @@ public:
         if (request.getMirrored().value_or(false)) {
             const auto& invocation = CommandInvocation::get(opCtx);
             invocation->markMirrored();
+        }
+
+        if (analyze_shard_key::supportsPersistingSampledQueries() && request.getSampleId()) {
+            analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                .addCountQuery(*request.getSampleId(),
+                               nss,
+                               request.getQuery(),
+                               request.getCollation().value_or(BSONObj()))
+                .getAsync([](auto) {});
         }
 
         if (ctx->getView()) {

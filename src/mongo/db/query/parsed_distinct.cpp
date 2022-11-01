@@ -322,7 +322,8 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
 
     return ParsedDistinct(std::move(cq.getValue()),
                           parsedDistinct.getKey().toString(),
-                          parsedDistinct.getMirrored().value_or(false));
+                          parsedDistinct.getMirrored().value_or(false),
+                          parsedDistinct.getSampleId());
 }
 
 }  // namespace mongo

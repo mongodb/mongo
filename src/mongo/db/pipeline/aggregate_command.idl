@@ -287,3 +287,8 @@ commands:
                 cpp_name: externalDataSources
                 optional: true
                 stability: unstable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: unstable

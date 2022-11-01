@@ -56,6 +56,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -483,6 +484,16 @@ public:
                             .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
                             .expectedUUID(findCommand->getCollectionUUID()));
             const auto& nss = ctx->getNss();
+
+            if (analyze_shard_key::supportsPersistingSampledQueries() &&
+                findCommand->getSampleId()) {
+                analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                    .addFindQuery(*findCommand->getSampleId(),
+                                  nss,
+                                  findCommand->getFilter(),
+                                  findCommand->getCollation())
+                    .getAsync([](auto) {});
+            }
 
             // Going forward this operation must never ignore interrupt signals while waiting for
             // lock acquisition. This InterruptibleLockGuard will ensure that waiting for lock

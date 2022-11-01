@@ -82,6 +82,7 @@
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -945,6 +946,15 @@ Status runAggregate(OperationContext* opCtx,
             if (!pipelineCollationStatus.isOK()) {
                 return pipelineCollationStatus;
             }
+        }
+
+        if (analyze_shard_key::supportsPersistingSampledQueries() && request.getSampleId()) {
+            analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                .addAggregateQuery(*request.getSampleId(),
+                                   expCtx->ns,
+                                   pipeline->getInitialQuery(),
+                                   expCtx->getCollatorBSON())
+                .getAsync([](auto) {});
         }
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
