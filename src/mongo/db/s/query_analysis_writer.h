@@ -34,6 +34,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -127,6 +128,14 @@ public:
                                            const NamespaceString& nss,
                                            const BSONObj& filter,
                                            const BSONObj& collation);
+
+    ExecutorFuture<void> addUpdateQuery(const write_ops::UpdateCommandRequest& updateCmd,
+                                        int opIndex);
+    ExecutorFuture<void> addDeleteQuery(const write_ops::DeleteCommandRequest& deleteCmd,
+                                        int opIndex);
+
+    ExecutorFuture<void> addFindAndModifyQuery(
+        const write_ops::FindAndModifyCommandRequest& findAndModifyCmd);
 
     int getQueriesCountForTest() const {
         stdx::lock_guard<Latch> lk(_mutex);

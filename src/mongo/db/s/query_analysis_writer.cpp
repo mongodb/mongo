@@ -176,6 +176,70 @@ BSONObj executeWriteCommand(OperationContext* opCtx,
     return {};
 }
 
+struct SampledWriteCommandRequest {
+    UUID sampleId;
+    NamespaceString nss;
+    BSONObj cmd;  // the BSON for a {Update,Delete,FindAndModify}CommandRequest
+};
+
+/*
+ * Returns a sampled update command for the update at 'opIndex' in the given update command.
+ */
+SampledWriteCommandRequest makeSampledUpdateCommandRequest(
+    const write_ops::UpdateCommandRequest& originalCmd, int opIndex) {
+    auto op = originalCmd.getUpdates()[opIndex];
+    auto sampleId = op.getSampleId();
+    invariant(sampleId);
+
+    write_ops::UpdateCommandRequest sampledCmd(originalCmd.getNamespace(), {std::move(op)});
+    sampledCmd.setLet(originalCmd.getLet());
+
+    return {*sampleId,
+            sampledCmd.getNamespace(),
+            sampledCmd.toBSON(BSON("$db" << sampledCmd.getNamespace().db().toString()))};
+}
+
+/*
+ * Returns a sampled delete command for the delete at 'opIndex' in the given delete command.
+ */
+SampledWriteCommandRequest makeSampledDeleteCommandRequest(
+    const write_ops::DeleteCommandRequest& originalCmd, int opIndex) {
+    auto op = originalCmd.getDeletes()[opIndex];
+    auto sampleId = op.getSampleId();
+    invariant(sampleId);
+
+    write_ops::DeleteCommandRequest sampledCmd(originalCmd.getNamespace(), {std::move(op)});
+    sampledCmd.setLet(originalCmd.getLet());
+
+    return {*sampleId,
+            sampledCmd.getNamespace(),
+            sampledCmd.toBSON(BSON("$db" << sampledCmd.getNamespace().db().toString()))};
+}
+
+/*
+ * Returns a sampled findAndModify command for the given findAndModify command.
+ */
+SampledWriteCommandRequest makeSampledFindAndModifyCommandRequest(
+    const write_ops::FindAndModifyCommandRequest& originalCmd) {
+    invariant(originalCmd.getSampleId());
+
+    write_ops::FindAndModifyCommandRequest sampledCmd(originalCmd.getNamespace());
+    sampledCmd.setQuery(originalCmd.getQuery());
+    sampledCmd.setUpdate(originalCmd.getUpdate());
+    sampledCmd.setRemove(originalCmd.getRemove());
+    sampledCmd.setUpsert(originalCmd.getUpsert());
+    sampledCmd.setNew(originalCmd.getNew());
+    sampledCmd.setSort(originalCmd.getSort());
+    sampledCmd.setCollation(originalCmd.getCollation());
+    sampledCmd.setArrayFilters(originalCmd.getArrayFilters());
+    sampledCmd.setLet(originalCmd.getLet());
+    sampledCmd.setSampleId(originalCmd.getSampleId());
+
+    return {*sampledCmd.getSampleId(),
+            sampledCmd.getNamespace(),
+            sampledCmd.toBSON(BSON("$db" << sampledCmd.getNamespace().db().toString()))};
+}
+
 }  // namespace
 
 QueryAnalysisWriter& QueryAnalysisWriter::get(OperationContext* opCtx) {
@@ -432,6 +496,134 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(const UUID& sampleId,
         .onError([this, nss](Status status) {
             LOGV2(7047302,
                   "Failed to add read query",
+                  "ns"_attr = nss,
+                  "error"_attr = redact(status));
+        });
+}
+
+ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
+    const write_ops::UpdateCommandRequest& updateCmd, int opIndex) {
+    invariant(updateCmd.getUpdates()[opIndex].getSampleId());
+    invariant(_executor);
+
+    return ExecutorFuture<void>(_executor)
+        .then([this, sampledUpdateCmd = makeSampledUpdateCommandRequest(updateCmd, opIndex)]() {
+            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtx = opCtxHolder.get();
+
+            auto collUuid =
+                CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledUpdateCmd.nss);
+
+            if (!collUuid) {
+                LOGV2_WARNING(7075300,
+                              "Found a sampled update query for a non-existing collection");
+                return;
+            }
+
+            auto doc = SampledWriteQueryDocument{sampledUpdateCmd.sampleId,
+                                                 sampledUpdateCmd.nss,
+                                                 *collUuid,
+                                                 SampledWriteCommandNameEnum::kUpdate,
+                                                 std::move(sampledUpdateCmd.cmd)};
+            stdx::lock_guard<Latch> lk(_mutex);
+            _queries.add(doc.toBSON());
+        })
+        .then([this] {
+            if (_exceedsMaxSizeBytes()) {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtx = opCtxHolder.get();
+                _flushQueries(opCtx);
+            }
+        })
+        .onError([this, nss = updateCmd.getNamespace()](Status status) {
+            LOGV2(7075301,
+                  "Failed to add update query",
+                  "ns"_attr = nss,
+                  "error"_attr = redact(status));
+        });
+}
+
+ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
+    const write_ops::DeleteCommandRequest& deleteCmd, int opIndex) {
+    invariant(deleteCmd.getDeletes()[opIndex].getSampleId());
+    invariant(_executor);
+
+    return ExecutorFuture<void>(_executor)
+        .then([this, sampledDeleteCmd = makeSampledDeleteCommandRequest(deleteCmd, opIndex)]() {
+            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtx = opCtxHolder.get();
+
+            auto collUuid =
+                CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledDeleteCmd.nss);
+
+            if (!collUuid) {
+                LOGV2_WARNING(7075302,
+                              "Found a sampled delete query for a non-existing collection");
+                return;
+            }
+
+            auto doc = SampledWriteQueryDocument{sampledDeleteCmd.sampleId,
+                                                 sampledDeleteCmd.nss,
+                                                 *collUuid,
+                                                 SampledWriteCommandNameEnum::kDelete,
+                                                 std::move(sampledDeleteCmd.cmd)};
+            stdx::lock_guard<Latch> lk(_mutex);
+            _queries.add(doc.toBSON());
+        })
+        .then([this] {
+            if (_exceedsMaxSizeBytes()) {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtx = opCtxHolder.get();
+                _flushQueries(opCtx);
+            }
+        })
+        .onError([this, nss = deleteCmd.getNamespace()](Status status) {
+            LOGV2(7075303,
+                  "Failed to add delete query",
+                  "ns"_attr = nss,
+                  "error"_attr = redact(status));
+        });
+}
+
+ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
+    const write_ops::FindAndModifyCommandRequest& findAndModifyCmd) {
+    invariant(findAndModifyCmd.getSampleId());
+    invariant(_executor);
+
+    return ExecutorFuture<void>(_executor)
+        .then([this,
+               sampledFindAndModifyCmd =
+                   makeSampledFindAndModifyCommandRequest(findAndModifyCmd)]() {
+            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtx = opCtxHolder.get();
+
+            auto collUuid =
+                CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledFindAndModifyCmd.nss);
+
+            if (!collUuid) {
+                LOGV2_WARNING(7075304,
+                              "Found a sampled findAndModify query for a non-existing collection");
+                return;
+            }
+
+            auto doc = SampledWriteQueryDocument{sampledFindAndModifyCmd.sampleId,
+                                                 sampledFindAndModifyCmd.nss,
+                                                 *collUuid,
+                                                 SampledWriteCommandNameEnum::kFindAndModify,
+                                                 std::move(sampledFindAndModifyCmd.cmd)};
+            stdx::lock_guard<Latch> lk(_mutex);
+            _queries.add(doc.toBSON());
+        })
+        .then([this] {
+            if (_exceedsMaxSizeBytes()) {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtx = opCtxHolder.get();
+                _flushQueries(opCtx);
+            }
+        })
+        .onError([this, nss = findAndModifyCmd.getNamespace()](Status status) {
+            LOGV2(7075305,
+                  "Failed to add findAndModify query",
                   "ns"_attr = nss,
                   "error"_attr = redact(status));
         });

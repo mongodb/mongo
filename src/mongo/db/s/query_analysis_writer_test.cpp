@@ -190,6 +190,131 @@ protected:
                     << "strength" << strength);
     }
 
+    /*
+     * Makes an UpdateCommandRequest for the collection 'nss' such that the command contains
+     * 'numOps' updates and the ones whose indices are in 'markForSampling' are marked for sampling.
+     * Returns the UpdateCommandRequest and the map storing the expected sampled
+     * UpdateCommandRequests by sample id, if any.
+     */
+    std::pair<write_ops::UpdateCommandRequest, std::map<UUID, write_ops::UpdateCommandRequest>>
+    makeUpdateCommandRequest(const NamespaceString& nss,
+                             int numOps,
+                             std::set<int> markForSampling,
+                             std::string filterFieldName = "a") {
+        write_ops::UpdateCommandRequest originalCmd(nss);
+        std::vector<write_ops::UpdateOpEntry> updateOps;  // populated below.
+        originalCmd.setLet(let);
+        originalCmd.getWriteCommandRequestBase().setEncryptionInformation(encryptionInformation);
+
+        std::map<UUID, write_ops::UpdateCommandRequest> expectedSampledCmds;
+
+        for (auto i = 0; i < numOps; i++) {
+            auto updateOp = write_ops::UpdateOpEntry(
+                BSON(filterFieldName << i),
+                write_ops::UpdateModification(BSON("$set" << BSON("b.$[element]" << i))));
+            updateOp.setC(BSON("x" << i));
+            updateOp.setArrayFilters(std::vector<BSONObj>{BSON("element" << BSON("$gt" << i))});
+            updateOp.setMulti(_getRandomBool());
+            updateOp.setUpsert(_getRandomBool());
+            updateOp.setUpsertSupplied(_getRandomBool());
+            updateOp.setCollation(makeNonEmptyCollation());
+
+            if (markForSampling.find(i) != markForSampling.end()) {
+                auto sampleId = UUID::gen();
+                updateOp.setSampleId(sampleId);
+
+                write_ops::UpdateCommandRequest expectedSampledCmd = originalCmd;
+                expectedSampledCmd.setUpdates({updateOp});
+                expectedSampledCmd.getWriteCommandRequestBase().setEncryptionInformation(
+                    boost::none);
+                expectedSampledCmds.emplace(sampleId, std::move(expectedSampledCmd));
+            }
+            updateOps.push_back(updateOp);
+        }
+        originalCmd.setUpdates(updateOps);
+
+        return {originalCmd, expectedSampledCmds};
+    }
+
+    /*
+     * Makes an DeleteCommandRequest for the collection 'nss' such that the command contains
+     * 'numOps' deletes and the ones whose indices are in 'markForSampling' are marked for sampling.
+     * Returns the DeleteCommandRequest and the map storing the expected sampled
+     * DeleteCommandRequests by sample id, if any.
+     */
+    std::pair<write_ops::DeleteCommandRequest, std::map<UUID, write_ops::DeleteCommandRequest>>
+    makeDeleteCommandRequest(const NamespaceString& nss,
+                             int numOps,
+                             std::set<int> markForSampling,
+                             std::string filterFieldName = "a") {
+        write_ops::DeleteCommandRequest originalCmd(nss);
+        std::vector<write_ops::DeleteOpEntry> deleteOps;  // populated and set below.
+        originalCmd.setLet(let);
+        originalCmd.getWriteCommandRequestBase().setEncryptionInformation(encryptionInformation);
+
+        std::map<UUID, write_ops::DeleteCommandRequest> expectedSampledCmds;
+
+        for (auto i = 0; i < numOps; i++) {
+            auto deleteOp =
+                write_ops::DeleteOpEntry(BSON(filterFieldName << i), _getRandomBool() /* multi */);
+            deleteOp.setCollation(makeNonEmptyCollation());
+
+            if (markForSampling.find(i) != markForSampling.end()) {
+                auto sampleId = UUID::gen();
+                deleteOp.setSampleId(sampleId);
+
+                write_ops::DeleteCommandRequest expectedSampledCmd = originalCmd;
+                expectedSampledCmd.setDeletes({deleteOp});
+                expectedSampledCmd.getWriteCommandRequestBase().setEncryptionInformation(
+                    boost::none);
+                expectedSampledCmds.emplace(sampleId, std::move(expectedSampledCmd));
+            }
+            deleteOps.push_back(deleteOp);
+        }
+        originalCmd.setDeletes(deleteOps);
+
+        return {originalCmd, expectedSampledCmds};
+    }
+
+    /*
+     * Makes a FindAndModifyCommandRequest for the collection 'nss'. The findAndModify is an update
+     * if 'isUpdate' is true, and a remove otherwise. If 'markForSampling' is true, it is marked for
+     * sampling. Returns the FindAndModifyCommandRequest and the map storing the expected sampled
+     * FindAndModifyCommandRequests by sample id, if any.
+     */
+    std::pair<write_ops::FindAndModifyCommandRequest,
+              std::map<UUID, write_ops::FindAndModifyCommandRequest>>
+    makeFindAndModifyCommandRequest(const NamespaceString& nss,
+                                    bool isUpdate,
+                                    bool markForSampling,
+                                    std::string filterFieldName = "a") {
+        write_ops::FindAndModifyCommandRequest originalCmd(nss);
+        originalCmd.setQuery(BSON(filterFieldName << 0));
+        originalCmd.setUpdate(
+            write_ops::UpdateModification(BSON("$set" << BSON("b.$[element]" << 0))));
+        originalCmd.setArrayFilters(std::vector<BSONObj>{BSON("element" << BSON("$gt" << 10))});
+        originalCmd.setSort(BSON("_id" << 1));
+        if (isUpdate) {
+            originalCmd.setUpsert(_getRandomBool());
+            originalCmd.setNew(_getRandomBool());
+        }
+        originalCmd.setCollation(makeNonEmptyCollation());
+        originalCmd.setLet(let);
+        originalCmd.setEncryptionInformation(encryptionInformation);
+
+        std::map<UUID, write_ops::FindAndModifyCommandRequest> expectedSampledCmds;
+        if (markForSampling) {
+            auto sampleId = UUID::gen();
+            originalCmd.setSampleId(sampleId);
+
+            auto expectedSampledCmd = originalCmd;
+            expectedSampledCmd.setEncryptionInformation(boost::none);
+            expectedSampledCmds.emplace(sampleId, std::move(expectedSampledCmd));
+        }
+
+        return {originalCmd, expectedSampledCmds};
+    }
+
     void deleteSampledQueryDocuments() const {
         DBDirectClient client(operationContext());
         client.remove(NamespaceString::kConfigSampledQueriesNamespace.toString(), BSONObj());
@@ -226,6 +351,28 @@ protected:
         ASSERT_BSONOBJ_EQ(parsedCmd.getCollation(), collation);
     }
 
+    /*
+     * Asserts that there is a sampled write query document with the given sample id and that it has
+     * the given fields.
+     */
+    template <typename CommandRequestType>
+    void assertSampledWriteQueryDocument(const UUID& sampleId,
+                                         const NamespaceString& nss,
+                                         SampledWriteCommandNameEnum cmdName,
+                                         const CommandRequestType& expectedCmd) {
+        auto doc = _getConfigDocument(NamespaceString::kConfigSampledQueriesNamespace, sampleId);
+        auto parsedQueryDoc =
+            SampledWriteQueryDocument::parse(IDLParserContext("QueryAnalysisWriterTest"), doc);
+
+        ASSERT_EQ(parsedQueryDoc.getNs(), nss);
+        ASSERT_EQ(parsedQueryDoc.getCollectionUuid(), getCollectionUUID(nss));
+        ASSERT_EQ(parsedQueryDoc.getSampleId(), sampleId);
+        ASSERT(parsedQueryDoc.getCmdName() == cmdName);
+        auto parsedCmd = CommandRequestType::parse(IDLParserContext("QueryAnalysisWriterTest"),
+                                                   parsedQueryDoc.getCmd());
+        ASSERT_BSONOBJ_EQ(parsedCmd.toBSON({}), expectedCmd.toBSON({}));
+    }
+
     const NamespaceString nss0{"testDb", "testColl0"};
     const NamespaceString nss1{"testDb", "testColl1"};
 
@@ -234,7 +381,17 @@ protected:
     const BSONObj emptyFilter{};
     const BSONObj emptyCollation{};
 
+    const BSONObj let = BSON("x" << 1);
+    // Test with EncryptionInformation to verify that QueryAnalysisWriter does not persist the
+    // WriteCommandRequestBase fields, especially this sensitive field.
+    const EncryptionInformation encryptionInformation{BSON("foo"
+                                                           << "bar")};
+
 private:
+    bool _getRandomBool() {
+        return rand() % 2 == 0;
+    }
+
     /**
      * Returns the number of the documents for the collection 'collNss' in the config collection
      * 'configNss'.
@@ -379,6 +536,152 @@ TEST_F(QueryAnalysisWriterTest, AggregateQuery) {
     testAggregateCmdCommon(emptyFilter, emptyCollation);
 }
 
+DEATH_TEST_F(QueryAnalysisWriterTest, UpdateQueryNotMarkedForSampling, "invariant") {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto [originalCmd, _] = makeUpdateCommandRequest(nss0, 1, {} /* markForSampling */);
+    writer.addUpdateQuery(originalCmd, 0).get();
+}
+
+TEST_F(QueryAnalysisWriterTest, UpdateQueriesMarkedForSampling) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto [originalCmd, expectedSampledCmds] =
+        makeUpdateCommandRequest(nss0, 3, {0, 2} /* markForSampling */);
+    ASSERT_EQ(expectedSampledCmds.size(), 2U);
+
+    writer.addUpdateQuery(originalCmd, 0).get();
+    writer.addUpdateQuery(originalCmd, 2).get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 2);
+    writer.flushQueriesForTest(operationContext());
+    ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+
+    ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 2);
+    for (const auto& [sampleId, expectedSampledCmd] : expectedSampledCmds) {
+        assertSampledWriteQueryDocument(sampleId,
+                                        expectedSampledCmd.getNamespace(),
+                                        SampledWriteCommandNameEnum::kUpdate,
+                                        expectedSampledCmd);
+    }
+}
+
+DEATH_TEST_F(QueryAnalysisWriterTest, DeleteQueryNotMarkedForSampling, "invariant") {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto [originalCmd, _] = makeDeleteCommandRequest(nss0, 1, {} /* markForSampling */);
+    writer.addDeleteQuery(originalCmd, 0).get();
+}
+
+TEST_F(QueryAnalysisWriterTest, DeleteQueriesMarkedForSampling) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto [originalCmd, expectedSampledCmds] =
+        makeDeleteCommandRequest(nss0, 3, {1, 2} /* markForSampling */);
+    ASSERT_EQ(expectedSampledCmds.size(), 2U);
+
+    writer.addDeleteQuery(originalCmd, 1).get();
+    writer.addDeleteQuery(originalCmd, 2).get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 2);
+    writer.flushQueriesForTest(operationContext());
+    ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+
+    ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 2);
+    for (const auto& [sampleId, expectedSampledCmd] : expectedSampledCmds) {
+        assertSampledWriteQueryDocument(sampleId,
+                                        expectedSampledCmd.getNamespace(),
+                                        SampledWriteCommandNameEnum::kDelete,
+                                        expectedSampledCmd);
+    }
+}
+
+DEATH_TEST_F(QueryAnalysisWriterTest, FindAndModifyQueryNotMarkedForSampling, "invariant") {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto [originalCmd, _] =
+        makeFindAndModifyCommandRequest(nss0, true /* isUpdate */, false /* markForSampling */);
+    writer.addFindAndModifyQuery(originalCmd).get();
+}
+
+TEST_F(QueryAnalysisWriterTest, FindAndModifyQueryUpdateMarkedForSampling) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto [originalCmd, expectedSampledCmds] =
+        makeFindAndModifyCommandRequest(nss0, true /* isUpdate */, true /* markForSampling */);
+    ASSERT_EQ(expectedSampledCmds.size(), 1U);
+    auto [sampleId, expectedSampledCmd] = *expectedSampledCmds.begin();
+
+    writer.addFindAndModifyQuery(originalCmd).get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 1);
+    writer.flushQueriesForTest(operationContext());
+    ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+
+    ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
+    assertSampledWriteQueryDocument(sampleId,
+                                    expectedSampledCmd.getNamespace(),
+                                    SampledWriteCommandNameEnum::kFindAndModify,
+                                    expectedSampledCmd);
+}
+
+TEST_F(QueryAnalysisWriterTest, FindAndModifyQueryRemoveMarkedForSampling) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto [originalCmd, expectedSampledCmds] =
+        makeFindAndModifyCommandRequest(nss0, false /* isUpdate */, true /* markForSampling */);
+    ASSERT_EQ(expectedSampledCmds.size(), 1U);
+    auto [sampleId, expectedSampledCmd] = *expectedSampledCmds.begin();
+
+    writer.addFindAndModifyQuery(originalCmd).get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 1);
+    writer.flushQueriesForTest(operationContext());
+    ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+
+    ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
+    assertSampledWriteQueryDocument(sampleId,
+                                    expectedSampledCmd.getNamespace(),
+                                    SampledWriteCommandNameEnum::kFindAndModify,
+                                    expectedSampledCmd);
+}
+
+TEST_F(QueryAnalysisWriterTest, MultipleQueriesAndCollections) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    // Make nss0 have one query.
+    auto [originalDeleteCmd, expectedSampledDeleteCmds] =
+        makeDeleteCommandRequest(nss1, 3, {1} /* markForSampling */);
+    ASSERT_EQ(expectedSampledDeleteCmds.size(), 1U);
+    auto [deleteSampleId, expectedSampledDeleteCmd] = *expectedSampledDeleteCmds.begin();
+
+    // Make nss1 have two queries.
+    auto [originalUpdateCmd, expectedSampledUpdateCmds] =
+        makeUpdateCommandRequest(nss0, 1, {0} /* markForSampling */);
+    ASSERT_EQ(expectedSampledUpdateCmds.size(), 1U);
+    auto [updateSampleId, expectedSampledUpdateCmd] = *expectedSampledUpdateCmds.begin();
+
+    auto countSampleId = UUID::gen();
+    auto originalCountFilter = makeNonEmptyFilter();
+    auto originalCountCollation = makeNonEmptyCollation();
+
+    writer.addDeleteQuery(originalDeleteCmd, 1).get();
+    writer.addUpdateQuery(originalUpdateCmd, 0).get();
+    writer.addCountQuery(countSampleId, nss1, originalCountFilter, originalCountCollation).get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 3);
+    writer.flushQueriesForTest(operationContext());
+    ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+
+    ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
+    assertSampledWriteQueryDocument(deleteSampleId,
+                                    expectedSampledDeleteCmd.getNamespace(),
+                                    SampledWriteCommandNameEnum::kDelete,
+                                    expectedSampledDeleteCmd);
+    ASSERT_EQ(getSampledQueryDocumentsCount(nss1), 2);
+    assertSampledWriteQueryDocument(updateSampleId,
+                                    expectedSampledUpdateCmd.getNamespace(),
+                                    SampledWriteCommandNameEnum::kUpdate,
+                                    expectedSampledUpdateCmd);
+    assertSampledReadQueryDocument(countSampleId,
+                                   nss1,
+                                   SampledReadCommandNameEnum::kCount,
+                                   originalCountFilter,
+                                   originalCountCollation);
+}
+
 TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
     auto& writer = QueryAnalysisWriter::get(operationContext());
 
@@ -386,9 +689,10 @@ TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
     auto originalFindFilter = makeNonEmptyFilter();
     auto originalFindCollation = makeNonEmptyCollation();
 
-    auto distinctSampleId = UUID::gen();
-    auto originalDistinctFilter = makeNonEmptyFilter();
-    auto originalDistinctCollation = makeNonEmptyCollation();
+    auto [originalUpdateCmd, expectedSampledUpdateCmds] =
+        makeUpdateCommandRequest(nss0, 1, {0} /* markForSampling */);
+    ASSERT_EQ(expectedSampledUpdateCmds.size(), 1U);
+    auto [updateSampleId, expectedSampledUpdateCmd] = *expectedSampledUpdateCmds.begin();
 
     auto countSampleId = UUID::gen();
     auto originalCountFilter = makeNonEmptyFilter();
@@ -406,9 +710,7 @@ TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
                                    originalFindFilter,
                                    originalFindCollation);
 
-    writer
-        .addDistinctQuery(distinctSampleId, nss0, originalDistinctFilter, originalDistinctCollation)
-        .get();
+    writer.addUpdateQuery(originalUpdateCmd, 0).get();
     writer.addFindQuery(findSampleId, nss0, originalFindFilter, originalFindCollation)
         .get();  // This is a duplicate.
     writer.addCountQuery(countSampleId, nss0, originalCountFilter, originalCountCollation).get();
@@ -417,11 +719,10 @@ TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
     ASSERT_EQ(writer.getQueriesCountForTest(), 0);
 
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 3);
-    assertSampledReadQueryDocument(distinctSampleId,
-                                   nss0,
-                                   SampledReadCommandNameEnum::kDistinct,
-                                   originalDistinctFilter,
-                                   originalDistinctCollation);
+    assertSampledWriteQueryDocument(updateSampleId,
+                                    expectedSampledUpdateCmd.getNamespace(),
+                                    SampledWriteCommandNameEnum::kUpdate,
+                                    expectedSampledUpdateCmd);
     assertSampledReadQueryDocument(findSampleId,
                                    nss0,
                                    SampledReadCommandNameEnum::kFind,
@@ -509,6 +810,103 @@ TEST_F(QueryAnalysisWriterTest, FlushAfterAddReadIfExceedsSizeLimit) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss1), 1);
     assertSampledReadQueryDocument(
         sampleId1, nss1, SampledReadCommandNameEnum::kAggregate, filter1, collation1);
+}
+
+TEST_F(QueryAnalysisWriterTest, FlushAfterAddUpdateIfExceedsSizeLimit) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto maxMemoryUsageBytes = 1024;
+    RAIIServerParameterControllerForTest maxMemoryBytes{"queryAnalysisWriterMaxMemoryUsageBytes",
+                                                        maxMemoryUsageBytes};
+    auto [originalCmd, expectedSampledCmds] =
+        makeUpdateCommandRequest(nss0,
+                                 3,
+                                 {0, 2} /* markForSampling */,
+                                 std::string(maxMemoryUsageBytes / 2, 'a') /* filterFieldName */);
+    ASSERT_EQ(expectedSampledCmds.size(), 2U);
+
+    writer.addUpdateQuery(originalCmd, 0).get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 1);
+    // Adding the next query causes the size to exceed the limit.
+    writer.addUpdateQuery(originalCmd, 2).get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+
+    ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 2);
+    for (const auto& [sampleId, expectedSampledCmd] : expectedSampledCmds) {
+        assertSampledWriteQueryDocument(sampleId,
+                                        expectedSampledCmd.getNamespace(),
+                                        SampledWriteCommandNameEnum::kUpdate,
+                                        expectedSampledCmd);
+    }
+}
+
+TEST_F(QueryAnalysisWriterTest, FlushAfterAddDeleteIfExceedsSizeLimit) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto maxMemoryUsageBytes = 1024;
+    RAIIServerParameterControllerForTest maxMemoryBytes{"queryAnalysisWriterMaxMemoryUsageBytes",
+                                                        maxMemoryUsageBytes};
+    auto [originalCmd, expectedSampledCmds] =
+        makeDeleteCommandRequest(nss0,
+                                 3,
+                                 {0, 1} /* markForSampling */,
+                                 std::string(maxMemoryUsageBytes / 2, 'a') /* filterFieldName */);
+    ASSERT_EQ(expectedSampledCmds.size(), 2U);
+
+    writer.addDeleteQuery(originalCmd, 0).get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 1);
+    // Adding the next query causes the size to exceed the limit.
+    writer.addDeleteQuery(originalCmd, 1).get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+
+    ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 2);
+    for (const auto& [sampleId, expectedSampledCmd] : expectedSampledCmds) {
+        assertSampledWriteQueryDocument(sampleId,
+                                        expectedSampledCmd.getNamespace(),
+                                        SampledWriteCommandNameEnum::kDelete,
+                                        expectedSampledCmd);
+    }
+}
+
+TEST_F(QueryAnalysisWriterTest, FlushAfterAddFindAndModifyIfExceedsSizeLimit) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto maxMemoryUsageBytes = 1024;
+    RAIIServerParameterControllerForTest maxMemoryBytes{"queryAnalysisWriterMaxMemoryUsageBytes",
+                                                        maxMemoryUsageBytes};
+
+    auto [originalCmd0, expectedSampledCmds0] = makeFindAndModifyCommandRequest(
+        nss0,
+        true /* isUpdate */,
+        true /* markForSampling */,
+        std::string(maxMemoryUsageBytes / 2, 'a') /* filterFieldName */);
+    ASSERT_EQ(expectedSampledCmds0.size(), 1U);
+    auto [sampleId0, expectedSampledCmd0] = *expectedSampledCmds0.begin();
+
+    auto [originalCmd1, expectedSampledCmds1] = makeFindAndModifyCommandRequest(
+        nss1,
+        false /* isUpdate */,
+        true /* markForSampling */,
+        std::string(maxMemoryUsageBytes / 2, 'b') /* filterFieldName */);
+    ASSERT_EQ(expectedSampledCmds0.size(), 1U);
+    auto [sampleId1, expectedSampledCmd1] = *expectedSampledCmds1.begin();
+
+    writer.addFindAndModifyQuery(originalCmd0).get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 1);
+    // Adding the next query causes the size to exceed the limit.
+    writer.addFindAndModifyQuery(originalCmd1).get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+
+    ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
+    assertSampledWriteQueryDocument(sampleId0,
+                                    expectedSampledCmd0.getNamespace(),
+                                    SampledWriteCommandNameEnum::kFindAndModify,
+                                    expectedSampledCmd0);
+    ASSERT_EQ(getSampledQueryDocumentsCount(nss1), 1);
+    assertSampledWriteQueryDocument(sampleId1,
+                                    expectedSampledCmd1.getNamespace(),
+                                    SampledWriteCommandNameEnum::kFindAndModify,
+                                    expectedSampledCmd1);
 }
 
 TEST_F(QueryAnalysisWriterTest, AddQueriesBackAfterWriteError) {

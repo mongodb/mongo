@@ -80,3 +80,24 @@ structs:
       cmd:
         type: object
         description: "The command object for the read."
+
+  SampledWriteQueryDocument:
+    description: "Represents a document storing a sampled write query."
+    strict: false
+    fields:
+      _id:
+        type: uuid
+        description: "The unique sample id for the write."
+        cpp_name: sampleId
+      ns:
+        type: namespacestring
+        description: "The namespace of the collection for the write."
+      collectionUuid:
+        type: uuid
+        description: "The UUID of the collection for the write."
+      cmdName:
+        type: SampledWriteCommandName
+        description: "The command name for the write."
+      cmd:
+        type: object
+        description: "The command object for the write."

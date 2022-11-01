@@ -49,6 +49,15 @@ enums:
       kCount: "count"
       kDistinct: "distinct"
 
+  SampledWriteCommandName:
+    description: "The command name of a sampled write query."
+    type: string
+    values:
+      kInsert: "insert"
+      kUpdate: "update"
+      kDelete: "delete"
+      kFindAndModify: "findAndModify"
+
 structs:
   QueryAnalyzerConfiguration:
     description: "The query analyzer configuration for a collection as configured via the
