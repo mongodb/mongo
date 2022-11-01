@@ -607,11 +607,18 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     if (inMultiDocumentTransaction) {
         auto operation = OplogEntry::makeUpdateOperation(
             args.nss, args.uuid, args.updateArgs.update, args.updateArgs.criteria);
+
+        auto collectionDescription =
+            CollectionShardingState::get(opCtx, args.nss)->getCurrentMetadata();
+        if (collectionDescription->isSharded()) {
+            operation.setPostImageDocumentKey(
+                collectionDescription->extractDocumentKey(args.updateArgs.updatedDoc).getOwned());
+        }
+
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         opTime = replLogUpdate(opCtx, args, storeImagesInSideCollection);
         // Check if we're in a retryable write that should save the image to
-        // `config.image_collection`.
         if (storeImagesInSideCollection && opCtx->getTxnNumber() &&
             args.updateArgs.storeDocOption != CollectionUpdateArgs::StoreDocOption::None) {
             BSONObj imageDoc;
