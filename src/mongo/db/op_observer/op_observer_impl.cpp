@@ -840,6 +840,16 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             operation.setChangeStreamPreImageRecordingMode(
                 ChangeStreamPreImageRecordingMode::kPreImagesCollection);
         }
+
+        auto scopedCss =
+            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, args.coll->ns());
+        auto scopedCollectionDescription = scopedCss->getCollectionDescription(opCtx);
+        if (scopedCollectionDescription.isSharded()) {
+            operation.setPostImageDocumentKey(
+                scopedCollectionDescription.extractDocumentKey(args.updateArgs->updatedDoc)
+                    .getOwned());
+        }
+
         operation.setDestinedRecipient(
             shardingWriteRouter.getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
