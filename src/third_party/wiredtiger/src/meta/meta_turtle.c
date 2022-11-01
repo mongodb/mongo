@@ -539,8 +539,11 @@ err:
         }
     __wt_free(session, backuphash);
 
-    /* Remove the backup files, we'll never read them again. */
-    return (__wt_backup_file_remove(session));
+    /*
+     * We used to remove the backup file here. But we cannot do that until the metadata is fully
+     * synced to disk after recovery.
+     */
+    return (ret);
 }
 
 /*
