@@ -462,6 +462,7 @@ Status CollectionImpl::initFromExisting(OperationContext* opCtx,
     // Update the idents for the newly initialized indexes.
     for (const auto& sharedIdent : sharedIdents) {
         auto desc = getIndexCatalog()->findIndexByName(opCtx, sharedIdent.first);
+        invariant(desc);
         auto entry = getIndexCatalog()->getEntryShared(desc);
         entry->setIdent(sharedIdent.second);
     }
