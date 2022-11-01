@@ -77,12 +77,22 @@ const Hours kMaxWaitToCommitCloneForJumboChunk(6);
 
 MONGO_FAIL_POINT_DEFINE(failTooMuchMemoryUsed);
 
-bool isInRange(const BSONObj& obj,
-               const BSONObj& min,
-               const BSONObj& max,
-               const ShardKeyPattern& shardKeyPattern) {
-    BSONObj k = shardKeyPattern.extractShardKeyFromDoc(obj);
-    return k.woCompare(min) >= 0 && k.woCompare(max) < 0;
+/**
+ * Returns true if the given BSON object in the shard key value pair format is within the given
+ * range.
+ */
+bool isShardKeyValueInRange(const BSONObj& shardKeyValue, const BSONObj& min, const BSONObj& max) {
+    return shardKeyValue.woCompare(min) >= 0 && shardKeyValue.woCompare(max) < 0;
+}
+
+/**
+ * Returns true if the given BSON document is within the given chunk range.
+ */
+bool isDocInRange(const BSONObj& obj,
+                  const BSONObj& min,
+                  const BSONObj& max,
+                  const ShardKeyPattern& shardKeyPattern) {
+    return isShardKeyValueInRange(shardKeyPattern.extractShardKeyFromDoc(obj), min, max);
 }
 
 BSONObj createRequestWithSessionId(StringData commandName,
@@ -214,14 +224,13 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
             continue;
         }
 
-        auto documentKey = getDocumentKeyFromReplOperation(stmt, opType);
+        auto preImageDocKey = getDocumentKeyFromReplOperation(stmt, opType);
 
-        auto idElement = documentKey["_id"];
+        auto idElement = preImageDocKey["_id"];
         if (idElement.eoo()) {
             LOGV2_WARNING(21994,
-                          "Received a document without an _id field, ignoring: {documentKey}",
                           "Received a document without an _id and will ignore that document",
-                          "documentKey"_attr = redact(documentKey));
+                          "documentKey"_attr = redact(preImageDocKey));
             continue;
         }
 
@@ -229,18 +238,42 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
         auto const& maxKey = cloner->_args.getMax().get();
         auto const& shardKeyPattern = cloner->_shardKeyPattern;
 
-        if (!isInRange(documentKey, minKey, maxKey, shardKeyPattern)) {
-            // If the preImageDoc is not in range but the postImageDoc was, we know that the
-            // document has changed shard keys and no longer belongs in the chunk being cloned.
-            // We will model the deletion of the preImage document so that the destination chunk
-            // does not receive an outdated version of this document.
-            if (opType == repl::OpTypeEnum::kUpdate &&
-                isInRange(stmt.getPreImageDocumentKey(), minKey, maxKey, shardKeyPattern) &&
-                !stmt.getPreImageDocumentKey()["_id"].eoo()) {
-                opType = repl::OpTypeEnum::kDelete;
-                idElement = stmt.getPreImageDocumentKey()["id"];
-            } else {
-                continue;
+        // Note: This assumes that prepared transactions will always have post document key
+        // set. There is a small window where create collection coordinator releases the critical
+        // section and before it writes down the chunks for non-empty collections. So in theory,
+        // it is possible to have a prepared transaction while collection is unsharded
+        // and becomes sharded midway. This doesn't happen in practice because the only way to
+        // have a prepared transactions without being sharded is by directly connecting to the
+        // shards and manually preparing the transaction. Another exception is when transaction
+        // is prepared on an older version that doesn't set the post image document key.
+        auto postImageDocKey = stmt.getPostImageDocumentKey();
+        if (postImageDocKey.isEmpty()) {
+            LOGV2_WARNING(
+                6836102,
+                "Migration encountered a transaction operation without a post image document key",
+                "preImageDocKey"_attr = preImageDocKey);
+        } else {
+            auto postShardKeyValues =
+                shardKeyPattern.extractShardKeyFromDocumentKey(postImageDocKey);
+            fassert(6836100, !postShardKeyValues.isEmpty());
+
+            if (!isShardKeyValueInRange(postShardKeyValues, minKey, maxKey)) {
+                // If the preImageDoc is not in range but the postImageDoc was, we know that the
+                // document has changed shard keys and no longer belongs in the chunk being cloned.
+                // We will model the deletion of the preImage document so that the destination chunk
+                // does not receive an outdated version of this document.
+
+                auto preImageShardKeyValues =
+                    shardKeyPattern.extractShardKeyFromDocumentKey(preImageDocKey);
+                fassert(6836101, !preImageShardKeyValues.isEmpty());
+
+                if (opType == repl::OpTypeEnum::kUpdate &&
+                    isShardKeyValueInRange(preImageShardKeyValues, minKey, maxKey)) {
+                    opType = repl::OpTypeEnum::kDelete;
+                    idElement = postImageDocKey["_id"];
+                } else {
+                    continue;
+                }
             }
         }
 
@@ -443,7 +476,7 @@ void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) noex
 }
 
 bool MigrationChunkClonerSourceLegacy::isDocumentInMigratingChunk(const BSONObj& doc) {
-    return isInRange(doc, getMin(), getMax(), _shardKeyPattern);
+    return isDocInRange(doc, getMin(), getMax(), _shardKeyPattern);
 }
 
 void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
@@ -462,7 +495,7 @@ void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
         return;
     }
 
-    if (!isInRange(insertedDoc, getMin(), getMax(), _shardKeyPattern)) {
+    if (!isDocInRange(insertedDoc, getMin(), getMax(), _shardKeyPattern)) {
         return;
     }
 
@@ -497,12 +530,12 @@ void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
         return;
     }
 
-    if (!isInRange(postImageDoc, getMin(), getMax(), _shardKeyPattern)) {
+    if (!isDocInRange(postImageDoc, getMin(), getMax(), _shardKeyPattern)) {
         // If the preImageDoc is not in range but the postImageDoc was, we know that the document
         // has changed shard keys and no longer belongs in the chunk being cloned. We will model
         // the deletion of the preImage document so that the destination chunk does not receive an
         // outdated version of this document.
-        if (preImageDoc && isInRange(*preImageDoc, getMin(), getMax(), _shardKeyPattern)) {
+        if (preImageDoc && isDocInRange(*preImageDoc, getMin(), getMax(), _shardKeyPattern)) {
             onDeleteOp(opCtx, *preImageDoc, opTime, prePostImageOpTime);
         }
         return;
@@ -698,9 +731,22 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromCloneLocs(OperationCon
         auto nextRecordId = *iter;
 
         lk.unlock();
+        ON_BLOCK_EXIT([&lk] { lk.lock(); });
 
         Snapshotted<BSONObj> doc;
         if (collection->findDoc(opCtx, nextRecordId, &doc)) {
+            // Do not send documents that are no longer in the chunk range being moved. This can
+            // happen when document shard key value of the document changed after the initial
+            // index scan during cloning. This is needed because the destination is very
+            // conservative in processing xferMod deletes and won't delete docs that are not in
+            // the range of the chunk being migrated.
+            if (!isDocInRange(doc.value(),
+                              _args.getMin().value(),
+                              _args.getMax().value(),
+                              _shardKeyPattern)) {
+                continue;
+            }
+
             // Use the builder size instead of accumulating the document sizes directly so
             // that we take into consideration the overhead of BSONArray indices.
             if (arrBuilder->arrSize() &&
@@ -712,8 +758,6 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromCloneLocs(OperationCon
             arrBuilder->append(doc.value());
             ShardingStatistics::get(opCtx).countDocsClonedOnDonor.addAndFetch(1);
         }
-
-        lk.lock();
     }
 
     _cloneLocs.erase(_cloneLocs.begin(), iter);

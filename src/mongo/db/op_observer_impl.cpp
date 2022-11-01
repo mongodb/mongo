@@ -744,6 +744,14 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             operation.setChangeStreamPreImageRecordingMode(
                 ChangeStreamPreImageRecordingMode::kPreImagesCollection);
         }
+
+        auto collectionDescription =
+            CollectionShardingState::get(opCtx, args.nss)->getCollectionDescription(opCtx);
+        if (collectionDescription.isSharded()) {
+            operation.setPostImageDocumentKey(
+                collectionDescription.extractDocumentKey(args.updateArgs->updatedDoc).getOwned());
+        }
+
         operation.setDestinedRecipient(
             shardingWriteRouter.getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue_BackwardsCompatible(args.updateArgs->source ==
