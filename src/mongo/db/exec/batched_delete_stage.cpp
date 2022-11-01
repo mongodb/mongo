@@ -325,7 +325,8 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
 
     // Start a WUOW with 'groupOplogEntries' which groups a delete batch into a single timestamp
     // and oplog entry.
-    WriteUnitOfWork wuow(opCtx(), true /* groupOplogEntries */);
+    WriteUnitOfWork wuow(opCtx(),
+                         _stagedDeletesBuffer.size() > 1U ? true : false /* groupOplogEntries */);
     for (; *bufferOffset < _stagedDeletesBuffer.size(); ++*bufferOffset) {
         if (MONGO_unlikely(throwWriteConflictExceptionInBatchedDeleteStage.shouldFail())) {
             throwWriteConflictException(
