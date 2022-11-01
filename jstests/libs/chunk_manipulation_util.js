@@ -138,7 +138,8 @@ function waitForMoveChunkStep(shardConnection, stepNumber) {
 
     assert.soon(function() {
         var inProgressStr = '';
-        let in_progress = admin.aggregate([{$currentOp: {'allUsers': true}}]);
+        let in_progress =
+            admin.aggregate([{$currentOp: {'allUsers': true, idleConnections: true}}]);
 
         while (in_progress.hasNext()) {
             let op = in_progress.next();
