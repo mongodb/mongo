@@ -328,6 +328,7 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                             int numDeleted;
 
                             {
+                                ScopedRangeDeleterLock rangeDeleterLock(opCtx, MODE_IX);
                                 AutoGetCollection collection(opCtx, nss, MODE_IX);
 
                                 // Ensure the collection exists and has not been dropped or dropped
@@ -343,8 +344,6 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                 markRangeDeletionTaskAsProcessing(opCtx, migrationId);
 
                                 {
-                                    ScopedRangeDeleterLock rangeDeleterLock(opCtx, collectionUuid);
-
                                     numDeleted =
                                         uassertStatusOK(deleteNextBatch(opCtx,
                                                                         collection.getCollection(),
@@ -649,12 +648,12 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
                      ShardingCatalogClient::kLocalWriteConcern);
     };
 
+    ScopedRangeDeleterLock rangeDeleterLock(opCtx, MODE_X);
     store.forEach(
         opCtx,
         BSONObj(),
         [opCtx, &store, &setNumOrphansOnTask](const RangeDeletionTask& deletionTask) {
             AutoGetCollection collection(opCtx, deletionTask.getNss(), MODE_IX);
-            ScopedRangeDeleterLock rangeDeleterLock(opCtx, deletionTask.getCollectionUuid());
             if (!collection || collection->uuid() != deletionTask.getCollectionUuid()) {
                 // The deletion task is referring to a collection that has been dropped
                 setNumOrphansOnTask(deletionTask, 0);

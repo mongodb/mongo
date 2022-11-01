@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/balancer_stats_registry.h"
 
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -57,21 +58,6 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
     return options;
 }
 }  // namespace
-
-ScopedRangeDeleterLock::ScopedRangeDeleterLock(OperationContext* opCtx)
-    : _configLock(opCtx, NamespaceString::kConfigDb, MODE_IX),
-      _rangeDeletionLock(opCtx, NamespaceString::kRangeDeletionNamespace, MODE_X) {}
-
-// Take DB and Collection lock in mode IX as well as collection UUID lock to serialize with
-// operations that take the above version of the ScopedRangeDeleterLock such as FCV downgrade and
-// BalancerStatsRegistry initialization.
-ScopedRangeDeleterLock::ScopedRangeDeleterLock(OperationContext* opCtx, const UUID& collectionUuid)
-    : _configLock(opCtx, NamespaceString::kConfigDb, MODE_IX),
-      _rangeDeletionLock(opCtx, NamespaceString::kRangeDeletionNamespace, MODE_IX),
-      _collectionUuidLock(Lock::ResourceLock(
-          opCtx->lockState(),
-          ResourceId(RESOURCE_MUTEX, "RangeDeleterCollLock::" + collectionUuid.toString()),
-          MODE_X)) {}
 
 const ReplicaSetAwareServiceRegistry::Registerer<BalancerStatsRegistry>
     balancerStatsRegistryRegisterer("BalancerStatsRegistry");
@@ -129,9 +115,12 @@ void BalancerStatsRegistry::initializeAsync(OperationContext* opCtx) {
 
             LOGV2_DEBUG(6419601, 2, "Initializing BalancerStatsRegistry");
             try {
-                // Lock the range deleter to prevent
-                // concurrent modifications of orphans count
-                ScopedRangeDeleterLock rangeDeleterLock(opCtx);
+                // Lock the range deleter to prevent concurrent modifications of orphans count
+                ScopedRangeDeleterLock rangeDeleterLock(opCtx, LockMode::MODE_S);
+                // The collection lock is needed to serialize with direct writes to
+                // config.rangeDeletions
+                AutoGetCollection rangeDeletionLock(
+                    opCtx, NamespaceString::kRangeDeletionNamespace, MODE_S);
                 // Load current ophans count from disk
                 _loadOrphansCount(opCtx);
                 LOGV2_DEBUG(6419602, 2, "Completed BalancerStatsRegistry initialization");

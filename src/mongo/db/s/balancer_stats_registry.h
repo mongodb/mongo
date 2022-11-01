@@ -38,18 +38,19 @@
 namespace mongo {
 
 /**
- * Acquires the config db lock in IX mode and the collection lock for config.rangeDeletions in X
- * mode.
+ * Scoped lock to synchronize with the execution of range deletions.
+ * The range-deleter acquires a scoped lock in IX mode while orphans are being deleted.
+ * Acquiring the scoped lock in MODE_X ensures that no orphan counter in `config.rangeDeletions`
+ * entries is going to be updated concurrently.
  */
 class ScopedRangeDeleterLock {
 public:
-    ScopedRangeDeleterLock(OperationContext* opCtx);
-    ScopedRangeDeleterLock(OperationContext* opCtx, const UUID& collectionUuid);
+    ScopedRangeDeleterLock(OperationContext* opCtx, LockMode mode)
+        : _resourceLock(opCtx, opCtx->lockState(), _mutex.getRid(), mode) {}
 
 private:
-    Lock::DBLock _configLock;
-    Lock::CollectionLock _rangeDeletionLock;
-    boost::optional<Lock::ResourceLock> _collectionUuidLock;
+    const Lock::ResourceLock _resourceLock;
+    static inline const Lock::ResourceMutex _mutex{"ScopedRangeDeleterLock"};
 };
 
 /**

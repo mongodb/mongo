@@ -128,6 +128,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/pipeline/document_sources_idl',
+        '$BUILD_DIR/mongo/db/s/balancer_stats_registry',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_stats',
         'fill_locker_info',

@@ -465,7 +465,7 @@ public:
                 if (actualVersion > requestedVersion &&
                     !feature_flags::gOrphanTracking.isEnabledOnVersion(requestedVersion)) {
                     BalancerStatsRegistry::get(opCtx)->terminate();
-                    ScopedRangeDeleterLock rangeDeleterLock(opCtx);
+                    ScopedRangeDeleterLock rangeDeleterLock(opCtx, LockMode::MODE_X);
                     clearOrphanCountersFromRangeDeletionTasks(opCtx);
                 }
 
