@@ -213,6 +213,15 @@ public:
 
     private:
         friend class TenantMigrationRecipientServiceTest;
+        friend class TenantMigrationRecipientServiceShardMergeTest;
+
+        /**
+         * Only used for testing. Allows setting a custom task executor for backup cursor fetcher.
+         */
+        void setBackupCursorFetcherExecutor_forTest(
+            std::shared_ptr<executor::TaskExecutor> taskExecutor) {
+            _backupCursorExecutor = taskExecutor;
+        }
 
         const NamespaceString _stateDocumentsNS =
             NamespaceString::kTenantMigrationRecipientsNamespace;
@@ -605,6 +614,13 @@ public:
         SemiFuture<TenantOplogApplier::OpTimePair> _migrateUsingShardMergeProtocol(
             const CancellationToken& token);
 
+        /*
+         * Send the killBackupCursor command to the remote in order to close the backup cursor
+         * connection on the donor.
+         */
+        StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleKillBackupCursorWithLock(
+            WithLock lk, std::shared_ptr<executor::TaskExecutor> executor);
+
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientService::_mutex");
 
         // All member variables are labeled with one of the following codes indicating the
@@ -618,6 +634,7 @@ public:
         ServiceContext* const _serviceContext;
         const TenantMigrationRecipientService* const _recipientService;  // (R) (not owned)
         std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;   // (M)
+        std::shared_ptr<executor::TaskExecutor> _backupCursorExecutor;   // (M)
         TenantMigrationRecipientDocument _stateDoc;                      // (M)
 
         // This data is provided in the initial state doc and never changes.  We keep copies to
