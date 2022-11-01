@@ -89,6 +89,16 @@ std::vector<Value> toValues(std::vector<PrfBlock>&& vec);
 std::unique_ptr<MatchExpression> makeTagDisjunction(BSONArray&& tagArray);
 
 void logTagsExceeded(const ExceptionFor<ErrorCodes::FLEMaxTagLimitExceeded>& ex);
+
+/**
+ * Returns true of the BSONElement contains BinData(6) with the specified sub-sub type.
+ */
+bool isPayloadOfType(EncryptedBinDataType ty, const BSONElement& elt);
+/**
+ * Returns true of the Value contains BinData(6) with the specified sub-sub type.
+ */
+bool isPayloadOfType(EncryptedBinDataType ty, const Value& elt);
+
 /**
  * Interface for implementing a server rewrite for an encrypted index. Each type of predicate
  * should have its own subclass that implements the virtual methods in this class.
@@ -126,32 +136,14 @@ protected:
      * Check if the passed-in payload is a FLE2 find payload for the right encrypted index type.
      */
     virtual bool isPayload(const BSONElement& elt) const {
-        if (!elt.isBinData(BinDataType::Encrypt)) {
-            return false;
-        }
-        int dataLen;
-        auto data = elt.binData(dataLen);
-
-        // Check that the BinData's subtype is 6, and its sub-subtype is equal to this predicate's
-        // encryptedBinDataType.
-        return dataLen >= 1 &&
-            static_cast<uint8_t>(data[0]) == static_cast<uint8_t>(encryptedBinDataType());
+        return isPayloadOfType(this->encryptedBinDataType(), elt);
     }
 
     /**
      * Check if the passed-in payload is a FLE2 find payload for the right encrypted index type.
      */
     virtual bool isPayload(const Value& v) const {
-        if (v.getType() != BSONType::BinData) {
-            return false;
-        }
-
-        auto binData = v.getBinData();
-        // Check that the BinData's subtype is 6, and its sub-subtype is equal to this predicate's
-        // encryptedBinDataType.
-        return binData.type == BinDataType::Encrypt && binData.length >= 1 &&
-            static_cast<uint8_t>(encryptedBinDataType()) ==
-            static_cast<const uint8_t*>(binData.data)[0];
+        return isPayloadOfType(this->encryptedBinDataType(), v);
     }
     /**
      * Generate tags from a FLE2 Find Payload. This function takes in a variant of BSONElement and

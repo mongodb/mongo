@@ -2278,7 +2278,7 @@ FLE2FindRangePayload FLEClientCrypto::serializeFindRangePayload(
     payload.setPayload(edgesInfo);
     payload.setFirstOperator(spec.getFirstOperator());
     payload.setSecondOperator(spec.getSecondOperator());
-    payload.setPayloadId(1234);
+    payload.setPayloadId(spec.getPayloadId());
 
     return payload;
 }
