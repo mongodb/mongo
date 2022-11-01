@@ -60,11 +60,13 @@ public:
         o.parseProtected(ctxt, bsonObject);
         return o;
     }
-    const BSONObj& getPreImageDocumentKey() const {
-        return _preImageDocumentKey;
+
+    const BSONObj& getPostImageDocumentKey() const {
+        return _postImageDocumentKey;
     }
-    void setPreImageDocumentKey(BSONObj value) {
-        _preImageDocumentKey = std::move(value);
+
+    void setPostImageDocumentKey(BSONObj value) {
+        _postImageDocumentKey = std::move(value);
     }
 
     const BSONObj& getPreImage() const {
@@ -76,7 +78,9 @@ public:
     }
 
 private:
-    BSONObj _preImageDocumentKey;
+    // Stores the post image _id + shard key values.
+    BSONObj _postImageDocumentKey;
+
     BSONObj _fullPreImage;
 };
 
