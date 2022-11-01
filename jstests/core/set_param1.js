@@ -1,7 +1,7 @@
 // @tags: [
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
-//   requires_fcv_61,
+//   requires_fcv_62,
 //   # This test attempts to compare the response from running the {getParameter: "*"}
 //   # command multiple times, which may observe the change to the failpoint enabled by the
 //   # migration hook.
@@ -33,6 +33,10 @@ const tmp1 = assert.commandWorked(db.adminCommand({"setParameter": 1, "logLevel"
 const tmp2 = assert.commandWorked(db.adminCommand({"setParameter": 1, "logLevel": old.logLevel}));
 const now = scrub(assert.commandWorked(db.adminCommand({"getParameter": "*"})));
 
+assert.commandFailed(db.adminCommand({"setParameter": 1, logLevel: NaN}));
+assert.commandFailed(db.adminCommand({"setParameter": 1, logLevel: Number.MAX_SAFE_INTEGER + 1}));
+assert.commandFailed(db.adminCommand({"setParameter": 1, logLevel: Number.MIN_SAFE_INTEGER - 1}));
+
 assert.eq(old, now, "A");
 assert.eq(old.logLevel, tmp1.was, "B");
 assert.eq(5, tmp2.was, "C");
@@ -57,6 +61,16 @@ assert.commandFailed(db.adminCommand({"setParameter": 1, logComponentVerbosity: 
 // Non-numeric verbosity for component should be rejected.
 assert.commandFailed(db.adminCommand(
     {"setParameter": 1, logComponentVerbosity: {storage: {journal: {verbosity: "not a number"}}}}));
+assert.commandFailed(db.adminCommand(
+    {"setParameter": 1, logComponentVerbosity: {storage: {journal: {verbosity: NaN}}}}));
+assert.commandFailed(db.adminCommand({
+    "setParameter": 1,
+    logComponentVerbosity: {storage: {journal: {verbosity: Number.MAX_SAFE_INTEGER + 1}}}
+}));
+assert.commandFailed(db.adminCommand({
+    "setParameter": 1,
+    logComponentVerbosity: {storage: {journal: {verbosity: Number.MIN_SAFE_INTEGER - 1}}}
+}));
 
 // Invalid component shall be rejected
 assert.commandFailed(
