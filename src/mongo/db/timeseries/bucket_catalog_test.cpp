@@ -43,17 +43,13 @@ namespace mongo {
 namespace {
 class BucketCatalogTest : public CatalogTestFixture {
 protected:
-    class Task {
-        AtomicWord<bool> _running{false};
-        stdx::packaged_task<void()> _task;
-        stdx::future<void> _future;
+    class RunBackgroundTaskAndWaitForFailpoint {
         stdx::thread _taskThread;
 
     public:
-        Task(std::function<void()>&& fn);
-        ~Task();
-
-        const stdx::future<void>& future();
+        RunBackgroundTaskAndWaitForFailpoint(const std::string& failpointName,
+                                             std::function<void()>&& fn);
+        ~RunBackgroundTaskAndWaitForFailpoint();
     };
 
     void setUp() override;
@@ -96,25 +92,6 @@ protected:
     BSONObj _makeTimeseriesOptionsForCreate() const override;
 };
 
-BucketCatalogTest::Task::Task(std::function<void()>&& fn)
-    : _task{[this, fn = std::move(fn)]() {
-          _running.store(true);
-          fn();
-      }},
-      _future{_task.get_future()},
-      _taskThread{std::move(_task)} {
-    while (!_running.load()) {
-        stdx::this_thread::yield();
-    }
-}
-BucketCatalogTest::Task::~Task() {
-    _taskThread.join();
-}
-
-const stdx::future<void>& BucketCatalogTest::Task::future() {
-    return _future;
-}
-
 void BucketCatalogTest::setUp() {
     CatalogTestFixture::setUp();
 
@@ -127,6 +104,23 @@ void BucketCatalogTest::setUp() {
             ns.db().toString(),
             BSON("create" << ns.coll() << "timeseries" << _makeTimeseriesOptionsForCreate())));
     }
+}
+
+BucketCatalogTest::RunBackgroundTaskAndWaitForFailpoint::RunBackgroundTaskAndWaitForFailpoint(
+    const std::string& failpointName, std::function<void()>&& fn) {
+    auto fp = globalFailPointRegistry().find(failpointName);
+    auto timesEntered = fp->setMode(FailPoint::alwaysOn, 0);
+
+    // Start background job.
+    _taskThread = stdx::thread(std::move(fn));
+
+    // Once we hit the failpoint once, turn it off.
+    fp->waitForTimesEntered(timesEntered + 1);
+    fp->setMode(FailPoint::off, 0);
+}
+
+BucketCatalogTest::RunBackgroundTaskAndWaitForFailpoint::~RunBackgroundTaskAndWaitForFailpoint() {
+    _taskThread.join();
 }
 
 std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
@@ -895,16 +889,137 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
 
     // Batch 2 will not be able to commit until batch 1 has finished.
     ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
-    auto task = Task{[&]() { ASSERT_OK(_bucketCatalog->prepareCommit(batch2)); }};
-    // Add a little extra wait to make sure prepareCommit actually gets to the blocking point.
-    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(10));
-    ASSERT(task.future().valid());
-    ASSERT(stdx::future_status::timeout == task.future().wait_for(stdx::chrono::microseconds(1)))
-        << "prepareCommit finished before expected";
 
-    _bucketCatalog->finish(batch1, {});
-    task.future().wait();
+    {
+        auto task = RunBackgroundTaskAndWaitForFailpoint{
+            "hangWaitingForConflictingPreparedBatch",
+            [&]() { ASSERT_OK(_bucketCatalog->prepareCommit(batch2)); }};
+
+        // Finish the first batch.
+        _bucketCatalog->finish(batch1, {});
+        ASSERT(batch1->finished());
+    }
+
     _bucketCatalog->finish(batch2, {});
+    ASSERT(batch2->finished());
+}
+
+TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
+    auto batch1 = _bucketCatalog
+                      ->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << Date_t::now()),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
+                      .getValue()
+                      .batch;
+
+    auto batch2 = _bucketCatalog
+                      ->insert(_makeOperationContext().second.get(),
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << Date_t::now()),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
+                      .getValue()
+                      .batch;
+    auto batch3 = _bucketCatalog
+                      ->insert(_makeOperationContext().second.get(),
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << Date_t::now()),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
+                      .getValue()
+                      .batch;
+    ASSERT_EQ(batch1->bucket().id, batch2->bucket().id);
+    ASSERT_EQ(batch1->bucket().id, batch3->bucket().id);
+
+    ASSERT(batch1->claimCommitRights());
+    ASSERT(batch2->claimCommitRights());
+    ASSERT(batch3->claimCommitRights());
+
+    // Batch 2 will not be able to commit until batch 1 has finished.
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
+
+    {
+        auto task = RunBackgroundTaskAndWaitForFailpoint{
+            "hangWaitingForConflictingPreparedBatch",
+            [&]() { ASSERT_NOT_OK(_bucketCatalog->prepareCommit(batch2)); }};
+
+        // If we abort the third batch, it should abort the second one too, as it isn't prepared.
+        // However, since the first batch is prepared, we can't abort it or clean up the bucket. We
+        // can then finish the first batch, which will allow the second batch to proceed. It should
+        // recognize it has been aborted and clean up the bucket.
+        _bucketCatalog->abort(batch3, Status{ErrorCodes::TimeseriesBucketCleared, "cleared"});
+        _bucketCatalog->finish(batch1, {});
+        ASSERT(batch1->finished());
+    }
+    // Wait for the batch 2 task to finish preparing commit. Since batch 1 finished, batch 2 should
+    // be unblocked. Note that after aborting batch 3, batch 2 was not in a prepared state, so we
+    // expect the prepareCommit() call to fail.
+    ASSERT(batch2->finished());
+
+    // Make sure a new batch ends up in a new bucket.
+    auto batch4 = _bucketCatalog
+                      ->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << Date_t::now()),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
+                      .getValue()
+                      .batch;
+    ASSERT_NE(batch2->bucket().id, batch4->bucket().id);
+}
+
+TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
+    auto batch1 = _bucketCatalog
+                      ->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << Date_t::now()),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
+                      .getValue()
+                      .batch;
+
+    auto batch2 = _bucketCatalog
+                      ->insert(_makeOperationContext().second.get(),
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << Date_t::now()),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
+                      .getValue()
+                      .batch;
+
+    // Batch 1 and 2 use the same bucket.
+    ASSERT_EQ(batch1->bucket().id, batch2->bucket().id);
+    ASSERT(batch1->claimCommitRights());
+    ASSERT(batch2->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
+
+    // Batch 1 will be in a prepared state now. Abort the second batch so that bucket 1 will be
+    // closed after batch 1 finishes.
+    _bucketCatalog->abort(batch2, Status{ErrorCodes::TimeseriesBucketCleared, "cleared"});
+    _bucketCatalog->finish(batch1, {});
+    ASSERT(batch1->finished());
+    ASSERT(batch2->finished());
+
+    // Ensure a batch started after batch 2 aborts, does not insert future measurements into the
+    // aborted batch/bucket.
+    auto batch3 = _bucketCatalog
+                      ->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << Date_t::now()),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
+                      .getValue()
+                      .batch;
+    ASSERT_NE(batch1->bucket().id, batch3->bucket().id);
 }
 
 TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {

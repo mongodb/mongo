@@ -51,6 +51,7 @@ void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj);
 
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
+MONGO_FAIL_POINT_DEFINE(hangWaitingForConflictingPreparedBatch);
 
 uint8_t numDigits(uint32_t num) {
     uint8_t numDigits = 0;
@@ -746,7 +747,11 @@ Status BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
         _useBucketInState(&stripe, stripeLock, batch->bucket().id, BucketState::kPrepared);
 
     if (batch->finished()) {
-        // Someone may have aborted it while we were waiting.
+        // Someone may have aborted it while we were waiting. Since we have the prepared batch, we
+        // should now be able to fully abort the bucket.
+        if (bucket) {
+            _abort(&stripe, stripeLock, batch, getBatchStatus());
+        }
         return getBatchStatus();
     } else if (!bucket) {
         _abort(&stripe, stripeLock, batch, getTimeseriesBucketClearedError(batch->bucket().id));
@@ -1051,6 +1056,10 @@ void BucketCatalog::_waitToCommitBatch(Stripe* stripe, const std::shared_ptr<Wri
             }
         }
 
+        // We only hit this failpoint when there are conflicting prepared batches on the same
+        // bucket.
+        hangWaitingForConflictingPreparedBatch.pauseWhileSet();
+
         // We have to wait for someone else to finish.
         current->getResult().getStatus().ignore();  // We don't care about the result.
     }
@@ -1108,7 +1117,7 @@ void BucketCatalog::_abort(Stripe* stripe,
                            // user is doing with it, but we need to keep the bucket around until
                            // that batch is finished.
     if (auto& prepared = bucket->_preparedBatch) {
-        if (prepared == batch) {
+        if (batch && prepared == batch) {
             // We own the prepared batch, so we can go ahead and abort it and remove the bucket.
             prepared->_abort(status);
             prepared.reset();
@@ -1119,6 +1128,8 @@ void BucketCatalog::_abort(Stripe* stripe,
 
     if (doRemove) {
         [[maybe_unused]] bool removed = _removeBucket(stripe, stripeLock, bucket);
+    } else {
+        _setBucketState(bucket->id(), BucketState::kCleared);
     }
 }
 
