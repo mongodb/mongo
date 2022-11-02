@@ -52,6 +52,13 @@
 
 namespace mongo {
 namespace {
+// Sentinel id for marking a catalogId mapping range as unknown. Must use an invalid RecordId.
+static RecordId kUnknownRangeMarkerId = RecordId::minLong();
+// Maximum number of entries in catalogId mapping when inserting catalogId missing at timestamp.
+// Used to avoid quadratic behavior when inserting entries at the beginning. When threshold is
+// reached we will fall back to more durable catalog scans.
+static constexpr int kMaxCatalogIdMappingLengthForMissingInsert = 1000;
+
 struct LatestCollectionCatalog {
     std::shared_ptr<CollectionCatalog> catalog = std::make_shared<CollectionCatalog>();
 };
@@ -1288,7 +1295,11 @@ CollectionCatalog::CatalogIdLookup CollectionCatalog::lookupCatalogIdByNSS(
         // iterator to get the last entry where the time is less or equal.
         auto catalogId = (--rangeIt)->id;
         if (catalogId) {
-            return {*catalogId, CatalogIdLookup::NamespaceExistence::kExists};
+            if (*catalogId != kUnknownRangeMarkerId) {
+                return {*catalogId, CatalogIdLookup::NamespaceExistence::kExists};
+            } else {
+                return {RecordId{}, CatalogIdLookup::NamespaceExistence::kUnknown};
+            }
         }
         return {RecordId{}, CatalogIdLookup::NamespaceExistence::kNotExists};
     }
@@ -1738,7 +1749,8 @@ void CollectionCatalog::_pushCatalogIdForNSS(const NamespaceString& nss,
         return;
     }
 
-    // Re-write latest entry if timestamp match (multiple changes occured in this transaction)
+    // An entry could exist already if concurrent writes are performed, keep the latest change in
+    // that case.
     if (!ids.empty() && ids.back().ts == *ts) {
         ids.back().id = catalogId;
         return;
@@ -1774,8 +1786,8 @@ void CollectionCatalog::_pushCatalogIdForRename(const NamespaceString& from,
     auto& fromIds = _catalogIds.at(from);
     invariant(!fromIds.empty());
 
-    // Re-write latest entry if timestamp match (multiple changes occured in this transaction),
-    // otherwise push at end
+    // An entry could exist already if concurrent writes are performed, keep the latest change in
+    // that case.
     if (!toIds.empty() && toIds.back().ts == *ts) {
         toIds.back().id = fromIds.back().id;
     } else {
@@ -1793,6 +1805,83 @@ void CollectionCatalog::_pushCatalogIdForRename(const NamespaceString& from,
         fromIds.push_back(TimestampedCatalogId{boost::none, *ts});
         _markNamespaceForCatalogIdCleanupIfNeeded(from, fromIds);
     }
+}
+
+void CollectionCatalog::_insertCatalogIdForNSSAfterScan(const NamespaceString& nss,
+                                                        boost::optional<RecordId> catalogId,
+                                                        Timestamp ts) {
+    // TODO SERVER-68674: Remove feature flag check.
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+        // No-op.
+        return;
+    }
+
+    auto& ids = _catalogIds[nss];
+
+    // Binary search for to the entry with same or larger timestamp
+    auto it =
+        std::lower_bound(ids.begin(), ids.end(), ts, [](const auto& entry, const Timestamp& ts) {
+            return entry.ts < ts;
+        });
+
+    // The logic of what we need to do differs whether we are inserting a valid catalogId or not.
+    if (catalogId) {
+        if (it != ids.end()) {
+            // An entry could exist already if concurrent writes are performed, keep the latest
+            // change in that case.
+            if (it->ts == ts) {
+                it->id = catalogId;
+                return;
+            }
+
+            // If next element has same catalogId, we can adjust its timestamp to cover a longer
+            // range
+            if (it->id == catalogId) {
+                it->ts = ts;
+                _markNamespaceForCatalogIdCleanupIfNeeded(nss, ids);
+                return;
+            }
+        }
+
+        // Otherwise insert new entry at timestamp
+        ids.insert(it, TimestampedCatalogId{catalogId, ts});
+        _markNamespaceForCatalogIdCleanupIfNeeded(nss, ids);
+        return;
+    }
+
+    // Avoid inserting missing mapping when the list has grown past the threshold. Will cause the
+    // system to fall back to scanning the durable catalog.
+    if (ids.size() >= kMaxCatalogIdMappingLengthForMissingInsert) {
+        return;
+    }
+
+    if (it != ids.end() && it->ts == ts) {
+        // An entry could exist already if concurrent writes are performed, keep the latest change
+        // in that case.
+        it->id = boost::none;
+    } else {
+        // Otherwise insert new entry
+        it = ids.insert(it, TimestampedCatalogId{boost::none, ts});
+    }
+
+    // The iterator is positioned on the added/modified element above, reposition it to the next
+    // entry
+    ++it;
+
+    // We don't want to assume that the namespace remains not existing until the next entry, as
+    // there can be times where the namespace actually does exist. To make sure we trigger the
+    // scanning of the durable catalog in this range we will insert a bogus entry using an invalid
+    // RecordId at the next timestamp. This will treat the range forward as unknown.
+    auto nextTs = ts + 1;
+
+    // If the next entry is on the next timestamp already, we can skip adding the bogus entry. If
+    // this function is called for a previously unknown namespace, we may not have any future valid
+    // entries and the iterator would be positioned at and at this point.
+    if (it == ids.end() || it->ts != nextTs) {
+        ids.insert(it, TimestampedCatalogId{kUnknownRangeMarkerId, nextTs});
+    }
+
+    _markNamespaceForCatalogIdCleanupIfNeeded(nss, ids);
 }
 
 void CollectionCatalog::_markNamespaceForCatalogIdCleanupIfNeeded(
