@@ -37,6 +37,7 @@
 
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
@@ -495,8 +496,19 @@ MigrateInfosWithReason BalancerPolicy::balance(
                 }
 
                 invariant(to != stat.shardId);
-                migrations.emplace_back(
-                    to, distribution.nss(), chunk, MoveChunkRequest::ForceJumbo::kForceBalancer);
+
+                auto maxChunkSizeBytes = [&]() -> boost::optional<int64_t> {
+                    if (collDataSizeInfo.has_value()) {
+                        return collDataSizeInfo->maxChunkSizeBytes;
+                    }
+                    return boost::none;
+                }();
+
+                migrations.emplace_back(to,
+                                        distribution.nss(),
+                                        chunk,
+                                        MoveChunkRequest::ForceJumbo::kForceBalancer,
+                                        maxChunkSizeBytes);
                 if (firstReason == MigrationReason::none) {
                     firstReason = MigrationReason::drain;
                 }
@@ -564,11 +576,20 @@ MigrateInfosWithReason BalancerPolicy::balance(
                 }
 
                 invariant(to != stat.shardId);
+
+                auto maxChunkSizeBytes = [&]() -> boost::optional<int64_t> {
+                    if (collDataSizeInfo.has_value()) {
+                        return collDataSizeInfo->maxChunkSizeBytes;
+                    }
+                    return boost::none;
+                }();
+
                 migrations.emplace_back(to,
                                         distribution.nss(),
                                         chunk,
                                         forceJumbo ? MoveChunkRequest::ForceJumbo::kForceBalancer
-                                                   : MoveChunkRequest::ForceJumbo::kDoNotForce);
+                                                   : MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                        maxChunkSizeBytes);
                 if (firstReason == MigrationReason::none) {
                     firstReason = MigrationReason::zoneViolation;
                 }
@@ -859,7 +880,8 @@ string ZoneRange::toString() const {
 MigrateInfo::MigrateInfo(const ShardId& a_to,
                          const NamespaceString& a_nss,
                          const ChunkType& a_chunk,
-                         const MoveChunkRequest::ForceJumbo a_forceJumbo)
+                         const MoveChunkRequest::ForceJumbo a_forceJumbo,
+                         boost::optional<int64_t> maxChunkSizeBytes)
     : nss(a_nss), uuid(a_chunk.getCollectionUUID()) {
     invariant(a_to.isValid());
 
@@ -870,6 +892,7 @@ MigrateInfo::MigrateInfo(const ShardId& a_to,
     maxKey = a_chunk.getMax();
     version = a_chunk.getVersion();
     forceJumbo = a_forceJumbo;
+    optMaxChunkSizeBytes = maxChunkSizeBytes;
 }
 
 MigrateInfo::MigrateInfo(const ShardId& a_to,
@@ -919,6 +942,10 @@ BSONObj MigrateInfo::getMigrationTypeQuery() const {
 string MigrateInfo::toString() const {
     return str::stream() << uuid << ": [" << minKey << ", " << maxKey << "), from " << from
                          << ", to " << to;
+}
+
+boost::optional<int64_t> MigrateInfo::getMaxChunkSizeBytes() const {
+    return optMaxChunkSizeBytes;
 }
 
 SplitInfo::SplitInfo(const ShardId& inShardId,

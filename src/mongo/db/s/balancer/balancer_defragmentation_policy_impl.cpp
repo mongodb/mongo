@@ -402,7 +402,8 @@ public:
                                         std::move(collectionChunks),
                                         std::move(shardInfos),
                                         std::move(collectionZones),
-                                        smallChunkSizeThresholdBytes));
+                                        smallChunkSizeThresholdBytes,
+                                        maxChunkSizeBytes));
     }
 
     DefragmentationPhaseEnum getType() const override {
@@ -465,7 +466,8 @@ public:
             availableShards->erase(targetSibling->shard);
             auto smallChunkVersion = getShardVersion(opCtx, nextSmallChunk->shard, _nss);
             _outstandingMigrations.emplace_back(nextSmallChunk, targetSibling);
-            return _outstandingMigrations.back().asMigrateInfo(_uuid, _nss, smallChunkVersion);
+            return _outstandingMigrations.back().asMigrateInfo(
+                _uuid, _nss, smallChunkVersion, _maxChunkSizeBytes);
         }
 
         return boost::none;
@@ -717,7 +719,8 @@ private:
 
         MigrateInfo asMigrateInfo(const UUID& collUuid,
                                   const NamespaceString& nss,
-                                  const ChunkVersion& version) const {
+                                  const ChunkVersion& version,
+                                  uint64_t maxChunkSizeBytes) const {
             return MigrateInfo(chunkToMergeWith->shard,
                                chunkToMove->shard,
                                nss,
@@ -725,7 +728,8 @@ private:
                                chunkToMove->range.getMin(),
                                chunkToMove->range.getMax(),
                                version,
-                               MoveChunkRequest::ForceJumbo::kDoNotForce);
+                               MoveChunkRequest::ForceJumbo::kDoNotForce,
+                               maxChunkSizeBytes);
         }
 
         ChunkRange asMergedRange() const {
@@ -790,6 +794,8 @@ private:
 
     const int64_t _smallChunkSizeThresholdBytes;
 
+    const uint64_t _maxChunkSizeBytes;
+
     bool _aborted{false};
 
     DefragmentationPhaseEnum _nextPhase{DefragmentationPhaseEnum::kMergeChunks};
@@ -799,7 +805,8 @@ private:
                             std::vector<ChunkType>&& collectionChunks,
                             stdx::unordered_map<ShardId, ShardInfo>&& shardInfos,
                             ZoneInfo&& collectionZones,
-                            uint64_t smallChunkSizeThresholdBytes)
+                            uint64_t smallChunkSizeThresholdBytes,
+                            uint64_t maxChunkSizeBytes)
         : _nss(nss),
           _uuid(uuid),
           _collectionChunks(),
@@ -810,7 +817,8 @@ private:
           _actionableMerges(),
           _outstandingMerges(),
           _zoneInfo(std::move(collectionZones)),
-          _smallChunkSizeThresholdBytes(smallChunkSizeThresholdBytes) {
+          _smallChunkSizeThresholdBytes(smallChunkSizeThresholdBytes),
+          _maxChunkSizeBytes(maxChunkSizeBytes) {
 
         // Load the collection routing table in a std::list to ease later manipulation
         for (auto&& chunk : collectionChunks) {
