@@ -133,8 +133,9 @@ SSLConnectionContext::~SSLConnectionContext() = default;
 
 class ASIOReactorTimer final : public ReactorTimer {
 public:
+    using TimerType = synchronized_value<asio::system_timer, RawSynchronizedValueMutexPolicy>;
     explicit ASIOReactorTimer(asio::io_context& ctx)
-        : _timer(std::make_shared<asio::system_timer>(ctx)) {}
+        : _timer(std::make_shared<TimerType>(asio::system_timer(ctx))) {}
 
     ~ASIOReactorTimer() {
         // The underlying timer won't get destroyed until the last promise from _asyncWait
@@ -150,7 +151,7 @@ public:
         }
 
         // Otherwise there could be a previous timer that was scheduled normally.
-        _timer->cancel();
+        (**_timer)->cancel();
     }
 
 
@@ -159,7 +160,7 @@ public:
             return _asyncWait([&] { return baton->networking()->waitUntil(*this, expiration); },
                               baton);
         } else {
-            return _asyncWait([&] { _timer->expires_at(expiration.toSystemTimePoint()); });
+            return _asyncWait([&] { (**_timer)->expires_at(expiration.toSystemTimePoint()); });
         }
     }
 
@@ -170,15 +171,17 @@ private:
             cancel();
 
             armTimer();
-            return _timer->async_wait(UseFuture{}).tapError([timer = _timer](const Status& status) {
-                if (status != ErrorCodes::CallbackCanceled) {
-                    LOGV2_DEBUG(23011,
-                                2,
-                                "Timer received error: {error}",
-                                "Timer received error",
-                                "error"_attr = status);
-                }
-            });
+            return (**_timer)
+                ->async_wait(UseFuture{})
+                .tapError([timer = _timer](const Status& status) {
+                    if (status != ErrorCodes::CallbackCanceled) {
+                        LOGV2_DEBUG(23011,
+                                    2,
+                                    "Timer received error: {error}",
+                                    "Timer received error",
+                                    "error"_attr = status);
+                    }
+                });
 
         } catch (asio::system_error& ex) {
             return futurize(ex.code());
@@ -201,7 +204,7 @@ private:
         return std::move(pf.future);
     }
 
-    std::shared_ptr<asio::system_timer> _timer;
+    std::shared_ptr<TimerType> _timer;
 };
 
 class TransportLayerASIO::ASIOReactor final : public Reactor {
