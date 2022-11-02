@@ -100,6 +100,14 @@ if platform_family? 'rhel' or platform_family? 'amazon'
       sleep 120
     EOH
   end
+  #rhel9 doesn't have Gconf2 without epel
+  if node['platform'] == 'redhat' and node['platform_version'] == '9.0'
+    execute 'install epel' do
+      command 'dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm -y'
+      live_stream true
+      cwd homedir
+    end
+  end
   execute 'install mongod' do
     command 'yum install -y `find . -name "*server*.rpm"`'
     live_stream true
