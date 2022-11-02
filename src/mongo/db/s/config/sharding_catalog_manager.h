@@ -359,7 +359,8 @@ public:
      */
     void splitOrMarkJumbo(OperationContext* opCtx,
                           const NamespaceString& nss,
-                          const BSONObj& minKey);
+                          const BSONObj& minKey,
+                          boost::optional<int64_t> optMaxChunkSizeBytes);
 
     /**
      * In a transaction, sets the 'allowMigrations' to the requested state and bumps the collection

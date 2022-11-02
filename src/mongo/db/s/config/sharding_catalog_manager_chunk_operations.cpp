@@ -1775,19 +1775,31 @@ void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTx
 
 void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                                               const NamespaceString& nss,
-                                              const BSONObj& minKey) {
+                                              const BSONObj& minKey,
+                                              boost::optional<int64_t> optMaxChunkSizeBytes) {
     const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
     auto chunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
 
     try {
-        const auto splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
-            opCtx,
-            chunk.getShardId(),
-            nss,
-            cm.getShardKeyPattern(),
-            ChunkRange(chunk.getMin(), chunk.getMax()),
-            Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes()));
+        const auto maxChunkSizeBytes = [&]() -> int64_t {
+            if (optMaxChunkSizeBytes.has_value()) {
+                return *optMaxChunkSizeBytes;
+            }
+
+            auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
+                opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
+            return coll.getMaxChunkSizeBytes().value_or(
+                Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes());
+        }();
+
+        const auto splitPoints = uassertStatusOK(
+            shardutil::selectChunkSplitPoints(opCtx,
+                                              chunk.getShardId(),
+                                              nss,
+                                              cm.getShardKeyPattern(),
+                                              ChunkRange(chunk.getMin(), chunk.getMax()),
+                                              maxChunkSizeBytes));
 
         if (splitPoints.empty()) {
             LOGV2(21873,

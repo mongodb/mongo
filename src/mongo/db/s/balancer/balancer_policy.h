@@ -60,7 +60,8 @@ struct MigrateInfo {
     MigrateInfo(const ShardId& a_to,
                 const NamespaceString& a_nss,
                 const ChunkType& a_chunk,
-                ForceJumbo a_forceJumbo);
+                ForceJumbo a_forceJumbo,
+                boost::optional<int64_t> maxChunkSizeBytes = boost::none);
 
     MigrateInfo(const ShardId& a_to,
                 const ShardId& a_from,
@@ -77,6 +78,8 @@ struct MigrateInfo {
     BSONObj getMigrationTypeQuery() const;
 
     std::string toString() const;
+
+    boost::optional<int64_t> getMaxChunkSizeBytes() const;
 
     NamespaceString nss;
     UUID uuid;

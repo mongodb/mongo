@@ -1085,7 +1085,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
                 opCtx, migrateInfo.uuid, repl::ReadConcernLevel::kMajorityReadConcern);
 
             ShardingCatalogManager::get(opCtx)->splitOrMarkJumbo(
-                opCtx, collection.getNss(), migrateInfo.minKey);
+                opCtx, collection.getNss(), migrateInfo.minKey, migrateInfo.getMaxChunkSizeBytes());
             continue;
         }
 
