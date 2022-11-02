@@ -52,6 +52,7 @@ void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj);
 
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
+MONGO_FAIL_POINT_DEFINE(hangWaitingForConflictingPreparedBatch);
 
 uint8_t numDigits(uint32_t num) {
     uint8_t numDigits = 0;
@@ -325,7 +326,19 @@ bool BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
 
     BucketAccess bucket(this, batch->bucketId(), BucketState::kPrepared);
     if (batch->finished()) {
-        // Someone may have aborted it while we were waiting.
+        // Someone may have aborted it while we were waiting. Since we have the prepared batch, we
+        // should now be able to fully abort the bucket.
+        if (bucket) {
+            bucket.release();
+            auto lk = _lockExclusive();
+            auto it = _allBuckets.find(batch->bucketId());
+            if (it != _allBuckets.end()) {
+                auto bucket = it->second.get();
+                stdx::unique_lock blk{bucket->_mutex};
+                bucket->_preparedBatch.reset();
+                _abort(blk, bucket, nullptr, boost::none);
+            }
+        }
         return false;
     } else if (!bucket) {
         abort(batch);
@@ -529,6 +542,11 @@ void BucketCatalog::_waitToCommitBatch(const std::shared_ptr<WriteBatch>& batch)
 
         // We have to wait for someone else to finish.
         bucket.release();
+
+        // We only hit this failpoint when there are conflicting prepared batches on the same
+        // bucket.
+        hangWaitingForConflictingPreparedBatch.pauseWhileSet();
+
         current->getResult().getStatus().ignore();  // We don't care about the result.
     }
 }
@@ -590,6 +608,8 @@ void BucketCatalog::_abort(stdx::unique_lock<Mutex>& lk,
     lk.unlock();
     if (doRemove) {
         [[maybe_unused]] bool removed = _removeBucket(bucket, false /* expiringBuckets */);
+    } else {
+        _setBucketState(bucket->id(), BucketState::kCleared);
     }
 }
 
