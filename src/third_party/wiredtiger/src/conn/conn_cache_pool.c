@@ -509,7 +509,7 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
         if (cache->cp_pass_pressure > highest)
             highest = cache->cp_pass_pressure;
 
-        __wt_verbose(session, WT_VERB_SHARED_CACHE,
+        __wt_verbose_debug2(session, WT_VERB_SHARED_CACHE,
           "Assess entry. reads: %" PRIu64 ", app evicts: %" PRIu64 ", app waits: %" PRIu64
           ", pressure: %" PRIu64,
           reads, app_evicts, app_waits, cache->cp_pass_pressure);
@@ -569,7 +569,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
         pressure = cache->cp_pass_pressure / highest_percentile;
         busy = __wt_eviction_needed(entry->default_session, false, true, &pct_full);
 
-        __wt_verbose(session, WT_VERB_SHARED_CACHE,
+        __wt_verbose_debug2(session, WT_VERB_SHARED_CACHE,
           "\t%5" PRIu64 ", %3" PRIu64 ", %2" PRIu32 ", %d, %2.3f", entry->cache_size >> 20,
           pressure, cache->cp_skip_count, busy, pct_full);
 
@@ -666,7 +666,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
                 entry->cache_size -= adjustment;
                 cp->currently_used -= adjustment;
             }
-            __wt_verbose(session, WT_VERB_SHARED_CACHE, "Allocated %s%" PRIu64 " to %s",
+            __wt_verbose_debug2(session, WT_VERB_SHARED_CACHE, "Allocated %s%" PRIu64 " to %s",
               grow ? "" : "-", adjustment, entry->home);
 
             /*
