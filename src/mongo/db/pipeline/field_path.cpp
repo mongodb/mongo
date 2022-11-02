@@ -69,10 +69,8 @@ string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffix) {
     return str::stream() << prefix << "." << suffix;
 }
 
-FieldPath::FieldPath(std::string inputPath)
-    : _fieldPath(std::move(inputPath)),
-      _fieldPathDotPosition{string::npos},
-      _fieldHash{kHashUninitialized} {
+FieldPath::FieldPath(std::string inputPath, bool precomputeHashes)
+    : _fieldPath(std::move(inputPath)), _fieldPathDotPosition{string::npos} {
     uassert(40352, "FieldPath cannot be constructed with empty string", !_fieldPath.empty());
     uassert(40353, "FieldPath must not end with a '.'.", _fieldPath[_fieldPath.size() - 1] != '.');
 
@@ -81,19 +79,21 @@ FieldPath::FieldPath(std::string inputPath)
     size_t startPos = 0;
     while (string::npos != (dotPos = _fieldPath.find('.', startPos))) {
         _fieldPathDotPosition.push_back(dotPos);
-        _fieldHash.push_back(kHashUninitialized);
         startPos = dotPos + 1;
     }
 
     _fieldPathDotPosition.push_back(_fieldPath.size());
 
-    // Validate the path length and the fields.
+    // Validate the path length and the fields, and precompute their hashes if requested.
     const auto pathLength = getPathLength();
     uassert(ErrorCodes::Overflow,
             "FieldPath is too long",
             pathLength <= BSONDepth::getMaxAllowableDepth());
+    _fieldHash.reserve(pathLength);
     for (size_t i = 0; i < pathLength; ++i) {
-        uassertValidFieldName(getFieldName(i));
+        const auto& fieldName = getFieldName(i);
+        uassertValidFieldName(fieldName);
+        _fieldHash.push_back(precomputeHashes ? FieldNameHasher()(fieldName) : kHashUninitialized);
     }
 }
 
