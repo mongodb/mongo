@@ -71,7 +71,6 @@ variables:
 
 # Common compile variant dependency specifications.
 - &linux_x86_dynamic_compile_variant_dependency
-  activate: false
   depends_on:
   - name: archive_dist_test
     variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile-required
@@ -79,7 +78,6 @@ variables:
     variant: generate-tasks-for-version
 
 - &linux_x86_dynamic_debug_compile_variant_dependency
-  activate: false
   depends_on:
   - name: archive_dist_test
     variant: &linux_x86_dynamic_debug_compile_variant_name linux-x86-dynamic-debug-compile-required
@@ -87,7 +85,6 @@ variables:
     variant: generate-tasks-for-version
 
 - &linux_debug_aubsan_compile_variant_dependency
-  activate: false
   depends_on:
   - name: archive_dist_test
     variant: &linux_debug_aubsan_compile_variant_name linux-debug-aubsan-compile-required
@@ -95,7 +92,6 @@ variables:
     variant: generate-tasks-for-version
 
 - &windows_compile_variant_dependency
-  activate: false
   depends_on:
   - name: archive_dist_test
     variant: &windows_compile_variant_name windows-compile-required
@@ -279,7 +275,6 @@ buildvariants:
   name: &linux-64-debug-required linux-64-debug-required
   display_name: "! Linux x86 Shared Library DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  activate: false
   run_on:
   - rhel80-medium
   expansions:
