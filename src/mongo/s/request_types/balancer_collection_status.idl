@@ -40,7 +40,7 @@ structs:
         strict: false
         fields:
             chunkSize:
-                type: safeInt64
+                type: safeDouble
                 description: "Configured chunk size in MiB for this collection"
             balancerCompliant:
                 type: bool
