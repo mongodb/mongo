@@ -860,7 +860,11 @@ Status BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
         _useBucketInState(&stripe, stripeLock, batch->bucket().id, BucketState::kPrepared);
 
     if (batch->finished()) {
-        // Someone may have aborted it while we were waiting.
+        // Someone may have aborted it while we were waiting. Since we have the prepared batch, we
+        // should now be able to fully abort the bucket.
+        if (bucket) {
+            _abort(&stripe, stripeLock, batch, getBatchStatus());
+        }
         return getBatchStatus();
     } else if (!bucket) {
         _abort(&stripe, stripeLock, batch, getTimeseriesBucketClearedError(batch->bucket().id));
