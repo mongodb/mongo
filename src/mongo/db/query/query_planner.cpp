@@ -252,6 +252,11 @@ void tryToAddColumnScan(const QueryPlannerParams& params,
     // collection scan. Add that solution.
     out.push_back(QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(columnScan)));
 }
+
+bool collscanIsBounded(const CollectionScanNode* collscan) {
+    return collscan->minRecord || collscan->maxRecord;
+}
+
 }  // namespace
 
 using std::numeric_limits;
@@ -503,13 +508,23 @@ int determineCollscanDirection(const CanonicalQuery& query, const QueryPlannerPa
     return determineClusteredScanDirection(query, params).value_or(1);
 }
 
+std::pair<std::unique_ptr<QuerySolution>, const CollectionScanNode*> buildCollscanSolnWithNode(
+    const CanonicalQuery& query,
+    bool tailable,
+    const QueryPlannerParams& params,
+    boost::optional<int> direction = boost::none) {
+    std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::makeCollectionScan(
+        query, tailable, params, direction.value_or(determineCollscanDirection(query, params))));
+    const auto* collscanNode = checked_cast<const CollectionScanNode*>(solnRoot.get());
+    return std::make_pair(
+        QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot)), collscanNode);
+}
+
 std::unique_ptr<QuerySolution> buildCollscanSoln(const CanonicalQuery& query,
                                                  bool tailable,
                                                  const QueryPlannerParams& params,
                                                  boost::optional<int> direction = boost::none) {
-    std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::makeCollectionScan(
-        query, tailable, params, direction.value_or(determineCollscanDirection(query, params))));
-    return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
+    return buildCollscanSolnWithNode(query, tailable, params, direction).first;
 }
 
 std::unique_ptr<QuerySolution> buildWholeIXSoln(
@@ -1357,6 +1372,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                       "No indexed plans available, and running with 'notablescan'");
     }
 
+    bool clusteredCollection = params.clusteredInfo.has_value();
+
     // geoNear and text queries *require* an index.
     // Also, if a hint is specified it indicates that we MUST use it.
     bool possibleToCollscan =
@@ -1366,23 +1383,24 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         return Status(ErrorCodes::NoQueryExecutionPlans, "No query solutions");
     }
 
-    if (possibleToCollscan && (collscanRequested || collScanRequired)) {
-        auto direction = determineCollscanDirection(query, params);
-        auto collscan = buildCollscanSoln(query, isTailable, params, direction);
-        if (!collscan && collScanRequired) {
+    if (possibleToCollscan && (collscanRequested || collScanRequired || clusteredCollection)) {
+        auto [collscanSoln, collscanNode] = buildCollscanSolnWithNode(query, isTailable, params);
+        if (!collscanSoln && collScanRequired) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "Failed to build collection scan soln");
         }
-        if (collscan) {
+
+        if (collscanSoln &&
+            (collscanRequested || collScanRequired || collscanIsBounded(collscanNode))) {
             LOGV2_DEBUG(20984,
                         5,
                         "Planner: outputting a collection scan",
-                        "collectionScan"_attr = redact(collscan->toString()));
+                        "collectionScan"_attr = redact(collscanSoln->toString()));
             SolutionCacheData* scd = new SolutionCacheData();
             scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
-            scd->wholeIXSolnDir = direction;
-            collscan->cacheData.reset(scd);
-            out.push_back(std::move(collscan));
+            scd->wholeIXSolnDir = determineCollscanDirection(query, params);
+            collscanSoln->cacheData.reset(scd);
+            out.push_back(std::move(collscanSoln));
         }
     }
 

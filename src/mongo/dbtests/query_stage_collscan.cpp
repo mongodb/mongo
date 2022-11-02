@@ -569,11 +569,6 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
     unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
         _expCtx.get(), collection.getCollection(), params, ws.get(), nullptr);
 
-    WorkingSetID id = WorkingSet::INVALID_ID;
-
-    // Check that the resume succeeds in making the cursor.
-    ASSERT_EQUALS(PlanStage::NEED_TIME, ps->work(&id));
-
     // Run the rest of the scan and verify the results.
     auto statusWithPlanExecutor =
         plan_executor_factory::make(_expCtx,

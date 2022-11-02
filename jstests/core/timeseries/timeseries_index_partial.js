@@ -2,6 +2,8 @@
  * Test creating and using partial indexes, on a time-series collection.
  *
  * @tags: [
+ *   # TODO (SERVER-73316): remove
+ *   assumes_against_mongod_not_mongos,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_fcv_52,
@@ -78,10 +80,24 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
 
 // Test creating and using a partial index.
 {
-    // Make sure the query uses the {a: 1} index.
+    let ixscanInWinningPlan = 0;
+
+    // Make sure the {a: 1} index was considered for this query.
     function checkPlan(predicate) {
         const explain = coll.find(predicate).explain();
-        const scan = getAggPlanStage(explain, 'IXSCAN');
+        let scan = getAggPlanStage(explain, 'IXSCAN');
+        // If scan is not present, check rejected plans
+        if (scan === null) {
+            const rejectedPlans = getRejectedPlans(getAggPlanStage(explain, "$cursor")["$cursor"]);
+            if (rejectedPlans.length === 1) {
+                const scans = getPlanStages(getRejectedPlan(rejectedPlans[0]), "IXSCAN");
+                if (scans.length === 1) {
+                    scan = scans[0];
+                }
+            }
+        } else {
+            ixscanInWinningPlan++;
+        }
         const indexes = buckets.getIndexes();
         assert(scan,
                "Expected an index scan for predicate: " + tojson(predicate) +
@@ -90,7 +106,7 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
     }
     // Make sure the query results match a collection-scan plan.
     function checkResults(predicate) {
-        const result = coll.aggregate({$match: predicate}).toArray();
+        const result = coll.aggregate([{$match: predicate}], {hint: {a: 1}}).toArray();
         const unindexed =
             coll.aggregate([{$_internalInhibitOptimization: {}}, {$match: predicate}]).toArray();
         assert.docEq(result, unindexed);
@@ -133,10 +149,6 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
         const t1 = ISODate('2000-01-01T00:00:01Z');
         const t2 = ISODate('2000-01-01T00:00:02Z');
 
-        // When the collection is sharded, there is an index on time that can win, instead of the
-        // partial index. So only check the results in that case, not the plan.
-        const check = FixtureHelpers.isSharded(buckets) ? checkResults : checkPlanAndResults;
-
         assert.commandWorked(coll.dropIndex({a: 1}));
         assert.commandWorked(
             coll.createIndex({a: 1}, {partialFilterExpression: {[timeField]: {$lt: t1}}}));
@@ -165,6 +177,7 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
     assert.commandWorked(coll.dropIndex({a: 1}));
     assert.sameMembers(coll.getIndexes(), extraIndexes);
     assert.sameMembers(buckets.getIndexes(), extraBucketIndexes);
+    assert.gt(ixscanInWinningPlan, 0);
 }
 
 // Check that partialFilterExpression can use a mixture of metadata, time, and measurement fields,

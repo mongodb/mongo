@@ -13,6 +13,7 @@
 
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
 load("jstests/libs/analyze_plan.js");         // For getAggPlanStages() and getPlanStages().
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 const coll = db.cover_null_queries;
 coll.drop();
@@ -135,6 +136,15 @@ function validateGroupCountAggCmdOutputAndPlan({filter, expectedStages, expected
         expectedCount,
         pipeline: [{$match: filter}, {$group: {_id: 0, count: {$count: {}}}}]
     });
+}
+
+function getExpectedStagesIndexScanAndFetch(extraStages) {
+    const clustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
+    const result = clustered ? {"CLUSTERED_IXSCAN": 1} : {"FETCH": 1, "IXSCAN": 1};
+    for (const stage in extraStages) {
+        result[stage] = extraStages[stage];
+    }
+    return result;
 }
 
 assert.commandWorked(coll.createIndex({a: 1, _id: 1}));
@@ -329,18 +339,18 @@ validateFindCmdOutputAndPlan({
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: null, _id: 3},
     expectedCount: 1,
-    expectedStages: {"FETCH": 1, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0}
+    expectedStages: getExpectedStagesIndexScanAndFetch({"OR": 0, "COUNT_SCAN": 0}),
 });
 validateCountAggCmdOutputAndPlan({
     filter: {a: null, _id: 3},
     expectedCount: 1,
-    expectedStages: {"FETCH": 1, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0},
+    expectedStages: getExpectedStagesIndexScanAndFetch({"OR": 0, "COUNT_SCAN": 0}),
 });
 validateFindCmdOutputAndPlan({
     filter: {a: null, _id: 3},
     projection: {_id: 1},
     expectedOutput: [{_id: 3}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
+    expectedStages: getExpectedStagesIndexScanAndFetch({"PROJECTION_SIMPLE": 1}),
 });
 
 // Verify that if the index is multikey and the query searches for null and empty array values, then

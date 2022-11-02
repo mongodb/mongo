@@ -98,12 +98,9 @@ assert.commandWorked(coll.update({_id: "new value", a: 4}, {$inc: {b: 1}}, {upse
 profileObj = getLatestProfilerEntry(testDB);
 
 const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
-// A clustered collection has no actual index on _id. While a bounded collection scan is in
-// principle an efficient option, the query planner only defaults to collection scan if no suitable
-// index is available.
-const expectedPlan = collectionIsClustered ? "IXSCAN { a: 1 }" : "IXSCAN { _id: 1 }";
-const expectedKeysExamined = collectionIsClustered ? 1 : 0;
-const expectedDocsExamined = expectedKeysExamined;
+const expectedPlan = collectionIsClustered ? "CLUSTERED_IXSCAN" : "IXSCAN { _id: 1 }";
+const expectedKeysExamined = 0;
+const expectedDocsExamined = collectionIsClustered ? 1 : 0;
 const expectedKeysInserted = collectionIsClustered ? 1 : 2;
 
 assert.eq(profileObj.command,
@@ -147,13 +144,17 @@ for (var i = 0; i < indices.length; i++) {
     const profileObj = profiles[i];
     const index = indices[i];
 
-    // A clustered collection has no actual index on _id. While a bounded collection scan is in
-    // principle an efficient option, the query planner only defaults to collection scan if no
-    // suitable index is available.
-    const expectedPlan = collectionIsClustered ? "IXSCAN { a: 1 }" : "IXSCAN { _id: 1 }";
-    const expectedKeysExamined = collectionIsClustered ? 1 : 0;
-    const expectedDocsExamined = expectedKeysExamined;
-    const expectedKeysInserted = collectionIsClustered ? 1 : 2;
+    let expectedPlan = "IXSCAN { _id: 1 }";
+    let expectedKeysExamined = 0;
+    let expectedDocsExamined = 0;
+    let expectedKeysInserted = 2;
+
+    if (collectionIsClustered) {
+        expectedPlan = "CLUSTERED_IXSCAN";
+        expectedKeysExamined = 0;
+        expectedDocsExamined = (i + 1 == indices.length) ? 1 : 2;
+        expectedKeysInserted = 1;
+    }
 
     assert.eq(
         profileObj.command,

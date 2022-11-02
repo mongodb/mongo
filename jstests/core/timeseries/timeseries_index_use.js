@@ -50,8 +50,9 @@ const generateTest = (useHint) => {
 
         /**
          * Creates the index specified by the spec and options, then explains the query to ensure
-         * that the created index is used. Runs the query and verifies that the expected number of
-         * documents are matched. Finally, deletes the created index.
+         * that the created index is used or was considered by multi-planner.
+         * Runs the query and verifies that the expected number of documents are matched.
+         * Finally, deletes the created index.
          */
         const testQueryUsesIndex = function(
             filter, numMatches, indexSpec, indexOpts = {}, queryOpts = {}) {
@@ -67,9 +68,23 @@ const generateTest = (useHint) => {
             assert.eq(numMatches, query.itcount());
 
             const explain = query.explain();
-            const ixscan = getAggPlanStage(explain, "IXSCAN");
-            assert.neq(null, ixscan, tojson(explain));
-            assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
+            if (useHint) {
+                const ixscan = getAggPlanStage(explain, "IXSCAN");
+                assert.neq(null, ixscan, tojson(explain));
+                assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
+            } else {
+                let ixscan = getAggPlanStage(explain, "IXSCAN");
+                // If ixscan is not present, check rejected plans
+                if (ixscan === null) {
+                    const rejectedPlans =
+                        getRejectedPlans(getAggPlanStage(explain, "$cursor")["$cursor"]);
+                    assert.eq(1, rejectedPlans.length);
+                    const ixscans = getPlanStages(getRejectedPlan(rejectedPlans[0]), "IXSCAN");
+                    assert.eq(1, ixscans.length);
+                    ixscan = ixscans[0];
+                }
+                assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
+            }
             assert.commandWorked(coll.dropIndex("testIndexName"));
         };
 

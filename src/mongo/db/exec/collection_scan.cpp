@@ -185,9 +185,26 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                             << "attempting to resume no longer exists in the collection. "
                             << "recordId: " << recordIdToSeek);
                 }
-            }
 
-            return PlanStage::NEED_TIME;
+                if (_params.resumeAfterRecordId && !_params.resumeAfterRecordId->isNull()) {
+                    invariant(!_params.tailable);
+                    invariant(_lastSeenId.isNull());
+                    // Seek to where we are trying to resume the scan from. Signal a KeyNotFound
+                    // error if the record no longer exists.
+                    //
+                    // Note that we want to return the record *after* this one since we have already
+                    // returned this one prior to the resume.
+                    auto& recordIdToSeek = *_params.resumeAfterRecordId;
+                    if (!_cursor->seekExact(recordIdToSeek)) {
+                        uasserted(ErrorCodes::KeyNotFound,
+                                  str::stream()
+                                      << "Failed to resume collection scan: the recordId from "
+                                         "which we are "
+                                      << "attempting to resume no longer exists in the collection. "
+                                      << "recordId: " << recordIdToSeek);
+                    }
+                }
+            }
         }
 
         if (_lastSeenId.isNull() && _params.direction == CollectionScanParams::FORWARD &&
