@@ -50,7 +50,7 @@ extern int __wt_optreset;
  * parse_tiered_opt --
  *     Parse a command line option for the tiered storage configurations.
  */
-static void
+static inline void
 parse_tiered_opt(TEST_OPTS *opts)
 {
     switch (*__wt_optarg++) {
@@ -91,14 +91,14 @@ testutil_parse_begin_opt(int argc, char *const *argv, const char *getopts_string
 
 #define USAGE_STR(ch, usage) ((strchr(getopts_string, (ch)) == NULL) ? "" : (usage))
 
-    testutil_check(__wt_snprintf(opts->usage, sizeof(opts->usage), "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+    testutil_check(__wt_snprintf(opts->usage, sizeof(opts->usage), "%s%s%s%s%s%s%s%s%s%s%s%s%s",
       USAGE_STR('A', " [-A append thread count]"), USAGE_STR('b', " [-b build directory]"),
-      USAGE_STR('C', " [-C]"), USAGE_STR('d', " [-d add data]"), USAGE_STR('h', " [-h home]"),
-      USAGE_STR('m', " [-m]"), USAGE_STR('n', " [-n record count]"),
-      USAGE_STR('o', " [-o op count]"), USAGE_STR('P', " [-PT] [-Po storage source]"),
-      USAGE_STR('p', " [-p]"), USAGE_STR('R', " [-R read thread count]"),
-      USAGE_STR('T', " [-T thread count]"), USAGE_STR('t', " [-t c|f|r table type]"),
-      USAGE_STR('v', " [-v]"), USAGE_STR('W', " [-W write thread count]")));
+      USAGE_STR('d', " [-d add data]"), USAGE_STR('h', " [-h home]"),
+      USAGE_STR('n', " [-n record count]"), USAGE_STR('o', " [-o op count]"),
+      USAGE_STR('P', " [-PT] [-Po storage source]"), USAGE_STR('p', " [-p]"),
+      USAGE_STR('R', " [-R read thread count]"), USAGE_STR('T', " [-T thread count]"),
+      USAGE_STR('t', " [-t c|f|r table type]"), USAGE_STR('v', " [-v]"),
+      USAGE_STR('W', " [-W write thread count]")));
 }
 
 /*
@@ -153,17 +153,11 @@ testutil_parse_single_opt(TEST_OPTS *opts, int ch)
     case 'b': /* Build directory */
         opts->build_dir = dstrdup(__wt_optarg);
         break;
-    case 'C': /* Compatibility */
-        opts->compat = true;
-        break;
     case 'd': /* Use data in multi-threaded test programs */
         opts->do_data_ops = true;
         break;
     case 'h': /* Home directory */
         opts->home = dstrdup(__wt_optarg);
-        break;
-    case 'm': /* In-memory */
-        opts->inmem = true;
         break;
     case 'n': /* Number of records */
         opts->nrecords = (uint64_t)atoll(__wt_optarg);

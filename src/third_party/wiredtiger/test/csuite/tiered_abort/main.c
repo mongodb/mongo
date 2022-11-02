@@ -109,7 +109,7 @@ static uint32_t flush_calls = 1;
     ",eviction_dirty_target=20,eviction_dirty_trigger=90" \
     ",transaction_sync=(enabled,method=none)"
 /* Set the flush_checkpoint debug mode so that the parent can call flush_tier alone. */
-#define ENV_CONFIG_ADD_REC                                                                         \
+#define ENV_CONFIG_REC                                                                             \
     "log=(recover=on,remove=false),debug_mode=(flush_checkpoint),statistics=(all),statistics_log=" \
     "(json,on_close,wait=1)"
 
@@ -802,7 +802,7 @@ main(int argc, char *argv[])
     printf("Open database, run recovery and verify content\n");
 
     /* Open the connection which forces recovery to be run. */
-    testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_ADD_REC));
+    testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_REC));
 
     testutil_check(__wt_snprintf(extconf, sizeof(extconf), ",extensions=(%s/%s=(early_load=true))",
       build_dir, WT_STORAGE_LIB));

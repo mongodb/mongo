@@ -49,16 +49,6 @@
 #include "windows_shim.h"
 #endif
 
-#define TESTUTIL_ENV_CONFIG_TIERED \
-    ",tiered_storage=(bucket=./"   \
-    "bucket,bucket_prefix=pfx-,local_retention=2,name=dir_store)"
-#define TESTUTIL_ENV_CONFIG_TIERED_EXT                        \
-    ",extensions=(../../../../ext/storage_sources/dir_store/" \
-    "libwiredtiger_dir_store.so=(early_load=true))"
-#define TESTUTIL_ENV_CONFIG_REC \
-    "log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
-#define TESTUTIL_ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
-
 /* Generic option parsing structure shared by all test cases. */
 typedef struct {
     char *home;
@@ -79,9 +69,7 @@ typedef struct {
     FILE *progress_fp; /* Progress tracking file */
     char *progress_file_name;
 
-    bool compat;               /* Compatibility */
     bool do_data_ops;          /* Have schema ops use data */
-    bool inmem;                /* In-memory */
     bool preserve;             /* Don't remove files on exit */
     bool tiered_storage;       /* Configure tiered storage */
     bool verbose;              /* Run in verbose mode */
@@ -407,8 +395,6 @@ void testutil_tiered_begin(TEST_OPTS *);
 void testutil_tiered_flush_complete(TEST_OPTS *, WT_SESSION *, void *);
 void testutil_tiered_sleep(TEST_OPTS *, WT_SESSION *, uint32_t, bool *);
 uint64_t testutil_time_us(WT_SESSION *);
-void testutil_wiredtiger_open(
-  TEST_OPTS *, const char *, WT_EVENT_HANDLER *, WT_CONNECTION **, bool);
 void testutil_work_dir_from_path(char *, size_t, const char *);
 WT_THREAD_RET thread_append(void *);
 
