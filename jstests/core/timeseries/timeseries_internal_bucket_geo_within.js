@@ -4,7 +4,7 @@
  * collection.
  *
  * @tags: [
- *   requires_fcv_51,
+ *   requires_fcv_60,
  *   requires_pipeline_optimization,
  *   requires_timeseries,
  *   does_not_support_stepdowns,
@@ -47,10 +47,6 @@ for (let collScanStage of collScanStages) {
             "field": "loc"
         }
     };
-    // TODO SERVER-60373 Fix duplicate predicates for sharded time-series collection
-    if (FixtureHelpers.isSharded(bucketsColl)) {
-        expectedPredicate = {$and: [expectedPredicate, expectedPredicate]};
-    }
     assert.docEq(expectedPredicate, collScanStage.filter, collScanStages);
 }
 
