@@ -517,7 +517,7 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAggRequest) {
 
 TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAtSecondBatchAggRequest) {
     // This 'nDocs' causes a cursor to be created for a simple scan aggregate command.
-    const auto nDocs = std::rand() % 100 + 102;
+    const auto nDocs = std::rand() % 100 + 102;  // 201 >= nDocs >= 102
     std::vector<BSONObj> srcDocs = generateRandomSimpleDocs(nDocs);
     PipeWaiter pw;
 
@@ -525,7 +525,7 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAtSecondBatchAgg
         NamedPipeOutput pipeWriter("named_pipe1");
         pw.notify();
         // The fail point occurs at the second batch.
-        const size_t failPoint = 102 + std::rand() % (nDocs - 102);
+        const size_t failPoint = 101 + std::rand() % (nDocs - 101);  // 200 >= failPoint >= 101
         pipeWriter.open();
         for (size_t i = 0; i < srcDocs.size(); ++i) {
             if (i == failPoint) {
