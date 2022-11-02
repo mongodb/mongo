@@ -46,6 +46,7 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
+#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
@@ -250,6 +251,35 @@ DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
       _bucketUnpacker(std::move(bucketUnpacker)),
       _bucketMaxSpanSeconds{bucketMaxSpanSeconds} {}
 
+DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BucketUnpacker bucketUnpacker,
+    int bucketMaxSpanSeconds,
+    const boost::optional<BSONObj>& eventFilterBson,
+    const boost::optional<BSONObj>& wholeBucketFilterBson,
+    bool assumeNoMixedSchemaData)
+    : DocumentSourceInternalUnpackBucket(
+          expCtx, std::move(bucketUnpacker), bucketMaxSpanSeconds, assumeNoMixedSchemaData) {
+    if (eventFilterBson) {
+        _eventFilterBson = eventFilterBson->getOwned();
+        _eventFilter =
+            uassertStatusOK(MatchExpressionParser::parse(_eventFilterBson,
+                                                         pExpCtx,
+                                                         ExtensionsCallbackNoop(),
+                                                         Pipeline::kAllowedMatcherFeatures));
+        _eventFilterDeps = {};
+        match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
+    }
+    if (wholeBucketFilterBson) {
+        _wholeBucketFilterBson = wholeBucketFilterBson->getOwned();
+        _wholeBucketFilter =
+            uassertStatusOK(MatchExpressionParser::parse(_wholeBucketFilterBson,
+                                                         pExpCtx,
+                                                         ExtensionsCallbackNoop(),
+                                                         Pipeline::kAllowedMatcherFeatures));
+    }
+}
+
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createFromBsonInternal(
     BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5346500,
@@ -267,6 +297,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
     auto bucketMaxSpanSeconds = 0;
     auto assumeClean = false;
     std::vector<std::string> computedMetaProjFields;
+    boost::optional<BSONObj> eventFilterBson;
+    boost::optional<BSONObj> wholeBucketFilterBson;
     for (auto&& elem : specElem.embeddedObject()) {
         auto fieldName = elem.fieldNameStringData();
         if (fieldName == kInclude || fieldName == kExclude) {
@@ -360,6 +392,18 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                                   << " field must be a bool, got: " << elem.type(),
                     elem.type() == BSONType::Bool);
             bucketSpec.setUsesExtendedRange(elem.boolean());
+        } else if (fieldName == kEventFilter) {
+            uassert(7026902,
+                    str::stream() << kEventFilter
+                                  << " field must be an object, got: " << elem.type(),
+                    elem.type() == BSONType::Object);
+            eventFilterBson = elem.Obj();
+        } else if (fieldName == kWholeBucketFilter) {
+            uassert(7026903,
+                    str::stream() << kWholeBucketFilter
+                                  << " field must be an object, got: " << elem.type(),
+                    elem.type() == BSONType::Object);
+            wholeBucketFilterBson = elem.Obj();
         } else {
             uasserted(5346506,
                       str::stream()
@@ -378,6 +422,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
         expCtx,
         BucketUnpacker{std::move(bucketSpec), unpackerBehavior},
         bucketMaxSpanSeconds,
+        eventFilterBson,
+        wholeBucketFilterBson,
         assumeClean);
 }
 
@@ -476,6 +522,13 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
         out.addField(kIncludeMaxTimeAsMetadata, Value{_bucketUnpacker.includeMaxTimeAsMetadata()});
     }
 
+    if (_wholeBucketFilter) {
+        out.addField(kWholeBucketFilter, Value{_wholeBucketFilter->serialize()});
+    }
+    if (_eventFilter) {
+        out.addField(kEventFilter, Value{_eventFilter->serialize()});
+    }
+
     if (!explain) {
         array.push_back(Value(DOC(getSourceName() << out.freeze())));
         if (_sampleSize) {
@@ -491,25 +544,49 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
     }
 }
 
+boost::optional<Document> DocumentSourceInternalUnpackBucket::getNextMatchingMeasure() {
+    while (_bucketUnpacker.hasNext()) {
+        auto measure = _bucketUnpacker.getNext();
+        if (_eventFilter) {
+            // MatchExpression only takes BSON documents, so we have to make one. As an
+            // optimization, only serialize the fields we need to do the match.
+            BSONObj measureBson = _eventFilterDeps.needWholeDocument
+                ? measure.toBson()
+                : document_path_support::documentToBsonWithPaths(measure, _eventFilterDeps.fields);
+            if (_bucketUnpacker.bucketMatchedQuery() || _eventFilter->matchesBSON(measureBson)) {
+                return measure;
+            }
+        } else {
+            return measure;
+        }
+    }
+    return {};
+}
+
 DocumentSource::GetNextResult DocumentSourceInternalUnpackBucket::doGetNext() {
     tassert(5521502, "calling doGetNext() when '_sampleSize' is set is disallowed", !_sampleSize);
 
     // Otherwise, fallback to unpacking every measurement in all buckets until the child stage is
     // exhausted.
-    if (_bucketUnpacker.hasNext()) {
-        return _bucketUnpacker.getNext();
+    if (auto measure = getNextMatchingMeasure()) {
+        return GetNextResult(std::move(*measure));
     }
 
     auto nextResult = pSource->getNext();
-    if (nextResult.isAdvanced()) {
+    while (nextResult.isAdvanced()) {
         auto bucket = nextResult.getDocument().toBson();
-        _bucketUnpacker.reset(std::move(bucket));
+        auto bucketMatchedQuery = _wholeBucketFilter && _wholeBucketFilter->matchesBSON(bucket);
+        _bucketUnpacker.reset(std::move(bucket), bucketMatchedQuery);
+
         uassert(5346509,
                 str::stream() << "A bucket with _id "
                               << _bucketUnpacker.bucket()[timeseries::kBucketIdFieldName].toString()
                               << " contains an empty data region",
                 _bucketUnpacker.hasNext());
-        return _bucketUnpacker.getNext();
+        if (auto measure = getNextMatchingMeasure()) {
+            return GetNextResult(std::move(*measure));
+        }
+        nextResult = pSource->getNext();
     }
 
     return nextResult;
@@ -587,7 +664,8 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
 
     // Check for a viable inclusion $project after the $_internalUnpackBucket.
     auto [existingProj, isInclusion] = getIncludeExcludeProjectAndType(std::next(itr)->get());
-    if (isInclusion && !existingProj.isEmpty() && canInternalizeProjectObj(existingProj)) {
+    if (!_eventFilter && isInclusion && !existingProj.isEmpty() &&
+        canInternalizeProjectObj(existingProj)) {
         container->erase(std::next(itr));
         return {existingProj, isInclusion};
     }
@@ -595,8 +673,7 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
     // Attempt to get an inclusion $project representing the root-level dependencies of the pipeline
     // after the $_internalUnpackBucket. If this $project is not empty, then the dependency set was
     // finite.
-    Pipeline::SourceContainer restOfPipeline(std::next(itr), container->end());
-    auto deps = Pipeline::getDependenciesForContainer(pExpCtx, restOfPipeline, boost::none);
+    auto deps = getRestPipelineDependencies(itr, container);
     if (auto dependencyProj =
             deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes);
         !dependencyProj.isEmpty()) {
@@ -604,7 +681,7 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
     }
 
     // Check for a viable exclusion $project after the $_internalUnpackBucket.
-    if (!existingProj.isEmpty() && canInternalizeProjectObj(existingProj)) {
+    if (!_eventFilter && !existingProj.isEmpty() && canInternalizeProjectObj(existingProj)) {
         container->erase(std::next(itr));
         return {existingProj, isInclusion};
     }
@@ -612,8 +689,7 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
     return {BSONObj{}, false};
 }
 
-std::unique_ptr<MatchExpression>
-DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
+BucketSpec::BucketPredicate DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
     const MatchExpression* matchExpr) const {
     return BucketSpec::createPredicatesOnBucketLevelField(
         matchExpr,
@@ -1005,6 +1081,16 @@ bool findSequentialDocumentCache(Pipeline::SourceContainer::iterator start,
     return start != end;
 }
 
+DepsTracker DocumentSourceInternalUnpackBucket::getRestPipelineDependencies(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const {
+    auto deps = Pipeline::getDependenciesForContainer(
+        pExpCtx, Pipeline::SourceContainer{std::next(itr), container->end()}, boost::none);
+    if (_eventFilter) {
+        match_expression::addDependencies(_eventFilter.get(), &deps);
+    }
+    return deps;
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -1018,7 +1104,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     bool haveComputedMetaField = this->haveComputedMetaField();
 
     // Before any other rewrites for the current stage, consider reordering with $sort.
-    if (auto sortPtr = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get())) {
+    if (auto sortPtr = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get());
+        sortPtr && !_eventFilter) {
         if (auto metaField = _bucketUnpacker.bucketSpec().metaField();
             metaField && !haveComputedMetaField) {
             if (checkMetadataSortReorder(sortPtr->getSortKeyPattern(), metaField.value())) {
@@ -1049,7 +1136,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     }
 
     // Attempt to push geoNear on the metaField past $_internalUnpackBucket.
-    if (auto nextNear = dynamic_cast<DocumentSourceGeoNear*>(std::next(itr)->get())) {
+    if (auto nextNear = dynamic_cast<DocumentSourceGeoNear*>(std::next(itr)->get());
+        nextNear && !_eventFilter) {
         // Currently we only support geo indexes on the meta field, and we enforce this by
         // requiring the key field to be set so we can check before we try to look up indexes.
         auto keyField = nextNear->getKeyField();
@@ -1130,8 +1218,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     {
         // Check if the rest of the pipeline needs any fields. For example we might only be
         // interested in $count.
-        auto deps = Pipeline::getDependenciesForContainer(
-            pExpCtx, Pipeline::SourceContainer{std::next(itr), container->end()}, boost::none);
+        auto deps = getRestPipelineDependencies(itr, container);
         if (deps.hasNoRequirements()) {
             _bucketUnpacker.setBucketSpecAndBehavior({_bucketUnpacker.bucketSpec().timeField(),
                                                       _bucketUnpacker.bucketSpec().metaField(),
@@ -1151,31 +1238,65 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     }
 
     // Attempt to optimize last-point type queries.
-    if (!_triedLastpointRewrite && optimizeLastpoint(itr, container)) {
+    if (!_triedLastpointRewrite && !_eventFilter && optimizeLastpoint(itr, container)) {
         _triedLastpointRewrite = true;
         // If we are able to rewrite the aggregation, give the resulting pipeline a chance to
         // perform further optimizations.
         return container->begin();
     };
 
-    // Attempt to map predicates on bucketed fields to predicates on the control field.
-    if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>(std::next(itr)->get());
-        nextMatch && !_triedBucketLevelFieldsPredicatesPushdown) {
-        _triedBucketLevelFieldsPredicatesPushdown = true;
+    // Attempt to map predicates on bucketed fields to the predicates on the control field.
+    if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>(std::next(itr)->get())) {
 
-        if (auto match = createPredicatesOnBucketLevelField(nextMatch->getMatchExpression())) {
+        // Merge multiple following $match stages.
+        auto itrToMatch = std::next(itr);
+        while (std::next(itrToMatch) != container->end() &&
+               dynamic_cast<DocumentSourceMatch*>(std::next(itrToMatch)->get())) {
+            nextMatch->doOptimizeAt(itrToMatch, container);
+        }
+
+        auto predicates = createPredicatesOnBucketLevelField(nextMatch->getMatchExpression());
+
+        // Try to create a tight bucket predicate to perform bucket level matching.
+        if (predicates.tightPredicate) {
+            _wholeBucketFilterBson = predicates.tightPredicate->serialize();
+            _wholeBucketFilter =
+                uassertStatusOK(MatchExpressionParser::parse(_wholeBucketFilterBson,
+                                                             pExpCtx,
+                                                             ExtensionsCallbackNoop(),
+                                                             Pipeline::kAllowedMatcherFeatures));
+            _wholeBucketFilter = MatchExpression::optimize(std::move(_wholeBucketFilter));
+        }
+
+        // Push the original event predicate into the unpacking stage.
+        _eventFilterBson = nextMatch->getQuery().getOwned();
+        _eventFilter =
+            uassertStatusOK(MatchExpressionParser::parse(_eventFilterBson,
+                                                         pExpCtx,
+                                                         ExtensionsCallbackNoop(),
+                                                         Pipeline::kAllowedMatcherFeatures));
+        _eventFilter = MatchExpression::optimize(std::move(_eventFilter));
+        _eventFilterDeps = {};
+        match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
+        container->erase(std::next(itr));
+
+        // Create a loose bucket predicate and push it before the unpacking stage.
+        if (predicates.loosePredicate) {
             BSONObjBuilder bob;
-            match->serialize(&bob);
+            predicates.loosePredicate->serialize(&bob);
             container->insert(itr, DocumentSourceMatch::create(bob.obj(), pExpCtx));
 
             // Give other stages a chance to optimize with the new $match.
             return std::prev(itr) == container->begin() ? std::prev(itr)
                                                         : std::prev(std::prev(itr));
         }
+
+        // We have removed a $match after this stage, so we try to optimize this stage again.
+        return itr;
     }
 
     // Attempt to push down a $project on the metaField past $_internalUnpackBucket.
-    if (!haveComputedMetaField) {
+    if (!_eventFilter && !haveComputedMetaField) {
         if (auto [metaProject, deleteRemainder] = extractProjectForPushDown(std::next(itr)->get());
             !metaProject.isEmpty()) {
             container->insert(itr,
@@ -1194,7 +1315,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
     // Attempt to extract computed meta projections from subsequent $project, $addFields, or $set
     // and push them before the $_internalunpackBucket.
-    if (pushDownComputedMetaProjection(itr, container)) {
+    if (!_eventFilter && pushDownComputedMetaProjection(itr, container)) {
         // We've pushed down and removed a stage after this one. Try to optimize the new stage.
         return std::prev(itr) == container->begin() ? std::prev(itr) : std::prev(std::prev(itr));
     }

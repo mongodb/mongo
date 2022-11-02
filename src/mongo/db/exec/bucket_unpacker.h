@@ -127,14 +127,29 @@ public:
         kError,
     };
 
+    struct BucketPredicate {
+        // A loose predicate is a predicate which returns true when any measures of a bucket
+        // matches.
+        std::unique_ptr<MatchExpression> loosePredicate;
+
+        // A tight predicate is a predicate which returns true when all measures of a bucket
+        // matches.
+        std::unique_ptr<MatchExpression> tightPredicate;
+    };
+
     /**
      * Takes a predicate after $_internalUnpackBucket on a bucketed field as an argument and
-     * attempts to map it to a new predicate on the 'control' field. For example, the predicate
-     * {a: {$gt: 5}} will generate the predicate {control.max.a: {$_internalExprGt: 5}}, which will
-     * be added before the $_internalUnpackBucket stage.
+     * attempts to map it to new predicates on the 'control' field. There will be a 'loose'
+     * predicate that will match if some of the event field matches, also a 'tight' predicate that
+     * will match if all of the event field matches. For example, the event level predicate {a:
+     * {$gt: 5}} will generate the loose predicate {control.max.a: {$_internalExprGt: 5}}, and the
+     * tight predicate {control.min.a: {$_internalExprGt: 5}}. The loose predicate will be added
+     * before the
+     * $_internalUnpackBucket stage to filter out buckets with no match. The tight predicate will
+     * be used to evaluate predicate on bucket level to avoid unnecessary event level evaluation.
      *
-     * If the original predicate is on the bucket's timeField we may also create a new predicate
-     * on the '_id' field to assist in index utilization. For example, the predicate
+     * If the original predicate is on the bucket's timeField we may also create a new loose
+     * predicate on the '_id' field to assist in index utilization. For example, the predicate
      * {time: {$lt: new Date(...)}} will generate the following predicate:
      * {$and: [
      *      {_id: {$lt: ObjectId(...)}},
@@ -147,7 +162,7 @@ public:
      * When using IneligiblePredicatePolicy::kIgnore, if the predicate can't be pushed down, it
      * returns null. When using IneligiblePredicatePolicy::kError it raises a user error.
      */
-    static std::unique_ptr<MatchExpression> createPredicatesOnBucketLevelField(
+    static BucketPredicate createPredicatesOnBucketLevelField(
         const MatchExpression* matchExpr,
         const BucketSpec& bucketSpec,
         int bucketMaxSpanSeconds,
@@ -269,7 +284,7 @@ public:
     /**
      * This resets the unpacker to prepare to unpack a new bucket described by the given document.
      */
-    void reset(BSONObj&& bucket);
+    void reset(BSONObj&& bucket, bool bucketMatchedQuery = false);
 
     Behavior behavior() const {
         return _unpackerBehavior;
@@ -281,6 +296,10 @@ public:
 
     const BSONObj& bucket() const {
         return _bucket;
+    }
+
+    bool bucketMatchedQuery() const {
+        return _bucketMatchedQuery;
     }
 
     bool includeMetaField() const {
@@ -349,6 +368,9 @@ private:
     std::unique_ptr<UnpackingImpl> _unpackingImpl;
 
     bool _hasNext = false;
+
+    // A flag used to mark that the entire bucket matches the following $match predicate.
+    bool _bucketMatchedQuery = false;
 
     // A flag used to mark that the timestamp value should be materialized in measurements.
     bool _includeTimeField{false};
