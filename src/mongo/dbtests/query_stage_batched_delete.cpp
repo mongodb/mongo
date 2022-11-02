@@ -252,9 +252,9 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchDocsBasic) {
         ASSERT_EQUALS(state, PlanStage::NEED_TIME);
 
         // Only delete documents once the current batch reaches targetBatchDocs.
+        nIterations++;
         int batch = nIterations / (int)targetBatchDocs;
         ASSERT_EQUALS(stats->docsDeleted, targetBatchDocs * batch);
-        nIterations++;
     }
 
     // There should be 2 more docs deleted by the time the command returns EOF.
@@ -556,7 +556,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSBasic) {
     // targetBatchDocs.
     {
         ASSERT_LTE(nDocs, targetBatchDocs);
-        for (auto i = 0; i <= nDocs; i++) {
+        for (auto i = 0; i < nDocs; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
             ASSERT_EQ(state, PlanStage::NEED_TIME);
@@ -634,7 +634,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSWithTargetBatc
 
     // Stages up to targetBatchDocs - 1 documents in the buffer.
     {
-        for (auto i = 0; i < targetBatchDocs; i++) {
+        for (auto i = 0; i < targetBatchDocs - 1; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
             ASSERT_EQ(state, PlanStage::NEED_TIME);
@@ -711,10 +711,9 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsBasic) {
     PlanStage::StageState state = PlanStage::NEED_TIME;
     WorkingSetID id = WorkingSet::INVALID_ID;
 
-    // Stages up to 'targetBatchDocs' - 1 documents in the buffer. The first work() initiates the
-    // collection scan and doesn't fetch a document to stage.
+    // Stages up to 'targetBatchDocs' - 1 documents in the buffer.
     {
-        for (auto i = 0; i < targetBatchDocs; i++) {
+        for (auto i = 0; i < targetBatchDocs - 1; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
             ASSERT_FALSE(stats->passTargetMet);
@@ -784,7 +783,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsWithUnlimitedBatc
 
     // Stage a batch of documents (all the documents).
     {
-        for (auto i = 0; i <= nDocs; i++) {
+        for (auto i = 0; i < nDocs; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
             ASSERT_FALSE(stats->passTargetMet);
@@ -822,7 +821,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSBasic) {
     batchedDeleteParams->targetBatchTimeMS = Milliseconds(0);
     batchedDeleteParams->targetBatchDocs = targetBatchDocs;
 
-    auto targetPassTimeMS = Milliseconds(3);
+    auto targetPassTimeMS = Milliseconds(targetBatchDocs - 1);
     batchedDeleteParams->targetPassTimeMS = targetPassTimeMS;
 
     auto deleteStage =
@@ -835,7 +834,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSBasic) {
 
     // Stages the first batch.
     {
-        for (auto i = 0; i < targetBatchDocs; i++) {
+        for (auto i = 0; i < targetBatchDocs - 1; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
             ASSERT_FALSE(stats->passTargetMet);
@@ -882,7 +881,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSWithUnlimitedBa
 
     // Stages the first batch (all the documents).
     {
-        for (auto i = 0; i <= nDocs; i++) {
+        for (auto i = 0; i < nDocs; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
             ASSERT_FALSE(stats->passTargetMet);
@@ -974,10 +973,9 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTa
     // Track the total amount of time the pass takes.
     Timer passTimer(tickSource());
 
-    // Stages up to 'targetBatchDocs' - 1 documents in the buffer. The first work() initiates the
-    // collection scan and doesn't fetch a document to stage.
+    // Stages up to 'targetBatchDocs' - 1 documents in the buffer.
     {
-        for (auto i = 0; i < targetBatchDocs; i++) {
+        for (auto i = 0; i < targetBatchDocs - 1; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
             ASSERT_FALSE(stats->passTargetMet);

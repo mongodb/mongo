@@ -206,8 +206,6 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                                       << "recordId: " << recordIdToSeek);
                     }
                 }
-
-                return PlanStage::NEED_TIME;
             }
 
             if (_lastSeenId.isNull() && _params.direction == CollectionScanParams::FORWARD &&
