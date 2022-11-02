@@ -50,6 +50,11 @@
 namespace mongo {
 namespace mozjs {
 
+// Windows compiler fails to resolve the correct base64 identifier
+// specified in the MONGO_ATTACH macro below.
+// Explicitly set precedence on the one we want here.
+using base64 = typename BinDataInfo::Functions::base64;
+
 const JSFunctionSpec BinDataInfo::methods[5] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(base64, BinDataInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(hex, BinDataInfo),
@@ -81,7 +86,7 @@ void hexToBinData(JSContext* cx,
     uassert(
         ErrorCodes::BadValue, "BinData hex string must be an even length", hexstr.size() % 2 == 0);
 
-    std::string encoded = base64::encode(hexblob::decode(hexstr));
+    std::string encoded = mongo::base64::encode(hexblob::decode(hexstr));
     JS::RootedValueArray<2> args(cx);
 
     args[0].setInt32(type);
@@ -243,7 +248,7 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     auto str = ValueWriter(cx, utf).toString();
 
-    auto tmpBase64 = base64::decode(str);
+    auto tmpBase64 = mongo::base64::decode(str);
 
     JS::RootedObject thisv(cx);
     scope->getProto<BinDataInfo>().newObject(&thisv);
