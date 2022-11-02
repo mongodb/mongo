@@ -54,6 +54,10 @@ selector:
   - jstests/concurrency/fsm_workloads/reindex_background.js
   - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
+  # This workload involves upgrading and downgrading the FCV, and can cause failure on other
+  # FSM workloads which depend on features which are only available in the latest FCV.
+  - jstests/concurrency/fsm_workloads/internal_transactions_setFCV.js
+
   exclude_with_any_tags:
   - requires_sharding
   - kills_random_sessions
