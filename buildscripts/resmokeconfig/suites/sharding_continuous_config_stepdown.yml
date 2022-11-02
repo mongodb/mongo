@@ -87,6 +87,7 @@ selector:
   # Calls the config server primary directly (not through mongos)
   - jstests/sharding/analyze_shard_key/configure_query_analyzer_basic.js
   - jstests/sharding/analyze_shard_key/persist_sampled_read_queries.js
+  - jstests/sharding/analyze_shard_key/persist_sampled_write_queries.js
   - jstests/sharding/analyze_shard_key/refresh_sample_rates_sharded.js
   - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
   - jstests/sharding/min_optime_recovery_on_successful_move_chunk_commit.js

@@ -60,6 +60,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/top.h"
@@ -76,6 +77,7 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(failAllFindAndModify);
 MONGO_FAIL_POINT_DEFINE(hangBeforeFindAndModifyPerformsUpdate);
 
 /**
@@ -680,6 +682,16 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
 
             return findAndModifyReply;
         }
+    }
+
+    if (analyze_shard_key::supportsPersistingSampledQueries() && request().getSampleId()) {
+        analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+            .addFindAndModifyQuery(request())
+            .getAsync([](auto) {});
+    }
+
+    if (MONGO_unlikely(failAllFindAndModify.shouldFail())) {
+        uasserted(ErrorCodes::InternalError, "failAllFindAndModify failpoint active!");
     }
 
     const bool inTransaction = opCtx->inMultiDocumentTransaction();

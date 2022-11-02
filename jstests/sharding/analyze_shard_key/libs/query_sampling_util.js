@@ -19,6 +19,13 @@ var QuerySamplingUtil = (function() {
         return {locale: "en_US", strength: AnalyzeShardKeyUtil.getRandInteger(1, 5)};
     }
 
+    function makeCmdObjIgnoreSessionInfo(originalCmdObj) {
+        const modifiedCmdObj = Object.extend({}, originalCmdObj);
+        delete modifiedCmdObj["lsid"];
+        delete modifiedCmdObj["txnNumber"];
+        return modifiedCmdObj;
+    }
+
     /**
      * Waits for the config.sampledQueries collection to have 'expectedSampledQueryDocs.length'
      * number of documents for the collection 'ns'. For every (sampleId, cmdName, cmdObj) in
@@ -69,6 +76,7 @@ var QuerySamplingUtil = (function() {
         getCollectionUuid,
         generateRandomString,
         generateRandomCollation,
+        makeCmdObjIgnoreSessionInfo,
         assertSoonSampledQueryDocuments,
         assertNoSampledQueryDocuments
     };

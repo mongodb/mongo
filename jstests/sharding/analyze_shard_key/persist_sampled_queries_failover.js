@@ -18,17 +18,15 @@ function testStepDown(rst) {
     let primary = rst.getPrimary();
     let primaryDB = primary.getDB(dbName);
 
-    assert.commandWorked(primaryDB.createCollection(collName));
+    assert.commandWorked(primaryDB.getCollection(collName).insert({a: 0}));
     const collectionUuid = QuerySamplingUtil.getCollectionUuid(primaryDB, collName);
 
     const localWriteFp = configureFailPoint(primary, "hangQueryAnalysisWriterBeforeWritingLocally");
 
-    const originalCmdObj = {find: collName, filter: {a: 2}, sampleId: UUID()};
-    const expectedSampledQueryDocs = [{
-        sampleId: originalCmdObj.sampleId,
-        cmdName: "find",
-        cmdObj: {filter: originalCmdObj.filter}
-    }];
+    const originalCmdObj =
+        {findAndModify: collName, query: {a: 0}, update: {a: 1}, sampleId: UUID()};
+    const expectedSampledQueryDocs =
+        [{sampleId: originalCmdObj.sampleId, cmdName: "findAndModify", cmdObj: originalCmdObj}];
 
     assert.commandWorked(primaryDB.getCollection(collName).runCommand(originalCmdObj));
 
