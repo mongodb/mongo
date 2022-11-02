@@ -68,7 +68,7 @@ public:
 
     Status initFromExisting(OperationContext* opCtx,
                             const std::shared_ptr<Collection>& collection,
-                            Timestamp readTimestamp) {
+                            boost::optional<Timestamp> readTimestamp) {
         MONGO_UNREACHABLE;
     }
 
