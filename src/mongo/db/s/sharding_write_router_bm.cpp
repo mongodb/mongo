@@ -38,6 +38,7 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
+#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_write_router.h"
@@ -213,6 +214,10 @@ void BM_UnshardedDestinedRecipient(benchmark::State& state) {
     const auto client = serviceContext->makeClient("test");
     serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     const auto opCtx = client->makeOperationContext();
+
+    CollectionShardingStateFactory::set(
+        opCtx->getServiceContext(),
+        std::make_unique<CollectionShardingStateFactoryStandalone>(opCtx->getServiceContext()));
 
     const auto catalogCache = CatalogCacheMock::make();
 
