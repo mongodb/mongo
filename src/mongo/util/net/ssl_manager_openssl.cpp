@@ -771,6 +771,10 @@ Future<UniqueOCSPResponse> retrieveOCSPResponse(const std::string& host,
         return getSSLFailure("Could not convert type OCSP Response to DER encoded object.");
     }
 
+    if (!OCSPManager::get(getGlobalServiceContext())) {
+        return getSSLFailure("OCSP fetch could not complete, server is in shutdown mode.");
+    }
+
     // Query the OCSP responder
     return OCSPManager::get(getGlobalServiceContext())
         ->requestStatus(buffer, host, purpose)
