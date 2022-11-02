@@ -52,7 +52,7 @@ __wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs
     if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
         return;
 
-    __wt_verbose(session, WT_VERB_MUTEX, "wait %s", cond->name);
+    __wt_verbose_debug2(session, WT_VERB_MUTEX, "wait %s", cond->name);
     WT_STAT_CONN_INCR(session, cond_wait);
 
     EnterCriticalSection(&cond->mtx);
@@ -129,7 +129,7 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
     WT_DECL_RET;
 
-    __wt_verbose(session, WT_VERB_MUTEX, "signal %s", cond->name);
+    __wt_verbose_debug2(session, WT_VERB_MUTEX, "signal %s", cond->name);
 
     /*
      * Our callers often set flags to cause a thread to exit. Add a barrier to ensure exit flags are
