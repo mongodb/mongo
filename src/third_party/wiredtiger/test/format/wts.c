@@ -218,7 +218,7 @@ create_database(const char *home, WT_CONNECTION **connp)
       ",checkpoint_sync=false"
       ",error_prefix=\"%s\""
       ",operation_timeout_ms=2000"
-      ",statistics=(all)"
+      ",statistics=(fast)"
       ",statistics_log=(json,on_close,wait=5)",
       GV(CACHE), progname);
 
@@ -488,7 +488,7 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
         CONFIG_APPEND(p, ",encryption=(name=%s)", enc);
 
     CONFIG_APPEND(
-      p, ",error_prefix=\"%s\",statistics=(all),statistics_log=(json,on_close,wait=5)", progname);
+      p, ",error_prefix=\"%s\",statistics=(fast),statistics_log=(json,on_close,wait=5)", progname);
 
     /* Optional timing stress. */
     configure_timing_stress(&p, max);
