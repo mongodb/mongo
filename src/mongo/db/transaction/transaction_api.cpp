@@ -300,17 +300,32 @@ SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj 
 
     BSONObjBuilder cmdBuilder(_behaviors->maybeModifyCommand(std::move(cmdObj)));
     _hooks->runRequestHook(&cmdBuilder);
+    auto modifiedCmdObj = cmdBuilder.obj();
+    bool isAbortTxnCmd = modifiedCmdObj.firstElementFieldNameStringData() == "abortTransaction";
 
     auto client = _serviceContext->makeClient("SEP-internal-txn-client");
     AlternativeClientRegion clientRegion(client);
+
     // Note that _token is only cancelled once the caller of the transaction no longer cares about
     // its result, so CancelableOperationContexts only being interrupted by ErrorCodes::Interrupted
-    // shouldn't impact any upstream retry logic.
-    CancelableOperationContextFactory opCtxFactory(_token, _executor);
+    // shouldn't impact any upstream retry logic. If a _bestEffortAbort() is invoked, a new
+    // cancelation token must be used in constructing the opCtx for running abortTransaction. This
+    // is because an operation that has already been interrupted would cancel the parent cancelation
+    // token and using that same token to send abortTransaction would fail to send abortTransaction,
+    // leaving the transaction open longer than necessary.
+    auto opCtxFactory = isAbortTxnCmd
+        ? CancelableOperationContextFactory(CancellationToken::uncancelable(), _executor)
+        : CancelableOperationContextFactory(_token, _executor);
+
     auto cancellableOpCtx = opCtxFactory.makeOperationContext(&cc());
+
+    // abortTransaction should still be interruptible on stepdown/shutdown.
+    if (isAbortTxnCmd) {
+        cancellableOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+    }
     primeInternalClient(&cc());
 
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, cmdBuilder.obj());
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, modifiedCmdObj);
     auto requestMessage = opMsgRequest.serialize();
     return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage)
         .then([this](DbResponse dbResponse) {
