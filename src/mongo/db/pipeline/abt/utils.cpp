@@ -94,7 +94,7 @@ ABT translateFieldRef(const FieldRef& fieldRef, ABT initial) {
     for (size_t i = fieldPathLength; i-- > 0;) {
         // A single empty field path will parse to a FieldRef with 0 parts but should
         // logically be considered a single part with an empty string.
-        if (fieldPathLength > 0 && i != fieldPathLength - 1) {
+        if (i != fieldPathLength - 1) {
             // For field paths with empty elements such as 'x.', we should traverse the
             // array 'x' but not reach into any sub-objects. So a predicate such as {'x.':
             // {$eq: 5}} should match {x: [5]} and {x: {"": 5}} but not {x: [{"": 5}]}.
