@@ -13,6 +13,7 @@ from typing import Optional, Set, Tuple, List, Dict, NamedTuple
 import click
 import yaml
 from git import Repo
+from pydantic import BaseModel
 import structlog
 from structlog.stdlib import LoggerFactory
 
@@ -352,7 +353,8 @@ def create_task_list_for_tests(changed_tests: Set[str], build_variant: str,
 
 
 def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
-                         changed_tests: Set[str], install_dir: str) -> Dict[str, TaskInfo]:
+                         changed_tests: Set[str],
+                         install_dir: Optional[str]) -> Dict[str, TaskInfo]:
     """
     Create a list of tests by task.
 
@@ -367,7 +369,11 @@ def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
         exclude_tests.append(f"{ENTERPRISE_MODULE_PATH}/**/*")
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
-    buildscripts.resmokelib.parser.set_run_options(f"--installDir={shlex.quote(install_dir)}")
+    run_options = ""
+    if install_dir is not None:
+        run_options = f"--installDir={shlex.quote(install_dir)}"
+    buildscripts.resmokelib.parser.set_run_options(run_options)
+
     if changed_tests:
         return create_task_list_for_tests(changed_tests, build_variant, evg_conf, exclude_suites,
                                           exclude_tasks)
@@ -408,7 +414,7 @@ def _configure_logging(verbose: bool):
     logging.basicConfig(
         format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
         level=level,
-        stream=sys.stdout,
+        stream=sys.stderr,
     )
     for log_name in EXTERNAL_LOGGERS:
         logging.getLogger(log_name).setLevel(logging.WARNING)
@@ -537,11 +543,45 @@ class LocalBurnInExecutor(BurnInExecutor):
         run_tests(tests_by_task, resmoke_cmd)
 
 
+class DiscoveredTask(BaseModel):
+    """
+    Model for a discovered task to run.
+
+    * task_name: Name of discovered task.
+    * test_list: List of tests to run under discovered task.
+    """
+
+    task_name: str
+    test_list: List[str]
+
+
+class DiscoveredTaskList(BaseModel):
+    """Model for a list of discovered tasks."""
+
+    discovered_tasks: List[DiscoveredTask]
+
+
+class YamlBurnInExecutor(BurnInExecutor):
+    """A burn-in executor that outputs discovered tasks as YAML."""
+
+    def execute(self, tests_by_task: Dict[str, TaskInfo]) -> None:
+        """
+        Report the given tasks and their tests to stdout.
+
+        :param tests_by_task: Dictionary of tasks to run with tests to run in each.
+        """
+        discovered_tasks = DiscoveredTaskList(discovered_tasks=[
+            DiscoveredTask(task_name=task_name, test_list=task_info.tests)
+            for task_name, task_info in tests_by_task.items()
+        ])
+        print(yaml.safe_dump(discovered_tasks.dict()))
+
+
 class BurnInOrchestrator:
     """Orchestrate the execution of burn_in_tests."""
 
     def __init__(self, change_detector: FileChangeDetector, burn_in_executor: BurnInExecutor,
-                 evg_conf: EvergreenProjectConfig) -> None:
+                 evg_conf: EvergreenProjectConfig, install_dir: Optional[str]) -> None:
         """
         Create a new orchestrator.
 
@@ -552,8 +592,9 @@ class BurnInOrchestrator:
         self.change_detector = change_detector
         self.burn_in_executor = burn_in_executor
         self.evg_conf = evg_conf
+        self.install_dir = install_dir
 
-    def burn_in(self, repos: List[Repo], build_variant: str, install_dir: str) -> None:
+    def burn_in(self, repos: List[Repo], build_variant: str) -> None:
         """
         Execute burn in tests for the given git repositories.
 
@@ -564,7 +605,7 @@ class BurnInOrchestrator:
         LOGGER.info("Found changed tests", files=changed_tests)
 
         tests_by_task = create_tests_by_task(build_variant, self.evg_conf, changed_tests,
-                                             install_dir)
+                                             self.install_dir)
         LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
         self.burn_in_executor.execute(tests_by_task)
@@ -584,18 +625,20 @@ class BurnInOrchestrator:
               help="The maximum number of times to repeat tests if time option is specified.")
 @click.option("--repeat-tests-secs", "repeat_tests_secs", default=None, type=int, metavar="SECONDS",
               help="Repeat tests for the given time (in secs).")
+@click.option("--yaml", "use_yaml", is_flag=True, default=False,
+              help="Output discovered tasks in YAML. Tests will not be run.")
 @click.option("--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging.")
 @click.option(
     "--origin-rev", "origin_rev", default=None,
     help="The revision in the mongo repo that changes will be compared against if specified.")
-@click.option("--install-dir", "install_dir", required=True, type=str,
+@click.option("--install-dir", "install_dir", type=str,
               help="Path to bin directory of a testable installation")
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
 # pylint: disable=too-many-arguments,too-many-locals
 def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
          repeat_tests_min: Optional[int], repeat_tests_max: Optional[int],
          repeat_tests_secs: Optional[int], resmoke_args: str, verbose: bool,
-         origin_rev: Optional[str], install_dir: str) -> None:
+         origin_rev: Optional[str], install_dir: Optional[str], use_yaml: bool) -> None:
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -639,11 +682,13 @@ def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
 
     change_detector = LocalFileChangeDetector(origin_rev)
     executor = LocalBurnInExecutor(resmoke_args, repeat_config)
-    if no_exec:
+    if use_yaml:
+        executor = YamlBurnInExecutor()
+    elif no_exec:
         executor = NopBurnInExecutor()
 
-    burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf)
-    burn_in_orchestrator.burn_in(repos, build_variant, install_dir)
+    burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf, install_dir)
+    burn_in_orchestrator.burn_in(repos, build_variant)
 
 
 if __name__ == "__main__":

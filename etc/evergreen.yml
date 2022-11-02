@@ -643,7 +643,7 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 5
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem linux-64-duroff enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-dynamic-required
     num_scons_link_jobs_available: 0.99
     test_flags: >-
       --mongodSetParameters="{roundtripBsonColumnOnValidate: true}"
@@ -1306,7 +1306,9 @@ buildvariants:
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem linux-64-duroff enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-dynamic-required
+    burn_in_tag_compile_distro: rhel80-xlarge
+    burn_in_tag_compile_task_group_name: compile_and_archive_dist_test_TG
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -1579,7 +1581,9 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 5
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem linux-64-duroff enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-dynamic-required
+    burn_in_tag_compile_distro: rhel80-xlarge
+    burn_in_tag_compile_task_group_name: compile_and_archive_dist_test_TG
     num_scons_link_jobs_available: 0.99
     test_flags: >-
       --mongodSetParameters="{internalQueryForceClassicEngine: true}"
