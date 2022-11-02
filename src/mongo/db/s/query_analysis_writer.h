@@ -179,10 +179,10 @@ private:
     void _flushDiffs(OperationContext* opCtx);
 
     /**
-     * The helper for '_flushQueries'. Inserts the documents in 'buffer' into the collection 'ns'
-     * in batches, and removes all the inserted documents from 'buffer'. Internally retries the
-     * inserts on retryable errors for a fixed number of times. Ignores DuplicateKey errors since
-     * they are expected for the following reasons:
+     * The helper for '_flushQueries' and '_flushDiffs'. Inserts the documents in 'buffer' into the
+     * collection 'ns' in batches, and removes all the inserted documents from 'buffer'. Internally
+     * retries the inserts on retryable errors for a fixed number of times. Ignores DuplicateKey
+     * errors since they are expected for the following reasons:
      * - For the query buffer, a sampled query that is idempotent (e.g. a read or retryable write)
      *   could get added to the buffer (across nodes) more than once due to retries.
      * - For the diff buffer, a sampled multi-update query could end up generating multiple diffs
