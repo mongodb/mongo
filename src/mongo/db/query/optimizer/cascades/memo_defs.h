@@ -59,6 +59,10 @@ public:
     OrderPreservingABTSet(const OrderPreservingABTSet&) = delete;
     OrderPreservingABTSet(OrderPreservingABTSet&&) = default;
 
+    OrderPreservingABTSet& operator=(const OrderPreservingABTSet&) = delete;
+    OrderPreservingABTSet& operator=(OrderPreservingABTSet&&) = default;
+
+
     ABT::reference_type at(size_t index) const;
     std::pair<size_t, bool> emplace_back(ABT node);
     std::pair<size_t, bool> find(ABT::reference_type node) const;
