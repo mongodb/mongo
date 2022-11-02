@@ -632,6 +632,7 @@ enum class Builtin : uint8_t {
     bsonSize,         // implements $bsonSize
     toUpper,
     toLower,
+    coerceToBool,
     coerceToString,
     concat,
     concatArrays,
@@ -1179,6 +1180,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinBsonSize(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinToUpper(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinToLower(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCoerceToBool(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCoerceToString(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAcos(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAcosh(ArityType arity);

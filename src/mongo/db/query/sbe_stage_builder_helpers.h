@@ -439,6 +439,14 @@ using BranchFn = std::function<std::pair<sbe::value::SlotId, EvalStage>(
     sbe::value::SlotIdGenerator* slotIdGenerator)>;
 
 /**
+ * Creates a chain of EIf expressions that will inspect each arg in order and return the first
+ * arg that is not null or missing.
+ */
+std::unique_ptr<sbe::EExpression> makeIfNullExpr(
+    std::vector<std::unique_ptr<sbe::EExpression>> values,
+    sbe::value::FrameIdGenerator* frameIdGenerator);
+
+/**
  * Creates a union stage with specified branches. Each branch is passed to 'branchFn' first. If
  * 'branchFn' is not set, expression from branch is simply projected to a slot.
  */
@@ -818,7 +826,7 @@ std::unique_ptr<FilterStateHelper> makeFilterStateHelper(bool trackIndex);
  * Creates a balanced boolean binary expression tree from given collection of leaf expression.
  */
 std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
-    sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>>& leaves);
+    sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>> leaves);
 
 /**
  * Creates tree with short-circuiting for OR and AND. Each element in 'braches' argument represents

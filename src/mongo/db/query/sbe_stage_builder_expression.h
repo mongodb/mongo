@@ -41,20 +41,12 @@ namespace mongo::stage_builder {
 class PlanStageSlots;
 
 /**
- * Translates an input Expression into an SBE EExpression. The 'stage' parameter provides the input
- * subtree to build on top of.
+ * Translates an input Expression into an SBE EvalExpr. 'rootSlot' should either be set to a slot
+ * that holds the root document or it should be boost::none. 'slots' can optionaly be provided as
+ * well so that generateExrpession() can make use of kField slots when appropriate.
  */
-EvalExprStagePair generateExpression(StageBuilderState& state,
-                                     const Expression* expr,
-                                     EvalStage stage,
-                                     boost::optional<sbe::value::SlotId> optionalRootSlot,
-                                     PlanNodeId planNodeId,
-                                     const PlanStageSlots* slots = nullptr);
-
-/**
- * Generate an EExpression that converts a value (contained in a variable bound to 'branchRef') that
- * can be of any type to a Boolean value based on MQL's definition of truth for the branch of any
- * logical expression.
- */
-std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(const sbe::EVariable& branchRef);
+EvalExpr generateExpression(StageBuilderState& state,
+                            const Expression* expr,
+                            boost::optional<sbe::value::SlotId> rootSlot,
+                            const PlanStageSlots* slots = nullptr);
 }  // namespace mongo::stage_builder

@@ -480,18 +480,6 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorMergeObjects(
 }
 };  // namespace
 
-std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildArgument(
-    StageBuilderState& state,
-    const AccumulationStatement& acc,
-    EvalStage stage,
-    boost::optional<sbe::value::SlotId> optionalRootSlot,
-    PlanNodeId planNodeId,
-    const PlanStageSlots* slots) {
-    auto [argExpr, outStage] = generateExpression(
-        state, acc.expr.argument.get(), std::move(stage), optionalRootSlot, planNodeId, slots);
-    return {argExpr.extractExpr(), std::move(outStage)};
-}
-
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     const AccumulationStatement& acc,
     std::unique_ptr<sbe::EExpression> argExpr,

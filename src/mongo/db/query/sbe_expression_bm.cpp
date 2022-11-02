@@ -92,10 +92,8 @@ public:
         // expressions directly.
         // It can be removed when stage_builder::generateExpressions
         // always return EExpression.
-        stage_builder::EvalStage bsonScanStage(
-            std::make_unique<sbe::BSONScanStage>(
-                convertToBson(documents), boost::make_optional(_inputSlotId), kEmptyPlanNodeId),
-            {_inputSlotId});
+        auto stage = sbe::makeS<sbe::BSONScanStage>(
+            convertToBson(documents), boost::make_optional(_inputSlotId), kEmptyPlanNodeId);
 
         stage_builder::StageBuilderState state{
             opCtx.get(),
@@ -107,14 +105,10 @@ public:
             false /* needsMerge */,
             false /* allowDiskUse */
         };
-        auto [evalExpr, evalStage] =
-            stage_builder::generateExpression(state,
-                                              expression.get(),
-                                              std::move(bsonScanStage),
-                                              boost::make_optional(_inputSlotId),
-                                              kEmptyPlanNodeId);
 
-        auto stage = evalStage.extractStage(kEmptyPlanNodeId);
+        auto evalExpr = stage_builder::generateExpression(
+            state, expression.get(), boost::make_optional(_inputSlotId));
+
         LOGV2_DEBUG(6979801,
                     1,
                     "sbe expression benchmark PlanStage",

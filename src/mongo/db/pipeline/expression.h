@@ -1073,10 +1073,14 @@ public:
 class ExpressionArrayElemAt final : public ExpressionFixedArity<ExpressionArrayElemAt, 2> {
 public:
     explicit ExpressionArrayElemAt(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx) {}
+        : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx) {
+        expCtx->sbeCompatible = false;
+    }
 
     ExpressionArrayElemAt(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx, std::move(children)) {
+        expCtx->sbeCompatible = false;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1093,10 +1097,14 @@ public:
 class ExpressionFirst final : public ExpressionFixedArity<ExpressionFirst, 1> {
 public:
     explicit ExpressionFirst(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionFirst, 1>(expCtx) {}
+        : ExpressionFixedArity<ExpressionFirst, 1>(expCtx) {
+        expCtx->sbeCompatible = false;
+    }
 
     ExpressionFirst(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionFirst, 1>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionFirst, 1>(expCtx, std::move(children)) {
+        expCtx->sbeCompatible = false;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1113,7 +1121,9 @@ public:
 class ExpressionLast final : public ExpressionFixedArity<ExpressionLast, 1> {
 public:
     explicit ExpressionLast(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionLast, 1>(expCtx) {}
+        : ExpressionFixedArity<ExpressionLast, 1>(expCtx) {
+        expCtx->sbeCompatible = false;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;

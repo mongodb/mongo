@@ -259,7 +259,6 @@ void CodeFragment::append(CodeFragment&& code) {
 }
 
 void CodeFragment::appendNoStack(CodeFragment&& code) {
-    invariant(code._fixUps.empty());
     copyCodeAndFixup(std::move(code));
 }
 
@@ -3235,6 +3234,40 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinToLower(ArityTyp
     return {false, value::TypeTags::Nothing, 0};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToBool(ArityType arity) {
+    auto [operandOwned, operandTag, operandVal] = getFromStack(0);
+
+    switch (operandTag) {
+        case value::TypeTags::Nothing: {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        case value::TypeTags::Null:
+        case value::TypeTags::bsonUndefined: {
+            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
+        }
+        case value::TypeTags::Boolean: {
+            return {false, operandTag, operandVal};
+        }
+        case value::TypeTags::NumberInt32: {
+            bool isNotZero = (value::bitcastTo<int32_t>(operandVal) != 0);
+            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(isNotZero)};
+        }
+        case value::TypeTags::NumberInt64: {
+            bool isNotZero = (value::bitcastTo<int64_t>(operandVal) != 0);
+            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(isNotZero)};
+        }
+        case value::TypeTags::NumberDouble: {
+            bool isNotZero = (value::bitcastTo<double>(operandVal) != 0.0);
+            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(isNotZero)};
+        }
+        case value::TypeTags::NumberDecimal: {
+            bool isNotZero = !value::bitcastTo<Decimal128>(operandVal).isZero();
+            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(isNotZero)};
+        }
+        default: { return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true)}; }
+    }
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(ArityType arity) {
     auto [operandOwn, operandTag, operandVal] = getFromStack(0);
 
@@ -4902,6 +4935,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinToUpper(arity);
         case Builtin::toLower:
             return builtinToLower(arity);
+        case Builtin::coerceToBool:
+            return builtinCoerceToBool(arity);
         case Builtin::coerceToString:
             return builtinCoerceToString(arity);
         case Builtin::acos:
@@ -5119,6 +5154,8 @@ std::string builtinToString(Builtin b) {
             return "toUpper";
         case Builtin::toLower:
             return "toLower";
+        case Builtin::coerceToBool:
+            return "coerceToBool";
         case Builtin::coerceToString:
             return "coerceToString";
         case Builtin::concat:

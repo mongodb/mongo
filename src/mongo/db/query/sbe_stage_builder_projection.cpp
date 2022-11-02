@@ -400,15 +400,10 @@ public:
         // 'evals' stack. If the expression is translated into a sub-tree, stack it with the
         // existing 'evalStage' sub-tree.
         auto expression = node->expression();
-        auto [expr, stage] = generateExpression(_context->state,
-                                                expression.get(),
-                                                std::move(_context->topLevel().evalStage),
-                                                _context->inputSlot,
-                                                _context->planNodeId,
-                                                _context->slots);
+        auto expr = generateExpression(
+            _context->state, expression.get(), _context->inputSlot, _context->slots);
 
         _context->topLevelEvals().emplace_back(std::move(expr));
-        _context->topLevel().evalStage = std::move(stage);
     }
 
     void visit(const projection_ast::ProjectionPathASTNode* node) final {

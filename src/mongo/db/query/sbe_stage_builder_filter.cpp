@@ -1415,23 +1415,15 @@ public:
                 "Eval frame for $expr is not computed over expression's input slot",
                 *frame.data().inputSlot == *_context->inputSlot);
 
-        auto&& [expr, stage] = generateExpression(_context->state,
-                                                  matchExpr->getExpression().get(),
-                                                  frame.extractStage(),
-                                                  *frame.data().inputSlot,
-                                                  _context->planNodeId,
-                                                  _context->slots);
-        auto frameId = _context->state.frameId();
+        auto expr = generateExpression(_context->state,
+                                       matchExpr->getExpression().get(),
+                                       *frame.data().inputSlot,
+                                       _context->slots);
 
-        // We will need to convert the result of $expr to a boolean value, so we'll wrap it into an
-        // expression which does exactly that.
-        auto logicExpr = generateCoerceToBoolExpression(sbe::EVariable{frameId, 0});
+        // We need to convert the result of the '{$expr: ..}' expression to a boolean value.
+        auto logicExpr = makeFillEmptyFalse(makeFunction("coerceToBool", expr.extractExpr()));
 
-        auto localBindExpr = sbe::makeE<sbe::ELocalBind>(
-            frameId, sbe::makeEs(expr.extractExpr()), std::move(logicExpr));
-
-        frame.pushExpr(_context->stateHelper.makeState(std::move(localBindExpr)));
-        frame.setStage(std::move(stage));
+        frame.pushExpr(_context->stateHelper.makeState(std::move(logicExpr)));
     }
 
     void visit(const GTEMatchExpression* expr) final {

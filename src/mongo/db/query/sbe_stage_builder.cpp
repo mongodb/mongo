@@ -761,7 +761,7 @@ std::unique_ptr<sbe::EExpression> generatePerColumnLogicalAndExpr(StageBuilderSt
     }
 
     // Create the balanced binary tree to keep the tree shallow and safe for recursion.
-    return makeBalancedBooleanOpTree(sbe::EPrimBinary::logicAnd, leaves);
+    return makeBalancedBooleanOpTree(sbe::EPrimBinary::logicAnd, std::move(leaves));
 }
 
 std::unique_ptr<sbe::EExpression> generatePerColumnFilterExpr(StageBuilderState& state,
@@ -2308,11 +2308,10 @@ EvalStage optimizeFieldPaths(StageBuilderState& state,
         auto fieldPathStr = fieldExpr->getFieldPath().fullPath();
 
         if (!state.preGeneratedExprs.contains(fieldPathStr)) {
-            auto [curEvalExpr, curEvalStage] =
-                generateExpression(state, fieldExpr, std::move(stage), rootSlot, nodeId, &outputs);
+            auto expr = generateExpression(state, fieldExpr, rootSlot, &outputs);
 
-            auto [slot, projectStage] = projectEvalExpr(
-                std::move(curEvalExpr), std::move(curEvalStage), nodeId, state.slotIdGenerator);
+            auto [slot, projectStage] =
+                projectEvalExpr(std::move(expr), std::move(stage), nodeId, state.slotIdGenerator);
 
             state.preGeneratedExprs.emplace(fieldPathStr, slot);
             stage = std::move(projectStage);
@@ -2322,19 +2321,19 @@ EvalStage optimizeFieldPaths(StageBuilderState& state,
     return stage;
 }
 
-std::pair<EvalExpr, EvalStage> generateGroupByKeyImpl(
-    StageBuilderState& state,
-    const boost::intrusive_ptr<Expression>& idExpr,
-    const PlanStageSlots& outputs,
-    const boost::optional<sbe::value::SlotId>& rootSlot,
-    EvalStage stage,
-    PlanNodeId nodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator) {
+EvalExprStagePair generateGroupByKeyImpl(StageBuilderState& state,
+                                         const boost::intrusive_ptr<Expression>& idExpr,
+                                         const PlanStageSlots& outputs,
+                                         const boost::optional<sbe::value::SlotId>& rootSlot,
+                                         EvalStage stage,
+                                         PlanNodeId nodeId,
+                                         sbe::value::SlotIdGenerator* slotIdGenerator) {
     // Optimize field paths before generating the expression.
     stage = optimizeFieldPaths(state, idExpr, std::move(stage), outputs, nodeId);
 
-    return stage_builder::generateExpression(
-        state, idExpr.get(), std::move(stage), rootSlot, nodeId, &outputs);
+    auto expr = stage_builder::generateExpression(state, idExpr.get(), rootSlot, &outputs);
+
+    return {std::move(expr), std::move(stage)};
 }
 
 std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>> generateGroupByKey(
@@ -2410,15 +2409,14 @@ std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
 
     // Input fields may need field traversal.
     stage = optimizeFieldPaths(state, accStmt.expr.argument, std::move(stage), outputs, nodeId);
-    auto [argExpr, accArgEvalStage] =
-        stage_builder::buildArgument(state, accStmt, std::move(stage), rootSlot, nodeId, &outputs);
+    auto argExpr = generateExpression(state, accStmt.expr.argument.get(), rootSlot, &outputs);
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
     // as sum(1).
     auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
     auto accExprs = stage_builder::buildAccumulator(
-        accStmt, std::move(argExpr), collatorSlot, *state.frameIdGenerator);
+        accStmt, argExpr.extractExpr(), collatorSlot, *state.frameIdGenerator);
 
     sbe::value::SlotVector aggSlots;
     for (auto& accExpr : accExprs) {
@@ -2427,7 +2425,7 @@ std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
         accSlotToExprMap.emplace(slot, std::move(accExpr));
     }
 
-    return {std::move(aggSlots), std::move(accArgEvalStage)};
+    return {std::move(aggSlots), std::move(stage)};
 }
 
 std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generateGroupFinalStage(

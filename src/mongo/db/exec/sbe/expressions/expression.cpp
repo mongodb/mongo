@@ -673,6 +673,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"bsonSize", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::bsonSize, false}},
     {"toLower", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::toLower, false}},
     {"toUpper", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::toUpper, false}},
+    {"coerceToBool", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::coerceToBool, false}},
     {"coerceToString",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::coerceToString, false}},
     {"acos", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::acos, false}},

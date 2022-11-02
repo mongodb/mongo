@@ -2652,7 +2652,11 @@ ExpressionFilter::ExpressionFilter(ExpressionContext* const expCtx,
       _cond(_children[1]),
       _limit(_children.size() == 3
                  ? _children[2]
-                 : boost::optional<boost::intrusive_ptr<Expression>&>(boost::none)) {}
+                 : boost::optional<boost::intrusive_ptr<Expression>&>(boost::none)) {
+    if (_limit) {
+        expCtx->sbeCompatible = false;
+    }
+}
 
 intrusive_ptr<Expression> ExpressionFilter::optimize() {
     // TODO handle when _input is constant.

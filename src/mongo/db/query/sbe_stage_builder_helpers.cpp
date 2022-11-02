@@ -113,6 +113,7 @@ std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression>
 
     return makeIsMember(std::move(input), std::move(arr), std::move(collatorVar));
 }
+
 std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpression& expr) {
     return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                         makeFunction("typeMatch",
@@ -509,6 +510,30 @@ EvalStage makeMkBsonObj(EvalStage stage,
     return stage;
 }
 
+std::unique_ptr<sbe::EExpression> makeIfNullExpr(
+    std::vector<std::unique_ptr<sbe::EExpression>> values,
+    sbe::value::FrameIdGenerator* frameIdGenerator) {
+    tassert(6987503, "Expected 'values' to be non-empty", values.size() > 0);
+
+    size_t idx = values.size() - 1;
+    auto expr = std::move(values[idx]);
+
+    while (idx > 0) {
+        --idx;
+
+        auto frameId = frameIdGenerator->generate();
+        auto var = sbe::EVariable{frameId, 0};
+
+        expr = sbe::makeE<sbe::ELocalBind>(frameId,
+                                           sbe::makeEs(std::move(values[idx])),
+                                           sbe::makeE<sbe::EIf>(makeNot(generateNullOrMissing(var)),
+                                                                var.clone(),
+                                                                std::move(expr)));
+    }
+
+    return expr;
+}
+
 EvalExprStagePair generateUnion(std::vector<EvalExprStagePair> branches,
                                 BranchFn branchFn,
                                 PlanNodeId planNodeId,
@@ -553,7 +578,7 @@ EvalExprStagePair generateSingleResultUnion(std::vector<EvalExprStagePair> branc
                       unionEvalStage.extractOutSlots()}};
 }
 
-std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
+std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTreeImpl(
     sbe::EPrimBinary::Op logicOp,
     std::vector<std::unique_ptr<sbe::EExpression>>& leaves,
     size_t from,
@@ -563,15 +588,15 @@ std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
         return std::move(leaves[from]);
     } else {
         size_t mid = (from + until) / 2;
-        auto lhs = makeBalancedBooleanOpTree(logicOp, leaves, from, mid);
-        auto rhs = makeBalancedBooleanOpTree(logicOp, leaves, mid, until);
+        auto lhs = makeBalancedBooleanOpTreeImpl(logicOp, leaves, from, mid);
+        auto rhs = makeBalancedBooleanOpTreeImpl(logicOp, leaves, mid, until);
         return makeBinaryOp(logicOp, std::move(lhs), std::move(rhs));
     }
 }
 
 std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
-    sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>>& leaves) {
-    return makeBalancedBooleanOpTree(logicOp, leaves, 0, leaves.size());
+    sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>> leaves) {
+    return makeBalancedBooleanOpTreeImpl(logicOp, leaves, 0, leaves.size());
 }
 
 EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
@@ -611,7 +636,7 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
             leaves.push_back(stateHelper.getBool(expr.extractExpr()));
         }
         // Create the balanced binary tree to keep the tree shallow and safe for recursion.
-        auto exprOnlyOp = makeBalancedBooleanOpTree(logicOp, leaves, 0, branches.size());
+        auto exprOnlyOp = makeBalancedBooleanOpTree(logicOp, std::move(leaves));
         return {EvalExpr{std::move(exprOnlyOp)}, EvalStage{}};
     }
 
