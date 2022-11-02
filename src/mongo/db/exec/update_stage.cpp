@@ -239,6 +239,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
 
         if (!request->explain()) {
             args.stmtIds = request->getStmtIds();
+            args.sampleId = request->getSampleId();
             args.update = logObj;
             if (_isUserInitiatedWrite) {
                 auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(

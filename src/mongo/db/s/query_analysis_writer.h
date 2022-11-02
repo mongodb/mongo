@@ -44,10 +44,17 @@ namespace analyze_shard_key {
  * Owns the machinery for persisting sampled queries. That consists of the following:
  * - The buffer that stores sampled queries and the periodic background job that inserts those
  *   queries into the local config.sampledQueries collection.
+ * - The buffer that stores diffs for sampled update queries and the periodic background job that
+ *   inserts those diffs into the local config.sampledQueriesDiff collection.
  *
  * Currently, query sampling is only supported on a sharded cluster. So a writer must be a shardsvr
  * mongod. If the mongod is a primary, it will execute the insert commands locally. If it is a
  * secondary, it will perform the insert commands against the primary.
+ *
+ * The memory usage of the buffers is controlled by the 'queryAnalysisWriterMaxMemoryUsageBytes'
+ * server parameter. Upon adding a query or a diff that causes the total size of buffers to exceed
+ * the limit, the writer will flush the corresponding buffer immediately instead of waiting for it
+ * to get flushed later by the periodic job.
  */
 class QueryAnalysisWriter final : public std::enable_shared_from_this<QueryAnalysisWriter> {
     QueryAnalysisWriter(const QueryAnalysisWriter&) = delete;
@@ -137,6 +144,12 @@ public:
     ExecutorFuture<void> addFindAndModifyQuery(
         const write_ops::FindAndModifyCommandRequest& findAndModifyCmd);
 
+    ExecutorFuture<void> addDiff(const UUID& sampleId,
+                                 const NamespaceString& nss,
+                                 const UUID& collUuid,
+                                 const BSONObj& preImage,
+                                 const BSONObj& postImage);
+
     int getQueriesCountForTest() const {
         stdx::lock_guard<Latch> lk(_mutex);
         return _queries.getCount();
@@ -144,6 +157,15 @@ public:
 
     void flushQueriesForTest(OperationContext* opCtx) {
         _flushQueries(opCtx);
+    }
+
+    int getDiffsCountForTest() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return _diffs.getCount();
+    }
+
+    void flushDiffsForTest(OperationContext* opCtx) {
+        _flushDiffs(opCtx);
     }
 
 private:
@@ -154,6 +176,7 @@ private:
                                        const BSONObj& collation);
 
     void _flushQueries(OperationContext* opCtx);
+    void _flushDiffs(OperationContext* opCtx);
 
     /**
      * The helper for '_flushQueries'. Inserts the documents in 'buffer' into the collection 'ns'
@@ -162,6 +185,8 @@ private:
      * they are expected for the following reasons:
      * - For the query buffer, a sampled query that is idempotent (e.g. a read or retryable write)
      *   could get added to the buffer (across nodes) more than once due to retries.
+     * - For the diff buffer, a sampled multi-update query could end up generating multiple diffs
+     *   and each diff is identified using the sample id of the sampled query that creates it.
      *
      * Throws an error if the inserts fail with any other error.
      */
@@ -177,6 +202,9 @@ private:
 
     PeriodicJobAnchor _periodicQueryWriter;
     Buffer _queries;
+
+    PeriodicJobAnchor _periodicDiffWriter;
+    Buffer _diffs;
 
     // Initialized on startup and joined on shutdown.
     std::shared_ptr<executor::TaskExecutor> _executor;

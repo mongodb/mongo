@@ -198,6 +198,9 @@ const NamespaceString NamespaceString::kConfigQueryAnalyzersNamespace(NamespaceS
 const NamespaceString NamespaceString::kConfigSampledQueriesNamespace(NamespaceString::kConfigDb,
                                                                       "sampledQueries");
 
+const NamespaceString NamespaceString::kConfigSampledQueriesDiffNamespace(
+    NamespaceString::kConfigDb, "sampledQueriesDiff");
+
 NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
     if (!gMultitenancySupport) {
         return NamespaceString(boost::none, ns);

@@ -72,12 +72,49 @@ var QuerySamplingUtil = (function() {
         assert.eq(coll.find({ns}).itcount(), 0);
     }
 
+    /**
+     * Waits for the config.sampledQueriesDiff collection to have a document with _id equal to
+     * sampleId, and then asserts that the diff in that document matches one of the diffs in
+     * 'expectedSampledDiffs'.
+     */
+    function assertSoonSingleSampledDiffDocument(
+        conn, sampleId, ns, collectionUuid, expectedSampledDiffs) {
+        const coll = conn.getCollection("config.sampledQueriesDiff");
+
+        assert.soon(() => {
+            const doc = coll.findOne({_id: sampleId});
+            if (!doc) {
+                return false;
+            }
+            assert.eq(doc.ns, ns, doc);
+            assert.eq(doc.collectionUuid, collectionUuid, doc);
+            assert(expectedSampledDiffs.some(diff => {
+                return bsonUnorderedFieldsCompare(doc.diff, diff) === 0;
+            }),
+                   doc);
+            return true;
+        });
+    }
+
+    function assertNoSampledDiffDocuments(conn, ns) {
+        const coll = conn.getCollection("config.sampledQueriesDiff");
+        assert.eq(coll.find({ns: ns}).itcount(), 0);
+    }
+
+    function clearSampledDiffCollection(primary) {
+        const coll = primary.getCollection("config.sampledQueriesDiff");
+        assert.commandWorked(coll.remove({}));
+    }
+
     return {
         getCollectionUuid,
         generateRandomString,
         generateRandomCollation,
         makeCmdObjIgnoreSessionInfo,
         assertSoonSampledQueryDocuments,
-        assertNoSampledQueryDocuments
+        assertNoSampledQueryDocuments,
+        assertSoonSingleSampledDiffDocument,
+        assertNoSampledDiffDocuments,
+        clearSampledDiffCollection
     };
 })();

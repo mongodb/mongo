@@ -21,12 +21,14 @@ function testStepDown(rst) {
     assert.commandWorked(primaryDB.getCollection(collName).insert({a: 0}));
     const collectionUuid = QuerySamplingUtil.getCollectionUuid(primaryDB, collName);
 
-    const localWriteFp = configureFailPoint(primary, "hangQueryAnalysisWriterBeforeWritingLocally");
+    const localWriteFp =
+        configureFailPoint(primary, "hangQueryAnalysisWriterBeforeWritingLocally", {}, {times: 1});
 
     const originalCmdObj =
         {findAndModify: collName, query: {a: 0}, update: {a: 1}, sampleId: UUID()};
     const expectedSampledQueryDocs =
         [{sampleId: originalCmdObj.sampleId, cmdName: "findAndModify", cmdObj: originalCmdObj}];
+    const expectedDiff = {a: "u"};
 
     assert.commandWorked(primaryDB.getCollection(collName).runCommand(originalCmdObj));
 
@@ -43,6 +45,8 @@ function testStepDown(rst) {
     // by stepdown.
     QuerySamplingUtil.assertSoonSampledQueryDocuments(
         primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSingleSampledDiffDocument(
+        primary, originalCmdObj.sampleId, ns, collectionUuid, [expectedDiff]);
 }
 
 function testStepUp(rst) {

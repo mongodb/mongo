@@ -276,6 +276,9 @@ public:
     // Namespace used for storing sampled queries.
     static const NamespaceString kConfigSampledQueriesNamespace;
 
+    // Namespace used for storing the diffs for sampled update queries.
+    static const NamespaceString kConfigSampledQueriesDiffNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

@@ -723,6 +723,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 if (opCtx->getTxnNumber()) {
                     updateRequest.setStmtIds({stmtId});
                 }
+                updateRequest.setSampleId(req.getSampleId());
 
                 const ExtensionsCallbackReal extensionsCallback(
                     opCtx, &updateRequest.getNamespaceString());

@@ -157,6 +157,11 @@ DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidSize_Positive, "invaria
     buffer.truncate(0, doc.objsize() * 2);
 }
 
+void assertBsonObjEqualUnordered(const BSONObj& lhs, const BSONObj& rhs) {
+    UnorderedFieldsBSONObjComparator comparator;
+    ASSERT_EQ(comparator.compare(lhs, rhs), 0);
+}
+
 struct QueryAnalysisWriterTest : public ShardServerTestFixture {
 public:
     void setUp() {
@@ -371,6 +376,32 @@ protected:
         auto parsedCmd = CommandRequestType::parse(IDLParserContext("QueryAnalysisWriterTest"),
                                                    parsedQueryDoc.getCmd());
         ASSERT_BSONOBJ_EQ(parsedCmd.toBSON({}), expectedCmd.toBSON({}));
+    }
+
+    /*
+     * Returns the number of the documents for the collection 'nss' in the config.sampledQueriesDiff
+     * collection.
+     */
+    int getDiffDocumentsCount(const NamespaceString& nss) {
+        return _getConfigDocumentsCount(NamespaceString::kConfigSampledQueriesDiffNamespace, nss);
+    }
+
+    /*
+     * Asserts that there is a sampled diff document with the given sample id and that it has
+     * the given fields.
+     */
+    void assertDiffDocument(const UUID& sampleId,
+                            const NamespaceString& nss,
+                            const BSONObj& expectedDiff) {
+        auto doc =
+            _getConfigDocument(NamespaceString::kConfigSampledQueriesDiffNamespace, sampleId);
+        auto parsedDiffDoc =
+            SampledQueryDiffDocument::parse(IDLParserContext("QueryAnalysisWriterTest"), doc);
+
+        ASSERT_EQ(parsedDiffDoc.getNs(), nss);
+        ASSERT_EQ(parsedDiffDoc.getCollectionUuid(), getCollectionUUID(nss));
+        ASSERT_EQ(parsedDiffDoc.getSampleId(), sampleId);
+        assertBsonObjEqualUnordered(parsedDiffDoc.getDiff(), expectedDiff);
     }
 
     const NamespaceString nss0{"testDb", "testColl0"};
@@ -1034,6 +1065,215 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicatesFromBufferAfterWriteError) {
         assertSampledReadQueryDocument(
             sampleId, nss1, SampledReadCommandNameEnum::kFind, originalFilter, originalCollation);
     }
+}
+
+TEST_F(QueryAnalysisWriterTest, NoDiffs) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+    writer.flushQueriesForTest(operationContext());
+}
+
+TEST_F(QueryAnalysisWriterTest, DiffsBasic) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto collUuid0 = getCollectionUUID(nss0);
+    auto sampleId = UUID::gen();
+    auto preImage = BSON("a" << 0);
+    auto postImage = BSON("a" << 1);
+
+    writer.addDiff(sampleId, nss0, collUuid0, preImage, postImage).get();
+    ASSERT_EQ(writer.getDiffsCountForTest(), 1);
+    writer.flushDiffsForTest(operationContext());
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+
+    ASSERT_EQ(getDiffDocumentsCount(nss0), 1);
+    assertDiffDocument(sampleId, nss0, *doc_diff::computeInlineDiff(preImage, postImage));
+}
+
+TEST_F(QueryAnalysisWriterTest, DiffsMultipleQueriesAndCollections) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    // Make nss0 have a diff for one query.
+    auto collUuid0 = getCollectionUUID(nss0);
+
+    auto sampleId0 = UUID::gen();
+    auto preImage0 = BSON("a" << 0 << "b" << 0 << "c" << 0);
+    auto postImage0 = BSON("a" << 0 << "b" << 1 << "d" << 1);
+
+    // Make nss1 have diffs for two queries.
+    auto collUuid1 = getCollectionUUID(nss1);
+
+    auto sampleId1 = UUID::gen();
+    auto preImage1 = BSON("a" << 1 << "b" << BSON_ARRAY(1) << "d" << BSON("e" << 1));
+    auto postImage1 = BSON("a" << 1 << "b" << BSON_ARRAY(1 << 2) << "d" << BSON("e" << 2));
+
+    auto sampleId2 = UUID::gen();
+    auto preImage2 = BSON("a" << BSONObj());
+    auto postImage2 = BSON("a" << BSON("b" << 2));
+
+    writer.addDiff(sampleId0, nss0, collUuid0, preImage0, postImage0).get();
+    writer.addDiff(sampleId1, nss1, collUuid1, preImage1, postImage1).get();
+    writer.addDiff(sampleId2, nss1, collUuid1, preImage2, postImage2).get();
+    ASSERT_EQ(writer.getDiffsCountForTest(), 3);
+    writer.flushDiffsForTest(operationContext());
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+
+    ASSERT_EQ(getDiffDocumentsCount(nss0), 1);
+    assertDiffDocument(sampleId0, nss0, *doc_diff::computeInlineDiff(preImage0, postImage0));
+
+    ASSERT_EQ(getDiffDocumentsCount(nss1), 2);
+    assertDiffDocument(sampleId1, nss1, *doc_diff::computeInlineDiff(preImage1, postImage1));
+    assertDiffDocument(sampleId2, nss1, *doc_diff::computeInlineDiff(preImage2, postImage2));
+}
+
+TEST_F(QueryAnalysisWriterTest, DuplicateDiffs) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto collUuid0 = getCollectionUUID(nss0);
+
+    auto sampleId0 = UUID::gen();
+    auto preImage0 = BSON("a" << 0);
+    auto postImage0 = BSON("a" << 1);
+
+    auto sampleId1 = UUID::gen();
+    auto preImage1 = BSON("a" << 1 << "b" << BSON_ARRAY(1));
+    auto postImage1 = BSON("a" << 1 << "b" << BSON_ARRAY(1 << 2));
+
+    auto sampleId2 = UUID::gen();
+    auto preImage2 = BSON("a" << BSONObj());
+    auto postImage2 = BSON("a" << BSON("b" << 2));
+
+    writer.addDiff(sampleId0, nss0, collUuid0, preImage0, postImage0).get();
+    ASSERT_EQ(writer.getDiffsCountForTest(), 1);
+    writer.flushDiffsForTest(operationContext());
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+
+    ASSERT_EQ(getDiffDocumentsCount(nss0), 1);
+    assertDiffDocument(sampleId0, nss0, *doc_diff::computeInlineDiff(preImage0, postImage0));
+
+    writer.addDiff(sampleId1, nss0, collUuid0, preImage1, postImage1).get();
+    writer.addDiff(sampleId0, nss0, collUuid0, preImage0, postImage0)
+        .get();  // This is a duplicate.
+    writer.addDiff(sampleId2, nss0, collUuid0, preImage2, postImage2).get();
+    ASSERT_EQ(writer.getDiffsCountForTest(), 3);
+    writer.flushDiffsForTest(operationContext());
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+
+    ASSERT_EQ(getDiffDocumentsCount(nss0), 3);
+    assertDiffDocument(sampleId0, nss0, *doc_diff::computeInlineDiff(preImage0, postImage0));
+    assertDiffDocument(sampleId1, nss0, *doc_diff::computeInlineDiff(preImage1, postImage1));
+    assertDiffDocument(sampleId2, nss0, *doc_diff::computeInlineDiff(preImage2, postImage2));
+}
+
+TEST_F(QueryAnalysisWriterTest, DiffsMultipleBatches_MaxBatchSize) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    RAIIServerParameterControllerForTest maxBatchSize{"queryAnalysisWriterMaxBatchSize", 2};
+    auto numDiffs = 5;
+    auto collUuid0 = getCollectionUUID(nss0);
+
+    std::vector<std::pair<UUID, BSONObj>> expectedSampledDiffs;
+    for (auto i = 0; i < numDiffs; i++) {
+        auto sampleId = UUID::gen();
+        auto preImage = BSON("a" << 0);
+        auto postImage = BSON(("a" + std::to_string(i)) << 1);
+        writer.addDiff(sampleId, nss0, collUuid0, preImage, postImage).get();
+        expectedSampledDiffs.push_back(
+            {sampleId, *doc_diff::computeInlineDiff(preImage, postImage)});
+    }
+    ASSERT_EQ(writer.getDiffsCountForTest(), numDiffs);
+    writer.flushDiffsForTest(operationContext());
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+
+    ASSERT_EQ(getDiffDocumentsCount(nss0), numDiffs);
+    for (const auto& [sampleId, diff] : expectedSampledDiffs) {
+        assertDiffDocument(sampleId, nss0, diff);
+    }
+}
+
+TEST_F(QueryAnalysisWriterTest, DiffsMultipleBatches_MaxBSONObjSize) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto numDiffs = 3;
+    auto collUuid0 = getCollectionUUID(nss0);
+
+    std::vector<std::pair<UUID, BSONObj>> expectedSampledDiffs;
+    for (auto i = 0; i < numDiffs; i++) {
+        auto sampleId = UUID::gen();
+        auto preImage = BSON("a" << 0);
+        auto postImage = BSON(std::string(BSONObjMaxUserSize / 2, 'a') << 1);
+        writer.addDiff(sampleId, nss0, collUuid0, preImage, postImage).get();
+        expectedSampledDiffs.push_back(
+            {sampleId, *doc_diff::computeInlineDiff(preImage, postImage)});
+    }
+    ASSERT_EQ(writer.getDiffsCountForTest(), numDiffs);
+    writer.flushDiffsForTest(operationContext());
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+
+    ASSERT_EQ(getDiffDocumentsCount(nss0), numDiffs);
+    for (const auto& [sampleId, diff] : expectedSampledDiffs) {
+        assertDiffDocument(sampleId, nss0, diff);
+    }
+}
+
+TEST_F(QueryAnalysisWriterTest, FlushAfterAddDiffIfExceedsSizeLimit) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto maxMemoryUsageBytes = 1024;
+    RAIIServerParameterControllerForTest maxMemoryBytes{"queryAnalysisWriterMaxMemoryUsageBytes",
+                                                        maxMemoryUsageBytes};
+
+    auto collUuid0 = getCollectionUUID(nss0);
+    auto sampleId0 = UUID::gen();
+    auto preImage0 = BSON("a" << 0);
+    auto postImage0 = BSON(std::string(maxMemoryUsageBytes / 2, 'a') << 1);
+
+    auto collUuid1 = getCollectionUUID(nss1);
+    auto sampleId1 = UUID::gen();
+    auto preImage1 = BSON("a" << 0);
+    auto postImage1 = BSON(std::string(maxMemoryUsageBytes / 2, 'b') << 1);
+
+    writer.addDiff(sampleId0, nss0, collUuid0, preImage0, postImage0).get();
+    ASSERT_EQ(writer.getDiffsCountForTest(), 1);
+    // Adding the next diff causes the size to exceed the limit.
+    writer.addDiff(sampleId1, nss1, collUuid1, preImage1, postImage1).get();
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+
+    ASSERT_EQ(getDiffDocumentsCount(nss0), 1);
+    assertDiffDocument(sampleId0, nss0, *doc_diff::computeInlineDiff(preImage0, postImage0));
+    ASSERT_EQ(getDiffDocumentsCount(nss1), 1);
+    assertDiffDocument(sampleId1, nss1, *doc_diff::computeInlineDiff(preImage1, postImage1));
+}
+
+TEST_F(QueryAnalysisWriterTest, DiffEmpty) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto collUuid0 = getCollectionUUID(nss0);
+    auto sampleId = UUID::gen();
+    auto preImage = BSON("a" << 1);
+    auto postImage = preImage;
+
+    writer.addDiff(sampleId, nss0, collUuid0, preImage, postImage).get();
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+    writer.flushDiffsForTest(operationContext());
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+
+    ASSERT_EQ(getDiffDocumentsCount(nss0), 0);
+}
+
+TEST_F(QueryAnalysisWriterTest, DiffExceedsSizeLimit) {
+    auto& writer = QueryAnalysisWriter::get(operationContext());
+
+    auto collUuid0 = getCollectionUUID(nss0);
+    auto sampleId = UUID::gen();
+    auto preImage = BSON(std::string(BSONObjMaxUserSize, 'a') << 1);
+    auto postImage = BSONObj();
+
+    writer.addDiff(sampleId, nss0, collUuid0, preImage, postImage).get();
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+    writer.flushDiffsForTest(operationContext());
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+
+    ASSERT_EQ(getDiffDocumentsCount(nss0), 0);
 }
 
 }  // namespace

@@ -35,6 +35,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
@@ -274,6 +275,19 @@ void QueryAnalysisWriter::onStartup() {
     _periodicQueryWriter = periodicRunner->makeJob(std::move(QueryWriterJob));
     _periodicQueryWriter.start();
 
+    PeriodicRunner::PeriodicJob diffWriterJob(
+        "QueryAnalysisDiffWriter",
+        [this](Client* client) {
+            if (MONGO_unlikely(disableQueryAnalysisWriter.shouldFail())) {
+                return;
+            }
+            auto opCtx = client->makeOperationContext();
+            _flushDiffs(opCtx.get());
+        },
+        Seconds(gQueryAnalysisWriterIntervalSecs));
+    _periodicDiffWriter = periodicRunner->makeJob(std::move(diffWriterJob));
+    _periodicDiffWriter.start();
+
     ThreadPool::Options threadPoolOptions;
     threadPoolOptions.maxThreads = gQueryAnalysisWriterMaxThreadPoolSize;
     threadPoolOptions.minThreads = gQueryAnalysisWriterMinThreadPoolSize;
@@ -296,6 +310,9 @@ void QueryAnalysisWriter::onShutdown() {
     if (_periodicQueryWriter.isValid()) {
         _periodicQueryWriter.stop();
     }
+    if (_periodicDiffWriter.isValid()) {
+        _periodicDiffWriter.stop();
+    }
 }
 
 void QueryAnalysisWriter::_flushQueries(OperationContext* opCtx) {
@@ -304,6 +321,16 @@ void QueryAnalysisWriter::_flushQueries(OperationContext* opCtx) {
     } catch (DBException& ex) {
         LOGV2(7047300,
               "Failed to flush queries, will try again at the next interval",
+              "error"_attr = redact(ex));
+    }
+}
+
+void QueryAnalysisWriter::_flushDiffs(OperationContext* opCtx) {
+    try {
+        _flush(opCtx, NamespaceString::kConfigSampledQueriesDiffNamespace, &_diffs);
+    } catch (DBException& ex) {
+        LOGV2(7075400,
+              "Failed to flush diffs, will try again at the next interval",
               "error"_attr = redact(ex));
     }
 }
@@ -427,7 +454,7 @@ void QueryAnalysisWriter::Buffer::truncate(size_t index, long long numBytes) {
 
 bool QueryAnalysisWriter::_exceedsMaxSizeBytes() {
     stdx::lock_guard<Latch> lk(_mutex);
-    return _queries.getSize() >= gQueryAnalysisWriterMaxMemoryUsageBytes.load();
+    return _queries.getSize() + _diffs.getSize() >= gQueryAnalysisWriterMaxMemoryUsageBytes.load();
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addFindQuery(const UUID& sampleId,
@@ -626,6 +653,41 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
                   "Failed to add findAndModify query",
                   "ns"_attr = nss,
                   "error"_attr = redact(status));
+        });
+}
+
+ExecutorFuture<void> QueryAnalysisWriter::addDiff(const UUID& sampleId,
+                                                  const NamespaceString& nss,
+                                                  const UUID& collUuid,
+                                                  const BSONObj& preImage,
+                                                  const BSONObj& postImage) {
+    invariant(_executor);
+    return ExecutorFuture<void>(_executor)
+        .then([this,
+               sampleId,
+               nss,
+               collUuid,
+               preImage = preImage.getOwned(),
+               postImage = postImage.getOwned()]() {
+            auto diff = doc_diff::computeInlineDiff(preImage, postImage);
+
+            if (!diff || diff->isEmpty()) {
+                return;
+            }
+
+            auto doc = SampledQueryDiffDocument{sampleId, nss, collUuid, std::move(*diff)};
+            stdx::lock_guard<Latch> lk(_mutex);
+            _diffs.add(doc.toBSON());
+        })
+        .then([this] {
+            if (_exceedsMaxSizeBytes()) {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtx = opCtxHolder.get();
+                _flushDiffs(opCtx);
+            }
+        })
+        .onError([this, nss](Status status) {
+            LOGV2(7075401, "Failed to add diff", "ns"_attr = nss, "error"_attr = redact(status));
         });
 }
 

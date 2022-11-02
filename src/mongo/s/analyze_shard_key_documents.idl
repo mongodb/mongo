@@ -101,3 +101,21 @@ structs:
       cmd:
         type: object
         description: "The command object for the write."
+
+  SampledQueryDiffDocument:
+    description: "Represents a document storing the diff for a sampled write query."
+    strict: false
+    fields:
+      _id:
+        type: uuid
+        description: "The unique sample id for the write."
+        cpp_name: sampleId
+      ns:
+        type: namespacestring
+        description: "The namespace of the collection for the write."
+      collectionUuid:
+        type: uuid
+        description: "The UUID of the collection for the write."
+      diff:
+        type: object
+        description: "The diff for the write."
