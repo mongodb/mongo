@@ -105,8 +105,6 @@ static uint64_t global_ts = 1;
 #define ENV_CONFIG_TXNSYNC \
     ENV_CONFIG_DEF         \
     ",transaction_sync=(enabled,method=none)"
-#define ENV_CONFIG_REC \
-    "log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their
@@ -905,7 +903,7 @@ main(int argc, char *argv[])
     /*
      * Open the connection which forces recovery to be run.
      */
-    testutil_check(wiredtiger_open(NULL, &my_event, ENV_CONFIG_REC, &conn));
+    testutil_check(wiredtiger_open(NULL, &my_event, TESTUTIL_ENV_CONFIG_REC, &conn));
     printf("Connection open and recovery complete. Verify content\n");
     /* Sleep to guarantee the statistics thread has enough time to run. */
     usleep(USEC_STAT + 10);

@@ -76,7 +76,7 @@ static const char *const uri_collection = "table:collection";
 
 static const char *const ckpt_file = "checkpoint_done";
 
-static bool compat, inmem, tiered, use_columns, use_ts, use_txn;
+static bool tiered, use_columns, use_ts, use_txn;
 static volatile bool stable_set;
 static volatile uint64_t global_ts = 1;
 static volatile uint64_t uid = 1;
@@ -86,23 +86,17 @@ typedef struct {
 } THREAD_TS;
 static volatile THREAD_TS th_ts[MAX_TH];
 
-#define ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
+static TEST_OPTS *opts, _opts;
+
 #define ENV_CONFIG_DEF                                                                             \
     "create,"                                                                                      \
     "eviction_updates_trigger=95,eviction_updates_target=80,"                                      \
     "log=(enabled,file_max=10M,remove=false),statistics=(all),statistics_log=(json,on_close,wait=" \
     "1)"
-#define ENV_CONFIG_TIER          \
-    ",tiered_storage=(bucket=./" \
-    "bucket,bucket_prefix=pfx-,local_retention=2,name=dir_store)"
-#define ENV_CONFIG_TIER_EXT                                   \
-    ",extensions=(../../../../ext/storage_sources/dir_store/" \
-    "libwiredtiger_dir_store.so=(early_load=true))"
+
 #define ENV_CONFIG_TXNSYNC \
     ENV_CONFIG_DEF         \
     ",transaction_sync=(enabled,method=none)"
-#define ENV_CONFIG_REC \
-    "log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their
@@ -830,18 +824,14 @@ run_workload(uint32_t nth)
     stable_set = false;
     if (chdir(home) != 0)
         testutil_die(errno, "Child chdir: %s", home);
-    if (inmem)
+    if (opts->inmem)
         strcpy(envconf, ENV_CONFIG_DEF);
     else
         strcpy(envconf, ENV_CONFIG_TXNSYNC);
-    if (compat)
-        strcat(envconf, ENV_CONFIG_COMPAT);
-    if (tiered) {
-        strcat(envconf, ENV_CONFIG_TIER_EXT);
-        strcat(envconf, ENV_CONFIG_TIER);
-    }
 
-    testutil_check(wiredtiger_open(NULL, &event_handler, envconf, &conn));
+    /* Open WiredTiger without recovery. */
+    testutil_wiredtiger_open(opts, envconf, &event_handler, &conn, false);
+
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     /*
      * Create all the tables.
@@ -964,12 +954,14 @@ main(int argc, char *argv[])
     int ch, status;
     char buf[1024], statname[1024];
     char fname[64], kname[64];
-    const char *working_dir;
-    bool fatal, preserve, rand_th, rand_time, verify_only;
+    bool fatal, rand_th, rand_time, verify_only;
 
     (void)testutil_set_progname(argv);
 
-    compat = inmem = tiered = false;
+    buf[0] = '\0';
+    opts = &_opts;
+    memset(opts, 0, sizeof(*opts));
+    tiered = false;
     use_ts = true;
     /*
      * Setting this to false forces us to use internal library code. Allow an override but default
@@ -977,32 +969,20 @@ main(int argc, char *argv[])
      */
     use_txn = false;
     nth = MIN_TH;
-    preserve = false;
     rand_th = rand_time = true;
     timeout = MIN_TIME;
     verify_only = false;
-    working_dir = "WT_TEST.schema-abort";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "BCch:mpT:t:vxz")) != EOF)
+    testutil_parse_begin_opt(argc, argv, "b:CmPTh:pv", opts);
+
+    while ((ch = __wt_getopt(progname, argc, argv, "BCch:mpP:T:t:vxz")) != EOF)
         switch (ch) {
         case 'B':
             tiered = true;
             break;
-        case 'C':
-            compat = true;
-            break;
         case 'c':
             /* Variable-length columns only; fixed would require considerable changes */
             use_columns = true;
-            break;
-        case 'h':
-            working_dir = __wt_optarg;
-            break;
-        case 'm':
-            inmem = true;
-            break;
-        case 'p':
-            preserve = true;
             break;
         case 'T':
             rand_th = false;
@@ -1022,13 +1002,19 @@ main(int argc, char *argv[])
             use_ts = false;
             break;
         default:
-            usage();
+            /* The option is either one that we're asking testutil to support, or illegal. */
+            if (testutil_parse_single_opt(opts, ch) != 0) {
+                usage();
+            }
         }
     argc -= __wt_optind;
     if (argc != 0)
         usage();
 
-    testutil_work_dir_from_path(home, sizeof(home), working_dir);
+    testutil_parse_end_opt(opts);
+
+    testutil_work_dir_from_path(home, sizeof(home), opts->home);
+
     /*
      * If the user wants to verify they need to tell us how many threads there were so we can find
      * the old record files.
@@ -1039,7 +1025,7 @@ main(int argc, char *argv[])
     }
     if (!verify_only) {
         testutil_make_work_dir(home);
-        if (tiered) {
+        if (opts->tiered_storage) {
             testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/bucket", home));
             testutil_make_work_dir(buf);
         }
@@ -1059,12 +1045,12 @@ main(int argc, char *argv[])
         printf(
           "Parent: compatibility: %s, in-mem log sync: %s, timestamp in use: %s, tiered in use: "
           "%s\n",
-          compat ? "true" : "false", inmem ? "true" : "false", use_ts ? "true" : "false",
-          tiered ? "true" : "false");
+          opts->compat ? "true" : "false", opts->inmem ? "true" : "false",
+          use_ts ? "true" : "false", opts->tiered_storage ? "true" : "false");
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
         printf("CONFIG: %s%s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
-          compat ? " -C" : "", inmem ? " -m" : "", tiered ? " -B" : "", !use_ts ? " -z" : "",
-          working_dir, nth, timeout);
+          opts->compat ? " -C" : "", opts->inmem ? " -m" : "", opts->tiered_storage ? " -B" : "",
+          !use_ts ? " -z" : "", opts->home, nth, timeout);
         /*
          * Fork a child to insert as many items. We will then randomly kill the child, run recovery
          * and make sure all items we wrote exist after recovery runs.
@@ -1114,15 +1100,11 @@ main(int argc, char *argv[])
     testutil_copy_data(home);
     printf("Open database, run recovery and verify content\n");
 
-    strcpy(buf, ENV_CONFIG_REC);
-    if (tiered) {
-        strcat(buf, ENV_CONFIG_TIER_EXT);
-        strcat(buf, ENV_CONFIG_TIER);
-    }
     /*
      * Open the connection which forces recovery to be run.
      */
-    testutil_check(wiredtiger_open(NULL, &event_handler, buf, &conn));
+    testutil_wiredtiger_open(opts, buf, &event_handler, &conn, true);
+
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     /*
      * Open a cursor on all the tables.
@@ -1204,7 +1186,7 @@ main(int argc, char *argv[])
                  * If we don't find a record, the stable timestamp written to our file better be
                  * larger than the saved one.
                  */
-                if (!inmem && stable_fp != 0 && stable_fp <= stable_val) {
+                if (!opts->inmem && stable_fp != 0 && stable_fp <= stable_val) {
                     printf("%s: COLLECTION no record with key %" PRIu64 " record ts %" PRIu64
                            " <= stable ts %" PRIu64 "\n",
                       fname, key, stable_fp, stable_val);
@@ -1220,7 +1202,7 @@ main(int argc, char *argv[])
                  */
                 c_rep[i].exist_key = key;
                 fatal = true;
-            } else if (!inmem && stable_fp != 0 && stable_fp > stable_val) {
+            } else if (!opts->inmem && stable_fp != 0 && stable_fp > stable_val) {
                 /*
                  * If we found a record, the stable timestamp written to our file better be no
                  * larger than the checkpoint one.
@@ -1236,7 +1218,7 @@ main(int argc, char *argv[])
             if ((ret = cur_local->search(cur_local)) != 0) {
                 if (ret != WT_NOTFOUND)
                     testutil_die(ret, "search");
-                if (!inmem)
+                if (!opts->inmem)
                     printf("%s: LOCAL no record with key %" PRIu64 "\n", fname, key);
                 absent_local++;
                 if (l_rep[i].first_miss == INVALID_KEY)
@@ -1255,7 +1237,7 @@ main(int argc, char *argv[])
             if ((ret = cur_oplog->search(cur_oplog)) != 0) {
                 if (ret != WT_NOTFOUND)
                     testutil_die(ret, "search");
-                if (!inmem)
+                if (!opts->inmem)
                     printf("%s: OPLOG no record with key %" PRIu64 "\n", fname, key);
                 absent_oplog++;
                 if (o_rep[i].first_miss == INVALID_KEY)
@@ -1278,27 +1260,28 @@ main(int argc, char *argv[])
         print_missing(&o_rep[i], fname, "OPLOG");
     }
     testutil_check(conn->close(conn, NULL));
-    if (!inmem && absent_coll) {
+    if (!opts->inmem && absent_coll) {
         printf("COLLECTION: %" PRIu64 " record(s) absent from %" PRIu64 "\n", absent_coll, count);
         fatal = true;
     }
-    if (!inmem && absent_local) {
+    if (!opts->inmem && absent_local) {
         printf("LOCAL: %" PRIu64 " record(s) absent from %" PRIu64 "\n", absent_local, count);
         fatal = true;
     }
-    if (!inmem && absent_oplog) {
+    if (!opts->inmem && absent_oplog) {
         printf("OPLOG: %" PRIu64 " record(s) absent from %" PRIu64 "\n", absent_oplog, count);
         fatal = true;
     }
     if (fatal)
         return (EXIT_FAILURE);
     printf("%" PRIu64 " records verified\n", count);
-    if (!preserve) {
+    if (!opts->preserve) {
         testutil_clean_test_artifacts(home);
         /* At this point $PATH is inside `home`, which we intend to delete. cd to the parent dir. */
         if (chdir("../") != 0)
             testutil_die(errno, "root chdir: %s", home);
         testutil_clean_work_dir(home);
     }
+    testutil_cleanup(opts);
     return (EXIT_SUCCESS);
 }
