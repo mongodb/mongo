@@ -536,6 +536,9 @@ void ReshardingMetrics::setDonorState(DonorStateEnum state) noexcept {
 
 void ReshardingMetrics::setRecipientState(RecipientStateEnum state) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
+    if (!_currentOp && state == RecipientStateEnum::kDone) {
+        return;
+    }
     invariant(_currentOp, kNoOperationInProgress);
 
     const auto oldState = std::exchange(_currentOp->recipientState, state);
@@ -686,6 +689,10 @@ void ReshardingMetrics::enterCriticalSection(Date_t start) {
 
 void ReshardingMetrics::leaveCriticalSection(Date_t end) {
     stdx::lock_guard<Latch> lk(_mutex);
+    if (!_currentOp) {
+        return;
+    }
+
     _currentOp->inCriticalSection.forceEnd(end);
 }
 

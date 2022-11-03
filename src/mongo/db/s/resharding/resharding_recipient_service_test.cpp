@@ -502,69 +502,81 @@ DEATH_TEST_REGEX_F(ReshardingRecipientServiceTest, CommitFn, "4457001.*tripwire"
 TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort) {
     auto metrics = ReshardingRecipientServiceTest::metrics();
     for (bool isAlsoDonor : {false, true}) {
-        LOGV2(5551107,
-              "Running case",
-              "test"_attr = _agent.getTestName(),
-              "isAlsoDonor"_attr = isAlsoDonor);
+        for (bool waitForMetricsInitialized : {false, true}) {
+            LOGV2(5551107,
+                  "Running case",
+                  "test"_attr = _agent.getTestName(),
+                  "isAlsoDonor"_attr = isAlsoDonor,
+                  "waitForMetricsInitialized"_attr = waitForMetricsInitialized);
 
-        boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
-        doneTransitionGuard.emplace(controller(), RecipientStateEnum::kDone);
+            boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
+            doneTransitionGuard.emplace(controller(), RecipientStateEnum::kDone);
 
-        auto doc = makeStateDocument(isAlsoDonor);
-        auto instanceId =
-            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+            auto doc = makeStateDocument(isAlsoDonor);
+            auto instanceId = BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
+                                   << doc.getReshardingUUID());
 
-        auto opCtx = makeOperationContext();
+            auto opCtx = makeOperationContext();
 
-        if (isAlsoDonor) {
-            // If the recipient is also a donor, the original collection should already exist on
-            // this shard.
-            createSourceCollection(opCtx.get(), doc);
-        }
+            if (isAlsoDonor) {
+                // If the recipient is also a donor, the original collection should already exist on
+                // this shard.
+                createSourceCollection(opCtx.get(), doc);
+            }
 
-        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
-        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+            RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+            auto recipient =
+                RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
-        notifyToStartCloning(opCtx.get(), *recipient, doc);
-        recipient->abort(false);
+            notifyToStartCloning(opCtx.get(), *recipient, doc);
+            if (waitForMetricsInitialized) {
+                // Waiting for the metrics to be initialized here causes the second abort to occur
+                // before the metrics are initialized after the step up, thereby testing a different
+                // code path.
+                doneTransitionGuard->wait(RecipientStateEnum::kCreatingCollection);
+            }
 
-        doneTransitionGuard->wait(RecipientStateEnum::kDone);
-        stepDown();
+            recipient->abort(false);
 
-        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
-                  ErrorCodes::InterruptedDueToReplStateChange);
+            doneTransitionGuard->wait(RecipientStateEnum::kDone);
 
-        recipient.reset();
-        stepUp(opCtx.get());
+            stepDown();
 
-        auto maybeRecipient = RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
-        ASSERT_TRUE(bool(maybeRecipient));
-        recipient = *maybeRecipient;
+            ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                      ErrorCodes::InterruptedDueToReplStateChange);
 
-        doneTransitionGuard.reset();
-        recipient->abort(false);
+            recipient.reset();
+            stepUp(opCtx.get());
 
-        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
-        checkStateDocumentRemoved(opCtx.get());
+            auto maybeRecipient = RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+            ASSERT_TRUE(bool(maybeRecipient));
+            recipient = *maybeRecipient;
 
-        if (isAlsoDonor) {
-            // Verify original collection still exists after aborting.
-            AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
-            ASSERT_TRUE(bool(coll));
-            ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
-        }
+            doneTransitionGuard.reset();
+            recipient->abort(false);
 
-        // Verify the temporary collection no longer exists.
-        {
-            AutoGetCollection coll(opCtx.get(), doc.getTempReshardingNss(), MODE_IS);
-            ASSERT_FALSE(bool(coll));
+            ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+            checkStateDocumentRemoved(opCtx.get());
+
+            if (isAlsoDonor) {
+                // Verify original collection still exists after aborting.
+                AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
+                ASSERT_TRUE(bool(coll));
+                ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
+            }
+
+            // Verify the temporary collection no longer exists.
+            {
+                AutoGetCollection coll(opCtx.get(), doc.getTempReshardingNss(), MODE_IS);
+                ASSERT_FALSE(bool(coll));
+            }
         }
     }
 
     BSONObjBuilder result;
     metrics->serializeCumulativeOpMetrics(&result);
 
-    ASSERT_EQ(result.obj().getField("countReshardingFailures").numberLong(), 2);
+    ASSERT_LESS_THAN_OR_EQUALS(result.obj().getField("countReshardingFailures").numberLong(), 4);
 }
 
 TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenDone) {
