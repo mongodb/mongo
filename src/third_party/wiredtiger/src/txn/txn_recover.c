@@ -1050,6 +1050,7 @@ err:
         WT_TRET(__wt_evict_destroy(session));
 
     WT_TRET(__wt_session_close_internal(session));
+    F_SET(conn, WT_CONN_RECOVERY_COMPLETE);
     F_CLR(conn, WT_CONN_RECOVERING);
 
     return (ret);
