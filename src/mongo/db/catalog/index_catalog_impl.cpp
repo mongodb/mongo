@@ -185,22 +185,20 @@ std::unique_ptr<IndexCatalog> IndexCatalogImpl::clone() const {
 }
 
 Status IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
-    return _init(
-        opCtx, collection, /*preexistingIndexes=*/{}, /*readTimestamp=*/boost::none, false);
+    return _init(opCtx, collection, /*preexistingIndexes=*/{}, /*readTimestamp=*/boost::none);
 };
 
 Status IndexCatalogImpl::initFromExisting(OperationContext* opCtx,
                                           Collection* collection,
                                           const IndexCatalogEntryContainer& preexistingIndexes,
                                           boost::optional<Timestamp> readTimestamp) {
-    return _init(opCtx, collection, preexistingIndexes, readTimestamp, true);
+    return _init(opCtx, collection, preexistingIndexes, readTimestamp);
 };
 
 Status IndexCatalogImpl::_init(OperationContext* opCtx,
                                Collection* collection,
                                const IndexCatalogEntryContainer& preexistingIndexes,
-                               boost::optional<Timestamp> readTimestamp,
-                               bool fromExisting) {
+                               boost::optional<Timestamp> readTimestamp) {
     vector<string> indexNames;
     collection->getAllIndexes(&indexNames);
     const bool replSetMemberInStandaloneMode =
@@ -217,7 +215,7 @@ Status IndexCatalogImpl::_init(OperationContext* opCtx,
         BSONObj spec = collection->getIndexSpec(indexName).getOwned();
         BSONObj keyPattern = spec.getObjectField("key");
 
-        if (fromExisting) {
+        if (readTimestamp) {
             auto preexistingIt = std::find_if(
                 preexistingIndexes.begin(),
                 preexistingIndexes.end(),
@@ -332,7 +330,7 @@ Status IndexCatalogImpl::_init(OperationContext* opCtx,
         }
     }
 
-    if (!fromExisting) {
+    if (!readTimestamp) {
         // Only do this when we're not initializing an earlier collection from the shared state of
         // an existing collection.
         CollectionQueryInfo::get(collection).init(opCtx, collection);

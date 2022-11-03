@@ -229,13 +229,9 @@ bool doesMinMaxHaveMixedSchemaData(const BSONObj& min, const BSONObj& max) {
     return false;
 }
 
-bool isIndexCompatible(std::shared_ptr<IndexCatalogEntry> index,
-                       boost::optional<Timestamp> readTimestamp) {
+bool isIndexCompatible(std::shared_ptr<IndexCatalogEntry> index, Timestamp readTimestamp) {
     if (!index) {
         return false;
-    }
-    if (!readTimestamp) {
-        return true;
     }
 
     boost::optional<Timestamp> minVisibleSnapshot = index->getMinimumVisibleSnapshot();
@@ -385,7 +381,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
 
 Status CollectionImpl::initFromExisting(OperationContext* opCtx,
                                         const std::shared_ptr<Collection>& collection,
-                                        boost::optional<Timestamp> readTimestamp) {
+                                        Timestamp readTimestamp) {
     LOGV2_DEBUG(
         6825402, 1, "Initializing collection using shared state", logAttrs(collection->ns()));
 

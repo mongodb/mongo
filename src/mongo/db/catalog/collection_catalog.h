@@ -196,16 +196,15 @@ public:
     Status reloadViews(OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
-     * Returns the collection pointer representative of 'nss' at the provided read timestamp. If no
-     * timestamp is provided, returns instance of the latest collection. The returned collection
-     * instance is only valid while the storage snapshot is open and becomes invalidated when the
-     * snapshot is closed.
+     * Returns the collection pointer representative of 'nss' at the provided read timestamp. The
+     * returned collection instance is only valid while the storage snapshot is open and becomes
+     * invalidated when the snapshot is closed.
      *
      * Returns nullptr when reading from a point-in-time where the collection did not exist.
      */
     CollectionPtr openCollection(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 boost::optional<Timestamp> readTimestamp) const;
+                                 Timestamp readTimestamp) const;
 
     /**
      * Returns a shared_ptr to a drop pending index if it's found and not expired.
@@ -644,9 +643,7 @@ private:
      * Searches for a catalog entry at a point-in-time.
      */
     boost::optional<DurableCatalogEntry> _fetchPITCatalogEntry(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        boost::optional<Timestamp> readTimestamp) const;
+        OperationContext* opCtx, const NamespaceString& nss, const Timestamp& readTimestamp) const;
 
     /**
      * Tries to create a Collection instance using existing shared collection state. Returns nullptr
@@ -655,7 +652,7 @@ private:
     std::shared_ptr<Collection> _createCompatibleCollection(
         OperationContext* opCtx,
         const std::shared_ptr<Collection>& latestCollection,
-        boost::optional<Timestamp> readTimestamp,
+        const Timestamp& readTimestamp,
         const DurableCatalogEntry& catalogEntry) const;
 
     /**
@@ -663,7 +660,7 @@ private:
      */
     std::shared_ptr<Collection> _createNewPITCollection(
         OperationContext* opCtx,
-        boost::optional<Timestamp> readTimestamp,
+        const Timestamp& readTimestamp,
         const DurableCatalogEntry& catalogEntry) const;
 
     /**

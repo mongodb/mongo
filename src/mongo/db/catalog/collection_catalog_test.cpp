@@ -2388,47 +2388,5 @@ DEATH_TEST_F(CollectionCatalogTimestampTest, OpenCollectionInWriteUnitOfWork, "i
         CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
 }
 
-TEST_F(CollectionCatalogTimestampTest, OpenCollectionNoTimestamp) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagPointInTimeCatalogLookups", true);
-
-    const NamespaceString nss("a.b");
-    const Timestamp createCollectionTs = Timestamp(10, 10);
-    const Timestamp createIndexTs = Timestamp(20, 20);
-    const Timestamp readTimestamp = Timestamp(30, 30);
-
-    createCollection(opCtx.get(), nss, createCollectionTs);
-
-    // Fetch a collection instance after creation but before creating an index.
-    auto preIndexColl =
-        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
-    ASSERT(preIndexColl);
-    ASSERT_EQ(0, preIndexColl->getIndexCatalog()->numIndexesTotal());
-
-    createIndex(opCtx.get(),
-                nss,
-                BSON("v" << 2 << "name"
-                         << "x_1"
-                         << "key" << BSON("x" << 1)),
-                createIndexTs);
-    OneOffRead oor(opCtx.get(), readTimestamp);
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-
-    // Open an instance of the latest collection by passing no timestamp.
-    auto coll = CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, boost::none);
-    ASSERT(coll);
-    ASSERT_EQ(1, coll->getIndexCatalog()->numIndexesTotal());
-
-    // Verify the CollectionCatalog returns the latest collection.
-    auto currentColl =
-        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
-    ASSERT(currentColl);
-    ASSERT_EQ(1, currentColl->getIndexCatalog()->numIndexesTotal());
-    ASSERT_EQ(coll, currentColl);
-    ASSERT_NE(coll, preIndexColl);
-
-    // Ensure the idents are shared between the up-to-date instances.
-    ASSERT_EQ(coll->getSharedIdent(), currentColl->getSharedIdent());
-}
 }  // namespace
 }  // namespace mongo
