@@ -227,6 +227,15 @@ var $config = (function() {
 
     function teardown(db, collName, cluster) {
         const mongos = cluster.getDB('config').getMongo();
+
+        cluster.executeOnConfigNodes((db) => {
+            assert.commandWorked(db.adminCommand({
+                configureFailPoint: 'overrideBalanceRoundInterval',
+                mode: 'alwaysOn',
+                data: {intervalMs: 100}
+            }));
+        });
+
         for (let i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
             for (let j = 0; j < collCount; j++) {
