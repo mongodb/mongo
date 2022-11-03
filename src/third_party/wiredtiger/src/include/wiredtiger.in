@@ -5892,12 +5892,15 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  */
 #define	WT_STAT_CONN_CURSOR_NEXT_HS_TOMBSTONE		1252
 /*!
+ * cursor: cursor next calls that skip greater than 1 and fewer than 100
+ * entries
+ */
+#define	WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100		1253
+/*!
  * cursor: cursor next calls that skip greater than or equal to 100
  * entries
  */
-#define	WT_STAT_CONN_CURSOR_NEXT_SKIP_GE_100		1253
-/*! cursor: cursor next calls that skip less than 100 entries */
-#define	WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100		1254
+#define	WT_STAT_CONN_CURSOR_NEXT_SKIP_GE_100		1254
 /*! cursor: cursor next random calls that return an error */
 #define	WT_STAT_CONN_CURSOR_NEXT_RANDOM_ERROR		1255
 /*! cursor: cursor operation restarted */
@@ -7150,12 +7153,15 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  */
 #define	WT_STAT_DSRC_CURSOR_NEXT_HS_TOMBSTONE		2177
 /*!
+ * cursor: cursor next calls that skip greater than 1 and fewer than 100
+ * entries
+ */
+#define	WT_STAT_DSRC_CURSOR_NEXT_SKIP_LT_100		2178
+/*!
  * cursor: cursor next calls that skip greater than or equal to 100
  * entries
  */
-#define	WT_STAT_DSRC_CURSOR_NEXT_SKIP_GE_100		2178
-/*! cursor: cursor next calls that skip less than 100 entries */
-#define	WT_STAT_DSRC_CURSOR_NEXT_SKIP_LT_100		2179
+#define	WT_STAT_DSRC_CURSOR_NEXT_SKIP_GE_100		2179
 /*! cursor: cursor next random calls that return an error */
 #define	WT_STAT_DSRC_CURSOR_NEXT_RANDOM_ERROR		2180
 /*! cursor: cursor prev calls that return an error */
