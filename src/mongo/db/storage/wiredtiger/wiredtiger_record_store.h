@@ -330,8 +330,9 @@ private:
      *      are pending writes to this ident as part of the recovery process, and so we must
      *      always adjust size metadata for these idents.
      */
-    void _changeNumRecords(OperationContext* opCtx, int64_t diff);
-    void _increaseDataSize(OperationContext* opCtx, int64_t amount);
+    void _changeNumRecordsAndDataSize(OperationContext* opCtx,
+                                      int64_t numRecordDiff,
+                                      int64_t dataSizeDiff);
 
     /**
      * Delete records from this record store as needed while _cappedMaxSize or _cappedMaxDocs is
