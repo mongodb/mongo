@@ -39,6 +39,11 @@ namespace mongo::optimizer {
 
 void maybePrintABT(const ABT& abt);
 
+bool handleAutoUpdate(const std::string& expected,
+                      const std::string& actual,
+                      const std::string& fileName,
+                      size_t lineNumber);
+
 #define ASSERT_EXPLAIN(expected, abt) \
     maybePrintABT(abt);               \
     ASSERT_EQ(expected, ExplainGenerator::explain(abt))
@@ -47,13 +52,36 @@ void maybePrintABT(const ABT& abt);
     maybePrintABT(abt);                  \
     ASSERT_EQ(expected, ExplainGenerator::explainV2(abt))
 
+/**
+ * Auto update result back in the source file if the assert fails.
+ * The expected result must be a multi-line string in the following form:
+ *
+ * ASSERT_EXPLAIN_V2_AUTO(     // NOLINT
+ *       "BinaryOp [Add]\n"
+ *       "|   Const [2]\n"
+ *       "Const [1]\n",
+ *       tree);
+ *
+ * Limitations:
+ *      1. There should not be any comments or other formatting inside the multi-line string
+ *      constant other than 'NOLINT'. If we have a single-line constant, the auto-updating will
+ *      generate a 'NOLINT' at the end of the line.
+ *      2. The expression which we are explaining ('tree' in the example above) must fit on a single
+ *      line. The macro should be indented by 4 spaces.
+ *
+ * TODO: SERVER-71004: Extend the usability of the auto-update macro.
+ */
+#define ASSERT_EXPLAIN_V2_AUTO(expected, abt) \
+    maybePrintABT(abt);                       \
+    ASSERT(handleAutoUpdate(expected, ExplainGenerator::explainV2(abt), __FILE__, __LINE__))
+
 #define ASSERT_EXPLAIN_V2Compact(expected, abt) \
     maybePrintABT(abt);                         \
     ASSERT_EQ(expected, ExplainGenerator::explainV2Compact(abt))
 
 #define ASSERT_EXPLAIN_BSON(expected, abt) \
     maybePrintABT(abt);                    \
-    ASSERT_EQ(expected, ExplainGenerator::explainBSON(abt))
+    ASSERT_EQ(expected, ExplainGenerator::explainBSONStr(abt))
 
 #define ASSERT_EXPLAIN_PROPS_V2(expected, phaseManager)                              \
     ASSERT_EQ(expected,                                                              \

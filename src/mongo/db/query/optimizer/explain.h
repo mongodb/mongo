@@ -94,7 +94,10 @@ public:
                                   const cascades::MemoExplainInterface* memoInterface = nullptr,
                                   const NodeToGroupPropsMap& nodeMap = {});
 
-    static std::string printBSON(sbe::value::TypeTags tag, sbe::value::Value val);
+    static std::string explainBSONStr(const ABT& node,
+                                      bool displayProperties = false,
+                                      const cascades::MemoExplainInterface* memoInterface = nullptr,
+                                      const NodeToGroupPropsMap& nodeMap = {});
 
     static std::string explainLogicalProps(const std::string& description,
                                            const properties::LogicalProps& props);

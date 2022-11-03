@@ -29,17 +29,44 @@
 
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/node.h"
-#include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/syntax/syntax_fwd_declare.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/unittest/unittest.h"
 
+
 namespace mongo::optimizer {
 namespace {
+
+TEST(Optimizer, AutoUpdateExplain) {
+    ABT tree = make<BinaryOp>(Operations::Add,
+                              Constant::int64(1),
+                              make<Variable>("very very very very very very very very very very "
+                                             "very very long variable name with \"quotes\""));
+
+    /**
+     * To exercise the auto-updating behavior:
+     *   1. Change the flag "kAutoUpdateOnFailure" to "true".
+     *   2. Induce a failure: change something in the expected output.
+     *   3. Recompile and run the test binary as normal.
+     *   4. Observe after the run the test file is updated with the correct output.
+     */
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT (test auto-update)
+        "BinaryOp [Add]\n"
+        "|   Variable [very very very very very very very very very very very very long variable "
+        "name with \"quotes\"]\n"
+        "Const [1]\n",
+        tree);
+
+    // Test for short constant. It should not be inlined. The nolint comment on the string constant
+    // itself is auto-generated.
+    ABT tree1 = make<Variable>("short name");
+    ASSERT_EXPLAIN_V2_AUTO(         // NOLINT (test auto-update)
+        "Variable [short name]\n",  // NOLINT (test auto-update)
+        tree1);
+}
 
 Constant* constEval(ABT& tree) {
     auto env = VariableEnvironment::build(tree);
@@ -746,13 +773,14 @@ TEST(Explain, ExplainV2Compact) {
 
 TEST(Explain, ExplainBsonForConstant) {
     ABT cNode = Constant::int64(3);
-    auto [tag, val] = ExplainGenerator::explainBSON(cNode);
-    sbe::value::ValueGuard vg(tag, val);
-    ASSERT_EQ(
-        "{\n    nodeType: \"Const\", \n"
+
+    ASSERT_EXPLAIN_BSON(
+        "{\n"
+        "    nodeType: \"Const\", \n"
         "    tag: \"NumberInt64\", \n"
-        "    value: 3\n}\n",
-        ExplainGenerator::printBSON(tag, val));
+        "    value: 3\n"
+        "}\n",
+        cNode);
 }
 
 }  // namespace

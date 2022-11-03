@@ -2542,8 +2542,12 @@ static void printBSONstr(PrinterType& printer,
     }
 }
 
-std::string ExplainGenerator::printBSON(const sbe::value::TypeTags tag,
-                                        const sbe::value::Value val) {
+std::string ExplainGenerator::explainBSONStr(const ABT& node,
+                                             bool displayProperties,
+                                             const cascades::MemoExplainInterface* memoInterface,
+                                             const NodeToGroupPropsMap& nodeMap) {
+    const auto [tag, val] = explainBSON(node, displayProperties, memoInterface, nodeMap);
+    sbe::value::ValueGuard vg(tag, val);
     ExplainPrinterImpl<ExplainVersion::V2> printer;
     printBSONstr(printer, tag, val);
     return printer.str();

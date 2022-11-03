@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 
+#include <fstream>
+
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/cost_model/cost_estimator.h"
 #include "mongo/db/query/cost_model/cost_model_manager.h"
@@ -37,27 +39,162 @@
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/str_escape.h"
 
 
 namespace mongo::optimizer {
 
 static constexpr bool kDebugAsserts = false;
 
+// DO NOT COMMIT WITH "TRUE".
+static constexpr bool kAutoUpdateOnFailure = false;
+static constexpr const char* kTempFileSuffix = ".tmp.txt";
+
+// Map from file name to a list of updates. We keep track of how many lines are added or deleted at
+// a particular line of a source file.
+using LineDeltaVector = std::vector<std::pair<uint64_t, int64_t>>;
+std::map<std::string, LineDeltaVector> gLineDeltaMap;
+
+
 void maybePrintABT(const ABT& abt) {
     // Always print using the supported versions to make sure we don't crash.
     const std::string strV1 = ExplainGenerator::explain(abt);
     const std::string strV2 = ExplainGenerator::explainV2(abt);
     const std::string strV2Compact = ExplainGenerator::explainV2Compact(abt);
-    auto [tag, val] = ExplainGenerator::explainBSON(abt);
-    sbe::value::ValueGuard vg(tag, val);
+    const std::string strBSON = ExplainGenerator::explainBSONStr(abt);
 
     if constexpr (kDebugAsserts) {
         std::cout << "V1: " << strV1 << "\n";
         std::cout << "V2: " << strV2 << "\n";
         std::cout << "V2Compact: " << strV2Compact << "\n";
-        std::cout << "BSON: " << ExplainGenerator::printBSON(tag, val) << "\n";
+        std::cout << "BSON: " << strBSON << "\n";
     }
+}
+
+static std::vector<std::string> formatStr(const std::string& str) {
+    std::vector<std::string> replacementLines;
+    std::istringstream lineInput(str);
+
+    // Account for maximum line length after linting. We need to indent, add quotes, etc.
+    static constexpr size_t kEscapedLength = 88;
+
+    std::string line;
+    while (std::getline(lineInput, line)) {
+        // Read the string line by line and format it to match the test file's expected format. We
+        // have an initial indentation, followed by quotes and the escaped string itself.
+
+        std::string escaped = mongo::str::escapeForJSON(line);
+        for (;;) {
+            // If the line is estimated to exceed the maximum length allowed by the linter, break it
+            // up and make sure to insert '\n' only at the end of the last segment.
+            const bool breakupLine = escaped.size() > kEscapedLength;
+
+            std::ostringstream os;
+            os << "        \"" << escaped.substr(0, kEscapedLength);
+            if (!breakupLine) {
+                os << "\\n";
+            }
+            os << "\"\n";
+            replacementLines.push_back(os.str());
+
+            if (breakupLine) {
+                escaped = escaped.substr(kEscapedLength);
+            } else {
+                break;
+            }
+        }
+    }
+
+    if (!replacementLines.empty() && !replacementLines.back().empty()) {
+        // Account for the fact that we need an extra comma after the string constant in the macro.
+        auto& lastLine = replacementLines.back();
+        lastLine.insert(lastLine.size() - 1, ",");
+
+        if (replacementLines.size() == 1) {
+            // For single lines, add a 'nolint' comment to prevent the linter from inlining the
+            // single line with the macro itself.
+            lastLine.insert(lastLine.size() - 1, "  // NOLINT (test auto-update)");
+        }
+    }
+
+    return replacementLines;
+}
+
+bool handleAutoUpdate(const std::string& expected,
+                      const std::string& actual,
+                      const std::string& fileName,
+                      const size_t lineNumber) {
+    if (expected == actual) {
+        return true;
+    }
+    if constexpr (!kAutoUpdateOnFailure) {
+        std::cout << "Auto-updating is disabled.\n";
+        return false;
+    }
+
+    const auto expectedFormatted = formatStr(expected);
+    const auto actualFormatted = formatStr(actual);
+
+    std::cout << "Updating expected result in file '" << fileName << "', line: " << lineNumber
+              << ".\n";
+    std::cout << "Replacement:\n";
+    for (const auto& line : actualFormatted) {
+        std::cout << line;
+    }
+
+    // Compute the total number of lines added or removed before the current macro line.
+    auto& lineDeltas = gLineDeltaMap.emplace(fileName, LineDeltaVector{}).first->second;
+    int64_t totalDelta = 0;
+    for (const auto& [line, delta] : lineDeltas) {
+        if (line < lineNumber) {
+            totalDelta += delta;
+        }
+    }
+
+    const size_t replacementEndLine = lineNumber + totalDelta;
+    // Treat an empty string as needing one line. Adjust for line delta.
+    const size_t replacementStartLine =
+        replacementEndLine - (expectedFormatted.empty() ? 1 : expectedFormatted.size());
+
+    const std::string tempFileName = fileName + kTempFileSuffix;
+    std::string line;
+    size_t lineIndex = 0;
+
+    try {
+        std::ifstream in;
+        in.open(fileName);
+        std::ofstream out;
+        out.open(tempFileName);
+
+        // Generate a new test file, updated with the replacement string.
+        while (std::getline(in, line)) {
+            lineIndex++;
+
+            if (lineIndex < replacementStartLine || lineIndex >= replacementEndLine) {
+                out << line << "\n";
+            } else if (lineIndex == replacementStartLine) {
+                for (const auto& line1 : actualFormatted) {
+                    out << line1;
+                }
+            }
+        }
+
+        out.close();
+        in.close();
+
+        std::rename(tempFileName.c_str(), fileName.c_str());
+    } catch (const std::exception& ex) {
+        // Print and re-throw exception.
+        std::cout << "Caught an exception while manipulating files: " << ex.what();
+        throw ex;
+    }
+
+    // Add the current delta.
+    lineDeltas.emplace_back(
+        lineNumber, static_cast<int64_t>(actualFormatted.size()) - expectedFormatted.size());
+
+    // Do not assert in order to allow multiple tests to be updated.
+    return true;
 }
 
 ABT makeIndexPath(FieldPathType fieldPath, bool isMultiKey) {
