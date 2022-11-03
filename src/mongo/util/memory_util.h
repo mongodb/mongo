@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,26 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/telemetry_util.h"
-#include "mongo/util/memory_util.h"
+#pragma once
 
-namespace mongo {
-namespace telemetry_util {
+#include <string>
 
-Status onTelemetryCacheSizeUpdate(const std::string& str) {
-    auto newSize = memory_util::MemorySize::parse(str);
-    if (!newSize.isOK()) {
-        return newSize.getStatus();
-    }
+#include "mongo/base/status_with.h"
 
-    // TODO update telemetry cache size wherever it is stored
+namespace mongo::memory_util {
 
-    return Status::OK();
-}
+/**
+ * Defines units of memory consumption.
+ */
+enum class MemoryUnits {
+    kPercent,
+    kMB,
+    kGB,
+};
 
-Status validateTelemetryCacheSize(const std::string& str, const boost::optional<TenantId>&) {
-    return memory_util::MemorySize::parse(str).getStatus();
-}
+StatusWith<MemoryUnits> parseUnitString(const std::string& strUnit);
 
-}  // namespace telemetry_util
-}  // namespace mongo
+/**
+ * Represents parsed memory size parameter.
+ */
+struct MemorySize {
+    static StatusWith<MemorySize> parse(const std::string& str);
+
+    const double size;
+    const MemoryUnits units;
+};
+
+}  // namespace mongo::memory_util

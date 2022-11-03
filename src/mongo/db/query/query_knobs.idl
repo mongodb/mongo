@@ -30,7 +30,7 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/db/query/ce_mode_parameter.h"
-    - "mongo/db/query/plan_cache_size_parameter.h"
+    - "mongo/util/memory_util.h"
     - "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
     - "mongo/db/query/telemetry_util.h"
     - "mongo/platform/atomic_proxy.h"

@@ -27,30 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/plan_cache_size_parameter.h"
+#include "mongo/util/memory_util.h"
 
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/pcre.h"
 
-namespace mongo::plan_cache_util {
+namespace mongo::memory_util {
 
-StatusWith<PlanCacheSizeUnits> parseUnitString(const std::string& strUnit) {
+StatusWith<MemoryUnits> parseUnitString(const std::string& strUnit) {
     if (strUnit.empty()) {
         return Status(ErrorCodes::Error{6007010}, "Unit value cannot be empty");
     }
 
     if (strUnit[0] == '%') {
-        return PlanCacheSizeUnits::kPercent;
+        return MemoryUnits::kPercent;
     } else if (strUnit[0] == 'M' || strUnit[0] == 'm') {
-        return PlanCacheSizeUnits::kMB;
+        return MemoryUnits::kMB;
     } else if (strUnit[0] == 'G' || strUnit[0] == 'g') {
-        return PlanCacheSizeUnits::kGB;
+        return MemoryUnits::kGB;
     }
 
     return Status(ErrorCodes::Error{6007011}, "Incorrect unit value");
 }
 
-StatusWith<PlanCacheSizeParameter> PlanCacheSizeParameter::parse(const std::string& str) {
+StatusWith<MemorySize> MemorySize::parse(const std::string& str) {
     // Looks for a floating point number with followed by a unit suffix (MB, GB, %).
     static auto& re = *new pcre::Regex(R"re((?i)^\s*(\d+\.?\d*)\s*(MB|GB|%)\s*$)re");
     auto m = re.matchView(str);
@@ -65,7 +64,7 @@ StatusWith<PlanCacheSizeParameter> PlanCacheSizeParameter::parse(const std::stri
         return statusWithUnit.getStatus();
     }
 
-    return PlanCacheSizeParameter{size, statusWithUnit.getValue()};
+    return MemorySize{size, statusWithUnit.getValue()};
 }
 
-}  // namespace mongo::plan_cache_util
+}  // namespace mongo::memory_util

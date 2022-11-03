@@ -30,9 +30,9 @@
 
 #include "mongo/db/query/sbe_plan_cache.h"
 
-#include "mongo/db/query/plan_cache_size_parameter.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/memory_util.h"
 #include "mongo/util/processinfo.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -44,19 +44,19 @@ namespace {
 const auto sbePlanCacheDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<sbe::PlanCache>>();
 
-size_t convertToSizeInBytes(const plan_cache_util::PlanCacheSizeParameter& param) {
+size_t convertToSizeInBytes(const memory_util::MemorySize& param) {
     constexpr size_t kBytesInMB = 1024 * 1024;
     constexpr size_t kMBytesInGB = 1024;
 
     double sizeInMB = param.size;
 
     switch (param.units) {
-        case plan_cache_util::PlanCacheSizeUnits::kPercent:
+        case memory_util::MemoryUnits::kPercent:
             sizeInMB *= ProcessInfo::getMemSizeMB() / 100.0;
             break;
-        case plan_cache_util::PlanCacheSizeUnits::kMB:
+        case memory_util::MemoryUnits::kMB:
             break;
-        case plan_cache_util::PlanCacheSizeUnits::kGB:
+        case memory_util::MemoryUnits::kGB:
             sizeInMB *= kMBytesInGB;
             break;
     }
@@ -75,8 +75,7 @@ size_t capPlanCacheSize(size_t planCacheSize) {
     constexpr size_t kMaximumPlanCacheSize = 500 * kBytesInGB;
 
     // Maximum size of the plan cache expressed as a share of the memory available to the process.
-    const plan_cache_util::PlanCacheSizeParameter limitToProcessSize{
-        25, plan_cache_util::PlanCacheSizeUnits::kPercent};
+    const memory_util::MemorySize limitToProcessSize{25, memory_util::MemoryUnits::kPercent};
     const size_t limitToProcessSizeInBytes = convertToSizeInBytes(limitToProcessSize);
 
     // The size will be capped by the minimum of the two values defined above.
@@ -93,7 +92,7 @@ size_t capPlanCacheSize(size_t planCacheSize) {
     return planCacheSize;
 }
 
-size_t getPlanCacheSizeInBytes(const plan_cache_util::PlanCacheSizeParameter& param) {
+size_t getPlanCacheSizeInBytes(const memory_util::MemorySize& param) {
     size_t planCacheSize = convertToSizeInBytes(param);
     uassert(5968001,
             "Cache size must be at least 1KB * number of cores",
@@ -103,8 +102,7 @@ size_t getPlanCacheSizeInBytes(const plan_cache_util::PlanCacheSizeParameter& pa
 
 class PlanCacheOnParamChangeUpdaterImpl final : public plan_cache_util::OnParamChangeUpdater {
 public:
-    void updateCacheSize(ServiceContext* serviceCtx,
-                         plan_cache_util::PlanCacheSizeParameter parameter) final {
+    void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize parameter) final {
         if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
             auto size = getPlanCacheSizeInBytes(parameter);
             auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
@@ -126,7 +124,7 @@ ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
             std::make_unique<PlanCacheOnParamChangeUpdaterImpl>();
 
         if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-            auto status = plan_cache_util::PlanCacheSizeParameter::parse(planCacheSize.get());
+            auto status = memory_util::MemorySize::parse(planCacheSize.get());
             uassertStatusOK(status);
 
             auto size = getPlanCacheSizeInBytes(status.getValue());
