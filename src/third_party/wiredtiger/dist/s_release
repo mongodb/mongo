@@ -16,16 +16,12 @@ PKG="wiredtiger-$pkgver"
 DEST="$RELEASE_DIR/$PKG"
 
 rm -rf $DEST ; mkdir -p $DEST
-EXCLUSIONS=`sed -e '/^#/d' -e 's/^/--exclude /' < s_release.list`
 
-if [ -d ../.hg ] ; then
-	echo "Running 'hg archive' to copy the tree"
-	(cd .. && hg archive $EXCLUSIONS $DEST)
-elif [ -d ../.git ] ; then
+if [ -d ../.git ] ; then
 	echo "Running 'git archive' to copy the tree"
-	(cd .. && git archive HEAD) | (cd $DEST && tar xf - $EXCLUSIONS)
+	(cd .. && git archive HEAD) | (cd $DEST && tar xf -)
 else
-	echo "$0 must be run in a Git or Mercurial tree"
+	echo "$0 must be run in a Git tree"
 	exit 1
 fi
 
