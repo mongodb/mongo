@@ -377,8 +377,10 @@ public:
         AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
         _uuid = autoColl.getCollection()->uuid();
 
-        RangeDeleterService::get(operationContext())->onStepUpComplete(operationContext(), 0L);
-        RangeDeleterService::get(operationContext())->_waitForRangeDeleterServiceUp_FOR_TESTING();
+        auto opCtx = operationContext();
+        RangeDeleterService::get(opCtx)->onStartup(opCtx);
+        RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, 0L);
+        RangeDeleterService::get(opCtx)->_waitForRangeDeleterServiceUp_FOR_TESTING();
     }
 
     void tearDown() override {
