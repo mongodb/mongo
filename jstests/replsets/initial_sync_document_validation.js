@@ -18,12 +18,15 @@ var coll = primary.getDB('test').getCollection(name);
 assert.commandWorked(coll.insert({_id: 0, x: 1}));
 assert.commandWorked(coll.runCommand("collMod", {"validator": {a: {$exists: true}}}));
 
-secondary = replSet.restart(secondary, {startClean: true});
+secondary = replSet.restart(secondary, {startClean: true, skipValidation: true});
 replSet.awaitReplication();
 replSet.awaitSecondaryNodes();
 
 assert.eq(1, secondary.getDB("test")[name].count());
 assert.docEq({_id: 0, x: 1}, secondary.getDB("test")[name].findOne());
+
+// Set the validationAction to "warn" to avoid failing collection validation.
+assert.commandWorked(coll.runCommand("collMod", {validationAction: "warn"}));
 
 replSet.stopSet();
 })();

@@ -32,6 +32,7 @@ load("jstests/libs/doc_validation_utils.js");
 
 const dbName = 'bypass_document_validation';
 const collName = 'bypass_document_validation';
+const outputCollName = 'bypass_output_coll';
 const myDb = db.getSiblingDB(dbName);
 const coll = myDb[collName];
 
@@ -61,7 +62,6 @@ function runBypassDocumentValidationTest(validator) {
     }
 
     // Test the aggregation command with a $out stage.
-    const outputCollName = 'bypass_output_coll';
     const outputColl = myDb[outputCollName];
     outputColl.drop();
     assert.commandWorked(myDb.createCollection(outputCollName, {validator: validator}));
@@ -196,4 +196,8 @@ runBypassDocumentValidationTest({a: {$exists: true}});
 
 // Run the test again with an equivalent JSON Schema validator.
 runBypassDocumentValidationTest({$jsonSchema: {required: ['a']}});
+
+// Set the validationAction to "warn" to avoid failing collection validation.
+assert.commandWorked(myDb.runCommand({collMod: collName, validationAction: "warn"}));
+assert.commandWorked(myDb.runCommand({collMod: outputCollName, validationAction: "warn"}));
 })();

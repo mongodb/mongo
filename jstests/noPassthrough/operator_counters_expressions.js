@@ -253,5 +253,8 @@ bulkOp.find({$expr: {$eq: ["$x", 2]}}).update({$set: {x: 10}});
 bulkOp.find({$expr: {$lt: ["$x", 1]}}).remove();
 checkCounters(() => assert.commandWorked(bulkOp.execute()), {"$eq": 1, "$lt": 1});
 
+// Set the validationAction to "warn" to avoid failing collection validation.
+assert.commandWorked(testColl.runCommand("collMod", {validationAction: "warn"}));
+
 MongoRunner.stopMongod(mongod);
 })();
