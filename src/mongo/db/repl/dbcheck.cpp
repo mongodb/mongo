@@ -364,14 +364,26 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
     // Set up the hasher,
     boost::optional<DbCheckHasher> hasher;
     try {
-        auto lockMode = MODE_S;
-        if (entry.getReadTimestamp()) {
-            lockMode = MODE_IS;
-            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                          entry.getReadTimestamp());
+        // We may not have a read timestamp if the dbCheck command was run on an older version of
+        // the server with snapshotRead:false. Since we don't implement this feature, we'll log an
+        // error about skipping the batch to ensure an operator notices.
+        if (!entry.getReadTimestamp().has_value()) {
+            auto logEntry =
+                dbCheckErrorHealthLogEntry(entry.getNss(),
+                                           "dbCheck failed",
+                                           OplogEntriesEnum::Batch,
+                                           Status{ErrorCodes::Error(6769502),
+                                                  "no readTimestamp in oplog entry. Ensure dbCheck "
+                                                  "command is not using snapshotRead:false"},
+                                           entry.toBSON());
+            HealthLog::get(opCtx).log(*logEntry);
+            return Status::OK();
         }
 
-        AutoGetCollection coll(opCtx, entry.getNss(), lockMode);
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                                      entry.getReadTimestamp());
+
+        AutoGetCollection coll(opCtx, entry.getNss(), MODE_IS);
         const auto& collection = coll.getCollection();
 
         if (!collection) {

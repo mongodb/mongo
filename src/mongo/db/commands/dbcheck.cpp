@@ -143,7 +143,6 @@ struct DbCheckCollectionInfo {
     int64_t maxDocsPerBatch;
     int64_t maxBytesPerBatch;
     int64_t maxBatchTimeMillis;
-    bool snapshotRead;
     WriteConcernOptions writeConcern;
 };
 
@@ -166,6 +165,8 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
             "Cannot run dbCheck on " + nss.toString() + " because it is not replicated",
             nss.isReplicated());
 
+    uassert(6769500, "dbCheck no longer supports snapshotRead:false", invocation.getSnapshotRead());
+
     const auto start = invocation.getMinKey();
     const auto end = invocation.getMaxKey();
     const auto maxCount = invocation.getMaxCount();
@@ -183,7 +184,6 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                             maxDocsPerBatch,
                                             maxBytesPerBatch,
                                             maxBatchTimeMillis,
-                                            invocation.getSnapshotRead(),
                                             invocation.getBatchWriteConcern()};
     auto result = std::make_unique<DbCheckRun>();
     result->push_back(info);
@@ -199,6 +199,8 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
 
     AutoGetDb agd(opCtx, dbName, MODE_IS);
     uassert(ErrorCodes::NamespaceNotFound, "Database " + dbName.db() + " not found", agd.getDb());
+
+    uassert(6769501, "dbCheck no longer supports snapshotRead:false", invocation.getSnapshotRead());
 
     const int64_t max = std::numeric_limits<int64_t>::max();
     const auto rate = invocation.getMaxCountPerSecond();
@@ -219,7 +221,6 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                    maxDocsPerBatch,
                                    maxBytesPerBatch,
                                    maxBatchTimeMillis,
-                                   invocation.getSnapshotRead(),
                                    invocation.getBatchWriteConcern()};
         result->push_back(info);
         return true;
@@ -492,122 +493,77 @@ private:
                                      const BSONKey& first,
                                      int64_t batchDocs,
                                      int64_t batchBytes) {
-        auto lockMode = MODE_S;
-        if (info.snapshotRead) {
-            // Each batch will read at the latest no-overlap point, which is the all_durable
-            // timestamp on primaries. We assume that the history window on secondaries is always
-            // longer than the time it takes between starting and replicating a batch on the
-            // primary. Otherwise, the readTimestamp will not be available on a secondary by the
-            // time it processes the oplog entry.
-            lockMode = MODE_IS;
-            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+        // Each batch will read at the latest no-overlap point, which is the all_durable timestamp
+        // on primaries. We assume that the history window on secondaries is always longer than the
+        // time it takes between starting and replicating a batch on the primary. Otherwise, the
+        // readTimestamp will not be available on a secondary by the time it processes the oplog
+        // entry.
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+
+        // dbCheck writes to the oplog, so we need to take an IX lock. We don't need to write to the
+        // collection, however, so we only take an intent lock on it.
+        Lock::GlobalLock glob(opCtx, MODE_IX);
+        AutoGetCollection collection(opCtx, info.nss, MODE_IS);
+
+        if (_stepdownHasOccurred(opCtx, info.nss)) {
+            _done = true;
+            return Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated due to stepdown");
         }
 
+        if (!collection) {
+            const auto msg = "Collection under dbCheck no longer exists";
+            return {ErrorCodes::NamespaceNotFound, msg};
+        }
+
+        auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+        uassert(ErrorCodes::SnapshotUnavailable,
+                "No snapshot available yet for dbCheck",
+                readTimestamp);
+        auto minVisible = collection->getMinimumVisibleSnapshot();
+        if (minVisible && *readTimestamp < *collection->getMinimumVisibleSnapshot()) {
+            return {ErrorCodes::SnapshotUnavailable,
+                    str::stream() << "Unable to read from collection " << info.nss
+                                  << " due to pending catalog changes"};
+        }
+
+        boost::optional<DbCheckHasher> hasher;
+        try {
+            hasher.emplace(opCtx,
+                           *collection,
+                           first,
+                           info.end,
+                           std::min(batchDocs, info.maxCount),
+                           std::min(batchBytes, info.maxSize));
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+
+        const auto batchDeadline = Date_t::now() + Milliseconds(info.maxBatchTimeMillis);
+        Status status = hasher->hashAll(opCtx, batchDeadline);
+
+        if (!status.isOK()) {
+            return status;
+        }
+
+        std::string md5 = hasher->total();
+
+        DbCheckOplogBatch batch;
+        batch.setType(OplogEntriesEnum::Batch);
+        batch.setNss(info.nss);
+        batch.setMd5(md5);
+        batch.setMinKey(first);
+        batch.setMaxKey(BSONKey(hasher->lastKey()));
+        batch.setReadTimestamp(readTimestamp);
+
+        // Send information on this batch over the oplog.
         BatchStats result;
-        auto timeoutMs = Milliseconds(gDbCheckCollectionTryLockTimeoutMillis.load());
-        const auto initialBackoffMs =
-            Milliseconds(gDbCheckCollectionTryLockMinBackoffMillis.load());
-        auto backoffMs = initialBackoffMs;
-        for (int attempt = 1;; attempt++) {
-            try {
-                // Try to acquire collection lock with increasing timeout and bounded exponential
-                // backoff.
-                auto const lockDeadline = Date_t::now() + timeoutMs;
-                timeoutMs *= 2;
+        result.time = _logOp(opCtx, info.nss, collection->uuid(), batch.toBSON());
+        result.readTimestamp = readTimestamp;
 
-                AutoGetCollection agc(
-                    opCtx, info.nss, lockMode, AutoGetCollection::Options{}.deadline(lockDeadline));
-
-                if (_stepdownHasOccurred(opCtx, info.nss)) {
-                    _done = true;
-                    return Status(ErrorCodes::PrimarySteppedDown,
-                                  "dbCheck terminated due to stepdown");
-                }
-
-                const auto& collection =
-                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, info.nss);
-                if (!collection) {
-                    const auto msg = "Collection under dbCheck no longer exists";
-                    return {ErrorCodes::NamespaceNotFound, msg};
-                }
-
-                auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-                auto minVisible = collection->getMinimumVisibleSnapshot();
-                if (readTimestamp && minVisible &&
-                    *readTimestamp < *collection->getMinimumVisibleSnapshot()) {
-                    return {ErrorCodes::SnapshotUnavailable,
-                            str::stream() << "Unable to read from collection " << info.nss
-                                          << " due to pending catalog changes"};
-                }
-
-                boost::optional<DbCheckHasher> hasher;
-                try {
-                    hasher.emplace(opCtx,
-                                   collection,
-                                   first,
-                                   info.end,
-                                   std::min(batchDocs, info.maxCount),
-                                   std::min(batchBytes, info.maxSize));
-                } catch (const DBException& e) {
-                    return e.toStatus();
-                }
-
-                const auto batchDeadline = Date_t::now() + Milliseconds(info.maxBatchTimeMillis);
-                Status status = hasher->hashAll(opCtx, batchDeadline);
-
-                if (!status.isOK()) {
-                    return status;
-                }
-
-                std::string md5 = hasher->total();
-
-                DbCheckOplogBatch batch;
-                batch.setType(OplogEntriesEnum::Batch);
-                batch.setNss(info.nss);
-                batch.setMd5(md5);
-                batch.setMinKey(first);
-                batch.setMaxKey(BSONKey(hasher->lastKey()));
-                batch.setReadTimestamp(readTimestamp);
-
-                // Send information on this batch over the oplog.
-                result.time = _logOp(opCtx, info.nss, collection->uuid(), batch.toBSON());
-                result.readTimestamp = readTimestamp;
-
-                result.nDocs = hasher->docsSeen();
-                result.nBytes = hasher->bytesSeen();
-                result.lastKey = hasher->lastKey();
-                result.md5 = md5;
-
-                break;
-            } catch (const ExceptionFor<ErrorCodes::LockTimeout>& e) {
-                if (attempt > gDbCheckCollectionTryLockMaxAttempts.load()) {
-                    return StatusWith<BatchStats>(e.code(),
-                                                  "Unable to acquire the collection lock");
-                }
-
-                // Bounded exponential backoff between tryLocks.
-                opCtx->sleepFor(backoffMs);
-                const auto maxBackoffMillis =
-                    Milliseconds(gDbCheckCollectionTryLockMaxBackoffMillis.load());
-                if (backoffMs < maxBackoffMillis) {
-                    auto backoff = durationCount<Milliseconds>(backoffMs);
-                    auto initialBackoff = durationCount<Milliseconds>(initialBackoffMs);
-                    backoff *= initialBackoff;
-                    backoffMs = Milliseconds(backoff);
-                }
-                if (backoffMs > maxBackoffMillis) {
-                    backoffMs = maxBackoffMillis;
-                }
-                LOGV2_DEBUG(6175700,
-                            1,
-                            "Could not acquire collection lock, retrying",
-                            "ns"_attr = info.nss.ns(),
-                            "batchRangeMin"_attr = info.start.obj(),
-                            "batchRangeMax"_attr = info.end.obj(),
-                            "attempt"_attr = attempt,
-                            "backoff"_attr = backoffMs);
-            }
-        }
+        result.nDocs = hasher->docsSeen();
+        result.nBytes = hasher->bytesSeen();
+        result.lastKey = hasher->lastKey();
+        result.md5 = md5;
         return result;
     }
 
@@ -669,7 +625,6 @@ public:
                "              maxDocsPerBatch: <max number of docs/batch>\n"
                "              maxBytesPerBatch: <try to keep a batch within max bytes/batch>\n"
                "              maxBatchTimeMillis: <max time processing a batch in milliseconds>\n"
-               "              readTimestamp: <bool, read at a timestamp without strong locks> }\n"
                "to check a collection.\n"
                "Invoke with {dbCheck: 1} to check all collections in the database.";
     }

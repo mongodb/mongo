@@ -38,42 +38,6 @@ imports:
   - "mongo/db/write_concern_options.idl"
 
 server_parameters:
-    dbCheckCollectionTryLockTimeoutMillis:
-        description: 'Timeout to acquire the collection for processing a dbCheck batch. Each subsequent attempt doubles the timeout'
-        set_at: [ startup, runtime ]
-        cpp_vartype: 'AtomicWord<int>'
-        cpp_varname: gDbCheckCollectionTryLockTimeoutMillis
-        default: 10
-        validator:
-          gte: 1
-          lte: 10000
-    dbCheckCollectionTryLockMaxAttempts:
-        description: 'Maximum number of attempts with backoff to acquire the collection lock for processing a dbCheck batch'
-        set_at: [ startup, runtime ]
-        cpp_vartype: 'AtomicWord<int>'
-        cpp_varname: gDbCheckCollectionTryLockMaxAttempts
-        default: 5
-        validator:
-          gte: 1
-          lte: 20
-    dbCheckCollectionTryLockMinBackoffMillis:
-        description: 'Initial backoff on failure to acquire the collection lock for processing a dbCheck batch. Grows exponentially'
-        set_at: [ startup, runtime ]
-        cpp_vartype: 'AtomicWord<int>'
-        cpp_varname: gDbCheckCollectionTryLockMinBackoffMillis
-        default: 10
-        validator:
-          gte: 2
-          lte: 60000
-    dbCheckCollectionTryLockMaxBackoffMillis:
-        description: 'Maximum exponential backoff on failure to acquire the collection lock for processing a dbCheck batch.'
-        set_at: [ startup, runtime ]
-        cpp_vartype: 'AtomicWord<int>'
-        cpp_varname: gDbCheckCollectionTryLockMaxBackoffMillis
-        default: 60000
-        validator:
-          gte: 20
-          lte: 120000
     dbCheckHealthLogEveryNBatches:
         description: 'Emit an info-severity health log batch every N batches processed'
         set_at: [ startup, runtime ]
