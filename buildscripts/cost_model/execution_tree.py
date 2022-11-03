@@ -52,7 +52,7 @@ class Node:
     def print(self, level=0):
         """Pretty print of the SBE tree."""
         print(
-            f'{"| "*level}stage: {self.stage}, plaNodeId: {self.plan_node_id}, totalExecutionTime: {self.total_execution_time}, nReturned: {self.n_returned}, nProcessed: {self.n_processed}'
+            f'{"| "*level}{self.stage}, plaNodeId: {self.plan_node_id}, totalExecutionTime: {self.total_execution_time:,}, nReturned: {self.n_returned}, nProcessed: {self.n_processed}'
         )
         for child in self.children:
             child.print(level + 1)
@@ -72,7 +72,7 @@ def process_stage(stage: dict[str, any]) -> Node:
         'traverse': process_traverse,
         'project': process_inner_node,
         'limit': process_inner_node,
-        'scan': process_leaf_node,
+        'scan': process_seek,
         'coscan': process_leaf_node,
         'nlj': process_nlj,
         'hj': process_hash_join_node,

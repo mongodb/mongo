@@ -39,11 +39,16 @@ class Node:
 
     node_type: str
     plan_node_id: int
+    cost: float
+    local_cost: float
+    adjusted_ce: float
     children: list[Node]
 
     def print(self, level=0):
         """Pretty print of the ABT."""
-        print(f'{"| "*level}nodeType: {self.node_type}, plaNodeId: {self.plan_node_id}')
+        print(
+            f'{"| "*level}{self.node_type}, planNodeId: {self.plan_node_id}, cost: {self.cost:0.5f}, localCost: {self.local_cost:0.5f}, adjustedCE: {self.adjusted_ce:0.2f}'
+        )
         for child in self.children:
             child.print(level + 1)
 
@@ -56,14 +61,21 @@ def build(optimizer_plan: dict[str, any]) -> Node:
 def parse_optimizer_node(explain_node: dict[str, any]) -> Node:
     """Recursively parse ABT node from query explain's node."""
     children = get_children(explain_node)
-    return Node(node_type=explain_node['nodeType'], plan_node_id=explain_node['properties'].get(
-        'planNodeID', -1), children=children)
+    properties = explain_node['properties']
+    return Node(node_type=explain_node['nodeType'], plan_node_id=properties['planNodeID'],
+                cost=properties['cost'], local_cost=properties['localCost'],
+                adjusted_ce=properties['adjustedCE'], children=children)
 
 
 def get_children(explain_node: dict[str, any]) -> list[Node]:
     """Get children nodes of the ABT node."""
+    if 'children' in explain_node:
+        children = [parse_optimizer_node(child) for child in explain_node['children']]
+    else:
+        children = []
+
     children_refs = ['child', 'leftChild', 'rightChild']
-    children = []
+
     for ref in children_refs:
         if ref in explain_node:
             children.append(parse_optimizer_node(explain_node[ref]))

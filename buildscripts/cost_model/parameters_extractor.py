@@ -34,15 +34,16 @@ import bson.json_util as json
 from workload_execution import QueryParameters
 from config import AbtCalibratorConfig
 from database_instance import DatabaseInstance
-from cost_estimator import ModelParameters, ExecutionStats
+from cost_estimator import CostModelParameters, ExecutionStats
 import execution_tree
 import physical_tree
 
 __all__ = ['extract_parameters', 'extract_execution_stats']
 
 
-async def extract_parameters(config: AbtCalibratorConfig, database: DatabaseInstance,
-                             abt_types: Sequence[str]) -> Mapping[str, Sequence[ModelParameters]]:
+async def extract_parameters(
+        config: AbtCalibratorConfig, database: DatabaseInstance,
+        abt_types: Sequence[str]) -> Mapping[str, Sequence[CostModelParameters]]:
     """Read measurements from database and extract cost model parameters for the given ABT types."""
 
     stats = defaultdict(list)
@@ -52,9 +53,11 @@ async def extract_parameters(config: AbtCalibratorConfig, database: DatabaseInst
         explain = json.loads(result['explain'])
         query_parameters = QueryParameters.from_json(result['query_parameters'])
         res = parse_explain(explain, abt_types)
-        for abt_type, stat in res.items():
-            stats[abt_type].append(
-                ModelParameters(execution_stats=stat, query_params=query_parameters))
+        for abt_type, es in res.items():
+            stats[abt_type] += [
+                CostModelParameters(execution_stats=stat, query_params=query_parameters)
+                for stat in es
+            ]
         if config.trace and len(res) > 0:
             print(res)
     return stats
@@ -63,13 +66,9 @@ async def extract_parameters(config: AbtCalibratorConfig, database: DatabaseInst
 Node = TypeVar('Node')
 
 
-def find_abt_node_by_type(root: physical_tree.Node, abt_type: str) -> physical_tree.Node | Node:
+def find_abt_node_by_type(root: physical_tree.Node, abt_type: str) -> Sequence[physical_tree.Node]:
     """Find ABT node by its type."""
-    abt_nodes = find_nodes(root, lambda node: node.node_type == abt_type)
-    if len(abt_nodes) > 0:
-        assert len(abt_nodes) == 1
-        return abt_nodes[0]
-    return None
+    return find_nodes(root, lambda node: node.node_type == abt_type)
 
 
 def find_nodes(root: Node, predicate: Callable[[Node], bool]) -> list[Node]:
@@ -129,19 +128,18 @@ def parse_explain(explain: Mapping[str, any], abt_types: Sequence[str]):
 
 
 def extract_execution_stats(et: execution_tree.Node, pt: physical_tree.Node,
-                            abt_types: Sequence[str]) -> Mapping[str, ExecutionStats]:
+                            abt_types: Sequence[str]) -> Mapping[str, Sequence[ExecutionStats]]:
     """Extract ExecutionStats from the given SBE and ABT trees for the given ABT types."""
 
     if len(abt_types) == 0:
         abt_types = get_abt_types(pt)
 
     try:
-        result: Mapping[str, ExecutionStats] = {}
+        result: Mapping[str, ExecutionStats] = defaultdict(list)
         for abt_type in abt_types:
-            abt_node = find_abt_node_by_type(pt, abt_type)
-            if abt_node is not None:
+            for abt_node in find_abt_node_by_type(pt, abt_type):
                 execution_stats = get_excution_stats(et, abt_node.plan_node_id)
-                result[abt_type] = execution_stats
+                result[abt_type].append(execution_stats)
         return result
     except AssertionError as ae:
         print(f'{pt.node_type} {ae} {pt}')

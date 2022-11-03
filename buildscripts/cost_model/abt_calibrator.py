@@ -67,10 +67,12 @@ def calibrate_node(abt_df: pd.DataFrame, config: AbtCalibratorConfig,
         variables = node_config.variables_override
     y = abt_node_df['execution_time']
     X = abt_node_df[variables]
+
     X = sm.add_constant(X)
 
     def fit(X, y):
         nnls = LinearRegression(positive=True, fit_intercept=False)
-        return nnls.fit(X, y)
+        model = nnls.fit(X, y)
+        return (model.coef_, model.predict)
 
     return estimate(fit, X, y, config.test_size, config.trace)

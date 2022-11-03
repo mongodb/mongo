@@ -143,3 +143,11 @@ class WorkloadExecutionConfig:
     write_mode: WriteMode
     warmup_runs: int
     runs: int
+
+
+@dataclass
+class BenchmarkConfig:
+    """A/B performance testing config."""
+
+    warmup_runs: int
+    runs: int

@@ -30,6 +30,7 @@
 from __future__ import annotations
 from typing import Sequence, Mapping, NewType, Any
 import subprocess
+from contextlib import asynccontextmanager
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import DatabaseConfig, RestoreMode
 
@@ -76,6 +77,9 @@ class DatabaseInstance:
     async def set_parameter(self, name: str, value: any) -> None:
         """Set MongoDB Parameter."""
         await self.client.admin.command({'setParameter': 1, name: value})
+
+    async def get_parameter(self, name: str) -> any:
+        return (await self.client.admin.command({'getParameter': 1, name: 1}))[name]
 
     async def enable_sbe(self, state: bool) -> None:
         """Enable new query execution engine. Throw pymongo.errors.OperationFailure in case of failure."""
@@ -145,3 +149,39 @@ class DatabaseInstance:
         stats = await self.get_stats(collection_name)
         avg_size = stats.get('avgObjSize')
         return avg_size if avg_size is not None else 0
+
+
+class DatabaseParameter:
+    """A utility class to work with MongoDB parameters."""
+
+    def __init__(self, database: DatabaseInstance, parameter_name: str) -> None:
+        """Initialize the class."""
+        self.database = database
+        self.parameter_name = parameter_name
+        self.original_value = None
+
+    async def set(self, value):
+        """Set the parameter's value."""
+        await self.database.set_parameter(self.parameter_name, value)
+
+    async def remember(self):
+        """Store the current value of the parameter so it can be restored lately."""
+        self.original_value = await self.database.get_parameter(self.parameter_name)
+
+    async def restore(self):
+        """Restore the remebered value of the parameter."""
+        if self.original_value is not None:
+            await self.set(self.original_value)
+        else:
+            raise ValueError(f'The parameter "{self.parameter_name}" has not been remembered.')
+
+
+@asynccontextmanager
+async def get_database_parameter(database: DatabaseInstance, parameter_name: str):
+    """Create a new instance of a context manager on top of DatabaseParameter. It restores the original value on teardown. Useful when we need temporarily change a parameter."""
+    param = DatabaseParameter(database, parameter_name)
+    await param.remember()
+    try:
+        yield param
+    finally:
+        await param.restore()

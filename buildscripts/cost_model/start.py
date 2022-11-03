@@ -33,7 +33,7 @@ import csv
 import asyncio
 from typing import Mapping, Sequence
 from config import WriteMode
-from cost_estimator import ExecutionStats, ModelParameters
+from cost_estimator import ExecutionStats, CostModelParameters
 from data_generator import CollectionInfo, DataGenerator
 from database_instance import DatabaseInstance
 import abt_calibrator
@@ -45,7 +45,7 @@ from calibration_settings import distributions, main_config
 __all__ = []
 
 
-def save_to_csv(parameters: Mapping[str, Sequence[ModelParameters]], filepath: str) -> None:
+def save_to_csv(parameters: Mapping[str, Sequence[CostModelParameters]], filepath: str) -> None:
     """Save model input parameters to a csv file."""
     abt_type_name = 'abt_type'
     fieldnames = [
