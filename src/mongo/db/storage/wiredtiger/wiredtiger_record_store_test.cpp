@@ -1063,6 +1063,7 @@ TEST(WiredTigerRecordStoreTest, NumRecordsAccurateAfterRollbackWithDelete) {
     }
 
     ASSERT_EQ(1, rs->numRecords(ctx.get()));
+    ASSERT_EQ(2, rs->dataSize(ctx.get()));
 
     WriteUnitOfWork uow(ctx.get());
 
@@ -1094,6 +1095,7 @@ TEST(WiredTigerRecordStoreTest, NumRecordsAccurateAfterRollbackWithDelete) {
 
     abortedThread.join();
     ASSERT_EQ(0, rs->numRecords(ctx.get()));
+    ASSERT_EQ(0, rs->dataSize(ctx.get()));
 }
 
 }  // namespace
