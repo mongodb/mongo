@@ -67,14 +67,13 @@ TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOff) {
 }
 
 // Assert that if multitenancySupport and featureFlagRequireTenantID are on, then tenantId is set.
-// TODO SERVER-70742 Uncomment out the massert below.
-/* TEST(NamespaceStringUtilTest,
+TEST(NamespaceStringUtilTest,
      DeserializeAssertTenantIdSetMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     ASSERT_THROWS_CODE(
         NamespaceStringUtil::deserialize(boost::none, "foo.bar"), AssertionException, 6972100);
-} */
+}
 
 // Deserialize NamespaceString using the tenantID as a parameter to the NamespaceString constructor
 // when multitenancySupport and featureFlagRequireTenantID are enabled and ns does not have prefixed

@@ -33,10 +33,11 @@ assert.commandWorked(
 // Insert a document to the collection and then capture the corresponding oplog timestamp. This
 // timestamp will be the start timestamp beyond (inclusive) which we will validate the oplog and the
 // change collection entries.
-const startTimestamp = assert
-                           .commandWorked(primary.getDB("test").runCommand(
-                               {insert: "seedCollection", documents: [{_id: "beginTs"}]}))
-                           .operationTime;
+const startTimestamp =
+    assert
+        .commandWorked(primary.getDB("test").runCommand(
+            {insert: "seedCollection", documents: [{_id: "beginTs"}], $tenant: tenantId}))
+        .operationTime;
 
 // Pause the checkpointing, as such non-journaled collection including the change collection will
 // not be persisted.
