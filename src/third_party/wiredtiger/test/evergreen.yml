@@ -364,6 +364,9 @@ functions:
           echo "$exit_code" > cppsuite_exit_code
           if [ "$exit_code" != 0 ]; then
             echo "[{\"info\":{\"test_name\": \"${test_name}\"},\"metrics\": []}]" > ${test_name}.json
+            # Since we later remove the WiredTiger folder, we need to check for core dumps now.
+            cd ../..
+            ${python_binary|python3} ../test/evergreen/print_stack_trace.py
           fi
           exit 0
     - command: perf.send
@@ -590,18 +593,14 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          # Parse through any failures inside the WT_TEST directory.
-          ${python_binary|python3} ../test/evergreen/print_stack_trace.py --unit_test -e ${python_binary|python3} -c WT_TEST -l .
+          ${python_binary|python3} ../test/evergreen/print_stack_trace.py
 
-          # Look through the stress format directory for any coredumps.
-          ${python_binary|python3} ../test/evergreen/print_stack_trace.py --format -e ./test/format/t -c test/format/. -l test/format/.
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
         local_files_include_filter:
           - wiredtiger/cmake_build/*stacktrace.txt
-          - wiredtiger/cmake_build/test/format/*stacktrace.txt
         bucket: build_external
         permissions: public-read
         content_type: text/plain
