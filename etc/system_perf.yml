@@ -836,6 +836,26 @@ tasks:
         vars:
           test_control: "bestbuy_query"
 
+  - name: bestbuy_4_analytics
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_analytics"
+          test_control_params: |
+            {scale: 4,
+             columnstore: False}
+
+  - name: bestbuy_4_analytics_columnstore
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_analytics"
+          test_control_params: |
+            {scale: 4,
+             columnstore: True}
+
   - name: tpch_1_normalized
     priority: 5
     commands:
@@ -1206,6 +1226,8 @@ buildvariants:
       - name: bestbuy_agg_merge_different_db
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_4_analytics
+      - name: bestbuy_4_analytics_columnstore
       - name: bestbuy_query
       - name: cursor_manager
       - name: map_reduce_workloads
