@@ -1,0 +1,14 @@
+# This benchmark measures the performance of ABT translation.
+test_kind: benchmark_test
+
+selector:
+  root: build/benchmarks.txt
+  include_files:
+  # The trailing asterisk is for handling the .exe extension on Windows.
+  - build/**/system_resource_canary_bm*
+  - build/install/bin/abt_translation_bm*
+
+executor:
+  config: {}
+  hooks:
+  - class: CombineBenchmarkResults

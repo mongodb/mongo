@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <list>
+
 #include "mongo/db/exec/projection_executor.h"
 
 #include "mongo/db/query/projection_policies.h"
@@ -176,7 +178,14 @@ protected:
 
     StringMap<std::unique_ptr<ProjectionNode>> _children;
     StringMap<boost::intrusive_ptr<Expression>> _expressions;
-    StringSet _projectedFields;
+
+    // List of the projected fields in the order in which they were specified.
+    std::list<std::string> _projectedFields;
+
+    // Set of projected fields. Note that the _projectedFields list actually owns the strings, and
+    // this StringDataSet simply holds views of those strings.
+    StringDataSet _projectedFieldsSet;
+
     ProjectionPolicies _policies;
     std::string _pathToNode;
 

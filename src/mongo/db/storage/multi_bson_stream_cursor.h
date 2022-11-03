@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/storage/external_record_store.h"
+#include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/storage/input_stream.h"
 #include "mongo/db/storage/named_pipe.h"
+#include "mongo/db/storage/record_store.h"
 
 namespace mongo {
 class MultiBsonStreamCursor : public SeekableRecordCursor {
@@ -39,8 +40,7 @@ public:
     MultiBsonStreamCursor(const VirtualCollectionOptions& vopts)
         : _numStreams(vopts.dataSources.size()), _vopts(vopts) {
         tassert(6968310, "_numStreams {} <= 0"_format(_numStreams), _numStreams > 0);
-        _streamReader =
-            std::make_unique<InputStream<NamedPipeInput>>(_vopts.dataSources[0].url.c_str());
+        _streamReader = getInputStream(_vopts.dataSources[_streamIdx].url);
     }
 
     boost::optional<Record> next() override;
@@ -71,6 +71,7 @@ public:
 private:
     void expandBuffer(int32_t bsonSize);
     boost::optional<Record> nextFromCurrentStream();
+    static std::unique_ptr<InputStream<NamedPipeInput>> getInputStream(const std::string& url);
 
     // The size in bytes of a BSON object's "size" prefix.
     static constexpr int kSizeSize = static_cast<int>(sizeof(int32_t));

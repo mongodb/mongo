@@ -57,6 +57,7 @@ class LLDBDumper:
             sys.exit("Debugger lldb not found,"
                      "skipping dumping of {}".format(core_path))
 
+        cmds = []
         if dump_all:
             cmds.append("thread apply all backtrace -c 30")
         else:
@@ -108,50 +109,56 @@ class GDBDumper:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-e', '--executable_path',
-                        help='path to the executable',
-                        required=True)
     parser.add_argument('-c', '--core_path',
-                        help='directory path to the core dumps',
-                        required=True)
+                        help='directory path to the core dumps')
     parser.add_argument('-l', '--lib_path', help='library path')
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--unit_test', action='store_true', help='Format core dumps from python unit tests')
-    group.add_argument('--format', action='store_true', help='Format core dumps from format tests')
     args = parser.parse_args()
 
-    # Store the path of the core files as a list.
+    # If the lib_path is not provided then search the current dir.
+    lib_path = "." if args.lib_path is None else args.lib_path
+
+    # If the core_path is not provided then search the current dir.
+    core_path = "." if args.core_path is None else args.core_path
+
+    # Append the path of the core files present in the core path in a list.
     core_files = []
-    dump_all = args.unit_test
-
-    regex = None
-    if (args.format):
-        regex = re.compile(r'dump_t.*core', re.IGNORECASE)
-    elif (args.unit_test):
-        regex = re.compile(r'dump.*python.*core', re.IGNORECASE)
-
-    for root, _, files in os.walk(args.core_path):
+    regex = re.compile(r'dump.*core', re.IGNORECASE)
+    for root, _, files in os.walk(core_path):
         for file in files:
             if regex.match(file):
                 core_files.append(os.path.join(root, file))
 
     for core_file_path in core_files:
         print(border_msg(core_file_path), flush=True)
+
+        # Get the executable from the core file itself.
+        proc = subprocess.Popen(["file", core_file_path], stdout=subprocess.PIPE)
+        # The file command prints something similar to:
+        # WT_TEST/test_practice.0/dump_python3.16562.core: ELF 64-bit LSB core file x86-64, version 1 (SYSV),
+        # SVR4-style, from 'python3 /home/ubuntu/wiredtiger/test/suite/run.py -j 1 -p test_practice',
+        # real uid: 1000, effective uid: 1000, real gid: 1000, effective gid: 1000, execfn: '/usr/bin/python3', platform: 'x86_64'
+        output = str(proc.communicate())
+
+        # The field of interest is execfn: '/usr/bin/python3' from the example above.
+        start = output.find('execfn: ')
+        # Fetch the value of execfn. This is the executable path!
+        executable_path = re.search(r'\'.*?\'', output[start:]).group(0)
+
         if sys.platform.startswith('linux'):
             dbg = GDBDumper()
-            dbg.dump(args.executable_path, core_file_path, args.lib_path, dump_all, None)
+            dbg.dump(executable_path, core_file_path, lib_path, False, None)
 
             # Extract the filename from the core file path, to create a stacktrace output file.
             file_name, _ = os.path.splitext(os.path.basename(core_file_path))
-            dbg.dump(args.executable_path, core_file_path, args.lib_path, True, file_name + ".stacktrace.txt")
+            dbg.dump(executable_path, core_file_path, lib_path, True, file_name + ".stacktrace.txt")
         elif sys.platform.startswith('darwin'):
             # FIXME - macOS to be supported in WT-8976
             # dbg = LLDBDumper()
-            # dbg.dump(args.executable_path, core_file_path, dump_all)
+            # dbg.dump(args.executable_path, core_file_path, False, None)
 
             # Extract the filename from the core file path, to create a stacktrace output file.
             # file_name, _ = os.path.splitext(os.path.basename(core_file_path))
-            # dbg.dump(args.executable_path, core_file_path, args.lib_path, dump_all, file_name + ".stacktrace.txt")
+            # dbg.dump(executable_path, core_file_path, True, file_name + ".stacktrace.txt")
             pass
         elif sys.platform.startswith('win32') or sys.platform.startswith('cygwin'):
             # FIXME - Windows to be supported in WT-8937

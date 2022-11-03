@@ -13,13 +13,13 @@
  *     Block cache verbose logging.
  */
 static inline void
-__blkcache_verbose(
-  WT_SESSION_IMPL *session, const char *tag, uint64_t hash, const uint8_t *addr, size_t addr_size)
+__blkcache_verbose(WT_SESSION_IMPL *session, WT_VERBOSE_LEVEL level, const char *tag, uint64_t hash,
+  const uint8_t *addr, size_t addr_size)
 {
     WT_DECL_ITEM(tmp);
     const char *addr_string;
 
-    if (!WT_VERBOSE_ISSET(session, WT_VERB_BLKCACHE))
+    if (!WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_BLKCACHE, level))
         return;
 
     /*
@@ -29,7 +29,8 @@ __blkcache_verbose(
     addr_string = __wt_scr_alloc(session, 0, &tmp) == 0 ?
       __wt_addr_string(session, addr, addr_size, tmp) :
       "[unable to format addr]";
-    __wt_verbose(session, WT_VERB_BLKCACHE, "%s: %s, hash=%" PRIu64, tag, addr_string, hash);
+    __wt_verbose_level(
+      session, WT_VERB_BLKCACHE, level, "%s: %s, hash=%" PRIu64, tag, addr_string, hash);
     __wt_scr_free(session, &tmp);
 }
 
@@ -373,10 +374,12 @@ __wt_blkcache_get(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_siz
         *blkcache_retp = blkcache_item;
         *foundp = *skip_cache_putp = true;
         WT_STAT_CONN_INCR(session, block_cache_hits);
-        __blkcache_verbose(session, "block found in cache", hash, addr, addr_size);
+        __blkcache_verbose(
+          session, WT_VERBOSE_DEBUG_2, "block found in cache", hash, addr, addr_size);
     } else {
         WT_STAT_CONN_INCR(session, block_cache_misses);
-        __blkcache_verbose(session, "block not found in cache", hash, addr, addr_size);
+        __blkcache_verbose(
+          session, WT_VERBOSE_DEBUG_2, "block not found in cache", hash, addr, addr_size);
     }
 }
 
@@ -460,7 +463,8 @@ __wt_blkcache_put(
 
                 WT_STAT_CONN_INCRV(session, block_cache_bytes_update, data->size);
                 WT_STAT_CONN_INCR(session, block_cache_blocks_update);
-                __blkcache_verbose(session, "block already in cache", hash, addr, addr_size);
+                __blkcache_verbose(
+                  session, WT_VERBOSE_DEBUG_2, "block already in cache", hash, addr, addr_size);
                 goto err;
             }
 
@@ -487,7 +491,8 @@ __wt_blkcache_put(
         WT_STAT_CONN_INCR(session, block_cache_blocks_insert_read);
     }
 
-    __blkcache_verbose(session, "block inserted in cache", hash, addr, addr_size);
+    __blkcache_verbose(
+      session, WT_VERBOSE_DEBUG_1, "block inserted in cache", hash, addr, addr_size);
     return (0);
 
 err:
@@ -526,7 +531,8 @@ __wt_blkcache_remove(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_
             WT_ASSERT(session, blkcache_item->ref_count == 0);
             __blkcache_free(session, blkcache_item->data);
             __wt_overwrite_and_free(session, blkcache_item);
-            __blkcache_verbose(session, "block removed from cache", hash, addr, addr_size);
+            __blkcache_verbose(
+              session, WT_VERBOSE_DEBUG_1, "block removed from cache", hash, addr, addr_size);
             return;
         }
     }

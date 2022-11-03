@@ -389,11 +389,7 @@ class RIDIntersectNode final : public Operator<2>, public ExclusivelyLogicalNode
     using Base = Operator<2>;
 
 public:
-    RIDIntersectNode(ProjectionName scanProjectionName,
-                     bool hasLeftIntervals,
-                     bool hasRightIntervals,
-                     ABT leftChild,
-                     ABT rightChild);
+    RIDIntersectNode(ProjectionName scanProjectionName, ABT leftChild, ABT rightChild);
 
     bool operator==(const RIDIntersectNode& other) const;
 
@@ -405,15 +401,8 @@ public:
 
     const ProjectionName& getScanProjectionName() const;
 
-    bool hasLeftIntervals() const;
-    bool hasRightIntervals() const;
-
 private:
     const ProjectionName _scanProjectionName;
-
-    // If true left and right children have at least one proper interval (not fully open).
-    const bool _hasLeftIntervals;
-    const bool _hasRightIntervals;
 };
 
 /**

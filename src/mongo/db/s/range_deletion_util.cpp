@@ -322,7 +322,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                             const ChunkRange& range) {
     suspendRangeDeletion.pauseWhileSet(opCtx);
 
-    SetTicketAquisitionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
+    SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
 
     bool allDocsRemoved = false;
     // Delete all batches in this range unless a stepdown error occurs. Do not yield the
@@ -584,7 +584,7 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
     const auto query = getQueryFilterForRangeDeletionTask(collectionUuid, range);
     try {
         PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-        ScopedRangeDeleterLock rangeDeleterLock(opCtx, collectionUuid);
+        ScopedRangeDeleterLock rangeDeleterLock(opCtx, LockMode::MODE_IX);
         // The DBDirectClient will not retry WriteConflictExceptions internally while holding an X
         // mode lock, so we need to retry at this level.
         writeConflictRetry(

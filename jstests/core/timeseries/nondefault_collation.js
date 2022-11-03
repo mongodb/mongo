@@ -44,7 +44,7 @@ const englishCollation = {
 };
 
 const simpleCollation = {
-    collation: {locale: "simple"}
+    locale: "simple"
 };
 
 assert.commandWorked(db.createCollection(coll.getName(), {
@@ -127,17 +127,17 @@ assert.commandWorked(coll.insert(
 // its metadata using simple collation. These tests confirm that queries on the indexed field using
 // nondefault (simple) collation use the index. They also confirm that queries that don't involve
 // strings but do use default collation, on indexed fields, also use the index.
-const nonDefaultCollationQuery = coll.find({meta: 2}, {collation: englishCollation}).explain();
+const nonDefaultCollationQuery = coll.find({meta: 2}).collation(englishCollation).explain();
 assert(aggPlanHasStage(nonDefaultCollationQuery, "IXSCAN"), nonDefaultCollationQuery);
 
-const simpleNonDefaultCollationQuery = coll.find({meta: 2}, simpleCollation).explain();
+const simpleNonDefaultCollationQuery = coll.find({meta: 2}).collation(simpleCollation).explain();
 assert(aggPlanHasStage(simpleNonDefaultCollationQuery, "IXSCAN"), simpleNonDefaultCollationQuery);
 
-const defaultCollationQuery = coll.find({meta: 1}, {collation: defaultCollation}).explain();
+const defaultCollationQuery = coll.find({meta: 1}).collation(defaultCollation).explain();
 assert(aggPlanHasStage(defaultCollationQuery, "IXSCAN"), defaultCollationQuery);
 
 // This test guarantees that the bucket's min/max matches the query's min/max regardless of
 // collation.
-results = coll.find({value: {$gt: "4"}}, simpleCollation);
-assert.eq(4, results.itcount());
+results = coll.find({value: {$gt: "4"}}).collation(simpleCollation);
+assert.eq(1, results.itcount());
 }());

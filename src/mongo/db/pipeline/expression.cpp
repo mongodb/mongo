@@ -2414,7 +2414,7 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::createVarFromString(
 ExpressionFieldPath::ExpressionFieldPath(ExpressionContext* const expCtx,
                                          const string& theFieldPath,
                                          Variables::Id variable)
-    : Expression(expCtx), _fieldPath(theFieldPath), _variable(variable) {
+    : Expression(expCtx), _fieldPath(theFieldPath, true /*precomputeHashes*/), _variable(variable) {
     const auto varName = theFieldPath.substr(0, theFieldPath.find('.'));
     tassert(5943201,
             std::string{"Variable with $$ROOT's id is not $$CURRENT or $$ROOT as expected, "

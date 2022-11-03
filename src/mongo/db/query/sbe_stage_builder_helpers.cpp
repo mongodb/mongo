@@ -958,27 +958,25 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
     return true;
 }
 
-std::tuple<sbe::value::SlotId, sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
-makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
-                     sbe::value::SlotId seekKeySlot,
-                     sbe::value::SlotId snapshotIdSlot,
-                     sbe::value::SlotId indexIdSlot,
-                     sbe::value::SlotId indexKeySlot,
-                     sbe::value::SlotId indexKeyPatternSlot,
-                     const CollectionPtr& collToFetch,
-                     StringMap<const IndexAccessMethod*> iamMap,
-                     PlanNodeId planNodeId,
-                     sbe::value::SlotVector slotsToForward,
-                     sbe::value::SlotIdGenerator& slotIdGenerator) {
+std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
+                                                     sbe::value::SlotId resultSlot,
+                                                     sbe::value::SlotId recordIdSlot,
+                                                     std::vector<std::string> fields,
+                                                     sbe::value::SlotVector fieldSlots,
+                                                     sbe::value::SlotId seekKeySlot,
+                                                     sbe::value::SlotId snapshotIdSlot,
+                                                     sbe::value::SlotId indexIdSlot,
+                                                     sbe::value::SlotId indexKeySlot,
+                                                     sbe::value::SlotId indexKeyPatternSlot,
+                                                     const CollectionPtr& collToFetch,
+                                                     StringMap<const IndexAccessMethod*> iamMap,
+                                                     PlanNodeId planNodeId,
+                                                     sbe::value::SlotVector slotsToForward) {
     // It is assumed that we are generating a fetch loop join over the main collection. If we are
     // generating a fetch over a secondary collection, it is the responsibility of a parent node
     // in the QSN tree to indicate which collection we are fetching over.
     tassert(6355301, "Cannot fetch from a collection that doesn't exist", collToFetch);
 
-    auto resultSlot = slotIdGenerator.generate();
-    auto recordIdSlot = slotIdGenerator.generate();
-
-    using namespace std::placeholders;
     sbe::ScanCallbacks callbacks(
         indexKeyCorruptionCheckCallback,
         [=](auto&& arg1, auto&& arg2, auto&& arg3, auto&& arg4, auto&& arg5, auto&& arg6) {
@@ -995,8 +993,8 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
                                                 indexKeySlot,
                                                 indexKeyPatternSlot,
                                                 boost::none,
-                                                std::vector<std::string>{},
-                                                sbe::makeSV(),
+                                                std::move(fields),
+                                                std::move(fieldSlots),
                                                 seekKeySlot,
                                                 true,
                                                 nullptr,
@@ -1005,15 +1003,13 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
 
     // Get the recordIdSlot from the outer side (e.g., IXSCAN) and feed it to the inner side,
     // limiting the result set to 1 row.
-    auto stage = sbe::makeS<sbe::LoopJoinStage>(
+    return sbe::makeS<sbe::LoopJoinStage>(
         std::move(inputStage),
         sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none, planNodeId),
         std::move(slotsToForward),
         sbe::makeSV(seekKeySlot, snapshotIdSlot, indexIdSlot, indexKeySlot, indexKeyPatternSlot),
         nullptr,
         planNodeId);
-
-    return {resultSlot, recordIdSlot, std::move(stage)};
 }
 
 sbe::value::SlotId StageBuilderState::registerInputParamSlot(
@@ -1121,4 +1117,172 @@ std::unique_ptr<sbe::PlanStage> rehydrateIndexKey(std::unique_ptr<sbe::PlanStage
     return sbe::makeProjectStage(std::move(stage), nodeId, resultSlot, std::move(keyExpr));
 }
 
+/**
+ * For covered projections, each of the projection field paths represent respective index key. To
+ * rehydrate index keys into the result object, we first need to convert projection AST into
+ * 'IndexKeyPatternTreeNode' structure. Context structure and visitors below are used for this
+ * purpose.
+ */
+struct IndexKeysBuilderContext {
+    // Contains resulting tree of index keys converted from projection AST.
+    IndexKeyPatternTreeNode root;
+
+    // Full field path of the currently visited projection node.
+    std::vector<StringData> currentFieldPath;
+
+    // Each projection node has a vector of field names. This stack contains indexes of the
+    // currently visited field names for each of the projection nodes.
+    std::vector<size_t> currentFieldIndex;
+};
+
+/**
+ * Covered projections are always inclusion-only, so we ban all other operators.
+ */
+class IndexKeysBuilder : public projection_ast::ProjectionASTConstVisitor {
+public:
+    using projection_ast::ProjectionASTConstVisitor::visit;
+
+    IndexKeysBuilder(IndexKeysBuilderContext* context) : _context{context} {}
+
+    void visit(const projection_ast::ProjectionPositionalASTNode* node) final {
+        tasserted(5474501, "Positional projection is not allowed in simple or covered projections");
+    }
+
+    void visit(const projection_ast::ProjectionSliceASTNode* node) final {
+        tasserted(5474502, "$slice is not allowed in simple or covered projections");
+    }
+
+    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {
+        tasserted(5474503, "$elemMatch is not allowed in simple or covered projections");
+    }
+
+    void visit(const projection_ast::ExpressionASTNode* node) final {
+        tasserted(5474504, "Expressions are not allowed in simple or covered projections");
+    }
+
+    void visit(const projection_ast::MatchExpressionASTNode* node) final {
+        tasserted(
+            5474505,
+            "$elemMatch / positional projection are not allowed in simple or covered projections");
+    }
+
+    void visit(const projection_ast::BooleanConstantASTNode* node) override {}
+
+protected:
+    IndexKeysBuilderContext* _context;
+};
+
+class IndexKeysPreBuilder final : public IndexKeysBuilder {
+public:
+    using IndexKeysBuilder::IndexKeysBuilder;
+    using IndexKeysBuilder::visit;
+
+    void visit(const projection_ast::ProjectionPathASTNode* node) final {
+        _context->currentFieldIndex.push_back(0);
+        _context->currentFieldPath.emplace_back(node->fieldNames().front());
+    }
+};
+
+class IndexKeysInBuilder final : public IndexKeysBuilder {
+public:
+    using IndexKeysBuilder::IndexKeysBuilder;
+    using IndexKeysBuilder::visit;
+
+    void visit(const projection_ast::ProjectionPathASTNode* node) final {
+        auto& currentIndex = _context->currentFieldIndex.back();
+        currentIndex++;
+        _context->currentFieldPath.back() = node->fieldNames()[currentIndex];
+    }
+};
+
+class IndexKeysPostBuilder final : public IndexKeysBuilder {
+public:
+    using IndexKeysBuilder::IndexKeysBuilder;
+    using IndexKeysBuilder::visit;
+
+    void visit(const projection_ast::ProjectionPathASTNode* node) final {
+        _context->currentFieldIndex.pop_back();
+        _context->currentFieldPath.pop_back();
+    }
+
+    void visit(const projection_ast::BooleanConstantASTNode* constantNode) final {
+        if (!constantNode->value()) {
+            // Even though only inclusion is allowed in covered projection, there still can be
+            // {_id: 0} component. We do not need to generate any nodes for it.
+            return;
+        }
+
+        // Insert current field path into the index keys tree if it does not exist yet.
+        auto* node = &_context->root;
+        for (const auto& part : _context->currentFieldPath) {
+            if (auto it = node->children.find(part); it != node->children.end()) {
+                node = it->second.get();
+            } else {
+                node = node->emplace(part);
+            }
+        }
+    }
+};
+
+IndexKeyPatternTreeNode buildPatternTree(const projection_ast::Projection& projection) {
+    IndexKeysBuilderContext context;
+    IndexKeysPreBuilder preVisitor{&context};
+    IndexKeysInBuilder inVisitor{&context};
+    IndexKeysPostBuilder postVisitor{&context};
+
+    projection_ast::ProjectionASTConstWalker walker{&preVisitor, &inVisitor, &postVisitor};
+
+    tree_walker::walk<true, projection_ast::ASTNode>(projection.root(), &walker);
+
+    return std::move(context.root);
+}
+
+std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectTopLevelFields(
+    std::unique_ptr<sbe::PlanStage> stage,
+    const std::vector<std::string>& fields,
+    sbe::value::SlotId resultSlot,
+    PlanNodeId nodeId,
+    sbe::value::SlotIdGenerator* slotIdGenerator) {
+    // 'outputSlots' will match the order of 'fields'.
+    sbe::value::SlotVector outputSlots;
+    outputSlots.reserve(fields.size());
+
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+    for (size_t i = 0; i < fields.size(); ++i) {
+        const auto& field = fields[i];
+        auto slot = slotIdGenerator->generate();
+        auto getFieldExpr =
+            makeFunction("getField"_sd, makeVariable(resultSlot), makeConstant(field));
+        projects.insert({slot, std::move(getFieldExpr)});
+        outputSlots.emplace_back(slot);
+    }
+
+    if (!projects.empty()) {
+        stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
+    }
+
+    return {std::move(stage), std::move(outputSlots)};
+}
+
+std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectNothingToSlots(
+    std::unique_ptr<sbe::PlanStage> stage,
+    size_t n,
+    PlanNodeId nodeId,
+    sbe::value::SlotIdGenerator* slotIdGenerator) {
+    if (n == 0) {
+        return {std::move(stage), sbe::value::SlotVector{}};
+    }
+
+    auto outputSlots = slotIdGenerator->generateMultiple(n);
+
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+    for (size_t i = 0; i < n; ++i) {
+        projects.insert(
+            {outputSlots[i], sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0)});
+    }
+
+    stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
+
+    return {std::move(stage), std::move(outputSlots)};
+}
 }  // namespace mongo::stage_builder

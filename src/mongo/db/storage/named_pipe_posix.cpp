@@ -31,10 +31,11 @@
 #include "named_pipe.h"
 
 #include <fmt/format.h>
+#include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "mongo/db/storage/external_record_store.h"
+#include "mongo/db/storage/io_error_message.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -43,23 +44,26 @@
 namespace mongo {
 using namespace fmt::literals;
 
-NamedPipeOutput::NamedPipeOutput(const char* pipePath) : _pipePath(pipePath), _ofs() {
-    remove(_pipePath);
+NamedPipeOutput::NamedPipeOutput(const std::string& pipeRelativePath)
+    : _pipeAbsolutePath(kDefaultPipePath + pipeRelativePath), _ofs() {
+    remove(_pipeAbsolutePath.c_str());
     uassert(7005005,
-            "Failed to create a named pipe, error={}"_format(getErrorMessage("mkfifo", _pipePath)),
-            mkfifo(_pipePath, 0664) == 0);
+            "Failed to create a named pipe, error={}"_format(
+                getErrorMessage("mkfifo", _pipeAbsolutePath)),
+            mkfifo(_pipeAbsolutePath.c_str(), 0664) == 0);
 }
 
 NamedPipeOutput::~NamedPipeOutput() {
     close();
+    remove(_pipeAbsolutePath.c_str());
 }
 
 void NamedPipeOutput::open() {
-    _ofs.open(_pipePath, std::ios::binary | std::ios::app);
+    _ofs.open(_pipeAbsolutePath.c_str(), std::ios::binary | std::ios::app);
     if (!_ofs.is_open() || !_ofs.good()) {
         LOGV2_ERROR(7005009,
                     "Failed to open a named pipe",
-                    "error"_attr = getErrorMessage("open", _pipePath));
+                    "error"_attr = getErrorMessage("open", _pipeAbsolutePath));
     }
 }
 
@@ -78,14 +82,15 @@ void NamedPipeOutput::close() {
     }
 }
 
-NamedPipeInput::NamedPipeInput(const char* pipePath) : _pipePath(pipePath), _ifs() {}
+NamedPipeInput::NamedPipeInput(const std::string& pipeRelativePath)
+    : _pipeAbsolutePath(kDefaultPipePath + pipeRelativePath), _ifs() {}
 
 NamedPipeInput::~NamedPipeInput() {
     close();
 }
 
 void NamedPipeInput::doOpen() {
-    _ifs.open(_pipePath, std::ios::binary | std::ios::in);
+    _ifs.open(_pipeAbsolutePath.c_str(), std::ios::binary | std::ios::in);
 }
 
 int NamedPipeInput::doRead(char* data, int size) {

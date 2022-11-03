@@ -377,8 +377,10 @@ public:
         AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
         _uuid = autoColl.getCollection()->uuid();
 
-        RangeDeleterService::get(operationContext())->onStepUpComplete(operationContext(), 0L);
-        RangeDeleterService::get(operationContext())->_waitForRangeDeleterServiceUp_FOR_TESTING();
+        auto opCtx = operationContext();
+        RangeDeleterService::get(opCtx)->onStartup(opCtx);
+        RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, 0L);
+        RangeDeleterService::get(opCtx)->_waitForRangeDeleterServiceUp_FOR_TESTING();
     }
 
     void tearDown() override {
@@ -611,8 +613,7 @@ TEST_F(CollectionShardingRuntimeWithCatalogTest, TestGlobalIndexesCache) {
         opCtx, kTestNss, "x_1", BSON("x" << 1), BSONObj(), uuid(), indexVersion, boost::none);
 
     ASSERT_EQ(true, csr()->getIndexes(opCtx).is_initialized());
-    ASSERT_EQ(indexVersion, *csr()->getIndexes(opCtx)->getVersion());
-    ASSERT_EQ(indexVersion, *csr()->getIndexVersion(opCtx));
+    ASSERT_EQ(CollectionIndexes(uuid(), indexVersion), *csr()->getCollectionIndexes(opCtx));
 }
 }  // namespace
 }  // namespace mongo

@@ -38,6 +38,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/storage/snapshot_helper.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -641,7 +642,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     }
 }
 
-AutoGetCollectionForReadLockFree::EmplaceHelper::EmplaceHelper(
+AutoGetCollectionForReadLockFreeLegacy::EmplaceHelper::EmplaceHelper(
     OperationContext* opCtx,
     CollectionCatalogStasher& catalogStasher,
     const NamespaceStringOrUUID& nsOrUUID,
@@ -653,7 +654,7 @@ AutoGetCollectionForReadLockFree::EmplaceHelper::EmplaceHelper(
       _options(std::move(options)),
       _isLockFreeReadSubOperation(isLockFreeReadSubOperation) {}
 
-void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
+void AutoGetCollectionForReadLockFreeLegacy::EmplaceHelper::emplace(
     boost::optional<AutoGetCollectionLockFree>& autoColl) const {
     autoColl.emplace(
         _opCtx,
@@ -706,7 +707,7 @@ void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
         _options);
 }
 
-AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
+AutoGetCollectionForReadLockFreeLegacy::AutoGetCollectionForReadLockFreeLegacy(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
     AutoGetCollection::Options options)
@@ -749,11 +750,22 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         options._secondaryNssOrUUIDs);
 }
 
+AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AutoGetCollection::Options options) {
+    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+        _impl.emplace<AutoGetCollectionForReadLockFreePITCatalog>(
+            opCtx, nsOrUUID, std::move(options));
+    } else {
+        _impl.emplace<AutoGetCollectionForReadLockFreeLegacy>(opCtx, nsOrUUID, std::move(options));
+    }
+}
+
 AutoGetCollectionForReadMaybeLockFree::AutoGetCollectionForReadMaybeLockFree(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
     AutoGetCollection::Options options) {
-
     if (supportsLockFreeRead(opCtx)) {
         _autoGetLockFree.emplace(opCtx, nsOrUUID, std::move(options));
     } else {
@@ -808,7 +820,6 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
                         _autoCollForRead.getNss().dbName()),
                     options._deadline,
                     options._secondaryNssOrUUIDs) {
-
     hangBeforeAutoGetShardVersionCheck.executeIf(
         [&](auto&) { hangBeforeAutoGetShardVersionCheck.pauseWhileSet(opCtx); },
         [&](const BSONObj& data) {
@@ -1050,7 +1061,7 @@ BlockSecondaryReadsDuringBatchApplication_DONT_USE::
 template class AutoGetCollectionForReadBase<AutoGetCollection, EmplaceAutoGetCollectionForRead>;
 template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForRead>;
 template class AutoGetCollectionForReadBase<AutoGetCollectionLockFree,
-                                            AutoGetCollectionForReadLockFree::EmplaceHelper>;
+                                            AutoGetCollectionForReadLockFreeLegacy::EmplaceHelper>;
 template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadLockFree>;
 
 }  // namespace mongo

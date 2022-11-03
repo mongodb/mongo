@@ -173,6 +173,10 @@ public:
         return false;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,

@@ -55,6 +55,12 @@ protected:
         return parsedPayload.isStub();
     }
 
+    virtual bool isStub(Value elt) const {
+        auto parsedPayload = parseFindPayload<ParsedFindRangePayload>(elt);
+        return parsedPayload.isStub();
+    }
+
+
 private:
     EncryptedBinDataType encryptedBinDataType() const override {
         return EncryptedBinDataType::kFLE2FindRangePayload;

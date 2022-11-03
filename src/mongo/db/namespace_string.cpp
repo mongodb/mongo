@@ -195,6 +195,12 @@ const NamespaceString NamespaceString::kGlobalIndexClonerNamespace(
 const NamespaceString NamespaceString::kConfigQueryAnalyzersNamespace(NamespaceString::kConfigDb,
                                                                       "queryAnalyzers");
 
+const NamespaceString NamespaceString::kConfigSampledQueriesNamespace(NamespaceString::kConfigDb,
+                                                                      "sampledQueries");
+
+const NamespaceString NamespaceString::kConfigSampledQueriesDiffNamespace(
+    NamespaceString::kConfigDb, "sampledQueriesDiff");
+
 NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
     if (!gMultitenancySupport) {
         return NamespaceString(boost::none, ns);
@@ -495,12 +501,12 @@ bool NamespaceString::isSystemStatsCollection() const {
 }
 
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
-    return {db(), kTimeseriesBucketsCollectionPrefix.toString() + coll()};
+    return {dbName(), kTimeseriesBucketsCollectionPrefix.toString() + coll()};
 }
 
 NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
     invariant(isTimeseriesBucketsCollection(), ns());
-    return {db(), coll().substr(kTimeseriesBucketsCollectionPrefix.size())};
+    return {dbName(), coll().substr(kTimeseriesBucketsCollectionPrefix.size())};
 }
 
 bool NamespaceString::isImplicitlyReplicated() const {

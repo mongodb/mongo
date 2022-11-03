@@ -234,7 +234,7 @@ TEST_F(SbeShardFilterTest, MissingFieldsAtBottomDottedPathFilledCorrectly) {
 
 TEST_F(SbeShardFilterTest, CoveredShardFilterPlan) {
     auto indexKeyPattern = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1);
-    auto projection = BSON("a" << 1 << "c" << 1);
+    auto projection = BSON("a" << 1 << "c" << 1 << "_id" << 0);
     auto mockedIndexKeys =
         std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 2 << "b" << 2 << "c" << 2 << "d" << 2)),
                                BSON_ARRAY(BSON("a" << 3 << "b" << 3 << "c" << 3 << "d" << 3))};

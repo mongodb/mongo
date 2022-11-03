@@ -331,6 +331,7 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
                 "test_truncate16.test_truncate16",
                 "test_truncate18.test_truncate18",
                 "test_truncate15.test_truncate15",
+                "test_truncate19.test_truncate19",
                 "test_txn22.test_corrupt_meta",
                 "test_verbose01.test_verbose_single",
                 "test_verbose02.test_verbose_single",

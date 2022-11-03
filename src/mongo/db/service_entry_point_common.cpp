@@ -2105,7 +2105,20 @@ DbResponse makeCommandResponse(std::shared_ptr<HandleRequest::ExecutionContext> 
         }
     }
 
-    dbResponse.response = replyBuilder->done();
+    try {
+        dbResponse.response = replyBuilder->done();
+    } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>& ex) {
+        // Create a new reply builder as subsequently calling any methods on a builder after
+        // 'done()' results in undefined behavior.
+        auto errorReplyBuilder = execContext->getReplyBuilder();
+        BSONObjBuilder metadataBob;
+        BSONObjBuilder extraFieldsBuilder;
+        appendClusterAndOperationTime(
+            opCtx, &extraFieldsBuilder, &metadataBob, LogicalTime::kUninitialized);
+        generateErrorResponse(
+            opCtx, errorReplyBuilder, ex.toStatus(), metadataBob.obj(), extraFieldsBuilder.obj());
+        dbResponse.response = errorReplyBuilder->done();
+    }
     CurOp::get(opCtx)->debug().responseLength = dbResponse.response.header().dataLen();
 
     return dbResponse;
@@ -2347,8 +2360,24 @@ BSONObj ServiceEntryPointCommon::getRedactedCopyForLogging(const Command* comman
     return bob.obj();
 }
 
-void onHandleRequestException(const Status& status) {
+void logHandleRequestFailure(const Status& status) {
     LOGV2_ERROR(4879802, "Failed to handle request", "error"_attr = redact(status));
+}
+
+void onHandleRequestException(const HandleRequest& hr, const Status& status) {
+    auto isMirrorOp = [&] {
+        const auto& obj = hr.executionContext->getRequest().body;
+        if (auto e = obj.getField("mirrored"); MONGO_unlikely(e.ok() && e.boolean()))
+            return true;
+        return false;
+    };
+
+    // TODO SERVER-70510 revert changes introduced by SERVER-60553 that suppresses errors occurred
+    // during handling of mirroring operations on recovering secondaries.
+    if (MONGO_unlikely(status == ErrorCodes::NotWritablePrimary && isMirrorOp()))
+        return;
+
+    logHandleRequestFailure(status);
 }
 
 Future<DbResponse> ServiceEntryPointCommon::handleRequest(
@@ -2362,7 +2391,7 @@ Future<DbResponse> ServiceEntryPointCommon::handleRequest(
     invariant(opRunner);
 
     return opRunner->run()
-        .then([hr = std::move(hr)](DbResponse response) mutable {
+        .then([&hr](DbResponse response) mutable {
             hr.completeOperation(response);
 
             auto opCtx = hr.executionContext->getOpCtx();
@@ -2377,10 +2406,10 @@ Future<DbResponse> ServiceEntryPointCommon::handleRequest(
 
             return response;
         })
-        .tapError([](Status status) { onHandleRequestException(status); });
+        .tapError([hr = std::move(hr)](Status status) { onHandleRequestException(hr, status); });
 } catch (const DBException& ex) {
     auto status = ex.toStatus();
-    onHandleRequestException(status);
+    logHandleRequestFailure(status);
     return status;
 }
 

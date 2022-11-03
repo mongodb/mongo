@@ -143,7 +143,7 @@ Configure WiredTiger to include support for extensions in the main library.
 This avoids requiring additional libraries for supported extensions. Currently
 supported builtin options are for \c lz4, \c snappy, \c zlib and \c zstd.
 
-@par <code>-DSPINLOCK_TYPE[=pthread, pthread_adaptive, gcc]</code>
+@par \c -DSPINLOCK_TYPE[=pthread, pthread_adaptive, gcc]
 Configure WiredTiger to use a specific mutex type for serialization;
 options are \c pthread (the default, which configures WiredTiger to use
 POSIX 1003.1c pthread mutexes), \c pthread_adaptive (which configures

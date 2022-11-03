@@ -145,12 +145,11 @@ struct __wt_data_handle {
     uint32_t flags;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_DHANDLE_TS_ASSERT_READ_ALWAYS 0x01u /* Assert read always checking. */
-#define WT_DHANDLE_TS_ASSERT_READ_NEVER 0x02u  /* Assert read never checking. */
-#define WT_DHANDLE_TS_MIXED_MODE 0x04u         /* Handle using mixed mode timestamps checking. */
-#define WT_DHANDLE_TS_NEVER 0x08u              /* Handle never using timestamps checking. */
-#define WT_DHANDLE_TS_ORDERED 0x10u            /* Handle using ordered timestamps checking. */
-                                               /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+#define WT_DHANDLE_TS_ASSERT_READ_ALWAYS 0x1u /* Assert read always checking. */
+#define WT_DHANDLE_TS_ASSERT_READ_NEVER 0x2u  /* Assert read never checking. */
+#define WT_DHANDLE_TS_NEVER 0x4u              /* Handle never using timestamps checking. */
+#define WT_DHANDLE_TS_ORDERED 0x8u            /* Handle using ordered timestamps checking. */
+                                              /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
     uint16_t ts_flags;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */

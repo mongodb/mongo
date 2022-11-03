@@ -422,9 +422,8 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
     }
 
     boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> autoColl;
-    const NamespaceStringOrUUID nsOrUUID = expCtx->uuid
-        ? NamespaceStringOrUUID{expCtx->ns.db().toString(), *expCtx->uuid}
-        : expCtx->ns;
+    const NamespaceStringOrUUID nsOrUUID =
+        expCtx->uuid ? NamespaceStringOrUUID{expCtx->ns.dbName(), *expCtx->uuid} : expCtx->ns;
 
     // Reparse 'pipeline' to discover whether there are secondary namespaces that we need to lock
     // when constructing our query executor.

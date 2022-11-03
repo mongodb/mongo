@@ -485,6 +485,10 @@ public:
         return Request::kCommandDescription.toString();
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     // Assume that appendCollectionStorageStats() gives us a valid response.
     void validateResult(const BSONObj& resultObj) final {}
 
@@ -586,6 +590,10 @@ public:
     using Reply = typename Request::Reply;
 
     CmdDbStats() : TypedCommand(Request::kCommandName, Request::kCommandAlias) {}
+
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
 
     class Invocation final : public InvocationBase {
     public:

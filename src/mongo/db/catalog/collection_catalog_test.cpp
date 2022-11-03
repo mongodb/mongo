@@ -2114,6 +2114,170 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRollback) {
               CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
 }
 
+TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsert) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    NamespaceString nss("a.b");
+
+    // Create a collection on the namespace
+    createCollection(opCtx.get(), nss, Timestamp(1, 10));
+    dropCollection(opCtx.get(), nss, Timestamp(1, 20));
+    createCollection(opCtx.get(), nss, Timestamp(1, 30));
+
+    auto rid1 = catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 10)).id;
+    auto rid2 = catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 30)).id;
+
+    // Simulate startup where we have a range [oldest, stable] by creating and dropping collections
+    // and then advancing the oldest timestamp and then reading behind it.
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 40));
+    });
+
+    // Confirm that the mappings have been cleaned up
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+
+    // TODO SERVER-70150: Use openCollection
+    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
+        catalog._insertCatalogIdForNSSAfterScan(nss, rid1, Timestamp(1, 17));
+    });
+
+    // Lookups before the inserted timestamp is still unknown
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 11)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+
+    // Lookups at or after the inserted timestamp is found, even if they don't match with WT
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 17)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 17)).id, rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 19)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 19)).id, rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).id, rid1);
+    // The entry at Timestamp(1, 30) is unaffected
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 30)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 30)).id, rid2);
+
+    // TODO SERVER-70150: Use openCollection
+    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
+        catalog._insertCatalogIdForNSSAfterScan(nss, rid1, Timestamp(1, 12));
+    });
+
+    // We should now have extended the range from Timestamp(1, 17) to Timestamp(1, 12)
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 12)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 12)).id, rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 16)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 16)).id, rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 17)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 17)).id, rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 19)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 19)).id, rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).id, rid1);
+    // The entry at Timestamp(1, 30) is unaffected
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 30)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 30)).id, rid2);
+
+    // TODO SERVER-70150: Use openCollection
+    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
+        catalog._insertCatalogIdForNSSAfterScan(nss, boost::none, Timestamp(1, 25));
+    });
+
+    // Check the entries, most didn't change
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 17)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 17)).id, rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 19)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 19)).id, rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 22)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 22)).id, rid1);
+    // At Timestamp(1, 25) we now return kNotExists
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+    // But next timestamp returns unknown
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 26)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    // The entry at Timestamp(1, 30) is unaffected
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 30)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 30)).id, rid2);
+
+    // TODO SERVER-70150: Use openCollection
+    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
+        catalog._insertCatalogIdForNSSAfterScan(nss, boost::none, Timestamp(1, 26));
+    });
+
+    // We should not have re-written the existing entry at Timestamp(1, 26)
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 17)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 17)).id, rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 19)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 19)).id, rid1);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 22)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 22)).id, rid1);
+    // At Timestamp(1, 25) we now return kNotExists
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 25)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+    // But next timestamp returns unknown
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 26)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 27)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    // The entry at Timestamp(1, 30) is unaffected
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 30)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 30)).id, rid2);
+
+    // Clean up, check so we are back to the original state
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 41));
+    });
+
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+}
+
+TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsertUnknown) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    NamespaceString nss("a.b");
+
+    // Simulate startup where we have a range [oldest, stable] by advancing the oldest timestamp and
+    // then reading behind it.
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 40));
+    });
+
+    // Reading before the oldest is unknown
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+
+    // Try to instantiate a non existing collection at this timestamp.
+    // TODO SERVER-70150: Use openCollection
+    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
+        catalog._insertCatalogIdForNSSAfterScan(nss, boost::none, Timestamp(1, 15));
+    });
+
+    // Lookup should now be not existing
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+}
+
 TEST_F(CollectionCatalogTimestampTest, CollectionLifetimeTiedToStorageTransactionLifetime) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagPointInTimeCatalogLookups", true);

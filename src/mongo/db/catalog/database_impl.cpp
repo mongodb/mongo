@@ -573,20 +573,22 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
           "namespace"_attr = nss,
           "uuid"_attr = uuid);
 
-    auto status = catalog::dropCollection(
-        opCtx, collection->ns(), collection->getCatalogId(), collection->getSharedIdent());
-    if (!status.isOK())
-        return status;
+    // A virtual collection does not have a durable catalog entry.
+    if (auto sharedIdent = collection->getSharedIdent()) {
+        auto status = catalog::dropCollection(
+            opCtx, collection->ns(), collection->getCatalogId(), sharedIdent);
+        if (!status.isOK())
+            return status;
 
-    opCtx->recoveryUnit()->onCommit(
-        [opCtx, nss, uuid, ident = collection->getSharedIdent()->getIdent()](
-            boost::optional<Timestamp> commitTime) {
+        opCtx->recoveryUnit()->onCommit([opCtx, nss, uuid, ident = sharedIdent->getIdent()](
+                                            boost::optional<Timestamp> commitTime) {
             if (!commitTime) {
                 return;
             }
 
             HistoricalIdentTracker::get(opCtx).recordDrop(ident, nss, uuid, commitTime.value());
         });
+    }
 
     CollectionCatalog::get(opCtx)->dropCollection(
         opCtx, collection, opCtx->getServiceContext()->getStorageEngine()->supportsPendingDrops());

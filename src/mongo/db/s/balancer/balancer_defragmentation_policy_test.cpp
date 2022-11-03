@@ -29,7 +29,6 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/balancer/balancer_defragmentation_policy_impl.h"
-#include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/db/s/balancer/cluster_statistics_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -75,9 +74,7 @@ protected:
     const std::function<void()> onDefragmentationStateUpdated = [] {};
 
     BalancerDefragmentationPolicyTest()
-        : _clusterStats(),
-          _random(std::random_device{}()),
-          _defragmentationPolicy(&_clusterStats, _random, onDefragmentationStateUpdated) {}
+        : _clusterStats(), _defragmentationPolicy(&_clusterStats, onDefragmentationStateUpdated) {}
 
     CollectionType setupCollectionWithPhase(
         const std::vector<ChunkType>& chunkList,
@@ -137,7 +134,6 @@ protected:
     }
 
     ClusterStatisticsMock _clusterStats;
-    BalancerRandomSource _random;
     BalancerDefragmentationPolicyImpl _defragmentationPolicy;
 
     ShardStatistics buildShardStats(ShardId id,

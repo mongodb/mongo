@@ -342,10 +342,11 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
         blk = &conn->incr_backups[i];
         /* If it isn't already in use, we can use it. */
         if (!F_ISSET(blk, WT_BLKINCR_INUSE)) {
-            __wt_verbose(session, WT_VERB_BACKUP, "Free blk[%u] entry", i);
+            __wt_verbose_debug2(session, WT_VERB_BACKUP, "Free blk[%u] entry", i);
             break;
         }
-        __wt_verbose(session, WT_VERB_BACKUP, "Entry blk[%u] has flags 0x%" PRIx8, i, blk->flags);
+        __wt_verbose_debug2(
+          session, WT_VERB_BACKUP, "Entry blk[%u] has flags 0x%" PRIx8, i, blk->flags);
     }
     /*
      * We didn't find an entry. This should not happen.
@@ -355,7 +356,7 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
 
     /* Use the slot. */
     if (blk->id_str != NULL)
-        __wt_verbose(
+        __wt_verbose_debug2(
           session, WT_VERB_BACKUP, "Freeing and reusing backup slot with old id %s", blk->id_str);
     /* Free anything that was there. */
     __wt_free(session, blk->id_str);
@@ -410,12 +411,13 @@ __backup_find_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_BLKINCR **in
                 WT_RET_MSG(session, EINVAL, "Incremental backup structure already in use");
             if (incrp != NULL)
                 *incrp = blk;
-            __wt_verbose(
+            __wt_verbose_debug2(
               session, WT_VERB_BACKUP, "Found src id %s at backup slot %u", blk->id_str, i);
             return (0);
         }
     }
-    __wt_verbose(session, WT_VERB_BACKUP, "Search %.*s not found", (int)cval->len, cval->str);
+    __wt_verbose_debug2(
+      session, WT_VERB_BACKUP, "Search %.*s not found", (int)cval->len, cval->str);
     return (WT_NOTFOUND);
 }
 

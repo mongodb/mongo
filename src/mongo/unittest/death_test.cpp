@@ -40,7 +40,9 @@
 #include "mongo/util/exit_code.h"
 
 #ifndef _WIN32
+#include <climits>
 #include <cstdio>
+#include <cstdlib>
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -162,6 +164,51 @@ int eintrLoop(F&& libcCall) {
     }
 }
 
+/**
+ * Reassign `arg0` (obtained from an `argv[0]`) with its full path.
+ * This is necessary to self-exec if this program was invoked through a `$PATH`
+ * lookup, such that `argv[0]` is just a basename. The `execve` used needs a
+ * pathname and does not consult the PATH.
+ *
+ * If `arg0` contains any '/' characters, then it didn't come from a PATH
+ * substitution, and is not changed.
+ *
+ * This reassignment is only attempted on Linux. This is simply because it's
+ * easy there to perform a realpath("/proc/self/exe") and find this
+ * program's executable pathname. Support for other OSes can be added as needed.
+ *
+ * Possibilities:
+ *   - "Finding current executable's path without /proc/self/exe"
+ *     [link](https://stackoverflow.com/questions/1023306)
+ *   - "What is the equivalent of /proc/self/exe on Macintosh OS X Mavericks?"
+ *     [link](https://stackoverflow.com/questions/22675457)
+ */
+void canonicalizeExe(std::string& arg0) {
+    // If it contains slashes, `orig` is already a pathname. It didn't come
+    // from a PATH search.
+    if (arg0.find('/') != std::string::npos) {
+        LOGV2_DEBUG(
+            7070500, 1, "Not changing executable pathname containing '/'", "arg0"_attr = arg0);
+        return;
+    }
+#ifdef __linux__
+    char* absPath = realpath("/proc/self/exe", nullptr);
+    if (!absPath) {
+        auto ec = lastPosixError();
+        LOGV2_WARNING(7070501,
+                      "Call to realpath failed. Not changing arg0",
+                      "arg0"_attr = arg0,
+                      "error"_attr = errorMessage(ec));
+        return;
+    }
+    ScopeGuard freeGuard = [&] { free(absPath); };
+    auto orig = std::exchange(arg0, std::string(absPath));
+    LOGV2_INFO(7070502, "Canonical executable pathname", "orig"_attr = orig, "arg0"_attr = arg0);
+#else
+    LOGV2_DEBUG(7070503, 1, "Recovery of executable pathname unimplemented", "arg0"_attr = arg0);
+#endif
+}
+
 /** Removes "--opt val" and "--opt=val" argument sequences from `av`. */
 void stripOption(std::vector<std::string>& av, StringData opt) {
     for (size_t i = 0; i < av.size();) {
@@ -226,6 +273,7 @@ void DeathTestBase::Subprocess::run() {
 void DeathTestBase::Subprocess::execChild(std::string tempPath) {
     auto& spawnInfo = getSpawnInfo();
     std::vector<std::string> av = spawnInfo.argVec;
+    canonicalizeExe(av[0]);
     // Arrange for the subprocess to execute only this test, exactly once.
     // Remove '--repeat' option. We want to repeat the whole death test not its child.
     stripOption(av, "repeat");

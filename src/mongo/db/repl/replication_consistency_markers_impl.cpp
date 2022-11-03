@@ -418,12 +418,11 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     }
     ON_BLOCK_EXIT([&] { opCtx->recoveryUnit()->setPrepareConflictBehavior(originalBehavior); });
 
-    // Exempt storage ticket acquisition in order to avoid starving upstream requests waiting
-    // for durability. SERVER-60682 is an example with more pending prepared transactions than
-    // storage tickets; the transaction coordinator could not persist the decision and
-    // had to unnecessarily wait for prepared transactions to expire to make forward progress.
-    SetTicketAquisitionPriorityForLock setTicketAquisition(opCtx,
-                                                           AdmissionContext::Priority::kImmediate);
+    // Exempt waiting for storage ticket acquisition in order to avoid starving upstream requests
+    // waiting for durability. SERVER-60682 is an example with more pending prepared transactions
+    // than storage tickets; the transaction coordinator could not persist the decision and had to
+    // unnecessarily wait for prepared transactions to expire to make forward progress.
+    SetAdmissionPriorityForLock setTicketAquisition(opCtx, AdmissionContext::Priority::kImmediate);
 
     // The locks necessary to write to the oplog truncate after point's collection and read from the
     // oplog collection must be taken up front so that the mutex can also be taken around both

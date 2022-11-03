@@ -62,6 +62,11 @@ struct ClusterCountCmdD {
         // which triggers an invariant, so only shard servers can run this.
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
     }
+
+    static void checkCanExplainHere(OperationContext* opCtx) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "Cannot explain a cluster count command on a mongod");
+    }
 };
 ClusterCountCmdBase<ClusterCountCmdD> clusterCountCmdD;
 

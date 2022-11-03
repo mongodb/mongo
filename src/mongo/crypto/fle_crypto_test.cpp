@@ -773,7 +773,6 @@ std::vector<char> generatePlaceholder(
 
     findSpec.setEdgesInfo(edgesInfo);
 
-    // TODO: SERVER-70302 update query analysis to generate payloads in gt/lt pairs.
     findSpec.setFirstOperator(Fle2RangeOperator::kGt);
 
     findSpec.setPayloadId(1234);
@@ -2599,7 +2598,6 @@ void assertMinCoverResult(A lb,
     FLE2RangeFindSpec spec;
     spec.setEdgesInfo(edgesInfo);
 
-    // TODO: SERVER-70302 update query analysis to generate payloads in gt/lt pairs.
     spec.setFirstOperator(Fle2RangeOperator::kGt);
     spec.setPayloadId(1234);
 
@@ -3531,7 +3529,6 @@ DEATH_TEST_REGEX(MinCoverInterfaceTest, Error_MinMaxTypeMismatch, "Tripwire asse
     FLE2RangeFindSpec spec;
     spec.setEdgesInfo(edgesInfo);
 
-    // TODO: SERVER-70302 update query analysis to generate payloads in gt/lt pairs.
     spec.setFirstOperator(Fle2RangeOperator::kGt);
     spec.setPayloadId(1234);
 

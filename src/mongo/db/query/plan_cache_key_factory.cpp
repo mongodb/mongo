@@ -106,7 +106,7 @@ boost::optional<Timestamp> computeNewestVisibleIndexTimestamp(OperationContext* 
     Timestamp currentNewestVisible = Timestamp::min();
 
     auto ii = collection->getIndexCatalog()->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+        opCtx, IndexCatalog::InclusionPolicy::kReady);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
         auto minVisibleSnapshot = ice->getMinimumVisibleSnapshot();

@@ -37,6 +37,7 @@
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/logv2/log.h"
@@ -114,8 +115,9 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
     OPTIMIZER_DEBUG_LOG(
         6264807, 5, "SBE translated ABT", "explain"_attr = ExplainGenerator::explainV2(tree));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         OptPhaseManager::getAllRewritesSet(), prefixId, {{}}, DebugInfo::kDefaultForTests);
+
     phaseManager.optimize(tree);
 
     OPTIMIZER_DEBUG_LOG(

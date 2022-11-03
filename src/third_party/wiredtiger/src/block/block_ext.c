@@ -885,7 +885,7 @@ __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *
     WT_EXTLIST tmp;
     u_int i;
 
-    __wt_verbose(session, WT_VERB_BLOCK, "merging %s into %s", a->name, b->name);
+    __wt_verbose_debug2(session, WT_VERB_BLOCK, "merging %s into %s", a->name, b->name);
 
     /*
      * Sometimes the list we are merging is much bigger than the other: if so, swap the lists around
@@ -1015,8 +1015,8 @@ __block_merge(
             after = NULL;
     }
     if (before == NULL && after == NULL) {
-        __wt_verbose(session, WT_VERB_BLOCK, "%s: insert range %" PRIdMAX "-%" PRIdMAX, el->name,
-          (intmax_t)off, (intmax_t)(off + size));
+        __wt_verbose_debug2(session, WT_VERB_BLOCK, "%s: insert range %" PRIdMAX "-%" PRIdMAX,
+          el->name, (intmax_t)off, (intmax_t)(off + size));
 
         return (__block_off_insert(session, el, off, size));
     }
@@ -1030,7 +1030,7 @@ __block_merge(
     if (before == NULL) {
         WT_RET(__block_off_remove(session, block, el, after->off, &ext));
 
-        __wt_verbose(session, WT_VERB_BLOCK,
+        __wt_verbose_debug2(session, WT_VERB_BLOCK,
           "%s: range grows from %" PRIdMAX "-%" PRIdMAX ", to %" PRIdMAX "-%" PRIdMAX, el->name,
           (intmax_t)ext->off, (intmax_t)(ext->off + ext->size), (intmax_t)off,
           (intmax_t)(off + ext->size + size));
@@ -1044,7 +1044,7 @@ __block_merge(
         }
         WT_RET(__block_off_remove(session, block, el, before->off, &ext));
 
-        __wt_verbose(session, WT_VERB_BLOCK,
+        __wt_verbose_debug2(session, WT_VERB_BLOCK,
           "%s: range grows from %" PRIdMAX "-%" PRIdMAX ", to %" PRIdMAX "-%" PRIdMAX, el->name,
           (intmax_t)ext->off, (intmax_t)(ext->off + ext->size), (intmax_t)ext->off,
           (intmax_t)(ext->off + ext->size + size));
@@ -1346,14 +1346,15 @@ __block_extlist_dump(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, 
     u_int i;
     const char *sep;
 
-    if (!block->verify_layout && !WT_VERBOSE_ISSET(session, WT_VERB_BLOCK))
+    if (!block->verify_layout &&
+      !WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_BLOCK, WT_VERBOSE_DEBUG_2))
         return (0);
 
     WT_ERR(__wt_scr_alloc(session, 0, &t1));
     if (block->verify_layout)
         level = WT_VERBOSE_NOTICE;
     else
-        level = WT_VERBOSE_DEBUG_1;
+        level = WT_VERBOSE_DEBUG_2;
     __wt_verbose_level(session, WT_VERB_BLOCK, level,
       "%s extent list %s, %" PRIu32 " entries, %s bytes", tag, el->name, el->entries,
       __wt_buf_set_size(session, el->bytes, true, t1));

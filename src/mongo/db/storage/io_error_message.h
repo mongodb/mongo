@@ -29,22 +29,15 @@
 
 #pragma once
 
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
-#include "mongo/db/query/optimizer/cascades/memo.h"
+#include <fmt/format.h>
 
-namespace mongo::optimizer::cascades {
+#include "mongo/util/errno_util.h"
 
-/**
- * Default costing for physical nodes with logical delegator (not-yet-optimized) inputs.
- */
-class DefaultCosting : public CostingInterface {
-public:
-    CostAndCE deriveCost(const Metadata& metadata,
-                         const Memo& memo,
-                         const properties::PhysProps& physProps,
-                         ABT::reference_type physNodeRef,
-                         const ChildPropsType& childProps,
-                         const NodeCEMap& nodeCEMap) const override final;
-};
-
-}  // namespace mongo::optimizer::cascades
+namespace mongo {
+namespace {
+inline std::string getErrorMessage(StringData op, const std::string& path) {
+    using namespace fmt::literals;
+    return "Failed to {} {}: {}"_format(op, path, errorMessage(lastSystemError()));
+}
+}  // namespace
+}  // namespace mongo

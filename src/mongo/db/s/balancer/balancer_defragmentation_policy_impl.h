@@ -72,9 +72,10 @@ class BalancerDefragmentationPolicyImpl : public BalancerDefragmentationPolicy {
 
 public:
     BalancerDefragmentationPolicyImpl(ClusterStatistics* clusterStats,
-                                      BalancerRandomSource& random,
                                       const std::function<void()>& onStateUpdated)
-        : _clusterStats(clusterStats), _random(random), _onStateUpdated(onStateUpdated) {}
+        : _clusterStats(clusterStats),
+          _random(std::random_device{}()),
+          _onStateUpdated(onStateUpdated) {}
 
     ~BalancerDefragmentationPolicyImpl() {}
 
@@ -145,7 +146,7 @@ private:
 
     ClusterStatistics* const _clusterStats;
 
-    BalancerRandomSource& _random;
+    BalancerRandomSource _random;
 
     const std::function<void()> _onStateUpdated;
 

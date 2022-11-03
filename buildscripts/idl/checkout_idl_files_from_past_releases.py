@@ -29,38 +29,27 @@
 import argparse
 import logging
 import os
+import sys
 import re
 import shutil
 from subprocess import check_output
 from typing import List
-
 from packaging.version import Version
 
-FIRST_API_V1_RELEASE = '5.0.0-rc3'
+# Get relative imports to work when the package is not installed on the PYTHONPATH.
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# pylint: disable=wrong-import-position
+from buildscripts.resmokelib.multiversionconstants import LAST_LTS_FCV, LAST_CONTINUOUS_FCV, LATEST_FCV
+# pylint: enable=wrong-import-position
+
 LOGGER_NAME = 'checkout-idl'
 LOGGER = logging.getLogger(LOGGER_NAME)
 
 
-def get_current_git_version() -> Version:
-    """Return current git version'.
-
-    If the version is a release like "2.3.4" or "2.3.4-rc0", or a pre-release like
-    "2.3.4-325-githash" or "2.3.4-pre-" these will return "2.3.4". If the version begins with the
-    letter 'r', it will also match, e.g. r2.3.4, r2.3.4-rc0, r2.3.4-git234, r2.3.4-rc0-234-githash
-    If the version is invalid (i.e. doesn't start with "2.3.4" or "2.3.4-rc0", this will return
-    False.
-    """
-    git_describe = check_output(['git', 'describe']).decode()
-    git_version = re.match(r'^r?(\d+\.\d+\.\d+)(?:-rc\d+|-alpha\d+)?(?:-.*)?', git_describe)
-    assert git_version, f"git describe output '{git_describe}' does not match pattern."
-    return Version(git_version.groups()[0])
-
-
 def get_release_tags() -> List[str]:
     """Get a list of release git tags since API Version 1 was introduced."""
-    # Use packaging.version.Version's parsing and comparison logic.
-    min_version = Version(FIRST_API_V1_RELEASE)
-    max_version = get_current_git_version()
 
     def gen_versions_and_tags():
         for tag in check_output(['git', 'tag']).decode().split():
@@ -75,17 +64,34 @@ def get_release_tags() -> List[str]:
                 pass
 
     def gen_release_tags():
-        #  gen_versions_and_tags yields pairs (version, tag). Sort them by version using
-        #  packaging.version.Version's comparison rules.
-        for version, tag in sorted(gen_versions_and_tags()):
-            if version < min_version or version > max_version:
+        """Get the latest released tag for LATEST, LAST_CONTINUOUS and LAST_LTS versions."""
+
+        base_versions = [Version(x) for x in [LAST_LTS_FCV, LAST_CONTINUOUS_FCV, LATEST_FCV]]
+        min_version = None
+        max_version = None
+
+        for version, tag in sorted(gen_versions_and_tags(), reverse=True):
+            if version.is_prerelease:
                 continue
 
-            # Skip alphas, betas, etc.
-            if version.is_prerelease and version != min_version:
+            while min_version is None or version < min_version:
+                # If we encounter a version smaller than the current min,
+                # replace the current min with FCV of the next reachable version.
+                #
+                # e.g. if we are looking for latest release of LAST_CONTINUOS_FCV (6.2.x
+                # and we encounter (6.1.13), update min/max version to match
+                # the latest release of LAST_LTS_FCV (6.0.x).
+
+                if not len(base_versions) > 0:
+                    return
+                min_version = base_versions.pop()
+                max_version = Version("{}.{}".format(min_version.major, min_version.minor + 1))
+
+            if version >= max_version:
                 continue
 
             yield tag
+            min_version = None
 
     return list(gen_release_tags())
 

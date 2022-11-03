@@ -486,8 +486,10 @@ void CollectionShardingRuntime::resetShardVersionRecoverRefreshFuture() {
     _shardVersionInRecoverOrRefresh = boost::none;
 }
 
-boost::optional<Timestamp> CollectionShardingRuntime::getIndexVersion(OperationContext* opCtx) {
-    return _globalIndexesInfo ? _globalIndexesInfo->getVersion() : boost::none;
+boost::optional<CollectionIndexes> CollectionShardingRuntime::getCollectionIndexes(
+    OperationContext* opCtx) {
+    return _globalIndexesInfo ? boost::make_optional(_globalIndexesInfo->getCollectionIndexes())
+                              : boost::none;
 }
 
 boost::optional<GlobalIndexesCache>& CollectionShardingRuntime::getIndexes(
@@ -497,22 +499,22 @@ boost::optional<GlobalIndexesCache>& CollectionShardingRuntime::getIndexes(
 
 void CollectionShardingRuntime::addIndex(OperationContext* opCtx,
                                          const IndexCatalogType& index,
-                                         const Timestamp& indexVersion) {
+                                         const CollectionIndexes& collectionIndexes) {
     if (_globalIndexesInfo) {
-        _globalIndexesInfo->add(index, indexVersion);
+        _globalIndexesInfo->add(index, collectionIndexes);
     } else {
         IndexCatalogTypeMap indexMap;
         indexMap.emplace(index.getName(), index);
-        _globalIndexesInfo.emplace(indexVersion, std::move(indexMap));
+        _globalIndexesInfo.emplace(collectionIndexes, std::move(indexMap));
     }
 }
 
 void CollectionShardingRuntime::removeIndex(OperationContext* opCtx,
                                             const std::string& name,
-                                            const Timestamp& indexVersion) {
+                                            const CollectionIndexes& collectionIndexes) {
     tassert(
         7019500, "Index information does not exist on CSR", _globalIndexesInfo.is_initialized());
-    _globalIndexesInfo->remove(name, indexVersion);
+    _globalIndexesInfo->remove(name, collectionIndexes);
 }
 
 void CollectionShardingRuntime::clearIndexes(OperationContext* opCtx) {

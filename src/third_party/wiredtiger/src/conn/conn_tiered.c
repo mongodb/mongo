@@ -48,19 +48,20 @@ __tier_storage_remove_local(WT_SESSION_IMPL *session)
             break;
 
         __wt_seconds(session, &now);
-        __wt_tiered_get_drop_local(session, now, &entry);
+        __wt_tiered_get_remove_local(session, now, &entry);
         if (entry == NULL)
             break;
         WT_ERR(__wt_tiered_name(
           session, &entry->tiered->iface, entry->id, WT_TIERED_NAME_OBJECT, &object));
-        __wt_verbose(session, WT_VERB_TIERED, "REMOVE_LOCAL: %s at %" PRIu64, object, now);
+        __wt_verbose_debug2(session, WT_VERB_TIERED, "REMOVE_LOCAL: %s at %" PRIu64, object, now);
         WT_PREFIX_SKIP_REQUIRED(session, object, "object:");
         /*
          * If the handle is still open, it could still be in use for reading. In that case put the
          * work unit back on the work queue and keep trying.
          */
         if (__wt_handle_is_open(session, object)) {
-            __wt_verbose(session, WT_VERB_TIERED, "REMOVE_LOCAL: %s in USE, queue again", object);
+            __wt_verbose_debug2(
+              session, WT_VERB_TIERED, "REMOVE_LOCAL: %s in USE, queue again", object);
             WT_STAT_CONN_INCR(session, local_objects_inuse);
             /*
              * FIXME-WT-7470: If the object we want to remove is in use this is the place to call
@@ -75,7 +76,8 @@ __tier_storage_remove_local(WT_SESSION_IMPL *session)
             entry->op_val = now + entry->tiered->bstorage->retain_secs;
             __wt_tiered_push_work(session, entry);
         } else {
-            __wt_verbose(session, WT_VERB_TIERED, "REMOVE_LOCAL: actually remove %s", object);
+            __wt_verbose_debug2(
+              session, WT_VERB_TIERED, "REMOVE_LOCAL: actually remove %s", object);
             WT_STAT_CONN_INCR(session, local_objects_removed);
             WT_ERR(__wt_fs_remove(session, object, false));
             /*
@@ -211,15 +213,15 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
             /*
              * After successful flushing, push a work unit to perform whatever post-processing the
              * shared storage wants to do for this object. Note that this work unit is unrelated to
-             * the drop local work unit below. They do not need to be in any order and do not
+             * the remove local work unit below. They do not need to be in any order and do not
              * interfere with each other.
              */
             WT_ERR(__wt_tiered_put_flush_finish(session, tiered, id));
             /*
-             * After successful flushing, push a work unit to drop the local object in the future.
+             * After successful flushing, push a work unit to remove the local object in the future.
              * The object will be removed locally after the local retention period expires.
              */
-            WT_ERR(__wt_tiered_put_drop_local(session, tiered, id));
+            WT_ERR(__wt_tiered_put_remove_local(session, tiered, id));
         }
     }
 

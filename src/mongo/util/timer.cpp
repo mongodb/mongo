@@ -42,7 +42,7 @@ const int64_t kMicrosPerSecond = 1000 * 1000;
 
 }  // unnamed namespace
 
-Timer::Timer() : Timer(SystemTickSource::get()) {}
+Timer::Timer() : Timer(globalSystemTickSource()) {}
 
 Timer::Timer(TickSource* tickSource)
     : _tickSource(tickSource),

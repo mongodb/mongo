@@ -1,7 +1,8 @@
 # IBM build variants.
 
 buildvariants:
-- name: enterprise-rhel-81-ppc64le
+- &enterprise-rhel-81-ppc64le-template
+  name: enterprise-rhel-81-ppc64le
   display_name: Enterprise RHEL 8.1 PPC64LE
   modules:
   - enterprise
@@ -66,6 +67,21 @@ buildvariants:
     distros:
     - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
+
+- <<: *enterprise-rhel-81-ppc64le-template
+  name: enterprise-rhel-81-ppc64le-dynamic
+  display_name: Enterprise RHEL 8.1 PPC64LE Shared
+  expansions:
+    compile_flags: >-
+      --link-model=dynamic
+      --ssl
+      MONGO_DISTMOD=rhel81
+      -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel81-power8-large
 
 - name: enterprise-rhel-72-s390x
   display_name: Enterprise RHEL 7.2 s390x

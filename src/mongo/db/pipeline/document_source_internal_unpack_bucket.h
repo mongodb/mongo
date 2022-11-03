@@ -51,6 +51,8 @@ public:
     static constexpr StringData kBucketMaxSpanSeconds = "bucketMaxSpanSeconds"_sd;
     static constexpr StringData kIncludeMinTimeAsMetadata = "includeMinTimeAsMetadata"_sd;
     static constexpr StringData kIncludeMaxTimeAsMetadata = "includeMaxTimeAsMetadata"_sd;
+    static constexpr StringData kWholeBucketFilter = "wholeBucketFilter"_sd;
+    static constexpr StringData kEventFilter = "eventFilter"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBsonInternal(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -60,6 +62,13 @@ public:
     DocumentSourceInternalUnpackBucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        BucketUnpacker bucketUnpacker,
                                        int bucketMaxSpanSeconds,
+                                       bool assumeNoMixedSchemaData = false);
+
+    DocumentSourceInternalUnpackBucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                       BucketUnpacker bucketUnpacker,
+                                       int bucketMaxSpanSeconds,
+                                       const boost::optional<BSONObj>& eventFilterBson,
+                                       const boost::optional<BSONObj>& wholeBucketFilterBson,
                                        bool assumeNoMixedSchemaData = false);
 
     const char* getSourceName() const override {
@@ -158,7 +167,7 @@ public:
     /**
      * Convenience wrapper around BucketSpec::createPredicatesOnBucketLevelField().
      */
-    std::unique_ptr<MatchExpression> createPredicatesOnBucketLevelField(
+    BucketSpec::BucketPredicate createPredicatesOnBucketLevelField(
         const MatchExpression* matchExpr) const;
 
     /**
@@ -243,8 +252,14 @@ public:
 
     GetModPathsReturn getModifiedPaths() const final override;
 
+    DepsTracker getRestPipelineDependencies(Pipeline::SourceContainer::iterator itr,
+                                            Pipeline::SourceContainer* container) const;
+
 private:
     GetNextResult doGetNext() final;
+
+    boost::optional<Document> getNextMatchingMeasure();
+
     bool haveComputedMetaField() const;
 
     // If buckets contained a mixed type schema along some path, we have to push down special
@@ -261,9 +276,13 @@ private:
     int _bucketMaxCount = 0;
     boost::optional<long long> _sampleSize;
 
-    // Used to avoid infinite loops after we step backwards to optimize a $match on bucket level
-    // fields, otherwise we may do an infinite number of $match pushdowns.
-    bool _triedBucketLevelFieldsPredicatesPushdown = false;
+    // Filters pushed from the later $match stages
+    std::unique_ptr<MatchExpression> _eventFilter;
+    BSONObj _eventFilterBson;
+    DepsTracker _eventFilterDeps;
+    std::unique_ptr<MatchExpression> _wholeBucketFilter;
+    BSONObj _wholeBucketFilterBson;
+
     bool _optimizedEndOfPipeline = false;
     bool _triedInternalizeProject = false;
     bool _triedLastpointRewrite = false;

@@ -33,8 +33,6 @@
 
 #define NUM_RECORDS 800000
 
-#define ENV_CONFIG_REC \
-    "log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
 /* Constants and variables declaration. */
 /*
  * You may want to add "verbose=[compact,compact_progress]" to the connection config string to get
@@ -182,7 +180,7 @@ run_test(bool column_store, const char *uri, bool preserve)
     printf("Open database and run recovery\n");
 
     /* Open the connection which forces recovery to be run. */
-    testutil_check(wiredtiger_open(home, NULL, ENV_CONFIG_REC, &conn));
+    testutil_check(wiredtiger_open(home, NULL, TESTUTIL_ENV_CONFIG_REC, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /*

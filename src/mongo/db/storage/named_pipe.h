@@ -34,20 +34,30 @@
 #else
 #include <windows.h>
 #endif
+#include <string>
 
 #include "mongo/db/storage/input_object.h"
 
 namespace mongo {
+#ifndef _WIN32
+static constexpr auto kDefaultPipePath = "/tmp/"_sd;
+#else
+// "//./pipe/" is the required path start of all named pipes on Windows, where "//." is the
+// abbreviation for the local server name and "/pipe" is a literal. (These also work with
+// Windows-native backslashes instead of forward slashes.
+static constexpr auto kDefaultPipePath = "//./pipe/"_sd;
+#endif
+
 class NamedPipeOutput {
 public:
-    NamedPipeOutput(const char* pipePath);
+    NamedPipeOutput(const std::string& pipeRelativePath);
     ~NamedPipeOutput();
     void open();
     int write(const char* data, int size);
     void close();
 
 private:
-    const char* _pipePath;
+    std::string _pipeAbsolutePath;
 #ifndef _WIN32
     std::ofstream _ofs;
 #else
@@ -58,10 +68,10 @@ private:
 
 class NamedPipeInput : public StreamableInput {
 public:
-    NamedPipeInput(const char* pipePath);
+    NamedPipeInput(const std::string& pipeRelativePath);
     ~NamedPipeInput() override;
-    const char* getPath() const override {
-        return _pipePath;
+    const std::string& getAbsolutePath() const override {
+        return _pipeAbsolutePath;
     }
     bool isOpen() const override;
     bool isGood() const override;
@@ -74,7 +84,7 @@ protected:
     void doClose() override;
 
 private:
-    const char* _pipePath;
+    std::string _pipeAbsolutePath;
 #ifndef _WIN32
     std::ifstream _ifs;
 #else

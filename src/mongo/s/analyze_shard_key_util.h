@@ -40,5 +40,9 @@ bool isFeatureFlagEnabledIgnoreFCV();
 
 bool supportsCoordinatingQueryAnalysis();
 
+bool supportsPersistingSampledQueries();
+
+bool supportsPersistingSampledQueriesIgnoreFCV();
+
 }  // namespace analyze_shard_key
 }  // namespace mongo

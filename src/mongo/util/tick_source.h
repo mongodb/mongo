@@ -65,18 +65,5 @@ public:
             static_cast<double>(getTicksPerSecond()) * D::period::num / D::period::den;
         return D(static_cast<int64_t>(ticks / ticksPerD));
     }
-
-    /**
-     * Measures the length of the span from the start tick to the end tick and returns the result
-     * using duration type D.
-     * If the start tick is after (greater than) the end tick, returns a duration equivalent to 0
-     * ticks.
-     *
-     * e.g. tickSource->spanTo<Milliseconds>(start, end);
-     */
-    template <typename D>
-    D spanTo(Tick start, Tick end) {
-        return ticksTo<D>(std::max((end - start), Tick{0}));
-    }
 };
 }  // namespace mongo

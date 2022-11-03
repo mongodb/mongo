@@ -920,17 +920,21 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     // stored in 'foreignRecordSlot'. We also pass in 'snapshotIdSlot', 'indexIdSlot',
     // 'indexKeySlot' and 'indexKeyPatternSlot' to perform index consistency check during the
     // seek.
-    auto [foreignRecordSlot, __, scanNljStage] = makeLoopJoinForFetch(std::move(ixScanNljStage),
-                                                                      foreignRecordIdSlot,
-                                                                      snapshotIdSlot,
-                                                                      indexIdSlot,
-                                                                      indexKeySlot,
-                                                                      indexKeyPatternSlot,
-                                                                      foreignColl,
-                                                                      iamMap,
-                                                                      nodeId,
-                                                                      makeSV() /* slotsToForward */,
-                                                                      slotIdGenerator);
+    auto foreignRecordSlot = slotIdGenerator.generate();
+    auto scanNljStage = makeLoopJoinForFetch(std::move(ixScanNljStage),
+                                             foreignRecordSlot,
+                                             slotIdGenerator.generate() /* unused recordId slot */,
+                                             std::vector<std::string>{},
+                                             makeSV(),
+                                             foreignRecordIdSlot,
+                                             snapshotIdSlot,
+                                             indexIdSlot,
+                                             indexKeySlot,
+                                             indexKeyPatternSlot,
+                                             foreignColl,
+                                             iamMap,
+                                             nodeId,
+                                             makeSV() /* slotsToForward */);
 
     // 'buildForeignMatches()' filters the foreign records, returned by the index scan, to match
     // those in 'localKeysSetSlot'. This is necessary because some values are encoded with the same

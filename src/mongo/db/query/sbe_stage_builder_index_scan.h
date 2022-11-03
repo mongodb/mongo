@@ -48,14 +48,10 @@ using IndexIntervals =
     std::vector<std::pair<std::unique_ptr<KeyString::Value>, std::unique_ptr<KeyString::Value>>>;
 
 /**
- * This method generates an SBE plan stage tree implementing an index scan. It returns a tuple
- * containing: (1) a slot produced by the index scan that holds the record ID ('recordIdSlot');
- * (2) a slot vector produced by the index scan which hold parts of the index key ('indexKeySlots');
- * and (3) the SBE plan stage tree. 'indexKeySlots' will only contain slots for the parts of the
- * index key specified by the 'indexKeysToInclude' bitset.
- *
- * If the caller provides a slot ID for the 'returnKeySlot' parameter, this method will populate
- * the specified slot with the rehydrated index key for each record.
+ * This method returns a pair containing: (1) an SBE plan stage tree implementing an index scan;
+ * and (2) a PlanStageSlots object containing a kRecordId slot, possibly some other kMeta slots,
+ * and slots produced by the index scan that correspond to parts of the index key specified by
+ * the 'indexKeyBitset' bitset.
  */
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     StageBuilderState& state,
@@ -87,40 +83,12 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
 
 /**
  * Constructs a generic multi-interval index scan. Depending on the intervals will either execute
- * the optimized or the generic index scan subplan. The generated subtree will have
- * the following form:
+ * the optimized or the generic index scan subplan.
  *
- * branch {isGenericScanSlot} [recordIdSlot, resultSlot, ...]
- * then
- *    filter {isRecordId(resultSlot)}
- *    lspool sp1 [resultSlot] {!isRecordId(resultSlot)}
- *    union [resultSlot]
-             project [startKeySlot = anchorSlot, unusedVarSlot0 = Nothing, ...]
- *           limit 1
- *           coscan
- *       [checkBoundsSlot]
- *           nlj [] [seekKeySlot]
- *               left
- *                   sspool sp1 [seekKeySlot]
- *               right
- *                  chkbounds resultSlot recordIdSlot checkBoundsSlot
- *                  nlj [] [lowKeySlot]
- *                      left
- *                          project [lowKeySlot = seekKeySlot]
- *                          limit 1
- *                          coscan
- *                   right
- *                      ixseek lowKeySlot resultSlot recordIdSlot [] @coll @index
- * else
- *     nlj [] [lowKeySlot, highKeySlot]
- *     left
- *         project [lowKeySlot = getField (unwindSlot, "l"),
- *                  highKeySlot = getField (unwindSlot, "h")]
- *         unwind unwindSlot indexSlot boundsSlot false
- *         limit 1
- *         coscan
- *     right
- *         ixseek lowKeySlot highKeySlot recordIdSlot [] @coll @index
+ * This method returns a pair containing: (1) an SBE plan stage tree implementing a generic multi-
+ * interval index scan; and (2) a PlanStageSlots object containing a kRecordId slot, possibly some
+ * other kMeta slots, and slots produced by the index scan that correspond to parts of the index
+ * key specified by the 'indexKeyBitset' bitset.
  */
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWithDynamicBounds(
     StageBuilderState& state,

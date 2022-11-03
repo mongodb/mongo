@@ -53,6 +53,10 @@ struct ClusterPipelineCommandS {
         // Can always run on a mongos.
     }
 
+    static void checkCanExplainHere(OperationContext* opCtx) {
+        // Can always run on a mongos.
+    }
+
     static AggregateCommandRequest parseAggregationRequest(
         OperationContext* opCtx,
         const OpMsgRequest& opMsgRequest,

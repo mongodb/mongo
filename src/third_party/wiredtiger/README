@@ -23,3 +23,7 @@ WiredTiger licensing information can be found at:
 For general questions and discussion, there's a WiredTiger group:
 
 	https://groups.google.com/group/wiredtiger-users
+
+For information about contributing to WiredTiger see:
+
+	https://github.com/wiredtiger/wiredtiger/wiki/Contributing-to-WiredTiger

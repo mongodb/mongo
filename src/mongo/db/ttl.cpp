@@ -320,7 +320,7 @@ void TTLMonitor::shutdown() {
 void TTLMonitor::_doTTLPass() {
     const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
     OperationContext* opCtx = opCtxPtr.get();
-    SetTicketAquisitionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
+    SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
 
     hangTTLMonitorBetweenPasses.pauseWhileSet(opCtx);
 

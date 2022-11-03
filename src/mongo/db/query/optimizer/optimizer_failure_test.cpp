@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
-#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
@@ -53,11 +52,11 @@ DEATH_TEST_REGEX(Optimizer, HitIterationLimitInrunStructuralPhases, "Tripwire as
     ABT evalNode = make<EvaluationNode>("evalProj1", Constant::int64(5), std::move(scanNode));
 
 
-    OptPhaseManager phaseManager(
-        {OptPhase::PathFuse, OptPhase::ConstEvalPre},
-        prefixId,
-        {{{"test1", createScanDef({}, {})}, {"test2", createScanDef({}, {})}}},
-        DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
+    auto phaseManager =
+        makePhaseManager({OptPhase::PathFuse, OptPhase::ConstEvalPre},
+                         prefixId,
+                         {{{"test1", createScanDef({}, {})}, {"test2", createScanDef({}, {})}}},
+                         DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(evalNode), DBException, 6808700);
 }
@@ -81,10 +80,10 @@ DEATH_TEST_REGEX(Optimizer,
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{{}}, std::move(filterNode));
 
 
-    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
-                                 prefixId,
-                                 {{{"test", createScanDef({}, {})}}},
-                                 DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         {{{"test", createScanDef({}, {})}}},
+                                         DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808702);
 }
@@ -108,10 +107,10 @@ DEATH_TEST_REGEX(Optimizer,
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{{}}, std::move(filterNode));
 
 
-    OptPhaseManager phaseManager({OptPhase::MemoExplorationPhase},
-                                 prefixId,
-                                 {{{"test", createScanDef({}, {})}}},
-                                 DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
+    auto phaseManager = makePhaseManager({OptPhase::MemoExplorationPhase},
+                                         prefixId,
+                                         {{{"test", createScanDef({}, {})}}},
+                                         DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808702);
 }
@@ -133,10 +132,10 @@ DEATH_TEST_REGEX(Optimizer, BadGroupID, "Tripwire assertion.*6808704") {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{{}}, std::move(filterNode));
 
 
-    OptPhaseManager phaseManager({OptPhase::MemoImplementationPhase},
-                                 prefixId,
-                                 {{{"test", createScanDef({}, {})}}},
-                                 DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
+    auto phaseManager = makePhaseManager({OptPhase::MemoImplementationPhase},
+                                         prefixId,
+                                         {{{"test", createScanDef({}, {})}}},
+                                         DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808704);
 }
@@ -161,13 +160,13 @@ DEATH_TEST_REGEX(Optimizer, EnvHasFreeVariables, "Tripwire assertion.*6808711") 
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"p3"}}, std::move(filter2Node));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"test", createScanDef({}, {})}}},
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+        DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, DebugInfo::kIterationLimitForTests));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808711);
 }
@@ -206,12 +205,11 @@ DEATH_TEST_REGEX(Optimizer, FailedToRetrieveRID, "Tripwire assertion.*6808705") 
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pc"}}, std::move(groupByNode));
 
-    OptPhaseManager phaseManager(
+    auto phaseManager = makePhaseManagerRequireRID(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase},
         prefixId,
-        true /*requireRID*/,
         {{{"c1",
            createScanDef(
                {},
@@ -224,11 +222,7 @@ DEATH_TEST_REGEX(Optimizer, FailedToRetrieveRID, "Tripwire assertion.*6808705") 
                ConstEval::constFold,
                {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("b"))})}},
          5 /*numberOfPartitions*/},
-        std::make_unique<HeuristicCE>(),
-        std::make_unique<DefaultCosting>(),
-        {} /*pathToInterval*/,
-        ConstEval::constFold,
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+        DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, DebugInfo::kIterationLimitForTests));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808705);
 }

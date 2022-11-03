@@ -298,32 +298,8 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
                                    long long* numKeysOut,
                                    IndexValidateResults* fullResults) const {
     dassert(opCtx->lockState()->isReadLocked());
-    if (fullResults && !WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->isEphemeral()) {
-        int err = WiredTigerUtil::verifyTable(opCtx, _uri, &(fullResults->errors));
-        if (err == EBUSY) {
-            std::string msg = str::stream()
-                << "Could not complete validation of " << _uri << ". "
-                << "This is a transient issue as the collection was actively "
-                   "in use by other operations.";
-
-            LOGV2_WARNING(51781,
-                          "Could not complete validation. This is a transient issue as "
-                          "the collection was actively in use by other operations",
-                          "uri"_attr = _uri);
-            fullResults->warnings.push_back(msg);
-        } else if (err) {
-            std::string msg = str::stream()
-                << "verify() returned " << wiredtiger_strerror(err) << ". "
-                << "This indicates structural damage. "
-                << "Not examining individual index entries.";
-            LOGV2_ERROR(51782,
-                        "verify() returned an error. This indicates structural damage. Not "
-                        "examining individual index entries.",
-                        "error"_attr = wiredtiger_strerror(err));
-            fullResults->errors.push_back(msg);
-            fullResults->valid = false;
-            return;
-        }
+    if (!WiredTigerIndexUtil::validateStructure(opCtx, _uri, fullResults)) {
+        return;
     }
 
     auto cursor = newCursor(opCtx);

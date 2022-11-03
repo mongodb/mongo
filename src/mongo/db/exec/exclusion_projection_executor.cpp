@@ -38,9 +38,10 @@ std::pair<BSONObj, bool> ExclusionNode::extractProjectOnFieldAndRename(const Str
     BSONObjBuilder extractedExclusion;
 
     // Check for a projection directly on 'oldName'. For example, {oldName: 0}.
-    if (auto it = _projectedFields.find(oldName); it != _projectedFields.end()) {
+    if (auto it = _projectedFieldsSet.find(oldName); it != _projectedFieldsSet.end()) {
         extractedExclusion.append(newName, false);
-        _projectedFields.erase(it);
+        _projectedFieldsSet.erase(it);
+        _projectedFields.remove(std::string(oldName));
     }
 
     // Check for a projection on subfields of 'oldName'. For example, {oldName: {a: 0, b: 0}}.

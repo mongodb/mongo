@@ -91,17 +91,6 @@ env.Library(
     ],
 )
 
-# Default costing module.
-env.Library(
-    target="optimizer_default_costing",
-    source=[
-        "cascades/cost_derivation.cpp",
-    ],
-    LIBDEPS=[
-        "optimizer_memo",
-    ],
-)
-
 # Main optimizer target.
 env.Library(
     target="optimizer",
@@ -112,7 +101,6 @@ env.Library(
     LIBDEPS=[
         "optimizer_cascades",
         "optimizer_default_ce",
-        "optimizer_default_costing",
         "optimizer_rewrites",
     ],
 )
@@ -126,6 +114,7 @@ env.Library(
     LIBDEPS=[
         # We do not depend on the entire pipeline target.
         "$BUILD_DIR/mongo/db/pipeline/abt_utils",
+        "$BUILD_DIR/mongo/db/query/cost_model/query_cost_model",
         "$BUILD_DIR/mongo/db/query/optimizer/optimizer",
         "$BUILD_DIR/mongo/unittest/unittest",
     ],

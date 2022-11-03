@@ -40,6 +40,7 @@
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/util/pair_map.h"
 
 namespace mongo::stage_builder {
 /**
@@ -50,6 +51,12 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
     const CanonicalQuery& cq,
     OperationContext* opCtx,
     sbe::value::SlotIdGenerator* slotIdGenerator);
+
+class PlanStageReqs;
+class PlanStageSlots;
+sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
+                                         const PlanStageSlots& outputs,
+                                         const sbe::value::SlotVector& exclude = sbe::makeSV());
 
 /**
  * This function prepares the SBE tree for execution, such as attaching the OperationContext,
@@ -105,78 +112,86 @@ struct ParameterizedIndexScanSlots {
  */
 class PlanStageSlots {
 public:
-    static constexpr StringData kResult = "result"_sd;
-    static constexpr StringData kRecordId = "recordId"_sd;
-    static constexpr StringData kReturnKey = "returnKey"_sd;
-    static constexpr StringData kSnapshotId = "snapshotId"_sd;
-    static constexpr StringData kIndexId = "indexId"_sd;
-    static constexpr StringData kIndexKey = "indexKey"_sd;
-    static constexpr StringData kIndexKeyPattern = "indexKeyPattern"_sd;
+    // The _slots map is capable of holding different "classes" of slots:
+    // 1) kMeta slots are used to hold the current document (kResult), record ID (kRecordId), and
+    //    various pieces of metadata.
+    // 2) kField slots represent the values of top-level fields, or in some cases of dotted field
+    //    paths (when we are getting the dotted field from a non-multikey index and we know no array
+    //    traversal is needed). These slots hold the actual values of the fields / field paths (not
+    //    the sort key or collation comparison key for the field).
+    // 3) kKey slots represent the raw key value that comes from an ixscan / ixseek stage for a
+    //    given field path. This raw key value can be used for sorting / comparison, but it is not
+    //    always equal to the actual value of the field path (for example, if the key is coming from
+    //    an index that has a non-simple collation).
+    enum class Type {
+        kMeta,
+        kField,
+        kKey,
+    };
+
+    using Name = std::pair<Type, StringData>;
+    using OwnedName = std::pair<Type, std::string>;
+
+    static constexpr auto kField = Type::kField;
+    static constexpr auto kKey = Type::kKey;
+    static constexpr auto kMeta = Type::kMeta;
+
+    static constexpr Name kResult = {kMeta, "result"_sd};
+    static constexpr Name kRecordId = {kMeta, "recordId"_sd};
+    static constexpr Name kReturnKey = {kMeta, "returnKey"_sd};
+    static constexpr Name kSnapshotId = {kMeta, "snapshotId"_sd};
+    static constexpr Name kIndexId = {kMeta, "indexId"_sd};
+    static constexpr Name kIndexKey = {kMeta, "indexKey"_sd};
+    static constexpr Name kIndexKeyPattern = {kMeta, "indexKeyPattern"_sd};
 
     PlanStageSlots() = default;
 
     PlanStageSlots(const PlanStageReqs& reqs, sbe::value::SlotIdGenerator* slotIdGenerator);
 
-    bool has(StringData str) const {
+    bool has(const Name& str) const {
         return _slots.count(str);
     }
 
-    sbe::value::SlotId get(StringData str) const {
+    sbe::value::SlotId get(const Name& str) const {
         auto it = _slots.find(str);
         invariant(it != _slots.end());
         return it->second;
     }
 
-    boost::optional<sbe::value::SlotId> getIfExists(StringData str) const {
+    boost::optional<sbe::value::SlotId> getIfExists(const Name& str) const {
         if (auto it = _slots.find(str); it != _slots.end()) {
             return it->second;
         }
         return boost::none;
     }
 
-    void set(StringData str, sbe::value::SlotId slot) {
-        _slots[str] = slot;
+    void set(const Name& str, sbe::value::SlotId slot) {
+        _slots.insert_or_assign(str, slot);
     }
 
-    void clear(StringData str) {
+    void set(OwnedName str, sbe::value::SlotId slot) {
+        _slots.insert_or_assign(std::move(str), slot);
+    }
+
+    void clear(const Name& str) {
         _slots.erase(str);
     }
 
-    const boost::optional<sbe::value::SlotVector>& getIndexKeySlots() const {
-        return _indexKeySlots;
-    }
-
-    boost::optional<sbe::value::SlotVector> extractIndexKeySlots() {
-        ON_BLOCK_EXIT([this] { _indexKeySlots = boost::none; });
-        return std::move(_indexKeySlots);
-    }
-
-    void setIndexKeySlots(sbe::value::SlotVector iks) {
-        _indexKeySlots = std::move(iks);
-    }
-
-    void setIndexKeySlots(boost::optional<sbe::value::SlotVector> iks) {
-        _indexKeySlots = std::move(iks);
-    }
-
     /**
-     * This method applies an action to some/all of the slots within this struct (excluding index
-     * key slots). For each slot in this struct, the action is will be applied to the slot if (and
-     * only if) the corresponding flag in 'reqs' is true.
+     * This method applies an action to some/all of the slots within this struct. For each slot in
+     * this struct, the action is will be applied to the slot if (and only if) the corresponding
+     * flag in 'reqs' is true.
      */
     inline void forEachSlot(const PlanStageReqs& reqs,
                             const std::function<void(sbe::value::SlotId)>& fn) const;
 
-    inline void forEachSlot(
-        const PlanStageReqs& reqs,
-        const std::function<void(sbe::value::SlotId, const StringData&)>& fn) const;
+    inline void forEachSlot(const PlanStageReqs& reqs,
+                            const std::function<void(sbe::value::SlotId, const Name&)>& fn) const;
+
+    inline void clearNonRequiredSlots(const PlanStageReqs& reqs);
 
 private:
-    StringMap<sbe::value::SlotId> _slots;
-
-    // When an index scan produces parts of an index key for a covered plan, this is where the
-    // slots for the produced values are stored.
-    boost::optional<sbe::value::SlotVector> _indexKeySlots;
+    PairMap<Type, std::string, sbe::value::SlotId> _slots;
 };
 
 /**
@@ -185,38 +200,71 @@ private:
  */
 class PlanStageReqs {
 public:
+    using Type = PlanStageSlots::Type;
+    using Name = PlanStageSlots::Name;
+    using OwnedName = std::pair<Type, std::string>;
+
+    static constexpr auto kField = PlanStageSlots::Type::kField;
+    static constexpr auto kKey = PlanStageSlots::Type::kKey;
+    static constexpr auto kMeta = PlanStageSlots::Type::kMeta;
+
     PlanStageReqs copy() const {
         return *this;
     }
 
-    bool has(StringData str) const {
+    bool has(const Name& str) const {
         auto it = _slots.find(str);
         return it != _slots.end() && it->second;
     }
 
-    PlanStageReqs& set(StringData str) {
-        _slots[str] = true;
+    PlanStageReqs& set(const Name& str) {
+        _slots.insert_or_assign(str, true);
         return *this;
     }
 
-    PlanStageReqs& setIf(StringData str, bool condition) {
-        if (condition) {
-            _slots[str] = true;
+    PlanStageReqs& set(OwnedName str) {
+        _slots.insert_or_assign(std::move(str), true);
+        return *this;
+    }
+
+    PlanStageReqs& set(const std::vector<Name>& strs) {
+        for (size_t i = 0; i < strs.size(); ++i) {
+            _slots.insert_or_assign(strs[i], true);
         }
         return *this;
     }
 
-    PlanStageReqs& clear(StringData str) {
-        _slots.erase(str);
+    PlanStageReqs& set(std::vector<OwnedName> strs) {
+        for (size_t i = 0; i < strs.size(); ++i) {
+            _slots.insert_or_assign(std::move(strs[i]), true);
+        }
         return *this;
     }
 
-    boost::optional<sbe::IndexKeysInclusionSet>& getIndexKeyBitset() {
-        return _indexKeyBitset;
+    PlanStageReqs& setIf(const Name& str, bool condition) {
+        if (condition) {
+            _slots.insert_or_assign(str, true);
+        }
+        return *this;
     }
 
-    const boost::optional<sbe::IndexKeysInclusionSet>& getIndexKeyBitset() const {
-        return _indexKeyBitset;
+    PlanStageReqs& setFields(std::vector<std::string> strs) {
+        for (size_t i = 0; i < strs.size(); ++i) {
+            _slots.insert_or_assign(std::make_pair(kField, std::move(strs[i])), true);
+        }
+        return *this;
+    }
+
+    PlanStageReqs& setKeys(std::vector<std::string> strs) {
+        for (size_t i = 0; i < strs.size(); ++i) {
+            _slots.insert_or_assign(std::make_pair(kKey, std::move(strs[i])), true);
+        }
+        return *this;
+    }
+
+    PlanStageReqs& clear(const Name& str) {
+        _slots.erase(str);
+        return *this;
     }
 
     bool getIsBuildingUnionForTailableCollScan() const {
@@ -243,6 +291,52 @@ public:
         return _targetNamespace;
     }
 
+    bool hasType(Type t) const {
+        for (auto&& [name, isRequired] : _slots) {
+            if (isRequired && name.first == t) {
+                return true;
+            }
+        }
+        return false;
+    }
+    bool hasFields() const {
+        return hasType(kField);
+    }
+    bool hasKeys() const {
+        return hasType(kKey);
+    }
+
+    std::vector<std::string> getOfType(Type t) const {
+        std::vector<std::string> res;
+        for (auto&& [name, isRequired] : _slots) {
+            if (isRequired && name.first == t) {
+                res.push_back(name.second);
+            }
+        }
+        std::sort(res.begin(), res.end());
+        return res;
+    }
+    std::vector<std::string> getFields() const {
+        return getOfType(kField);
+    }
+    std::vector<std::string> getKeys() const {
+        return getOfType(kKey);
+    }
+
+    PlanStageReqs& clearAllOfType(Type t) {
+        auto fields = getOfType(t);
+        for (const auto& field : fields) {
+            _slots.erase(std::make_pair(kField, StringData(field)));
+        }
+        return *this;
+    }
+    PlanStageReqs& clearAllFields() {
+        return clearAllOfType(kField);
+    }
+    PlanStageReqs& clearAllKeys() {
+        return clearAllOfType(kKey);
+    }
+
     friend PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
                                           sbe::value::SlotIdGenerator* slotIdGenerator);
 
@@ -251,14 +345,12 @@ public:
 
     friend void PlanStageSlots::forEachSlot(
         const PlanStageReqs& reqs,
-        const std::function<void(sbe::value::SlotId, const StringData&)>& fn) const;
+        const std::function<void(sbe::value::SlotId, const Name&)>& fn) const;
+
+    friend void PlanStageSlots::clearNonRequiredSlots(const PlanStageReqs& reqs);
 
 private:
-    StringMap<bool> _slots;
-
-    // A bitset here indicates that we have a covered projection that is expecting to parts of the
-    // index key from an index scan.
-    boost::optional<sbe::IndexKeysInclusionSet> _indexKeyBitset;
+    PairMap<Type, std::string, bool> _slots;
 
     // When we're in the middle of building a special union sub-tree implementing a tailable cursor
     // collection scan, this flag will be set to true. Otherwise this flag will be false.
@@ -283,11 +375,11 @@ void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
             // Clang raises an error if we attempt to use 'name' in the tassert() below, because
             // tassert() is a macro that uses lambdas and 'name' is defined via "local binding".
             // We work-around this by copying 'name' to a local variable 'slotName'.
-            auto slotName = StringData(name);
+            auto slotName = Name(name);
             auto it = _slots.find(slotName);
             tassert(7050900,
-                    str::stream() << "Could not find '" << slotName
-                                  << "' slot in the map, expected slot to exist",
+                    str::stream() << "Could not find " << static_cast<int>(slotName.first) << ":'"
+                                  << slotName.second << "' in the slot map, expected slot to exist",
                     it != _slots.end());
 
             fn(it->second);
@@ -297,20 +389,35 @@ void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
 
 void PlanStageSlots::forEachSlot(
     const PlanStageReqs& reqs,
-    const std::function<void(sbe::value::SlotId, const StringData&)>& fn) const {
+    const std::function<void(sbe::value::SlotId, const Name&)>& fn) const {
     for (auto&& [name, isRequired] : reqs._slots) {
         if (isRequired) {
             // Clang raises an error if we attempt to use 'name' in the tassert() below, because
             // tassert() is a macro that uses lambdas and 'name' is defined via "local binding".
             // We work-around this by copying 'name' to a local variable 'slotName'.
-            auto slotName = StringData(name);
+            auto slotName = Name(name);
             auto it = _slots.find(slotName);
             tassert(7050901,
-                    str::stream() << "Could not find '" << slotName
-                                  << "' slot in the map, expected slot to exist",
+                    str::stream() << "Could not find " << static_cast<int>(slotName.first) << ":'"
+                                  << slotName.second << "' in the slot map, expected slot to exist",
                     it != _slots.end());
 
             fn(it->second, slotName);
+        }
+    }
+}
+
+void PlanStageSlots::clearNonRequiredSlots(const PlanStageReqs& reqs) {
+    auto it = _slots.begin();
+    while (it != _slots.end()) {
+        auto& name = it->first;
+        auto reqIt = reqs._slots.find(name);
+        // We never clear kResult, regardless of whether it is required by 'reqs'.
+        if ((reqIt != reqs._slots.end() && reqIt->second) ||
+            (name.first == kResult.first && name.second == kResult.second)) {
+            ++it;
+        } else {
+            _slots.erase(it++);
         }
     }
 }
@@ -443,13 +550,13 @@ private:
  */
 class SlotBasedStageBuilder final : public StageBuilder<sbe::PlanStage> {
 public:
-    static constexpr StringData kResult = PlanStageSlots::kResult;
-    static constexpr StringData kRecordId = PlanStageSlots::kRecordId;
-    static constexpr StringData kReturnKey = PlanStageSlots::kReturnKey;
-    static constexpr StringData kSnapshotId = PlanStageSlots::kSnapshotId;
-    static constexpr StringData kIndexId = PlanStageSlots::kIndexId;
-    static constexpr StringData kIndexKey = PlanStageSlots::kIndexKey;
-    static constexpr StringData kIndexKeyPattern = PlanStageSlots::kIndexKeyPattern;
+    static constexpr auto kResult = PlanStageSlots::kResult;
+    static constexpr auto kRecordId = PlanStageSlots::kRecordId;
+    static constexpr auto kReturnKey = PlanStageSlots::kReturnKey;
+    static constexpr auto kSnapshotId = PlanStageSlots::kSnapshotId;
+    static constexpr auto kIndexId = PlanStageSlots::kIndexId;
+    static constexpr auto kIndexKey = PlanStageSlots::kIndexKey;
+    static constexpr auto kIndexKeyPattern = PlanStageSlots::kIndexKeyPattern;
 
     SlotBasedStageBuilder(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
@@ -457,6 +564,12 @@ public:
                           const QuerySolution& solution,
                           PlanYieldPolicySBE* yieldPolicy);
 
+    /**
+     * This method will build an SBE PlanStage tree for QuerySolutionNode 'root' and its
+     * descendents.
+     *
+     * This method is a wrapper around 'build(const QuerySolutionNode*, const PlanStageReqs&)'.
+     */
     std::unique_ptr<sbe::PlanStage> build(const QuerySolutionNode* root) final;
 
     PlanStageData getPlanStageData() {
@@ -464,6 +577,14 @@ public:
     }
 
 private:
+    /**
+     * This method will build an SBE PlanStage tree for QuerySolutionNode 'root' and its
+     * descendents.
+     *
+     * Based on the type of 'root', this method will dispatch to the appropriate buildXXX() method.
+     * This method will also handle generating calls to getField() to satisfy kField reqs that were
+     * not satisfied by the buildXXX() method.
+     */
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> build(const QuerySolutionNode* node,
                                                                      const PlanStageReqs& reqs);
 
@@ -494,7 +615,7 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSortCovered(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
-    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSortKeyGeneraror(
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSortKeyGenerator(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSortMerge(
@@ -539,19 +660,14 @@ private:
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     /**
-     * Constructs an optimized SBE plan for 'filterNode' in the case that the fields of the
-     * 'shardKeyPattern' are provided by 'childIxscan'. In this case, the SBE plan for the child
+     * Constructs an optimized SBE plan for 'root' in the case that the fields of the shard key
+     * pattern are provided by the child index scan. In this case, the SBE plan for the child
      * index scan node will fill out slots for the necessary components of the index key. These
      * slots can be read directly in order to determine the shard key that should be passed to the
      * 'shardFiltererSlot'.
      */
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildShardFilterCovered(
-        const ShardingFilterNode* filterNode,
-        sbe::value::SlotId shardFiltererSlot,
-        BSONObj shardKeyPattern,
-        BSONObj indexKeyPattern,
-        const QuerySolutionNode* child,
-        PlanStageReqs childReqs);
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildGroup(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);

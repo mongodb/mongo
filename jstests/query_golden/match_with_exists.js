@@ -18,7 +18,7 @@ const runWithData = (docs, filters) => {
     jsTestLog("Inserting docs:");
     show(docs);
     assert.commandWorked(coll.insert(docs));
-    print(`Collection count: ${coll.count()}`);
+    print(`Collection count: ${coll.find().itcount()}`);
     for (const filter of filters) {
         runTest(filter);
     }

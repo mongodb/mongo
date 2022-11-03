@@ -32,12 +32,12 @@
 #include "mongo/db/query/ce/ce_test_utils.h"
 
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
+#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/unittest/unittest.h"
 
@@ -81,7 +81,7 @@ optimizer::CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> node
                                  false /*requireRID*/,
                                  _metadata,
                                  getCETransport(),
-                                 std::make_unique<DefaultCosting>(),
+                                 makeCosting(),
                                  defaultConvertPathToInterval,
                                  ConstEval::constFold,
                                  DebugInfo::kDefaultForTests,

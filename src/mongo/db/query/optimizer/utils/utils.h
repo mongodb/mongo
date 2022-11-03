@@ -347,4 +347,5 @@ ABT lowerIntervals(PrefixId& prefixId,
  */
 bool pathEndsInTraverse(const optimizer::ABT& path);
 
+bool hasProperIntervals(const PartialSchemaRequirements& reqMap);
 }  // namespace mongo::optimizer

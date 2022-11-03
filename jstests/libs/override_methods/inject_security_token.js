@@ -54,7 +54,7 @@ function prepareSecurityToken(conn) {
 
 function getDbName(nss) {
     if (nss.length === 0 || !nss.includes(".")) {
-        return ns;
+        return nss;
     }
     return nss.split(".")[0];
 }
@@ -75,9 +75,9 @@ function checkReponse(res, requestDbName, logError) {
         let v = res[k];
         if (typeof v === "string") {
             if (k === "dbName" || k == "db" || k == "dropped") {
-                assert.eq(v, requestDbName, logError);
+                checkDbNameInString(v, requestDbName, logError);
             } else if (k === "namespace" || k === "ns") {
-                assert.eq(getDbName(v), requestDbName, logError);
+                checkDbNameInString(getDbName(v), requestDbName, logError);
             } else if (k === "errmsg" || k == "name") {
                 checkDbNameInString(v, requestDbName, logError);
             }
@@ -92,10 +92,82 @@ function checkReponse(res, requestDbName, logError) {
     }
 }
 
+const kCmdsAllowedWithSecurityToken = new Set([
+    `abortTransaction`,
+    `aggregate`,
+    `availableQueryOptions`,
+    `buildinfo`,
+    `buildinfo`,
+    `collMod`,
+    `collStats`,
+    `collstats`,
+    `commitTransaction`,
+    `configureFailPoint`,
+    `count`,
+    `create`,
+    `createIndexes`,
+    `currentOp`,
+    `dbStats`,
+    `delete`,
+    `deleteIndexes`,
+    `distinct`,
+    `drop`,
+    `dropDatabase`,
+    `dropIndexes`,
+    `explain`,
+    `features`,
+    `filemd5`,
+    `find`,
+    `findAndModify`,
+    `findandmodify`,
+    `geoNear`,
+    `geoSearch`,
+    `getLastError`,
+    `getlasterror`,
+    `getMore`,
+    `getParameter`,
+    `hello`,
+    `insert`,
+    `isMaster`,
+    `ismaster`,
+    `listCollections`,
+    `listCommands`,
+    `listDatabases`,
+    `listIndexes`,
+    `ping`,
+    `renameCollection`,
+    `resourceUsage`,
+    `rolesInfo`,
+    `serverStatus`,
+    `startSession`,
+    `statusMetrics`,
+    `update`,
+    `usersInfo`,
+    `validate`,
+    // The following commands are going to be allowed in serverless mode but stil not ready for
+    // per-tenant yet.
+    // `killCursors`,
+    // `connectionStatus`,
+    // `connPoolStats`,
+    // `top`,
+    // `killop`,
+    // `endSessions`,
+]);
+
+function isAllowedWithSecurityToken(cmdName) {
+    return kCmdsAllowedWithSecurityToken.has(cmdName);
+}
+
 // Override the runCommand to inject security token and check for the response has the right nss and
 // db name.
 function runCommandWithResponseCheck(
     conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
+    if (!isAllowedWithSecurityToken(cmdName)) {
+        throw new Error(
+            "Refusing to run a test that issues commands that are not allowed in serverless mode, " +
+            " CmdName: " + cmdName + ", CmdObj: " + tojson(cmdObj));
+    }
+
     prepareSecurityToken(conn);
 
     // Actually run the provided command.

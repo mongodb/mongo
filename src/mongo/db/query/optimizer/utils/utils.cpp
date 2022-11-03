@@ -102,6 +102,7 @@ properties::LogicalProps createInitialScanProps(const ProjectionName& projection
                                                              projectionName,
                                                              scanDefName,
                                                              true /*eqPredsOnly*/,
+                                                             false /*hasProperInterval*/,
                                                              {} /*satisfiedPartialIndexes*/),
                             properties::CollectionAvailability({scanDefName}),
                             properties::DistributionAvailability(std::move(distributions)));
@@ -1926,6 +1927,16 @@ public:
 bool pathEndsInTraverse(const optimizer::ABT& path) {
     PathEndsInTraverseId t;
     return optimizer::algebra::transport<false>(path, t);
+}
+
+bool hasProperIntervals(const PartialSchemaRequirements& reqMap) {
+    // Compute if this node has any proper (not fully open) intervals.
+    for (const auto& [key, req] : reqMap) {
+        if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace mongo::optimizer

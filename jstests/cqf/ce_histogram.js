@@ -82,7 +82,6 @@ function assertApproxEq(expected, actual, msg) {
  * Validates that the results and cardinality estimate for a given $match predicate agree.
  */
 function verifyCEForMatch({coll, predicate, expected, hint}) {
-    print("ACB", tojson(predicate));
     const actual = coll.aggregate([{$match: predicate}], {hint}).toArray();
     assertArrayEq({actual, expected});
 

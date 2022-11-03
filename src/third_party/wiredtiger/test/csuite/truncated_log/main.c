@@ -40,7 +40,7 @@ static bool use_columns = false;
     "create,log=(enabled,file_max=100K,remove=false),"                                            \
     "transaction_sync=(enabled,method=none),statistics=(all),statistics_log=(json,on_close,wait=" \
     "1)"
-#define ENV_CONFIG_REC "log=(recover=on),statistics=(all),statistics_log=(json,on_close,wait=1)"
+#define ENV_CONFIG_ADD_REC "log=(recover=on),statistics=(all),statistics_log=(json,on_close,wait=1)"
 
 #define LOG_FILE_1 "WiredTigerLog.0000000001"
 
@@ -319,7 +319,7 @@ main(int argc, char *argv[])
     if (truncate(LOG_FILE_1, (wt_off_t)new_offset) != 0)
         testutil_die(errno, "truncate");
 
-    testutil_check(wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn));
+    testutil_check(wiredtiger_open(NULL, NULL, ENV_CONFIG_ADD_REC, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 

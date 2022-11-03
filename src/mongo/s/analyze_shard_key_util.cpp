@@ -48,5 +48,14 @@ bool supportsCoordinatingQueryAnalysis() {
     return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
 }
 
+bool supportsPersistingSampledQueries() {
+    return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ShardServer;
+}
+
+bool supportsPersistingSampledQueriesIgnoreFCV() {
+    return isFeatureFlagEnabledIgnoreFCV() &&
+        serverGlobalParams.clusterRole == ClusterRole::ShardServer;
+}
+
 }  // namespace analyze_shard_key
 }  // namespace mongo

@@ -136,20 +136,22 @@ __sync_delete_obsolete_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 
     /* Ignore root pages as they can never be deleted. */
     if (__wt_ref_is_root(ref)) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: skipping root page", (void *)ref);
+        __wt_verbose_debug2(
+          session, WT_VERB_CHECKPOINT_CLEANUP, "%p: skipping root page", (void *)ref);
         return (0);
     }
 
     /* Ignore internal pages, these are taken care of during reconciliation. */
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP,
+        __wt_verbose_debug2(session, WT_VERB_CHECKPOINT_CLEANUP,
           "%p: skipping internal page with parent: %p", (void *)ref, (void *)ref->home);
         return (0);
     }
 
     /* Fast-check, ignore deleted pages. */
     if (ref->state == WT_REF_DELETED) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: skipping deleted page", (void *)ref);
+        __wt_verbose_debug2(
+          session, WT_VERB_CHECKPOINT_CLEANUP, "%p: skipping deleted page", (void *)ref);
         return (0);
     }
 
@@ -191,7 +193,7 @@ __sync_delete_obsolete_ref(WT_SESSION_IMPL *session, WT_REF *ref)
         } else
             WT_REF_UNLOCK(ref, previous_state);
 
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP,
+        __wt_verbose_debug2(session, WT_VERB_CHECKPOINT_CLEANUP,
           "%p on-disk page obsolete check: %s"
           "obsolete, stop time point %s",
           (void *)ref, obsolete ? "" : "not ",
@@ -206,7 +208,7 @@ __sync_delete_obsolete_ref(WT_SESSION_IMPL *session, WT_REF *ref)
      * they might have split or been deleted while we were locking the WT_REF.
      */
     if (previous_state != WT_REF_MEM) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: skipping page", (void *)ref);
+        __wt_verbose_debug2(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: skipping page", (void *)ref);
         return (0);
     }
 
@@ -289,7 +291,7 @@ __sync_delete_obsolete_ref(WT_SESSION_IMPL *session, WT_REF *ref)
         WT_STAT_CONN_DATA_INCR(session, cc_pages_evict);
     }
 
-    __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP,
+    __wt_verbose_debug2(session, WT_VERB_CHECKPOINT_CLEANUP,
       "%p in-memory page obsolete check: %s %s"
       "obsolete, stop time point %s",
       (void *)ref, tag, obsolete ? "" : "not ",
@@ -313,7 +315,7 @@ __sync_ref_int_obsolete_cleanup(WT_SESSION_IMPL *session, WT_REF *parent)
     WT_REF *ref;
     uint32_t slot;
 
-    __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP,
+    __wt_verbose_debug2(session, WT_VERB_CHECKPOINT_CLEANUP,
       "%p: traversing the internal page %p for obsolete child pages", (void *)parent,
       (void *)parent->page);
 
@@ -387,7 +389,8 @@ __sync_page_skip(
      * timestamp.
      */
     if (addr.type == WT_ADDR_LEAF_NO || addr.ta.newest_stop_durable_ts == WT_TS_NONE) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: page walk skipped", (void *)ref);
+        __wt_verbose_debug2(
+          session, WT_VERB_CHECKPOINT_CLEANUP, "%p: page walk skipped", (void *)ref);
         WT_STAT_CONN_DATA_INCR(session, cc_pages_walk_skipped);
         *skipp = true;
     }

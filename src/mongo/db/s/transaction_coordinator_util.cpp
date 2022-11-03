@@ -445,7 +445,7 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
                     // Do not acquire a storage ticket in order to avoid unnecessary serialization
                     // with other prepared transactions that are holding a storage ticket
                     // themselves; see SERVER-60682.
-                    SetTicketAquisitionPriorityForLock setTicketAquisition(
+                    SetAdmissionPriorityForLock setTicketAquisition(
                         opCtx, AdmissionContext::Priority::kImmediate);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kWritingDecision);

@@ -55,8 +55,12 @@ public:
 
     ParsedDistinct(std::unique_ptr<CanonicalQuery> query,
                    const std::string key,
-                   const bool mirrored = false)
-        : _query(std::move(query)), _key(std::move(key)), _mirrored(std::move(mirrored)) {}
+                   const bool mirrored = false,
+                   const boost::optional<UUID> sampleId = boost::none)
+        : _query(std::move(query)),
+          _key(std::move(key)),
+          _mirrored(std::move(mirrored)),
+          _sampleId(std::move(sampleId)) {}
 
     const CanonicalQuery* getQuery() const {
         return _query.get();
@@ -72,6 +76,10 @@ public:
 
     const std::string& getKey() const {
         return _key;
+    }
+
+    boost::optional<UUID> getSampleId() const {
+        return _sampleId;
     }
 
     bool isMirrored() const {
@@ -102,6 +110,9 @@ private:
 
     // Indicates that this was a mirrored operation.
     bool _mirrored = false;
+
+    // The unique sample id for this operation if it has been chosen for sampling.
+    boost::optional<UUID> _sampleId;
 };
 
 }  // namespace mongo

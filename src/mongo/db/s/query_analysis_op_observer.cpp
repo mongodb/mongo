@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/query_analysis_coordinator.h"
 #include "mongo/db/s/query_analysis_op_observer.h"
+#include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/catalog/type_mongos.h"
@@ -87,6 +88,17 @@ void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdat
                     updatedDoc);
             });
         }
+    }
+
+    if (analyze_shard_key::supportsPersistingSampledQueries() && args.updateArgs->sampleId &&
+        args.updateArgs->preImageDoc && opCtx->writesAreReplicated()) {
+        analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+            .addDiff(*args.updateArgs->sampleId,
+                     args.coll->ns(),
+                     args.coll->uuid(),
+                     *args.updateArgs->preImageDoc,
+                     args.updateArgs->updatedDoc)
+            .getAsync([](auto) {});
     }
 }
 

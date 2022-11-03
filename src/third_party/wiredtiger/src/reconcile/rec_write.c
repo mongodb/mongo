@@ -2372,18 +2372,19 @@ __rec_split_dump_keys(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
     btree = S2BT(session);
 
-    __wt_verbose(session, WT_VERB_SPLIT, "split: %" PRIu32 " pages", r->multi_next);
+    __wt_verbose_debug2(session, WT_VERB_SPLIT, "split: %" PRIu32 " pages", r->multi_next);
 
     if (btree->type == BTREE_ROW) {
         WT_RET(__wt_scr_alloc(session, 0, &tkey));
         for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
-            __wt_verbose(session, WT_VERB_SPLIT, "starting key %s",
+            __wt_verbose_debug2(session, WT_VERB_SPLIT, "starting key %s",
               __wt_buf_set_printable(
                 session, WT_IKEY_DATA(multi->key.ikey), multi->key.ikey->size, false, tkey));
         __wt_scr_free(session, &tkey);
     } else
         for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
-            __wt_verbose(session, WT_VERB_SPLIT, "starting recno %" PRIu64, multi->key.recno);
+            __wt_verbose_debug2(
+              session, WT_VERB_SPLIT, "starting recno %" PRIu64, multi->key.recno);
     return (0);
 }
 
@@ -2544,7 +2545,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
             WT_STAT_DATA_INCR(session, rec_multiblock_leaf);
 
         /* Optionally display the actual split keys in verbose mode. */
-        if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT))
+        if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_SPLIT, WT_VERBOSE_DEBUG_2))
             WT_RET(__rec_split_dump_keys(session, r));
 
         /*

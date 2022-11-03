@@ -1,0 +1,92 @@
+
+
+[jsTest] ----
+[jsTest] Inserting docs:
+[jsTest] ----
+
+{  "a" : 5 }
+{  "a" : 6 }
+{  "a" : [ 1 ] }
+{  "a" : [ 1, 2, 3 ] }
+{  "a" : [ 1, 2, 3, 4, 5, 6 ] }
+{  "a" : [ 10 ] }
+{  "a" : [ 5, 6, 7, 8, 9 ] }
+{  "a" : [ [ 6 ] ] }
+{  "a" : [ [ [ 6 ] ] ] }
+{  "a" : [ [ { "b" : [ 6 ] } ] ] }
+{  "a" : [ ] }
+{  "a" : [ { "b" : [ 6 ] } ] }
+
+
+[jsTest] ----
+[jsTest] Pipeline: [ { "$match" : { "a" : { "$elemMatch" : { "$gte" : 5, "$lte" : 6 } } } }, { "$project" : { "_id" : 0 } } ]
+[jsTest] ----
+
+{  "a" : [ 1, 2, 3, 4, 5, 6 ] }
+{  "a" : [ 5, 6, 7, 8, 9 ] }
+
+
+[jsTest] ----
+[jsTest] Pipeline: [ { "$match" : { "a" : { "$elemMatch" : { "$lt" : 11, "$gt" : 9 } } } }, { "$project" : { "_id" : 0 } } ]
+[jsTest] ----
+
+{  "a" : [ 10 ] }
+
+
+[jsTest] ----
+[jsTest] Pipeline: [ { "$match" : { "a" : { "$elemMatch" : { "$lt" : 5, "$gt" : 6 } } } }, { "$project" : { "_id" : 0 } } ]
+[jsTest] ----
+
+
+
+
+[jsTest] ----
+[jsTest] Pipeline: [ { "$match" : { "a" : { "$elemMatch" : { "$elemMatch" : { "$gte" : 5, "$lte" : 6 } } } } }, { "$project" : { "_id" : 0 } } ]
+[jsTest] ----
+
+{  "a" : [ [ 6 ] ] }
+
+
+[jsTest] ----
+[jsTest] Pipeline: [ { "$match" : { "a" : { "$elemMatch" : { "$elemMatch" : { "$elemMatch" : { "$gte" : 5, "$lte" : 6 } } } } } }, { "$project" : { "_id" : 0 } } ]
+[jsTest] ----
+
+{  "a" : [ [ [ 6 ] ] ] }
+
+
+[jsTest] ----
+[jsTest] Pipeline: [ { "$match" : { "a" : { "$elemMatch" : { "$size" : 1 } } } }, { "$project" : { "_id" : 0 } } ]
+[jsTest] ----
+
+{  "a" : [ [ 6 ] ] }
+{  "a" : [ [ [ 6 ] ] ] }
+{  "a" : [ [ { "b" : [ 6 ] } ] ] }
+
+
+[jsTest] ----
+[jsTest] Pipeline: [ { "$match" : { "a" : { "$elemMatch" : { "$exists" : true } } } }, { "$project" : { "_id" : 0 } } ]
+[jsTest] ----
+
+{  "a" : [ 1 ] }
+{  "a" : [ 1, 2, 3 ] }
+{  "a" : [ 1, 2, 3, 4, 5, 6 ] }
+{  "a" : [ 10 ] }
+{  "a" : [ 5, 6, 7, 8, 9 ] }
+{  "a" : [ [ 6 ] ] }
+{  "a" : [ [ [ 6 ] ] ] }
+{  "a" : [ [ { "b" : [ 6 ] } ] ] }
+{  "a" : [ { "b" : [ 6 ] } ] }
+
+
+[jsTest] ----
+[jsTest] Pipeline: [ { "$match" : { "a" : { "$elemMatch" : { "b" : { "$elemMatch" : { "$gt" : 5 } } } } } }, { "$project" : { "_id" : 0 } } ]
+[jsTest] ----
+
+{  "a" : [ { "b" : [ 6 ] } ] }
+
+
+[jsTest] ----
+[jsTest] Pipeline: [ { "$match" : { "a" : { "$elemMatch" : { "$elemMatch" : { "b" : { "$elemMatch" : { "$gt" : 5 } } } } } } }, { "$project" : { "_id" : 0 } } ]
+[jsTest] ----
+
+{  "a" : [ [ { "b" : [ 6 ] } ] ] }

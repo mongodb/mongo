@@ -32,12 +32,12 @@
 #include <fmt/format.h>
 #include <utility>
 
+#include "mongo/db/storage/io_error_message.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
-
 /**
  * This template class provides a standardized input facility over StreamableInput or SeekableInput.
  *
@@ -57,7 +57,7 @@ public:
         using namespace fmt::literals;
         InputT::open();
         uassert(ErrorCodes::FileNotOpen,
-                "error"_format(getErrorMessage("open"_sd, InputT::getPath())),
+                "error"_format(getErrorMessage("open"_sd, InputT::getAbsolutePath())),
                 InputT::isOpen());
     }
 
@@ -95,14 +95,14 @@ public:
         // If we reach this point, we accumulated fewer than 'count' bytes.
 
         if (MONGO_likely(InputT::isEof())) {
-            LOGV2_INFO(7005001, "Named pipe is closed", "path"_attr = InputT::getPath());
+            LOGV2_INFO(7005001, "Named pipe is closed", "path"_attr = InputT::getAbsolutePath());
             return nReadTotal;
         }
 
         tassert(7005002, "Expected an error condition but succeeded", InputT::isFailed());
         LOGV2_ERROR(7005003,
                     "Failed to read a named pipe",
-                    "error"_attr = getErrorMessage("read", InputT::getPath()));
+                    "error"_attr = getErrorMessage("read", InputT::getAbsolutePath()));
 
         return -1;
     }

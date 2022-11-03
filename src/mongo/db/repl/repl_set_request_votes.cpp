@@ -61,9 +61,9 @@ private:
         uassertStatusOK(status);
 
         // Operations that are part of Replica Set elections are crucial to the stability of the
-        // cluster. Marking it as having Immediate priority will make it skip ticket acquisition and
-        // Flow Control.
-        SetTicketAquisitionPriorityForLock priority(opCtx, AdmissionContext::Priority::kImmediate);
+        // cluster. Marking it as having Immediate priority will make it skip waiting for ticket
+        // acquisition and Flow Control.
+        SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kImmediate);
         ReplSetRequestVotesResponse response;
         status = ReplicationCoordinator::get(opCtx)->processReplSetRequestVotes(
             opCtx, parsedArgs, &response);

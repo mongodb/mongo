@@ -532,7 +532,7 @@ void ShardingRecoveryService::recoverIndexesCatalog(OperationContext* opCtx) {
             AutoGetCollection collLock(opCtx, nss, MODE_X);
             CollectionShardingRuntime::assertCollectionLockedAndAcquire(
                 opCtx, collLock->ns(), CSRAcquisitionMode::kExclusive)
-                ->addIndex(opCtx, indexEntry, indexVersion);
+                ->addIndex(opCtx, indexEntry, {indexEntry.getCollectionUUID(), indexVersion});
         }
     }
     LOGV2_DEBUG(6686502, 2, "Recovered all index versions");

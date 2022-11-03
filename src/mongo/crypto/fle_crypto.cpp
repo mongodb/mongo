@@ -1157,10 +1157,20 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                 auto rangeFindSpec =
                     FLE2RangeFindSpec::parse(ctx, ep.getValue().getElement().Obj());
 
-                auto edges = getMinCover(rangeFindSpec, ep.getSparsity().value());
+                auto findpayload = [&]() {
+                    if (rangeFindSpec.getEdgesInfo().has_value()) {
+                        auto edges = getMinCover(rangeFindSpec, ep.getSparsity().value());
 
-                auto findpayload = FLEClientCrypto::serializeFindRangePayload(
-                    indexKey, userKey, edges, ep.getMaxContentionCounter(), rangeFindSpec);
+                        return FLEClientCrypto::serializeFindRangePayload(
+                            indexKey,
+                            userKey,
+                            std::move(edges),
+                            ep.getMaxContentionCounter(),
+                            rangeFindSpec);
+                    } else {
+                        return FLEClientCrypto::serializeFindRangeStub(rangeFindSpec);
+                    }
+                }();
 
                 toEncryptedBinData(fieldNameToSerialize,
                                    EncryptedBinDataType::kFLE2FindRangePayload,
@@ -1509,7 +1519,7 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
             "getMinCover should never be passed a findSpec without edges information",
             spec.getEdgesInfo());
 
-    auto& edgesInfo = spec.getEdgesInfo().get();
+    auto& edgesInfo = spec.getEdgesInfo().value();
 
     auto indexMin = edgesInfo.getIndexMin().getElement();
     auto indexMax = edgesInfo.getIndexMax().getElement();
@@ -2269,6 +2279,16 @@ FLE2FindRangePayload FLEClientCrypto::serializeFindRangePayload(
     payload.setFirstOperator(spec.getFirstOperator());
     payload.setSecondOperator(spec.getSecondOperator());
     payload.setPayloadId(1234);
+
+    return payload;
+}
+
+FLE2FindRangePayload FLEClientCrypto::serializeFindRangeStub(const FLE2RangeFindSpec& spec) {
+    FLE2FindRangePayload payload;
+
+    payload.setFirstOperator(spec.getFirstOperator());
+    payload.setSecondOperator(spec.getSecondOperator());
+    payload.setPayloadId(spec.getPayloadId());
 
     return payload;
 }

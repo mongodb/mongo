@@ -4,7 +4,7 @@ function removeShard(st, shardName, timeout) {
     }
 
     assert.soon(function() {
-        let res = assert.commandWorked(st.s.adminCommand({removeShard: shardName}));
+        const res = st.s.adminCommand({removeShard: shardName});
         if (!res.ok && res.code === ErrorCodes.ShardNotFound) {
             // If the config server primary steps down right after removing the config.shards doc
             // for the shard but before responding with "state": "completed", the mongos would retry
@@ -14,6 +14,7 @@ function removeShard(st, shardName, timeout) {
             // to fail with ShardNotFound.
             return true;
         }
+        assert.commandWorked(res);
         return res.state == 'completed';
     }, "failed to remove shard " + shardName + " within " + timeout + "ms", timeout);
 }

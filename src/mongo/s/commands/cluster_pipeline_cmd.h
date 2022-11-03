@@ -155,7 +155,7 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
-            Impl::checkCanRunHere(opCtx);
+            Impl::checkCanExplainHere(opCtx);
             auto bodyBuilder = result->getBodyBuilder();
             _runAggCommand(opCtx, _dbName, _request.body, &bodyBuilder);
         }

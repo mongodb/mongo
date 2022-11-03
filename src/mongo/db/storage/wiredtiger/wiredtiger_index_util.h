@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -51,6 +52,10 @@ public:
     static Status compact(OperationContext* opCtx, const std::string& uri);
 
     static bool isEmpty(OperationContext* opCtx, const std::string& uri, uint64_t tableId);
+
+    static bool validateStructure(OperationContext* opCtx,
+                                  const std::string& uri,
+                                  IndexValidateResults* fullResults);
 };
 
 }  // namespace mongo

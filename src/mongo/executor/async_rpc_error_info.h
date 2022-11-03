@@ -147,4 +147,37 @@ private:
     stdx::variant<Status, const RemoteError> _error;
 };
 
+namespace async_rpc {
+/**
+ * Note! Treats *all* possible RPC failures, including writeConcern and write errors,
+ * as errors!
+ *
+ * Converts a RemoteCommandExecutionError from the async_rpc::sendCommand API
+ * into the highest-priority 'underlying error' responsible for the RPC error.
+ * The priority-ordering is as follows:
+ *   (1) If there was an error on the local node (i.e. the sender) that caused
+ *       the failure, that error is returned.
+ *   (2) If we received an {ok: 0} response from the remote node, that error
+ *       is returned.
+ *   (3) If we received an {ok: 1} response from the remote node, but a write
+ *       concern error, the write concern error is returned.
+ *   (4) If we received an {ok: 1} response from the remote node, and no write
+ *       concern error, but write error[s], the first write error is returned.
+ */
+Status unpackRPCStatus(Status status);
+
+/**
+ * Converts a RemoteCommandExecutionError from the async_rpc::sendCommand API
+ * into the highest-priority 'underlying error' responsible for the RPC error,
+ * ignoring and writeConcern and/or write errors returned from the remote. This
+ * means:
+ *   (1) If there was an error on the local node that caused the failure,
+ *       that error is returned.
+ *   (2) If we received an {ok: 0} response from the remote node, that error
+ *       is returned.
+ *   (3) Otherwise, we received an {ok: 1} response from the remote node,
+ *       and therefore Status::OK is returned.
+ */
+Status unpackRPCStatusIgnoringWriteConcernAndWriteErrors(Status status);
+};  // namespace async_rpc
 }  // namespace mongo

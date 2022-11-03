@@ -399,6 +399,7 @@ public:
                          ProjectionName scanProjection,
                          std::string scanDefName,
                          bool eqPredsOnly,
+                         bool hasProperInterval,
                          opt::unordered_set<std::string> satisfiedPartialIndexes);
 
     bool operator==(const IndexingAvailability& other) const;
@@ -415,6 +416,9 @@ public:
     bool getEqPredsOnly() const;
     void setEqPredsOnly(bool value);
 
+    bool hasProperInterval() const;
+    void setHasProperInterval(bool hasProperInterval);
+
 private:
     GroupIdType _scanGroupId;
     const ProjectionName _scanProjection;
@@ -427,6 +431,9 @@ private:
     // Set of indexes with partial indexes whose partial filters are satisfied for the current
     // group.
     opt::unordered_set<std::string> _satisfiedPartialIndexes;
+
+    // True if there is at least one proper interval in a sargable node in this group.
+    bool _hasProperInterval;
 };
 
 

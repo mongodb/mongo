@@ -97,6 +97,7 @@ commands:
     strict: true
     namespace: ignored
     api_version: ""
+    reply_type: recipientSyncDataResponse
     inline_chained_structs: true
     chained_structs:
       MigrationRecipientCommonData: MigrationRecipientCommonData
@@ -144,6 +145,7 @@ commands:
   recipientForgetMigration:
     description: "Parser for the 'recipientForgetMigration' command."
     command_name: recipientForgetMigration
+    reply_type: OkReply 
     strict: true
     namespace: ignored
     api_version: ""

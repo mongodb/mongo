@@ -56,8 +56,11 @@
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
+#include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
+MONGO_FAIL_POINT_DEFINE(failConstructingBonsaiExecutor);
 
 namespace mongo {
 using namespace optimizer;
@@ -638,6 +641,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     const boost::optional<BSONObj>& indexHint,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     std::unique_ptr<CanonicalQuery> canonicalQuery) {
+    if (MONGO_unlikely(failConstructingBonsaiExecutor.shouldFail())) {
+        uasserted(620340, "attempting to use CQF while it is disabled");
+    }
     // Ensure that either pipeline or canonicalQuery is set.
     tassert(624070,
             "getSBEExecutorViaCascadesOptimizer expects exactly one of the following to be set: "

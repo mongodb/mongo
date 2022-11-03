@@ -11,7 +11,7 @@ const coll = db.cqf_basic_find;
 coll.drop();
 
 assert.commandWorked(
-    coll.insert([{a: {b: 1}}, {a: {b: 2}}, {a: {b: 3}}, {a: {b: 4}}, {a: {b: 5}}]));
+    coll.insert([{a: {b: 1}}, {a: {b: 2}}, {a: {b: 3}}, {a: {b: 4}}, {a: {b: 5}}, {'': 3}]));
 
 const extraDocCount = 50;
 // Add extra docs to make sure indexes can be picked.
@@ -39,4 +39,8 @@ assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 res = coll.explain("executionStats").find({'a.b': {$lte: 2}}).finish();
 assert.eq(2, res.executionStats.nReturned);
 assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
+
+res = coll.explain("executionStats").find({'': {$gt: 2}}).finish();
+assert.eq(1, res.executionStats.nReturned);
+assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }());

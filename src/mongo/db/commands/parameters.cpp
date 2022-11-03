@@ -238,6 +238,11 @@ public:
         h += "{ getParameter:'*' } or { getParameter:{allParameters: true} } to get everything\n";
         return h;
     }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
              const BSONObj& cmdObj,

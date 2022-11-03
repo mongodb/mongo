@@ -222,8 +222,7 @@ public:
             indexingAvailability.setEqPredsOnly(computeEqPredsOnly(node.getReqMap()));
         }
 
-        auto& satisfiedPartialIndexes =
-            getProperty<IndexingAvailability>(result).getSatisfiedPartialIndexes();
+        auto& satisfiedPartialIndexes = indexingAvailability.getSatisfiedPartialIndexes();
         for (const auto& [indexDefName, indexDef] : scanDef.getIndexDefs()) {
             if (!indexDef.getPartialReqMap().empty()) {
                 auto intersection = node.getReqMap();
@@ -236,6 +235,8 @@ public:
                 }
             }
         }
+
+        indexingAvailability.setHasProperInterval(hasProperIntervals(node.getReqMap()));
 
         return maybeUpdateNodePropsMap(node, std::move(result));
     }

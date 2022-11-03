@@ -102,6 +102,7 @@ public:
 
 private:
     virtual void preRunImplHook(OperationContext* opCtx) const = 0;
+    virtual void preExplainImplHook(OperationContext* opCtx) const = 0;
     virtual void doCheckAuthorizationHook(AuthorizationSession* authzSession) const = 0;
 
     bool runImpl(OperationContext* opCtx,
@@ -162,6 +163,10 @@ private:
             Impl::checkCanRunHere(opCtx);
         }
 
+        void preExplainImplHook(OperationContext* opCtx) const final {
+            Impl::checkCanExplainHere(opCtx);
+        }
+
         void doCheckAuthorizationHook(AuthorizationSession* authzSession) const final {
             Impl::doCheckAuthorization(
                 authzSession, getBypass(), getBatchedRequest().getInsertRequest());
@@ -206,6 +211,10 @@ private:
     private:
         void preRunImplHook(OperationContext* opCtx) const final {
             Impl::checkCanRunHere(opCtx);
+        }
+
+        void preExplainImplHook(OperationContext* opCtx) const final {
+            Impl::checkCanExplainHere(opCtx);
         }
 
         void doCheckAuthorizationHook(AuthorizationSession* authzSession) const final {
@@ -258,6 +267,10 @@ private:
     private:
         void preRunImplHook(OperationContext* opCtx) const final {
             Impl::checkCanRunHere(opCtx);
+        }
+
+        void preExplainImplHook(OperationContext* opCtx) const final {
+            Impl::checkCanExplainHere(opCtx);
         }
 
         void doCheckAuthorizationHook(AuthorizationSession* authzSession) const final {

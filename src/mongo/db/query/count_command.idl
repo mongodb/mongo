@@ -130,3 +130,8 @@ commands:
                 description: "Indicates whether the operation is a mirrored read"
                 type: optionalBool
                 stability: unstable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: unstable

@@ -409,7 +409,7 @@ Status _createTimeseries(OperationContext* opCtx,
             AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
         Lock::CollectionLock systemDotViewsLock(
             opCtx,
-            NamespaceString(ns.db(), NamespaceString::kSystemDotViewsCollectionName),
+            NamespaceString(ns.dbName(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
         auto db = autoColl.ensureDbExists(opCtx);
 

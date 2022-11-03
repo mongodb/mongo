@@ -1488,6 +1488,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/fetcher',
+        '$BUILD_DIR/mongo/executor/async_rpc',
         'primary_only_service',
         'tenant_migration_access_blocker',
         'tenant_migration_statistics',
@@ -1717,6 +1718,7 @@ if wiredtiger:
             'tenant_migration_recipient_access_blocker_test.cpp',
             'tenant_migration_recipient_entry_helpers_test.cpp',
             'tenant_migration_recipient_service_test.cpp',
+            'tenant_migration_recipient_service_shard_merge_test.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/bson/mutable/mutable_bson',

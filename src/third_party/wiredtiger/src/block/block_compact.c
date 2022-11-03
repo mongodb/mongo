@@ -77,7 +77,7 @@ __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block, u_int *ms
     struct timespec cur_time;
     uint64_t time_diff;
 
-    if (!WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT_PROGRESS, WT_VERBOSE_DEBUG_1))
+    if (!WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT_PROGRESS, WT_VERBOSE_DEBUG_2))
         return;
 
     __wt_epoch(session, &cur_time);
@@ -121,7 +121,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
     __wt_spin_lock(session, &block->live_lock);
 
     /* Dump the current state of the file. */
-    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG_1))
+    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG_2))
         __block_dump_file_stat(session, block, true);
 
     /* Sum the available bytes in the initial 80% and 90% of the file. */
@@ -333,7 +333,7 @@ __block_dump_bucket_stat(WT_SESSION_IMPL *session, uintmax_t file_size, uintmax_
     if (file_size > file_free)
         used_pct = (bucket_used * 100) / (file_size - file_free);
 
-    __wt_verbose_debug(session, WT_VERB_COMPACT,
+    __wt_verbose_debug2(session, WT_VERB_COMPACT,
       "%2u%%: %12" PRIuMAX "MB, (free: %" PRIuMAX "B, %" PRIuMAX "%%), (used: %" PRIuMAX
       "MB, %" PRIuMAX "B, %" PRIuMAX "%%)",
       bucket_pct, bucket_free / WT_MEGABYTE, bucket_free, free_pct, bucket_used / WT_MEGABYTE,

@@ -963,6 +963,15 @@ server_parameters:
     validator:
       callback: telemetry_util::validateTelemetryCacheSize
 
+  internalQueryDisableExclusionProjectionFastPath:
+    description: "If true, then ExclusionProjectionExecutor won't use fast path implementation. This
+    is needed to pass generational fuzzers that are sensitive to field order and other corner cases
+    when switching from Document to BSONObj."
+    set_at: [ startup ]
+    cpp_varname: "internalQueryDisableExclusionProjectionFastPath"
+    cpp_vartype: bool
+    default: false
+    test_only: true
 
 # Note for adding additional query knobs:
 #

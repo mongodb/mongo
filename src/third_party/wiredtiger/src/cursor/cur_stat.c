@@ -565,6 +565,8 @@ __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *curjoin,
         return (0);
     }
 
+    /* Data source statistics are only available after recovery completes. */
+    WT_ASSERT(session, F_ISSET(S2C(session), WT_CONN_RECOVERY_COMPLETE));
     dsrc_uri = uri + strlen("statistics:");
 
     if (strcmp(dsrc_uri, "join") == 0)

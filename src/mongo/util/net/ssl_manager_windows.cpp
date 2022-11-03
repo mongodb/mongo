@@ -2067,10 +2067,12 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     }
     const auto cipher = std::wstring(cipherInfo.szCipherSuite);
 
-    LOGV2_INFO(6723802,
-               "Accepted TLS connection from peer",
-               "peerSubjectName"_attr = peerSubjectName,
-               "cipher"_attr = toUtf8String(cipher));
+    if (!serverGlobalParams.quiet.load()) {
+        LOGV2_INFO(6723802,
+                   "Accepted TLS connection from peer",
+                   "peerSubjectName"_attr = peerSubjectName,
+                   "cipher"_attr = toUtf8String(cipher));
+    }
 
     // If this is a server and client and server certificate are the same, log a warning.
     if (remoteHost.empty() && _sslConfiguration.serverSubjectName() == peerSubjectName) {

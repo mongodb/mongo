@@ -259,6 +259,11 @@ structs:
                 type: object
                 optional: true
                 stability: stable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: unstable
 
     DeleteOpEntry:
         description: "Parser for the entries in the 'deletes' array of a delete command."
@@ -285,6 +290,11 @@ structs:
                 type: object
                 optional: true
                 stability: stable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: unstable
 
     FindAndModifyLastError:
         description: "Contains execution details for the findAndModify command"
@@ -542,4 +552,9 @@ commands:
             mirrored:
                 description: "Indicates whether the operation is a mirrored read"
                 type: optionalBool
+                stability: unstable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
                 stability: unstable

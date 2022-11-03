@@ -41,7 +41,7 @@ class StreamableInput {
 public:
     virtual ~StreamableInput() {}
 
-    virtual const char* getPath() const = 0;
+    virtual const std::string& getAbsolutePath() const = 0;
 
     void open() {
         if (isOpen()) {

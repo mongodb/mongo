@@ -290,15 +290,9 @@ bool EvaluationNode::operator==(const EvaluationNode& other) const {
         getChild() == other.getChild();
 }
 
-RIDIntersectNode::RIDIntersectNode(ProjectionName scanProjectionName,
-                                   const bool hasLeftIntervals,
-                                   const bool hasRightIntervals,
-                                   ABT leftChild,
-                                   ABT rightChild)
+RIDIntersectNode::RIDIntersectNode(ProjectionName scanProjectionName, ABT leftChild, ABT rightChild)
     : Base(std::move(leftChild), std::move(rightChild)),
-      _scanProjectionName(std::move(scanProjectionName)),
-      _hasLeftIntervals(hasLeftIntervals),
-      _hasRightIntervals(hasRightIntervals) {
+      _scanProjectionName(std::move(scanProjectionName)) {
     assertNodeSort(getLeftChild());
     assertNodeSort(getRightChild());
 }
@@ -321,21 +315,11 @@ ABT& RIDIntersectNode::getRightChild() {
 
 bool RIDIntersectNode::operator==(const RIDIntersectNode& other) const {
     return _scanProjectionName == other._scanProjectionName &&
-        _hasLeftIntervals == other._hasLeftIntervals &&
-        _hasRightIntervals == other._hasRightIntervals && getLeftChild() == other.getLeftChild() &&
-        getRightChild() == other.getRightChild();
+        getLeftChild() == other.getLeftChild() && getRightChild() == other.getRightChild();
 }
 
 const ProjectionName& RIDIntersectNode::getScanProjectionName() const {
     return _scanProjectionName;
-}
-
-bool RIDIntersectNode::hasLeftIntervals() const {
-    return _hasLeftIntervals;
-}
-
-bool RIDIntersectNode::hasRightIntervals() const {
-    return _hasRightIntervals;
 }
 
 static ProjectionNameVector createSargableBindings(const PartialSchemaRequirements& reqMap) {

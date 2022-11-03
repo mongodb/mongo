@@ -52,7 +52,7 @@ void PrepareConflictTracker::endPrepareConflict(OperationContext* opCtx) {
         auto curTick = tickSource->getTicks();
 
         auto curConflictDuration =
-            tickSource->spanTo<Microseconds>(_prepareConflictStartTime, curTick);
+            tickSource->ticksTo<Microseconds>(curTick - _prepareConflictStartTime);
         _prepareConflictDuration.store(_prepareConflictDuration.load() + curConflictDuration);
         _prepareConflictStartTime = 0;
 

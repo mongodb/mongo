@@ -30,7 +30,6 @@
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
-#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path.h"
@@ -46,22 +45,6 @@ OptPhaseManager::PhaseSet OptPhaseManager::_allRewrites = {OptPhase::ConstEvalPr
                                                            OptPhase::MemoImplementationPhase,
                                                            OptPhase::PathLower,
                                                            OptPhase::ConstEvalPost};
-
-OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
-                                 PrefixId& prefixId,
-                                 Metadata metadata,
-                                 DebugInfo debugInfo,
-                                 QueryHints queryHints)
-    : OptPhaseManager(std::move(phaseSet),
-                      prefixId,
-                      false /*requireRID*/,
-                      std::move(metadata),
-                      std::make_unique<HeuristicCE>(),
-                      std::make_unique<DefaultCosting>(),
-                      {} /*pathToInterval*/,
-                      ConstEval::constFold,
-                      std::move(debugInfo),
-                      std::move(queryHints)) {}
 
 OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  PrefixId& prefixId,

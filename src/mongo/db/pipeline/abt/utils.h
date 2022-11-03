@@ -40,10 +40,20 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> convertFrom(Value val);
 
 using ABTFieldNameFn =
     std::function<ABT(const std::string& fieldName, const bool isLastElement, ABT input)>;
+
+/**
+ * Translates an aggregation FieldPath by invoking the `fieldNameFn` for each path component.
+ */
 ABT translateFieldPath(const FieldPath& fieldPath,
                        ABT initial,
                        const ABTFieldNameFn& fieldNameFn,
                        size_t skipFromStart = 0);
+
+/**
+ * Translates a given FieldRef (typically used in a MatchExpression) with 'initial' as the input
+ * ABT.
+ */
+ABT translateFieldRef(const FieldRef& fieldRef, ABT initial);
 
 /**
  * Return the minimum or maximum value for the "class" of values represented by the input

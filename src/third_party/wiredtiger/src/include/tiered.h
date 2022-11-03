@@ -36,10 +36,10 @@
  * Different types of work units for tiered trees.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_TIERED_WORK_DROP_LOCAL 0x1u   /* Drop object from local storage. */
-#define WT_TIERED_WORK_DROP_SHARED 0x2u  /* Drop object from tier. */
-#define WT_TIERED_WORK_FLUSH 0x4u        /* Flush object to tier. */
-#define WT_TIERED_WORK_FLUSH_FINISH 0x8u /* Perform flush finish on object. */
+#define WT_TIERED_WORK_FLUSH 0x1u         /* Flush object to tier. */
+#define WT_TIERED_WORK_FLUSH_FINISH 0x2u  /* Perform flush finish on object. */
+#define WT_TIERED_WORK_REMOVE_LOCAL 0x4u  /* Remove object from local storage. */
+#define WT_TIERED_WORK_REMOVE_SHARED 0x8u /* Remove object from tier. */
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /*

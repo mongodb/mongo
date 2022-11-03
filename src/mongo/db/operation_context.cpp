@@ -80,7 +80,7 @@ OperationContext::OperationContext(Client* client, OperationIdSlot&& opIdSlot)
     : _client(client),
       _opId(std::move(opIdSlot)),
       _elapsedTime(client ? client->getServiceContext()->getTickSource()
-                          : SystemTickSource::get()) {}
+                          : globalSystemTickSource()) {}
 
 OperationContext::~OperationContext() {
     releaseOperationKey();

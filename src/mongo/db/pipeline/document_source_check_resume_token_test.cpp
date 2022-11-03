@@ -206,10 +206,6 @@ protected:
         if (!_collScan) {
             _collScan = std::make_unique<CollectionScan>(
                 pExpCtx.get(), _collectionPtr, _params, &_ws, _filter.get());
-            // The first call to doWork will create the cursor and return NEED_TIME. But it won't
-            // actually scan any of the documents that are present in the mock cursor queue.
-            ASSERT_EQ(_collScan->doWork(nullptr), PlanStage::NEED_TIME);
-            ASSERT_EQ(_getNumDocsTested(), 0);
         }
         while (true) {
             // If the next result is a pause, return it and don't collscan.

@@ -155,7 +155,9 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
  * If the caller provides a 'extractAndAttachPipelineStages' function and the query is eligible for
  * pushdown into the find layer this function will be invoked to extract pipeline stages and
  * attach them to the provided 'CanonicalQuery'. This function should capture the Pipeline that
- * stages should be extracted from.
+ * stages should be extracted from. If the boolean 'attachOnly' argument is true, it will only find
+ * and attach the applicable stages to the query. If it is false, it will remove the extracted
+ * stages from the pipeline.
  *
  * Note that the first overload takes a 'MultipleCollectionAccessor' and can construct a
  * PlanExecutor over multiple collections, while the second overload takes a single 'CollectionPtr'
@@ -165,7 +167,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
+    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const QueryPlannerParams& plannerOptions);
 
@@ -173,7 +175,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
     const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
+    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions = 0);
 
@@ -190,7 +192,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
  * If the caller provides a 'extractAndAttachPipelineStages' function and the query is eligible for
  * pushdown into the find layer this function will be invoked to extract pipeline stages and
  * attach them to the provided 'CanonicalQuery'. This function should capture the Pipeline that
- * stages should be extracted from.
+ * stages should be extracted from. If the boolean 'attachOnly' argument is true, it will only find
+ * and attach the applicable stages to the query. If it is false, it will remove the extracted
+ * stages from the pipeline.
  *
  * Note that the first overload takes a 'MultipleCollectionAccessor' and can construct a
  * PlanExecutor over multiple collections, while the second overload takes a single
@@ -200,7 +204,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
+    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     bool permitYield = false,
     QueryPlannerParams plannerOptions = QueryPlannerParams{});
 
@@ -208,7 +212,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     OperationContext* opCtx,
     const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
+    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     bool permitYield = false,
     size_t plannerOptions = QueryPlannerParams::DEFAULT);
 

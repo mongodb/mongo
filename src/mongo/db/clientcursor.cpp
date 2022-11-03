@@ -40,6 +40,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/external_data_source_scope_guard.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
@@ -64,6 +65,10 @@ static CounterMetric cursorStatsOpenNoTimeout{"cursor.open.noTimeout"};
 static CounterMetric cursorStatsTimedOut{"cursor.timedOut"};
 static CounterMetric cursorStatsTotalOpened{"cursor.totalOpened"};
 static CounterMetric cursorStatsMoreThanOneBatch{"cursor.moreThanOneBatch"};
+
+const ClientCursor::Decoration<std::shared_ptr<ExternalDataSourceScopeGuard>>
+    ExternalDataSourceScopeGuard::get =
+        ClientCursor::declareDecoration<std::shared_ptr<ExternalDataSourceScopeGuard>>();
 
 ClientCursor::ClientCursor(ClientCursorParams params,
                            CursorId cursorId,
@@ -133,6 +138,9 @@ void ClientCursor::dispose(OperationContext* opCtx) {
     }
 
     _exec->dispose(opCtx);
+    // Update opCtx of the decorated ExternalDataSourceScopeGuard object so that it can drop virtual
+    // collections in the new 'opCtx'.
+    ExternalDataSourceScopeGuard::updateOperationContext(this, opCtx);
     _disposed = true;
 }
 

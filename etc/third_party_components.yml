@@ -83,7 +83,7 @@ components:
     homepage_url: https://github.com/cgoldberg/concurrencytest
     open_hub_url: https://www.openhub.net/p/concurrencytest
     release_monitoring_id: -1
-    local_directory_path: src/third_party/wiredtiger/test/3rdparty/concurrencytest-0.1.2
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/concurrencytest-0.1.2-locally-modified
     is_test_only: true
     team_owner: "Wiredtiger"
 

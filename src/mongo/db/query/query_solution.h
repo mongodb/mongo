@@ -1396,15 +1396,15 @@ struct GroupNode : public QuerySolutionNode {
           shouldProduceBson(shouldProduceBson) {
         // Use the DepsTracker to extract the fields that the 'groupByExpression' and accumulator
         // expressions depend on.
-        for (auto& groupByExprField : expression::getDependencies(groupByExpression.get()).fields) {
-            requiredFields.insert(groupByExprField);
-        }
+        DepsTracker deps;
+        expression::addDependencies(groupByExpression.get(), &deps);
         for (auto&& acc : accumulators) {
-            auto argExpr = acc.expr.argument;
-            for (auto& argExprField : expression::getDependencies(argExpr.get()).fields) {
-                requiredFields.insert(argExprField);
-            }
+            expression::addDependencies(acc.expr.argument.get(), &deps);
         }
+
+        requiredFields = deps.fields;
+        needWholeDocument = deps.needWholeDocument;
+        needsAnyMetadata = deps.getNeedsAnyMetadata();
     }
 
     StageType getType() const override {
@@ -1438,7 +1438,9 @@ struct GroupNode : public QuerySolutionNode {
     // Carries the fields this GroupNode depends on. Namely, 'requiredFields' contains the union of
     // the fields in the 'groupByExpressions' and the fields in the input Expressions of the
     // 'accumulators'.
-    StringSet requiredFields;
+    OrderedPathSet requiredFields;
+    bool needWholeDocument = false;
+    bool needsAnyMetadata = false;
 
     // If set to true, generated SBE plan will produce result as BSON object. If false,
     // 'sbe::Object' is produced instead.

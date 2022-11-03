@@ -440,6 +440,9 @@ function runTest(featureFlagRequireTenantId) {
         assert(validateRes.valid);
     }
 
+    // Test dbCheck command.
+    { assert.commandWorked(testDb.runCommand({dbCheck: kCollName, '$tenant': kTenant})); }
+
     rst.stopSet();
 }
 

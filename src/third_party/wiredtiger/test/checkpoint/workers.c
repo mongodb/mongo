@@ -391,7 +391,7 @@ real_worker(void)
             goto err;
         }
 
-    for (i = 0; i < g.nops && g.running; ++i, __wt_yield()) {
+    for (i = 0; i < g.nops && g.opts.running; ++i, __wt_yield()) {
         if (i > 0 && i % 5000 == 0)
             printf("Worker %u of %u ops\n", i, g.nops);
         if (start_txn) {

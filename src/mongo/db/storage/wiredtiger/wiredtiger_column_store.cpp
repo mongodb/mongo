@@ -39,7 +39,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-
 namespace mongo {
 StatusWith<std::string> WiredTigerColumnStore::generateCreateString(
     const std::string& engineName,
@@ -218,9 +217,19 @@ void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellVi
 void WiredTigerColumnStore::fullValidate(OperationContext* opCtx,
                                          int64_t* numKeysOut,
                                          IndexValidateResults* fullResults) const {
-    // TODO SERVER-65484: Validation for column indexes.
-    // uasserted(ErrorCodes::NotImplemented, "WiredTigerColumnStore::fullValidate()");
-    return;
+    dassert(opCtx->lockState()->isReadLocked());
+    if (!WiredTigerIndexUtil::validateStructure(opCtx, _uri, fullResults)) {
+        return;
+    }
+    auto cursor = newCursor(opCtx);
+    long long count = 0;
+
+    while (cursor->next()) {
+        count++;
+    }
+    if (numKeysOut) {
+        *numKeysOut = count;
+    }
 }
 
 class WiredTigerColumnStore::Cursor final : public ColumnStore::Cursor,

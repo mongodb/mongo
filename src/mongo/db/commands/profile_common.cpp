@@ -133,6 +133,7 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
             newState.append("filter"_sd, newSettings.filter->serialize());
         }
         attrs.add("to", newState.obj());
+        attrs.add("db", dbName.db());
 
         LOGV2(48742, "Profiler settings changed", attrs);
     }

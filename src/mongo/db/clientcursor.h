@@ -117,7 +117,7 @@ struct ClientCursorParams {
  * caller as "no timeout", it will be automatically destroyed by its cursor manager after a period
  * of inactivity.
  */
-class ClientCursor {
+class ClientCursor : public Decorable<ClientCursor> {
     ClientCursor(const ClientCursor&) = delete;
     ClientCursor& operator=(const ClientCursor&) = delete;
 

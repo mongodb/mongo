@@ -9,14 +9,11 @@ selector:
   - jstests/core/nan.js
   # TODO SERVER-67506
   - jstests/core/arrayfind5.js
-  # TODO SERVER-23229 on classic which is fixed by SERVER-67548 in CQF.
+  # TODO SERVER-67550
   - jstests/aggregation/bugs/groupMissing.js
   - jstests/core/null_query_semantics.js
   # TODO SERVER-70142 Populate planSummary field which is shown in output of $currentOp.
   - jstests/core/currentop_cursors.js
-  # TODO SERVER-67517
-  - jstests/core/field_name_empty.js
-  - jstests/core/field_name_validation.js
   # TODO SERVER-67639
   - jstests/core/index_stats.js
   # TODO SERVER-67640
@@ -38,8 +35,6 @@ selector:
   - jstests/core/sbe/from_plan_cache_flag.js
   - jstests/core/sbe/plan_cache_sbe_with_or_queries.js
   - jstests/core/sbe_plan_cache_autoparameterize_collscan.js
-  # TODO SERVER-62034 Prevent distinct() from using CQF.
-  - jstests/core/profile_distinct.js
   # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
   # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
   - jstests/core/txns/**/*.js

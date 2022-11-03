@@ -76,8 +76,9 @@ struct ExpressionVisitorContext {
     ExpressionVisitorContext(StageBuilderState& state,
                              EvalStage inputStage,
                              boost::optional<sbe::value::SlotId> optionalRootSlot,
-                             PlanNodeId planNodeId)
-        : state(state), optionalRootSlot(optionalRootSlot), planNodeId(planNodeId) {
+                             PlanNodeId planNodeId,
+                             const PlanStageSlots* slots = nullptr)
+        : state(state), optionalRootSlot(optionalRootSlot), planNodeId(planNodeId), slots(slots) {
         evalStack.emplaceFrame(std::move(inputStage));
     }
 
@@ -142,6 +143,9 @@ struct ExpressionVisitorContext {
     std::stack<VarsFrame> varsFrameStack;
     // The id of the QuerySolutionNode to which the expression we are converting to SBE is attached.
     const PlanNodeId planNodeId;
+
+    const PlanStageSlots* slots = nullptr;
+
     // This stack contains slot id for the current element variable of $filter expression.
     std::stack<sbe::value::SlotId> filterExprSlotIdStack;
     // We use this counter to track which children of $filter we've already processed.
@@ -149,17 +153,23 @@ struct ExpressionVisitorContext {
 };
 
 std::unique_ptr<sbe::EExpression> generateTraverseHelper(
-    const sbe::EVariable& inputVar,
+    std::unique_ptr<sbe::EExpression> inputExpr,
     const FieldPath& fp,
     size_t level,
-    sbe::value::FrameIdGenerator* frameIdGenerator) {
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    boost::optional<sbe::value::SlotId> topLevelFieldSlot = boost::none) {
     using namespace std::literals;
 
     invariant(level < fp.getPathLength());
+    tassert(6023417,
+            "Expected an input expression or top level field",
+            inputExpr.get() || topLevelFieldSlot.has_value());
 
     // Generate an expression to read a sub-field at the current nested level.
     auto fieldName = sbe::makeE<sbe::EConstant>(fp.getFieldName(level));
-    auto fieldExpr = makeFunction("getField"_sd, inputVar.clone(), std::move(fieldName));
+    auto fieldExpr = topLevelFieldSlot
+        ? makeVariable(*topLevelFieldSlot)
+        : makeFunction("getField"_sd, std::move(inputExpr), std::move(fieldName));
 
     if (level == fp.getPathLength() - 1) {
         // For the last level, we can just return the field slot without the need for a
@@ -171,7 +181,7 @@ std::unique_ptr<sbe::EExpression> generateTraverseHelper(
     auto lambdaFrameId = frameIdGenerator->generate();
     auto lambdaParam = sbe::EVariable{lambdaFrameId, 0};
 
-    auto resultExpr = generateTraverseHelper(lambdaParam, fp, level + 1, frameIdGenerator);
+    auto resultExpr = generateTraverseHelper(lambdaParam.clone(), fp, level + 1, frameIdGenerator);
 
     auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(lambdaFrameId, std::move(resultExpr));
 
@@ -186,28 +196,32 @@ std::unique_ptr<sbe::EExpression> generateTraverseHelper(
  * For the given MatchExpression 'expr', generates a path traversal SBE plan stage sub-tree
  * implementing the comparison expression.
  */
-std::unique_ptr<sbe::EExpression> generateTraverse(const sbe::EVariable& inputVar,
-                                                   bool expectsDocumentInputOnly,
-                                                   const FieldPath& fp,
-                                                   sbe::value::FrameIdGenerator* frameIdGenerator) {
+std::unique_ptr<sbe::EExpression> generateTraverse(
+    std::unique_ptr<sbe::EExpression> inputExpr,
+    bool expectsDocumentInputOnly,
+    const FieldPath& fp,
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    boost::optional<sbe::value::SlotId> topLevelFieldSlot = boost::none) {
     size_t level = 0;
 
     if (expectsDocumentInputOnly) {
-        // When we know for sure that 'inputVar' will be a document and _not_ an array (such as
-        // when traversing the root document), we can generate a simpler expression.
-        return generateTraverseHelper(inputVar, fp, level, frameIdGenerator);
+        // When we know for sure that 'inputExpr' will be a document and _not_ an array (such as
+        // when accessing a field on the root document), we can generate a simpler expression.
+        return generateTraverseHelper(
+            std::move(inputExpr), fp, level, frameIdGenerator, topLevelFieldSlot);
     } else {
-        // The general case: the value in the 'inputVar' may be an array that will require
+        tassert(6023418, "Expected an input expression", inputExpr.get());
+        // The general case: the value in the 'inputExpr' may be an array that will require
         // traversal.
         auto lambdaFrameId = frameIdGenerator->generate();
         auto lambdaParam = sbe::EVariable{lambdaFrameId, 0};
 
-        auto resultExpr = generateTraverseHelper(lambdaParam, fp, level, frameIdGenerator);
+        auto resultExpr = generateTraverseHelper(lambdaParam.clone(), fp, level, frameIdGenerator);
 
         auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(lambdaFrameId, std::move(resultExpr));
 
         return makeFunction("traverseP",
-                            inputVar.clone(),
+                            std::move(inputExpr),
                             std::move(lambdaExpr),
                             makeConstant(sbe::value::TypeTags::NumberInt32, 1));
     }
@@ -1951,28 +1965,44 @@ public:
     void visit(const ExpressionFieldPath* expr) final {
         // There's a chance that we've already generated a SBE plan stage tree for this field path,
         // in which case we avoid regeneration of the same plan stage tree.
-        if (auto it = _context->state.preGeneratedExprs.find(expr->getFieldPath().fullPath());
-            it != _context->state.preGeneratedExprs.end()) {
-            tassert(6089301,
-                    "Expressions for top-level document or a variable must not be pre-generated",
-                    expr->getFieldPath().getPathLength() != 1 && !expr->isVariableReference());
-            if (auto optionalSlot = it->second.getSlot(); optionalSlot) {
-                _context->pushExpr(*optionalSlot);
-            } else {
-                auto preGeneratedExpr = it->second.extractExpr();
-                _context->pushExpr(preGeneratedExpr->clone());
-                it->second = std::move(preGeneratedExpr);
+        if (!_context->state.preGeneratedExprs.empty()) {
+            if (auto it = _context->state.preGeneratedExprs.find(expr->getFieldPath().fullPath());
+                it != _context->state.preGeneratedExprs.end()) {
+                tassert(6089301,
+                        "Expressions for top-level documents / variables must not be pre-generated",
+                        expr->getFieldPath().getPathLength() != 1 && !expr->isVariableReference());
+                if (auto optionalSlot = it->second.getSlot(); optionalSlot) {
+                    _context->pushExpr(*optionalSlot);
+                } else {
+                    auto preGeneratedExpr = it->second.extractExpr();
+                    _context->pushExpr(preGeneratedExpr->clone());
+                    it->second = std::move(preGeneratedExpr);
+                }
+                return;
             }
-            return;
         }
 
-        tassert(6075901, "Must have a valid root slot", _context->optionalRootSlot.has_value());
+        boost::optional<sbe::value::SlotId> slotId;
+        boost::optional<sbe::value::SlotId> topLevelFieldSlot;
+        boost::optional<FieldPath> fp;
+        bool expectsDocumentInputOnly = false;
 
-        sbe::value::SlotId slotId;
+        if (expr->getFieldPath().getPathLength() > 1) {
+            fp = expr->getFieldPathWithoutCurrentPrefix();
+        }
 
-        if (!Variables::isUserDefinedVariable(expr->getVariableId())) {
+        if (expr->getVariableId() == Variables::kRootId &&
+            expr->getFieldPath().getPathLength() > 1) {
+            slotId = _context->optionalRootSlot;
+            expectsDocumentInputOnly = true;
+
+            if (_context->slots) {
+                auto topLevelField = std::make_pair(PlanStageSlots::kField, fp->front());
+                topLevelFieldSlot = _context->slots->getIfExists(topLevelField);
+            }
+        } else if (!Variables::isUserDefinedVariable(expr->getVariableId())) {
             if (expr->getVariableId() == Variables::kRootId) {
-                slotId = *(_context->optionalRootSlot);
+                slotId = _context->optionalRootSlot;
             } else if (expr->getVariableId() == Variables::kRemoveId) {
                 // For the field paths that begin with "$$REMOVE", we always produce Nothing,
                 // so no traversal is necessary.
@@ -1990,7 +2020,7 @@ public:
                             << "Builtin variable '$$" << it->second << "' is not available",
                         variableSlot.has_value());
 
-                slotId = *variableSlot;
+                slotId = variableSlot;
             }
         } else {
             auto it = _context->environment.find(expr->getVariableId());
@@ -2002,19 +2032,27 @@ public:
         }
 
         if (expr->getFieldPath().getPathLength() == 1) {
+            tassert(6023419, "Must have a valid slot", slotId.has_value());
+
             // A solo variable reference (e.g.: "$$ROOT" or "$$myvar") that doesn't need any
             // traversal.
-            _context->pushExpr(slotId);
+            _context->pushExpr(*slotId);
             return;
         }
 
-        // Dereference a dotted path, which may contain arrays requiring implicit traversal.
-        const bool expectsDocumentInputOnly = slotId == *(_context->optionalRootSlot);
+        tassert(6023420,
+                "Must have a valid root slot or field slot",
+                slotId.has_value() || topLevelFieldSlot.has_value());
 
-        auto resultExpr = generateTraverse(sbe::EVariable{slotId},
+        auto inputExpr =
+            slotId ? sbe::makeE<sbe::EVariable>(*slotId) : std::unique_ptr<sbe::EExpression>{};
+
+        // Dereference a dotted path, which may contain arrays requiring implicit traversal.
+        auto resultExpr = generateTraverse(std::move(inputExpr),
                                            expectsDocumentInputOnly,
-                                           expr->getFieldPathWithoutCurrentPrefix(),
-                                           _context->state.frameIdGenerator);
+                                           *fp,
+                                           _context->state.frameIdGenerator,
+                                           topLevelFieldSlot);
 
         _context->pushExpr(std::move(resultExpr));
     }
@@ -4126,8 +4164,9 @@ EvalExprStagePair generateExpression(StageBuilderState& state,
                                      const Expression* expr,
                                      EvalStage stage,
                                      boost::optional<sbe::value::SlotId> optionalRootSlot,
-                                     PlanNodeId planNodeId) {
-    ExpressionVisitorContext context(state, std::move(stage), optionalRootSlot, planNodeId);
+                                     PlanNodeId planNodeId,
+                                     const PlanStageSlots* slots) {
+    ExpressionVisitorContext context(state, std::move(stage), optionalRootSlot, planNodeId, slots);
 
     ExpressionPreVisitor preVisitor{&context};
     ExpressionInVisitor inVisitor{&context};

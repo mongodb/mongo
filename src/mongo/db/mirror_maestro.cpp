@@ -32,6 +32,7 @@
 
 #include "mongo/db/mirror_maestro.h"
 
+#include "mongo/rpc/get_status_from_command_result.h"
 #include <cmath>
 #include <cstdlib>
 #include <utility>
@@ -72,9 +73,10 @@ constexpr auto kMirroredReadsParamName = "mirrorReads"_sd;
 
 constexpr auto kMirroredReadsSeenKey = "seen"_sd;
 constexpr auto kMirroredReadsSentKey = "sent"_sd;
-constexpr auto kMirroredReadsReceivedKey = "received"_sd;
+constexpr auto kMirroredReadsProcessedAsSecondaryKey = "processedAsSecondary"_sd;
 constexpr auto kMirroredReadsResolvedKey = "resolved"_sd;
 constexpr auto kMirroredReadsResolvedBreakdownKey = "resolvedBreakdown"_sd;
+constexpr auto kMirroredReadsSucceededKey = "succeeded"_sd;
 constexpr auto kMirroredReadsPendingKey = "pending"_sd;
 
 MONGO_FAIL_POINT_DEFINE(mirrorMaestroExpectsResponse);
@@ -185,12 +187,13 @@ public:
         BSONObjBuilder section;
         section.append(kMirroredReadsSeenKey, seen.loadRelaxed());
         section.append(kMirroredReadsSentKey, sent.loadRelaxed());
-        section.append(kMirroredReadsReceivedKey, received.loadRelaxed());
+        section.append(kMirroredReadsProcessedAsSecondaryKey, processedAsSecondary.loadRelaxed());
 
         if (MONGO_unlikely(mirrorMaestroExpectsResponse.shouldFail())) {
             // We only can see if the command resolved if we got a response
             section.append(kMirroredReadsResolvedKey, resolved.loadRelaxed());
             section.append(kMirroredReadsResolvedBreakdownKey, resolvedBreakdown.toBSON());
+            section.append(kMirroredReadsSucceededKey, succeeded.loadRelaxed());
         }
         if (MONGO_unlikely(mirrorMaestroTracksPending.shouldFail())) {
             section.append(kMirroredReadsPendingKey, pending.loadRelaxed());
@@ -232,13 +235,22 @@ public:
 
     ResolvedBreakdownByHost resolvedBreakdown;
 
+    // Counts the number of operations (as primary) recognized as "to be mirrored".
     AtomicWord<CounterT> seen;
+    // Counts the number of remote requests (for mirroring as primary) sent over the network.
     AtomicWord<CounterT> sent;
+    // Counts the number of responses (as primary) from secondaries after mirrored operations.
     AtomicWord<CounterT> resolved;
-    // Counts the number of operations that are scheduled to be mirrored, but haven't yet been sent.
+    // Counts the number of responses (as primary) of successful mirrored operations. Disabled by
+    // default, hidden behind the mirrorMaestroExpectsResponse fail point.
+    AtomicWord<CounterT> succeeded;
+    // Counts the number of operations (as primary) that are scheduled to be mirrored, but
+    // haven't yet been sent. Disabled by default, hidden behind the mirrorMaestroTracksPending
+    // fail point.
     AtomicWord<CounterT> pending;
-    // Counts the number of mirrored operations received by this node as a secondary.
-    AtomicWord<CounterT> received;
+    // Counts the number of mirrored operations processed successfully by this node as a
+    // secondary. Disabled by default, hidden behind the mirrorMaestroExpectsResponse fail point.
+    AtomicWord<CounterT> processedAsSecondary;
 } gMirroredReadsSection;
 
 auto parseMirroredReadsParameters(const BSONObj& obj) {
@@ -306,7 +318,7 @@ void MirrorMaestro::tryMirrorRequest(OperationContext* opCtx) noexcept {
 void MirrorMaestro::onReceiveMirroredRead(OperationContext* opCtx) noexcept {
     const auto& invocation = CommandInvocation::get(opCtx);
     if (MONGO_unlikely(invocation->isMirrored())) {
-        gMirroredReadsSection.received.fetchAndAddRelaxed(1);
+        gMirroredReadsSection.processedAsSecondary.fetchAndAddRelaxed(1);
     }
 }
 
@@ -418,6 +430,11 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
             // Count both failed and successful reads as resolved
             gMirroredReadsSection.resolved.fetchAndAdd(1);
             gMirroredReadsSection.resolvedBreakdown.onResponseReceived(host);
+
+            if (getStatusFromCommandResult(args.response.data).isOK()) {
+                gMirroredReadsSection.succeeded.fetchAndAdd(1);
+            }
+
             LOGV2_DEBUG(
                 31457, 4, "Response received", "host"_attr = host, "response"_attr = args.response);
 

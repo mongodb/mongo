@@ -76,7 +76,7 @@ public:
     };
 
     UpdateRequest(const write_ops::UpdateOpEntry& updateOp = write_ops::UpdateOpEntry())
-        : _updateOp(updateOp) {}
+        : _updateOp(updateOp), _sampleId(updateOp.getSampleId()) {}
 
     void setNamespaceString(const NamespaceString& nsString) {
         _nsString = nsString;
@@ -257,6 +257,14 @@ public:
         return _stmtIds;
     }
 
+    void setSampleId(boost::optional<UUID> sampleId) {
+        _sampleId = sampleId;
+    }
+
+    const boost::optional<UUID>& getSampleId() const {
+        return _sampleId;
+    }
+
     std::string toString() const {
         StringBuilder builder;
         builder << " query: " << getQuery();
@@ -313,6 +321,9 @@ private:
 
     // The statement ids of this request.
     std::vector<StmtId> _stmtIds = {kUninitializedStmtId};
+
+    // The unique sample id for this request if it has been chosen for sampling.
+    boost::optional<UUID> _sampleId;
 
     // Flags controlling the update.
 

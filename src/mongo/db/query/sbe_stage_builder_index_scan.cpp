@@ -696,7 +696,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     PlanYieldPolicy* yieldPolicy,
     StringMap<const IndexAccessMethod*>* iamMap,
     bool needsCorruptionCheck) {
-
     auto indexName = ixn->index.identifier.catalogName;
     auto descriptor = collection->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
     tassert(5483200,
@@ -855,8 +854,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
         stage = outputStage.extractStage(ixn->nodeId());
     }
 
-    outputs.setIndexKeySlots(makeIndexKeyOutputSlotsMatchingParentReqs(
-        ixn->index.keyPattern, originalIndexKeyBitset, indexKeyBitset, indexKeySlots));
+    size_t i = 0;
+    size_t slotIdx = 0;
+    for (const auto& elt : ixn->index.keyPattern) {
+        StringData name = elt.fieldNameStringData();
+        if (indexKeyBitset.test(i)) {
+            outputs.set(std::make_pair(PlanStageSlots::kKey, name), indexKeySlots[slotIdx]);
+            ++slotIdx;
+        }
+        ++i;
+    }
 
     return {std::move(stage), std::move(outputs)};
 }
@@ -981,8 +988,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     // Whenever possible we should prefer building simplified single interval index scan plans in
     // order to get the best performance.
     if (canGenerateSingleIntervalIndexScan(ixn->iets)) {
-        auto makeSlot = [&](const bool cond,
-                            const StringData slotKey) -> boost::optional<sbe::value::SlotId> {
+        auto makeSlot =
+            [&](const bool cond,
+                const PlanStageSlots::Name slotKey) -> boost::optional<sbe::value::SlotId> {
             if (!cond)
                 return boost::none;
 
@@ -1024,10 +1032,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
         auto optimizedIndexScanSlots = optimizedIndexKeySlots;
         auto branchOutputSlots = outputIndexKeySlots;
 
-        auto makeSlotsForThenElseBranches =
-            [&](const bool cond,
-                const StringData slotKey) -> std::tuple<boost::optional<sbe::value::SlotId>,
-                                                        boost::optional<sbe::value::SlotId>> {
+        auto makeSlotsForThenElseBranches = [&](const bool cond, const PlanStageSlots::Name slotKey)
+            -> std::tuple<boost::optional<sbe::value::SlotId>,
+                          boost::optional<sbe::value::SlotId>> {
             if (!cond)
                 return {boost::none, boost::none};
 
@@ -1145,9 +1152,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
         stage = outputStage.extractStage(ixn->nodeId());
     }
 
-    outputs.setIndexKeySlots(makeIndexKeyOutputSlotsMatchingParentReqs(
-        ixn->index.keyPattern, originalIndexKeyBitset, indexKeyBitset, outputIndexKeySlots));
-
     state.data->indexBoundsEvaluationInfos.emplace_back(
         IndexBoundsEvaluationInfo{ixn->index,
                                   accessMethod->getSortedDataInterface()->getKeyStringVersion(),
@@ -1155,6 +1159,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
                                   ixn->direction,
                                   std::move(ixn->iets),
                                   std::move(parameterizedScanSlots)});
+
+    size_t i = 0;
+    size_t slotIdx = 0;
+    for (const auto& elt : ixn->index.keyPattern) {
+        StringData name = elt.fieldNameStringData();
+        if (indexKeyBitset.test(i)) {
+            outputs.set(std::make_pair(PlanStageSlots::kKey, name), outputIndexKeySlots[slotIdx]);
+            ++slotIdx;
+        }
+        ++i;
+    }
 
     return {std::move(stage), std::move(outputs)};
 }

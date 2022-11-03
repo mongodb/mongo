@@ -35,6 +35,9 @@
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
 namespace mongo {
 namespace {
@@ -54,10 +57,15 @@ void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
             (void)RangeDeleterService::get(opCtx)->registerTask(
                 rdt, std::move(waitForActiveQueriesToComplete));
         } catch (const DBException& ex) {
-            dassert(ex.code() == ErrorCodes::NotYetInitialized,
-                    str::stream() << "No error different from `NotYetInitialized` is expected "
-                                     "to be propagated to the range deleter observer. Got error: "
-                                  << ex.toStatus());
+            if (ex.code() != ErrorCodes::NotYetInitialized &&
+                !ErrorCodes::isA<ErrorCategory::NotPrimaryError>(ex.code())) {
+                LOGV2_WARNING(7092800,
+                              "No error different from `NotYetInitialized` or `NotPrimaryError` "
+                              "category is expected to be propagated to the range deleter "
+                              "observer. Range deletion task not registered.",
+                              "error"_attr = redact(ex),
+                              "task"_attr = rdt);
+            }
         }
     });
 }

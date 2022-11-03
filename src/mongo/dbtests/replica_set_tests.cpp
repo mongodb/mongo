@@ -99,8 +99,7 @@ private:
 TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    SetTicketAquisitionPriorityForLock priority(opCtx.get(),
-                                                AdmissionContext::Priority::kImmediate);
+    SetAdmissionPriorityForLock priority(opCtx.get(), AdmissionContext::Priority::kImmediate);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})
@@ -123,8 +122,7 @@ TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
 TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithOldTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    SetTicketAquisitionPriorityForLock priority(opCtx.get(),
-                                                AdmissionContext::Priority::kImmediate);
+    SetAdmissionPriorityForLock priority(opCtx.get(), AdmissionContext::Priority::kImmediate);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})
@@ -147,8 +145,7 @@ TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithOldTerm) {
 TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithEqualTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    SetTicketAquisitionPriorityForLock priority(opCtx.get(),
-                                                AdmissionContext::Priority::kImmediate);
+    SetAdmissionPriorityForLock priority(opCtx.get(), AdmissionContext::Priority::kImmediate);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})

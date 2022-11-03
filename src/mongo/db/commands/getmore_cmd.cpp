@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/external_data_source_scope_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_manager.h"
@@ -485,6 +486,10 @@ public:
             setUpOperationContextStateForGetMore(
                 opCtx, *cursorPin.getCursor(), _cmd, disableAwaitDataFailpointActive);
 
+            // Update opCtx of the decorated ExternalDataSourceScopeGuard object so that it can drop
+            // virtual collections in the new 'opCtx'.
+            ExternalDataSourceScopeGuard::updateOperationContext(cursorPin.getCursor(), opCtx);
+
             // On early return, typically due to a failed assertion, delete the cursor.
             ScopeGuard cursorDeleter([&] { cursorPin.deleteUnderlying(); });
 
@@ -717,10 +722,10 @@ public:
                 // internal clients (see checkAuthForGetMore).
                 curOp->debug().isReplOplogGetMore = true;
 
-                // We do not want to take tickets for internal (replication) oplog reads. Stalling
-                // on ticket acquisition can cause complicated deadlocks. Primaries may depend on
-                // data reaching secondaries in order to proceed; and secondaries may get stalled
-                // replicating because of an inability to acquire a read ticket.
+                // We do not want to wait to take tickets for internal (replication) oplog reads.
+                // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
+                // depend on data reaching secondaries in order to proceed; and secondaries may get
+                // stalled replicating because of an inability to acquire a read ticket.
                 opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
             }
 

@@ -56,6 +56,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -65,6 +66,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/fail_point.h"
 
@@ -362,6 +364,8 @@ public:
             // execution tree with an EOFStage.
             const auto& collection = ctx->getCollection();
 
+            cq->setUseCqfIfEligible(true);
+
             // Get the execution plan for the query.
             bool permitYield = true;
             auto exec =
@@ -433,10 +437,10 @@ public:
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.
             if (term && isOplogNss) {
-                // We do not want to take tickets for internal (replication) oplog reads. Stalling
-                // on ticket acquisition can cause complicated deadlocks. Primaries may depend on
-                // data reaching secondaries in order to proceed; and secondaries may get stalled
-                // replicating because of an inability to acquire a read ticket.
+                // We do not want to wait to take tickets for internal (replication) oplog reads.
+                // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
+                // depend on data reaching secondaries in order to proceed; and secondaries may get
+                // stalled replicating because of an inability to acquire a read ticket.
                 opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
             }
 
@@ -480,6 +484,16 @@ public:
                             .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
                             .expectedUUID(findCommand->getCollectionUUID()));
             const auto& nss = ctx->getNss();
+
+            if (analyze_shard_key::supportsPersistingSampledQueries() &&
+                findCommand->getSampleId()) {
+                analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                    .addFindQuery(*findCommand->getSampleId(),
+                                  nss,
+                                  findCommand->getFilter(),
+                                  findCommand->getCollation())
+                    .getAsync([](auto) {});
+            }
 
             // Going forward this operation must never ignore interrupt signals while waiting for
             // lock acquisition. This InterruptibleLockGuard will ensure that waiting for lock
@@ -542,10 +556,10 @@ public:
                 const auto& findCommand = cq->getFindCommandRequest();
                 auto viewAggregationCommand =
                     uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
-
-                BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                    opCtx,
-                    OpMsgRequest::fromDBAndBody(_dbName.db(), std::move(viewAggregationCommand)));
+                auto aggRequest =
+                    OpMsgRequestBuilder::create(_dbName, std::move(viewAggregationCommand));
+                aggRequest.validatedTenancyScope = _request.validatedTenancyScope;
+                BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, aggRequest);
                 auto status = getStatusFromCommandResult(aggResult);
                 if (status.code() == ErrorCodes::InvalidPipelineOperator) {
                     uasserted(ErrorCodes::InvalidPipelineOperator,
@@ -571,6 +585,8 @@ public:
                 // execution to assume read data will not be needed again and need not be cached.
                 opCtx->recoveryUnit()->setReadOnce(true);
             }
+
+            cq->setUseCqfIfEligible(true);
 
             // Get the execution plan for the query.
             bool permitYield = true;

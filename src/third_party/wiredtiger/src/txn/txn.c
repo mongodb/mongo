@@ -869,7 +869,7 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
      * Ordered consistency requires all updates use timestamps, once they are first used, but this
      * test can be turned off on a per-transaction basis.
      */
-    no_ts_ok = LF_ISSET(WT_DHANDLE_TS_MIXED_MODE) || F_ISSET(txn, WT_TXN_TS_NOT_SET);
+    no_ts_ok = F_ISSET(txn, WT_TXN_TS_NOT_SET);
     if (!txn_has_ts && prev_op_durable_ts != WT_TS_NONE && !no_ts_ok) {
         __wt_err(session, EINVAL,
           "%s: " WT_TS_VERBOSE_PREFIX

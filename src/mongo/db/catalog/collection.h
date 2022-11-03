@@ -67,6 +67,9 @@ struct CollectionUpdateArgs {
 
     std::vector<StmtId> stmtIds = {kUninitializedStmtId};
 
+    // The unique sample id for this update if it has been chosen for sampling.
+    boost::optional<UUID> sampleId;
+
     // The document before modifiers were applied.
     boost::optional<BSONObj> preImageDoc;
 

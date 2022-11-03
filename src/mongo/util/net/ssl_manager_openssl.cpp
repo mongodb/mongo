@@ -771,6 +771,10 @@ Future<UniqueOCSPResponse> retrieveOCSPResponse(const std::string& host,
         return getSSLFailure("Could not convert type OCSP Response to DER encoded object.");
     }
 
+    if (!OCSPManager::get(getGlobalServiceContext())) {
+        return getSSLFailure("OCSP fetch could not complete, server is in shutdown mode.");
+    }
+
     // Query the OCSP responder
     return OCSPManager::get(getGlobalServiceContext())
         ->requestStatus(buffer, host, purpose)
@@ -3309,10 +3313,12 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     // TODO: check optional cipher restriction, using cert.
     auto peerSubject = getCertificateSubjectX509Name(peerCert.get());
     const auto cipher = SSL_get_current_cipher(conn);
-    LOGV2_INFO(6723801,
-               "Accepted TLS connection from peer",
-               "peerSubject"_attr = peerSubject,
-               "cipher"_attr = SSL_CIPHER_get_name(cipher));
+    if (!serverGlobalParams.quiet.load()) {
+        LOGV2_INFO(6723801,
+                   "Accepted TLS connection from peer",
+                   "peerSubject"_attr = peerSubject,
+                   "cipher"_attr = SSL_CIPHER_get_name(cipher));
+    }
 
     StatusWith<stdx::unordered_set<RoleName>> swPeerCertificateRoles =
         _parsePeerRoles(peerCert.get());

@@ -487,10 +487,6 @@ __conn_dhandle_config_parse_ts(WT_SESSION_IMPL *session)
     WT_RET(__wt_config_gets(session, cfg, "write_timestamp_usage", &cval));
     if (WT_STRING_MATCH("never", cval.str, cval.len))
         LF_SET(WT_DHANDLE_TS_NEVER);
-#ifndef WT_STANDALONE_BUILD
-    else if (WT_STRING_MATCH("mixed_mode", cval.str, cval.len))
-        LF_SET(WT_DHANDLE_TS_MIXED_MODE);
-#endif
     else
         LF_SET(WT_DHANDLE_TS_ORDERED);
 
