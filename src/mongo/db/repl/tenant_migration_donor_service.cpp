@@ -131,7 +131,7 @@ public:
             return false;
         }
         auto underlyingError = async_rpc::unpackRPCStatusIgnoringWriteConcernAndWriteErrors(status);
-        return RetryWithBackoffOnErrorCategories::recordAndEvaluateRetry(status) ||
+        return RetryWithBackoffOnErrorCategories::recordAndEvaluateRetry(underlyingError) ||
             underlyingError == ErrorCodes::FailedToSatisfyReadPreference;
     }
 
