@@ -659,6 +659,10 @@ TEST_F(ShardSplitDonorServiceTest, ReconfigToRemoveSplitConfig) {
     dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord)->setGetConfigReturnValue(
         splitConfig);
 
+    // Validate shard split sets a new replicaSetId on the recipientConfig.
+    auto recipientConfig = *splitConfig.getRecipientConfig();
+    ASSERT_NE(splitConfig.getReplicaSetId(), recipientConfig.getReplicaSetId());
+
     // Clear the failpoint and wait for completion.
     fpPtr.reset();
     serviceInstance->tryForget();
