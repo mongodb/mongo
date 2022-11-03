@@ -46,6 +46,15 @@ boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx, const Namespa
                                      : boost::none;
 }
 
+boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              const std::set<ShardId>& shardIds) {
+    if (auto sampleId = tryGenerateSampleId(opCtx, nss)) {
+        return TargetedSampleId{*sampleId, getRandomShardId(shardIds)};
+    }
+    return boost::none;
+}
+
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -54,6 +63,12 @@ boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(
         return TargetedSampleId{*sampleId, getRandomShardId(endpoints)};
     }
     return boost::none;
+}
+
+ShardId getRandomShardId(const std::set<ShardId>& shardIds) {
+    auto it = shardIds.begin();
+    std::advance(it, std::rand() % shardIds.size());
+    return *it;
 }
 
 ShardId getRandomShardId(const std::vector<ShardEndpoint>& endpoints) {

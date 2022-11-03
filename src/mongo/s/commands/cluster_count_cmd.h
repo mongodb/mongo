@@ -145,7 +145,8 @@ public:
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
                 countRequest.getQuery(),
-                collation);
+                collation,
+                true /* eligibleForSampling */);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);

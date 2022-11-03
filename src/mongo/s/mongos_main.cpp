@@ -793,6 +793,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         return ExitCode::processHealthCheck;
     }
 
+    srand((unsigned)(curTimeMicros64()) ^ (unsigned(uintptr_t(&opCtx))));
+
     if (analyze_shard_key::isFeatureFlagEnabled()) {
         LOGV2_OPTIONS(6973900, {LogComponent::kDefault}, "Starting the QueryAnalysisSampler");
         analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onStartup();

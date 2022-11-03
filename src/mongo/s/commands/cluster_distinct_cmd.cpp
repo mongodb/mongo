@@ -232,7 +232,8 @@ public:
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
                 query,
-                collation);
+                collation,
+                true /* eligibleForSampling */);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             auto parsedDistinct = ParsedDistinct::parse(
                 opCtx, ex->getNamespace(), cmdObj, ExtensionsCallbackNoop(), true);

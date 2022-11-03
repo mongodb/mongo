@@ -66,6 +66,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/store_possible_cursor.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
@@ -151,13 +152,14 @@ StatusWith<std::unique_ptr<FindCommandRequest>> transformQueryForShards(
 
 /**
  * Constructs the find commands sent to each targeted shard to establish cursors, attaching the
- * shardVersion and txnNumber, if necessary.
+ * shardVersion, txnNumber and sampleId if necessary.
  */
 std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
     OperationContext* opCtx,
     const ChunkManager& cm,
     const std::set<ShardId>& shardIds,
     const CanonicalQuery& query,
+    const boost::optional<UUID> sampleId,
     bool appendGeoNearDistanceProjection) {
 
     std::unique_ptr<FindCommandRequest> findCommandToForward;
@@ -175,6 +177,11 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
         // If mongos selected atClusterTime or received it from client, transmit it to shard.
         findCommandToForward->setReadConcern(readConcernArgs.toBSONInner());
     }
+
+    // Choose the shard to sample the query on if needed.
+    const auto sampleShardId = sampleId
+        ? boost::make_optional(analyze_shard_key::getRandomShardId(shardIds))
+        : boost::none;
 
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     std::vector<std::pair<ShardId, BSONObj>> requests;
@@ -196,6 +203,9 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
 
         if (opCtx->getTxnNumber()) {
             cmdBuilder.append(OperationSessionInfo::kTxnNumberFieldName, *opCtx->getTxnNumber());
+        }
+        if (shardId == sampleShardId) {
+            analyze_shard_key::appendSampleId(&cmdBuilder, *sampleId);
         }
 
         requests.emplace_back(shardId, cmdBuilder.obj());
@@ -221,6 +231,7 @@ void updateNumHostsTargetedMetrics(OperationContext* opCtx,
 CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  const CanonicalQuery& query,
                                  const ReadPreferenceSetting& readPref,
+                                 const boost::optional<UUID> sampleId,
                                  const ChunkManager& cm,
                                  std::vector<BSONObj>* results,
                                  bool* partialResultsReturned) {
@@ -295,7 +306,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
             readPref,
             // Construct the requests that we will use to establish cursors on the targeted shards,
             // attaching the shardVersion and txnNumber, if necessary.
-            constructRequestsForShards(opCtx, cm, shardIds, query, appendGeoNearDistanceProjection),
+            constructRequestsForShards(
+                opCtx, cm, shardIds, query, sampleId, appendGeoNearDistanceProjection),
             findCommand.getAllowPartialResults());
     };
 
@@ -571,6 +583,9 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             !findCommand.getRequestResumeToken() && findCommand.getResumeAfter().isEmpty());
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
+    // Try to generate a sample id for this query here instead of inside 'runQueryWithoutRetrying()'
+    // since it is incorrect to generate multiple sample ids for a single query.
+    const auto sampleId = analyze_shard_key::tryGenerateSampleId(opCtx, query.nss());
 
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
@@ -593,7 +608,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
 
         try {
             return runQueryWithoutRetrying(
-                opCtx, query, readPref, cm, results, partialResultsReturned);
+                opCtx, query, readPref, sampleId, cm, results, partialResultsReturned);
         } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
             if (retries >= kMaxRetries) {
                 // Check if there are no retries remaining, so the last received error can be

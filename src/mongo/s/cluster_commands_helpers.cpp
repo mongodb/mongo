@@ -55,6 +55,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
@@ -131,6 +132,9 @@ namespace {
  *
  * If a shard is included in shardsToSkip, it will be excluded from the list returned to the
  * caller.
+ * If the command is eligible for sampling, attaches a unique sample id to one of requests if the
+ * collection has query sampling enabled and the rate-limited sampler successfully generates a
+ * sample id for it.
  */
 std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShards(
     OperationContext* opCtx,
@@ -139,10 +143,8 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     const std::set<ShardId>& shardsToSkip,
     const BSONObj& cmdObj,
     const BSONObj& query,
-    const BSONObj& collation) {
-
-    auto cmdToSend = cmdObj;
-
+    const BSONObj& collation,
+    bool eligibleForSampling = false) {
     if (!cm.isSharded()) {
         // The collection is unsharded. Target only the primary shard for the database.
 
@@ -153,13 +155,20 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
         }
 
         // Attach shardVersion "UNSHARDED", unless targeting the config server.
-        const auto cmdObjWithShardVersion = (primaryShardId != ShardId::kConfigServerId)
-            ? appendShardVersion(cmdToSend, ShardVersion::UNSHARDED())
-            : cmdToSend;
+        auto cmdObjWithVersions = (primaryShardId != ShardId::kConfigServerId)
+            ? appendShardVersion(cmdObj, ShardVersion::UNSHARDED())
+            : cmdObj;
+        cmdObjWithVersions = appendDbVersionIfPresent(cmdObjWithVersions, cm.dbVersion());
 
-        return std::vector<AsyncRequestsSender::Request>{AsyncRequestsSender::Request(
-            std::move(primaryShardId),
-            appendDbVersionIfPresent(cmdObjWithShardVersion, cm.dbVersion()))};
+        if (eligibleForSampling) {
+            if (auto sampleId = analyze_shard_key::tryGenerateSampleId(opCtx, nss)) {
+                cmdObjWithVersions =
+                    analyze_shard_key::appendSampleId(cmdObjWithVersions, *sampleId);
+            }
+        }
+
+        return std::vector<AsyncRequestsSender::Request>{
+            AsyncRequestsSender::Request(std::move(primaryShardId), std::move(cmdObjWithVersions))};
     }
 
     std::vector<AsyncRequestsSender::Request> requests;
@@ -175,14 +184,21 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), nss);
     cm.getShardIdsForQuery(expCtx, query, collation, &shardIds);
 
+    const auto targetedSampleId = eligibleForSampling
+        ? analyze_shard_key::tryGenerateTargetedSampleId(opCtx, nss, shardIds)
+        : boost::none;
+
     for (const ShardId& shardId : shardIds) {
         if (shardsToSkip.find(shardId) == shardsToSkip.end()) {
             ChunkVersion placementVersion = cm.getVersion(shardId);
-            requests.emplace_back(
-                shardId,
-                appendShardVersion(cmdToSend,
-                                   ShardVersion(placementVersion,
-                                                boost::optional<CollectionIndexes>(boost::none))));
+            auto cmdObjWithVersions = appendShardVersion(
+                cmdObj,
+                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
+            if (targetedSampleId && targetedSampleId->isFor(shardId)) {
+                cmdObjWithVersions = analyze_shard_key::appendSampleId(cmdObjWithVersions,
+                                                                       targetedSampleId->getId());
+            }
+            requests.emplace_back(shardId, std::move(cmdObjWithVersions));
         }
     }
 
@@ -408,9 +424,10 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const BSONObj& query,
-    const BSONObj& collation) {
+    const BSONObj& collation,
+    bool eligibleForSampling) {
     const auto requests = buildVersionedRequestsForTargetedShards(
-        opCtx, nss, cm, {} /* shardsToSkip */, cmdObj, query, collation);
+        opCtx, nss, cm, {} /* shardsToSkip */, cmdObj, query, collation, eligibleForSampling);
 
     return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
 }

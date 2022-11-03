@@ -46,6 +46,10 @@ public:
         return _shardId == endpoint.shardName;
     }
 
+    bool isFor(ShardId shardId) const {
+        return _shardId == shardId;
+    }
+
     UUID getId() const {
         return _sampleId;
     }
@@ -66,11 +70,15 @@ boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx, const Namespa
  * Similar to 'tryGenerateSampleId()' but assigns the sample id to a random shard out of the given
  * ones.
  */
+boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              const std::set<ShardId>& shardIds);
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const std::vector<ShardEndpoint>& endpoints);
 
+ShardId getRandomShardId(const std::set<ShardId>& shardIds);
 ShardId getRandomShardId(const std::vector<ShardEndpoint>& endpoints);
 
 BSONObj appendSampleId(const BSONObj& cmdObj, const UUID& sampleId);
