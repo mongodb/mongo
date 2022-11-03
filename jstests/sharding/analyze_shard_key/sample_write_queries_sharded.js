@@ -1,0 +1,207 @@
+/**
+ * Tests basic support for sampling write queries against a sharded collection on a sharded cluster.
+ *
+ * @tags: [requires_fcv_62, featureFlagAnalyzeShardKey]
+ */
+(function() {
+"use strict";
+
+load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+
+// Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
+// period of 1 second to speed up the test.
+const st = new ShardingTest({
+    shards: 3,
+    rs: {nodes: 2, setParameter: {queryAnalysisWriterIntervalSecs: 1}},
+    mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs: 1}}
+});
+
+const dbName = "testDb";
+const collName = "testColl";
+const ns = dbName + "." + collName;
+const mongosDB = st.s.getDB(dbName);
+const mongosColl = mongosDB.getCollection(collName);
+
+// Make the collection have two chunks:
+// shard0: [MinKey, 0]
+// shard1: [0, 1000]
+// shard1: [1000, MaxKey]
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+st.ensurePrimaryShard(dbName, st.shard0.name);
+// TODO (SERVER-69237): Use a regular collection once pre-images are always available in the
+// OpObserver. Currently, the pre-images are not available in the test cases involving array
+// updates.
+assert.commandWorked(
+    mongosDB.createCollection(collName, {changeStreamPreAndPostImages: {enabled: true}}));
+assert.commandWorked(mongosColl.createIndex({x: 1}));
+assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
+assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
+assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 1000}}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
+const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
+
+assert.commandWorked(
+    st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1000}));
+QuerySamplingUtil.waitForActiveSampling(st.s);
+
+const expectedSampledQueryDocs = [];
+
+// Make each write below have a unique filter and use that to look up the corresponding
+// config.sampledQueries document later.
+
+{
+    // Perform some updates.
+    assert.commandWorked(mongosColl.insert([
+        // The docs below are on shard1.
+        {x: 1, y: 1, z: [1, 0, 1]},
+        {x: 2, y: 2, z: [2]},
+        // The doc below is on shard2.
+        {x: 1002, y: 2, z: [2]}
+    ]));
+
+    const cmdName = "update";
+
+    const updateOp0 = {
+        q: {x: 1},
+        u: {$mul: {y: 10}, $set: {"z.$[element]": 10}},
+        arrayFilters: [{"element": {$gte: 1}}],
+        multi: false,
+        upsert: false,
+        collation: QuerySamplingUtil.generateRandomCollation(),
+    };
+    const diff0 = {y: 'u', z: 'u'};
+    const shardNames0 = [st.rs1.name];
+
+    const updateOp1 = {
+        q: {x: {$gte: 2}},
+        u: [{$set: {y: 20, w: 200}}],
+        c: {var0: 1},
+        multi: true,
+    };
+    const diff1 = {y: 'u', w: 'i'};
+    const shardNames1 = [st.rs1.name, st.rs2.name];
+
+    const originalCmdObj = {
+        update: collName,
+        updates: [updateOp0, updateOp1],
+        let : {var1: 1},
+    };
+
+    // Use a transaction, otherwise updateOp1 would get routed to all shards.
+    const lsid = {id: UUID()};
+    const txnNumber = NumberLong(1);
+    assert.commandWorked(mongosDB.runCommand(Object.assign(
+        {}, originalCmdObj, {lsid, txnNumber, startTransaction: true, autocommit: false})));
+    assert.commandWorked(
+        mongosDB.adminCommand({commitTransaction: 1, lsid, txnNumber, autocommit: false}));
+    assert.neq(mongosColl.findOne({x: 1, y: 10, z: [10, 0, 10]}), null);
+    assert.neq(mongosColl.findOne({x: 2, y: 20, z: [2], w: 200}), null);
+    assert.neq(mongosColl.findOne({x: 1002, y: 20, z: [2], w: 200}), null);
+
+    expectedSampledQueryDocs.push({
+        filter: {"cmd.updates.0.q": updateOp0.q},
+        cmdName: cmdName,
+        cmdObj: Object.assign({}, originalCmdObj, {updates: [updateOp0]}),
+        diff: diff0,
+        shardNames: shardNames0
+    });
+    expectedSampledQueryDocs.push({
+        filter: {"cmd.updates.0.q": updateOp1.q},
+        cmdName: cmdName,
+        cmdObj: Object.assign({}, originalCmdObj, {updates: [updateOp1]}),
+        diff: diff1,
+        shardNames: shardNames1
+    });
+}
+
+{
+    // Perform some deletes.
+    assert.commandWorked(mongosColl.insert([
+        // The docs below are on shard1.
+        {x: 3},
+        {x: 4},
+        // The docs below are on shard2.
+        {x: 1004}
+    ]));
+
+    const cmdName = "delete";
+
+    const deleteOp0 = {
+        q: {x: 3},
+        limit: 1,
+        collation: QuerySamplingUtil.generateRandomCollation(),
+    };
+    const shardNames0 = [st.rs1.name];
+
+    const deleteOp1 = {q: {x: {$gte: 4}}, limit: 0};
+    const shardNames1 = [st.rs1.name, st.rs2.name];
+
+    const originalCmdObj = {delete: collName, deletes: [deleteOp0, deleteOp1]};
+
+    // Use a transaction, otherwise deleteOp1 would get routed to all shards.
+    const lsid = {id: UUID()};
+    const txnNumber = NumberLong(1);
+    assert.commandWorked(mongosDB.runCommand(Object.assign(
+        {}, originalCmdObj, {lsid, txnNumber, startTransaction: true, autocommit: false})));
+    assert.commandWorked(
+        mongosDB.adminCommand({commitTransaction: 1, lsid, txnNumber, autocommit: false}));
+    assert.eq(mongosColl.findOne({x: 3}), null);
+    assert.eq(mongosColl.findOne({x: 4}), null);
+
+    expectedSampledQueryDocs.push({
+        filter: {"cmd.deletes.0.q": deleteOp0.q},
+        cmdName: cmdName,
+        cmdObj: Object.assign({}, originalCmdObj, {deletes: [deleteOp0]}),
+        shardNames: shardNames0
+    });
+    expectedSampledQueryDocs.push({
+        filter: {"cmd.deletes.0.q": deleteOp1.q},
+        cmdName: cmdName,
+        cmdObj: Object.assign({}, originalCmdObj, {deletes: [deleteOp1]}),
+        shardNames: shardNames1
+    });
+}
+
+{
+    // Perform some findAndModify.
+    assert.commandWorked(mongosColl.insert([
+        // The doc below is on shard0.
+        {x: -5, y: -5, z: [-5, 0, -5]}
+    ]));
+
+    const cmdName = "findAndModify";
+    const originalCmdObj = {
+        findAndModify: collName,
+        query: {x: -5},
+        update: {$mul: {y: 10}, $set: {"z.$[element]": -50}},
+        arrayFilters: [{"element": {$lte: -5}}],
+        sort: {_id: 1},
+        collation: QuerySamplingUtil.generateRandomCollation(),
+        new: true,
+        upsert: false,
+        let : {var0: 1}
+    };
+    const diff = {y: 'u', z: 'u'};
+    const shardNames = [st.rs0.name];
+
+    assert.commandWorked(mongosDB.runCommand(originalCmdObj));
+    assert.neq(mongosColl.findOne({x: -5, y: -50, z: [-50, 0, -50]}), null);
+
+    expectedSampledQueryDocs.push({
+        filter: {"cmd.query": originalCmdObj.query},
+        cmdName: cmdName,
+        cmdObj: Object.assign({}, originalCmdObj),
+        diff,
+        shardNames
+    });
+}
+
+const cmdNames = ["update", "delete", "findAndModify"];
+QuerySamplingUtil.assertSoonSampledQueryDocumentsAcrossShards(
+    st, ns, collectionUuid, cmdNames, expectedSampledQueryDocs);
+
+assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
+
+st.stop();
+})();

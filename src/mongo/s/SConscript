@@ -50,6 +50,8 @@ env.Library(
         'collection_uuid_mismatch.cpp',
         'multi_statement_transaction_requests_sender.cpp',
         'query_analysis_sampler.cpp',
+        'query_analysis_sampler_util.cpp',
+        'query_analysis_server_status.cpp',
         'router_transactions_metrics.cpp',
         'router_transactions_stats.idl',
         'router.cpp',
@@ -143,6 +145,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )

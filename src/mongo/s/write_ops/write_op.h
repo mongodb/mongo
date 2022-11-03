@@ -219,8 +219,10 @@ typedef std::pair<int, int> WriteOpRef;
  * operation.
  */
 struct TargetedWrite {
-    TargetedWrite(const ShardEndpoint& endpoint, WriteOpRef writeOpRef)
-        : endpoint(endpoint), writeOpRef(writeOpRef) {}
+    TargetedWrite(const ShardEndpoint& endpoint,
+                  WriteOpRef writeOpRef,
+                  boost::optional<UUID> sampleId)
+        : endpoint(endpoint), writeOpRef(writeOpRef), sampleId(sampleId) {}
 
     // Where to send the write
     ShardEndpoint endpoint;
@@ -229,6 +231,9 @@ struct TargetedWrite {
     // TODO: Could be a more complex handle, shared between write state and networking code if
     // we need to be able to cancel ops.
     WriteOpRef writeOpRef;
+
+    // The unique sample id for the write if it has been chosen for sampling.
+    boost::optional<UUID> sampleId;
 };
 
 }  // namespace mongo

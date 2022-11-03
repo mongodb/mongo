@@ -27,40 +27,54 @@
  *    it in the license file.
  */
 
-#include "mongo/s/analyze_shard_key_util.h"
+#pragma once
 
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
-#include "mongo/s/is_mongos.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace analyze_shard_key {
 
-bool isFeatureFlagEnabled() {
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility);
-}
+struct TargetedSampleId {
+public:
+    TargetedSampleId(UUID sampleId, ShardId shardId) : _sampleId(sampleId), _shardId(shardId){};
 
-bool isFeatureFlagEnabledIgnoreFCV() {
-    return analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabledAndIgnoreFCV();
-}
+    bool isFor(ShardEndpoint endpoint) const {
+        return _shardId == endpoint.shardName;
+    }
 
-bool supportsCoordinatingQueryAnalysis() {
-    return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
-}
+    UUID getId() const {
+        return _sampleId;
+    }
 
-bool supportsPersistingSampledQueries() {
-    return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ShardServer;
-}
+private:
+    UUID _sampleId;
+    ShardId _shardId;
+};
 
-bool supportsPersistingSampledQueriesIgnoreFCV() {
-    return isFeatureFlagEnabledIgnoreFCV() &&
-        serverGlobalParams.clusterRole == ClusterRole::ShardServer;
-}
+/**
+ * Returns a unique sample id for a query if it should be sampled, and none otherwise. Can only be
+ * invoked once for each query since generating a sample id causes the number of remaining queries
+ * to sample to get decremented.
+ */
+boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx, const NamespaceString& nss);
 
-bool supportsSamplingQueries() {
-    return isFeatureFlagEnabled() && isMongos();
-}
+/**
+ * Similar to 'tryGenerateSampleId()' but assigns the sample id to a random shard out of the given
+ * ones.
+ */
+boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ShardEndpoint>& endpoints);
+
+ShardId getRandomShardId(const std::vector<ShardEndpoint>& endpoints);
+
+BSONObj appendSampleId(const BSONObj& cmdObj, const UUID& sampleId);
+void appendSampleId(BSONObjBuilder* bob, const UUID& sampleId);
 
 }  // namespace analyze_shard_key
 }  // namespace mongo

@@ -27,39 +27,47 @@
  *    it in the license file.
  */
 
-#include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
-#include "mongo/s/is_mongos.h"
+#include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/s/query_analysis_sampler.h"
 
 namespace mongo {
 namespace analyze_shard_key {
 
-bool isFeatureFlagEnabled() {
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility);
+namespace {
+
+constexpr auto kSampleIdFieldName = "sampleId"_sd;
+
 }
 
-bool isFeatureFlagEnabledIgnoreFCV() {
-    return analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabledAndIgnoreFCV();
+boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx, const NamespaceString& nss) {
+    return supportsSamplingQueries() ? QueryAnalysisSampler::get(opCtx).tryGenerateSampleId(nss)
+                                     : boost::none;
 }
 
-bool supportsCoordinatingQueryAnalysis() {
-    return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
+boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ShardEndpoint>& endpoints) {
+    if (auto sampleId = tryGenerateSampleId(opCtx, nss)) {
+        return TargetedSampleId{*sampleId, getRandomShardId(endpoints)};
+    }
+    return boost::none;
 }
 
-bool supportsPersistingSampledQueries() {
-    return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ShardServer;
+ShardId getRandomShardId(const std::vector<ShardEndpoint>& endpoints) {
+    return endpoints[std::rand() % endpoints.size()].shardName;
 }
 
-bool supportsPersistingSampledQueriesIgnoreFCV() {
-    return isFeatureFlagEnabledIgnoreFCV() &&
-        serverGlobalParams.clusterRole == ClusterRole::ShardServer;
+BSONObj appendSampleId(const BSONObj& cmdObj, const UUID& sampleId) {
+    BSONObjBuilder bob(std::move(cmdObj));
+    appendSampleId(&bob, sampleId);
+    return bob.obj();
 }
 
-bool supportsSamplingQueries() {
-    return isFeatureFlagEnabled() && isMongos();
+void appendSampleId(BSONObjBuilder* bob, const UUID& sampleId) {
+    sampleId.appendToBuilder(bob, kSampleIdFieldName);
 }
 
 }  // namespace analyze_shard_key

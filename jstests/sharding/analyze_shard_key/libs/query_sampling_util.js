@@ -27,13 +27,44 @@ var QuerySamplingUtil = (function() {
     }
 
     /**
-     * Waits for the config.sampledQueries collection to have 'expectedSampledQueryDocs.length'
-     * number of documents for the collection 'ns'. For every (sampleId, cmdName, cmdObj) in
+     * Waits for the given mongos to have one active collection for query sampling.
+     */
+    function waitForActiveSampling(mongosConn) {
+        assert.soon(() => {
+            const res = assert.commandWorked(mongosConn.adminCommand({serverStatus: 1}));
+            return res.queryAnalyzers.activeCollections == 1;
+        });
+    }
+
+    /**
+     * Returns true if 'subsetObj' is a sub object of 'supersetObj'. That is, every key that exists
+     * in 'subsetObj' also exists in 'supersetObj' and the values of that key in the two objects are
+     * equal.
+     */
+    function assertSubObject(supersetObj, subsetObj) {
+        for (let key in subsetObj) {
+            const value = subsetObj[key];
+            if (typeof value === 'object') {
+                assertSubObject(supersetObj[key], subsetObj[key]);
+            } else {
+                assert.eq(supersetObj[key],
+                          subsetObj[key],
+                          {key, actual: supersetObj, expected: subsetObj});
+            }
+        }
+    }
+
+    const kSampledQueriesNs = "config.sampledQueries";
+    const kSampledQueriesDiffNs = "config.sampledQueriesDiff";
+
+    /**
+     * Waits for the number of the config.sampledQueries documents for the collection 'ns' to be
+     * equal to 'expectedSampledQueryDocs.length'. Then, for every (sampleId, cmdName, cmdObj) in
      * 'expectedSampledQueryDocs', asserts that there is a config.sampledQueries document with _id
-     * equal to sampleId and that it has the given fields.
+     * equal to 'sampleId' and that the document has the expected fields.
      */
     function assertSoonSampledQueryDocuments(conn, ns, collectionUuid, expectedSampledQueryDocs) {
-        const coll = conn.getCollection("config.sampledQueries");
+        const coll = conn.getCollection(kSampledQueriesNs);
 
         let actualSampledQueryDocs;
         assert.soon(() => {
@@ -51,19 +82,71 @@ var QuerySamplingUtil = (function() {
             assert.eq(doc.ns, ns, doc);
             assert.eq(doc.collectionUuid, collectionUuid, doc);
             assert.eq(doc.cmdName, cmdName, doc);
+            assertSubObject(doc.cmd, cmdObj);
+        }
+    }
 
-            for (let key in cmdObj) {
-                const value = cmdObj[key];
-                if (typeof value === 'object') {
-                    for (let subKey in value) {
-                        assert.eq(doc.cmd[key][subKey],
-                                  cmdObj[key][subKey],
-                                  {subKey, actual: doc.cmd, expected: cmdObj});
+    /**
+     * Waits for the total number of the config.sampledQueries documents for the collection 'ns' and
+     * commands 'cmdNames' across all shards to be equal to 'expectedSampledQueryDocs.length'. Then,
+     * for every (filter, shardNames, cmdName, cmdObj, diff) in 'expectedSampledQueryDocs', asserts
+     * that:
+     * - There is exactly one shard that has the config.sampledQueries document that 'filter'
+     *   matches against, and that shard is one of the shards in 'shardNames'.
+     * - The document has the expected fields. If 'diff' is not null, the query has a corresponding
+     *   config.sampledQueriesDiff document with the expected diff on that same shard.
+     */
+    function assertSoonSampledQueryDocumentsAcrossShards(
+        st, ns, collectionUuid, cmdNames, expectedSampledQueryDocs) {
+        let actualSampledQueryDocs, actualCount;
+        assert.soon(() => {
+            actualSampledQueryDocs = {};
+            actualCount = 0;
+
+            st._rs.forEach((rs) => {
+                const docs = rs.test.getPrimary()
+                                 .getCollection(kSampledQueriesNs)
+                                 .find({cmdName: {$in: cmdNames}})
+                                 .toArray();
+                actualSampledQueryDocs[[rs.test.name]] = docs;
+                actualCount += docs.length;
+            });
+            return actualCount >= expectedSampledQueryDocs.length;
+        }, "timed out waiting for sampled query documents");
+        assert.eq(actualCount,
+                  expectedSampledQueryDocs.length,
+                  {actualSampledQueryDocs, expectedSampledQueryDocs});
+
+        for (let {filter, shardNames, cmdName, cmdObj, diff} of expectedSampledQueryDocs) {
+            let shardName = null;
+            for (let rs of st._rs) {
+                const primary = rs.test.getPrimary();
+                const queryDoc = primary.getCollection(kSampledQueriesNs).findOne(filter);
+
+                if (shardName) {
+                    assert.eq(queryDoc,
+                              null,
+                              "Found a sampled query on more than one shard " +
+                                  tojson({shardNames: [shardName, rs.test.name], cmdName, cmdObj}));
+                    continue;
+                } else if (queryDoc) {
+                    shardName = rs.test.name;
+                    assert(shardNames.includes(shardName),
+                           "Found a sampled query on an unexpected shard " +
+                               tojson({actual: shardName, expected: shardNames, cmdName, cmdObj}));
+
+                    assert.eq(queryDoc.ns, ns, queryDoc);
+                    assert.eq(queryDoc.collectionUuid, collectionUuid, queryDoc);
+                    assert.eq(queryDoc.cmdName, cmdName, queryDoc);
+                    assertSubObject(queryDoc.cmd, cmdObj);
+
+                    if (diff) {
+                        assertSoonSingleSampledDiffDocument(
+                            primary, queryDoc._id, ns, collectionUuid, [diff]);
                     }
-                } else {
-                    assert.eq(doc.cmd[key], cmdObj[key], {key, actual: doc.cmd, expected: cmdObj});
                 }
             }
+            assert(shardName, "Failed to find the sampled query " + tojson({cmdName, cmdObj}));
         }
     }
 
@@ -74,12 +157,12 @@ var QuerySamplingUtil = (function() {
 
     /**
      * Waits for the config.sampledQueriesDiff collection to have a document with _id equal to
-     * sampleId, and then asserts that the diff in that document matches one of the diffs in
-     * 'expectedSampledDiffs'.
+     * 'sampleId' for the collection 'ns', and then asserts that the diff in that document matches
+     * one of the diffs in 'expectedSampledDiffs'.
      */
     function assertSoonSingleSampledDiffDocument(
         conn, sampleId, ns, collectionUuid, expectedSampledDiffs) {
-        const coll = conn.getCollection("config.sampledQueriesDiff");
+        const coll = conn.getCollection(kSampledQueriesDiffNs);
 
         assert.soon(() => {
             const doc = coll.findOne({_id: sampleId});
@@ -97,12 +180,12 @@ var QuerySamplingUtil = (function() {
     }
 
     function assertNoSampledDiffDocuments(conn, ns) {
-        const coll = conn.getCollection("config.sampledQueriesDiff");
+        const coll = conn.getCollection(kSampledQueriesDiffNs);
         assert.eq(coll.find({ns: ns}).itcount(), 0);
     }
 
     function clearSampledDiffCollection(primary) {
-        const coll = primary.getCollection("config.sampledQueriesDiff");
+        const coll = primary.getCollection(kSampledQueriesDiffNs);
         assert.commandWorked(coll.remove({}));
     }
 
@@ -111,7 +194,9 @@ var QuerySamplingUtil = (function() {
         generateRandomString,
         generateRandomCollation,
         makeCmdObjIgnoreSessionInfo,
+        waitForActiveSampling,
         assertSoonSampledQueryDocuments,
+        assertSoonSampledQueryDocumentsAcrossShards,
         assertNoSampledQueryDocuments,
         assertSoonSingleSampledDiffDocument,
         assertNoSampledDiffDocuments,

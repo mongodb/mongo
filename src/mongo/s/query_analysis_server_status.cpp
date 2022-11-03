@@ -27,40 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/platform/basic.h"
 
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/s/query_analysis_sampler.h"
 
 namespace mongo {
 namespace analyze_shard_key {
+namespace {
 
-bool isFeatureFlagEnabled() {
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility);
-}
+class QueryAnalysisServerStatus final : public ServerStatusSection {
+public:
+    QueryAnalysisServerStatus() : ServerStatusSection("queryAnalyzers") {}
 
-bool isFeatureFlagEnabledIgnoreFCV() {
-    return analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabledAndIgnoreFCV();
-}
+    bool includeByDefault() const override {
+        return supportsSamplingQueries();
+    }
 
-bool supportsCoordinatingQueryAnalysis() {
-    return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
-}
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        if (!supportsSamplingQueries()) {
+            return {};
+        }
 
-bool supportsPersistingSampledQueries() {
-    return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ShardServer;
-}
+        BSONObjBuilder builder;
+        QueryAnalysisSampler::get(opCtx).appendInfoForServerStatus(&builder);
+        return builder.obj();
+    }
 
-bool supportsPersistingSampledQueriesIgnoreFCV() {
-    return isFeatureFlagEnabledIgnoreFCV() &&
-        serverGlobalParams.clusterRole == ClusterRole::ShardServer;
-}
+} queryAnalysisServerStatus;
 
-bool supportsSamplingQueries() {
-    return isFeatureFlagEnabled() && isMongos();
-}
-
+}  // namespace
 }  // namespace analyze_shard_key
 }  // namespace mongo

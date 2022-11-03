@@ -58,6 +58,7 @@
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
@@ -555,6 +556,11 @@ private:
         const auto response = [&] {
             std::vector<AsyncRequestsSender::Request> requests;
             BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+            if (auto sampleId = analyze_shard_key::tryGenerateSampleId(opCtx, nss)) {
+                filteredCmdObj = analyze_shard_key::appendSampleId(std::move(filteredCmdObj),
+                                                                   std::move(*sampleId));
+            }
+
             BSONObj cmdObjWithVersions(std::move(filteredCmdObj));
             if (dbVersion) {
                 cmdObjWithVersions = appendDbVersionIfPresent(cmdObjWithVersions, *dbVersion);

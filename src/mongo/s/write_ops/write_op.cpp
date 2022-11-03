@@ -29,6 +29,7 @@
 
 #include "mongo/s/write_ops/write_op.h"
 
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 
@@ -115,6 +116,9 @@ void WriteOp::targetWrites(OperationContext* opCtx,
         endpoints = targeter.targetAllShards(opCtx);
     }
 
+    const auto targetedSampleId =
+        analyze_shard_key::tryGenerateTargetedSampleId(opCtx, targeter.getNS(), endpoints);
+
     for (auto&& endpoint : endpoints) {
         // If the operation was already successfull on that shard, do not repeat it
         if (_successfulShardSet.count(endpoint.shardName))
@@ -130,7 +134,12 @@ void WriteOp::targetWrites(OperationContext* opCtx,
             endpoint.shardVersion = ShardVersion::IGNORED();
         }
 
-        targetedWrites->push_back(std::make_unique<TargetedWrite>(std::move(endpoint), ref));
+        const auto sampleId = targetedSampleId && targetedSampleId->isFor(endpoint)
+            ? boost::make_optional(targetedSampleId->getId())
+            : boost::none;
+
+        targetedWrites->push_back(
+            std::make_unique<TargetedWrite>(std::move(endpoint), ref, std::move(sampleId)));
 
         _childOps.back().pendingWrite = targetedWrites->back().get();
         _childOps.back().state = WriteOpState_Pending;

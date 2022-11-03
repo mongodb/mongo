@@ -44,5 +44,7 @@ bool supportsPersistingSampledQueries();
 
 bool supportsPersistingSampledQueriesIgnoreFCV();
 
+bool supportsSamplingQueries();
+
 }  // namespace analyze_shard_key
 }  // namespace mongo

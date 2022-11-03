@@ -499,12 +499,14 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& 
                     updates.emplace();
                 updates->emplace_back(
                     _clientRequest.getUpdateRequest().getUpdates().at(writeOpRef.first));
+                updates->back().setSampleId(targetedWrite->sampleId);
                 break;
             case BatchedCommandRequest::BatchType_Delete:
                 if (!deletes)
                     deletes.emplace();
                 deletes->emplace_back(
                     _clientRequest.getDeleteRequest().getDeletes().at(writeOpRef.first));
+                deletes->back().setSampleId(targetedWrite->sampleId);
                 break;
             default:
                 MONGO_UNREACHABLE;

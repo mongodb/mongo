@@ -741,31 +741,31 @@ TEST_F(QueryAnalysisSamplerTest, ShouldSampleBasic) {
     setUpConfigurations(&sampler, configurations);
 
     // Cannot sample if time has not elapsed.
-    ASSERT_FALSE(sampler.shouldSample(nss0));
-    ASSERT_FALSE(sampler.shouldSample(nss1));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(nss0));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(nss1));
 
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket for rateLimiter0 right after the refill is 0
     // + 1.0.
-    ASSERT(sampler.shouldSample(nss0));
-    ASSERT_FALSE(sampler.shouldSample(nss0));
+    ASSERT(sampler.tryGenerateSampleId(nss0));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(nss0));
     // The number of tokens available in the bucket for rateLimiter1 right after the refill is 0 +
     // 0.5.
-    ASSERT_FALSE(sampler.shouldSample(nss1));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(nss1));
     // This collection doesn't have sampling enabled.
-    ASSERT_FALSE(sampler.shouldSample(nss2));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(nss2));
 
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket for rateLimiter0 right after the refill is 0
     // + 1.0.
-    ASSERT(sampler.shouldSample(nss0));
-    ASSERT_FALSE(sampler.shouldSample(nss0));
+    ASSERT(sampler.tryGenerateSampleId(nss0));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(nss0));
     // The number of tokens available in the bucket for rateLimiter1 right after the refill is 0.5 +
     // 0.5.
-    ASSERT(sampler.shouldSample(nss1));
-    ASSERT_FALSE(sampler.shouldSample(nss1));
+    ASSERT(sampler.tryGenerateSampleId(nss1));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(nss1));
     // This collection doesn't have sampling enabled.
-    ASSERT_FALSE(sampler.shouldSample(nss2));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(nss2));
 }
 
 TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
@@ -788,7 +788,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
 
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket right after the refill is 0 + 2.
-    ASSERT(sampler.shouldSample(nss0));
+    ASSERT(sampler.tryGenerateSampleId(nss0));
 
     // Force the sampler to refresh and return a different collection uuid and sample rate this
     // time.
@@ -812,7 +812,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
     // Cannot sample if time has not elapsed. There should be no tokens available in the bucket
     // right after the refill unless the one token from the previous configurations was
     // carried over, which is not the correct behavior.
-    ASSERT_FALSE(sampler.shouldSample(nss0));
+    ASSERT_FALSE(sampler.tryGenerateSampleId(nss0));
 }
 
 }  // namespace
