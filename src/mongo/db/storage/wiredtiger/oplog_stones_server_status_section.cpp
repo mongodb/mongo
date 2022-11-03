@@ -58,26 +58,10 @@ public:
             return builder.obj();
         }
 
-        Lock::GlobalLock lk(
-            opCtx, LockMode::MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked);
-        if (!lk.isLocked()) {
-            LOGV2_DEBUG(4822100, 2, "Failed to retrieve oplogTruncation statistics");
-            return BSONObj();
-        }
-
-        AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
-        const auto& oplog = oplogRead.getCollection();
-        if (oplog) {
-            const auto localDb =
-                DatabaseHolder::get(opCtx)->getDb(opCtx, NamespaceString::kLocalDb);
-            invariant(localDb);
-            AutoStatsTracker statsTracker(
-                opCtx,
-                NamespaceString::kRsOplogNamespace,
-                Top::LockType::ReadLocked,
-                AutoStatsTracker::LogMode::kUpdateTop,
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(NamespaceString::kLocalDb));
-            oplog->getRecordStore()->getOplogTruncateStats(builder);
+        auto oplogCollection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
+            opCtx, NamespaceString::kRsOplogNamespace);
+        if (oplogCollection) {
+            oplogCollection->getRecordStore()->getOplogTruncateStats(builder);
         }
         return builder.obj();
     }

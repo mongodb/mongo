@@ -57,8 +57,12 @@ bool WiredTigerServerStatusSection::includeByDefault() const {
 
 BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
                                                        const BSONElement& configElement) const {
-    Lock::GlobalLock lk(
-        opCtx, LockMode::MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked);
+    Lock::GlobalLock lk(opCtx,
+                        LockMode::MODE_IS,
+                        Date_t::now(),
+                        Lock::InterruptBehavior::kLeaveUnlocked,
+                        // Replication state change does not affect the following operation.
+                        true /* skipRSTLLock */);
     if (!lk.isLocked()) {
         LOGV2_DEBUG(3088800, 2, "Failed to retrieve wiredTiger statistics");
         return BSONObj();

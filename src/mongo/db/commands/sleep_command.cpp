@@ -78,6 +78,9 @@ public:
                       const StringData& ns) {
         if (ns.empty()) {
             Lock::GlobalLock lk(opCtx, mode, Date_t::max(), Lock::InterruptBehavior::kThrow);
+            LOGV2(6001601,
+                  "Global lock acquired by sleep command.",
+                  "lockMode"_attr = modeName(mode));
             opCtx->sleepFor(Milliseconds(millis));
             return;
         }
@@ -94,6 +97,9 @@ public:
         Lock::DBLock dbLock(opCtx, nss.db(), dbMode, Date_t::max());
 
         if (nsIsDbOnly(ns)) {
+            LOGV2(6001602,
+                  "Database lock acquired by sleep command.",
+                  "lockMode"_attr = modeName(dbMode));
             opCtx->sleepFor(Milliseconds(millis));
             return;
         }
@@ -103,6 +109,9 @@ public:
                 "lockTarget is not a valid namespace",
                 NamespaceString::validCollectionComponent(ns));
         Lock::CollectionLock collLock(opCtx, nss, mode, Date_t::max());
+        LOGV2(6001603,
+              "Collection lock acquired by sleep command.",
+              "lockMode"_attr = modeName(mode));
         opCtx->sleepFor(Milliseconds(millis));
     }
 
@@ -111,6 +120,14 @@ public:
         pbwm.lock(nullptr, MODE_X);
         opCtx->sleepFor(Milliseconds(millis));
         pbwm.unlock();
+    }
+
+    void _sleepInRSTL(mongo::OperationContext* opCtx, long long millis) {
+        Lock::ResourceLock rstl(opCtx->lockState(), resourceIdReplicationStateTransitionLock);
+        rstl.lock(nullptr, MODE_X);
+        LOGV2(6001600, "RSTL MODE_X lock acquired by sleep command.");
+        opCtx->sleepFor(Milliseconds(millis));
+        rstl.unlock();
     }
 
     CmdSleep() : BasicCommand("sleep") {}
@@ -168,6 +185,11 @@ public:
 
             if (lockTarget == "ParallelBatchWriterMode") {
                 _sleepInPBWM(opCtx, msRemaining.count());
+                continue;
+            }
+
+            if (lockTarget == "RSTL") {
+                _sleepInRSTL(opCtx, msRemaining.count());
                 continue;
             }
 
