@@ -274,8 +274,21 @@ if (checkSBEEnabled(db, ["featureFlagSbeFull"], true)) {
     return;
 }
 
-verifyCEForNDV(1);
-verifyCEForNDV(2);
-verifyCEForNDV(3);
-verifyCEForNDV(10);
+// We will be updating some query knobs, so store the old state and restore it after the test.
+const {internalQueryCardinalityEstimatorMode, internalQueryFrameworkControl} = db.adminCommand({
+    getParameter: 1,
+    internalQueryCardinalityEstimatorMode: 1,
+    internalQueryFrameworkControl: 1,
+});
+
+try {
+    verifyCEForNDV(1);
+    verifyCEForNDV(2);
+    verifyCEForNDV(3);
+    verifyCEForNDV(10);
+} finally {
+    // Reset query knobs to their original state.
+    assert.commandWorked(db.adminCommand(
+        {setParameter: 1, internalQueryCardinalityEstimatorMode, internalQueryFrameworkControl}));
+}
 }());
