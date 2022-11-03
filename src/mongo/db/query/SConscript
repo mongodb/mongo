@@ -100,6 +100,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",
+        '$BUILD_DIR/mongo/util/memory_util',
         "canonical_query",
     ],
 )
@@ -257,14 +258,15 @@ env.Library(
     source=[
         'ce_mode_parameter.cpp',
         'framework_control.cpp',
-        'plan_cache_size_parameter.cpp',
         'query_feature_flags.idl',
         'query_knobs.idl',
         'sbe_plan_cache_on_parameter_change.cpp',
+        'telemetry_util.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/memory_util',
         '$BUILD_DIR/mongo/util/pcre_wrapper',
     ],
 )
@@ -372,7 +374,6 @@ env.CppUnitTest(
         'map_reduce_output_format_test.cpp',
         "parsed_distinct_test.cpp",
         "plan_cache_indexability_test.cpp",
-        "plan_cache_size_parameter_test.cpp",
         "plan_cache_key_info_test.cpp",
         "plan_cache_test.cpp",
         "plan_ranker_test.cpp",

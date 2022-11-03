@@ -614,6 +614,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='memory_util',
+    source=[
+        'memory_util.cpp',
+    ],
+    LIBDEPS=[
+        'pcre_wrapper',
+    ],
+)
+
 env.Benchmark(
     target='hash_table_bm',
     source='hash_table_bm.cpp',
@@ -748,6 +758,7 @@ icuEnv.CppUnitTest(
         'lru_cache_test.cpp',
         'md5_test.cpp',
         'md5main.cpp',
+        'memory_util_test.cpp',
         'optional_util_test.cpp',
         'out_of_line_executor_test.cpp',
         'overloaded_visitor_test.cpp',
@@ -795,6 +806,7 @@ icuEnv.CppUnitTest(
         'icu',
         'latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
         'md5',
+        'memory_util',
         'pcre_util',
         'pcre_wrapper',
         'periodic_runner_impl',

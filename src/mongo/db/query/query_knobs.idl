@@ -30,8 +30,8 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/db/query/ce_mode_parameter.h"
-    - "mongo/db/query/plan_cache_size_parameter.h"
     - "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
+    - "mongo/db/query/telemetry_util.h"
     - "mongo/platform/atomic_proxy.h"
     - "mongo/platform/atomic_word.h"
 
@@ -947,6 +947,31 @@ server_parameters:
     cpp_vartype: bool
     default: false
     test_only: true
+
+  internalQueryConfigureTelemetrySamplingRate:
+    description: "The maximum number of queries per second that are sampled for query telemetry.
+      If the rate of queries goes above this number, then rate limiting will kick in, and any
+      further queries will not be sampled. The default is INT_MAX, effectively meaning that all
+      queries will be sampled. This can be set to 0 to turn telemetry off completely."
+    set_at: [ startup, runtime ]
+    cpp_varname: "queryTelemetrySamplingRate"
+    cpp_vartype: AtomicWord<int>
+    default: 2147483647
+
+  internalQueryConfigureTelemetryCacheSize:
+    description: "The maximum amount of memory that the system will allocate for the query telemetry
+      cache. This will accept values in either of the following formats:
+      1. <number>% indicates a percentage of the physical memory available to the process. E.g.: 15%.
+      2. <number>(MB|GB), indicates the amount of memory in MB or GB. E.g.: 1.5GB, 100MB.
+      The default value is 5%, which means 5% of the physical memory available to the process."
+    set_at: [ startup, runtime ]
+    cpp_varname: "queryTelemetryCacheSize"
+    cpp_vartype: synchronized_value<std::string>
+    default: "5%"
+    on_update: telemetry_util::onTelemetryCacheSizeUpdate
+    validator:
+      callback: telemetry_util::validateTelemetryCacheSize
+
 
 # Note for adding additional query knobs:
 #

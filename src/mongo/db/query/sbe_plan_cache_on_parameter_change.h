@@ -32,8 +32,8 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/db/query/plan_cache_size_parameter.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/memory_util.h"
 
 namespace mongo::plan_cache_util {
 
@@ -70,11 +70,11 @@ public:
     virtual ~OnParamChangeUpdater() = default;
 
     /**
-     * Resizes the SBE plan cache decorating 'serviceCtx' to the new size given by 'parameter'. If
+     * Resizes the SBE plan cache decorating 'serviceCtx' to the new size given by 'memSize'. If
      * the new cache size is smaller than the old, cache entries are evicted in order to ensure the
      * cache fits within the new size bound.
      */
-    virtual void updateCacheSize(ServiceContext* serviceCtx, PlanCacheSizeParameter parameter) = 0;
+    virtual void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) = 0;
 
     /**
      * Deletes all plans from the SBE plan cache decorating 'serviceCtx'.

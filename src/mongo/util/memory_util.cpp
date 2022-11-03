@@ -27,33 +27,44 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/util/memory_util.h"
 
-#include <string>
+#include "mongo/util/pcre.h"
 
-#include "mongo/base/status_with.h"
+namespace mongo::memory_util {
 
-namespace mongo::plan_cache_util {
+StatusWith<MemoryUnits> parseUnitString(const std::string& strUnit) {
+    if (strUnit.empty()) {
+        return Status(ErrorCodes::Error{6007010}, "Unit value cannot be empty");
+    }
 
-/**
- * Defines units of planCacheSize parameter.
- */
-enum class PlanCacheSizeUnits {
-    kPercent,
-    kMB,
-    kGB,
-};
+    if (strUnit[0] == '%') {
+        return MemoryUnits::kPercent;
+    } else if (strUnit[0] == 'M' || strUnit[0] == 'm') {
+        return MemoryUnits::kMB;
+    } else if (strUnit[0] == 'G' || strUnit[0] == 'g') {
+        return MemoryUnits::kGB;
+    }
 
-StatusWith<PlanCacheSizeUnits> parseUnitString(const std::string& strUnit);
+    return Status(ErrorCodes::Error{6007011}, "Incorrect unit value");
+}
 
-/**
- * Represents parsed planCacheSize parameter.
- */
-struct PlanCacheSizeParameter {
-    static StatusWith<PlanCacheSizeParameter> parse(const std::string& str);
+StatusWith<MemorySize> MemorySize::parse(const std::string& str) {
+    // Looks for a floating point number with followed by a unit suffix (MB, GB, %).
+    static auto& re = *new pcre::Regex(R"re((?i)^\s*(\d+\.?\d*)\s*(MB|GB|%)\s*$)re");
+    auto m = re.matchView(str);
+    if (!m) {
+        return {ErrorCodes::Error{6007012}, "Unable to parse memory size string"};
+    }
+    double size = std::stod(std::string{m[1]});
+    std::string strUnit{m[2]};
 
-    const double size;
-    const PlanCacheSizeUnits units;
-};
+    auto statusWithUnit = parseUnitString(strUnit);
+    if (!statusWithUnit.isOK()) {
+        return statusWithUnit.getStatus();
+    }
 
-}  // namespace mongo::plan_cache_util
+    return MemorySize{size, statusWithUnit.getValue()};
+}
+
+}  // namespace mongo::memory_util

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,45 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/plan_cache_size_parameter.h"
+#include "mongo/db/query/telemetry_util.h"
+#include "mongo/util/memory_util.h"
 
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/util/pcre.h"
+namespace mongo {
+namespace telemetry_util {
 
-namespace mongo::plan_cache_util {
-
-StatusWith<PlanCacheSizeUnits> parseUnitString(const std::string& strUnit) {
-    if (strUnit.empty()) {
-        return Status(ErrorCodes::Error{6007010}, "Unit value cannot be empty");
+Status onTelemetryCacheSizeUpdate(const std::string& str) {
+    auto newSize = memory_util::MemorySize::parse(str);
+    if (!newSize.isOK()) {
+        return newSize.getStatus();
     }
 
-    if (strUnit[0] == '%') {
-        return PlanCacheSizeUnits::kPercent;
-    } else if (strUnit[0] == 'M' || strUnit[0] == 'm') {
-        return PlanCacheSizeUnits::kMB;
-    } else if (strUnit[0] == 'G' || strUnit[0] == 'g') {
-        return PlanCacheSizeUnits::kGB;
-    }
+    // TODO SERVER-71065 update telemetry cache size
 
-    return Status(ErrorCodes::Error{6007011}, "Incorrect unit value");
+    return Status::OK();
 }
 
-StatusWith<PlanCacheSizeParameter> PlanCacheSizeParameter::parse(const std::string& str) {
-    // Looks for a floating point number with followed by a unit suffix (MB, GB, %).
-    static auto& re = *new pcre::Regex(R"re((?i)^\s*(\d+\.?\d*)\s*(MB|GB|%)\s*$)re");
-    auto m = re.matchView(str);
-    if (!m) {
-        return {ErrorCodes::Error{6007012}, "Unable to parse plan cache size string"};
-    }
-    double size = std::stod(std::string{m[1]});
-    std::string strUnit{m[2]};
-
-    auto statusWithUnit = parseUnitString(strUnit);
-    if (!statusWithUnit.isOK()) {
-        return statusWithUnit.getStatus();
-    }
-
-    return PlanCacheSizeParameter{size, statusWithUnit.getValue()};
+Status validateTelemetryCacheSize(const std::string& str, const boost::optional<TenantId>&) {
+    return memory_util::MemorySize::parse(str).getStatus();
 }
 
-}  // namespace mongo::plan_cache_util
+}  // namespace telemetry_util
+}  // namespace mongo
