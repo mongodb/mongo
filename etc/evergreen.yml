@@ -320,6 +320,11 @@ buildvariants:
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - wtdevelop
+  depends_on:
+  - name: archive_dist_test
+    variant: &linux_x86_dynamic_debug_wtdevelop_compile_variant_name linux-x86-dynamic-debug-wtdevelop-compile
+  - name: version_gen
+    variant: generate-tasks-for-version
   expansions:
     use_wt_develop: true
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
@@ -335,7 +340,7 @@ buildvariants:
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
     test_flags: --excludeWithAnyTags=requires_http_client
-    compile_variant: *linux-64-debug-wtdevelop
+    compile_variant: *linux_x86_dynamic_debug_wtdevelop_compile_variant_name
 
 - name: &tla-plus tla-plus
   display_name: TLA+

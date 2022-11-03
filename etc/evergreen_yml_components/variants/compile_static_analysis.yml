@@ -89,14 +89,15 @@ buildvariants:
   - name: .integration !.audit
 
 - <<: *generic_linux_compile_params
-  name: &linux-64-debug-wtdevelop-compile-required linux-64-debug-wtdevelop-compile-required
+  name: &linux-x86-dynamic-debug-wtdevelop-compile linux-x86-dynamic-debug-wtdevelop-compile
   display_name: "~ Linux WiredTiger develop DEBUG Compile"
+  activate: false
   modules:
   - wtdevelop
   expansions:
     <<: *linux_debug_compile_expansions
     use_wt_develop: true
-    compile_variant: *linux-64-debug-wtdevelop-compile-required
+    compile_variant: *linux-x86-dynamic-debug-wtdevelop-compile
 
 - <<: *generic_linux_compile_params
   name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
