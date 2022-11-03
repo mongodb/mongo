@@ -393,7 +393,6 @@ protected:
             _commonStats.isEOF = true;
             _slotsAccessible = false;
         } else {
-            invariant(state == PlanState::ADVANCED);
             _commonStats.advances++;
             _slotsAccessible = true;
         }
@@ -414,7 +413,7 @@ protected:
      * May return boost::none if it is not necessary to collect timing info.
      */
     boost::optional<ScopedTimer> getOptTimer(OperationContext* opCtx) {
-        if (opCtx) {
+        if (opCtx && _commonStats.executionTime.precision != QueryExecTimerPrecision::kNoTiming) {
             return scoped_timer_factory::make(opCtx->getServiceContext(),
                                               _commonStats.executionTime.precision,
                                               &_commonStats.executionTime.executionTimeEstimate);

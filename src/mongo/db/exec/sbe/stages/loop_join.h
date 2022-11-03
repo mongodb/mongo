@@ -34,7 +34,7 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 namespace mongo::sbe {
-enum class JoinType { Inner, Left, Right };
+enum class JoinType : uint8_t { Inner, Left, Right };
 
 /**
  * Implements a traditional nested loop join. For each advance from the 'outer' child, re-opens the
@@ -114,8 +114,6 @@ private:
     // meaning that if they are coming from the 'outer', they must be projected by the 'outer'.
     const std::unique_ptr<EExpression> _predicate;
 
-    const JoinType _joinType;
-
     vm::ByteCode _bytecode;
     std::unique_ptr<vm::CodeFragment> _predicateCode;
 
@@ -127,11 +125,12 @@ private:
     // '_outerProjects' as a set (for faster checking of accessors, provided by the 'outer' child).
     value::SlotSet _outerRefs;
 
-    PlanState _innerState{PlanState::IS_EOF};
-    bool _innerReturned{false};
+    LoopJoinStats _specificStats;
+
+    const JoinType _joinType;
+
     bool _reOpenInner{false};
     bool _outerGetNext{false};
-    LoopJoinStats _specificStats;
 
     // Tracks whether or not we're reading from the left child or the right child.
     // This is necessary for yielding.

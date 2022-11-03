@@ -141,12 +141,11 @@ void LoopJoinStage::open(bool reOpen) {
 
 void LoopJoinStage::openInner() {
     // Reset back to the inputs.
-    for (auto&& [k, v] : _outProjectAccessors) {
-        v.setIndex(0);
+    if (_joinType == JoinType::Left) {
+        for (auto&& [k, v] : _outProjectAccessors) {
+            v.setIndex(0);
+        }
     }
-    _innerState = PlanState::ADVANCED;
-    _innerReturned = false;
-
     // (re)open the inner side as it can see the correlated value now.
     _children[1]->open(_reOpenInner);
     _reOpenInner = true;
@@ -155,6 +154,7 @@ void LoopJoinStage::openInner() {
 
 PlanState LoopJoinStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
+    bool innerSideMatched = true;
 
     if (_outerGetNext) {
         auto state = getNextOuterSide();
@@ -163,34 +163,21 @@ PlanState LoopJoinStage::getNext() {
         }
 
         openInner();
+        innerSideMatched = false;
         _outerGetNext = false;
     }
 
     for (;;) {
-        bool pass = false;
-
-        while (_innerState == PlanState::ADVANCED && !pass) {
-            _innerState = _children[1]->getNext();
-            if (_innerState == PlanState::ADVANCED) {
-                if (!_predicateCode) {
-                    pass = true;
-                } else {
-                    pass = _bytecode.runPredicate(_predicateCode.get());
-                }
+        while (_children[1]->getNext() == PlanState::ADVANCED) {
+            if (!_predicateCode || _bytecode.runPredicate(_predicateCode.get())) {
+                return trackPlanState(PlanState::ADVANCED);
             }
         }
 
-        if (_innerState == PlanState::ADVANCED) {
-            _innerReturned = true;
-            return trackPlanState(PlanState::ADVANCED);
-        }
-        invariant(_innerState == PlanState::IS_EOF);
-
-        if (_joinType == JoinType::Left && !_innerReturned) {
+        if (!innerSideMatched && _joinType == JoinType::Left) {
             for (auto&& [k, v] : _outProjectAccessors) {
                 v.setIndex(1);
             }
-            _innerReturned = true;
             return trackPlanState(PlanState::ADVANCED);
         }
 
@@ -200,6 +187,7 @@ PlanState LoopJoinStage::getNext() {
         }
 
         openInner();
+        innerSideMatched = false;
     }
 }
 
