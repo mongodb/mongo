@@ -1286,13 +1286,19 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     if (!opDebug.classicEngineUsed) {
         opDebug.classicEngineUsed = false;
     }
-    if (collections.getMainCollection()) {
+    const auto& mainColl = collections.getMainCollection();
+    if (mainColl) {
         auto planCacheKey = plan_cache_key_factory::make(*cq, collections);
         if (!opDebug.queryHash) {
             opDebug.queryHash = planCacheKey.queryHash();
         }
         if (!opDebug.planCacheKey && shouldCacheQuery(*cq)) {
-            opDebug.planCacheKey = planCacheKey.planCacheKeyHash();
+            if (!feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
+                opDebug.planCacheKey =
+                    plan_cache_key_factory::make<PlanCacheKey>(*cq, mainColl).planCacheKeyHash();
+            } else {
+                opDebug.planCacheKey = planCacheKey.planCacheKeyHash();
+            }
         }
     }
 
