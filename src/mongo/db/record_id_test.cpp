@@ -309,11 +309,11 @@ TEST(RecordId, RecordIdBigStr) {
     ASSERT_GT(bigId, smallId);
     ASSERT_LT(smallId, bigId);
 
-    // Once copied, this RecordId should not be sharing its contents.
+    // Once copied, this RecordId should be sharing its contents.
     RecordId bigCopy = bigId;
     ASSERT_FALSE(bigId.isInlineAllocated_forTest());
     ASSERT_FALSE(bigCopy.isInlineAllocated_forTest());
-    ASSERT_NE(bigId.getStr().rawData(), bigCopy.getStr().rawData());
+    ASSERT_EQ(bigId.getStr().rawData(), bigCopy.getStr().rawData());
     ASSERT_EQ(bigId.getStr().size(), bigCopy.getStr().size());
     ASSERT_EQ(sizeof(RecordId) + bigId.getStr().size(), bigCopy.memUsage());
 

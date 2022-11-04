@@ -56,8 +56,8 @@ class RecordIdChecks;
 #pragma pack(push, 1)
 class alignas(int64_t) RecordId {
     // The alignas is necessary in order to comply with memory alignment. Internally we're using
-    // 8-byte aligned data members (int64_t / char *) but as we're packing the structure the
-    // compiler will set the alignment to 1 due to the pragma so we must correct its alignment
+    // 8-byte aligned data members (int64_t / ConstSharedBuffer) but as we're packing the structure
+    // the compiler will set the alignment to 1 due to the pragma so we must correct its alignment
     // information for users of the class.
 
     // Class used for static assertions that can only happen when RecordId is completely defined.
@@ -90,56 +90,89 @@ public:
 
     RecordId() : _format(Format::kNull){};
 
-// We believe that due to https://gcc.gnu.org/bugzilla/show_bug.cgi?id=106092 GCC 11.2 gives an
-// invalid error for freeing a non-heap pointer in the destructor. As it is a false positive we
-// manually disable the warning here. Note that this pragma doesn't work on Clang so we must verify
-// that only GCC can read this.
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
-#endif
     ~RecordId() {
         if (_format == Format::kBigStr) {
-            free(_data.heapStr.stringPtr);
+            _data.heapStr.buffer.~ConstSharedBuffer();
         }
     }
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
 
     RecordId(RecordId&& other) {
-        std::memcpy(this, &other, sizeof(RecordId));
+        switch (other._format) {
+            case kNull:
+                break;
+            case kLong:
+                _data.longId.id = other._data.longId.id;
+                break;
+            case kSmallStr:
+                _data.inlineStr = other._data.inlineStr;
+                break;
+            case kBigStr:
+                new (&_data.heapStr.buffer)
+                    ConstSharedBuffer(std::move(other._data.heapStr.buffer));
+                break;
+        }
+        _format = other._format;
         other._format = Format::kNull;
     };
 
     RecordId(const RecordId& other) {
-        std::memcpy(this, &other, sizeof(RecordId));
-        if (other._format == Format::kBigStr) {
-            auto ptr = (char*)mongoMalloc(other._data.heapStr.size);
-            std::memcpy(ptr, other._data.heapStr.stringPtr, other._data.heapStr.size);
-            _data.heapStr.stringPtr = ptr;
+        switch (other._format) {
+            case kNull:
+                break;
+            case kLong:
+                _data.longId.id = other._data.longId.id;
+                break;
+            case kSmallStr:
+                _data.inlineStr = other._data.inlineStr;
+                break;
+            case kBigStr:
+                new (&_data.heapStr.buffer) ConstSharedBuffer(other._data.heapStr.buffer);
+                break;
         }
+        _format = other._format;
     };
 
     RecordId& operator=(const RecordId& other) {
         if (_format == Format::kBigStr) {
-            free(_data.heapStr.stringPtr);
+            _data.heapStr.buffer.~ConstSharedBuffer();
         }
-        std::memcpy(this, &other, sizeof(RecordId));
-        if (other._format == Format::kBigStr) {
-            auto ptr = (char*)mongoMalloc(other._data.heapStr.size);
-            std::memcpy(ptr, other._data.heapStr.stringPtr, other._data.heapStr.size);
-            _data.heapStr.stringPtr = ptr;
+        switch (other._format) {
+            case kNull:
+                break;
+            case kLong:
+                _data.longId.id = other._data.longId.id;
+                break;
+            case kSmallStr:
+                _data.inlineStr = other._data.inlineStr;
+                break;
+            case kBigStr:
+                new (&_data.heapStr.buffer) ConstSharedBuffer(other._data.heapStr.buffer);
+                break;
         }
+        _format = other._format;
         return *this;
     };
 
 
     RecordId& operator=(RecordId&& other) {
         if (_format == Format::kBigStr) {
-            free(_data.heapStr.stringPtr);
+            _data.heapStr.buffer.~ConstSharedBuffer();
         }
-        std::memcpy(this, &other, sizeof(RecordId));
+        switch (other._format) {
+            case kNull:
+                break;
+            case kLong:
+                _data.longId.id = other._data.longId.id;
+                break;
+            case kSmallStr:
+                _data.inlineStr = other._data.inlineStr;
+                break;
+            case kBigStr:
+                new (&_data.heapStr.buffer)
+                    ConstSharedBuffer(std::move(other._data.heapStr.buffer));
+                break;
+        }
+        _format = other._format;
         other._format = Format::kNull;
         return *this;
     }
@@ -169,10 +202,9 @@ public:
             std::memcpy(_data.inlineStr.dataArr.data(), str, size);
         } else {
             _format = Format::kBigStr;
-            _data.heapStr.size = size;
-            auto ptr = (char*)mongoMalloc(size);
-            _data.heapStr.stringPtr = ptr;
-            std::memcpy(ptr, str, size);
+            auto buffer = SharedBuffer::allocate(size);
+            std::memcpy(buffer.get(), str, size);
+            new (&_data.heapStr.buffer) ConstSharedBuffer(std::move(buffer));
         }
     }
 
@@ -330,7 +362,7 @@ public:
      * buffers.
      */
     size_t memUsage() const {
-        size_t largeStrSize = (_format == Format::kBigStr) ? _data.heapStr.size : 0;
+        size_t largeStrSize = (_format == Format::kBigStr) ? _data.heapStr.buffer.capacity() : 0;
         return sizeof(RecordId) + largeStrSize;
     }
 
@@ -438,7 +470,7 @@ private:
         kSmallStr,
         /**
          * Stores a variable-length binary string larger than kSmallStrMaxSize. The value is stored
-         * in a heap buffer '_data.heapStr.stringPtr' with its size stored in '_data.heapStr.size'.
+         * in a SharedBuffer '_data.heapStr.buffer'.
          * This RecordId may only be accessed using getStr().
          */
         kBigStr
@@ -467,13 +499,13 @@ private:
     }
 
     StringData _getBigStrNoCheck() const {
-        return StringData(_data.heapStr.stringPtr, _data.heapStr.size);
+        return StringData(_data.heapStr.buffer.get(), _data.heapStr.buffer.capacity());
     }
 
     static constexpr auto kTargetSizeInBytes = 32;
     // In the usual case we would store the data as Format followed by a struct union of the
-    // InlineString (size + array), HeapStr (size + ptr), and LongId (int64_t). This however leaves
-    // 7 bytes unused for pading if Format is 1 byte and 4 if it is 4 bytes (x86) due to data
+    // InlineString (size + array), HeapStr (ConstSharedBuffer), and LongId (int64_t). This however
+    // leaves 7 bytes unused for pading if Format is 1 byte and 4 if it is 4 bytes (x86) due to data
     // alignment requirements of the union. To avoid this we manually perform memory padding in the
     // structs of the union coupled with packing the class so that all items align properly.
     Format _format;  // offset = 0, size = 1
@@ -483,13 +515,12 @@ private:
     // Offsets/padding will be computed in respect to the whole class by taking into account the
     // Format data member.
     struct HeapStr {
-        std::byte _padding[std::alignment_of_v<uint32_t> - sizeof(Format)];  // offset = 1, size = 3
-        uint32_t size;  // offset = 1 + 3, size = 4
-        static constexpr auto ptrPaddingBytes =
-            std::alignment_of_v<char*> - sizeof(Format) - sizeof(_padding) - sizeof(size);
-        static_assert(ptrPaddingBytes == 0,
-                      "No padding should be necessary between the size and pointer of HeapStr");
-        char* stringPtr;  // offset = 1 + 3 + 4, size = 8
+        static_assert(std::alignment_of_v<ConstSharedBuffer> <= 8,
+                      "ConstSharedBuffer is expected to have 8 bytes alignment at most. Having a "
+                      "larger alignment requires changing the RecordId class alignment");
+        std::byte _padding[std::alignment_of_v<ConstSharedBuffer> -
+                           sizeof(Format)];  // offset = 1, size = 7
+        ConstSharedBuffer buffer;            // offset = 1 + 7, size = 8
     };
     struct InlineStr {
         uint8_t size;  // offset = 1, size = 1
@@ -501,6 +532,14 @@ private:
         int64_t id;  // offset = 1 + 7, size = 8
     };
     union Content {
+        // Constructor and destructor are needed so that the union class is default constructible.
+        // Placement new will be used to initialize the correct data member in the RecordId
+        // constructor. This is necessary due to ConstSharedBuffer not being trivially
+        // constructible.
+        Content(){};
+        // Destructor is handled in the RecordId destructor as it handles knowing which data member
+        // is active.
+        ~Content(){};
         HeapStr heapStr;
         InlineStr inlineStr;
         LongId longId;
