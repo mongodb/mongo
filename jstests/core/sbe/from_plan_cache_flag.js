@@ -14,7 +14,7 @@ if (!checkSBEEnabled(db, ["featureFlagSbeFull"], true /* checkAllNodes */)) {
     jsTest.log("Skip running the test because SBE is not enabled");
     return;
 }
-var testDB = db.getSiblingDB("profile_findandmodify");
+var testDB = db.getSiblingDB("from_plan_cache_flag");
 assert.commandWorked(testDB.dropDatabase());
 var coll = testDB.getCollection("test");
 assert.commandWorked(testDB.setProfilingLevel(2));
