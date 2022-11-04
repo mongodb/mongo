@@ -243,7 +243,7 @@ TEST(SBEVM, Add) {
         vm::CodeFragment code;
         code.appendConstVal(tagInt32, valInt32);
         code.appendConstVal(tagInt64, valInt64);
-        code.appendAdd();
+        code.appendAdd({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -261,7 +261,7 @@ TEST(SBEVM, Add) {
         vm::CodeFragment code;
         code.appendConstVal(tagInt32, valInt32);
         code.appendConstVal(tagDouble, valDouble);
-        code.appendAdd();
+        code.appendAdd({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -278,7 +278,7 @@ TEST(SBEVM, Add) {
         vm::CodeFragment code;
         code.appendConstVal(tagDecimal, valDecimal);
         code.appendConstVal(tagDouble, valDouble);
-        code.appendAdd();
+        code.appendAdd({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -304,7 +304,7 @@ TEST(SBEVM, CompareBinData) {
                             value::bitcastFrom<const char*>(operands[0].value()));
         code.appendConstVal(value::TypeTags::bsonBinData,
                             value::bitcastFrom<const char*>(operands[1].value()));
-        code.appendCmp3w();
+        code.appendCmp3w({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -324,7 +324,7 @@ TEST(SBEVM, CompareBinData) {
                             value::bitcastFrom<const char*>(operands[0].value()));
         code.appendConstVal(value::TypeTags::bsonBinData,
                             value::bitcastFrom<const char*>(operands[1].value()));
-        code.appendCmp3w();
+        code.appendCmp3w({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -344,7 +344,7 @@ TEST(SBEVM, CompareBinData) {
                             value::bitcastFrom<const char*>(operands[0].value()));
         code.appendConstVal(value::TypeTags::bsonBinData,
                             value::bitcastFrom<const char*>(operands[1].value()));
-        code.appendCmp3w();
+        code.appendCmp3w({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -368,7 +368,7 @@ TEST(SBEVM, CompareBinData) {
                             value::bitcastFrom<const char*>(operands[0].value()));
         code.appendConstVal(value::TypeTags::bsonBinData,
                             value::bitcastFrom<const char*>(operands[1].value()));
-        code.appendCmp3w();
+        code.appendCmp3w({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -392,7 +392,7 @@ TEST(SBEVM, CompareBinData) {
                             value::bitcastFrom<const char*>(operands[0].value()));
         code.appendConstVal(value::TypeTags::bsonBinData,
                             value::bitcastFrom<const char*>(operands[1].value()));
-        code.appendCmp3w();
+        code.appendCmp3w({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -448,11 +448,11 @@ TEST(SBEVM, CodeFragmentToString) {
         vm::CodeFragment code;
         std::string toStringPattern{kPcPointerRangePattern + "( )"};
 
-        code.appendDiv();
+        code.appendDiv({}, {});
         toStringPattern += instrPattern("div", "");
-        code.appendMul();
+        code.appendMul({}, {});
         toStringPattern += instrPattern("mul", "");
-        code.appendAdd();
+        code.appendAdd({}, {});
         toStringPattern += instrPattern("add", "");
 
         std::string instrs = code.toString();
@@ -488,13 +488,12 @@ TEST(SBEVM, CodeFragmentToStringArgs) {
         toStringPattern +=
             instrPattern("traverseFImm", "k: True, offset: " + std::to_string(offsetF));
 
-        auto [tag, val] = value::makeNewString("Hello world!");
-        value::ValueGuard guard{tag, val};
-        code.appendGetField(tag, val);
-        toStringPattern += instrPattern("getFieldImm", "value: \"Hello world!\"");
+        code.appendGetField({}, "Hello world!"_sd);
+        toStringPattern +=
+            instrPattern("getFieldImm", "popParam: 1, offsetParam: 0, value: \"Hello world!\"");
 
-        code.appendAdd();
-        toStringPattern += instrPattern("add", "");
+        code.appendAdd({}, {});
+        toStringPattern += instrPattern("add", "popLhs: 1, offsetLhs: 0, popRhs: 1, offsetRhs: 0");
 
         std::string instrs = code.toString();
 

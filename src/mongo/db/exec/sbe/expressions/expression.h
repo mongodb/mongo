@@ -455,6 +455,10 @@ public:
         return _var;
     }
 
+    bool isMoveFrom() const {
+        return _moveFrom;
+    }
+
 private:
     value::SlotId _var;
     boost::optional<FrameId> _frameId;

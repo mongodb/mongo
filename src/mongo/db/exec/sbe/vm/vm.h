@@ -232,6 +232,25 @@ std::pair<value::TypeTags, value::Value> genericCompare(value::TypeTags lhsTag,
     return genericCompare(lhsTag, lhsValue, rhsTag, rhsValue, comparator, op);
 }
 
+namespace {
+template <typename T>
+T readFromMemory(const uint8_t* ptr) noexcept {
+    static_assert(!IsEndian<T>::value);
+
+    T val;
+    memcpy(&val, ptr, sizeof(T));
+    return val;
+}
+
+template <typename T>
+size_t writeToMemory(uint8_t* ptr, const T val) noexcept {
+    static_assert(!IsEndian<T>::value);
+
+    memcpy(ptr, &val, sizeof(T));
+    return sizeof(T);
+}
+}  // namespace
+
 struct Instruction {
     enum Tags {
         pushConstVal,
@@ -324,6 +343,7 @@ struct Instruction {
         jmpTrue,
         jmpNothing,
         ret,  // used only by simple local lambdas
+        allocStack,
 
         fail,
 
@@ -340,6 +360,39 @@ struct Instruction {
         False,
         True,
         Int32One,
+    };
+
+    constexpr static size_t kMaxInlineStringSize = 256;
+
+    /**
+     * An instruction parameter descriptor. Values (instruction arguments) live on the VM stack and
+     * the descriptor tells where to find it. The position on the stack is expressed as an offset
+     * from the top of stack.
+     * Optionally, an instruction can "consume" the value by poping the stack. All non-named
+     * temporaries are poped after the use. Naturally, only the top of stack (offset 0) can be
+     * popped. We do not support an arbitrary erasure from the middle of stack.
+     */
+    struct Parameter {
+        int variable{0};
+        boost::optional<FrameId> frameId;
+
+        // Get the size in bytes of an instruction parameter encoded in byte code.
+        size_t size() const noexcept {
+            return sizeof(bool) + (frameId ? sizeof(int) : 0);
+        }
+
+        MONGO_COMPILER_ALWAYS_INLINE
+        static std::pair<bool, int> decodeParam(const uint8_t*& pcPointer) noexcept {
+            auto pop = readFromMemory<bool>(pcPointer);
+            pcPointer += sizeof(pop);
+            int offset = 0;
+            if (!pop) {
+                offset = readFromMemory<int>(pcPointer);
+                pcPointer += sizeof(offset);
+            }
+
+            return {pop, offset};
+        }
     };
 
     static const char* toStringConstants(Constants k) {
@@ -514,6 +567,8 @@ struct Instruction {
                 return "jmpNothing";
             case ret:
                 return "ret";
+            case allocStack:
+                return "allocStack";
             case fail:
                 return "fail";
             case applyClassicMatcher:
@@ -687,6 +742,9 @@ public:
     auto stackSize() const {
         return _stackSize;
     }
+    auto maxStackSize() const {
+        return _maxStackSize;
+    }
     void removeFixup(FrameId frameId);
 
     void append(CodeFragment&& code);
@@ -695,7 +753,7 @@ public:
     void appendConstVal(value::TypeTags tag, value::Value val);
     void appendAccessVal(value::SlotAccessor* accessor);
     void appendMoveVal(value::SlotAccessor* accessor);
-    void appendLocalVal(FrameId frameId, int stackOffset, bool moveFrom);
+    void appendLocalVal(FrameId frameId, int variable, bool moveFrom);
     void appendLocalLambda(int codePosition);
     void appendPop() {
         appendSimpleInstruction(Instruction::pop);
@@ -703,65 +761,71 @@ public:
     void appendSwap() {
         appendSimpleInstruction(Instruction::swap);
     }
-    void appendAdd();
-    void appendSub();
-    void appendMul();
-    void appendDiv();
-    void appendIDiv();
-    void appendMod();
-    void appendNegate();
-    void appendNot();
-    void appendLess() {
-        appendSimpleInstruction(Instruction::less);
+    void appendAdd(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendSub(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendMul(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendDiv(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendIDiv(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendMod(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendNegate(Instruction::Parameter input);
+    void appendNot(Instruction::Parameter input);
+    void appendLess(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+        appendSimpleInstruction(Instruction::less, lhs, rhs);
     }
-    void appendLessEq() {
-        appendSimpleInstruction(Instruction::lessEq);
+    void appendLessEq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+        appendSimpleInstruction(Instruction::lessEq, lhs, rhs);
     }
-    void appendGreater() {
-        appendSimpleInstruction(Instruction::greater);
+    void appendGreater(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+        appendSimpleInstruction(Instruction::greater, lhs, rhs);
     }
-    void appendGreaterEq() {
-        appendSimpleInstruction(Instruction::greaterEq);
+    void appendGreaterEq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+        appendSimpleInstruction(Instruction::greaterEq, lhs, rhs);
     }
-    void appendEq() {
-        appendSimpleInstruction(Instruction::eq);
+    void appendEq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+        appendSimpleInstruction(Instruction::eq, lhs, rhs);
     }
-    void appendNeq() {
-        appendSimpleInstruction(Instruction::neq);
+    void appendNeq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+        appendSimpleInstruction(Instruction::neq, lhs, rhs);
     }
-    void appendCmp3w() {
-        appendSimpleInstruction(Instruction::cmp3w);
-    }
-    void appendCollLess() {
-        appendSimpleInstruction(Instruction::collLess);
-    }
-    void appendCollLessEq() {
-        appendSimpleInstruction(Instruction::collLessEq);
-    }
-    void appendCollGreater() {
-        appendSimpleInstruction(Instruction::collGreater);
-    }
-    void appendCollGreaterEq() {
-        appendSimpleInstruction(Instruction::collGreaterEq);
-    }
-    void appendCollEq() {
-        appendSimpleInstruction(Instruction::collEq);
-    }
-    void appendCollNeq() {
-        appendSimpleInstruction(Instruction::collNeq);
-    }
-    void appendCollCmp3w() {
-        appendSimpleInstruction(Instruction::collCmp3w);
-    }
+    void appendCmp3w(Instruction::Parameter lhs, Instruction::Parameter rhs);
+
+    void appendCollLess(Instruction::Parameter lhs,
+                        Instruction::Parameter rhs,
+                        Instruction::Parameter collator);
+
+    void appendCollLessEq(Instruction::Parameter lhs,
+                          Instruction::Parameter rhs,
+                          Instruction::Parameter collator);
+
+    void appendCollGreater(Instruction::Parameter lhs,
+                           Instruction::Parameter rhs,
+                           Instruction::Parameter collator);
+
+    void appendCollGreaterEq(Instruction::Parameter lhs,
+                             Instruction::Parameter rhs,
+                             Instruction::Parameter collator);
+
+    void appendCollEq(Instruction::Parameter lhs,
+                      Instruction::Parameter rhs,
+                      Instruction::Parameter collator);
+
+    void appendCollNeq(Instruction::Parameter lhs,
+                       Instruction::Parameter rhs,
+                       Instruction::Parameter collator);
+
+    void appendCollCmp3w(Instruction::Parameter lhs,
+                         Instruction::Parameter rhs,
+                         Instruction::Parameter collator);
+
     void appendFillEmpty() {
         appendSimpleInstruction(Instruction::fillEmpty);
     }
     void appendFillEmpty(Instruction::Constants k);
-    void appendGetField();
-    void appendGetField(value::TypeTags tag, value::Value val);
-    void appendGetElement();
-    void appendCollComparisonKey();
-    void appendGetFieldOrElement();
+    void appendGetField(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendGetField(Instruction::Parameter input, StringData fieldName);
+    void appendGetElement(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendCollComparisonKey(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendGetFieldOrElement(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendTraverseP() {
         appendSimpleInstruction(Instruction::traverseP);
     }
@@ -781,7 +845,7 @@ public:
     void appendSetField() {
         appendSimpleInstruction(Instruction::setField);
     }
-    void appendGetArraySize();
+    void appendGetArraySize(Instruction::Parameter input);
     void appendDateTrunc(TimeUnit unit, int64_t binSize, TimeZone timezone, DayOfWeek startOfWeek);
 
     void appendSum();
@@ -791,27 +855,27 @@ public:
     void appendLast();
     void appendCollMin();
     void appendCollMax();
-    void appendExists();
-    void appendIsNull();
-    void appendIsObject();
-    void appendIsArray();
-    void appendIsString();
-    void appendIsNumber();
-    void appendIsBinData();
-    void appendIsDate();
-    void appendIsNaN();
-    void appendIsInfinity();
-    void appendIsRecordId();
-    void appendIsMinKey() {
-        appendSimpleInstruction(Instruction::isMinKey);
+    void appendExists(Instruction::Parameter input);
+    void appendIsNull(Instruction::Parameter input);
+    void appendIsObject(Instruction::Parameter input);
+    void appendIsArray(Instruction::Parameter input);
+    void appendIsString(Instruction::Parameter input);
+    void appendIsNumber(Instruction::Parameter input);
+    void appendIsBinData(Instruction::Parameter input);
+    void appendIsDate(Instruction::Parameter input);
+    void appendIsNaN(Instruction::Parameter input);
+    void appendIsInfinity(Instruction::Parameter input);
+    void appendIsRecordId(Instruction::Parameter input);
+    void appendIsMinKey(Instruction::Parameter input) {
+        appendSimpleInstruction(Instruction::isMinKey, input);
     }
-    void appendIsMaxKey() {
-        appendSimpleInstruction(Instruction::isMaxKey);
+    void appendIsMaxKey(Instruction::Parameter input) {
+        appendSimpleInstruction(Instruction::isMaxKey, input);
     }
-    void appendIsTimestamp() {
-        appendSimpleInstruction(Instruction::isTimestamp);
+    void appendIsTimestamp(Instruction::Parameter input) {
+        appendSimpleInstruction(Instruction::isTimestamp, input);
     }
-    void appendTypeMatch(uint32_t mask);
+    void appendTypeMatch(Instruction::Parameter input, uint32_t mask);
     void appendFunction(Builtin f, ArityType arity);
     void appendJump(int jumpOffset);
     void appendJumpTrue(int jumpOffset);
@@ -819,6 +883,7 @@ public:
     void appendRet() {
         appendSimpleInstruction(Instruction::ret);
     }
+    void appendAllocStack(uint32_t size);
     void appendFail() {
         appendSimpleInstruction(Instruction::fail);
     }
@@ -831,15 +896,24 @@ public:
     std::string toString() const;
 
 private:
-    void appendSimpleInstruction(Instruction::Tags tag);
+    template <typename... Ts>
+    void appendSimpleInstruction(Instruction::Tags tag, Ts&&... params);
     auto allocateSpace(size_t size) {
         auto oldSize = _instrs.size();
         _instrs.resize(oldSize + size);
         return _instrs.data() + oldSize;
     }
 
-    void adjustStackSimple(const Instruction& i);
+    template <typename... Ts>
+    void adjustStackSimple(const Instruction& i, Ts&&... params);
     void copyCodeAndFixup(CodeFragment&& from);
+
+    size_t appendParameter(uint8_t* ptr, Instruction::Parameter param, int& popCompensation);
+
+    // Convert a variable index to a stack offset.
+    constexpr int varToOffset(int var) const {
+        return -var - 1;
+    }
 
 private:
     absl::InlinedVector<uint8_t, 16> _instrs;
@@ -858,26 +932,8 @@ private:
     std::vector<FixUp> _fixUps;
 
     size_t _stackSize{0};
+    size_t _maxStackSize{0};
 };
-
-namespace {
-template <typename T>
-T readFromMemory(const uint8_t* ptr) noexcept {
-    static_assert(!IsEndian<T>::value);
-
-    T val;
-    memcpy(&val, ptr, sizeof(T));
-    return val;
-}
-
-template <typename T>
-size_t writeToMemory(uint8_t* ptr, const T val) noexcept {
-    static_assert(!IsEndian<T>::value);
-
-    memcpy(ptr, &val, sizeof(T));
-    return sizeof(T);
-}
-}  // namespace
 
 class ByteCode {
     static constexpr size_t sizeOfElement =
@@ -907,8 +963,13 @@ private:
     void runClassicMatcher(const MatchExpression* matcher);
 
     template <typename T>
-    void runTagCheck(T&& predicate);
-    void runTagCheck(value::TypeTags tagRhs);
+    void runTagCheck(const uint8_t*& pcPointer, T&& predicate);
+    void runTagCheck(const uint8_t*& pcPointer, value::TypeTags tagRhs);
+
+    MONGO_COMPILER_ALWAYS_INLINE
+    static std::pair<bool, int> decodeParam(const uint8_t*& pcPointer) noexcept {
+        return Instruction::Parameter::decodeParam(pcPointer);
+    }
 
     FastTuple<bool, value::TypeTags, value::Value> genericDiv(value::TypeTags lhsTag,
                                                               value::Value lhsValue,
@@ -1234,12 +1295,14 @@ private:
         writeToMemory(ptr + offsetVal, val);
     }
     MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> getFromStack(
-        size_t offset) noexcept {
-        if (MONGO_likely(offset == 0)) {
-            return readTuple(_argStackTop);
-        } else {
-            return readTuple(_argStackTop - offset * sizeOfElement);
+        size_t offset, bool pop = false) noexcept {
+        auto ret = readTuple(_argStackTop - offset * sizeOfElement);
+
+        if (pop) {
+            popStack();
         }
+
+        return ret;
     }
 
     MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> moveFromStack(
@@ -1280,11 +1343,12 @@ private:
     MONGO_COMPILER_ALWAYS_INLINE void pushStack(bool owned,
                                                 value::TypeTags tag,
                                                 value::Value val) noexcept {
-        _argStackTop += sizeOfElement;
-        if (MONGO_unlikely(_argStackTop == _argStackEnd)) {
-            growAndResize();
+        auto localPtr = _argStackTop += sizeOfElement;
+        if constexpr (kDebugBuild) {
+            invariant(localPtr != _argStackEnd);
         }
-        topStack(owned, tag, val);
+
+        writeTuple(localPtr, owned, tag, val);
     }
 
     MONGO_COMPILER_ALWAYS_INLINE void topStack(bool owned,
@@ -1310,13 +1374,12 @@ private:
         _argStackTop = _argStack - sizeOfElement;
     }
 
-    void growAndResize() noexcept;
-
+    void allocStack(size_t size) noexcept;
     void swapStack();
 
     uint8_t* _argStackTop{nullptr};
-    uint8_t* _argStack{nullptr};
     uint8_t* _argStackEnd{nullptr};
+    uint8_t* _argStack{nullptr};
 };
 }  // namespace vm
 }  // namespace sbe

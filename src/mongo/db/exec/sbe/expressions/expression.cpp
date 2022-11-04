@@ -63,6 +63,41 @@ vm::CodeFragment wrapNothingTest(vm::CodeFragment&& code, F&& generator) {
     return std::move(code);
 }
 
+/**
+ * Try to convert to a variable if possible.
+ */
+EVariable* getFrameVariable(EExpression* e) {
+    auto var = e->as<EVariable>();
+    if (var && var->getFrameId() && !var->isMoveFrom()) {
+        return var;
+    }
+    return nullptr;
+}
+
+/**
+ * Construct a parameter descriptor from a variable.
+ */
+vm::Instruction::Parameter getParam(EVariable* var) {
+    if (var) {
+        return {(int)var->getSlotId(), var->getFrameId()};
+    } else {
+        return {};
+    }
+}
+
+vm::Instruction::Parameter appendParameter(vm::CodeFragment& code,
+                                           CompileCtx& ctx,
+                                           EExpression* e) {
+    auto var = getFrameVariable(e);
+
+    // If an expression is not a simple variable then we must generate code for it.
+    if (!var) {
+        code.append(e->compileDirect(ctx));
+    }
+
+    return getParam(var);
+}
+
 std::string EExpression::toString() const {
     return DebugPrinter{}.print(debugPrint());
 }
@@ -106,8 +141,7 @@ vm::CodeFragment EVariable::compileDirect(CompileCtx& ctx) const {
     vm::CodeFragment code;
 
     if (_frameId) {
-        int offset = -_var - 1;
-        code.appendLocalVal(*_frameId, offset, _moveFrom);
+        code.appendLocalVal(*_frameId, _var, _moveFrom);
     } else {
         // ctx.root is optional. If root stage is not specified, then resolve the variable using
         // default context rules.
@@ -156,10 +190,10 @@ vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
 
     invariant(!hasCollatorArg || isComparisonOp(_op));
 
-    auto lhs = _nodes[0]->compileDirect(ctx);
-    auto rhs = _nodes[1]->compileDirect(ctx);
-
     if (_op == EPrimBinary::logicAnd) {
+        auto lhs = _nodes[0]->compileDirect(ctx);
+        auto rhs = _nodes[1]->compileDirect(ctx);
+
         vm::CodeFragment codeFalseBranch;
         codeFalseBranch.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
 
@@ -176,6 +210,9 @@ vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
 
         return code;
     } else if (_op == EPrimBinary::logicOr) {
+        auto lhs = _nodes[0]->compileDirect(ctx);
+        auto rhs = _nodes[1]->compileDirect(ctx);
+
         vm::CodeFragment codeTrueBranch;
         codeTrueBranch.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
 
@@ -193,47 +230,55 @@ vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
         return code;
     }
 
-    if (hasCollatorArg) {
-        auto collator = _nodes[2]->compileDirect(ctx);
-        code.append(std::move(collator));
-    }
 
-    code.append(std::move(lhs));
-    code.append(std::move(rhs));
+    vm::Instruction::Parameter collatorParam;
+
+    if (hasCollatorArg) {
+        collatorParam = appendParameter(code, ctx, _nodes[2].get());
+    }
+    vm::Instruction::Parameter lhsParam = appendParameter(code, ctx, _nodes[0].get());
+    vm::Instruction::Parameter rhsParam = appendParameter(code, ctx, _nodes[1].get());
 
     switch (_op) {
         case EPrimBinary::add:
-            code.appendAdd();
+            code.appendAdd(lhsParam, rhsParam);
             break;
         case EPrimBinary::sub:
-            code.appendSub();
+            code.appendSub(lhsParam, rhsParam);
             break;
         case EPrimBinary::mul:
-            code.appendMul();
+            code.appendMul(lhsParam, rhsParam);
             break;
         case EPrimBinary::div:
-            code.appendDiv();
+            code.appendDiv(lhsParam, rhsParam);
             break;
         case EPrimBinary::less:
-            hasCollatorArg ? code.appendCollLess() : code.appendLess();
+            hasCollatorArg ? code.appendCollLess(lhsParam, rhsParam, collatorParam)
+                           : code.appendLess(lhsParam, rhsParam);
             break;
         case EPrimBinary::lessEq:
-            hasCollatorArg ? code.appendCollLessEq() : code.appendLessEq();
+            hasCollatorArg ? code.appendCollLessEq(lhsParam, rhsParam, collatorParam)
+                           : code.appendLessEq(lhsParam, rhsParam);
             break;
         case EPrimBinary::greater:
-            hasCollatorArg ? code.appendCollGreater() : code.appendGreater();
+            hasCollatorArg ? code.appendCollGreater(lhsParam, rhsParam, collatorParam)
+                           : code.appendGreater(lhsParam, rhsParam);
             break;
         case EPrimBinary::greaterEq:
-            hasCollatorArg ? code.appendCollGreaterEq() : code.appendGreaterEq();
+            hasCollatorArg ? code.appendCollGreaterEq(lhsParam, rhsParam, collatorParam)
+                           : code.appendGreaterEq(lhsParam, rhsParam);
             break;
         case EPrimBinary::eq:
-            hasCollatorArg ? code.appendCollEq() : code.appendEq();
+            hasCollatorArg ? code.appendCollEq(lhsParam, rhsParam, collatorParam)
+                           : code.appendEq(lhsParam, rhsParam);
             break;
         case EPrimBinary::neq:
-            hasCollatorArg ? code.appendCollNeq() : code.appendNeq();
+            hasCollatorArg ? code.appendCollNeq(lhsParam, rhsParam, collatorParam)
+                           : code.appendNeq(lhsParam, rhsParam);
             break;
         case EPrimBinary::cmp3w:
-            hasCollatorArg ? code.appendCollCmp3w() : code.appendCmp3w();
+            hasCollatorArg ? code.appendCollCmp3w(lhsParam, rhsParam, collatorParam)
+                           : code.appendCmp3w(lhsParam, rhsParam);
             break;
         default:
             MONGO_UNREACHABLE;
@@ -316,14 +361,16 @@ std::unique_ptr<EExpression> EPrimUnary::clone() const {
 }
 
 vm::CodeFragment EPrimUnary::compileDirect(CompileCtx& ctx) const {
-    auto code = _nodes[0]->compileDirect(ctx);
+    vm::CodeFragment code;
+
+    auto param = appendParameter(code, ctx, _nodes[0].get());
 
     switch (_op) {
         case negate:
-            code.appendNegate();
+            code.appendNegate(param);
             break;
         case EPrimUnary::logicNot:
-            code.appendNot();
+            code.appendNot(param);
             break;
         default:
             MONGO_UNREACHABLE;
@@ -536,79 +583,275 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
 /**
  * The code generation function.
  */
-using CodeFn = void (vm::CodeFragment::*)();
+using CodeFnLegacy = void (vm::CodeFragment::*)();
+using CodeFn = vm::CodeFragment (*)(CompileCtx&, const EExpression::Vector&, bool);
 
 /**
  * The function description.
  */
 struct InstrFn {
-    ArityFn arityTest;
+    size_t arity;
     CodeFn generate;
     bool aggregate;
 };
+
+template <CodeFnLegacy Appender>
+vm::CodeFragment generatorLegacy(CompileCtx& ctx,
+                                 const EExpression::Vector& nodes,
+                                 bool aggregate) {
+    vm::CodeFragment code;
+
+    if (aggregate) {
+        code.appendAccessVal(ctx.accumulator);
+    }
+
+    for (size_t idx = 0; idx < nodes.size(); ++idx) {
+        code.append(nodes[idx]->compileDirect(ctx));
+    }
+
+    (code.*Appender)();
+
+    return code;
+}
+
+void generatorCommon(vm::CodeFragment& code,
+                     vm::Instruction::Parameter* params,
+                     size_t arity,
+                     CompileCtx& ctx,
+                     const EExpression::Vector& nodes,
+                     bool aggregate) {
+
+    invariant(nodes.size() == arity);
+
+    if (aggregate) {
+        code.appendAccessVal(ctx.accumulator);
+    }
+    for (size_t idx = 0; idx < arity; ++idx) {
+        params[idx] = appendParameter(code, ctx, nodes[idx].get());
+    }
+}
+
+template <size_t Arity, auto Appender>
+vm::CodeFragment generator(CompileCtx& ctx, const EExpression::Vector& nodes, bool aggregate) {
+    vm::CodeFragment code;
+    vm::Instruction::Parameter params[Arity];
+
+    generatorCommon(code, params, Arity, ctx, nodes, aggregate);
+
+    if constexpr (Arity == 0) {
+        (code.*Appender)();
+    } else if constexpr (Arity == 1) {
+        (code.*Appender)(params[0]);
+    } else if constexpr (Arity == 2) {
+        (code.*Appender)(params[0], params[1]);
+    } else {
+        static_assert(!Arity, "Missing specialization for Arity");
+    }
+
+    return code;
+}
+
+vm::CodeFragment generateGetField(CompileCtx& ctx, const EExpression::Vector& nodes, bool) {
+    vm::CodeFragment code;
+
+    if (nodes[1]->as<EConstant>()) {
+        auto [tag, val] = nodes[1]->as<EConstant>()->getConstant();
+
+        if (value::isString(tag)) {
+            auto fieldName = value::getStringView(tag, val);
+            if (fieldName.size() < vm::Instruction::kMaxInlineStringSize) {
+                auto param = appendParameter(code, ctx, nodes[0].get());
+                code.appendGetField(param, fieldName);
+
+                return code;
+            }
+        }
+    }
+
+    vm::Instruction::Parameter params[2];
+    generatorCommon(code, params, 2, ctx, nodes, false);
+    code.appendGetField(params[0], params[1]);
+
+    return code;
+}
+
+vm::CodeFragment generateFillEmpty(CompileCtx& ctx, const EExpression::Vector& nodes, bool) {
+
+    if (nodes[1]->as<EConstant>()) {
+        vm::CodeFragment code;
+        auto [tag, val] = nodes[1]->as<EConstant>()->getConstant();
+        if (tag == value::TypeTags::Null) {
+            code.append(nodes[0]->compileDirect(ctx));
+            code.appendFillEmpty(vm::Instruction::Null);
+
+            return code;
+        }
+        if (tag == value::TypeTags::Boolean) {
+            code.append(nodes[0]->compileDirect(ctx));
+            code.appendFillEmpty(value::bitcastTo<bool>(val) ? vm::Instruction::True
+                                                             : vm::Instruction::False);
+
+            return code;
+        }
+    }
+    return generatorLegacy<&vm::CodeFragment::appendFillEmpty>(ctx, nodes, false);
+}
+
+vm::CodeFragment generateTraverseP(CompileCtx& ctx, const EExpression::Vector& nodes, bool) {
+    if (nodes[1]->as<ELocalLambda>() && nodes[2]->as<EConstant>()) {
+        auto [tag, val] = nodes[2]->as<EConstant>()->getConstant();
+        if ((tag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(val) == 1) ||
+            tag == value::TypeTags::Nothing) {
+            vm::CodeFragment code;
+            auto lambda = nodes[1]->as<ELocalLambda>();
+
+            auto body = lambda->compileBodyDirect(ctx);
+            // Jump around the body.
+            code.appendJump(body.instrs().size());
+
+            // Remember the position and append the body.
+            auto bodyPosition = code.instrs().size();
+            code.appendNoStack(std::move(body));
+
+            code.append(nodes[0]->compileDirect(ctx));
+
+            code.appendTraverseP(bodyPosition,
+                                 tag == value::TypeTags::Nothing ? vm::Instruction::Nothing
+                                                                 : vm::Instruction::Int32One);
+            return code;
+        }
+    }
+
+    return generatorLegacy<&vm::CodeFragment::appendTraverseP>(ctx, nodes, false);
+}
+
+vm::CodeFragment generateTraverseF(CompileCtx& ctx, const EExpression::Vector& nodes, bool) {
+    if (nodes[1]->as<ELocalLambda>() && nodes[2]->as<EConstant>()) {
+        vm::CodeFragment code;
+        auto lambda = nodes[1]->as<ELocalLambda>();
+        auto [tag, val] = nodes[2]->as<EConstant>()->getConstant();
+
+        auto body = lambda->compileBodyDirect(ctx);
+        // Jump around the body.
+        code.appendJump(body.instrs().size());
+
+        // Remember the position and append the body.
+        auto bodyPosition = code.instrs().size();
+        code.appendNoStack(std::move(body));
+
+        code.append(nodes[0]->compileDirect(ctx));
+        code.appendTraverseF(bodyPosition,
+                             value::bitcastTo<bool>(val) ? vm::Instruction::True
+                                                         : vm::Instruction::False);
+        return code;
+    }
+
+    return generatorLegacy<&vm::CodeFragment::appendTraverseF>(ctx, nodes, false);
+}
+
+vm::CodeFragment generateTraverseCellValues(CompileCtx& ctx,
+                                            const EExpression::Vector& nodes,
+                                            bool) {
+    if (nodes[1]->as<ELocalLambda>()) {
+        vm::CodeFragment code;
+        auto lambda = nodes[1]->as<ELocalLambda>();
+
+        auto body = lambda->compileBodyDirect(ctx);
+        // Jump around the body.
+        code.appendJump(body.instrs().size());
+
+        // Remember the position and append the body.
+        auto bodyPosition = code.instrs().size();
+        code.appendNoStack(std::move(body));
+
+        code.append(nodes[0]->compileDirect(ctx));
+
+        code.appendTraverseCellValues(bodyPosition);
+        return code;
+    }
+
+    return generatorLegacy<&vm::CodeFragment::appendTraverseCellValues>(ctx, nodes, false);
+}
+
+vm::CodeFragment generateTraverseCellTypes(CompileCtx& ctx,
+                                           const EExpression::Vector& nodes,
+                                           bool) {
+    if (nodes[1]->as<ELocalLambda>()) {
+        vm::CodeFragment code;
+        auto lambda = nodes[1]->as<ELocalLambda>();
+
+        auto body = lambda->compileBodyDirect(ctx);
+        // Jump around the body.
+        code.appendJump(body.instrs().size());
+
+        // Remember the position and append the body.
+        auto bodyPosition = code.instrs().size();
+        code.appendNoStack(std::move(body));
+
+        code.append(nodes[0]->compileDirect(ctx));
+
+        code.appendTraverseCellTypes(bodyPosition);
+        return code;
+    }
+
+    return generatorLegacy<&vm::CodeFragment::appendTraverseCellTypes>(ctx, nodes, false);
+}
+
+vm::CodeFragment generateClassicMatcher(CompileCtx& ctx, const EExpression::Vector& nodes, bool) {
+    tassert(6681400,
+            "First argument to applyClassicMatcher must be constant",
+            nodes[0]->as<EConstant>());
+    auto [matcherTag, matcherVal] = nodes[0]->as<EConstant>()->getConstant();
+    tassert(6681409,
+            "First argument to applyClassicMatcher must be a classic matcher",
+            matcherTag == value::TypeTags::classicMatchExpresion);
+
+    vm::CodeFragment code;
+    code.append(nodes[1]->compileDirect(ctx));
+    code.appendApplyClassicMatcher(value::getClassicMatchExpressionView(matcherVal));
+    return code;
+}
 
 /**
  * The map of functions that resolve directly to instructions.
  */
 static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
-    {"getField",
-     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendGetField, false}},
-    {"getElement",
-     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendGetElement, false}},
-    {"getArraySize",
-     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendGetArraySize, false}},
+    {"getElement", InstrFn{2, generator<2, &vm::CodeFragment::appendGetElement>, false}},
+    {"getField", InstrFn{2, generateGetField, false}},
+    {"getArraySize", InstrFn{1, generator<1, &vm::CodeFragment::appendGetArraySize>, false}},
     {"collComparisonKey",
-     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendCollComparisonKey, false}},
+     InstrFn{2, generator<2, &vm::CodeFragment::appendCollComparisonKey>, false}},
     {"getFieldOrElement",
-     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendGetFieldOrElement, false}},
-    {"fillEmpty",
-     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendFillEmpty, false}},
-    {"traverseP",
-     InstrFn{[](size_t n) { return n == 3; }, &vm::CodeFragment::appendTraverseP, false}},
-    {"traverseF",
-     InstrFn{[](size_t n) { return n == 3; }, &vm::CodeFragment::appendTraverseF, false}},
-    {"traverseCsiCellValues",
-     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendTraverseCellValues, false}},
-    {"traverseCsiCellTypes",
-     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendTraverseCellTypes, false}},
-    {"setField",
-     InstrFn{[](size_t n) { return n == 3; }, &vm::CodeFragment::appendSetField, false}},
-    {"exists", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendExists, false}},
-    {"isNull", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsNull, false}},
-    {"isObject",
-     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsObject, false}},
-    {"isArray", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsArray, false}},
-    {"isString",
-     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsString, false}},
-    {"isNumber",
-     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsNumber, false}},
-    {"isBinData",
-     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsBinData, false}},
-    {"isDate", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsDate, false}},
-    {"isNaN", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsNaN, false}},
-    {"isInfinity",
-     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsInfinity, false}},
-    {"isRecordId",
-     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsRecordId, false}},
-    {"isMinKey",
-     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsMinKey, false}},
-    {"isMaxKey",
-     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsMaxKey, false}},
-    {"isTimestamp",
-     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsTimestamp, false}},
-    {"sum", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendSum, true}},
-    {"min", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendMin, true}},
-    {"max", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendMax, true}},
-    {"first", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendFirst, true}},
-    {"last", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendLast, true}},
-    {"collMin", InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendCollMin, true}},
-    {"collMax", InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendCollMax, true}},
-    {"mod", InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendMod, false}},
-    // Note that we do not provide a pointer to a function for appending the 'applyClassicMatcher'
-    // instruction, because it's required that the first argument to applyClassicMatcher be a
-    // constant MatchExpression. This constant is stored as part of the bytecode itself, to avoid
-    // the stack manipulation overhead.
-    {"applyClassicMatcher", InstrFn{[](size_t n) { return n == 2; }, nullptr, false}},
+     InstrFn{2, generator<2, &vm::CodeFragment::appendGetFieldOrElement>, false}},
+    {"fillEmpty", InstrFn{2, generateFillEmpty, false}},
+    {"traverseP", InstrFn{3, generateTraverseP, false}},
+    {"traverseF", InstrFn{3, generateTraverseF, false}},
+    {"traverseCsiCellValues", InstrFn{2, generateTraverseCellValues, false}},
+    {"traverseCsiCellTypes", InstrFn{2, generateTraverseCellTypes, false}},
+    {"setField", InstrFn{3, generatorLegacy<&vm::CodeFragment::appendSetField>, false}},
+    {"sum", InstrFn{1, generatorLegacy<&vm::CodeFragment::appendSum>, true}},
+    {"min", InstrFn{1, generatorLegacy<&vm::CodeFragment::appendMin>, true}},
+    {"max", InstrFn{1, generatorLegacy<&vm::CodeFragment::appendMax>, true}},
+    {"first", InstrFn{1, generatorLegacy<&vm::CodeFragment::appendFirst>, true}},
+    {"last", InstrFn{1, generatorLegacy<&vm::CodeFragment::appendLast>, true}},
+    {"collMin", InstrFn{2, generatorLegacy<&vm::CodeFragment::appendCollMin>, true}},
+    {"collMax", InstrFn{2, generatorLegacy<&vm::CodeFragment::appendCollMax>, true}},
+    {"exists", InstrFn{1, generator<1, &vm::CodeFragment::appendExists>, false}},
+    {"mod", InstrFn{2, generator<2, &vm::CodeFragment::appendMod>, false}},
+    {"isDate", InstrFn{1, generator<1, &vm::CodeFragment::appendIsDate>, false}},
+    {"isNumber", InstrFn{1, generator<1, &vm::CodeFragment::appendIsNumber>, false}},
+    {"isNull", InstrFn{1, generator<1, &vm::CodeFragment::appendIsNull>, false}},
+    {"isObject", InstrFn{1, generator<1, &vm::CodeFragment::appendIsObject>, false}},
+    {"isArray", InstrFn{1, generator<1, &vm::CodeFragment::appendIsArray>, false}},
+    {"isString", InstrFn{1, generator<1, &vm::CodeFragment::appendIsString>, false}},
+    {"isBinData", InstrFn{1, generator<1, &vm::CodeFragment::appendIsBinData>, false}},
+    {"isNaN", InstrFn{1, generator<1, &vm::CodeFragment::appendIsNaN>, false}},
+    {"isInfinity", InstrFn{1, generator<1, &vm::CodeFragment::appendIsInfinity>, false}},
+    {"isRecordId", InstrFn{1, generator<1, &vm::CodeFragment::appendIsRecordId>, false}},
+    {"isMinKey", InstrFn{1, generator<1, &vm::CodeFragment::appendIsMinKey>, false}},
+    {"isMaxKey", InstrFn{1, generator<1, &vm::CodeFragment::appendIsMaxKey>, false}},
+    {"isTimestamp", InstrFn{1, generator<1, &vm::CodeFragment::appendIsTimestamp>, false}},
+    {"applyClassicMatcher", InstrFn{2, generateClassicMatcher, false}},
 };
 }  // namespace
 
@@ -630,8 +873,8 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
                 uassert(6996901,
                         "Second argument to typeMatch() must be a 32-bit integer constant",
                         mask >> 32 == 0 || mask >> 32 == -1);
-                code.append(_nodes[0]->compileDirect(ctx));
-                code.appendTypeMatch(mask);
+                auto param = appendParameter(code, ctx, _nodes[0].get());
+                code.appendTypeMatch(param, mask);
 
                 return code;
             }
@@ -689,140 +932,19 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
     }
 
     if (auto it = kInstrFunctions.find(_name); it != kInstrFunctions.end()) {
-        if (!it->second.arityTest(_nodes.size())) {
+        if (it->second.arity != _nodes.size()) {
             uasserted(4822845,
                       str::stream()
                           << "function call: " << _name << " has wrong arity: " << _nodes.size());
         }
-        vm::CodeFragment code;
-
         if (it->second.aggregate) {
             uassert(4822846,
                     str::stream() << "aggregate function call: " << _name
                                   << " occurs in the non-aggregate context.",
                     ctx.aggExpression && ctx.accumulator);
-
-            code.appendAccessVal(ctx.accumulator);
         }
 
-        // Optimize well known set of functions with constant arguments and generate their
-        // specialized variants.
-        if (_name == "fillEmpty" && _nodes[1]->as<EConstant>()) {
-            auto [tag, val] = _nodes[1]->as<EConstant>()->getConstant();
-            if (tag == value::TypeTags::Null) {
-                code.append(_nodes[0]->compileDirect(ctx));
-                code.appendFillEmpty(vm::Instruction::Null);
-
-                return code;
-            }
-            if (tag == value::TypeTags::Boolean) {
-                code.append(_nodes[0]->compileDirect(ctx));
-                code.appendFillEmpty(value::bitcastTo<bool>(val) ? vm::Instruction::True
-                                                                 : vm::Instruction::False);
-
-                return code;
-            }
-        } else if (_name == "getField" && _nodes[1]->as<EConstant>()) {
-            auto [tag, val] = _nodes[1]->as<EConstant>()->getConstant();
-
-            if (value::isString(tag)) {
-                code.append(_nodes[0]->compileDirect(ctx));
-                code.appendGetField(tag, val);
-
-                return code;
-            }
-        } else if (_name == "traverseF" && _nodes[1]->as<ELocalLambda>() &&
-                   _nodes[2]->as<EConstant>()) {
-            auto lambda = _nodes[1]->as<ELocalLambda>();
-            auto [tag, val] = _nodes[2]->as<EConstant>()->getConstant();
-
-            auto body = lambda->compileBodyDirect(ctx);
-            // Jump around the body.
-            code.appendJump(body.instrs().size());
-
-            // Remember the position and append the body.
-            auto bodyPosition = code.instrs().size();
-            code.appendNoStack(std::move(body));
-
-            code.append(_nodes[0]->compileDirect(ctx));
-            code.appendTraverseF(bodyPosition,
-                                 value::bitcastTo<bool>(val) ? vm::Instruction::True
-                                                             : vm::Instruction::False);
-            return code;
-        } else if (_name == "traverseP" && _nodes[1]->as<ELocalLambda>() &&
-                   _nodes[2]->as<EConstant>()) {
-            auto [tag, val] = _nodes[2]->as<EConstant>()->getConstant();
-            if ((tag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(val) == 1) ||
-                tag == value::TypeTags::Nothing) {
-                auto lambda = _nodes[1]->as<ELocalLambda>();
-
-                auto body = lambda->compileBodyDirect(ctx);
-                // Jump around the body.
-                code.appendJump(body.instrs().size());
-
-                // Remember the position and append the body.
-                auto bodyPosition = code.instrs().size();
-                code.appendNoStack(std::move(body));
-
-                code.append(_nodes[0]->compileDirect(ctx));
-
-                code.appendTraverseP(bodyPosition,
-                                     tag == value::TypeTags::Nothing ? vm::Instruction::Nothing
-                                                                     : vm::Instruction::Int32One);
-                return code;
-            }
-        } else if (_name == "traverseCsiCellValues" && _nodes[1]->as<ELocalLambda>()) {
-            auto lambda = _nodes[1]->as<ELocalLambda>();
-
-            auto body = lambda->compileBodyDirect(ctx);
-            // Jump around the body.
-            code.appendJump(body.instrs().size());
-
-            // Remember the position and append the body.
-            auto bodyPosition = code.instrs().size();
-            code.appendNoStack(std::move(body));
-
-            code.append(_nodes[0]->compileDirect(ctx));
-
-            code.appendTraverseCellValues(bodyPosition);
-            return code;
-        } else if (_name == "traverseCsiCellTypes" && _nodes[1]->as<ELocalLambda>()) {
-            auto lambda = _nodes[1]->as<ELocalLambda>();
-
-            auto body = lambda->compileBodyDirect(ctx);
-            // Jump around the body.
-            code.appendJump(body.instrs().size());
-
-            // Remember the position and append the body.
-            auto bodyPosition = code.instrs().size();
-            code.appendNoStack(std::move(body));
-
-            code.append(_nodes[0]->compileDirect(ctx));
-
-            code.appendTraverseCellTypes(bodyPosition);
-            return code;
-        } else if (_name == "applyClassicMatcher") {
-            tassert(6681400,
-                    "First argument to applyClassicMatcher must be constant",
-                    _nodes[0]->as<EConstant>());
-            auto [matcherTag, matcherVal] = _nodes[0]->as<EConstant>()->getConstant();
-            tassert(6681409,
-                    "First argument to applyClassicMatcher must be a classic matcher",
-                    matcherTag == value::TypeTags::classicMatchExpresion);
-
-            code.append(_nodes[1]->compileDirect(ctx));
-            code.appendApplyClassicMatcher(value::getClassicMatchExpressionView(matcherVal));
-            return code;
-        }
-
-        // The order of evaluation is flipped for instruction functions. We may want to change the
-        // evaluation code for those functions so we have the same behavior for all functions.
-        for (size_t idx = 0; idx < _nodes.size(); ++idx) {
-            code.append(_nodes[idx]->compileDirect(ctx));
-        }
-        (code.*(it->second.generate))();
-
-        return code;
+        return (it->second.generate)(ctx, _nodes, it->second.aggregate);
     }
 
     uasserted(4822847, str::stream() << "unknown function call: " << _name);
@@ -976,7 +1098,11 @@ std::unique_ptr<EExpression> ELocalLambda::clone() const {
 
 vm::CodeFragment ELocalLambda::compileBodyDirect(CompileCtx& ctx) const {
     // Compile the body first so we know its size.
-    auto body = _nodes.back()->compileDirect(ctx);
+    auto inner = _nodes.back()->compileDirect(ctx);
+    vm::CodeFragment body;
+    // Make sure the stack is sufficiently large.
+    body.appendAllocStack(inner.maxStackSize());
+    body.append(std::move(inner));
     body.appendRet();
     invariant(body.stackSize() == 1);
     body.fixup(1);
