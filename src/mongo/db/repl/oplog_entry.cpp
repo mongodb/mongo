@@ -28,9 +28,9 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/oplog_entry.h"
+
+#include <fmt/format.h>
 
 #include "mongo/db/global_index.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -191,6 +191,34 @@ DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
                                 << " Object field: " << redact(objectField));
     }
     MONGO_UNREACHABLE;
+}
+
+void ReplOperation::extractPrePostImageForTransaction(boost::optional<ImageBundle>* image) const {
+    auto needsRetryImage = getNeedsRetryImage();
+    if (!needsRetryImage) {
+        return;
+    }
+
+    uassert(6054001,
+            fmt::format("{} can only store the pre or post image of one findAndModify operation "
+                        "for each transaction",
+                        NamespaceString::kConfigImagesNamespace.toString()),
+            !(*image));
+
+    switch (*needsRetryImage) {
+        case repl::RetryImageEnum::kPreImage: {
+            invariant(!getPreImage().isEmpty());
+            *image = ImageBundle{repl::RetryImageEnum::kPreImage, getPreImage(), Timestamp{}};
+            break;
+        }
+        case repl::RetryImageEnum::kPostImage: {
+            invariant(!getPostImage().isEmpty());
+            *image = ImageBundle{repl::RetryImageEnum::kPostImage, getPostImage(), Timestamp{}};
+            break;
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 // Static
