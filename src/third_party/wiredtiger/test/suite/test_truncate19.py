@@ -44,13 +44,9 @@ class test_truncate19(wttest.WiredTigerTestCase):
 
     def append_rows(self, uri, ds, start_row, nrows, value):
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction()
         for i in range(start_row, start_row + nrows + 1):
-            cursor[ds.key(i)] = value
-            if i % 2 == 0:
-                self.session.commit_transaction()
-                self.session.begin_transaction()
-        self.session.commit_transaction()
+            with self.transaction(session=self.session):
+                cursor[ds.key(i)] = value
         cursor.close()
 
     def do_truncate(self, ds, start_row, nrows):
