@@ -64,13 +64,14 @@ let moveChunkThread =
 moveChunkThread.start();
 
 moveChunkHangAtStep5FailPoint.wait();
-assert.commandWorked(
-    donorPrimary.adminCommand({replSetStepDown: 5 /* stepDownSecs */, force: true}));
+donorReplSetTest.freeze(donorPrimary);
 
 moveChunkHangAtStep5FailPoint.off();
 moveChunkThread.join();
 
 metadataRefreshFailPoint.wait();
+donorReplSetTest.unfreeze(donorPrimary);
+donorReplSetTest.awaitNodesAgreeOnPrimary();
 
 jsTest.log("Verify that the donor has the migration coordinator doc and range deletion task doc");
 assert.eq(1, getNumMigrationCoordinatorDocs(donorShard, ns));
