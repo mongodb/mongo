@@ -2322,7 +2322,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
         auto* index = &metadata.indexes[offset];
         stdx::lock_guard lock(index->multikeyMutex);
 
-        auto tracksPathLevelMultikeyInfo = !metadata.indexes[offset].multikeyPaths.empty();
+        auto tracksPathLevelMultikeyInfo = !index->multikeyPaths.empty();
         if (!tracksPathLevelMultikeyInfo) {
             invariant(multikeyPaths.empty());
 
@@ -2338,7 +2338,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
 
         // We are tracking path-level multikey information for this index.
         invariant(!multikeyPaths.empty());
-        invariant(multikeyPaths.size() == metadata.indexes[offset].multikeyPaths.size());
+        invariant(multikeyPaths.size() == index->multikeyPaths.size());
 
         index->multikey = true;
 
@@ -2377,11 +2377,31 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
     }
     BSONCollectionCatalogEntry::MetaData* metadata = nullptr;
     bool hasSetMultikey = false;
+
     if (auto it = uncommittedMultikeys->find(this); it != uncommittedMultikeys->end()) {
         metadata = &it->second;
         hasSetMultikey = setMultikey(*metadata);
     } else {
-        BSONCollectionCatalogEntry::MetaData metadataLocal(*_metadata);
+        // First time this OperationContext needs to change multikey information for this
+        // collection. We cannot use the cached metadata in this collection as we may have just
+        // committed a multikey change concurrently to the storage engine without being able to
+        // observe it if its onCommit handlers haven't run yet.
+        auto metadataLocal = *DurableCatalog::get(opCtx)->getMetaData(opCtx, getCatalogId());
+        // When reading from the durable catalog the index offsets are different because when
+        // removing indexes in-memory just zeros out the slot instead of actually removing it. We
+        // must adjust the entries so they match how they are stored in _metadata so we can rely on
+        // the index offsets being stable. The order of valid indexes are the same, so we can
+        // iterate from the end and move them into the right positions.
+        int localIdx = metadataLocal.indexes.size() - 1;
+        metadataLocal.indexes.resize(_metadata->indexes.size());
+        for (int i = _metadata->indexes.size() - 1; i >= 0 && localIdx != i; --i) {
+            if (_metadata->indexes[i].isPresent()) {
+                metadataLocal.indexes[i] = std::move(metadataLocal.indexes[localIdx]);
+                metadataLocal.indexes[localIdx] = {};
+                --localIdx;
+            }
+        }
+
         hasSetMultikey = setMultikey(metadataLocal);
         if (hasSetMultikey) {
             metadata = &uncommittedMultikeys->emplace(this, std::move(metadataLocal)).first->second;
