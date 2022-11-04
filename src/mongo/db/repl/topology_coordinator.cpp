@@ -3485,7 +3485,7 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
             if (!args.isADryRun()) {
                 _lastVote.setTerm(args.getTerm());
                 _lastVote.setCandidateIndex(args.getCandidateIndex());
-                LOGV2_DEBUG(5972100, 0, "Voting yes in election");
+                LOGV2_DEBUG(5972100, 1, "Voting yes in election");
             }
             response->setVoteGranted(true);
         }

@@ -64,6 +64,9 @@ assert.commandWorked(node1.adminCommand({clearLog: 'global'}));
 
 jsTestLog("Stepping up node 2");
 
+// Make sure id:5972100 debug log is enabled.
+setLogVerbosity([node1], {"replication": {"verbosity": 1}});
+
 // Node 2 runs for election. This is needed before node 1 steps up because otherwise it will always
 // lose future elections and will not be considered the proper branch of history.
 const electionShell = startParallelShell(() => {

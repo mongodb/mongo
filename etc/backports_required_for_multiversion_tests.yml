@@ -228,6 +228,8 @@ last-continuous:
     ticket: SERVER-68361
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
+    ticket: SERVER-69861
   suites: null
 last-lts:
   all:
@@ -533,4 +535,6 @@ last-lts:
     ticket: SERVER-68361
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
+    ticket: SERVER-69861
   suites: null
