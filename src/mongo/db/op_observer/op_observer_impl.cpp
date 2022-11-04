@@ -1790,7 +1790,9 @@ int logOplogEntries(
     invariant(opCtx->lockState()->isWriteLocked());
 
     if (txnParticipant) {
-        prevWriteOpTime.writeOpTime = txnParticipant.getLastWriteOpTime();
+        // Prior to writing any applyOps oplog entries for a multi-document transaction, the
+        // last written optime maintained within the transaction participant should be null.
+        invariant(txnParticipant.getLastWriteOpTime().isNull());
     }
 
     // Stores the statement ids of all write statements in the transaction.
