@@ -282,8 +282,40 @@ void DocumentSource::serializeToArray(vector<Value>& array,
     }
 }
 
+namespace {
+std::list<boost::intrusive_ptr<DocumentSource>> throwOnParse(
+    BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uasserted(6047400, "Search stages are only allowed on MongoDB Atlas");
+}
+std::unique_ptr<LiteParsedDocumentSource> throwOnParseLite(NamespaceString nss,
+                                                           const BSONElement& spec) {
+    uasserted(6047401, "Search stages are only allowed on MongoDB Atlas");
+}
+}  // namespace
 MONGO_INITIALIZER_GROUP(BeginDocumentSourceRegistration,
                         ("default"),
                         ("EndDocumentSourceRegistration"))
-MONGO_INITIALIZER_GROUP(EndDocumentSourceRegistration, ("BeginDocumentSourceRegistration"), ())
+// Any remaining work on the parserMap should be done before finishing DocumentSource Registration.
+MONGO_INITIALIZER_WITH_PREREQUISITES(EndDocumentSourceRegistration,
+                                     ("BeginDocumentSourceRegistration"))
+(InitializerContext*) {
+    auto stageName = "$search"_sd;
+    auto searchIt = parserMap.find(stageName);
+    // If the $search stage has not been registered at this point, register a parser that errors
+    // with a useful error message on parsing a search stage.
+    if (searchIt == parserMap.end()) {
+        LiteParsedDocumentSource::registerParser("$search",
+                                                 throwOnParseLite,
+                                                 AllowedWithApiStrict::kAlways,
+                                                 AllowedWithClientType::kAny);
+        DocumentSource::registerParser("$search", throwOnParse, boost::none);
+        LiteParsedDocumentSource::registerParser("$searchMeta",
+                                                 throwOnParseLite,
+                                                 AllowedWithApiStrict::kAlways,
+                                                 AllowedWithClientType::kAny);
+        DocumentSource::registerParser("$searchMeta", throwOnParse, boost::none);
+    }
+}
+
+
 }  // namespace mongo

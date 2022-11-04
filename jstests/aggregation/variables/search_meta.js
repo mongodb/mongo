@@ -40,7 +40,7 @@ const response = db.runCommand({
     cursor: {}
 });
 if (!response.ok) {
-    assert.commandFailedWithCode(response, [31082, 40324] /* community or mongos */);
+    assert.commandFailedWithCode(response, [31082, 6047401] /* mongos or community */);
 } else {
     assert.eq(response.cursor.firstBatch, []);
 }
