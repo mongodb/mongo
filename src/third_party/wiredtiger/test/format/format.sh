@@ -560,6 +560,7 @@ format()
 	count_jobs=$(($count_jobs + 1))
 	dir="$home/RUNDIR.$count_jobs"
 	log="$dir.log"
+	live_record_command=""
 
 	args=""
 	if [[ $smoke_test -ne 0 ]]; then
@@ -586,10 +587,10 @@ format()
 	# This script is typically left running until a failure is hit. To avoid filling up the
 	# disk, we should avoid keeping recordings from successful runs.
 	if [[ ! -z $live_record_binary ]]; then
-		live_record_binary="$live_record_binary --save-on error"
+		live_record_command="$live_record_binary --save-on error"
 	fi
 
-	cmd="$live_record_binary $format_binary -c "$config" -h "$dir" $trace $args quiet=1"
+	cmd="$live_record_command $format_binary -c "$config" -h "$dir" $trace $args quiet=1"
 	msg "$cmd"
 
 	# Disassociate the command from the shell script so we can exit and let the command
