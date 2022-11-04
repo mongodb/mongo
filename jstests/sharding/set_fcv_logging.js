@@ -43,23 +43,23 @@ function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers) {
     }
 
     if (serverType === "replica set/standalone") {
-        assert.soon(
-            () =>
-                rawMongoProgramOutput().match(/\"serverType\":"replica set\/standalone"/g).length ==
-                status,
-            "should have " + status + " log(s) with serverType: replica set/standalone");
+        assert.soon(() => {
+            let matchRes =
+                rawMongoProgramOutput().match(/\"serverType\":"replica set\/standalone"/g);
+            return matchRes != null && matchRes.length == status;
+        }, "should have " + status + " log(s) with serverType: replica set/standalone");
     } else if (serverType === "shardedCluster") {
-        assert.soon(
-            () => rawMongoProgramOutput().match(/\"serverType\":"config server"/g).length == status,
-            "should have " + status + " log(s) with serverType: config server");
+        assert.soon(() => {
+            let matchRes = rawMongoProgramOutput().match(/\"serverType\":"config server"/g);
+            return matchRes != null && matchRes.length == status;
+        }, "should have " + status + " log(s) with serverType: config server");
         // If the FCV change failed before the config server reached the transitioning state,
         // there should not be any logs containing 'shard server'.
         if (status >= SetFCVStatus.transitioning) {
-            assert.soon(
-                () => rawMongoProgramOutput().match(/\"serverType\":"shard server"/g).length ==
-                    numShardServers * status,
-                "should have " + numShardServers * status +
-                    " log(s) with serverType: shard server");
+            assert.soon(() => {
+                let matchRes = rawMongoProgramOutput().match(/\"serverType\":"shard server"/g);
+                return matchRes != null && matchRes.length == numShardServers * status;
+            }, "should have " + numShardServers * status + " log(s) with serverType: shard server");
         } else {
             assert(rawMongoProgramOutput().match(/\"serverType\":"shard server"/g) == null,
                    'should not have log containing shard server');
