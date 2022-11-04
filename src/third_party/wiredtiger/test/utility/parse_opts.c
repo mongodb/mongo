@@ -47,10 +47,73 @@ extern int __wt_optreset;
     } while (0)
 
 /*
- * parse_tiered_opt --
+ * parse_init_random --
+ *     Initialize the random number generator from the seed. If the seed is not yet set, get a
+ *     random seed.
+ */
+static void
+parse_init_random(WT_RAND_STATE *rnd, uint64_t *seedp)
+{
+    if (*seedp == 0) {
+        __wt_random_init_seed(NULL, rnd);
+        *seedp = (rnd->v & 0xffff);
+    }
+    rnd->v = *seedp;
+}
+
+/*
+ * parse_seed --
+ *     Parse a random number generator seed from the command line.
+ */
+static void
+parse_seed(uint64_t *seedp, const char *seed_str, char **parse_end)
+{
+    *seedp = (uint64_t)strtoll(seed_str, parse_end, 10);
+}
+
+/*
+ * parse_tiered_random_seeds --
  *     Parse a command line option for the tiered storage configurations.
  */
 static void
+parse_tiered_random_seeds(TEST_OPTS *opts, const char *seed_str)
+{
+    char *parse_end;
+    const char *seed_end;
+    static const char *SEED_USAGE =
+      "-PS parameter is comma separated data and extra seeds, e.g. -PSD1234,E5678";
+
+    while (*seed_str != '\0') {
+        /* Point the end of string either to comma or the final null character. */
+        if ((seed_end = strchr(seed_str, ',')) == NULL)
+            seed_end = &seed_str[strlen(seed_str)];
+        parse_end = (char *)seed_end;
+        if (*seed_str == 'D') {
+            if (opts->data_seed != 0)
+                testutil_die(EINVAL, "-PS Dxxx data seed specified twice: %s", SEED_USAGE);
+            parse_seed(&opts->data_seed, seed_str + 1, &parse_end);
+        } else if (*seed_str == 'E') {
+            if (opts->extra_seed != 0)
+                testutil_die(EINVAL, "-PS Exxx extra seed specified twice: %s, SEED_USAGE");
+            parse_seed(&opts->extra_seed, seed_str + 1, &parse_end);
+        } else
+            testutil_die(EINVAL, "%s", SEED_USAGE);
+
+        if (*parse_end != '\0' && *parse_end != ',')
+            testutil_die(EINVAL, "-PS value after 'D' or 'E' is not an integer: %s", SEED_USAGE);
+
+        seed_str = parse_end;
+        if (*seed_str == ',') {
+            ++seed_str;
+        }
+    }
+}
+
+/*
+ * parse_tiered_opt --
+ *     Parse a command line option for the tiered storage configurations.
+ */
+static int
 parse_tiered_opt(TEST_OPTS *opts)
 {
     switch (*__wt_optarg++) {
@@ -60,10 +123,16 @@ parse_tiered_opt(TEST_OPTS *opts)
             testutil_die(EINVAL, "-Po option requires an argument");
         opts->tiered_storage_source = dstrdup(__wt_optarg);
         break;
+    case 'S':
+        parse_tiered_random_seeds(opts, __wt_optarg);
+        break;
     case 'T':
         opts->tiered_storage = true;
         break;
+    default:
+        return (1); /* Caller can print complete usage. */
     }
+    return (0);
 }
 
 /*
@@ -79,6 +148,8 @@ testutil_parse_begin_opt(int argc, char *const *argv, const char *getopts_string
     opts->preserve = false;
     opts->running = true;
     opts->verbose = false;
+    opts->data_seed = 0;
+    opts->extra_seed = 0;
 
     opts->argv0 = argv[0];
     opts->progname = testutil_set_progname(argv);
@@ -95,7 +166,8 @@ testutil_parse_begin_opt(int argc, char *const *argv, const char *getopts_string
       USAGE_STR('A', " [-A append thread count]"), USAGE_STR('b', " [-b build directory]"),
       USAGE_STR('C', " [-C]"), USAGE_STR('d', " [-d add data]"), USAGE_STR('h', " [-h home]"),
       USAGE_STR('m', " [-m]"), USAGE_STR('n', " [-n record count]"),
-      USAGE_STR('o', " [-o op count]"), USAGE_STR('P', " [-PT] [-Po storage source]"),
+      USAGE_STR('o', " [-o op count]"),
+      USAGE_STR('P', " [-PT] [-Po storage source] [-PSD<data_seed>,E<extra_seed>]"),
       USAGE_STR('p', " [-p]"), USAGE_STR('R', " [-R read thread count]"),
       USAGE_STR('T', " [-T thread count]"), USAGE_STR('t', " [-t c|f|r table type]"),
       USAGE_STR('v', " [-v]"), USAGE_STR('W', " [-W write thread count]")));
@@ -132,8 +204,14 @@ testutil_parse_end_opt(TEST_OPTS *opts)
     opts->uri = dmalloc(len);
     testutil_check(__wt_snprintf(opts->uri, len, "table:%s", opts->progname));
 
-    if (opts->tiered_storage && opts->tiered_storage_source == NULL)
-        opts->tiered_storage_source = dstrdup(DIR_STORE);
+    if (opts->tiered_storage) {
+        if (opts->tiered_storage_source == NULL)
+            opts->tiered_storage_source = dstrdup(DIR_STORE);
+
+        /* Initialize the state for the random number generators. */
+        parse_init_random(&opts->data_rnd, &opts->data_seed);
+        parse_init_random(&opts->extra_rnd, &opts->extra_seed);
+    }
 }
 
 /*
@@ -172,7 +250,8 @@ testutil_parse_single_opt(TEST_OPTS *opts, int ch)
         opts->nops = (uint64_t)atoll(__wt_optarg);
         break;
     case 'P': /* Tiered storage options follow */
-        parse_tiered_opt(opts);
+        if (parse_tiered_opt(opts) != 0)
+            return (1);
         break;
     case 'p': /* Preserve directory contents */
         opts->preserve = true;

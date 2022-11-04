@@ -69,10 +69,17 @@ typedef struct {
 typedef struct {
     const char *build_dir;             /* Build directory path */
     const char *tiered_storage_source; /* Tiered storage source */
+    uint64_t data_seed;                /* Random seed for data ops */
+    uint64_t extra_seed;               /* Random seed for read ops */
     bool tiered_storage;               /* Configure tiered storage */
     bool verbose;                      /* Run in verbose mode */
     uint64_t nthreads;                 /* Number of threads */
 } SUBSET_TEST_OPTS;
+
+/*
+ * This is an indicator that we will expect any value other than zero.
+ */
+#define NONZERO 0xfafafafa
 
 /*
  * This drives the testing. For each given command_line, there is a matching expected TEST_OPTS
@@ -97,38 +104,53 @@ typedef struct {
  *
  */
 static TEST_DRIVER driver[] = {
-  {{"parse_opts", "-b", "builddir", "-T", "21", NULL}, {"builddir", NULL, false, false, 21},
+  {{"parse_opts", "-b", "builddir", "-T", "21", NULL}, {"builddir", NULL, 0, 0, false, false, 21},
     {NULL, 0, 0, 0}},
 
-  {{"parse_opts", "-bbuilddir", "-T21", NULL}, {"builddir", NULL, false, false, 21},
+  {{"parse_opts", "-bbuilddir", "-T21", NULL}, {"builddir", NULL, 0, 0, false, false, 21},
     {NULL, 0, 0, 0}},
 
-  /* If -PT is used, the tiered_storage source is set to dir_store, even if -Po is not used. */
-  {{"parse_opts", "-v", "-PT", NULL}, {NULL, "dir_store", true, true, 0}, {NULL, 0, 0, 0}},
-
-  {{"parse_opts", "-v", "-Po", "my_store", "-PT", NULL}, {NULL, "my_store", true, true, 0},
+  /*
+   * If -PT is used, the tiered_storage source is set to dir_store, even if -Po is not used. Also
+   * when -PT is used, random seeds are initialized to some non-zero value.
+   */
+  {{"parse_opts", "-v", "-PT", NULL}, {NULL, "dir_store", NONZERO, NONZERO, true, true, 0},
     {NULL, 0, 0, 0}},
 
-  {{"parse_opts", "-vPomy_store", "-PT", NULL}, {NULL, "my_store", true, true, 0}, {NULL, 0, 0, 0}},
+  {{"parse_opts", "-v", "-Po", "my_store", "-PT", NULL},
+    {NULL, "my_store", NONZERO, NONZERO, true, true, 0}, {NULL, 0, 0, 0}},
+
+  {{"parse_opts", "-vPomy_store", "-PT", NULL}, {NULL, "my_store", NONZERO, NONZERO, true, true, 0},
+    {NULL, 0, 0, 0}},
+
+  /* Setting random seeds can be done together or separately. */
+  {{"parse_opts", "-PT", "-PSE2345,D1234", NULL}, {NULL, "dir_store", 1234, 2345, true, false, 0},
+    {NULL, 0, 0, 0}},
+
+  {{"parse_opts", "-PT", "-PSD1234", "-PSE2345", NULL},
+    {NULL, "dir_store", 1234, 2345, true, false, 0}, {NULL, 0, 0, 0}},
+
+  {{"parse_opts", "-PT", "-PSD1234", NULL}, {NULL, "dir_store", 1234, NONZERO, true, false, 0},
+    {NULL, 0, 0, 0}},
 
   /*
    * From here on, we are using some "extended" options, see previous comment. We set the argv[0] to
    * "parse_single_opt" to indicate to use the extended parsing idiom.
    */
   {{"parse_single_opt", "-vd", "-Pomy_store", "-c", "string_opt", "-PT", NULL},
-    {NULL, "my_store", true, true, 0}, {(char *)"string_opt", true, false, 0}},
+    {NULL, "my_store", NONZERO, NONZERO, true, true, 0}, {(char *)"string_opt", true, false, 0}},
 
   {{"parse_single_opt", "-dv", "-Pomy_store", "-cstring_opt", "-PT", NULL},
-    {NULL, "my_store", true, true, 0}, {(char *)"string_opt", true, false, 0}},
+    {NULL, "my_store", NONZERO, NONZERO, true, true, 0}, {(char *)"string_opt", true, false, 0}},
 
   {{"parse_single_opt", "-ev", "-cstring_opt", "-Pomy_store", "-PT", "-f", "22", NULL},
-    {NULL, "my_store", true, true, 0}, {(char *)"string_opt", false, true, 22}},
+    {NULL, "my_store", NONZERO, NONZERO, true, true, 0}, {(char *)"string_opt", false, true, 22}},
 
   {{"parse_single_opt", "-evd", "-Pomy_store", "-PT", "-f22", NULL},
-    {NULL, "my_store", true, true, 0}, {NULL, true, true, 22}},
+    {NULL, "my_store", NONZERO, NONZERO, true, true, 0}, {NULL, true, true, 22}},
 
-  {{"parse_single_opt", "-v", "-Pomy_store", "-PT", NULL}, {NULL, "my_store", true, true, 0},
-    {NULL, false, false, 0}},
+  {{"parse_single_opt", "-v", "-Pomy_store", "-PT", NULL},
+    {NULL, "my_store", NONZERO, NONZERO, true, true, 0}, {NULL, false, false, 0}},
 };
 
 /*
@@ -153,6 +175,8 @@ report(const TEST_OPTS *opts, FICTIONAL_OPTS *fiction_opts)
     REPORT_STR(opts, build_dir);
     REPORT_STR(opts, tiered_storage_source);
     REPORT_INT(opts, table_type);
+    REPORT_INT(opts, data_seed);
+    REPORT_INT(opts, extra_seed);
     REPORT_INT(opts, do_data_ops);
     REPORT_INT(opts, preserve);
     REPORT_INT(opts, tiered_storage);
@@ -167,6 +191,7 @@ report(const TEST_OPTS *opts, FICTIONAL_OPTS *fiction_opts)
     REPORT_INT(fiction_opts, delete_flag);
     REPORT_INT(fiction_opts, energize_flag);
     REPORT_INT(fiction_opts, fuzziness_option);
+    printf("Seeds: " TESTUTIL_SEED_FORMAT "\n", opts->data_seed, opts->extra_seed);
 }
 
 /*
@@ -264,6 +289,17 @@ verify_expect(
             testutil_assert(strcmp(o->field, e->field) == 0); \
         }                                                     \
     } while (0)
+/*
+ * Random seeds are treated specially. If we've marked the expected value to be NONZERO, that's all
+ * we need to confirm.
+ */
+#define VERIFY_RANDOM_INT(o, e, field)      \
+    do {                                    \
+        if (e->field == NONZERO)            \
+            testutil_assert(o->field != 0); \
+        else                                \
+            VERIFY_INT(o, e, field);        \
+    } while (0)
 
     /*
      * opts->home is always set, even without -h on the command line, so don't check it here.
@@ -271,6 +307,8 @@ verify_expect(
     VERIFY_STR(opts, expect, build_dir);
     VERIFY_STR(opts, expect, tiered_storage_source);
     VERIFY_INT(opts, expect, table_type);
+    VERIFY_RANDOM_INT(opts, expect, data_seed);
+    VERIFY_RANDOM_INT(opts, expect, extra_seed);
     VERIFY_INT(opts, expect, do_data_ops);
     VERIFY_INT(opts, expect, preserve);
     VERIFY_INT(opts, expect, tiered_storage);
@@ -355,9 +393,12 @@ main(int argc, char *argv[])
             expect.tiered_storage = subset->tiered_storage;
             expect.verbose = subset->verbose;
             expect.nthreads = subset->nthreads;
+            expect.data_seed = subset->data_seed;
+            expect.extra_seed = subset->extra_seed;
 
             fiction_expect = &driver[i].fiction_expected;
             check(nargs, cmd, &opts, &fiction_opts);
+
             verify_expect(&opts, &fiction_opts, &expect, fiction_expect);
             cleanup(&opts, &fiction_opts);
         }
