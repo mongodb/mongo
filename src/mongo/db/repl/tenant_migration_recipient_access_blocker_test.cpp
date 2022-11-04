@@ -79,6 +79,7 @@ public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         auto serviceContext = getServiceContext();
+        TenantMigrationAccessBlockerRegistry::get(cc().getServiceContext()).startup();
 
         {
             _opCtx = cc().makeOperationContext();

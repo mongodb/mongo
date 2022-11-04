@@ -32,6 +32,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -101,7 +104,8 @@ public:
         std::shared_ptr<TenantMigrationDonorAccessBlocker> _donor;
         std::shared_ptr<TenantMigrationRecipientAccessBlocker> _recipient;
     };
-    TenantMigrationAccessBlockerRegistry() = default;
+
+    TenantMigrationAccessBlockerRegistry();
 
     static const ServiceContext::Decoration<TenantMigrationAccessBlockerRegistry> get;
 
@@ -174,8 +178,19 @@ public:
     void applyAll(TenantMigrationAccessBlocker::BlockerType type, applyAllCallback&& callback);
 
     /**
+     * Starts the _asyncBlockingOperationsExecutor.
+     */
+    void startup();
+
+    /**
      * Shuts down each of the TenantMigrationAccessBlockers and releases the shared_ptrs to the
      * TenantMigrationAccessBlockers from the map.
+     */
+    void clear();
+
+    /**
+     * Shuts down each of the TenantMigrationAccessBlockers, releases the shared_ptrs to the
+     * TenantMigrationAccessBlockers from the map, and resets the executor.
      */
     void shutDown();
 
@@ -195,10 +210,12 @@ public:
      */
     void onMajorityCommitPointUpdate(repl::OpTime opTime);
 
-    std::shared_ptr<executor::TaskExecutor> getAsyncBlockingOperationsExecutor();
+    std::shared_ptr<executor::TaskExecutor> getAsyncBlockingOperationsExecutor() const;
 
 private:
     void _remove(WithLock, StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
+
+    void _clear(WithLock);
 
     std::shared_ptr<TenantMigrationDonorAccessBlocker> _getAllTenantDonorAccessBlocker(
         WithLock) const;
@@ -206,10 +223,19 @@ private:
     std::shared_ptr<TenantMigrationDonorAccessBlocker> _getAllTenantDonorAccessBlocker(
         WithLock, StringData dbName) const;
 
-    std::shared_ptr<executor::TaskExecutor> _asyncBlockingOperationsExecutor;
-
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerRegistry::_mutex");
-    StringMap<DonorRecipientAccessBlockerPair> _tenantMigrationAccessBlockers;
+
+    // All member variables are labeled with one of the following codes indicating the
+    // synchronization rules for accessing them.
+    //
+    // (R)  Read-only in concurrent operation; no synchronization required.
+    // (S)  Self-synchronizing; access according to class's own rules.
+    // (M)  Reads and writes guarded by _mutex.
+    // (W)  Synchronization required only for writes.
+    std::shared_ptr<executor::TaskExecutor>
+        _asyncBlockingOperationsExecutor;  // (S) Lives for the lifetime of the registry.
+
+    StringMap<DonorRecipientAccessBlockerPair> _tenantMigrationAccessBlockers;  // (M)
 };
 
 }  // namespace mongo

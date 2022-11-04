@@ -43,6 +43,7 @@ public:
 
     void setUp() {
         _opCtx = makeOperationContext();
+        TenantMigrationAccessBlockerRegistry::get(getServiceContext()).startup();
     }
 
     void tearDown() {

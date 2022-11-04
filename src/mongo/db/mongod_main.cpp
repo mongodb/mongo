@@ -1637,6 +1637,10 @@ int mongod_main(int argc, char* argv[]) {
     }
 #endif
 
+    LOGV2_OPTIONS(
+        7091600, {LogComponent::kTenantMigration}, "Starting TenantMigrationAccessBlockerRegistry");
+    TenantMigrationAccessBlockerRegistry::get(service).startup();
+
     ExitCode exitCode = initAndListen(service, serverGlobalParams.port);
     exitCleanly(exitCode);
     return 0;

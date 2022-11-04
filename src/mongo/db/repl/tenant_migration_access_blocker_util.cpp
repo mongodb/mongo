@@ -336,7 +336,7 @@ bool hasActiveTenantMigration(OperationContext* opCtx, StringData dbName) {
 }
 
 void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
-    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).shutDown();
+    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).clear();
 
     if (MONGO_unlikely(skipRecoverTenantMigrationAccessBlockers.shouldFail())) {
         return;

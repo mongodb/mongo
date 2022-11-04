@@ -31,10 +31,7 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/concurrency/thread_pool.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
@@ -43,12 +40,20 @@ namespace mongo {
 namespace {
 
 constexpr char kBlockAllTenantsKey[] = "__ALL__";
+}  // namespace
 
-// Executor to asynchronously schedule blocking operations while the tenant migration access
-// blockers are in action. This provides migrated tenants isolation from the non-migrated users.
-// The executor is shared by all access blockers and the thread count goes to 0 when there is no
-// migration.
-std::shared_ptr<executor::TaskExecutor> _createBlockedOperationsExecutor() {
+using MtabType = TenantMigrationAccessBlocker::BlockerType;
+using MtabPair = TenantMigrationAccessBlockerRegistry::DonorRecipientAccessBlockerPair;
+
+const ServiceContext::Decoration<TenantMigrationAccessBlockerRegistry>
+    TenantMigrationAccessBlockerRegistry::get =
+        ServiceContext::declareDecoration<TenantMigrationAccessBlockerRegistry>();
+
+TenantMigrationAccessBlockerRegistry::TenantMigrationAccessBlockerRegistry() {
+    // Executor to asynchronously schedule blocking operations while the tenant migration access
+    // blockers are in action. This provides migrated tenants isolation from the non-migrated
+    // users. The executor is shared by all access blockers and the thread count goes to 0 when
+    // there is no migration.
     ThreadPool::Options threadPoolOptions;
     threadPoolOptions.maxThreads = 4;
     // When there is no migration, reduce thread count to 0.
@@ -58,20 +63,10 @@ std::shared_ptr<executor::TaskExecutor> _createBlockedOperationsExecutor() {
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
     };
-    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+    _asyncBlockingOperationsExecutor = std::make_shared<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(threadPoolOptions),
         executor::makeNetworkInterface("TenantMigrationBlockerNet"));
-
-    return executor;
 }
-}  // namespace
-
-using MtabType = TenantMigrationAccessBlocker::BlockerType;
-using MtabPair = TenantMigrationAccessBlockerRegistry::DonorRecipientAccessBlockerPair;
-
-const ServiceContext::Decoration<TenantMigrationAccessBlockerRegistry>
-    TenantMigrationAccessBlockerRegistry::get =
-        ServiceContext::declareDecoration<TenantMigrationAccessBlockerRegistry>();
 
 void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
                                                std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
@@ -324,9 +319,22 @@ void TenantMigrationAccessBlockerRegistry::applyAll(TenantMigrationAccessBlocker
     }
 }
 
+void TenantMigrationAccessBlockerRegistry::startup() {
+    _asyncBlockingOperationsExecutor->startup();
+}
+
+void TenantMigrationAccessBlockerRegistry::clear() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    _clear(lg);
+}
+
+void TenantMigrationAccessBlockerRegistry::_clear(WithLock) {
+    _tenantMigrationAccessBlockers.clear();
+}
+
 void TenantMigrationAccessBlockerRegistry::shutDown() {
     stdx::lock_guard<Latch> lg(_mutex);
-    _tenantMigrationAccessBlockers.clear();
+    _clear(lg);
     _asyncBlockingOperationsExecutor.reset();
 }
 
@@ -379,13 +387,7 @@ void TenantMigrationAccessBlockerRegistry::onMajorityCommitPointUpdate(repl::OpT
 }
 
 std::shared_ptr<executor::TaskExecutor>
-TenantMigrationAccessBlockerRegistry::getAsyncBlockingOperationsExecutor() {
-    stdx::lock_guard<Latch> lg(_mutex);
-    if (!_asyncBlockingOperationsExecutor) {
-        _asyncBlockingOperationsExecutor = _createBlockedOperationsExecutor();
-        _asyncBlockingOperationsExecutor->startup();
-    }
-
+TenantMigrationAccessBlockerRegistry::getAsyncBlockingOperationsExecutor() const {
     return _asyncBlockingOperationsExecutor;
 }
 
