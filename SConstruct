@@ -1419,7 +1419,7 @@ for tool in ['build_metrics', 'split_dwarf']:
     try:
         Tool(tool).options(env_vars)
     except ImportError as exc:
-        print(f"Failed import while loading options for tool: {tool}\n{exc}")
+        print(f"WARNING: The {tool} tool might not work as intended due to a failed import:\n{exc}")
         pass
 
 # -- Validate user provided options --
