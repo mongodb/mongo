@@ -428,19 +428,6 @@ public:
                                   const NamespaceString& nss,
                                   const ShardKeyPattern& newShardKey);
 
-    /**
-     * Runs a replacement update on config.collections for the collection entry for 'nss' in a
-     * transaction with 'txnNumber'. 'coll' is used as the replacement doc.
-     *
-     * Throws exception on errors.
-     */
-    void updateShardingCatalogEntryForCollectionInTxn(OperationContext* opCtx,
-                                                      const NamespaceString& nss,
-                                                      const CollectionType& coll,
-                                                      bool upsert,
-                                                      TxnNumber txnNumber);
-
-
     void configureCollectionBalancing(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       boost::optional<int32_t> chunkSizeMB,

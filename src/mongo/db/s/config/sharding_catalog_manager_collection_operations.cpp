@@ -32,55 +32,21 @@
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
-#include <iomanip>
 #include <set>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/api_parameters.h"
-#include "mongo/db/auth/authorization_session_impl.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
-#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_constraints.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
-#include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/shard_util.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/transport/service_entry_point.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -90,54 +56,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeUpdatingChunks);
 MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeCommit);
-
-const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
-const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
-const char kWriteConcernField[] = "writeConcern";
-
-const KeyPattern kUnshardedCollectionShardKey(BSON("_id" << 1));
-
-boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
-                                             Shard* shard,
-                                             const NamespaceString& ns,
-                                             const CollectionOptions options) {
-    BSONObjBuilder listCollCmd;
-    listCollCmd.append("listCollections", 1);
-    listCollCmd.append("filter", BSON("name" << ns.coll()));
-
-    auto response = uassertStatusOK(
-        shard->runCommandWithFixedRetryAttempts(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                ns.db().toString(),
-                                                listCollCmd.obj(),
-                                                Shard::RetryPolicy::kIdempotent));
-
-    auto cursorObj = response.response["cursor"].Obj();
-    auto collections = cursorObj["firstBatch"].Obj();
-    BSONObjIterator collIter(collections);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "cannot find ns: " << ns.ns(),
-            collIter.more());
-
-    auto collectionDetails = collIter.next();
-    CollectionOptions actualOptions =
-        uassertStatusOK(CollectionOptions::parse(collectionDetails["options"].Obj()));
-    // TODO: SERVER-33048 check idIndex field
-
-    uassert(ErrorCodes::NamespaceExists,
-            str::stream() << "ns: " << ns.ns()
-                          << " already exists with different options: " << actualOptions.toBSON(),
-            options.matchesStorageOptions(
-                actualOptions, CollatorFactoryInterface::get(opCtx->getServiceContext())));
-
-    if (actualOptions.isView()) {
-        // Views don't have UUID.
-        return boost::none;
-    }
-
-    auto collectionInfo = collectionDetails["info"].Obj();
-    return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
-}
 
 void triggerFireAndForgetShardRefreshes(OperationContext* opCtx, const CollectionType& coll) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -453,30 +371,6 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
             "namespace"_attr = nss.ns());
     }
 }
-
-void ShardingCatalogManager::updateShardingCatalogEntryForCollectionInTxn(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const CollectionType& coll,
-    const bool upsert,
-    TxnNumber txnNumber) {
-    try {
-        writeToConfigDocumentInTxn(
-            opCtx,
-            CollectionType::ConfigNS,
-            BatchedCommandRequest::buildUpdateOp(CollectionType::ConfigNS,
-                                                 BSON(CollectionType::kNssFieldName << nss.ns()),
-                                                 coll.toBSON(),
-                                                 upsert,
-                                                 false /* multi */
-                                                 ),
-            txnNumber);
-    } catch (DBException& e) {
-        e.addContext("Collection metadata write failed");
-        throw;
-    }
-}
-
 
 void ShardingCatalogManager::configureCollectionBalancing(
     OperationContext* opCtx,
