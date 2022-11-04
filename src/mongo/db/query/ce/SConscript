@@ -18,6 +18,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
+        '$BUILD_DIR/mongo/util/caching',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'query_stats',
         'stats_serialization',
     ],
