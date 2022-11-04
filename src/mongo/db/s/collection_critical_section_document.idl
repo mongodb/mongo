@@ -26,10 +26,9 @@
 # it in the license file.
 #
 
-# This file defines the format of documents stored in config.collectionCriticalSections.
-# Each document is used to represent that a collection is under an operation that holds
-# the collection critical section.
-
+# This file defines the format of documents stored in the `config.collectionCriticalSections`
+# collection. Each document is used to represent that a database or a collection is under an
+# operation that entered the critical section.
 
 global:
     cpp_namespace: "mongo"
@@ -39,30 +38,27 @@ imports:
 
 structs:
     collectionCriticalSectionDocument:
-        description: "Represents that a collection is under an operation that holds the collection
-                      critical section."
+        description: "Represents that a database or a collection is under an operation that entered
+                     the critical section."
         generate_comparison_operators: false
         strict: false
         fields:
             _id:
                 type: namespacestring
-                description: "The namespace of the collection that is under the collection critical
-                              section."
+                description: "The name of the database or the namespace of the collection that is
+                             under the critical section."
                 cpp_name: nss
             reason:
                 type: object
-                description: "An identifier of the operation that is holding the critical section.
-
-                              Only used for diagnostic purposes."
+                description: "An identifier of the operation that entered the critical section.
+                             Only used for diagnostic purposes."
             blockReads:
                 type: bool
-                description: "It states whether this critical section should block reads
-                              (CS in commit phase) or not (CS in catch up phase)."
+                description: "It states whether this critical section should block reads (CS in
+                             commit phase) or not (CS in catch up phase)."
             additionalInfo:
                 type: object 
-                description: "Additional information associated to the operation that is holding
-                              the critical section.
-
-                              Only used for diagnostic purposes."
+                description: "Additional information associated to the operation that entered the
+                             critical section.
+                             Only used for diagnostic purposes."
                 optional: true
-

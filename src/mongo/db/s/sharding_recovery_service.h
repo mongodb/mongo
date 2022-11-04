@@ -52,17 +52,17 @@ public:
     static ShardingRecoveryService* get(OperationContext* opCtx);
 
     /**
-     * Acquires the collection critical section in the catch-up phase (i.e. blocking writes) for the
-     * specified namespace and reason. It works even if the namespace's current metadata are
+     * Acquires the recoverable critical section in the catch-up phase (i.e. blocking writes) for
+     * the specified namespace and reason. It works even if the namespace's current metadata are
      * UNKNOWN.
      *
-     * Entering into the Critical Section interrupts any ongoing filtering metadata refresh.
+     * Entering into the critical section interrupts any ongoing filtering metadata refresh.
      *
-     * It adds a doc to config.collectionCriticalSections with with writeConcern write concern.
+     * It adds a doc to `config.collectionCriticalSections` with with `writeConcern` write concern.
      *
-     * Do nothing if the collection critical section is taken for that nss and reason, and will
-     * invariant otherwise since it is the responsibility of the caller to ensure that only one
-     * thread is taking the critical section.
+     * Do nothing if the critical section is taken for that namespace and reason, and will invariant
+     * otherwise since it is the responsibility of the caller to ensure that only one thread is
+     * taking the critical section.
      */
     void acquireRecoverableCriticalSectionBlockWrites(
         OperationContext* opCtx,
@@ -73,26 +73,26 @@ public:
 
     /**
      * Advances the recoverable critical section from the catch-up phase (i.e. blocking writes) to
-     * the commit phase (i.e. blocking reads) for the specified nss and reason. The recoverable
-     * critical section must have been acquired first through
-     * 'acquireRecoverableCriticalSectionBlockWrites' function.
+     * the commit phase (i.e. blocking reads) for the specified namespace and reason. The
+     * recoverable critical section must have been acquired first through
+     * `acquireRecoverableCriticalSectionBlockWrites` function.
      *
-     * It updates a doc from config.collectionCriticalSections with writeConcern write concern.
+     * It updates a doc from `config.collectionCriticalSections` with `writeConcern` write concern.
      *
-     * Do nothing if the collection critical section is already taken in commit phase.
+     * Do nothing if the critical section is already taken in commit phase.
      */
     void promoteRecoverableCriticalSectionToBlockAlsoReads(OperationContext* opCtx,
                                                            const NamespaceString& nss,
                                                            const BSONObj& reason,
                                                            const WriteConcernOptions& writeConcern);
     /**
-     * Releases the recoverable critical section for the given nss and reason.
+     * Releases the recoverable critical section for the given namespace and reason.
      *
-     * It removes a doc from config.collectionCriticalSections with writeConcern write concern. As
-     * part of the removal, the filtering information is cleared on secondary nodes. It is
-     * responsability of the caller to properly set the filtering information on the primary node.
+     * It removes a doc from `config.collectionCriticalSections` with `writeConcern` write concern.
+     * As part of the removal, the filtering information is cleared on secondary nodes. It is
+     * responsibility of the caller to properly set the filtering information on the primary node.
      *
-     * Do nothing if the collection critical section is not taken for that nss and reason.
+     * Do nothing if the critical section is not taken for that namespace and reason.
      *
      * Throw an invariant in case the collection critical section is already taken by another
      * operation with a different reason unless the flag 'throwIfReasonDiffers' is set to false.
@@ -104,28 +104,29 @@ public:
                                            bool throwIfReasonDiffers = true);
 
     /**
-     * Recover all sharding related in memory states from disk.
+     * Recovers all sharding related in memory states from disk.
      */
     void recoverStates(OperationContext* opCtx,
                        const std::set<NamespaceString>& rollbackNamespaces);
 
+    /**
+     * Recovers critical sections and indexes from disk when either initial sync or startup recovery
+     * have completed.
+     */
+    void onInitialDataAvailable(OperationContext* opCtx,
+                                bool isMajorityDataAvailable) override final;
+
 private:
     /**
      * This method is called when we have to mirror the state on disk of the recoverable critical
-     * section to memory (on startUp or on rollback).
+     * section to memory (on startup or on rollback).
      */
     void recoverRecoverableCriticalSections(OperationContext* opCtx);
 
     /**
-     * Recover the index versions from disk into the CSR.
+     * Recovers the index versions from disk into the CSR.
      */
     void recoverIndexesCatalog(OperationContext* opCtx);
-
-    void onInitialDataAvailable(OperationContext* opCtx,
-                                bool isMajorityDataAvailable) override final {
-        recoverRecoverableCriticalSections(opCtx);
-        recoverIndexesCatalog(opCtx);
-    }
 
     void onStartup(OperationContext* opCtx) override final {}
     void onShutdown() override final {}

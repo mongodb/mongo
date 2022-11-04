@@ -71,6 +71,16 @@ public:
         return it->second.get();
     }
 
+    std::vector<DatabaseName> getDatabaseNames() {
+        stdx::lock_guard lg(_mutex);
+        std::vector<DatabaseName> result;
+        result.reserve(_databases.size());
+        for (const auto& [dbName, _] : _databases) {
+            result.emplace_back(dbName);
+        }
+        return result;
+    }
+
 private:
     Mutex _mutex = MONGO_MAKE_LATCH("DatabaseShardingStateMap::_mutex");
 
@@ -122,22 +132,28 @@ DatabaseShardingState::ScopedDatabaseShardingState DatabaseShardingState::acquir
     return ScopedDatabaseShardingState(std::move(lock), dssAndLock->dss.get());
 }
 
+std::vector<DatabaseName> DatabaseShardingState::getDatabaseNames(OperationContext* opCtx) {
+    auto& databasesMap = DatabaseShardingStateMap::get(opCtx->getServiceContext());
+    return databasesMap.getDatabaseNames();
+}
+
 void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
                                                              const BSONObj& reason) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
     _critSec.enterCriticalSectionCatchUpPhase(reason);
-
     cancelDbMetadataRefresh();
 }
 
 void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx,
                                                             const BSONObj& reason) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
     _critSec.enterCriticalSectionCommitPhase(reason);
 }
 
 void DatabaseShardingState::exitCriticalSection(OperationContext* opCtx, const BSONObj& reason) {
     _critSec.exitCriticalSection(reason);
+}
+
+void DatabaseShardingState::exitCriticalSectionNoChecks(OperationContext* opCtx) {
+    _critSec.exitCriticalSectionNoChecks();
 }
 
 void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,

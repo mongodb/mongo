@@ -291,10 +291,21 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             !recoverable_critical_section_util::inRecoveryMode(opCtx)) {
             const auto collCSDoc = CollectionCriticalSectionDocument::parse(
                 IDLParserContext("ShardServerOpObserver"), insertedDoc);
-            opCtx->recoveryUnit()->onCommit(
-                [opCtx,
-                 insertedNss = collCSDoc.getNss(),
-                 reason = collCSDoc.getReason().getOwned()](boost::optional<Timestamp>) {
+            opCtx->recoveryUnit()->onCommit([opCtx,
+                                             insertedNss = collCSDoc.getNss(),
+                                             reason = collCSDoc.getReason().getOwned()](
+                                                boost::optional<Timestamp>) {
+                if (nsIsDbOnly(insertedNss.ns())) {
+                    boost::optional<AutoGetDb> lockDbIfNotPrimary;
+                    if (!isStandaloneOrPrimary(opCtx)) {
+                        lockDbIfNotPrimary.emplace(opCtx, insertedNss.dbName(), MODE_IX);
+                    }
+
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+                        opCtx, insertedNss.dbName(), DSSAcquisitionMode::kExclusive);
+                    scopedDss->enterCriticalSectionCatchUpPhase(opCtx, reason);
+                } else {
                     boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
                     if (!isStandaloneOrPrimary(opCtx)) {
                         lockCollectionIfNotPrimary.emplace(
@@ -309,7 +320,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                     auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
                         opCtx, insertedNss, CSRAcquisitionMode::kExclusive);
                     scopedCsr->enterCriticalSectionCatchUpPhase(reason);
-                });
+                }
+            });
         }
 
         if (metadata && metadata->isSharded()) {
@@ -452,20 +464,32 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         opCtx->recoveryUnit()->onCommit(
             [opCtx, updatedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                 boost::optional<Timestamp>) {
-                boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-                if (!isStandaloneOrPrimary(opCtx)) {
-                    lockCollectionIfNotPrimary.emplace(
-                        opCtx,
-                        updatedNss,
-                        MODE_IX,
-                        AutoGetCollection::Options{}.viewMode(
-                            auto_get_collection::ViewMode::kViewsPermitted));
-                }
+                if (nsIsDbOnly(updatedNss.ns())) {
+                    boost::optional<AutoGetDb> lockDbIfNotPrimary;
+                    if (!isStandaloneOrPrimary(opCtx)) {
+                        lockDbIfNotPrimary.emplace(opCtx, updatedNss.dbName(), MODE_IX);
+                    }
 
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                    opCtx, updatedNss, CSRAcquisitionMode::kExclusive)
-                    ->enterCriticalSectionCommitPhase(reason);
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+                        opCtx, updatedNss.dbName(), DSSAcquisitionMode::kExclusive);
+                    scopedDss->enterCriticalSectionCommitPhase(opCtx, reason);
+                } else {
+                    boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
+                    if (!isStandaloneOrPrimary(opCtx)) {
+                        lockCollectionIfNotPrimary.emplace(
+                            opCtx,
+                            updatedNss,
+                            MODE_IX,
+                            AutoGetCollection::Options{}.viewMode(
+                                auto_get_collection::ViewMode::kViewsPermitted));
+                    }
+
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                        opCtx, updatedNss, CSRAcquisitionMode::kExclusive);
+                    scopedCsr->enterCriticalSectionCommitPhase(reason);
+                }
             });
     }
 
@@ -594,26 +618,46 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         opCtx->recoveryUnit()->onCommit(
             [opCtx, deletedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                 boost::optional<Timestamp>) {
-                boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-                if (!isStandaloneOrPrimary(opCtx)) {
-                    lockCollectionIfNotPrimary.emplace(
-                        opCtx,
-                        deletedNss,
-                        MODE_IX,
-                        AutoGetCollection::Options{}.viewMode(
-                            auto_get_collection::ViewMode::kViewsPermitted));
+                if (nsIsDbOnly(deletedNss.ns())) {
+                    boost::optional<AutoGetDb> lockDbIfNotPrimary;
+                    if (!isStandaloneOrPrimary(opCtx)) {
+                        lockDbIfNotPrimary.emplace(opCtx, deletedNss.dbName(), MODE_IX);
+                    }
+
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+                        opCtx, deletedNss.dbName(), DSSAcquisitionMode::kExclusive);
+
+                    // Secondary nodes must clear the database metadata before releasing the
+                    // in-memory critical section.
+                    if (!isStandaloneOrPrimary(opCtx)) {
+                        DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, deletedNss.dbName());
+                    }
+
+                    scopedDss->exitCriticalSection(opCtx, reason);
+                } else {
+                    boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
+                    if (!isStandaloneOrPrimary(opCtx)) {
+                        lockCollectionIfNotPrimary.emplace(
+                            opCtx,
+                            deletedNss,
+                            MODE_IX,
+                            AutoGetCollection::Options{}.viewMode(
+                                auto_get_collection::ViewMode::kViewsPermitted));
+                    }
+
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                        opCtx, deletedNss, CSRAcquisitionMode::kExclusive);
+
+                    // Secondary nodes must clear the collection filtering metadata before releasing
+                    // the in-memory critical section.
+                    if (!isStandaloneOrPrimary(opCtx)) {
+                        scopedCsr->clearFilteringMetadata(opCtx);
+                    }
+
+                    scopedCsr->exitCriticalSection(reason);
                 }
-
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                    opCtx, deletedNss, CSRAcquisitionMode::kExclusive);
-
-                // Secondary nodes must clear the filtering metadata before releasing the
-                // in-memory critical section
-                if (!isStandaloneOrPrimary(opCtx))
-                    scopedCsr->clearFilteringMetadata(opCtx);
-
-                scopedCsr->exitCriticalSection(reason);
             });
     }
 

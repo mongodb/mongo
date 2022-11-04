@@ -83,6 +83,11 @@ public:
                                                DSSAcquisitionMode mode);
 
     /**
+     * Returns the names of the databases that have a DatabaseShardingState.
+     */
+    static std::vector<DatabaseName> getDatabaseNames(OperationContext* opCtx);
+
+    /**
      * Returns the name of the database related to the current sharding state.
      */
     const DatabaseName& getDbName() const {
@@ -96,6 +101,7 @@ public:
     void enterCriticalSectionCatchUpPhase(OperationContext* opCtx, const BSONObj& reason);
     void enterCriticalSectionCommitPhase(OperationContext* opCtx, const BSONObj& reason);
     void exitCriticalSection(OperationContext* opCtx, const BSONObj& reason);
+    void exitCriticalSectionNoChecks(OperationContext* opCtx);
 
     auto getCriticalSectionSignal(ShardingMigrationCriticalSection::Operation op) const {
         return _critSec.getSignal(op);
