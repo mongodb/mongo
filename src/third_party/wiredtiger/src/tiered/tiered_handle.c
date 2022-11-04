@@ -342,7 +342,7 @@ __tiered_create_object(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     cfg[2] = "flush_time=0,flush_timestamp=0";
     WT_ASSERT(session, tiered->obj_config != NULL);
     WT_ERR(__wt_config_merge(session, cfg, NULL, (const char **)&config));
-    __wt_verbose(
+    __wt_verbose_debug2(
       session, WT_VERB_TIERED, "TIER_CREATE_OBJECT: schema create %s : %s", name, config);
     /* Create the new shared object. */
     WT_ERR(__wt_schema_create(session, name, config));
@@ -455,7 +455,7 @@ __tiered_update_dhandles(WT_SESSION_IMPL *session, WT_TIERED *tiered)
         }
         if (tiered->tiers[i].name == NULL)
             continue;
-        __wt_verbose(
+        __wt_verbose_debug2(
           session, WT_VERB_TIERED, "UPDATE_DH: Get dhandle for %s", tiered->tiers[i].name);
         WT_ERR(__tiered_dhandle_setup(session, tiered, i, tiered->tiers[i].name));
     }

@@ -209,7 +209,8 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
      */
     tier = tiered->tiers[WT_TIERED_INDEX_LOCAL].tier;
     if (tier != NULL) {
-        __wt_verbose(session, WT_VERB_TIERED, "DROP_TIERED: drop local object %s", tier->name);
+        __wt_verbose_debug2(
+          session, WT_VERB_TIERED, "DROP_TIERED: drop local object %s", tier->name);
         WT_WITHOUT_DHANDLE(session,
           WT_WITH_HANDLE_LIST_WRITE_LOCK(
             session, ret = __wt_conn_dhandle_close_all(session, tier->name, true, force)));
@@ -226,7 +227,8 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
     /* Close any dhandle and remove any tier: entry from metadata. */
     tier = tiered->tiers[WT_TIERED_INDEX_SHARED].tier;
     if (tier != NULL) {
-        __wt_verbose(session, WT_VERB_TIERED, "DROP_TIERED: drop shared object %s", tier->name);
+        __wt_verbose_debug2(
+          session, WT_VERB_TIERED, "DROP_TIERED: drop shared object %s", tier->name);
         WT_WITHOUT_DHANDLE(session,
           WT_WITH_HANDLE_LIST_WRITE_LOCK(
             session, ret = __wt_conn_dhandle_close_all(session, tier->name, true, force)));
@@ -241,11 +243,13 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
      */
     for (i = tiered->oldest_id; i < tiered->current_id; ++i) {
         WT_ERR(__wt_tiered_name(session, &tiered->iface, i, WT_TIERED_NAME_LOCAL, &name));
-        __wt_verbose(session, WT_VERB_TIERED, "DROP_TIERED: remove object %s from metadata", name);
+        __wt_verbose_debug2(
+          session, WT_VERB_TIERED, "DROP_TIERED: remove object %s from metadata", name);
         WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, name), false);
         __wt_free(session, name);
         WT_ERR(__wt_tiered_name(session, &tiered->iface, i, WT_TIERED_NAME_OBJECT, &name));
-        __wt_verbose(session, WT_VERB_TIERED, "DROP_TIERED: remove object %s from metadata", name);
+        __wt_verbose_debug2(
+          session, WT_VERB_TIERED, "DROP_TIERED: remove object %s from metadata", name);
         WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, name), false);
         if (remove_files && tier != NULL) {
             filename = name;
