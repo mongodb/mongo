@@ -192,7 +192,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
     def CacheDebugJson(self, json_data, target, cachefile):
 
         if SCons.CacheDir.cache_debug and SCons.CacheDir.cache_debug != '-' and self.json_log is None:
-            self.json_log = open(SCons.CacheDir.cache_debug + '.json', 'w')
+            self.json_log = open(SCons.CacheDir.cache_debug + '.json', 'a')
 
         if self.json_log is not None:
             cksum_cachefile = str(pathlib.Path(cachefile).parent)

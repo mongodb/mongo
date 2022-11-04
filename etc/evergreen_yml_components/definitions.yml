@@ -1241,6 +1241,13 @@ functions:
   - *apply_version_expansions
   - *f_expansions_write
   - command: subprocess.exec
+    params:
+      background: true
+      continue_on_err: true
+      binary: bash
+      args:
+      - "./src/evergreen/scons_splunk.sh"
+  - command: subprocess.exec
     type: test
     params:
       binary: bash
@@ -2093,14 +2100,6 @@ functions:
       bucket: mciuploads
       permissions: public-read
       display_name: SCons stdout log
-
-  - *f_expansions_write
-  - command: subprocess.exec
-    params:
-      continue_on_err: true
-      binary: bash
-      args:
-      - "./src/evergreen/scons_splunk.sh"
 
   "send scons cedar report":
     - command: subprocess.exec
