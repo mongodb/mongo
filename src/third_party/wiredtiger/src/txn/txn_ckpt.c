@@ -106,7 +106,7 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
         cursor->get_value(cursor, &value);
         /* For now just switch tiers which just does metadata manipulation. */
         if (WT_PREFIX_MATCH(key, "tiered:")) {
-            __wt_verbose(
+            __wt_verbose_debug2(
               session, WT_VERB_TIERED, "CKPT_FLUSH_TIER: %s %s force %d", key, value, force);
             if (!force) {
                 /*
