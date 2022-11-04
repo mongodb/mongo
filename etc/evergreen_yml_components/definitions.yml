@@ -7039,6 +7039,7 @@ tasks:
       - "./src/evergreen/packages_publish_test.sh"
 
 - name: push
+  run_on: rhel80-small
   tags: ["publish"]
   patchable: false
   depends_on:
@@ -7518,6 +7519,7 @@ tasks:
          'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
 - name: crypt_push
+  run_on: rhel80-small
   tags: ["publish_crypt"]
   patchable: false
   stepback: false
