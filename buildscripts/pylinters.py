@@ -9,9 +9,10 @@ from typing import Dict, List
 
 import structlog
 
+mongo_dir = os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
+    sys.path.append(mongo_dir)
 
 # pylint: disable=wrong-import-position
 from buildscripts.linter.filediff import gather_changed_files_for_lint
@@ -87,8 +88,8 @@ def is_scons_file(file_name):
             file_name == "SConstruct"
 
 
-def _lint_files(linters, config_dict, file_names):
-    # type: (str, Dict[str, str], List[str]) -> None
+def _lint_files(linters: str, config_dict: Dict[str, str], file_names: List[str],
+                fix_command: str = "fix"):
     """Lint a list of files with clang-format."""
     linter_list = get_py_linter(linters)
 
@@ -101,7 +102,7 @@ def _lint_files(linters, config_dict, file_names):
     failed_lint = False
 
     for linter in linter_instances:
-        run_fix = lambda param1: lint_runner.run_lint(linter, param1)  # pylint: disable=cell-var-from-loop
+        run_fix = lambda param1: lint_runner.run_lint(linter, param1, mongo_dir, fix_command)  # pylint: disable=cell-var-from-loop
         lint_clean = parallel.parallel_process([os.path.abspath(f) for f in file_names], run_fix)
 
         if not lint_clean:
@@ -154,7 +155,7 @@ def lint_scons(linters, config_dict, file_names):
     """Lint SCons files command entry point."""
     scons_file_names = git.get_files_to_check(file_names, is_scons_file)
 
-    _lint_files(linters, config_dict, scons_file_names)
+    _lint_files(linters, config_dict, scons_file_names, "fix-scons")
 
 
 def _fix_files(linters, config_dict, file_names):

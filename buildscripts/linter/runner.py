@@ -168,8 +168,8 @@ class LintRunner(object):
         with self.print_lock:
             print(line)
 
-    def run_lint(self, linter, file_name):
-        # type: (base.LinterInstance, str) -> bool
+    def run_lint(self, linter: base.LinterInstance, file_name: str, mongo_path: str,
+                 fix_command: str) -> bool:
         """Run the specified linter for the file."""
 
         linter_args = linter.linter.get_lint_cmd_args(file_name)
@@ -201,8 +201,11 @@ class LintRunner(object):
 
                     # Take a lock to ensure diffs do not get mixed when printed to the screen
                     with self.print_lock:
+                        file_name = os.path.relpath(file_name, mongo_path)
                         print("ERROR: Found diff for " + file_name)
-                        print("To fix formatting errors, run pylinters.py fix %s" % (file_name))
+                        print(
+                            f"To fix formatting errors, run buildscripts/pylinters.py {fix_command} {file_name}"
+                        )
 
                         count = 0
                         for line in result:

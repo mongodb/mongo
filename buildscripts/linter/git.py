@@ -147,6 +147,7 @@ def expand_file_string(glob_pattern):
     # type: (str) -> List[str]
     """Expand a string that represents a set of files."""
     current_path = Path(".")
+    glob_pattern = os.path.relpath(glob_pattern)
     return [str(glob_match.resolve()) for glob_match in current_path.glob(glob_pattern)]
 
 
