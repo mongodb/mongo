@@ -911,7 +911,8 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
      * If we find a key with a timestamp larger than or equal to the specified timestamp then the
      * specified timestamp must be mixed mode.
      *
-     * FIXME-WT-9846: Change this back to WT_ASSERT_ALWAYS once WT-9846 is resolved
+     * FIXME-WT-10017: Change this back to WT_ASSERT_ALWAYS once WT-10017 is resolved. WT-10017 will
+     * resolve a known issue where this assert fires for column store configurations.
      */
     WT_ASSERT(session, ts == 1 || ts == WT_TS_NONE);
 
