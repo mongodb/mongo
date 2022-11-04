@@ -242,6 +242,10 @@ CONFIG configuration_list[] = {
 
 {"runs.verify_failure_dump", "configure page dump on repeatable read error", C_BOOL | C_IGNORE, 0, 0, 1}
 
+{"statistics.mode", "statistics mode (all | fast)", C_IGNORE | C_STRING, 0, 0, 0}
+
+{"statistics_log.sources", "statistics_log sources (file: | off)", C_IGNORE | C_STRING, 0, 0, 0}
+
 {"stress.aggressive_sweep", "stress aggressive sweep", C_BOOL, 2, 0, 0}
 
 {"stress.checkpoint", "stress checkpoints", C_BOOL, 2, 0, 0}

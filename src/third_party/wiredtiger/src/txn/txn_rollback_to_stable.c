@@ -1392,7 +1392,7 @@ __rollback_to_stable_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollbac
     ref = NULL;
     while (
       (ret = __wt_tree_walk_custom_skip(session, &ref, __rollback_to_stable_page_skip,
-         &rollback_timestamp, WT_READ_NO_EVICT | WT_READ_WONT_NEED | WT_READ_VISIBLE_ALL)) == 0 &&
+         &rollback_timestamp, WT_READ_NO_EVICT | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED)) == 0 &&
       ref != NULL)
         if (F_ISSET(ref, WT_REF_FLAG_LEAF))
             WT_RET(__rollback_abort_updates(session, ref, rollback_timestamp));

@@ -366,7 +366,7 @@ __wt_compact(WT_SESSION_IMPL *session)
          * evicted quickly.
          */
         WT_ERR(__wt_tree_walk_custom_skip(session, &ref, __compact_walk_page_skip, NULL,
-          WT_READ_NO_GEN | WT_READ_WONT_NEED | WT_READ_VISIBLE_ALL));
+          WT_READ_NO_GEN | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED));
         if (ref == NULL)
             break;
 

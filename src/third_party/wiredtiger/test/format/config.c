@@ -51,6 +51,7 @@ static void config_mirrors(void);
 static void config_off(TABLE *, const char *);
 static void config_off_all(const char *);
 static void config_pct(TABLE *);
+static void config_statistics(void);
 static void config_transaction(void);
 
 /*
@@ -348,6 +349,7 @@ config_run(void)
     config_in_memory_reset();                        /* Reset in-memory as needed */
     config_backward_compatible();                    /* Reset backward compatibility as needed */
     config_mirrors();                                /* Mirrors */
+    config_statistics();                             /* Statistics */
 
     /* Configure the cache last, cache size depends on everything else. */
     config_cache();
@@ -1128,6 +1130,32 @@ config_pct(TABLE *table)
     testutil_assert(TV(OPS_PCT_DELETE) + TV(OPS_PCT_INSERT) + TV(OPS_PCT_MODIFY) +
         TV(OPS_PCT_READ) + TV(OPS_PCT_WRITE) ==
       100);
+}
+
+/*
+ * config_statistics --
+ *     Statistics configuration.
+ */
+static void
+config_statistics(void)
+{
+    /* Sources is only applicable when the mode is all. */
+    if (strcmp(GVS(STATISTICS_MODE), "all") != 0 && strcmp(GVS(STATISTICS_LOG_SOURCES), "off") != 0)
+        testutil_die(EINVAL, "statistics sources requires mode to be all");
+
+    if (!config_explicit(NULL, "statistics.mode")) {
+        /* 70% of the time set statistics to fast. */
+        if (mmrand(NULL, 1, 10) < 8)
+            config_single(NULL, "statistics.mode=fast", false);
+        else
+            config_single(NULL, "statistics.mode=all", false);
+    }
+
+    if (!config_explicit(NULL, "statistics_log.sources")) {
+        /* 10% of the time use sources if all. */
+        if (strcmp(GVS(STATISTICS_MODE), "all") == 0 && mmrand(NULL, 1, 10) == 1)
+            config_single(NULL, "statistics_log.sources=file:", false);
+    }
 }
 
 /*

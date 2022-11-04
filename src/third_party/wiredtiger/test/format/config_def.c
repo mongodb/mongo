@@ -257,6 +257,12 @@ CONFIG configuration_list[] = {
   {"runs.verify_failure_dump", "configure page dump on repeatable read error",
     C_BOOL | C_IGNORE, 0, 0, 1, V_GLOBAL_RUNS_VERIFY_FAILURE_DUMP},
 
+  {"statistics.mode", "statistics mode (all | fast)",
+    C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_STATISTICS_MODE},
+
+  {"statistics_log.sources", "statistics_log sources (file: | off)",
+    C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_STATISTICS_LOG_SOURCES},
+
   {"stress.aggressive_sweep", "stress aggressive sweep",
     C_BOOL, 2, 0, 0, V_GLOBAL_STRESS_AGGRESSIVE_SWEEP},
 
