@@ -72,28 +72,28 @@ variables:
 # Common compile variant dependency specifications.
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
     variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile-required
   - name: version_gen
     variant: generate-tasks-for-version
 
 - &linux_x86_dynamic_debug_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
     variant: &linux_x86_dynamic_debug_compile_variant_name linux-x86-dynamic-debug-compile-required
   - name: version_gen
     variant: generate-tasks-for-version
 
 - &linux_debug_aubsan_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
     variant: &linux_debug_aubsan_compile_variant_name linux-debug-aubsan-compile-required
   - name: version_gen
     variant: generate-tasks-for-version
 
 - &windows_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
     variant: &windows_compile_variant_name windows-compile-required
   - name: version_gen
     variant: generate-tasks-for-version
@@ -1378,7 +1378,7 @@ buildvariants:
     burn_in_tag_compile_distro: rhel80-xlarge
   depends_on:
   - name: archive_dist_test
-    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile-required
+    variant: *linux_x86_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
   - name: version_burn_in_gen
@@ -1713,7 +1713,7 @@ buildvariants:
     burn_in_tag_compile_distro: rhel80-xlarge
   depends_on:
   - name: archive_dist_test
-    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile-required
+    variant: *linux_x86_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
   - name: version_burn_in_gen
