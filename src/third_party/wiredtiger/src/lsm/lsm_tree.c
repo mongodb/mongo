@@ -1147,7 +1147,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
     }
 
     if (push_flush) {
-        __wt_verbose(session, WT_VERB_LSM,
+        __wt_verbose_debug2(session, WT_VERB_LSM,
           "Compact force flush %s flags 0x%" PRIx32 " chunk %" PRIu32 " flags 0x%" PRIx32, name,
           lsm_tree->flags, chunk->id, chunk->flags);
         flushing = true;
@@ -1166,7 +1166,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
         compacting = true;
         progress = lsm_tree->merge_progressing;
         F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
-        __wt_verbose(session, WT_VERB_LSM, "COMPACT: Start compacting %s", lsm_tree->name);
+        __wt_verbose_debug2(session, WT_VERB_LSM, "COMPACT: Start compacting %s", lsm_tree->name);
         locked = false;
         __wt_lsm_tree_writeunlock(session, lsm_tree);
     }
@@ -1180,7 +1180,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
         if (flushing) {
             WT_ASSERT(session, chunk != NULL);
             if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
-                __wt_verbose(session, WT_VERB_LSM,
+                __wt_verbose_debug2(session, WT_VERB_LSM,
                   "Compact flush done %s chunk %" PRIu32 ". Start compacting progress %" PRIu64,
                   name, chunk->id, lsm_tree->merge_progressing);
                 (void)__wt_atomic_sub32(&chunk->refcnt, 1);
@@ -1189,7 +1189,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
                 F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
                 progress = lsm_tree->merge_progressing;
             } else {
-                __wt_verbose(
+                __wt_verbose_debug2(
                   session, WT_VERB_LSM, "Compact flush retry %s chunk %" PRIu32, name, chunk->id);
                 WT_ERR(__wt_lsm_manager_push_entry(
                   session, WT_LSM_WORK_FLUSH, WT_LSM_WORK_FORCE, lsm_tree));

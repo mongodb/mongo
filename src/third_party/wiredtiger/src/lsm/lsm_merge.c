@@ -372,12 +372,12 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
      * We only want to do the chunk loop if we're running with verbose, so we wrap these statements
      * in the conditional. Avoid the loop in the normal path.
      */
-    if (WT_VERBOSE_ISSET(session, WT_VERB_LSM)) {
-        __wt_verbose(session, WT_VERB_LSM,
+    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_LSM, WT_VERBOSE_DEBUG_2)) {
+        __wt_verbose_debug2(session, WT_VERB_LSM,
           "Merging %s chunks %u-%u into %u (%" PRIu64 " records), generation %" PRIu32,
           lsm_tree->name, start_chunk, end_chunk, dest_id, record_count, generation);
         for (verb = start_chunk; verb < end_chunk + 1; verb++)
-            __wt_verbose(session, WT_VERB_LSM,
+            __wt_verbose_debug2(session, WT_VERB_LSM,
               "Merging %s: Chunk[%u] id %" PRIu32 ", gen: %" PRIu32 ", size: %" PRIu64
               ", records: %" PRIu64,
               lsm_tree->name, verb, lsm_tree->chunk[verb]->id, lsm_tree->chunk[verb]->generation,

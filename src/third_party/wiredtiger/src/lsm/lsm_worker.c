@@ -68,7 +68,7 @@ __lsm_worker_general_op(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *cookie, bo
          * If we got a chunk to flush, checkpoint it.
          */
         if (chunk != NULL) {
-            __wt_verbose(session, WT_VERB_LSM, "Flush%s chunk %" PRIu32 " %s",
+            __wt_verbose_debug2(session, WT_VERB_LSM, "Flush%s chunk %" PRIu32 " %s",
               force ? " w/ force" : "", chunk->id, chunk->uri);
             ret = __wt_lsm_checkpoint_chunk(session, entry->lsm_tree, chunk);
             WT_ASSERT(session, chunk->refcnt > 0);
