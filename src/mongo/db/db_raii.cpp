@@ -384,6 +384,80 @@ auto acquireCollectionAndConsistentSnapshot(
     return collection;
 }
 
+void assertReadConcernSupported(const CollectionPtr& coll,
+                                const repl::ReadConcernArgs& readConcernArgs,
+                                const RecoveryUnit::ReadSource& readSource) {
+    const auto readConcernLevel = readConcernArgs.getLevel();
+    // Ban snapshot reads on capped collections.
+    uassert(ErrorCodes::SnapshotUnavailable,
+            "Reading from capped collections with readConcern snapshot is not supported",
+            !coll->isCapped() || readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    // Disallow snapshot reads and causal consistent majority reads on config.transactions
+    // outside of transactions to avoid running the collection at a point-in-time in the middle
+    // of a secondary batch. Such reads are unsafe because config.transactions updates are
+    // coalesced on secondaries. Majority reads without an afterClusterTime is allowed because
+    // they are allowed to return arbitrarily stale data. We allow kNoTimestamp and kLastApplied
+    // reads because they must be from internal readers given the snapshot/majority readConcern
+    // (e.g. for session checkout).
+
+    if (coll->ns() == NamespaceString::kSessionTransactionsTableNamespace &&
+        readSource != RecoveryUnit::ReadSource::kNoTimestamp &&
+        readSource != RecoveryUnit::ReadSource::kLastApplied &&
+        ((readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern &&
+          !readConcernArgs.allowTransactionTableSnapshot()) ||
+         (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern &&
+          readConcernArgs.getArgsAfterClusterTime()))) {
+        uasserted(5557800,
+                  "Snapshot reads and causal consistent majority reads on config.transactions "
+                  "are not supported");
+    }
+}
+
+void checkInvariantsForReadOptions(const NamespaceString& nss,
+                                   const boost::optional<LogicalTime>& afterClusterTime,
+                                   const RecoveryUnit::ReadSource& readSource,
+                                   const boost::optional<Timestamp>& readTimestamp,
+                                   bool callerWasConflicting,
+                                   bool shouldReadAtLastApplied) {
+    if (readTimestamp && afterClusterTime) {
+        // Readers that use afterClusterTime have already waited at a higher level for the
+        // all_durable time to advance to a specified optime, and they assume the read timestamp
+        // of the operation is at least that waited-for timestamp. For kNoOverlap, which is
+        // the minimum of lastApplied and all_durable, this invariant ensures that
+        // afterClusterTime reads do not choose a read timestamp older than the one requested.
+        invariant(*readTimestamp >= afterClusterTime->asTimestamp(),
+                  str::stream() << "read timestamp " << readTimestamp->toString()
+                                << "was less than afterClusterTime: "
+                                << afterClusterTime->asTimestamp().toString());
+    }
+
+    // This assertion protects operations from reading inconsistent data on secondaries when
+    // using the default ReadSource of kNoTimestamp.
+
+    // Reading at lastApplied on secondaries is the safest behavior and is enabled for all user
+    // and DBDirectClient reads using 'local' and 'available' readConcerns. If an internal
+    // operation wishes to read without a timestamp during a batch, a ShouldNotConflict can
+    // suppress this fatal assertion with the following considerations:
+    // * The operation is not reading replicated data in a replication state where batch
+    //   application is active OR
+    // * Reading inconsistent, out-of-order data is either inconsequential or required by
+    //   the operation.
+
+    // If the caller entered this function expecting to conflict with batch application
+    // (i.e. no ShouldNotConflict block in scope), but they are reading without a timestamp and
+    // not holding the PBWM lock, then there is a possibility that this reader may
+    // unintentionally see inconsistent data during a batch. Certain namespaces are applied
+    // serially in oplog application, and therefore can be safely read without taking the PBWM
+    // lock or reading at a timestamp.
+    if (readSource == RecoveryUnit::ReadSource::kNoTimestamp && callerWasConflicting &&
+        !nss.mustBeAppliedInOwnOplogBatch() && shouldReadAtLastApplied) {
+        LOGV2_FATAL(4728700,
+                    "Reading from replicated collection on a secondary without read timestamp "
+                    "or PBWM lock",
+                    "collection"_attr = nss);
+    }
+}
 }  // namespace
 
 AutoStatsTracker::AutoStatsTracker(
@@ -450,42 +524,16 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
 
     emplaceAutoColl.emplace(_autoColl);
 
-    repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const auto readConcernLevel = repl::ReadConcernArgs::get(opCtx).getLevel();
-
+    auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     // If the collection doesn't exist or disappears after releasing locks and waiting, there is no
     // need to check for pending catalog changes.
     while (const auto& coll = _autoColl->getCollection()) {
-        // Ban snapshot reads on capped collections.
-        uassert(ErrorCodes::SnapshotUnavailable,
-                "Reading from capped collections with readConcern snapshot is not supported",
-                !coll->isCapped() ||
-                    readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+        assertReadConcernSupported(
+            coll, readConcernArgs, opCtx->recoveryUnit()->getTimestampReadSource());
 
-        // Disallow snapshot reads and causal consistent majority reads on config.transactions
-        // outside of transactions to avoid running the collection at a point-in-time in the middle
-        // of a secondary batch. Such reads are unsafe because config.transactions updates are
-        // coalesced on secondaries. Majority reads without an afterClusterTime is allowed because
-        // they are allowed to return arbitrarily stale data. We allow kNoTimestamp and kLastApplied
-        // reads because they must be from internal readers given the snapshot/majority readConcern
-        // (e.g. for session checkout).
+        // We make a copy of the namespace so we can use the variable after locks are released,
+        // since releasing locks will allow the value of coll->ns() to change.
         const NamespaceString nss = coll->ns();
-        const auto afterClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
-        const auto allowTransactionTableSnapshot =
-            repl::ReadConcernArgs::get(opCtx).allowTransactionTableSnapshot();
-        auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
-        if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
-            readSource != RecoveryUnit::ReadSource::kNoTimestamp &&
-            readSource != RecoveryUnit::ReadSource::kLastApplied &&
-            ((readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern &&
-              !allowTransactionTableSnapshot) ||
-             (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern &&
-              afterClusterTime))) {
-            uasserted(5557800,
-                      "Snapshot reads and causal consistent majority reads on config.transactions "
-                      "are not supported");
-        }
-
         // During batch application on secondaries, there is a potential to read inconsistent states
         // that would normally be protected by the PBWM lock. In order to serve secondary reads
         // during this period, we default to not acquiring the lock (by setting
@@ -498,46 +546,16 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
         // set before acquiring locks.
         const bool shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(opCtx, nss);
         // Update readSource in case it was updated.
-        readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+        const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
 
         const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-        if (readTimestamp && afterClusterTime) {
-            // Readers that use afterClusterTime have already waited at a higher level for the
-            // all_durable time to advance to a specified optime, and they assume the read timestamp
-            // of the operation is at least that waited-for timestamp. For kNoOverlap, which is
-            // the minimum of lastApplied and all_durable, this invariant ensures that
-            // afterClusterTime reads do not choose a read timestamp older than the one requested.
-            invariant(*readTimestamp >= afterClusterTime->asTimestamp(),
-                      str::stream() << "read timestamp " << readTimestamp->toString()
-                                    << "was less than afterClusterTime: "
-                                    << afterClusterTime->asTimestamp().toString());
-        }
 
-        // This assertion protects operations from reading inconsistent data on secondaries when
-        // using the default ReadSource of kNoTimestamp.
-
-        // Reading at lastApplied on secondaries is the safest behavior and is enabled for all user
-        // and DBDirectClient reads using 'local' and 'available' readConcerns. If an internal
-        // operation wishes to read without a timestamp during a batch, a ShouldNotConflict can
-        // suppress this fatal assertion with the following considerations:
-        // * The operation is not reading replicated data in a replication state where batch
-        //   application is active OR
-        // * Reading inconsistent, out-of-order data is either inconsequential or required by
-        //   the operation.
-
-        // If the caller entered this function expecting to conflict with batch application
-        // (i.e. no ShouldNotConflict block in scope), but they are reading without a timestamp and
-        // not holding the PBWM lock, then there is a possibility that this reader may
-        // unintentionally see inconsistent data during a batch. Certain namespaces are applied
-        // serially in oplog application, and therefore can be safely read without taking the PBWM
-        // lock or reading at a timestamp.
-        if (readSource == RecoveryUnit::ReadSource::kNoTimestamp && callerWasConflicting &&
-            !nss.mustBeAppliedInOwnOplogBatch() && shouldReadAtLastApplied) {
-            LOGV2_FATAL(4728700,
-                        "Reading from replicated collection on a secondary without read timestamp "
-                        "or PBWM lock",
-                        "collection"_attr = nss);
-        }
+        checkInvariantsForReadOptions(nss,
+                                      readConcernArgs.getArgsAfterClusterTime(),
+                                      readSource,
+                                      readTimestamp,
+                                      callerWasConflicting,
+                                      shouldReadAtLastApplied);
 
         auto minSnapshot = coll->getMinimumVisibleSnapshot();
         if (!SnapshotHelper::collectionChangesConflictWithRead(minSnapshot, readTimestamp)) {
@@ -562,7 +580,8 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
             readSource == RecoveryUnit::ReadSource::kMajorityCommitted ||
             readSource == RecoveryUnit::ReadSource::kNoOverlap ||
             readSource == RecoveryUnit::ReadSource::kLastApplied);
-        invariant(readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+
+        invariant(readConcernArgs.getLevel() != repl::ReadConcernLevel::kSnapshotReadConcern);
 
         // Yield locks in order to do the blocking call below.
         _autoColl = boost::none;
@@ -597,6 +616,7 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
         }
 
         if (readSource == RecoveryUnit::ReadSource::kMajorityCommitted) {
+            const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             replCoord->waitUntilSnapshotCommitted(opCtx, *minSnapshot);
             uassertStatusOK(opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable());
         }
