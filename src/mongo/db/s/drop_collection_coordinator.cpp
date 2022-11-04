@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/drop_collection_coordinator.h"
 
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
@@ -84,8 +85,12 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
             stdx::lock_guard<Client> lk(*newClient.get());
             newClient->setSystemOperationKillableByStepdown(lk);
         }
-        auto alternativeOpCtx = newClient->makeOperationContext();
         AlternativeClientRegion acr{newClient};
+        auto executor =
+            Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
+
+        CancelableOperationContext alternativeOpCtx(
+            cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
 
         try {
             removePersistentRangeDeletionTasksByUUID(alternativeOpCtx.get(), *collectionUUID);
