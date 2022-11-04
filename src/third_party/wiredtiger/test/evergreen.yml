@@ -4558,7 +4558,6 @@ buildvariants:
 
 - name: code-statistics
   display_name: "Code statistics"
-  batchtime: 10080 # 7 days
   run_on:
   - ubuntu2004-test
   expansions:
@@ -4574,6 +4573,7 @@ buildvariants:
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
   tasks:
     - name: coverage-report
+      batchtime: 10080 # 7 days
     - name: cyclomatic-complexity
 
 - name: compatibility-tests-less-frequent
