@@ -62,8 +62,8 @@ MovePrimarySourceManager::MovePrimarySourceManager(OperationContext* opCtx,
                                                    ShardId& toShard)
     : _requestArgs(std::move(requestArgs)),
       _dbname(dbname),
-      _fromShard(std::move(fromShard)),
-      _toShard(std::move(toShard)),
+      _fromShard(fromShard),
+      _toShard(toShard),
       _critSecReason(BSON("command"
                           << "movePrimary"
                           << "dbName" << _dbname << "fromShard" << fromShard << "toShard"

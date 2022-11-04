@@ -75,7 +75,6 @@ public:
      *  - StaleConfigException if the expected database version does not match what we find it
      *      to be after acquiring the distributed lock.
      */
-
     MovePrimarySourceManager(OperationContext* opCtx,
                              ShardMovePrimary requestArgs,
                              StringData dbname,
