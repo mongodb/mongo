@@ -270,6 +270,8 @@ last-continuous:
     ticket: SERVER-69861
   - test_file: jstests/aggregation/expressions/switch_errors.js
     ticket: SERVER-70190
+  - test_file: jstests/core/cover_null_queries.js
+    ticket: SERVER-70436
   suites: null
 last-lts:
   all:
@@ -615,4 +617,6 @@ last-lts:
     ticket: SERVER-69861
   - test_file: jstests/aggregation/expressions/switch_errors.js
     ticket: SERVER-70190
+  - test_file: jstests/core/cover_null_queries.js
+    ticket: SERVER-70436
   suites: null
