@@ -101,6 +101,7 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
+#include "mongo/db/pipeline/document_source_telemetry.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor.h"
@@ -525,6 +526,10 @@ public:
     }
 
     void visit(const DocumentSourceTeeConsumer* source) override {
+        unsupportedStage(source);
+    }
+
+    void visit(const DocumentSourceTelemetry* source) override {
         unsupportedStage(source);
     }
 

@@ -64,6 +64,7 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
+#include "mongo/db/pipeline/document_source_telemetry.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
@@ -128,6 +129,7 @@ void DocumentSourceWalker::walk(const Pipeline& pipeline) {
                 visitHelper<DocumentSourceSingleDocumentTransformation>(ds) ||
                 visitHelper<DocumentSourceSkip>(ds) || visitHelper<DocumentSourceSort>(ds) ||
                 visitHelper<DocumentSourceTeeConsumer>(ds) ||
+                visitHelper<DocumentSourceTelemetry>(ds) ||
                 visitHelper<DocumentSourceUnionWith>(ds) || visitHelper<DocumentSourceUnwind>(ds)
                 // TODO: uncomment after fixing dependency
                 //&& visitHelper<DocumentSourceUpdateOnAddShard>(ds)
