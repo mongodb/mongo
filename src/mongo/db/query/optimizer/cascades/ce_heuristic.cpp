@@ -42,6 +42,7 @@ using namespace mongo::ce;
 constexpr SelectivityType kInvalidSel = -1.0;
 
 constexpr SelectivityType kDefaultFilterSel = 0.1;
+constexpr SelectivityType kDefaultExistsSel = 0.70;
 
 // The selectivities used in the piece-wise function for open-range intervals.
 // Note that we assume a smaller input cardinality will result in a less selective range.
@@ -332,6 +333,18 @@ public:
     EvalFilterSelectivityResult transport(const PathConstant& /*node*/,
                                           CEType /*inputCard*/,
                                           EvalFilterSelectivityResult childResult) {
+        return childResult;
+    }
+
+    EvalFilterSelectivityResult transport(const PathDefault& node,
+                                          CEType inputCard,
+                                          EvalFilterSelectivityResult childResult) {
+        if (node.getDefault() == Constant::boolean(false)) {
+            // We have a {$exists: true} predicate on this path if we have a Constant[false] child
+            // here. Note that ${exists: false} is handled by the presence of a negation expression
+            // higher in the ABT.
+            childResult.selectivity = kDefaultExistsSel;
+        }
         return childResult;
     }
 

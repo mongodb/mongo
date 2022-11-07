@@ -995,5 +995,21 @@ TEST(CEHeuristicTest, CENotClosedRange) {
     ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$gte: 10, $lt: 20}}}", inverseCE);
 }
 
+TEST(CEHeuristicTest, CEExists) {
+    HeuristicCETester noOpt(collName);
+
+    // Test basic case + $not.
+    ASSERT_MATCH_CE(noOpt, "{a: {$exists: true}}", 7000);
+    ASSERT_MATCH_CE(noOpt, "{a: {$exists: false}}", 3000);
+    ASSERT_MATCH_CE(noOpt, "{a: {$not: {$exists: false}}}", 7000);
+    ASSERT_MATCH_CE(noOpt, "{a: {$not: {$exists: true}}}", 3000);
+
+    // Test combinations of predicates.
+    ASSERT_MATCH_CE(noOpt, "{a: {$exists: true, $eq: 123}}", 70);
+    ASSERT_MATCH_CE(noOpt, "{a: {$exists: false, $eq: null}}", 30);
+    ASSERT_MATCH_CE(noOpt, "{a: {$exists: false}, b: {$eq: 123}}", 30);
+    ASSERT_MATCH_CE(noOpt, "{a: {$exists: true, $gt: 123}}", 2310);
+}
+
 }  // namespace
 }  // namespace mongo::ce
