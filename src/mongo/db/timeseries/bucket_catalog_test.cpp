@@ -1622,6 +1622,9 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
         return autoColl->checkValidation(opCtx, bucketDoc);
     };
 
+    BucketCatalog::BucketFindResult findResult;
+    findResult.bucketToReopen = BucketCatalog::BucketToReopen{bucketDoc, validator};
+
     // We should be able to pass in a valid bucket and insert into it.
     result = _bucketCatalog->insert(
         _opCtx,
@@ -1630,7 +1633,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
         _getTimeseriesOptions(_ns1),
         ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
         BucketCatalog::CombineWithInsertsFromOtherClients::kAllow,
-        BucketCatalog::BucketToReopen{bucketDoc, validator});
+        findResult);
     ASSERT_OK(result.getStatus());
     batch = result.getValue().batch;
     ASSERT(batch);
@@ -1697,6 +1700,10 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     // previous era.
     _bucketCatalog->clear(OID());
 
+    BucketCatalog::BucketFindResult findResult;
+    findResult.bucketToReopen =
+        BucketCatalog::BucketToReopen{bucketDoc, validator, result.getValue().catalogEra};
+
     // We should get an WriteConflict back if we pass in an outdated bucket.
     result = _bucketCatalog->insert(
         _opCtx,
@@ -1705,7 +1712,7 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
         _getTimeseriesOptions(_ns1),
         ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
         BucketCatalog::CombineWithInsertsFromOtherClients::kAllow,
-        BucketCatalog::BucketToReopen{bucketDoc, validator, result.getValue().catalogEra});
+        findResult);
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::WriteConflict);
 }

@@ -82,6 +82,12 @@ protected:
         AtomicWord<long long> numMeasurementsCommitted;
         AtomicWord<long long> numBucketsReopened;
         AtomicWord<long long> numBucketsKeptOpenDueToLargeMeasurements;
+        AtomicWord<long long> numBucketsFetched;
+        AtomicWord<long long> numBucketsQueried;
+        AtomicWord<long long> numBucketFetchesFailed;
+        AtomicWord<long long> numBucketQueriesFailed;
+        AtomicWord<long long> numBucketReopeningsFailed;
+        AtomicWord<long long> numDuplicateBucketsReopened;
     };
 
     class ExecutionStatsController {
@@ -109,6 +115,12 @@ protected:
         void incNumMeasurementsCommitted(long long increment = 1);
         void incNumBucketsReopened(long long increment = 1);
         void incNumBucketsKeptOpenDueToLargeMeasurements(long long increment = 1);
+        void incNumBucketsFetched(long long increment = 1);
+        void incNumBucketsQueried(long long increment = 1);
+        void incNumBucketFetchesFailed(long long increment = 1);
+        void incNumBucketQueriesFailed(long long increment = 1);
+        void incNumBucketReopeningsFailed(long long increment = 1);
+        void incNumDuplicateBucketsReopened(long long increment = 1);
 
     private:
         std::shared_ptr<ExecutionStats> _collectionStats;
@@ -282,6 +294,14 @@ public:
         uint64_t catalogEra = 0;
     };
 
+    struct BucketFindResult {
+        BucketFindResult() {}
+
+        bool fetchedBucket{false};
+        bool queriedBucket{false};
+        boost::optional<BucketToReopen> bucketToReopen{boost::none};
+    };
+
     static BucketCatalog& get(ServiceContext* svcCtx);
     static BucketCatalog& get(OperationContext* opCtx);
 
@@ -347,7 +367,7 @@ public:
                                     const TimeseriesOptions& options,
                                     const BSONObj& doc,
                                     CombineWithInsertsFromOtherClients combine,
-                                    boost::optional<BucketToReopen> bucketToReopen = boost::none);
+                                    BucketFindResult bucketFindResult = {});
 
     /**
      * Prepares a batch for commit, transitioning it to an inactive state. Caller must already have
@@ -946,7 +966,7 @@ protected:
                                      const BSONObj& doc,
                                      CombineWithInsertsFromOtherClients combine,
                                      AllowBucketCreation mode,
-                                     boost::optional<BucketToReopen> bucketToReopen = boost::none);
+                                     BucketFindResult bucketFindResult = {});
 
     /**
      * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, and
@@ -1091,6 +1111,13 @@ protected:
      */
     static long long _marginalMemoryUsageForArchivedBucket(const ArchivedBucket& bucket,
                                                            bool onlyEntryForMatchingMetaHash);
+
+    /**
+     * Updates stats to reflect the status of bucket fetches and queries based off of the FindResult
+     * (which is populated when attempting to reopen a bucket).
+     */
+    void _updateBucketFetchAndQueryStats(ExecutionStatsController& stats,
+                                         const BucketFindResult& findResult);
 
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketCatalog::_mutex");

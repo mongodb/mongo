@@ -254,6 +254,36 @@ void BucketCatalog::ExecutionStatsController::incNumBucketsKeptOpenDueToLargeMea
     _globalStats->numBucketsKeptOpenDueToLargeMeasurements.fetchAndAddRelaxed(increment);
 }
 
+void BucketCatalog::ExecutionStatsController::incNumBucketFetchesFailed(long long increment) {
+    _collectionStats->numBucketFetchesFailed.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketFetchesFailed.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketQueriesFailed(long long increment) {
+    _collectionStats->numBucketQueriesFailed.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketQueriesFailed.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsFetched(long long increment) {
+    _collectionStats->numBucketsFetched.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsFetched.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsQueried(long long increment) {
+    _collectionStats->numBucketsQueried.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsQueried.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketReopeningsFailed(long long increment) {
+    _collectionStats->numBucketReopeningsFailed.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketReopeningsFailed.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumDuplicateBucketsReopened(long long increment) {
+    _collectionStats->numDuplicateBucketsReopened.fetchAndAddRelaxed(increment);
+    _globalStats->numDuplicateBucketsReopened.fetchAndAddRelaxed(increment);
+}
+
 BucketCatalog::BucketStateManager::BucketStateManager(Mutex* m) : _mutex(m), _era(0) {}
 
 uint64_t BucketCatalog::BucketStateManager::getEra() {
@@ -839,9 +869,9 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
     const TimeseriesOptions& options,
     const BSONObj& doc,
     CombineWithInsertsFromOtherClients combine,
-    boost::optional<BucketToReopen> bucketToReopen) {
+    BucketFindResult bucketFindResult) {
     return _insert(
-        opCtx, ns, comparator, options, doc, combine, AllowBucketCreation::kYes, bucketToReopen);
+        opCtx, ns, comparator, options, doc, combine, AllowBucketCreation::kYes, bucketFindResult);
 }
 
 Status BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
@@ -1043,6 +1073,13 @@ void BucketCatalog::_appendExecutionStatsToBuilder(const ExecutionStats* stats,
                               stats->numBucketsKeptOpenDueToLargeMeasurements.load());
         builder->appendNumber("numBucketsClosedDueToCachePressure",
                               stats->numBucketsClosedDueToCachePressure.load());
+        builder->appendNumber("numBucketsFetched", stats->numBucketsFetched.load());
+        builder->appendNumber("numBucketsQueried", stats->numBucketsQueried.load());
+        builder->appendNumber("numBucketFetchesFailed", stats->numBucketFetchesFailed.load());
+        builder->appendNumber("numBucketQueriesFailed", stats->numBucketQueriesFailed.load());
+        builder->appendNumber("numBucketReopeningsFailed", stats->numBucketReopeningsFailed.load());
+        builder->appendNumber("numDuplicateBucketsReopened",
+                              stats->numDuplicateBucketsReopened.load());
     }
 }
 
@@ -1365,6 +1402,7 @@ BucketCatalog::Bucket* BucketCatalog::_reopenBucket(Stripe* stripe,
     // If the bucket wasn't inserted into the stripe, then that bucket is already open and we can
     // return the bucket 'it' points to.
     if (!inserted) {
+        stats.incNumDuplicateBucketsReopened();
         _markBucketNotIdle(stripe, stripeLock, unownedBucket);
         return unownedBucket;
     }
@@ -1404,7 +1442,8 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
     const BSONObj& doc,
     CombineWithInsertsFromOtherClients combine,
     AllowBucketCreation mode,
-    boost::optional<BucketToReopen> bucketToReopen) {
+    BucketFindResult bucketFindResult) {
+
     auto res = _extractBucketingParameters(ns, comparator, options, doc);
     if (!res.isOK()) {
         return res.getStatus();
@@ -1413,6 +1452,7 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
     auto time = res.getValue().second;
 
     ExecutionStatsController stats = _getExecutionStats(ns);
+    _updateBucketFetchAndQueryStats(stats, bucketFindResult);
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
@@ -1421,10 +1461,12 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
     InsertResult result;
     result.catalogEra = _bucketStateManager.getEra();
     CreationInfo info{key, stripeNumber, time, options, stats, &result.closedBuckets};
+    boost::optional<BucketToReopen> bucketToReopen = std::move(bucketFindResult.bucketToReopen);
 
     auto rehydratedBucket =
         _rehydrateBucket(opCtx, ns, comparator, options, stats, bucketToReopen, key);
     if (rehydratedBucket.getStatus().code() == ErrorCodes::WriteConflict) {
+        stats.incNumBucketReopeningsFailed();
         return rehydratedBucket.getStatus();
     }
 
@@ -1453,6 +1495,7 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
 
             return std::move(result);
         } else {
+            stats.incNumBucketReopeningsFailed();
             return {ErrorCodes::WriteConflict, "Bucket may be stale"};
         }
     }
@@ -1995,6 +2038,25 @@ long long BucketCatalog::_marginalMemoryUsageForArchivedBucket(const ArchivedBuc
         (onlyEntryForMatchingMetaHash ? sizeof(std::size_t) +           // key in set (meta hash)
                  sizeof(decltype(Stripe::archivedBuckets)::value_type)  // set container
                                       : 0);
+}
+
+void BucketCatalog::_updateBucketFetchAndQueryStats(ExecutionStatsController& stats,
+                                                    const BucketFindResult& findResult) {
+    if (findResult.fetchedBucket) {
+        if (findResult.bucketToReopen.has_value()) {
+            stats.incNumBucketsFetched();
+        } else {
+            stats.incNumBucketFetchesFailed();
+        }
+    }
+
+    if (findResult.queriedBucket) {
+        if (findResult.bucketToReopen.has_value()) {
+            stats.incNumBucketsQueried();
+        } else {
+            stats.incNumBucketQueriesFailed();
+        }
+    }
 }
 
 class BucketCatalog::ServerStatus : public ServerStatusSection {

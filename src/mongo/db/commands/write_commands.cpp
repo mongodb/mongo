@@ -1148,14 +1148,15 @@ public:
                             // If the InsertResult doesn't contain a batch, we failed to insert the
                             // measurement into an open bucket and need to create/reopen a bucket.
                             if (!insertResult.batch) {
+                                BucketCatalog::BucketFindResult bucketFindResult;
                                 BSONObj suitableBucket;
 
                                 if (auto* bucketId = stdx::get_if<OID>(&insertResult.candidate)) {
-                                    // Look up archived bucket by _id
+                                    // Look up archived bucket by _id.
                                     DBDirectClient client{opCtx};
                                     suitableBucket =
                                         client.findOne(bucketsColl->ns(), BSON("_id" << *bucketId));
-
+                                    bucketFindResult.fetchedBucket = true;
                                 } else if (auto* filter =
                                                stdx::get_if<BSONObj>(&insertResult.candidate)) {
                                     // Resort to Query-Based reopening approach.
@@ -1171,9 +1172,9 @@ public:
                                             timeSeriesOptions)) {
                                         // Run a query to find a suitable bucket to reopen.
                                         suitableBucket = client.findOne(bucketsColl->ns(), *filter);
+                                        bucketFindResult.queriedBucket = true;
                                     }
                                 }
-
 
                                 boost::optional<BucketCatalog::BucketToReopen> bucketToReopen =
                                     boost::none;
@@ -1182,8 +1183,9 @@ public:
                                                          const BSONObj& bucketDoc) -> auto {
                                         return bucketsColl->checkValidation(opCtx, bucketDoc);
                                     };
-                                    bucketToReopen = BucketCatalog::BucketToReopen{
+                                    auto bucketToReopen = BucketCatalog::BucketToReopen{
                                         suitableBucket, validator, insertResult.catalogEra};
+                                    bucketFindResult.bucketToReopen = std::move(bucketToReopen);
                                 }
 
                                 swResult = bucketCatalog.insert(
@@ -1193,17 +1195,19 @@ public:
                                     timeSeriesOptions,
                                     measurementDoc,
                                     _canCombineTimeseriesInsertWithOtherClients(opCtx),
-                                    bucketToReopen);
+                                    std::move(bucketFindResult));
                             }
                         }
                     } else {
-                        swResult = bucketCatalog.insert(
-                            opCtx,
-                            viewNs,
-                            bucketsColl->getDefaultCollator(),
-                            timeSeriesOptions,
-                            measurementDoc,
-                            _canCombineTimeseriesInsertWithOtherClients(opCtx));
+                        BucketCatalog::BucketFindResult bucketFindResult;
+                        swResult =
+                            bucketCatalog.insert(opCtx,
+                                                 viewNs,
+                                                 bucketsColl->getDefaultCollator(),
+                                                 timeSeriesOptions,
+                                                 measurementDoc,
+                                                 _canCombineTimeseriesInsertWithOtherClients(opCtx),
+                                                 bucketFindResult);
                     }
 
                     // If there is an era offset (between the bucket we want to reopen and the
