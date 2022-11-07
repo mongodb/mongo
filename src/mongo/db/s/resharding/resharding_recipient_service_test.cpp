@@ -573,7 +573,7 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
     BSONObjBuilder result;
     metrics->serializeCumulativeOpMetrics(&result);
 
-    ASSERT_LESS_THAN_OR_EQUALS(result.obj().getField("countReshardingFailures").numberLong(), 2);
+    ASSERT_LESS_THAN_OR_EQUALS(result.obj().getField("countReshardingFailures").numberLong(), 4);
 }
 
 TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenDone) {
