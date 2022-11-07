@@ -112,7 +112,7 @@ var QuerySamplingUtil = (function() {
                 actualCount += docs.length;
             });
             return actualCount >= expectedSampledQueryDocs.length;
-        }, "timed out waiting for sampled query documents");
+        }, "timed out waiting for sampled query documents " + tojson(expectedSampledQueryDocs));
         assert.eq(actualCount,
                   expectedSampledQueryDocs.length,
                   {actualSampledQueryDocs, expectedSampledQueryDocs});

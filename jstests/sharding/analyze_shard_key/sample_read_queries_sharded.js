@@ -43,97 +43,99 @@ const expectedSampledQueryDocs = [];
 
 // Make each read below have a unique filter and use that to look up the corresponding
 // config.sampledQueries document later.
+function runCmd(makeCmdObjFunc, filter, shardNames, explain) {
+    const collation = QuerySamplingUtil.generateRandomCollation();
+    const originalCmdObj = makeCmdObjFunc(filter, collation);
+    const cmdName = Object.keys(originalCmdObj)[0];
+
+    assert.commandWorked(mongosDB.runCommand(explain ? {explain: originalCmdObj} : originalCmdObj));
+    // 'explain' queries should not get sampled.
+    if (!explain) {
+        expectedSampledQueryDocs.push(
+            {filter: {"cmd.filter": filter}, cmdName, cmdObj: {filter, collation}, shardNames});
+    }
+}
 
 {
     // Run find commands.
-    const cmdName = "find";
-
-    function runFindCmd(filter, shardNames) {
-        const collation = QuerySamplingUtil.generateRandomCollation();
-        const originalCmdObj = {
+    const makeCmdObjFunc = (filter, collation) => {
+        return {
             find: collName,
             filter,
             collation,
         };
-        assert.commandWorked(mongosDB.runCommand(originalCmdObj));
-        expectedSampledQueryDocs.push({
-            filter: {"cmd.filter": filter},
-            cmdName: cmdName,
-            cmdObj: {filter, collation},
-            shardNames
-        });
-    }
+    };
 
     const filter0 = {x: 1};
     const shardNames0 = [st.rs1.name];
-    runFindCmd(filter0, shardNames0);
+    runCmd(makeCmdObjFunc, filter0, shardNames0, false /* explain */);
 
     const filter1 = {x: {$gte: 2}};
     const shardNames1 = [st.rs1.name, st.rs2.name];
-    runFindCmd(filter1, shardNames1);
+    runCmd(makeCmdObjFunc, filter1, shardNames1, false /* explain */);
+
+    const filter2 = {x: 3};
+    const shardNames2 = [];
+    runCmd(makeCmdObjFunc, filter2, shardNames2, true /* explain */);
+
+    const filter3 = {x: {$gte: 4}};
+    const shardNames3 = [];
+    runCmd(makeCmdObjFunc, filter3, shardNames3, true /* explain */);
 }
 
 {
     // Run count commands.
-    const cmdName = "count";
-
-    function runCountCmd(filter, shardNames) {
-        const collation = QuerySamplingUtil.generateRandomCollation();
-        const originalCmdObj = {
+    const makeCmdObjFunc = (filter, collation) => {
+        return {
             count: collName,
             query: filter,
             collation,
         };
+    };
 
-        assert.commandWorked(mongosDB.runCommand(originalCmdObj));
-
-        expectedSampledQueryDocs.push({
-            filter: {"cmd.filter": filter},
-            cmdName: cmdName,
-            cmdObj: {filter, collation},
-            shardNames
-        });
-    }
-
-    const filter0 = {x: 3};
+    const filter0 = {x: 5};
     const shardNames0 = [st.rs1.name];
-    runCountCmd(filter0, shardNames0);
+    runCmd(makeCmdObjFunc, filter0, shardNames0, false /* explain */);
 
-    const filter1 = {x: {$gte: 4}};
+    const filter1 = {x: {$gte: 6}};
     const shardNames1 = [st.rs1.name, st.rs2.name];
-    runCountCmd(filter1, shardNames1);
+    runCmd(makeCmdObjFunc, filter1, shardNames1, false /* explain */);
+
+    const filter2 = {x: 7};
+    const shardNames2 = [];
+    runCmd(makeCmdObjFunc, filter2, shardNames2, true /* explain */);
+
+    const filter3 = {x: {$gte: 8}};
+    const shardNames3 = [];
+    runCmd(makeCmdObjFunc, filter3, shardNames3, true /* explain */);
 }
 
 {
     // Run distinct commands.
-    const cmdName = "distinct";
-
-    function runDistinctCmd(filter, shardNames) {
-        const collation = QuerySamplingUtil.generateRandomCollation();
-        const originalCmdObj = {
+    const makeCmdObjFunc = (filter, collation) => {
+        return {
             distinct: collName,
             key: "x",
             query: filter,
             collation,
         };
+    };
 
-        assert.commandWorked(mongosDB.runCommand(originalCmdObj));
-
-        expectedSampledQueryDocs.push({
-            filter: {"cmd.filter": filter},
-            cmdName: cmdName,
-            cmdObj: {filter, collation},
-            shardNames
-        });
-    }
-
-    const filter0 = {x: 5};
+    const filter0 = {x: 9};
     const shardNames0 = [st.rs1.name];
-    runDistinctCmd(filter0, shardNames0);
+    runCmd(makeCmdObjFunc, filter0, shardNames0, false /* explain */);
 
-    const filter1 = {x: {$gte: 6}};
+    const filter1 = {x: {$gte: 10}};
     const shardNames1 = [st.rs1.name, st.rs2.name];
-    runDistinctCmd(filter1, shardNames1);
+    runCmd(makeCmdObjFunc, filter1, shardNames1, false /* explain */);
+
+    const filter2 = {x: 11};
+    const shardNames2 = [];
+    runCmd(makeCmdObjFunc, filter2, shardNames2, true /* explain */);
+
+    const filter3 = {x: {$gte: 12}};
+    const shardNames3 = [];
+    runCmd(makeCmdObjFunc, filter3, shardNames3, true /* explain */);
 }
 
 const cmdNames = ["find", "count", "distinct"];

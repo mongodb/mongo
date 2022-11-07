@@ -37,69 +37,69 @@ const shardNames = [st.rs0.name];
 
 // Make each read below have a unique filter and use that to look up the corresponding
 // config.sampledQueries document later.
-
-{
-    // Run a find command.
-    const cmdName = "find";
-    const filter = {x: 1};
+function runCmd(makeCmdObjFunc, filter, explain) {
     const collation = QuerySamplingUtil.generateRandomCollation();
-    const originalCmdObj = {
-        find: collName,
-        filter,
-        collation,
-    };
+    const originalCmdObj = makeCmdObjFunc(filter, collation);
+    const cmdName = Object.keys(originalCmdObj)[0];
 
-    assert.commandWorked(mongosDB.runCommand(originalCmdObj));
-
-    expectedSampledQueryDocs.push({
-        filter: {"cmd.filter": filter},
-        cmdName: cmdName,
-        cmdObj: {filter, collation},
-        shardNames
-    });
+    assert.commandWorked(mongosDB.runCommand(explain ? {explain: originalCmdObj} : originalCmdObj));
+    // 'explain' queries should not get sampled.
+    if (!explain) {
+        expectedSampledQueryDocs.push(
+            {filter: {"cmd.filter": filter}, cmdName, cmdObj: {filter, collation}, shardNames});
+    }
 }
 
 {
-    // Run a count command.
-    const cmdName = "count";
-    const filter = {x: 2};
-    const collation = QuerySamplingUtil.generateRandomCollation();
-    const originalCmdObj = {
-        count: collName,
-        query: filter,
-        collation,
+    // Run find commands.
+    const makeCmdObjFunc = (filter, collation) => {
+        return {
+            find: collName,
+            filter,
+            collation,
+        };
     };
 
-    assert.commandWorked(mongosDB.runCommand(originalCmdObj));
+    const filter0 = {x: 1};
+    runCmd(makeCmdObjFunc, filter0, false /* explain */);
 
-    expectedSampledQueryDocs.push({
-        filter: {"cmd.filter": filter},
-        cmdName: cmdName,
-        cmdObj: {filter, collation},
-        shardNames
-    });
+    const filter1 = {x: 2};
+    runCmd(makeCmdObjFunc, filter1, true /* explain */);
 }
 
 {
-    // Run a distinct command.
-    const cmdName = "distinct";
-    const filter = {x: 3};
-    const collation = QuerySamplingUtil.generateRandomCollation();
-    const originalCmdObj = {
-        distinct: collName,
-        key: "x",
-        query: filter,
-        collation,
+    // Run count commands.
+    const makeCmdObjFunc = (filter, collation) => {
+        return {
+            count: collName,
+            query: filter,
+            collation,
+        };
     };
 
-    assert.commandWorked(mongosDB.runCommand(originalCmdObj));
+    const filter0 = {x: 3};
+    runCmd(makeCmdObjFunc, filter0, false /* explain */);
 
-    expectedSampledQueryDocs.push({
-        filter: {"cmd.filter": filter},
-        cmdName: cmdName,
-        cmdObj: {filter, collation},
-        shardNames
-    });
+    const filter1 = {x: 4};
+    runCmd(makeCmdObjFunc, filter1, true /* explain */);
+}
+
+{
+    // Run distinct commands.
+    const makeCmdObjFunc = (filter, collation) => {
+        return {
+            distinct: collName,
+            key: "x",
+            query: filter,
+            collation,
+        };
+    };
+
+    const filter0 = {x: 5};
+    runCmd(makeCmdObjFunc, filter0, false /* explain */);
+
+    const filter1 = {x: 6};
+    runCmd(makeCmdObjFunc, filter1, true /* explain */);
 }
 
 const cmdNames = ["find", "count", "distinct"];

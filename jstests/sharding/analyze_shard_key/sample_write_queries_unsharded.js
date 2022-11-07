@@ -88,6 +88,10 @@ const shardNames = [st.rs0.name];
         diff: diff1,
         shardNames
     });
+
+    // 'explain' queries should not get sampled.
+    assert.commandWorked(mongosDB.runCommand(
+        {explain: {update: collName, updates: [{q: {x: 101}, u: [{$set: {y: 101}}]}]}}));
 }
 
 {
@@ -123,6 +127,10 @@ const shardNames = [st.rs0.name];
         cmdObj: Object.assign({}, originalCmdObj, {deletes: [deleteOp1]}),
         shardNames
     });
+
+    // 'explain' queries should not get sampled.
+    assert.commandWorked(
+        mongosDB.runCommand({explain: {delete: collName, deletes: [{q: {x: 301}, limit: 1}]}}));
 }
 
 {
@@ -153,6 +161,10 @@ const shardNames = [st.rs0.name];
         diff,
         shardNames
     });
+
+    // 'explain' queries should not get sampled.
+    assert.commandWorked(mongosDB.runCommand(
+        {explain: {findAndModify: collName, query: {x: 501}, update: {$set: {y: 501}}}}));
 }
 
 const cmdNames = ["update", "delete", "findAndModify"];

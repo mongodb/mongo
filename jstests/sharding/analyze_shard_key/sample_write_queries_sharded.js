@@ -113,6 +113,14 @@ const expectedSampledQueryDocs = [];
         diff: diff1,
         shardNames: shardNames1
     });
+
+    // 'explain' queries should not get sampled.
+    assert.commandWorked(mongosDB.runCommand(
+        {explain: {update: collName, updates: [{q: {x: 101}, u: [{$set: {y: 101}}]}]}}));
+    assert.commandWorked(mongosDB.runCommand({
+        explain:
+            {update: collName, updates: [{q: {x: {$gte: 102}}, u: {$set: {y: 102}}, multi: true}]}
+    }));
 }
 
 {
@@ -161,6 +169,12 @@ const expectedSampledQueryDocs = [];
         cmdObj: Object.assign({}, originalCmdObj, {deletes: [deleteOp1]}),
         shardNames: shardNames1
     });
+
+    // 'explain' queries should not get sampled.
+    assert.commandWorked(
+        mongosDB.runCommand({explain: {delete: collName, deletes: [{q: {x: 301}, limit: 1}]}}));
+    assert.commandWorked(mongosDB.runCommand(
+        {explain: {delete: collName, deletes: [{q: {x: {$gte: 401}}, limit: 0}]}}));
 }
 
 {
@@ -195,6 +209,10 @@ const expectedSampledQueryDocs = [];
         diff,
         shardNames
     });
+
+    // 'explain' queries should not get sampled.
+    assert.commandWorked(mongosDB.runCommand(
+        {explain: {findAndModify: collName, query: {x: 501}, update: {$set: {y: 501}}}}));
 }
 
 const cmdNames = ["update", "delete", "findAndModify"];
