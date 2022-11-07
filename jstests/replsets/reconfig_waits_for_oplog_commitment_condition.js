@@ -40,7 +40,7 @@ let singleNodeConfig = Object.assign({}, origConfig);
 singleNodeConfig.members = singleNodeConfig.members.slice(0, 1);  // Remove the second node.
 singleNodeConfig.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: singleNodeConfig}));
-assert(isConfigCommitted(primary));
+assert.soon(() => isConfigCommitted(primary));
 
 //
 // Below we start out in config C1 = {n0}, try to reconfig to C2 = {n0,n1}, and then to C3 =
@@ -96,7 +96,7 @@ rst.awaitReplication();
 
 // Now that we can commit the op in the new config, reconfig should succeed.
 assert.commandWorked(primary.adminCommand({replSetReconfig: C3}));
-assert(isConfigCommitted(primary));
+assert.soon(() => isConfigCommitted(primary));
 rst.awaitReplication();
 
 //
@@ -114,7 +114,7 @@ stopServerReplication(secondary);
 // config.
 config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
-assert(isConfigCommitted(primary));
+assert.soon(() => isConfigCommitted(primary));
 
 jsTestLog("Stepping down the primary.");
 // Step down the primary and then step it back up so that it writes a log entry in a newer term.
