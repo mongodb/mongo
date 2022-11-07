@@ -576,6 +576,14 @@ env.Benchmark(
     LIBDEPS=[],
 )
 
+env.Benchmark(
+    target='tick_source_bm',
+    source=[
+        'tick_source_bm.cpp',
+    ],
+    LIBDEPS=[],
+)
+
 env.Library(
     target='future_util',
     source=[
