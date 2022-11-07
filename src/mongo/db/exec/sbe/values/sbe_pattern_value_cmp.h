@@ -51,6 +51,7 @@ public:
     BSONObj sortPattern;
     bool useWholeValue = true;
     const CollatorInterface* collator = nullptr;
+    bool reversed = false;
 };
 
 }  // namespace mongo::sbe::value

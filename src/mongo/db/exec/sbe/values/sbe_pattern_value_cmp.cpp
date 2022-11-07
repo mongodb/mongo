@@ -66,7 +66,8 @@ SbePatternValueCmp::SbePatternValueCmp(TypeTags specTag,
                                        const CollatorInterface* collator)
     : sortPattern(convertValueToBSONObj(specTag, specVal)),
       useWholeValue(sortPattern.hasField("")),
-      collator(collator) {}
+      collator(collator),
+      reversed(sortPattern.firstElement().number() < 0) {}
 
 bool SbePatternValueCmp::operator()(const std::pair<TypeTags, Value>& lhs,
                                     const std::pair<TypeTags, Value>& rhs) const {
@@ -74,7 +75,6 @@ bool SbePatternValueCmp::operator()(const std::pair<TypeTags, Value>& lhs,
     auto [rhsTag, rhsVal] = rhs;
     if (useWholeValue) {
         auto [comparedTag, comparedVal] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal, collator);
-        const bool reversed = (sortPattern.firstElement().number() < 0);
         if (comparedTag == value::TypeTags::NumberInt32) {
             auto val = value::bitcastTo<int32_t>(comparedVal);
             return (reversed ? val > 0 : val < 0);
