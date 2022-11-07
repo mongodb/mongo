@@ -51,9 +51,8 @@ function testWithAdminDB(conn) {
 
     // An empty parameter to 'changeStreams' cluster parameter should reset the 'expireAfterSeconds'
     // to the default value.
-    // TODO SERVER-67145 uncomment this code.
-    // assert.commandWorked(adminDB.runCommand({setClusterParameter: {changeStreams: {}}}));
-    // assertGetResponse(adminDB, {expireAfterSeconds: NumberLong(3600)});
+    assert.commandWorked(adminDB.runCommand({setClusterParameter: {changeStreams: {}}}));
+    assertGetResponse(adminDB, {expireAfterSeconds: NumberLong(3600)});
 
     // Modifying expireAfterSeconds should succeed.
     assert.commandWorked(adminDB.runCommand(
