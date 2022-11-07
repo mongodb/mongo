@@ -43,11 +43,8 @@ function insertDocument(primaryHost, dbName, collName) {
     jsTestLog(
         "Testing blocked writes can see shard split outcome for a split that has been committed and garbage collected.");
 
-    const test = new ShardSplitTest({
-        recipientTagName: "recipientNode",
-        recipientSetName: "recipient",
-        nodeOptions: Object.assign({setParameter: kGarbageCollectionParams})
-    });
+    const test =
+        new ShardSplitTest({nodeOptions: Object.assign({setParameter: kGarbageCollectionParams})});
     test.addRecipientNodes();
     const tenantIds = ["migrationOutcome-committed"];
     const operation = test.createSplitOperation(tenantIds);
@@ -94,11 +91,8 @@ function insertDocument(primaryHost, dbName, collName) {
     jsTestLog(
         "Testing blocked writes can see shard split outcome for a split that has been aborted and garbage collected.");
 
-    const test = new ShardSplitTest({
-        recipientTagName: "recipientNode",
-        recipientSetName: "recipient",
-        nodeOptions: Object.assign({setParameter: kGarbageCollectionParams})
-    });
+    const test =
+        new ShardSplitTest({nodeOptions: Object.assign({setParameter: kGarbageCollectionParams})});
     test.addRecipientNodes();
     const tenantIds = ["migrationOutcome-committed"];
     const operation = test.createSplitOperation(tenantIds);

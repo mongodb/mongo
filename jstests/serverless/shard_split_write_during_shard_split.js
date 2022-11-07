@@ -9,12 +9,8 @@ load("jstests/serverless/libs/shard_split_test.js");
 (function() {
 "use strict";
 
-const recipientTagName = "recipientNode";
-const recipientSetName = "recipientSetName";
-const test = new ShardSplitTest({recipientTagName, recipientSetName});
-
-test.addRecipientNodes();
-test.donor.awaitSecondaryNodes();
+const test = new ShardSplitTest();
+test.addAndAwaitRecipientNodes();
 
 const donorPrimary = test.donor.getPrimary();
 const tenantIds = ["tenant1", "tenant2"];

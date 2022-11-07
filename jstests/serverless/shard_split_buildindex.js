@@ -19,11 +19,7 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/serverless/libs/shard_split_test.js");
 
-const shardSplitTest = new ShardSplitTest({
-    recipientTagName: "recipientNode",
-    recipientSetName: "recipient",
-    quickGarbageCollection: true
-});
+const shardSplitTest = new ShardSplitTest({quickGarbageCollection: true});
 shardSplitTest.addRecipientNodes();
 
 const kTenantId = "testTenantId1";

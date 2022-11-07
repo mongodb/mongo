@@ -17,15 +17,10 @@ jsTestLog("Starting runBlocking");
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
 
-const test = new ShardSplitTest({
-    recipientTagName: "recipientNode",
-    recipientSetName: "recipient",
-    quickGarbageCollection: true
-});
+const test = new ShardSplitTest({quickGarbageCollection: true});
 test.addRecipientNodes();
 
 const donorPrimary = test.donor.getPrimary();
-const maxTimeMS = 1 * 2000;  // 2 seconds
 const tenantIds = ["tenant1", "tenant2"];
 
 jsTestLog("Asserting no state document exist before command");

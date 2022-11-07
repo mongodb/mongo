@@ -21,11 +21,7 @@ load("jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js");
 load("jstests/serverless/libs/shard_split_test.js");
 
 TestData.skipCheckDBHashes = true;
-const recipientTagName = "recipientNode";
-const recipientSetName = "recipient";
 const tenantMigrationTest = new ShardSplitTest({
-    recipientTagName,
-    recipientSetName,
     quickGarbageCollection: true,
     allowStaleReadsOnDonor: true,
     initiateWithShortElectionTimeout: true

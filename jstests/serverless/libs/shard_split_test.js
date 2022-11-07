@@ -340,13 +340,13 @@ class ShardSplitOperation {
  */
 class ShardSplitTest {
     constructor({
-        recipientTagName,
-        recipientSetName,
+        recipientTagName = "recipientNode",
+        recipientSetName = "recipientSetName",
         quickGarbageCollection = false,
         nodeOptions,
         allowStaleReadsOnDonor = false,
         initiateWithShortElectionTimeout = false
-    }) {
+    } = {}) {
         nodeOptions = nodeOptions || {};
         if (quickGarbageCollection) {
             nodeOptions["setParameter"] = nodeOptions["setParameter"] || {};
@@ -415,6 +415,15 @@ class ShardSplitTest {
 
         this.recipientNodes =
             addRecipientNodes({rst: this.donor, numNodes, recipientTagName: this.recipientTagName});
+    }
+
+    /*
+     * Add recipient nodes to the current donor set, and wait for them to become ready.
+     * @param {numNodes} indicates the number of recipient nodes to be added.
+     */
+    addAndAwaitRecipientNodes(numNodes) {
+        this.addRecipientNodes(numNodes);
+        this.donor.awaitSecondaryNodes();
     }
 
     /*

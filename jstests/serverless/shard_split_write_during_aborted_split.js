@@ -1,5 +1,4 @@
 /**
- *
  * Test that starts a shard split and abort it while doing a write.
  * @tags: [requires_fcv_62, serverless]
  */
@@ -9,61 +8,63 @@ load("jstests/serverless/libs/shard_split_test.js");
 (function() {
 "use strict";
 
-const recipientTagName = "recipientNode";
-const recipientSetName = "recipientSetName";
+TestData.skipCheckDBHashes = true;
 const test = new ShardSplitTest({
-    recipientTagName,
-    recipientSetName,
     nodeOptions: {
         // Set a short timeout to test that the operation times out waiting for replication
         setParameter: "shardSplitTimeoutMS=100000"
     }
 });
 
-test.addRecipientNodes();
-test.donor.awaitSecondaryNodes();
+test.addAndAwaitRecipientNodes();
 
-const donorPrimary = test.donor.getPrimary();
 const tenantIds = ["tenant1", "tenant2"];
-
-jsTestLog("Writing data before split");
-tenantIds.forEach(id => {
-    const kDbName = test.tenantDB(id, "testDb");
-    const kCollName = "testColl";
-    const kNs = `${kDbName}.${kCollName}`;
-
-    assert.commandWorked(donorPrimary.getCollection(kNs).insert(
-        [{_id: 0, x: 0}, {_id: 1, x: 1}, {_id: 2, x: 2}], {writeConcern: {w: "majority"}}));
-});
-
 const operation = test.createSplitOperation(tenantIds);
-
+const donorPrimary = test.donor.getPrimary();
 const blockingFP = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
 
+// Start the shard split and wait until we enter the kBlocking state
 const splitThread = operation.commitAsync();
-
 blockingFP.wait();
 
-const donorRst = createRstArgs(test.donor);
-test.removeRecipientsFromRstArgs(donorRst);
-const writeThread = new Thread(doWriteOperations, donorRst, tenantIds);
-writeThread.start();
+// Assert there are no blocked writes for tenants so we can confirm there were blocks later
+tenantIds.forEach(
+    tenantId => assert.eq(TenantMigrationUtil.getNumBlockedWrites(donorPrimary, tenantId), 0));
 
-operation.abort();
+// Now perform one write for each tenantId being split and wait for the writes to become blocked
+const writes = tenantIds.map(tenantId => {
+    const writeThread = new Thread(function(primaryConnStr, tenantId) {
+        const primary = new Mongo(primaryConnStr);
+        const coll = primary.getDB(`${tenantId}_testDb`).testColl;
+        const res = coll.insert([{_id: 0, x: 0}, {_id: 1, x: 1}, {_id: 2, x: 2}],
+                                {writeConcern: {w: "majority"}});
+        assert.commandFailedWithCode(res, ErrorCodes.TenantMigrationAborted);
+    }, donorPrimary.host, tenantId);
 
-blockingFP.off();
-
-splitThread.join();
-const result = splitThread.returnData();
-assert.commandFailed(result);
-
-writeThread.join();
-const writeResults = writeThread.returnData();
-writeResults.forEach(res => {
-    assert.eq(res, ErrorCodes.OK);
+    writeThread.start();
+    return writeThread;
 });
 
-TestData.skipCheckDBHashes = true;
+// Verify that we have blocked the expected number of writes to tenant data
+tenantIds.forEach(tenantId => {
+    assert.soon(() => {
+        // We expect the numBlockedWrites to be a function of tenantIds size because shard split
+        // donor access blockers are shared for all tenants being split. I don't understand why
+        // there are two writes for each insert though.
+        const kExpectedBlockedWrites = tenantIds.length * 2;
+
+        return TenantMigrationUtil.getNumBlockedWrites(donorPrimary, tenantId) ==
+            kExpectedBlockedWrites;
+    });
+});
+
+// Then abort the operation, disable the failpoint, and assert the operation was aborted
+operation.abort();
+blockingFP.off();
+assert.commandFailedWithCode(splitThread.returnData(), ErrorCodes.TenantMigrationAborted);
+
+// Assert all writes were completed with a TenantMigrationAborted error
+writes.forEach(write => write.join());
 
 test.stop();
 })();

@@ -20,11 +20,7 @@ const {ServerlessLockType, getServerlessOperationLock} = TenantMigrationUtil;
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
 
-const recipientTagName = "recipientNode";
-const recipientSetName = "recipient";
 const test = new ShardSplitTest({
-    recipientTagName,
-    recipientSetName,
     quickGarbageCollection: true,
     nodeOptions: {
         setParameter:

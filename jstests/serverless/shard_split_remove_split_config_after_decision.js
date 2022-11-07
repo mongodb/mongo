@@ -7,13 +7,13 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/serverless/libs/shard_split_test.js");
 
-function assertSplitConfigExists(donorPrimary) {
+function assertSplitConfigExists(donorPrimary, recipientSetName) {
     jsTestLog("Asserting a split config has been applied");
     const config = assert.commandWorked(donorPrimary.adminCommand({replSetGetConfig: 1})).config;
     assert(config, "There must be a config document");
     assert.eq(config["members"].length, 3);
     assert(config["recipientConfig"]);
-    assert.eq(config["recipientConfig"]["_id"], "recipient");
+    assert.eq(config["recipientConfig"]["_id"], recipientSetName);
     assert.eq(config["recipientConfig"]["members"].length, 3);
 }
 
@@ -32,12 +32,7 @@ function splitConfigRemovedAfterDecision(simulateErrorToAbortOperation) {
     // Skip db hash check because secondary is left with a different config.
     TestData.skipCheckDBHashes = true;
     const tenantIds = ["tenant1", "tenant2"];
-    const test = new ShardSplitTest({
-        recipientTagName: "recipientNode",
-        recipientSetName: "recipient",
-        quickGarbageCollection: true
-    });
-
+    const test = new ShardSplitTest({quickGarbageCollection: true});
     test.addRecipientNodes();
 
     const donorPrimary = test.donor.getPrimary();
@@ -62,7 +57,7 @@ function splitConfigRemovedAfterDecision(simulateErrorToAbortOperation) {
         assertMigrationState(donorPrimary, operation.migrationId, "committed");
     }
 
-    assertSplitConfigExists(donorPrimary);
+    assertSplitConfigExists(donorPrimary, test.recipientSetName);
     beforeConfigRemovalFp.off();
 
     afterDecisionFp.wait();

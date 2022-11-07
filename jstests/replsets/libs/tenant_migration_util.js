@@ -265,33 +265,18 @@ var TenantMigrationUtil = (function() {
      * or shard merge for the given node.
      */
     function getTenantMigrationAccessBlocker({donorNode, recipientNode, tenantId}) {
+        assert(donorNode || recipientNode, "missing required parameter donorNode or recipientNode");
         if (donorNode && recipientNode) {
             throw new Error("please specify either 'donorNode' or 'recipientNode' but not both");
         }
+
         const node = donorNode || recipientNode;
-        const res = node.adminCommand({serverStatus: 1});
-        assert.commandWorked(res);
+        const {tenantMigrationAccessBlocker} =
+            assert.commandWorked(node.adminCommand({serverStatus: 1}));
 
-        const isShardMergeEnabled = TenantMigrationUtil.isShardMergeEnabled(
-            typeof node.getDB === "function" ? node.getDB("admin") : node);
-        const {tenantMigrationAccessBlocker} = res;
-        if (!tenantMigrationAccessBlocker) {
-            return undefined;
-        }
-
-        if (isShardMergeEnabled && tenantId) {
-            tenantMigrationAccessBlocker.recipient = tenantMigrationAccessBlocker[tenantId] &&
-                tenantMigrationAccessBlocker[tenantId].recipient;
-            return tenantMigrationAccessBlocker;
-        }
-
-        if (tenantId) {
-            tenantMigrationAccessBlocker.donor = tenantMigrationAccessBlocker[tenantId] &&
-                tenantMigrationAccessBlocker[tenantId].donor;
-            tenantMigrationAccessBlocker.recipient = tenantMigrationAccessBlocker[tenantId] &&
-                tenantMigrationAccessBlocker[tenantId].recipient;
-
-            return tenantMigrationAccessBlocker;
+        if (tenantMigrationAccessBlocker && tenantId &&
+            tenantMigrationAccessBlocker.hasOwnProperty(tenantId)) {
+            return tenantMigrationAccessBlocker[tenantId];
         }
 
         return tenantMigrationAccessBlocker;

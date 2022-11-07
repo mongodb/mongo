@@ -19,9 +19,6 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/serverless/libs/shard_split_test.js");
 
-const recipientTagName = "recipientNode";
-const recipientSetName = "recipient";
-
 TestData.skipCheckDBHashes = true;
 
 function testDroppingStateDocCollections(
@@ -87,12 +84,8 @@ function testDroppingStateDocCollections(
 }
 
 jsTest.log("Test dropping donor and recipient state doc collections during a shard split.");
-const test = new ShardSplitTest({
-    recipientTagName,
-    recipientSetName,
-    quickGarbageCollection: true,
-    initiateWithShortElectionTimeout: true
-});
+const test =
+    new ShardSplitTest({quickGarbageCollection: true, initiateWithShortElectionTimeout: true});
 
 const fpName = "pauseShardSplitAfterBlocking";
 testDroppingStateDocCollections(test, fpName, {dropDonorsCollection: true});

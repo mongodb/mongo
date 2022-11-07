@@ -16,12 +16,7 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
 
-const recipientTagName = "recipientNode";
-const recipientSetName = "recipientSetName";
-
 const test = new ShardSplitTest({
-    recipientTagName,
-    recipientSetName,
     quickGarbageCollection: true,
     nodeOptions: {
         setParameter:
@@ -30,34 +25,27 @@ const test = new ShardSplitTest({
 });
 test.addRecipientNodes();
 
-const migrationId = UUID();
 let donorPrimary = test.donor.getPrimary();
-assert.isnull(findSplitOperation(donorPrimary, migrationId));
-
-let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
+const fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
 
 jsTestLog("Running Shard Split restart after blocking");
 const tenantIds = ["tenant1", "tenant2"];
-const awaitFirstSplitOperation = startParallelShell(
-    funWithArgs(function(migrationId, recipientTagName, recipientSetName, tenantIds) {
-        db.adminCommand(
-            {commitShardSplit: 1, migrationId, recipientTagName, recipientSetName, tenantIds});
-    }, migrationId, recipientTagName, recipientSetName, tenantIds), donorPrimary.port);
+const operation = test.createSplitOperation(tenantIds);
+const splitThread = operation.commitAsync();
 
 fp.wait();
-
-assertMigrationState(donorPrimary, migrationId, "blocking");
+assertMigrationState(donorPrimary, operation.migrationId, "blocking");
 
 test.stop({shouldRestart: true});
-awaitFirstSplitOperation();
+splitThread.join();
 
 test.donor.startSet({restart: true});
 
 donorPrimary = test.donor.getPrimary();
-assert(findSplitOperation(donorPrimary, migrationId), "There must be a config document");
+assert(findSplitOperation(donorPrimary, operation.migrationId), "There must be a config document");
 
 test.validateTenantAccessBlockers(
-    migrationId, tenantIds, TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
+    operation.migrationId, tenantIds, TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
 
 test.stop();
 })();

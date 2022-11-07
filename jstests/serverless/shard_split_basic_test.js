@@ -8,12 +8,8 @@ load("jstests/serverless/libs/shard_split_test.js");
 (function() {
 "use strict";
 
-const recipientTagName = "recipientNode";
-const recipientSetName = "recipientSetName";
 const tenantIds = ["tenant1", "tenant2"];
-
-const test = new ShardSplitTest({recipientTagName, recipientSetName, quickGarbageCollection: true});
-
+const test = new ShardSplitTest({quickGarbageCollection: true});
 test.addRecipientNodes();
 test.donor.awaitSecondaryNodes();
 

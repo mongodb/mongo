@@ -342,16 +342,19 @@ void TenantMigrationAccessBlockerRegistry::appendInfoForServerStatus(
     BSONObjBuilder* builder) const {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    if (const auto donorAccessBlocker = _getAllTenantDonorAccessBlocker(lg); donorAccessBlocker) {
+    const auto globalDonorAccessBlocker = _getAllTenantDonorAccessBlocker(lg);
+    if (globalDonorAccessBlocker) {
         BSONObjBuilder donorMtabInfoBuilder;
-        donorAccessBlocker->appendInfoForServerStatus(&donorMtabInfoBuilder);
+        globalDonorAccessBlocker->appendInfoForServerStatus(&donorMtabInfoBuilder);
         builder->append("donor", donorMtabInfoBuilder.obj());
     }
 
     for (auto& [tenantId, mtabPair] : _tenantMigrationAccessBlockers) {
         BSONObjBuilder mtabInfoBuilder;
 
-        if (auto donorMtab = mtabPair.getDonorAccessBlocker()) {
+        auto donorMtab = mtabPair.getDonorAccessBlocker() ? mtabPair.getDonorAccessBlocker()
+                                                          : globalDonorAccessBlocker;
+        if (donorMtab) {
             BSONObjBuilder donorMtabInfoBuilder;
             donorMtab->appendInfoForServerStatus(&donorMtabInfoBuilder);
             mtabInfoBuilder.append("donor", donorMtabInfoBuilder.obj());

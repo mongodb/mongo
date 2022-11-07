@@ -17,9 +17,8 @@ load("jstests/serverless/libs/shard_split_test.js");
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
+
 const test = new ShardSplitTest({
-    recipientTagName: "recipientNode",
-    recipientSetName: "recipient",
     quickGarbageCollection: true,
     nodeOptions: {
         setParameter:  // Timeout to test that the operation times out waiting for replication

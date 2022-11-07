@@ -58,13 +58,8 @@ function extractTs(message) {
 function runOneSplit() {
     "use strict";
 
-    const recipientTagName = "recipientNode";
-    const recipientSetName = "recipientSetName";
-    const test =
-        new ShardSplitTest({recipientTagName, recipientSetName, quickGarbageCollection: true});
-
-    test.addRecipientNodes();
-    test.donor.awaitSecondaryNodes();
+    const test = new ShardSplitTest({quickGarbageCollection: true});
+    test.addAndAwaitRecipientNodes();
 
     const primary = test.donor.getPrimary();
 

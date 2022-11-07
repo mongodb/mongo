@@ -21,17 +21,13 @@ load("jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js");
 load("jstests/serverless/libs/shard_split_test.js");
 
 TestData.skipCheckDBHashes = true;
-const recipientTagName = "recipientNode";
-const recipientSetName = "recipient";
-const tenantMigrationTest = new ShardSplitTest({
-    recipientTagName,
-    recipientSetName,
+const test = new ShardSplitTest({
     quickGarbageCollection: true,
     allowStaleReadsOnDonor: true,
     initiateWithShortElectionTimeout: true
 });
 
-const donorPrimary = tenantMigrationTest.getDonorPrimary();
+const donorPrimary = test.getDonorPrimary();
 
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
@@ -126,9 +122,9 @@ function runTestsAfterMigration() {
     }
 }
 
-tenantMigrationTest.addRecipientNodes();
+test.addRecipientNodes();
 const tenantIds = [kTenantID];
-const operation = tenantMigrationTest.createSplitOperation(tenantIds);
+const operation = test.createSplitOperation(tenantIds);
 
 setupTestsBeforeMigration();
 
@@ -140,5 +136,5 @@ ShardSplitTest.checkShardSplitAccessBlocker(donorPrimary, kTenantID, {
     numTenantMigrationCommittedErrors: countTenantMigrationCommittedErrors
 });
 
-tenantMigrationTest.stop();
+test.stop();
 })();

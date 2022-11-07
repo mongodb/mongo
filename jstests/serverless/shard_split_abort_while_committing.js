@@ -14,11 +14,7 @@ function testAbortAfterSplitIsAppliedStillsCommits(failpoint) {
 
     const tenantIds = ["tenant1", "tenant2"];
 
-    const test = new ShardSplitTest({
-        recipientTagName: "recipientNode",
-        recipientSetName: "recipient",
-        quickGarbageCollection: true
-    });
+    const test = new ShardSplitTest({quickGarbageCollection: true});
     test.addRecipientNodes();
 
     const donorPrimary = test.getDonorPrimary();

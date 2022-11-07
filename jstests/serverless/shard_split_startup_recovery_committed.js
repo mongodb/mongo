@@ -16,11 +16,7 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
 
-const recipientTagName = "recipientNode";
-const recipientSetName = "recipient";
 const test = new ShardSplitTest({
-    recipientTagName,
-    recipientSetName,
     quickGarbageCollection: true,
     nodeOptions: {
         setParameter:
@@ -29,32 +25,30 @@ const test = new ShardSplitTest({
 });
 test.addRecipientNodes();
 
-const migrationId = UUID();
 let donorPrimary = test.donor.getPrimary();
-assert.isnull(findSplitOperation(donorPrimary, migrationId));
 
 // Pause the shard split before waiting to mark the doc for garbage collection.
 let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterDecision");
 
 jsTestLog("Running Shard Split restart after committed");
 const tenantIds = ["tenant3", "tenant4"];
-assert.commandWorked(donorPrimary.adminCommand(
-    {commitShardSplit: 1, migrationId, recipientTagName, recipientSetName, tenantIds}));
-
+const operation = test.createSplitOperation(tenantIds);
+const splitThread = operation.commitAsync();
 fp.wait();
 
-assertMigrationState(donorPrimary, migrationId, "committed");
+splitThread.join();
+assertMigrationState(donorPrimary, operation.migrationId, "committed");
 
 test.stop({shouldRestart: true});
 
 test.donor.startSet({restart: true});
 
 donorPrimary = test.donor.getPrimary();
-const splitDoc = findSplitOperation(donorPrimary, migrationId);
+const splitDoc = findSplitOperation(donorPrimary, operation.migrationId);
 assert(splitDoc, "There must be a config document");
 
 test.validateTenantAccessBlockers(
-    migrationId, tenantIds, TenantMigrationTest.DonorAccessState.kReject);
+    operation.migrationId, tenantIds, TenantMigrationTest.DonorAccessState.kReject);
 
 test.stop();
 })();
