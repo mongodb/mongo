@@ -1218,8 +1218,6 @@ void ShardingCatalogManager::_pushClusterParametersToNewShard(
     OperationContext* opCtx,
     Shard* shard,
     const TenantIdMap<std::vector<BSONObj>>& allClusterParameters) {
-    // TODO SERVER-70663 Optimize this pushing process with new replaceAllClusterParameters command.
-
     // First, remove all existing parameters from the new shard.
     _removeAllClusterParametersFromShard(opCtx, shard);
 
