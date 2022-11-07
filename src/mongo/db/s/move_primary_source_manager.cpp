@@ -412,24 +412,24 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx,
 Status MovePrimarySourceManager::_fallbackCommitOnConfig(OperationContext* opCtx,
                                                          const DatabaseVersion& expectedDbVersion) {
     const auto query = [&] {
-        BSONObjBuilder queryBuilder;
-        queryBuilder.append(DatabaseType::kNameFieldName, _dbname);
+        BSONObjBuilder bsonBuilder;
+        bsonBuilder.append(DatabaseType::kNameFieldName, _dbname);
         // Include the version in the update filter to be resilient to potential network retries and
         // delayed messages.
         for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {
             const auto dottedFieldName = DatabaseType::kVersionFieldName + "." + fieldName;
-            queryBuilder.appendAs(fieldValue, dottedFieldName);
+            bsonBuilder.appendAs(fieldValue, dottedFieldName);
         }
-        return queryBuilder.obj();
+        return bsonBuilder.obj();
     }();
 
     const auto update = [&] {
         const auto newDbVersion = expectedDbVersion.makeUpdated();
 
-        BSONObjBuilder updateBuilder;
-        updateBuilder.append(DatabaseType::kPrimaryFieldName, _toShard);
-        updateBuilder.append(DatabaseType::kVersionFieldName, newDbVersion.toBSON());
-        return updateBuilder.obj();
+        BSONObjBuilder bsonBuilder;
+        bsonBuilder.append(DatabaseType::kPrimaryFieldName, _toShard);
+        bsonBuilder.append(DatabaseType::kVersionFieldName, newDbVersion.toBSON());
+        return BSON("$set" << bsonBuilder.obj());
     }();
 
     return Grid::get(opCtx)

@@ -294,24 +294,24 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
     const auto updateOp = [&] {
         const auto query = [&] {
-            BSONObjBuilder queryBuilder;
-            queryBuilder.append(DatabaseType::kNameFieldName, dbName.db());
+            BSONObjBuilder bsonBuilder;
+            bsonBuilder.append(DatabaseType::kNameFieldName, dbName.db());
             // Include the version in the update filter to be resilient to potential network retries
             // and delayed messages.
             for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {
                 const auto dottedFieldName = DatabaseType::kVersionFieldName + "." + fieldName;
-                queryBuilder.appendAs(fieldValue, dottedFieldName);
+                bsonBuilder.appendAs(fieldValue, dottedFieldName);
             }
-            return queryBuilder.obj();
+            return bsonBuilder.obj();
         }();
 
         const auto update = [&] {
             const auto newDbVersion = expectedDbVersion.makeUpdated();
 
-            BSONObjBuilder updateBuilder;
-            updateBuilder.append(DatabaseType::kPrimaryFieldName, toShard);
-            updateBuilder.append(DatabaseType::kVersionFieldName, newDbVersion.toBSON());
-            return updateBuilder.obj();
+            BSONObjBuilder bsonBuilder;
+            bsonBuilder.append(DatabaseType::kPrimaryFieldName, toShard);
+            bsonBuilder.append(DatabaseType::kVersionFieldName, newDbVersion.toBSON());
+            return BSON("$set" << bsonBuilder.obj());
         }();
 
         write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigDatabasesNamespace);
