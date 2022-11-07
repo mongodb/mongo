@@ -1104,8 +1104,6 @@ void ShardingCatalogManager::_setClusterParametersLocally(OperationContext* opCt
 
 void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext* opCtx,
                                                                 Shard* shard) {
-    // TODO SERVER-70664 Optimize this pulling process with new getAllClusterParameters command.
-
     const auto& targeter = shard->getTargeter();
     LOGV2(6538600, "Pulling cluster parameters from new shard");
 
