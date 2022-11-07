@@ -68,6 +68,6 @@ namespace fle {
  * payloads for their new query.
  */
 void validateRanges(const MatchExpression& expr);
-void validateRanges(const Expression* expr);
+void validateRanges(const Expression& expr);
 }  // namespace fle
 }  // namespace mongo

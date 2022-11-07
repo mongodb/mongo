@@ -50,7 +50,7 @@ MatchExpression::MatchType rangeOpToMatchType(Fle2RangeOperator op) {
         case Fle2RangeOperator::kLte:
             return MatchExpression::LTE;
     }
-    MONGO_UNREACHABLE_TASSERT(7030718);
+    MONGO_UNREACHABLE_TASSERT(7030720);
 }
 
 Fle2RangeOperator matchTypeToRangeOp(MatchExpression::MatchType ty) {
@@ -69,9 +69,7 @@ Fle2RangeOperator matchTypeToRangeOp(MatchExpression::MatchType ty) {
     MONGO_UNREACHABLE_TASSERT(7030714);
 }
 
-void validateOneSidedRange(MatchExpression::MatchType ty,
-                           StringData name,
-                           const ParsedFindRangePayload& payload) {
+void validateOneSidedRange(Fle2RangeOperator ty, const ParsedFindRangePayload& payload) {
     uassert(
         7030709, "One-sided range comparison cannot be a stub payload.", payload.edges.has_value());
     uassert(7030710,
@@ -79,8 +77,8 @@ void validateOneSidedRange(MatchExpression::MatchType ty,
             !payload.secondOp.has_value());
     uassert(7030711,
             str::stream() << "Payload generated for " << payload.firstOp << " but was found under "
-                          << name,
-            ty == rangeOpToMatchType(payload.firstOp));
+                          << ty,
+            ty == payload.firstOp);
 }
 
 void validateOneSidedRange(const ComparisonMatchExpression& expr) {
@@ -89,7 +87,7 @@ void validateOneSidedRange(const ComparisonMatchExpression& expr) {
         return;
     }
     auto payload = parseFindPayload<ParsedFindRangePayload>(data);
-    validateOneSidedRange(expr.matchType(), expr.name(), payload);
+    validateOneSidedRange(matchTypeToRangeOp(expr.matchType()), payload);
 }
 
 /**
@@ -179,9 +177,35 @@ struct RangePayloadValidator {
     }
 };
 
+using ValidatorMap = stdx::unordered_map<int32_t, RangePayloadValidator>;
+
+void updateValidatorForPayload(ValidatorMap& map,
+                               Fle2RangeOperator rangeOp,
+                               ParsedFindRangePayload& payload) {
+    if (!payload.secondOp.has_value()) {
+        // If there is no secondOp in this payload then it should be treated as a
+        // one-sided range that should be validated on its own.
+        validateOneSidedRange(rangeOp, payload);
+        return;
+    }
+
+    // At this point, we know that the payload is one side of a two-sided range.
+
+    // Create a new validator for this payloadId if it's the first time it's seen.
+    auto payloadEntry = map.find(payload.payloadId);
+    if (payloadEntry == map.end()) {
+        payloadEntry =
+            map.insert({payload.payloadId,
+                        RangePayloadValidator(payload.firstOp, payload.secondOp.value())})
+                .first;
+    }
+    // Update the validator with information from this payload.
+    payloadEntry->second.update(rangeOp, payload);
+}
+
 void validateTwoSidedRanges(const AndMatchExpression& expr) {
     // Keep track of a map from payloadId to the validator struct.
-    stdx::unordered_map<int32_t, RangePayloadValidator> payloads;
+    ValidatorMap payloads;
     for (size_t i = 0; i < expr.numChildren(); i++) {
         auto child = expr.getChild(i);
         switch (child->matchType()) {
@@ -196,28 +220,10 @@ void validateTwoSidedRanges(const AndMatchExpression& expr) {
                     // Skip any comparison operators over non-encrypted data.
                     continue;
                 }
+
                 auto payload = parseFindPayload<ParsedFindRangePayload>(data);
-
-                if (!payload.secondOp.has_value()) {
-                    // If there is no secondOp in this payload then it should be treated as a
-                    // one-sided range that should be validated on its own.
-                    validateOneSidedRange(compExpr->matchType(), compExpr->name(), payload);
-                    continue;
-                }
-
-                // At this point, we know that the payload is one side of a two-sided range.
-
-                // Create a new validator for this payloadId if it's the first time it's seen.
-                auto payloadEntry = payloads.find(payload.payloadId);
-                if (payloadEntry == payloads.end()) {
-                    payloadEntry = payloads
-                                       .insert({payload.payloadId,
-                                                RangePayloadValidator(payload.firstOp,
-                                                                      payload.secondOp.value())})
-                                       .first;
-                }
-                // Update the validator with information from this payload.
-                payloadEntry->second.update(matchTypeToRangeOp(compExpr->matchType()), payload);
+                updateValidatorForPayload(
+                    payloads, matchTypeToRangeOp(compExpr->matchType()), payload);
                 break;
             }
             default:
@@ -269,7 +275,121 @@ void validateRanges(const MatchExpression& expr) {
     }
 }
 
-// TODO: SERVER-70308 add agg expression validation pass
-void validateRanges(const Expression* expr) {}
+namespace {
+
+Fle2RangeOperator cmpOpToRangeOp(ExpressionCompare::CmpOp op) {
+    switch (op) {
+        case ExpressionCompare::GT:
+            return Fle2RangeOperator::kGt;
+        case ExpressionCompare::GTE:
+            return Fle2RangeOperator::kGte;
+        case ExpressionCompare::LT:
+            return Fle2RangeOperator::kLt;
+        case ExpressionCompare::LTE:
+            return Fle2RangeOperator::kLte;
+        case ExpressionCompare::EQ:
+        case ExpressionCompare::NE:
+        case ExpressionCompare::CMP:
+            break;
+    }
+    MONGO_UNREACHABLE_TASSERT(7030800);
+}
+
+// Gets the first constant value from a comparison. All enrypted range predicates will have one
+// fieldpath and one constant value. If no constant is found, returns none. If both are values, then
+// this is not an encrypted predicate, but that case is handled by the caller.
+boost::optional<Value> getFirstConstantFromComparison(const ExpressionCompare& expr) {
+    auto& ops = expr.getChildren();
+    auto leftConstant = dynamic_cast<ExpressionConstant*>(ops[0].get());
+    auto rightConstant = dynamic_cast<ExpressionConstant*>(ops[1].get());
+
+    if (leftConstant) {
+        return leftConstant->getValue();
+    } else if (rightConstant) {
+        return rightConstant->getValue();
+    } else {
+        return boost::none;
+    }
+}
+
+void validateOneSidedRange(const ExpressionCompare& expr) {
+    auto v = getFirstConstantFromComparison(expr);
+    if (!v.has_value()) {
+        return;
+    }
+
+    if (!isPayloadOfType(EncryptedBinDataType::kFLE2FindRangePayload, v.value())) {
+        return;
+    }
+
+    auto payload = parseFindPayload<ParsedFindRangePayload>(v.value());
+
+    validateOneSidedRange(cmpOpToRangeOp(expr.getOp()), payload);
+}
+
+
+void validateTwoSidedRanges(const ExpressionAnd& expr) {
+    ValidatorMap payloads;
+    for (auto& child : expr.getOperandList()) {
+        if (auto compExpr = dynamic_cast<const ExpressionCompare*>(child.get())) {
+            switch (compExpr->getOp()) {
+                case ExpressionCompare::GT:
+                case ExpressionCompare::GTE:
+                case ExpressionCompare::LT:
+                case ExpressionCompare::LTE: {
+                    auto data = getFirstConstantFromComparison(*compExpr);
+                    if (!data.has_value()) {
+                        continue;
+                    }
+                    if (!isPayloadOfType(EncryptedBinDataType::kFLE2FindRangePayload,
+                                         data.value())) {
+                        continue;
+                    }
+                    auto payload = parseFindPayload<ParsedFindRangePayload>(data.value());
+                    updateValidatorForPayload(payloads, cmpOpToRangeOp(compExpr->getOp()), payload);
+                    break;
+                }
+                case ExpressionCompare::EQ:
+                case ExpressionCompare::NE:
+                case ExpressionCompare::CMP:
+                    continue;
+            }
+        } else {
+            validateRanges(*child.get());
+        }
+    }
+    // Once the entire operand list of the $and is traversed, make sure that all the
+    // two-sided ranges had fully valid payloads.
+    for (auto& [_, validator] : payloads) {
+        uassert(7030718,
+                str::stream() << "Payloads must be regenerated every time a query is modified.",
+                validator.isValid());
+    }
+}
+}  // namespace
+
+void validateRanges(const Expression& expr) {
+    if (auto compExpr = dynamic_cast<const ExpressionCompare*>(&expr)) {
+        switch (compExpr->getOp()) {
+            case ExpressionCompare::GT:
+            case ExpressionCompare::GTE:
+            case ExpressionCompare::LT:
+            case ExpressionCompare::LTE: {
+                validateOneSidedRange(*compExpr);
+                break;
+            }
+            case ExpressionCompare::CMP:
+            case ExpressionCompare::EQ:
+            case ExpressionCompare::NE:
+                break;
+        }
+    } else if (auto andExpr = dynamic_cast<const ExpressionAnd*>(&expr)) {
+        validateTwoSidedRanges(*andExpr);
+    } else {
+        for (auto& child : expr.getChildren()) {
+            validateRanges(*child.get());
+        }
+    }
+}
 }  // namespace fle
 }  // namespace mongo
