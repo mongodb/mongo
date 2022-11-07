@@ -375,9 +375,12 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        "$BUILD_DIR/mongo/rpc/client_metadata",
         '$BUILD_DIR/mongo/util/processinfo',
+        'command_request_response',
         'memory_util',
         'query_knobs',
+        'rate_limiting',
     ],
 )
 

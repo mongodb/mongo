@@ -32,7 +32,7 @@
 #include "mongo/db/query/telemetry.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
+namespace mongo::telemetry {
 
 class TelemetryStoreTest : public unittest::Test {
 protected:
@@ -96,4 +96,4 @@ TEST_F(TelemetryStoreTest, BasicUsage) {
     ASSERT_EQ(numKeys, 2);
 }
 
-}  // namespace mongo
+}  // namespace mongo::telemetry

@@ -53,6 +53,7 @@
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/telemetry.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -691,6 +692,15 @@ public:
             // Ensure log and profiler include the number of results returned in this getMore's
             // response batch.
             curOp->debug().nreturned = numResults;
+
+            auto telemetryKey = telemetry::shouldCollectTelemetry(
+                opCtx, exec->getPlanExplainer().getTelemetryKey());
+            if (telemetryKey) {
+                telemetry::collectTelemetry(opCtx->getServiceContext(),
+                                            exec->getPlanExplainer().getTelemetryKey(),
+                                            curOp->debug(),
+                                            false);
+            }
 
             if (respondWithId) {
                 cursorDeleter.dismiss();

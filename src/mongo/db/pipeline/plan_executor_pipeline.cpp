@@ -47,7 +47,7 @@ PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContex
                                            Microseconds timeElapsedPlanning)
     : _expCtx(std::move(expCtx)),
       _pipeline(std::move(pipeline)),
-      _planExplainer{_pipeline.get(), timeElapsedPlanning},
+      _planExplainer{_pipeline.get(), timeElapsedPlanning, _expCtx->opCtx->getTelemetryKey()},
       _resumableScanType{resumableScanType} {
     // Pipeline plan executors must always have an ExpressionContext.
     invariant(_expCtx);

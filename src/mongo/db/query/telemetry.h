@@ -31,17 +31,26 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/query/partitioned_cache.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
 
+class OpDebug;
+class AggregateCommandRequest;
+class FindCommandRequest;
+
+namespace {
 /**
  * Type we use to render values to BSON.
  */
 using BSONNumeric = long long;
+}  // namespace
 
+namespace telemetry {
 /**
  * An aggregated metric stores a compressed view of data. It balances the loss of information with
  * the reduction in required storage.
@@ -58,13 +67,19 @@ struct AggregatedMetric {
         sumOfSquares += val * val;
     }
 
-    BSONObj toBSON() const {
-        return BSON("sum" << (BSONNumeric)sum << "max" << (BSONNumeric)sum << "min"
-                          << (BSONNumeric)sum << "sumOfSquares" << (BSONNumeric)sum);
+    void appendTo(BSONObjBuilder& builder, const StringData& fieldName) const {
+        BSONObjBuilder metricsBuilder = builder.subobjStart(fieldName);
+        metricsBuilder.append("sum", (BSONNumeric)sum);
+        metricsBuilder.append("max", (BSONNumeric)max);
+        metricsBuilder.append("min", (BSONNumeric)min);
+        metricsBuilder.append("sumOfSquares", (BSONNumeric)sumOfSquares);
+        metricsBuilder.done();
     }
 
     uint64_t sum = 0;
-    uint64_t min = 0;
+    // Default to the _signed_ maximum (which fits in unsigned range) because we cast to BSONNumeric
+    // when serializing.
+    uint64_t min = (uint64_t)std::numeric_limits<int64_t>::max;
     uint64_t max = 0;
 
     /**
@@ -76,17 +91,25 @@ struct AggregatedMetric {
 
 class TelemetryMetrics {
 public:
+    TelemetryMetrics() : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0) {}
+
     BSONObj toBSON() const {
         BSONObjBuilder builder{sizeof(TelemetryMetrics) + 100};
         builder.append("lastExecutionMicros", (BSONNumeric)lastExecutionMicros);
         builder.append("execCount", (BSONNumeric)execCount);
-        builder.append("queryOptTime", queryOptMicros.toBSON());
-        builder.append("queryExecMicros", queryExecMicros.toBSON());
-        builder.append("docsReturned", docsReturned.toBSON());
-        builder.append("docsScanned", docsScanned.toBSON());
-        builder.append("keysScanned", keysScanned.toBSON());
+        queryOptMicros.appendTo(builder, "queryOptMicros");
+        queryExecMicros.appendTo(builder, "queryExecMicros");
+        docsReturned.appendTo(builder, "docsReturned");
+        docsScanned.appendTo(builder, "docsScanned");
+        keysScanned.appendTo(builder, "keysScanned");
+        builder.append("firstSeenTimestamp", firstSeenTimestamp);
         return builder.obj();
     }
+
+    /**
+     * Timestamp for when this query shape was added to the store. Set on construction.
+     */
+    const Timestamp firstSeenTimestamp;
 
     /**
      * Last execution time in microseconds.
@@ -132,8 +155,41 @@ using TelemetryStore = PartitionedCache<BSONObj,
 /**
  * Acquire a reference to the global telemetry store.
  */
-std::pair<TelemetryStore*, Lock::ResourceLock> getTelemetryStoreForRead(ServiceContext* serviceCtx);
+std::pair<TelemetryStore*, Lock::ResourceLock> getTelemetryStoreForRead(
+    const ServiceContext* serviceCtx);
 
-std::unique_ptr<TelemetryStore> resetTelemetryStore(ServiceContext* serviceCtx);
+std::unique_ptr<TelemetryStore> resetTelemetryStore(const ServiceContext* serviceCtx);
 
+bool isTelemetryEnabled(const ServiceContext* serviceCtx);
+
+/**
+ * Should we collect telemetry for a request? The decision is made based on the feature flag and
+ * telemetry parameters such as rate limiting.
+ *
+ * If the return value is a telemetry key in the form of BSONObj, this indicates the telemetry
+ * should be collected. Otherwise, telemetry should not be collected.
+ *
+ * Note that calling this affects internal state. It should be called once for each request for
+ * which telemetry may be collected.
+ */
+boost::optional<BSONObj> shouldCollectTelemetry(const AggregateCommandRequest& request,
+                                                const OperationContext* opCtx);
+
+boost::optional<BSONObj> shouldCollectTelemetry(const FindCommandRequest& request,
+                                                const NamespaceString& collection,
+                                                const OperationContext* opCtx);
+
+boost::optional<BSONObj> shouldCollectTelemetry(const OperationContext* opCtx,
+                                                const BSONObj& telemetryKey);
+
+/**
+ * Collect telemetry for the operation identified by `key`. The `isExec` flag should be set if it's
+ * the beginning of execution (first batch) of results and not set for subsequent getMore() calls.
+ */
+void collectTelemetry(const ServiceContext* serviceCtx,
+                      const BSONObj& key,
+                      const OpDebug& opDebug,
+                      bool isExec);
+
+}  // namespace telemetry
 }  // namespace mongo

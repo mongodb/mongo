@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
@@ -47,12 +48,13 @@ class PlanExplainerImpl final : public PlanExplainer {
 public:
     PlanExplainerImpl(PlanStage* root,
                       const PlanEnumeratorExplainInfo& explainInfo,
-                      Microseconds timeElapsedPlanning)
-        : PlanExplainer{explainInfo, timeElapsedPlanning}, _root{root} {}
+                      Microseconds timeElapsedPlanning,
+                      BSONObj telemetryKey)
+        : PlanExplainer{explainInfo, timeElapsedPlanning, telemetryKey}, _root{root} {}
     PlanExplainerImpl(PlanStage* root, const PlanEnumeratorExplainInfo& explainInfo)
         : PlanExplainer{explainInfo}, _root{root} {}
-    PlanExplainerImpl(PlanStage* root, Microseconds timeElapsedPlanning)
-        : PlanExplainer{timeElapsedPlanning}, _root{root} {}
+    PlanExplainerImpl(PlanStage* root, Microseconds timeElapsedPlanning, BSONObj telemetryKey)
+        : PlanExplainer{timeElapsedPlanning, telemetryKey}, _root{root} {}
     PlanExplainerImpl(PlanStage* root) : _root{root} {}
     const ExplainVersion& getVersion() const final;
     bool isMultiPlan() const final;

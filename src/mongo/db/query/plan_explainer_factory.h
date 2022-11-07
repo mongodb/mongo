@@ -40,7 +40,9 @@
 
 namespace mongo::plan_explainer_factory {
 std::unique_ptr<PlanExplainer> make(PlanStage* root);
-std::unique_ptr<PlanExplainer> make(PlanStage* root, Microseconds timeElapsedPlanning);
+std::unique_ptr<PlanExplainer> make(PlanStage* root,
+                                    Microseconds timeElapsedPlanning,
+                                    BSONObj telemetryKey);
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     const PlanEnumeratorExplainInfo& enumeratorInfo);
@@ -65,5 +67,6 @@ std::unique_ptr<PlanExplainer> make(
     bool isMultiPlan,
     bool isFromPlanCache,
     Microseconds timeElapsedPlanning,
+    BSONObj telemetryKey,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo);
 }  // namespace mongo::plan_explainer_factory

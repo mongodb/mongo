@@ -725,6 +725,7 @@ Status runAggregate(OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
     auto catalog = CollectionCatalog::get(opCtx);
+    boost::optional<BSONObj> telemetryKey;
 
     {
         // If we are in a transaction, check whether the parsed pipeline supports being in
@@ -1094,6 +1095,19 @@ Status runAggregate(OperationContext* opCtx,
         planExplainer.getSummaryStats(&stats);
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->debug().nreturned = stats.nReturned;
+
+        telemetryKey = telemetry::shouldCollectTelemetry(request, opCtx);
+        // Build the telemetry key and store it in the operation context
+        if (telemetryKey) {
+            // TODO SERVER-71315: should we store it in the CurOp instead? (or even PlanExplainer)
+            opCtx->storeQueryBSON(*telemetryKey);
+        }
+
+
+        if (telemetryKey) {
+            telemetry::collectTelemetry(
+                opCtx->getServiceContext(), *telemetryKey, curOp->debug(), true);
+        }
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.

@@ -55,6 +55,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/telemetry.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/service_context.h"
@@ -744,6 +745,15 @@ public:
             metricsCollector.incrementDocUnitsReturned(nss.ns(), docUnitsReturned);
             query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj(),
                                                          nss.tenantId());
+
+            auto telemetryKey =
+                telemetry::shouldCollectTelemetry(originalFC, collection.get()->ns(), opCtx);
+            if (telemetryKey) {
+                opCtx->storeQueryBSON(*telemetryKey);
+
+                telemetry::collectTelemetry(
+                    opCtx->getServiceContext(), *telemetryKey, CurOp::get(opCtx)->debug(), true);
+            }
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {

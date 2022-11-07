@@ -127,6 +127,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   isMultiPlan,
                                                   isCachedCandidate,
                                                   timeElapsedPlanning,
+                                                  opCtx->getTelemetryKey(),
                                                   _rootData.debugInfo);
 }
 

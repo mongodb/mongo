@@ -129,13 +129,13 @@ CandidatePlans CachedSolutionPlanner::plan(
         candidate.root.get(),
         &candidate.data,
         candidate.solution.get(),
-        {},                                   /* optimizedData */
-        {},                                   /* rejectedCandidates */
-        false,                                /* isMultiPlan */
-        true,                                 /* isFromPlanCache */
-        _opCtx->getElapsedQueryPlanningTime() /* metric stored in PlanExplainer via PlanExecutor
+        {},                                    /* optimizedData */
+        {},                                    /* rejectedCandidates */
+        false,                                 /* isMultiPlan */
+        true,                                  /* isFromPlanCache */
+        _opCtx->getElapsedQueryPlanningTime(), /* metric stored in PlanExplainer via PlanExecutor
                                                  construction*/
-        ,
+        _opCtx->getTelemetryKey(),
         candidate.data.debugInfo
             ? std::make_unique<plan_cache_debug_info::DebugInfoSBE>(*candidate.data.debugInfo)
             : nullptr);

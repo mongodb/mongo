@@ -50,6 +50,13 @@ public:
     RateLimiting(RequestCount samplingRate, Milliseconds timePeriod = Seconds{1});
 
     /*
+     * Getter for the sampling rate.
+     */
+    RequestCount getSamplingRate() {
+        return _samplingRate;
+    }
+
+    /*
      * A simple method for rate limiting. Returns false if we have reached the request limit for the
      * current time window; otherwise, returns true and adds the request to the count for the
      * current window. If we have passed the end of the previous window, the slate is wiped clean.

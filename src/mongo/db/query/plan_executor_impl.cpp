@@ -133,7 +133,8 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
-      _planExplainer(plan_explainer_factory::make(_root.get(), timeElapsedPlanning)),
+      _planExplainer(
+          plan_explainer_factory::make(_root.get(), timeElapsedPlanning, opCtx->getTelemetryKey())),
       _mustReturnOwnedBson(returnOwnedBson),
       _nss(std::move(nss)) {
     invariant(!_expCtx || _expCtx->opCtx == _opCtx);

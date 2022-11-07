@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/explain_options.h"
@@ -58,14 +59,22 @@ public:
     using PlanStatsDetails = std::pair<BSONObj, boost::optional<PlanSummaryStats>>;
 
     PlanExplainer() {}
-    PlanExplainer(const QuerySolution* solution, Microseconds timeElapsedPlanning)
+    PlanExplainer(const QuerySolution* solution,
+                  Microseconds timeElapsedPlanning,
+                  BSONObj telemetryKey)
         : _enumeratorExplainInfo{solution ? solution->_enumeratorExplainInfo
                                           : PlanEnumeratorExplainInfo{}},
-          _timeElapsedPlanning{timeElapsedPlanning} {}
-    PlanExplainer(Microseconds timeElapsedPlanning) : _timeElapsedPlanning{timeElapsedPlanning} {}
+          _timeElapsedPlanning{timeElapsedPlanning},
+          _telemetryKey{telemetryKey} {}
+    PlanExplainer(Microseconds timeElapsedPlanning, BSONObj telemetryKey)
+        : _timeElapsedPlanning{timeElapsedPlanning}, _telemetryKey{telemetryKey} {}
     PlanExplainer(const PlanEnumeratorExplainInfo& info) : _enumeratorExplainInfo{info} {}
-    PlanExplainer(const PlanEnumeratorExplainInfo& info, Microseconds timeElapsedPlanning)
-        : _enumeratorExplainInfo{info}, _timeElapsedPlanning{timeElapsedPlanning} {}
+    PlanExplainer(const PlanEnumeratorExplainInfo& info,
+                  Microseconds timeElapsedPlanning,
+                  BSONObj telemetryKey)
+        : _enumeratorExplainInfo{info},
+          _timeElapsedPlanning{timeElapsedPlanning},
+          _telemetryKey{telemetryKey} {}
 
     virtual ~PlanExplainer() = default;
 
@@ -144,9 +153,16 @@ public:
     void updateEnumeratorExplainInfo(const PlanEnumeratorExplainInfo& other) {
         _enumeratorExplainInfo.merge(other);
     }
+    Microseconds getTimeElapsedPlanning() const {
+        return _timeElapsedPlanning;
+    }
+    BSONObj getTelemetryKey() const {
+        return _telemetryKey;
+    }
 
 protected:
     PlanEnumeratorExplainInfo _enumeratorExplainInfo;
     Microseconds _timeElapsedPlanning{0};
+    BSONObj _telemetryKey;
 };
 }  // namespace mongo

@@ -51,8 +51,9 @@ public:
                      bool isMultiPlan,
                      bool isCachedPlan,
                      Microseconds timeElapsedPlanning,
+                     BSONObj telemetryKey,
                      std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo)
-        : PlanExplainer{solution, timeElapsedPlanning},
+        : PlanExplainer{solution, timeElapsedPlanning, telemetryKey},
           _root{root},
           _rootData{data},
           _solution{solution},

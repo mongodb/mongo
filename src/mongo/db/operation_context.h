@@ -416,6 +416,18 @@ public:
         // cache.
         return Microseconds{-1};
     }
+
+    BSONObj getTelemetryKey() const {
+        return _originalQueryBSON;
+    }
+
+    void storeQueryBSON(BSONObj originalBSON) {
+        if (_originalQueryBSON.isEmpty()) {
+            _originalQueryBSON = originalBSON.copy();
+        }
+    }
+
+
     /**
      * Sets the deadline for this operation to the given point in time.
      *
@@ -822,6 +834,7 @@ private:
 
     std::unique_ptr<Timer> _planningTimer = nullptr;
     Microseconds _timeElapsedPlanning;
+    BSONObj _originalQueryBSON;
     bool _writesAreReplicated = true;
     bool _shouldIncrementLatencyStats = true;
     bool _inMultiDocumentTransaction = false;

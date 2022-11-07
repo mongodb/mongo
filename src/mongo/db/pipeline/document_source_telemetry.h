@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+using namespace telemetry;
+
 class DocumentSourceTelemetry final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$telemetry"_sd;
@@ -143,13 +145,7 @@ private:
          */
         void waitForEmpty() {
             stdx::unique_lock lk{_mutex};
-            _waitForEmpty.wait(lk, [&] {
-                try {
-                    return !_queue.tryPop();
-                } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
-                    return true;
-                }
-            });
+            _waitForEmpty.wait(lk, [&] { return _queue.getStats().queueDepth == 0; });
         }
 
     private:
