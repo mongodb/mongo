@@ -228,7 +228,7 @@ public:
      */
     virtual Status initFromExisting(OperationContext* opCtx,
                                     const std::shared_ptr<Collection>& collection,
-                                    Timestamp readTimestamp) = 0;
+                                    boost::optional<Timestamp> readTimestamp) = 0;
 
     virtual bool isCommitted() const {
         return true;

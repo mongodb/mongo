@@ -73,8 +73,11 @@ const OperationContext::Decoration<std::shared_ptr<const CollectionCatalog>> sta
 /**
  * Returns true if the collection is compatible with the read timestamp.
  */
-bool isCollectionCompatible(std::shared_ptr<Collection> coll, Timestamp readTimestamp) {
-    if (!coll) {
+bool isExistingCollectionCompatible(std::shared_ptr<Collection> coll,
+                                    boost::optional<Timestamp> readTimestamp) {
+    // If no read timestamp is provided, no existing collection is compatible since we must
+    // instantiate a new collection instance.
+    if (!coll || !readTimestamp) {
         return false;
     }
 
@@ -764,18 +767,12 @@ Status CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseNam
 
 CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
                                                 const NamespaceString& nss,
-                                                Timestamp readTimestamp) const {
+                                                boost::optional<Timestamp> readTimestamp) const {
     if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
         return CollectionPtr();
     }
 
-    // Check if the storage transaction already has this collection instantiated.
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto lookupResult = uncommittedCatalogUpdates.lookupCollection(opCtx, nss);
-    if (lookupResult.found && !lookupResult.newColl) {
-        invariant(isCollectionCompatible(lookupResult.collection, readTimestamp));
-        return CollectionPtr(lookupResult.collection.get(), CollectionPtr::NoYieldTag{});
-    }
 
     // Try to find a catalog entry matching 'readTimestamp'.
     auto catalogEntry = _fetchPITCatalogEntry(opCtx, nss, readTimestamp);
@@ -788,7 +785,7 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
     auto latestCollection = _lookupCollectionByUUID(*catalogEntry->metadata->options.uuid);
 
     // Return the in-memory Collection instance if it is compatible with the read timestamp.
-    if (isCollectionCompatible(latestCollection, readTimestamp)) {
+    if (isExistingCollectionCompatible(latestCollection, readTimestamp)) {
         uncommittedCatalogUpdates.openCollection(opCtx, latestCollection);
         return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
     }
@@ -813,7 +810,9 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
 }
 
 boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
-    OperationContext* opCtx, const NamespaceString& nss, const Timestamp& readTimestamp) const {
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<Timestamp> readTimestamp) const {
     auto [catalogId, result] = lookupCatalogIdByNSS(nss, readTimestamp);
     if (result == CatalogIdLookup::NamespaceExistence::kNotExists) {
         return boost::none;
@@ -837,7 +836,7 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
 std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
     OperationContext* opCtx,
     const std::shared_ptr<Collection>& latestCollection,
-    const Timestamp& readTimestamp,
+    boost::optional<Timestamp> readTimestamp,
     const DurableCatalogEntry& catalogEntry) const {
     // Check if the collection is drop pending, not expired, and compatible with the read timestamp.
     std::shared_ptr<Collection> dropPendingColl = [&]() -> std::shared_ptr<Collection> {
@@ -848,7 +847,7 @@ std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
         return dropPendingIt->second.lock();
     }();
 
-    if (isCollectionCompatible(dropPendingColl, readTimestamp)) {
+    if (isExistingCollectionCompatible(dropPendingColl, readTimestamp)) {
         return dropPendingColl;
     }
 
@@ -885,7 +884,7 @@ std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
 
 std::shared_ptr<Collection> CollectionCatalog::_createNewPITCollection(
     OperationContext* opCtx,
-    const Timestamp& readTimestamp,
+    boost::optional<Timestamp> readTimestamp,
     const DurableCatalogEntry& catalogEntry) const {
     // The ident is expired, but it still may not have been dropped by the reaper. Try to mark it as
     // in use.
