@@ -63,15 +63,15 @@ void removeDatabaseMetadataFromConfig(OperationContext* opCtx,
         Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName);
     });
 
-    // Remove the database entry from the metadata. Making the dbVersion uuid part of the query
+    // Remove the database entry from the metadata. Making the dbVersion timestamp part of the query
     // ensures idempotency.
     const Status status = catalogClient->removeConfigDocuments(
         opCtx,
         NamespaceString::kConfigDatabasesNamespace,
         BSON(DatabaseType::kNameFieldName
              << dbName.toString()
-             << DatabaseType::kVersionFieldName + "." + DatabaseVersion::kUuidFieldName
-             << dbVersion.getUuid()),
+             << DatabaseType::kVersionFieldName + "." + DatabaseVersion::kTimestampFieldName
+             << dbVersion.getTimestamp()),
         ShardingCatalogClient::kMajorityWriteConcern);
     uassertStatusOKWithContext(status,
                                str::stream()
