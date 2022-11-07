@@ -556,6 +556,8 @@ class _StepdownThread(threading.Thread):
             self.logger.info(
                 "Successfully stepped up the secondary on port %d of replica set '%s'.",
                 new_primary.port, rs_fixture.replset_name)
+            retry_time_secs = rs_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
+            retry_start_time = time.time()
             while True:
                 try:
                     client = self._create_client(old_primary)
@@ -564,6 +566,11 @@ class _StepdownThread(threading.Thread):
                         break
                 except pymongo.errors.AutoReconnect:
                     pass
+                if time.time() - retry_start_time > retry_time_secs:
+                    raise errors.ServerFailure(
+                        "The old primary on port {} of replica set {} did not step down in"
+                        " {} seconds.".format(client.port, rs_fixture.replset_name,
+                                              retry_time_secs))
                 self.logger.info("Waiting for primary on port %d of replica set '%s' to step down.",
                                  old_primary.port, rs_fixture.replset_name)
                 time.sleep(0.2)  # Wait a little bit before trying again.
