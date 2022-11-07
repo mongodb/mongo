@@ -1293,6 +1293,9 @@ public:
                 if (update.getArrayFilters()) {
                     CmdUpdate::updateMetrics.incrementExecutedWithArrayFilters();
                 }
+                if (update.getMulti()) {
+                    updateManyCount.increment(1);
+                }
             }
 
             return updateReply;
@@ -1427,6 +1430,13 @@ public:
                           request().getDeletes().size(),
                           std::move(reply),
                           &deleteReply);
+
+            // Collect metrics.
+            for (auto&& deletes : request().getDeletes()) {
+                if (deletes.getMulti()) {
+                    deleteManyCount.increment(1);
+                }
+            }
 
             return deleteReply;
         } catch (const DBException& ex) {

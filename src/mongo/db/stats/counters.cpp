@@ -339,4 +339,11 @@ AggStageCounters aggStageCounters;
 DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 OperatorCountersAggExpressions operatorCountersAggExpressions;
 OperatorCountersMatchExpressions operatorCountersMatchExpressions;
+
+Counter64 updateManyCount;
+ServerStatusMetricField<Counter64> displayUpdateManyCount("query.updateManyCount",
+                                                          &updateManyCount);
+Counter64 deleteManyCount;
+ServerStatusMetricField<Counter64> displayeleteManyCount("query.deleteManyCount", &deleteManyCount);
+
 }  // namespace mongo

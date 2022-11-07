@@ -43,6 +43,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
@@ -386,6 +387,10 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
 
     const auto& updateOp = itemRef.getUpdate();
 
+    if (updateOp.getMulti()) {
+        updateManyCount.increment(1);
+    }
+
     // If the collection is not sharded, forward the update to the primary shard.
     if (!_cm.isSharded()) {
         // TODO (SERVER-51070): Remove the boost::none when the config server can support
@@ -501,6 +506,10 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
                                                                boost::none,  // explain
                                                                itemRef.getLet(),
                                                                itemRef.getLegacyRuntimeConstants());
+
+    if (deleteOp.getMulti()) {
+        deleteManyCount.increment(1);
+    }
 
     BSONObj deleteQuery = deleteOp.getQ();
     BSONObj shardKey;
