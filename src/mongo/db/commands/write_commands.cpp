@@ -74,6 +74,7 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
@@ -1159,8 +1160,20 @@ public:
                                                stdx::get_if<BSONObj>(&insertResult.candidate)) {
                                     // Resort to Query-Based reopening approach.
                                     DBDirectClient client{opCtx};
-                                    suitableBucket = client.findOne(bucketsColl->ns(), *filter);
+
+                                    // Ensure we have a index on meta and time for the time-series
+                                    // collection before performing the query. Without the index we
+                                    // will perform a full collection scan which could cause us to
+                                    // take a performance hit.
+                                    if (timeseries::collectionHasIndexSupportingReopeningQuery(
+                                            opCtx,
+                                            bucketsColl->getIndexCatalog(),
+                                            timeSeriesOptions)) {
+                                        // Run a query to find a suitable bucket to reopen.
+                                        suitableBucket = client.findOne(bucketsColl->ns(), *filter);
+                                    }
                                 }
+
 
                                 boost::optional<BucketCatalog::BucketToReopen> bucketToReopen =
                                     boost::none;

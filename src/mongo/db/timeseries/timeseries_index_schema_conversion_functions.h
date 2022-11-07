@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 
 /**
@@ -97,5 +98,13 @@ bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
  * or it can be {} which means no hint is given.
  */
 bool isHintIndexKey(const BSONObj& obj);
+
+/**
+ * Returns true if the IndexCatalog contains an index for a time-series collection which we can use
+ * for query based reopening.
+ */
+bool collectionHasIndexSupportingReopeningQuery(OperationContext* opCtx,
+                                                const IndexCatalog* indexCatalog,
+                                                const TimeseriesOptions& tsOptions);
 
 }  // namespace mongo::timeseries

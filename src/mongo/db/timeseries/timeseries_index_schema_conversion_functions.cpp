@@ -30,6 +30,8 @@
 
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
+#include "mongo/db/catalog/index_catalog_impl.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -501,6 +503,43 @@ bool isHintIndexKey(const BSONObj& obj) {
         return false;
 
     return true;
+}
+
+bool collectionHasIndexSupportingReopeningQuery(OperationContext* opCtx,
+                                                const IndexCatalog* indexCatalog,
+                                                const TimeseriesOptions& tsOptions) {
+    if (!tsOptions.getMetaField().has_value()) {
+        return false;
+    }
+
+    auto indexIt = indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    const std::string controlTimeField =
+        timeseries::kControlMinFieldNamePrefix.toString() + tsOptions.getTimeField();
+    while (indexIt->more()) {
+        auto indexEntry = indexIt->next();
+        auto indexDesc = indexEntry->descriptor();
+
+        // We cannot use a partial index when querying buckets to reopen.
+        if (indexDesc->isPartial()) {
+            continue;
+        }
+
+        auto indexKey = indexDesc->keyPattern();
+        int index = 0;
+        for (auto& elem : indexKey) {
+            // The index must include the meta and time field (in that order), but may have
+            // additional fields included.
+            if (index == 0 && elem.fieldName() != kBucketMetaFieldName) {
+                break;
+            } else if (index == 1 && elem.fieldName() == controlTimeField) {
+                return true;
+            } else if (index > 1) {
+                break;
+            }
+            index++;
+        }
+    }
+    return false;
 }
 
 }  // namespace mongo::timeseries

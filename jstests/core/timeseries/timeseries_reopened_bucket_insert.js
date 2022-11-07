@@ -1,6 +1,7 @@
 /**
  * Inserts time-series measurements into closed buckets identified by query-based reopening method.
- * * @tags: [
+ *
+ * @tags: [
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
  *   # writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
@@ -25,6 +26,7 @@ const coll = db.timeseries_reopened_bucket_insert;
 const bucketsColl = db["system.buckets." + coll.getName()];
 const timeField = "time";
 const metaField = "mm";
+const metaTimeIndexName = [[metaField], "1", [timeField], "1"].join("_");
 
 const resetCollection = function() {
     coll.drop();
@@ -56,11 +58,11 @@ const expectNoBucketReopening = function() {
 
     const measurement1 = {
         [timeField]: ISODate("2022-08-26T19:17:00Z"),
-        [metaField]: "bucket1",
+        [metaField]: "Bucket1",
     };
     const measurement2 = {
         [timeField]: ISODate("2022-08-26T19:18:00Z"),
-        [metaField]: "bucket1",
+        [metaField]: "Bucket1",
     };
 
     // When there are no open buckets available and none to reopen, we expect to create a new one.
@@ -77,15 +79,15 @@ const expectToReopenBuckets = function() {
 
     const measurement1 = {
         [timeField]: ISODate("2022-08-26T19:19:00Z"),
-        [metaField]: "reopenedBucket1",
+        [metaField]: "ReopenedBucket1",
     };
     const measurement2 = {
         [timeField]: ISODate("2022-08-26T19:19:00Z"),
-        [metaField]: "reopenedBucket1",
+        [metaField]: "ReopenedBucket1",
     };
     const measurement3 = {
         [timeField]: ISODate("2022-08-26T19:19:00Z"),
-        [metaField]: "reopenedBucket2",
+        [metaField]: "ReopenedBucket2",
     };
 
     const bucketDoc = {
@@ -102,7 +104,7 @@ const expectToReopenBuckets = function() {
             },
             "closed": false
         },
-        "meta": "reopenedBucket1",
+        "meta": "ReopenedBucket1",
         "data": {
             "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
             "time": {"0": ISODate("2022-08-26T19:19:30Z")}
@@ -121,7 +123,7 @@ const expectToReopenBuckets = function() {
                 "time": ISODate("2022-08-26T19:19:30Z")
             },
         },
-        "meta": "reopenedBucket2",
+        "meta": "ReopenedBucket2",
         "data": {
             "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
             "time": {"0": ISODate("2022-08-26T19:19:30Z")}
@@ -192,15 +194,15 @@ const expectToReopenArchivedBuckets = function() {
 
     const measurement1 = {
         [timeField]: ISODate("2022-08-26T19:19:00Z"),
-        [metaField]: "meta1",
+        [metaField]: "Meta1",
     };
     const measurement2 = {
         [timeField]: ISODate("2022-08-26T21:19:00Z"),
-        [metaField]: "meta1",
+        [metaField]: "Meta1",
     };
     const measurement3 = {
         [timeField]: ISODate("2022-08-26T19:20:00Z"),
-        [metaField]: "meta1",
+        [metaField]: "Meta1",
     };
 
     checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
@@ -234,7 +236,7 @@ const failToReopenNonSuitableBuckets = function() {
     };
     const measurement5 = {
         [timeField]: ISODate("2022-08-26T19:19:00Z"),
-        [metaField]: "meta",
+        [metaField]: "Meta",
     };
 
     const closedBucketDoc = {
@@ -331,7 +333,7 @@ const failToReopenNonSuitableBuckets = function() {
             },
             "closed": false
         },
-        "meta": "metaMismatch",
+        "meta": "MetaMismatch",
         "data": {
             "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
             "time": {"0": ISODate("2022-08-26T19:19:30Z")}
@@ -360,5 +362,264 @@ const failToReopenNonSuitableBuckets = function() {
     checkIfBucketReopened(measurement5, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     jsTestLog("Exiting failToReopenNonSuitableBuckets.");
+}();
+
+const failToReopenBucketWithNoMetaTimeIndex = function() {
+    jsTestLog("Entering failToReopenBucketWithNoMetaTimeIndex...");
+    resetCollection();
+
+    const measurement1 = {
+        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [metaField]: "Suitable1",
+    };
+    const measurement2 = {
+        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [metaField]: "Suitable2",
+    };
+    const measurement3 = {
+        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [metaField]: "Suitable3",
+    };
+
+    const closedBucketDoc1 = {
+        "_id": ObjectId("63091c2c050b7495eaef4581"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "meta": "Suitable1",
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
+    const closedBucketDoc2 = {
+        "_id": ObjectId("63091c2c050b7495eaef4582"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "meta": "Suitable2",
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
+    const closedBucketDoc3 = {
+        "_id": ObjectId("63091c2c050b7495eaef4583"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "meta": "Suitable3",
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
+
+    let metaTimeIndex = coll.getIndexes().filter(function(index) {
+        return index.name == metaTimeIndexName;
+    });
+    assert(metaTimeIndex.length == 1);
+
+    assert.commandWorked(bucketsColl.insert(closedBucketDoc1));
+    // We expect to reopen the suitable bucket when inserting the first measurement.
+    checkIfBucketReopened(measurement1, /* willCreateBucket */ false, /* willReopenBucket */ true);
+
+    // Drop the meta time index.
+    assert.commandWorked(coll.dropIndexes([metaTimeIndexName]));
+    metaTimeIndex = coll.getIndexes().filter(function(index) {
+        return index.name == metaTimeIndexName;
+    });
+    assert(metaTimeIndex.length == 0);
+
+    assert.commandWorked(bucketsColl.insert(closedBucketDoc2));
+    // We have a suitable bucket for the second measurement but it is only visible via query-based
+    // reopening which is not supported without the meta and time index.
+    checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
+
+    // Create a meta and time index for query-based reopening.
+    assert.commandWorked(
+        coll.createIndex({[metaField]: 1, [timeField]: 1}, {name: "generic_meta_time_index_name"}));
+
+    assert.commandWorked(bucketsColl.insert(closedBucketDoc3));
+    // Creating an index on meta and time will re-enable us to perform query-based reopening to
+    // insert measurement 3 into a suitable bucket.
+    checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
+
+    jsTestLog("Exiting failToReopenBucketWithNoMetaTimeIndex.");
+}();
+
+const reopenBucketsWhenSuitableIndexExists = function() {
+    jsTestLog("Entering reopenBucketsWhenSuitableIndexExists...");
+    resetCollection();
+
+    const measurement1 = {
+        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [metaField]: "Suitable1",
+    };
+    const measurement2 = {
+        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [metaField]: "Suitable2",
+    };
+    const measurement3 = {
+        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [metaField]: "Suitable3",
+    };
+    const measurement4 = {
+        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [metaField]: "Suitable4",
+    };
+
+    const closedBucketDoc1 = {
+        "_id": ObjectId("63091c2c050b7495eaef4584"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "meta": "Suitable1",
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
+    const closedBucketDoc2 = {
+        "_id": ObjectId("63091c2c050b7495eaef4585"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "meta": "Suitable2",
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
+    const closedBucketDoc3 = {
+        "_id": ObjectId("63091c2c050b7495eaef4586"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "meta": "Suitable3",
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
+    const closedBucketDoc4 = {
+        "_id": ObjectId("63091c2c050b7495eaef4587"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "meta": "Suitable4",
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
+
+    // Drop the meta time index.
+    assert.commandWorked(coll.dropIndexes([metaTimeIndexName]));
+    let metaTimeIndex = coll.getIndexes().filter(function(index) {
+        return index.name == metaTimeIndexName;
+    });
+    assert(metaTimeIndex.length == 0);
+
+    // Create a partial index on meta and time.
+    assert.commandWorked(
+        coll.createIndex({[metaField]: 1, [timeField]: 1},
+                         {name: "partialMetaTimeIndex", partialFilterExpression: {b: {$lt: 12}}}));
+
+    assert.commandWorked(bucketsColl.insert(closedBucketDoc1));
+    // We expect no buckets to be reopened because a partial index on meta and time cannot be used
+    // for query based reopening.
+    checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
+
+    // Create an index on an arbitrary field.
+    assert.commandWorked(coll.createIndex({"a": 1}, {name: "arbitraryIndex"}));
+
+    assert.commandWorked(bucketsColl.insert(closedBucketDoc2));
+    // We expect no buckets to be reopened because the index created cannot be used for query-based
+    // reopening.
+    checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
+
+    // Create an index on an arbitrary field in addition to the meta and time fields.
+    assert.commandWorked(
+        coll.createIndex({"a": 1, [metaField]: 1, [timeField]: 1}, {name: "nonSuitableIndex"}));
+
+    assert.commandWorked(bucketsColl.insert(closedBucketDoc3));
+    // We expect no buckets to be reopened because the index created cannot be used for
+    // query-based reopening.
+    checkIfBucketReopened(measurement3, /* willCreateBucket */ true, /* willReopenBucket */ false);
+
+    // Create a meta and time index with an additional key on another arbitrary, data field.
+    assert.commandWorked(
+        coll.createIndex({[metaField]: 1, [timeField]: 1, "a": 1}, {name: metaTimeIndexName}));
+
+    assert.commandWorked(bucketsColl.insert(closedBucketDoc4));
+    // We expect to be able to reopen the suitable bucket when inserting the measurement because as
+    // long as an index covers the meta and time field, it can have additional keys.
+    checkIfBucketReopened(measurement4, /* willCreateBucket */ false, /* willReopenBucket */ true);
+
+    jsTestLog("Exiting reopenBucketsWhenSuitableIndexExists.");
 }();
 })();
