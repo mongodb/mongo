@@ -65,6 +65,10 @@ void generateServerParameters(BSONObjBuilder* out) {
     out->appendNumber("internalQueryMaxAddToSetBytes", internalQueryMaxAddToSetBytes.load());
     out->appendNumber("internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
                       internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load());
+    auto queryControl = ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
+        "internalQueryFrameworkControl");
+    out->append("internalQueryFrameworkControl",
+                QueryFrameworkControl_serializer(queryControl->_data.get()));
 }
 
 bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out) {
