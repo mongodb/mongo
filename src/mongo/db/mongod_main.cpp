@@ -740,7 +740,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
             Grid::get(startupOpCtx.get())->setShardingInitialized();
         } else if (replSettings.usingReplSets()) {  // standalone replica set
-            auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>();
+            // The keys client must use local read concern if the storage engine can't support
+            // majority read concern.
+            auto keysClientMustUseLocalReads =
+                !serviceContext->getStorageEngine()->supportsReadConcernMajority();
+            auto keysCollectionClient =
+                std::make_unique<KeysCollectionClientDirect>(keysClientMustUseLocalReads);
             auto keyManager = std::make_shared<KeysCollectionManager>(
                 KeysCollectionManager::kKeyManagerPurposeString,
                 std::move(keysCollectionClient),

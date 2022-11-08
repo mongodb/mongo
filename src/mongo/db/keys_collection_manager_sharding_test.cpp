@@ -394,7 +394,10 @@ protected:
         ConfigServerTestFixture::setUp();
 
         _keyManager = std::make_unique<KeysCollectionManager>(
-            "dummy", std::make_unique<KeysCollectionClientDirect>(), Seconds(1));
+            "dummy",
+            std::make_unique<KeysCollectionClientDirect>(
+                !getServiceContext()->getStorageEngine()->supportsReadConcernMajority()),
+            Seconds(1));
     }
 
     void tearDown() override {

@@ -72,15 +72,17 @@ bool isRetriableError(ErrorCodes::Error code, Shard::RetryPolicy options) {
 
 }  // namespace
 
-KeysCollectionClientDirect::KeysCollectionClientDirect() : _rsLocalClient() {}
+KeysCollectionClientDirect::KeysCollectionClientDirect(bool mustUseLocalReads)
+    : _rsLocalClient(), _mustUseLocalReads(mustUseLocalReads) {}
 
 StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getNewInternalKeys(
     OperationContext* opCtx,
     StringData purpose,
     const LogicalTime& newerThanThis,
-    bool useMajority) {
+    bool tryUseMajority) {
+
     return _getNewKeys<KeysCollectionDocument>(
-        opCtx, NamespaceString::kKeysCollectionNamespace, purpose, newerThanThis, useMajority);
+        opCtx, NamespaceString::kKeysCollectionNamespace, purpose, newerThanThis, tryUseMajority);
 }
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
@@ -93,7 +95,7 @@ KeysCollectionClientDirect::getAllExternalKeys(OperationContext* opCtx, StringDa
         // It is safe to read external keys with local read concern because they are only used to
         // validate incoming signatures, not to sign them. If a cached key is rolled back, it will
         // eventually be reaped from the cache.
-        false /* useMajority */);
+        false /* tryUseMajority */);
 }
 
 template <typename KeyDocumentType>
@@ -102,13 +104,14 @@ StatusWith<std::vector<KeyDocumentType>> KeysCollectionClientDirect::_getNewKeys
     const NamespaceString& nss,
     StringData purpose,
     const LogicalTime& newerThanThis,
-    bool useMajority) {
+    bool tryUseMajority) {
     BSONObjBuilder queryBuilder;
     queryBuilder.append("purpose", purpose);
     queryBuilder.append("expiresAt", BSON("$gt" << newerThanThis.asTimestamp()));
 
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto readConcern = storageEngine->supportsReadConcernMajority() && useMajority
+    // Use majority read concern if the caller wants that and the client supports it. Otherwise fall
+    // back to local read concern.
+    auto readConcern = (tryUseMajority && !_mustUseLocalReads)
         ? repl::ReadConcernLevel::kMajorityReadConcern
         : repl::ReadConcernLevel::kLocalReadConcern;
 

@@ -41,6 +41,8 @@
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/keys_collection_client_direct.h"
+#include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
@@ -566,6 +568,18 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
     auto shardRegistry = std::make_unique<ShardRegistry>(
         service, std::move(shardFactory), configCS, std::move(shardRemovalHooks));
 
+    auto initKeysClient =
+        [service](ShardingCatalogClient* catalogClient) -> std::unique_ptr<KeysCollectionClient> {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // The direct keys client must use local read concern if the storage engine can't
+            // support majority read concern.
+            bool keysClientMustUseLocalReads =
+                !service->getStorageEngine()->supportsReadConcernMajority();
+            return std::make_unique<KeysCollectionClientDirect>(keysClientMustUseLocalReads);
+        }
+        return std::make_unique<KeysCollectionClientSharded>(catalogClient);
+    };
+
     uassertStatusOK(
         initializeGlobalShardingState(opCtx,
                                       std::move(catalogCache),
@@ -573,7 +587,8 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
                                       [service] { return makeEgressHooksList(service); },
                                       // We only need one task executor here because sharding task
                                       // executors aren't used for user queries in mongod.
-                                      1));
+                                      1,
+                                      initKeysClient));
 
     auto const replCoord = repl::ReplicationCoordinator::get(service);
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&

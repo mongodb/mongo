@@ -66,7 +66,6 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext
     return _refreshInternalKeys(opCtx);
 }
 
-
 StatusWith<KeysCollectionDocument> KeysCollectionCache::_refreshInternalKeys(
     OperationContext* opCtx) {
     LogicalTime newerThanThis;
@@ -82,7 +81,8 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::_refreshInternalKeys(
         originalSize = _internalKeysCache.size();
     }
 
-    auto refreshStatus = _client->getNewInternalKeys(opCtx, _purpose, newerThanThis, true);
+    auto refreshStatus =
+        _client->getNewInternalKeys(opCtx, _purpose, newerThanThis, true /* tryUseMajority */);
 
     if (!refreshStatus.isOK()) {
         return refreshStatus.getStatus();
@@ -207,8 +207,9 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::getInternalKey(
 }
 
 void KeysCollectionCache::resetCache() {
-    // keys that read with non majority readConcern level can be rolled back.
-    if (!_client->supportsMajorityReads()) {
+    // Refreshes try to use majority read concern, but if the client can't support that then any
+    // cached keys may have been rolled back and should be cleared.
+    if (_client->mustUseLocalReads()) {
         stdx::lock_guard<Latch> lk(_cacheMutex);
         _internalKeysCache.clear();
         _externalKeysCache.clear();

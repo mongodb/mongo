@@ -164,11 +164,14 @@ std::unique_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
     return std::make_unique<executor::ShardingTaskExecutor>(std::move(executor));
 }
 
-Status initializeGlobalShardingState(OperationContext* opCtx,
-                                     std::unique_ptr<CatalogCache> catalogCache,
-                                     std::unique_ptr<ShardRegistry> shardRegistry,
-                                     rpc::ShardingEgressMetadataHookBuilder hookBuilder,
-                                     boost::optional<size_t> taskExecutorPoolSize) {
+Status initializeGlobalShardingState(
+    OperationContext* opCtx,
+    std::unique_ptr<CatalogCache> catalogCache,
+    std::unique_ptr<ShardRegistry> shardRegistry,
+    rpc::ShardingEgressMetadataHookBuilder hookBuilder,
+    boost::optional<size_t> taskExecutorPoolSize,
+    std::function<std::unique_ptr<KeysCollectionClient>(ShardingCatalogClient*)> initKeysClient) {
+
     ConnectionPool::Options connPoolOptions;
     std::shared_ptr<ShardRegistry> srsp(std::move(shardRegistry));
     connPoolOptions.controllerFactory = [srwp = std::weak_ptr(srsp)] {
@@ -199,8 +202,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     // The shard registry must be started once the grid is initialized
     grid->shardRegistry()->startupPeriodicReloader(opCtx);
 
-    auto keysCollectionClient =
-        std::make_unique<KeysCollectionClientSharded>(grid->catalogClient());
+    auto keysCollectionClient = initKeysClient(grid->catalogClient());
     auto keyManager =
         std::make_shared<KeysCollectionManager>(KeysCollectionManager::kKeyManagerPurposeString,
                                                 std::move(keysCollectionClient),

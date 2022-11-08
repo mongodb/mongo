@@ -59,7 +59,8 @@ protected:
         _catalogClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
 
-        _directClient = std::make_unique<KeysCollectionClientDirect>();
+        _directClient = std::make_unique<KeysCollectionClientDirect>(
+            !getServiceContext()->getStorageEngine()->supportsReadConcernMajority());
     }
 
     KeysCollectionClient* catalogClient() const {
@@ -686,6 +687,51 @@ TEST_F(CacheTest, RefreshHandlesKeysReceivingTTLValue) {
         ASSERT(key.getTTLExpiresAt());
         ASSERT_EQ(*origKey1.getTTLExpiresAt(), *key.getTTLExpiresAt());
     }
+}
+
+TEST_F(CacheTest, ResetCacheShouldNotClearKeysIfMajorityReadsAreSupported) {
+    auto directClient = std::make_unique<KeysCollectionClientDirect>(false /* mustUseLocalReads */);
+    KeysCollectionCache cache("test", directClient.get());
+
+    KeysCollectionDocument origKey0(1);
+    origKey0.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON());
+
+    ASSERT_OK(cache.refresh(operationContext()));
+
+    auto swInternalKey = cache.getInternalKey(LogicalTime(Timestamp(1, 0)));
+    ASSERT_OK(swInternalKey.getStatus());
+    ASSERT_EQ(1, swInternalKey.getValue().getKeyId());
+
+    // Resetting the cache shouldn't remove the key since the client supports majority reads.
+    cache.resetCache();
+    swInternalKey = cache.getInternalKey(LogicalTime(Timestamp(1, 0)));
+    ASSERT_OK(swInternalKey.getStatus());
+    ASSERT_EQ(1, swInternalKey.getValue().getKeyId());
+}
+
+TEST_F(CacheTest, ResetCacheShouldClearKeysIfMajorityReadsAreNotSupported) {
+    auto directClient = std::make_unique<KeysCollectionClientDirect>(true /* mustUseLocalReads */);
+    KeysCollectionCache cache("test", directClient.get());
+
+    KeysCollectionDocument origKey0(1);
+    origKey0.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON());
+
+    ASSERT_OK(cache.refresh(operationContext()));
+
+    auto swInternalKey = cache.getInternalKey(LogicalTime(Timestamp(1, 0)));
+    ASSERT_OK(swInternalKey.getStatus());
+    ASSERT_EQ(1, swInternalKey.getValue().getKeyId());
+
+    // Resetting the cache should remove the key since the client does not support majority reads.
+    cache.resetCache();
+    swInternalKey = cache.getInternalKey(LogicalTime(Timestamp(1, 0)));
+    ASSERT_EQ(ErrorCodes::KeyNotFound, swInternalKey);
 }
 
 }  // namespace

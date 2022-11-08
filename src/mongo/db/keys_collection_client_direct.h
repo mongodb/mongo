@@ -43,7 +43,8 @@ class BSONObj;
 
 class KeysCollectionClientDirect : public KeysCollectionClient {
 public:
-    KeysCollectionClientDirect();
+    KeysCollectionClientDirect(bool mustUseLocalReads);
+
     /**
      * Returns keys in admin.system.keys that match the given purpose and have an expiresAt value
      * greater than newerThanThis. Uses readConcern level majority if possible.
@@ -52,7 +53,7 @@ public:
         OperationContext* opCtx,
         StringData purpose,
         const LogicalTime& newerThanThis,
-        bool useMajority) override;
+        bool tryUseMajority) override;
 
     /**
      * Returns all keys in config.external_validation_keys that match the given purpose.
@@ -66,11 +67,11 @@ public:
     Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) override;
 
     /**
-     * Returns false if getNewKeys uses readConcern level:local, so the documents returned can be
-     * rolled back.
+     * Returns true if getNewKeys always uses readConcern level:local, so the documents returned can
+     * be rolled back.
      */
-    bool supportsMajorityReads() const final {
-        return false;
+    bool mustUseLocalReads() const final {
+        return _mustUseLocalReads;
     }
 
 private:
@@ -83,7 +84,7 @@ private:
                                                          const NamespaceString& nss,
                                                          StringData purpose,
                                                          const LogicalTime& newerThanThis,
-                                                         bool useMajority);
+                                                         bool tryUseMajority);
 
     StatusWith<Shard::QueryResponse> _query(OperationContext* opCtx,
                                             const ReadPreferenceSetting& readPref,
@@ -99,5 +100,6 @@ private:
                    const WriteConcernOptions& writeConcern);
 
     RSLocalClient _rsLocalClient;
+    bool _mustUseLocalReads{false};
 };
 }  // namespace mongo

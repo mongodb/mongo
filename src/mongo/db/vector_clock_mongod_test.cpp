@@ -58,7 +58,8 @@ protected:
     void setUp() override {
         ShardingMongodTestFixture::setUp();
 
-        auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>();
+        auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>(
+            !getServiceContext()->getStorageEngine()->supportsReadConcernMajority());
 
         VectorClockMutable::get(getServiceContext())
             ->tickClusterTimeTo(LogicalTime(Timestamp(1, 0)));

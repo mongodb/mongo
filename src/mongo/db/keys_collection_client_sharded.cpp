@@ -43,7 +43,7 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientSharded::get
     OperationContext* opCtx,
     StringData purpose,
     const LogicalTime& newerThanThis,
-    bool useMajority) {
+    bool tryUseMajority) {
 
     return _catalogClient->getNewKeys(
         opCtx, purpose, newerThanThis, repl::ReadConcernLevel::kMajorityReadConcern);
