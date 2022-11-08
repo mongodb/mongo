@@ -172,12 +172,17 @@ BSONObj ShardServerProcessInterface::preparePipelineAndExplain(
 
 std::unique_ptr<ShardFilterer> ShardServerProcessInterface::getShardFilterer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-    auto collectionFilter =
-        CollectionShardingState::get(expCtx->opCtx, expCtx->ns)
-            ->getOwnershipFilter(
-                expCtx->opCtx,
-                CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
-    return std::make_unique<ShardFiltererImpl>(std::move(collectionFilter));
+    if (OperationShardingState::isOperationVersioned(expCtx->opCtx)) {
+        // We can only rely on the ownership filter if the operation is coming from the router
+        // (i.e. it is versioned).
+        auto collectionFilter =
+            CollectionShardingState::get(expCtx->opCtx, expCtx->ns)
+                ->getOwnershipFilter(
+                    expCtx->opCtx,
+                    CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
+        return std::make_unique<ShardFiltererImpl>(std::move(collectionFilter));
+    }
+    return nullptr;
 }
 
 void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
