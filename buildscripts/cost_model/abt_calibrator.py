@@ -29,8 +29,8 @@
 
 from __future__ import annotations
 import pandas as pd
-import statsmodels.api as sm
 from sklearn.linear_model import LinearRegression
+import statsmodels.api as sm
 from config import AbtCalibratorConfig, AbtNodeCalibrationConfig
 from database_instance import DatabaseInstance
 from cost_estimator import estimate

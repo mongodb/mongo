@@ -36,7 +36,7 @@ import pymongo
 from pymongo import IndexModel
 from motor.motor_asyncio import AsyncIOMotorCollection
 from random_generator import RandomDistribution
-from config import DataGeneratorConfig, DataType
+from config import DataGeneratorConfig, DataType, WriteMode
 from database_instance import DatabaseInstance
 
 __all__ = ['DataGenerator']
@@ -92,7 +92,8 @@ class DataGenerator:
         tasks = []
         for coll_info in self.collection_infos:
             coll = self.database.database[coll_info.name]
-            await coll.drop()
+            if self.config.write_mode == WriteMode.REPLACE:
+                await coll.drop()
             tasks.append(asyncio.create_task(self._populate_collection(coll, coll_info)))
             tasks.append(asyncio.create_task(create_single_field_indexes(coll, coll_info.fields)))
             tasks.append(asyncio.create_task(create_compound_indexes(coll, coll_info)))
@@ -110,7 +111,9 @@ class DataGenerator:
                           indexed=ft.indexed) for ft in coll_template.fields
             ]
             for doc_count in self.config.collection_cardinalities:
-                name = f'{coll_template.name}_{doc_count}'
+                name = f'{coll_template.name}'
+                if self.config.collection_name_with_card is True:
+                    name = f'{coll_template.name}_{doc_count}'
                 yield CollectionInfo(name=name, fields=fields, documents_count=doc_count,
                                      compound_indexes=coll_template.compound_indexes)
 

@@ -98,9 +98,9 @@ import dataclasses
 import bson.json_util as json
 import seaborn as sns
 import pandas as pd
-import statsmodels.api as sm
 from sklearn.metrics import r2_score
 from sklearn.linear_model import LinearRegression
+import statsmodels.api as sm
 from database_instance import DatabaseInstance
 import execution_tree as sbe
 import physical_tree as abt

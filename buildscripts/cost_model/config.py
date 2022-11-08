@@ -74,7 +74,9 @@ class DataGeneratorConfig:
 
     enabled: bool
     collection_cardinalities: list[int]
+    collection_name_with_card: bool
     collection_templates: list[CollectionTemplate]
+    write_mode: WriteMode
     batch_size: int
 
 

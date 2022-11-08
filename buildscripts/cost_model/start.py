@@ -76,26 +76,9 @@ async def execute_general(database: DatabaseInstance, collections: Sequence[Coll
                                      requests)
 
 
-async def execute_index_intersections(database: DatabaseInstance,
-                                      collections: Sequence[CollectionInfo]):
-    collections = [ci for ci in collections if ci.name.startswith('c_int')]
-
-    requests = []
-
-    for i in range(0, 1000, 100):
-        requests.append(Query(pipeline=[{'$match': {'in1': i, 'in2': i}}], keys_length_in_bytes=1))
-
-        requests.append(
-            Query(pipeline=[{'$match': {'in1': i, 'in2': 1000 - i}}], keys_length_in_bytes=1))
-
-        requests.append(
-            Query(pipeline=[{'$match': {'in1': {'$lte': i}, 'in2': 1000 - i}}],
-                  keys_length_in_bytes=1))
-
-        requests.append(
-            Query(pipeline=[{'$match': {'in1': i, 'in2': {'$gt': 1000 - i}}}],
-                  keys_length_in_bytes=1))
-
+async def execute_index_intersections_with_requests(database: DatabaseInstance,
+                                                    collections: Sequence[CollectionInfo],
+                                                    requests: Sequence[Query]):
     try:
         await database.set_parameter('internalCostModelCoefficients',
                                      '{"filterIncrementalCost": 10000.0}')
@@ -116,6 +99,29 @@ async def execute_index_intersections(database: DatabaseInstance,
         await database.set_parameter('internalCascadesOptimizerDisableMergeJoinRIDIntersect', False)
         await database.set_parameter('internalCascadesOptimizerDisableHashJoinRIDIntersect', False)
         await database.set_parameter('internalCostModelCoefficients', '')
+
+
+async def execute_index_intersections(database: DatabaseInstance,
+                                      collections: Sequence[CollectionInfo]):
+    collections = [ci for ci in collections if ci.name.startswith('c_int')]
+
+    requests = []
+
+    for i in range(0, 1000, 100):
+        requests.append(Query(pipeline=[{'$match': {'in1': i, 'in2': i}}], keys_length_in_bytes=1))
+
+        requests.append(
+            Query(pipeline=[{'$match': {'in1': i, 'in2': 1000 - i}}], keys_length_in_bytes=1))
+
+        requests.append(
+            Query(pipeline=[{'$match': {'in1': {'$lte': i}, 'in2': 1000 - i}}],
+                  keys_length_in_bytes=1))
+
+        requests.append(
+            Query(pipeline=[{'$match': {'in1': i, 'in2': {'$gt': 1000 - i}}}],
+                  keys_length_in_bytes=1))
+
+    await execute_index_intersections_with_requests(database, collections, requests)
 
 
 async def execute_evaluation(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
@@ -145,6 +151,62 @@ async def execute_unwind(database: DatabaseInstance, collections: Sequence[Colle
                                      requests)
 
 
+async def execute_small_queries(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    # strings
+    requests = []
+    for val in distributions['string_choice_small'].get_values():
+        keys_length = len(val) + 2
+        for i in range(1, 3):
+            requests.append(
+                Query(pipeline=[{'$match': {f'choice{i}': val}}], keys_length_in_bytes=keys_length))
+
+    await workload_execution.execute(database, main_config.workload_execution,
+                                     [ci for ci in collections if ci.name.startswith('c_str_02')],
+                                     requests)
+
+    # index intersection
+    colls = [ci for ci in collections if ci.name.startswith('c_int_05')]
+    requests = []
+
+    for val in distributions['int_choice'].get_values():
+        for val2 in distributions['int_choice'].get_values():
+            requests.append(
+                Query(pipeline=[{'$match': {'in1': val, 'in2': val2}}], keys_length_in_bytes=1))
+
+        requests.append(
+            Query(pipeline=[{'$match': {'in1': val, 'in2': {'$gt': 500}}}], keys_length_in_bytes=1))
+
+        requests.append(
+            Query(pipeline=[{'$match': {'in1': {'$lte': 500}, 'in2': val}}],
+                  keys_length_in_bytes=1))
+
+    await execute_index_intersections_with_requests(database, colls, requests)
+
+    # Evaluation
+    colls = [ci for ci in collections if ci.name.startswith('c_int_05')]
+    requests = []
+
+    for val in distributions['int_choice'].get_values():
+        requests.append(
+            Query(pipeline=[{"$match": {'in1': val}}, {'$project': {'proj1': 1}}],
+                  keys_length_in_bytes=1, number_of_fields=1))
+
+    await workload_execution.execute(database, main_config.workload_execution, colls, requests)
+
+    # Unwind
+    colls = [ci for ci in collections if ci.name.startswith('c_arr_01')]
+    requests = []
+    # average size of arrays in the collection
+    average_size_of_arrays = 10
+
+    for val in distributions['int_choice'].get_values():
+        requests.append(
+            Query(pipeline=[{"$match": {'in1': val}}, {"$unwind": "$as"}],
+                  number_of_fields=average_size_of_arrays))
+
+    await workload_execution.execute(database, main_config.workload_execution, colls, requests)
+
+
 async def main():
     """Entry point function."""
     script_directory = os.path.abspath(os.path.dirname(__file__))
@@ -160,6 +222,9 @@ async def main():
 
         # 3. Collecting data for calibration (optional).
         # It runs the pipelines and stores explains to the database.
+
+        # Run this execute function only to collect calibration data in the "smaller" experiment.
+        # await execute_small_queries(database, generator.collection_infos);
 
         await execute_general(database, generator.collection_infos)
         main_config.workload_execution.write_mode = WriteMode.APPEND

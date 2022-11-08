@@ -230,7 +230,7 @@ class RandomDistribution:
     def _choice(size: int, values: Sequence[TVar], probs: Sequence[float]):
         if probs is None:
             raise ValueError("props must be specified for choice distribution")
-        return list(_rng.choice(a=values, size=size, p=probs))
+        return [val.item() for val in _rng.choice(a=values, size=size, p=probs)]
 
     @staticmethod
     def _normal(size: int, values: Sequence[TVar], _: Sequence[float]):

@@ -134,7 +134,8 @@ class DatabaseInstance:
 
     async def insert_many(self, collection_name: str, docs: Sequence[Mapping[str, any]]) -> None:
         """Insert documents into the collection with the given name."""
-        await self.database[collection_name].insert_many(docs, ordered=False)
+        if len(docs) > 0:
+            await self.database[collection_name].insert_many(docs, ordered=False)
 
     async def get_all_documents(self, collection_name: str):
         """Get all documents from the collection with the given name."""
