@@ -424,6 +424,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         auto client2 = harnessHelper->serviceContext()->makeClient("c2");
         auto opCtx = harnessHelper->newOperationContext(client2.get());
         rs->cappedTruncateAfter(opCtx.get(), id1, /*inclusive*/ false);
+        harnessHelper->getEngine()->setStableTimestamp(Timestamp(id1.getLong()), true /* force */);
     }
 
     rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
