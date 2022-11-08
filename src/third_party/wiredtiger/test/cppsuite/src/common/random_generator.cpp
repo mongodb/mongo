@@ -86,14 +86,10 @@ random_generator::get_distribution(characters_type type)
     switch (type) {
     case characters_type::ALPHABET:
         return (_alpha_distrib);
-        break;
     case characters_type::PSEUDO_ALPHANUMERIC:
         return (_alphanum_distrib);
-        break;
-    default:
-        testutil_die(type, "Unexpected characters_type");
-        break;
     }
+    testutil_die(EINVAL, "unexpected characters_type: %d", type);
 }
 
 const std::string &
@@ -102,14 +98,10 @@ random_generator::get_characters(characters_type type)
     switch (type) {
     case characters_type::ALPHABET:
         return (_alphabet);
-        break;
     case characters_type::PSEUDO_ALPHANUMERIC:
         return (_pseudo_alphanum);
-        break;
-    default:
-        testutil_die(type, "Unexpected characters_type");
-        break;
     }
+    testutil_die(EINVAL, "unexpected characters_type: %d", static_cast<int>(type));
 }
 
 } // namespace test_harness

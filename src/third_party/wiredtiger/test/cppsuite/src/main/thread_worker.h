@@ -40,7 +40,7 @@
 #include "transaction.h"
 
 namespace test_harness {
-enum thread_type { CHECKPOINT, CUSTOM, INSERT, READ, REMOVE, UPDATE };
+enum class thread_type { CHECKPOINT, CUSTOM, INSERT, READ, REMOVE, UPDATE };
 
 const std::string type_string(thread_type type);
 
