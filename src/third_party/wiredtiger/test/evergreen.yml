@@ -3515,6 +3515,70 @@ tasks:
         vars:
           perf-test-name: modify-force-update-large-record-btree.wtperf
 
+    ###############################
+    # Performance Tests for oplog #
+    ###############################
+
+  - name: perf-test-mongodb-oplog
+    tags: ["oplog-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: mongodb-oplog.wtperf
+          maxruns: 1
+          wtarg: -ops ['"load", "insert", "truncate", "database_size"']
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: mongodb-oplog.wtperf
+
+  - name: perf-test-mongodb-small-oplog
+    tags: ["oplog-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: mongodb-small-oplog.wtperf
+          maxruns: 1
+          wtarg: -ops ['"load", "insert", "truncate", "database_size"']
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: mongodb-small-oplog.wtperf
+
+  - name: perf-test-mongodb-large-oplog
+    tags: ["oplog-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: mongodb-large-oplog.wtperf
+          maxruns: 1
+          wtarg: -ops ['"load", "insert", "truncate", "database_size"']
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: mongodb-large-oplog.wtperf
+
+  - name: perf-test-mongodb-secondary-apply
+    tags: ["oplog-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: mongodb-secondary-apply.wtperf
+          maxruns: 1
+          wtarg: -ops ['"insert"']
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: mongodb-secondary-apply.wtperf
+
     #########################################
     # Performance Tests for perf-checkpoint #
     #########################################
@@ -4388,6 +4452,7 @@ buildvariants:
     - name: ".evict-perf"
     - name: ".log-perf"
     - name: ".long-perf"
+    - name: ".oplog-perf"
     - name: many-dhandle-stress
     - name: ".wt2853-perf"
     - name: cppsuite-bounded-cursor-perf-stress
@@ -4414,6 +4479,9 @@ buildvariants:
     - name: Wiredtiger-perf-long-jobs
       execution_tasks:
       - ".long-perf"
+    - name: Wiredtiger-perf-oplog-jobs
+      execution_tasks:
+      - ".oplog-perf"
     - name: WiredTiger-wt2853-perf
       execution_tasks:
       - ".wt2853-perf"

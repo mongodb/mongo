@@ -29,6 +29,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 import glob
 import json
+import os
 import re
 from typing import List
 
@@ -169,3 +170,14 @@ class PerfStatLatencyWorkgen(PerfStat):
                 'values': sorted(self.values)
             })
         return as_list
+
+
+class PerfStatDBSize(PerfStat):
+    def find_stat(self, test_stat_path: str):
+        home_path = os.path.dirname(test_stat_path)
+        total_size = 0
+
+        for ele in os.scandir(home_path):
+            total_size += os.path.getsize(ele)
+
+        return [total_size]
