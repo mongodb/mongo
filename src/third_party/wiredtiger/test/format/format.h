@@ -174,6 +174,8 @@ extern u_int ntables;
     ((table)->v[V_TABLE_##off].vstr == NULL ? "off" : (table)->v[V_TABLE_##off].vstr)
 #define TV(off) NTV(table, off)
 #define TVS(off) NTVS(table, off)
+#define NT_EXPLICIT_SET(table, off) ((table)->v[V_TABLE_##off].set)
+#define NT_EXPLICIT_OFF(table, off) (NT_EXPLICIT_SET(table, off) && !NTV(table, off))
 
 #define DATASOURCE(table, ds) (strcmp((table)->v[V_TABLE_RUNS_SOURCE].vstr, ds) == 0)
 

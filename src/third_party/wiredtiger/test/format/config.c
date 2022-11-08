@@ -963,7 +963,7 @@ config_lsm_reset(TABLE *table)
 static void
 config_mirrors(void)
 {
-    u_int i, mirrors;
+    u_int available_tables, i, mirrors;
     char buf[100];
     bool already_set, explicit_mirror;
 
@@ -977,6 +977,13 @@ config_mirrors(void)
     if (already_set) {
         if (g.base_mirror == NULL)
             testutil_die(EINVAL, "no table configured that can act as the base mirror");
+        /*
+         * Assume that mirroring is already configured if one of the tables has explicitly
+         * configured it on. This isn't optimal since there could still be other tables that haven't
+         * set it at all (and might be usable as extra mirrors), but that's an uncommon scenario and
+         * it lets us avoid a bunch of extra logic around figuring out whether we have an acceptable
+         * minimum number of tables.
+         */
         return;
     }
 
@@ -989,20 +996,40 @@ config_mirrors(void)
      * tables.
      */
     explicit_mirror = config_explicit(NULL, "runs.mirror");
-    if (!explicit_mirror && mmrand(NULL, 1, 10) < 9)
+    if (!explicit_mirror && mmrand(NULL, 1, 10) < 9) {
+        config_off_all("runs.mirror");
         return;
-    config_off_all("runs.mirror");
+    }
 
     /*
      * We can't mirror if we don't have enough tables. A FLCS table can be a mirror, but it can't be
      * the source of the bulk-load mirror records. Find the first table we can use as a base.
      */
     for (i = 1; i <= ntables; ++i)
-        if (tables[i]->type != FIX)
+        if (tables[i]->type != FIX && !NT_EXPLICIT_OFF(tables[i], RUNS_MIRROR))
             break;
-    if (ntables < 2 || i > ntables) {
+
+    if (i > ntables) {
         if (explicit_mirror)
             WARN("%s", "table selection didn't support mirroring, turning off mirroring");
+        config_off_all("runs.mirror");
+        return;
+    }
+
+    /*
+     * We also can't mirror if we don't have enough tables that have allowed mirroring. It's
+     * possible for a table to explicitly set tableX.runs.mirror=0, so check how many tables have
+     * done that and remove them from the count of tables we can use for mirroring.
+     */
+    available_tables = ntables;
+    for (i = 1; i <= ntables; ++i)
+        if (NT_EXPLICIT_OFF(tables[i], RUNS_MIRROR))
+            --available_tables;
+
+    if (available_tables < 2) {
+        if (explicit_mirror)
+            WARN("%s", "not enough tables left mirroring enabled, turning off mirroring");
+        config_off_all("runs.mirror");
         return;
     }
 
@@ -1015,22 +1042,28 @@ config_mirrors(void)
         }
     config_off_all("btree.reverse");
 
-    /* Good to go: pick the first non-FLCS table as our base and turn on mirroring. */
+    /* Good to go: pick the first non-FLCS table that allows mirroring as our base. */
     for (i = 1; i <= ntables; ++i)
-        if (tables[i]->type != FIX)
+        if (tables[i]->type != FIX && !NT_EXPLICIT_OFF(tables[i], RUNS_MIRROR))
             break;
     tables[i]->mirror = true;
     config_single(tables[i], "runs.mirror=1", false);
     g.base_mirror = tables[i];
 
-    /* Pick some number of tables to mirror, then turn on mirroring the next (n-1) tables. */
-    for (mirrors = mmrand(NULL, 2, ntables) - 1, i = 1; i <= ntables; ++i)
+    /*
+     * Pick some number of tables to mirror, then turn on mirroring the next (n-1) tables, where
+     * allowed.
+     */
+    for (mirrors = mmrand(NULL, 2, ntables) - 1, i = 1; i <= ntables; ++i) {
+        if (NT_EXPLICIT_OFF(tables[i], RUNS_MIRROR))
+            continue;
         if (tables[i] != g.base_mirror) {
             tables[i]->mirror = true;
             config_single(tables[i], "runs.mirror=1", false);
             if (--mirrors == 0)
                 break;
         }
+    }
 
     /*
      * Give each mirror the same number of rows (it's not necessary, we could treat end-of-table on
