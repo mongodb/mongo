@@ -132,6 +132,24 @@ Status refreshDbMetadata(OperationContext* opCtx,
     const auto swDbMetadata =
         Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName.db());
 
+    // Before setting the database metadata, exit early if the database version received by the
+    // config server is not newer than the cached one. This is a best-effort optimization to reduce
+    // the number of possible threads convoying on the exclusive lock below.
+    {
+        Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+        const auto cachedDbVersion = DatabaseHolder::get(opCtx)->getDbVersion(opCtx, dbName);
+        if (swDbMetadata.isOK() && swDbMetadata.getValue()->getVersion() <= cachedDbVersion) {
+            LOGV2_DEBUG(7079300,
+                        2,
+                        "Skip setting cached database metadata as there are no updates",
+                        "db"_attr = dbName,
+                        "cachedDbVersion"_attr = *cachedDbVersion,
+                        "refreshedDbVersion"_attr = swDbMetadata.getValue()->getVersion());
+
+            return Status::OK();
+        }
+    }
+
     Lock::DBLock dbLock(opCtx, dbName, MODE_X);
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
         opCtx, dbName, DSSAcquisitionMode::kExclusive);
