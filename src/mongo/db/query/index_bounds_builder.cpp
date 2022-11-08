@@ -108,13 +108,38 @@ Interval makeNullPointInterval(bool isHashed) {
     return isHashed ? kHashedNullInterval : IndexBoundsBuilder::kNullPointInterval;
 }
 
+/**
+ * This helper updates the query bounds tightness for the limited set of conditions where we see a
+ * null query that can be covered.
+ */
+void updateTightnessForNullQuery(const IndexEntry& index,
+                                 IndexBoundsBuilder::BoundsTightness* tightnessOut) {
+    if (index.sparse || index.type == IndexType::INDEX_HASHED) {
+        // Sparse indexes and hashed indexes require a FETCH stage with a filter for null queries.
+        *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+        return;
+    }
+
+    if (index.multikey) {
+        // If we have a simple equality null query and our index is multikey, we cannot cover the
+        // query. This is because null intervals are translated into the null and undefined point
+        // intervals, and the undefined point interval includes entries for []. In the case of a
+        // single null interval, [] should not match.
+        *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+        return;
+    }
+
+    // The query may be fully covered by the index if the projection allows it, since the case above
+    // about the empty array can only become an issue if there is an empty array present, which
+    // would mark the index as multikey.
+    *tightnessOut = IndexBoundsBuilder::EXACT_MAYBE_COVERED;
+}
+
 void makeNullEqualityBounds(const IndexEntry& index,
                             bool isHashed,
                             OrderedIntervalList* oil,
                             IndexBoundsBuilder::BoundsTightness* tightnessOut) {
-    // An equality to null predicate cannot be covered because the index does not distinguish
-    // between the lack of a value and the literal value null.
-    *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+    updateTightnessForNullQuery(index, tightnessOut);
 
     // There are two values that could possibly be equal to null in an index: undefined and null.
     oil->intervals.push_back(makeUndefinedPointInterval(isHashed));
@@ -254,7 +279,10 @@ bool IndexBoundsBuilder::canUseCoveredMatching(const MatchExpression* expr,
     IndexBoundsBuilder::BoundsTightness tightness;
     OrderedIntervalList oil;
     translate(expr, BSONElement{}, index, &oil, &tightness, /* iet::Builder */ nullptr);
-    return tightness >= IndexBoundsBuilder::INEXACT_COVERED;
+    // We have additional tightness values (MAYBE_COVERED), but we cannot generally cover those
+    // cases unless we have an appropriate projection.
+    return tightness == IndexBoundsBuilder::INEXACT_COVERED ||
+        tightness == IndexBoundsBuilder::EXACT;
 }
 
 // static
@@ -403,6 +431,61 @@ const Interval IndexBoundsBuilder::kNullPointInterval =
     IndexBoundsBuilder::makePointInterval(kNullElementObj);
 const Interval IndexBoundsBuilder::kEmptyArrayPointInterval =
     IndexBoundsBuilder::makePointInterval(kEmptyArrayElementObj);
+
+bool detectIfEntireNullIntervalMatchesPredicate(const InMatchExpression* ime,
+                                                const IndexEntry& index) {
+    if (!ime->hasNull()) {
+        // This isn't a null query.
+        return false;
+    }
+
+    if (index.sparse || (IndexType::INDEX_HASHED == index.type)) {
+        // Sparse indexes and hashed indexes still require a FETCH stage with a filter for null
+        // queries.
+        return false;
+    }
+
+    // Given the context of having a null $in query with eligible indexes, we may be able to cover
+    // some combinations of intervals that we could not cover individually.
+    if (index.multikey) {
+        // If the path has multiple components and we have a multikey index, we still need a FETCH
+        // in order to defend against cases where we have a multikey index on "a". These documents
+        // will generate null index keys: {"a.b": null} and {a: [1,2,3]}. However, a query like
+        // {"a.b": {$in: [null, []]}} should not match {a: [1, 2, 3]}.
+        // TODO SERVER-71021: it may be possible to cover more cases here.
+        if (ime->fieldRef()->numParts() > 1) {
+            return false;
+        }
+
+        // We must have an equality to an empty array for this null query to be covered, otherwise,
+        // because we generate both null and undefined point intervals for a null query, and because
+        // a multikey index reuses the same entry for [] and undefined, we will not be able to cover
+        // the query.
+        if (!ime->hasEmptyArray()) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void IndexBoundsBuilder::_mergeTightness(const BoundsTightness& tightness,
+                                         BoundsTightness& tightnessOut) {
+    // There is a special case where we may have a covered null query (EXACT_MAYBE_COVERED) and a
+    // regex with inexact bounds that doesn't need a FETCH (INEXACT_COVERED). In this case, we want
+    // to update the tightness to INEXACT_MAYBE_COVERED, to indicate that we need to check if the
+    // projection allows us to cover the query, but ensure that we will have a filter on the index
+    // if it turns out we can.
+    if (((tightness == BoundsTightness::EXACT_MAYBE_COVERED) &&
+         (tightnessOut == BoundsTightness::INEXACT_COVERED)) ||
+        ((tightness == BoundsTightness::INEXACT_COVERED) &&
+         (tightnessOut == BoundsTightness::EXACT_MAYBE_COVERED))) {
+        tightnessOut = BoundsTightness::INEXACT_MAYBE_COVERED;
+    } else if (tightness < tightnessOut) {
+        // Otherwise, fallback to picking the new tightness if it is looser than the old tightness.
+        tightnessOut = tightness;
+    }
+}
 
 void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
                                              const BSONElement& elt,
@@ -955,51 +1038,45 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         });
 
         const InMatchExpression* ime = static_cast<const InMatchExpression*>(expr);
-
         *tightnessOut = IndexBoundsBuilder::EXACT;
 
         // Create our various intervals.
 
         IndexBoundsBuilder::BoundsTightness tightness;
-        bool arrayOrNullPresent = false;
+        // We check if the $in predicate satisfies conditions to be a covered null predicate on the
+        // basis of indexes, null intervals, and array intervals.
+        const bool entireNullIntervalMatchesPredicate =
+            detectIfEntireNullIntervalMatchesPredicate(ime, index);
         for (auto&& equality : ime->getEqualities()) {
-            translateEquality(equality, index, isHashed, oilOut, &tightness);
-            // The ordering invariant of oil has been violated by the call to translateEquality.
-            arrayOrNullPresent = arrayOrNullPresent || equality.type() == BSONType::jstNULL ||
-                equality.type() == BSONType::Array;
-            if (tightness != IndexBoundsBuilder::EXACT) {
-                *tightnessOut = tightness;
+            // First, we generate the bounds the same way that we would do for an individual
+            // equality. This will set tightness to the value it should be if this equality is being
+            // considered in isolation.
+            IndexBoundsBuilder::translateEquality(equality, index, isHashed, oilOut, &tightness);
+            if (entireNullIntervalMatchesPredicate &&
+                (BSONType::jstNULL == equality.type() ||
+                 (BSONType::Array == equality.type() && equality.Obj().isEmpty()))) {
+                // We may have a covered null query. In this case, we update both empty array and
+                // null interval tightness to EXACT_MAYBE_COVERED, as individually they would have a
+                // tightness of INEXACT_FETCH. However, we already know we will be able to cover
+                // these intervals together if we have appropriate projections. Note that any other
+                // intervals that cannot be covered may still require the query to use a FETCH.
+                tightness = IndexBoundsBuilder::EXACT_MAYBE_COVERED;
             }
+            IndexBoundsBuilder::_mergeTightness(tightness, *tightnessOut);
         }
 
         for (auto&& regex : ime->getRegexes()) {
             translateRegex(regex.get(), index, oilOut, &tightness);
-            if (tightness != IndexBoundsBuilder::EXACT) {
-                *tightnessOut = tightness;
-            }
-        }
-
-        if (ime->hasNull()) {
-            // A null index key does not always match a null query value so we must fetch the
-            // doc and run a full comparison.  See SERVER-4529.
-            // TODO: Do we already set the tightnessOut by calling translateEquality?
-            *tightnessOut = INEXACT_FETCH;
-        }
-
-        if (ime->hasEmptyArray()) {
-            // Empty arrays are indexed as undefined.
-            BSONObjBuilder undefinedBob;
-            undefinedBob.appendUndefined("");
-            oilOut->intervals.push_back(makePointInterval(undefinedBob.obj()));
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            IndexBoundsBuilder::_mergeTightness(tightness, *tightnessOut);
         }
 
         // Equalities are already sorted and deduped so unionize is unneccesary if no regexes
         // are present. Hashed indexes may also cause the bounds to be out-of-order.
-        // Arrays and nulls introduce multiple elements that neccesitate a sort and deduping.
-        if (!ime->getRegexes().empty() || index.type == IndexType::INDEX_HASHED ||
-            arrayOrNullPresent)
+        // Arrays and nulls introduce multiple elements that necessitate a sort and deduping.
+        if (ime->hasNonScalarOrNonEmptyValues() || index.type == IndexType::INDEX_HASHED) {
             unionize(oilOut);
+        }
+
     } else if (MatchExpression::GEO == expr->matchType()) {
         const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
         if ("2dsphere" == elt.valueStringDataSafe()) {
@@ -1315,6 +1392,7 @@ void IndexBoundsBuilder::translateEquality(const BSONElement& data,
     }
 
     std::sort(oil->intervals.begin(), oil->intervals.end(), IntervalComparison);
+
     *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
 }
 

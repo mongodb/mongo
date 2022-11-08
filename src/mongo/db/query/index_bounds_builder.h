@@ -67,16 +67,28 @@ public:
      * increasing tightness. These values are used when we need to do comparison between two
      * BoundsTightness values. Such comparisons can answer questions such as "Does predicate
      * X have tighter or looser bounds than predicate Y?".
+     *
+     * These enum values are ordered from loosest to tightest.
      */
     enum BoundsTightness {
         // Index bounds are inexact, and a fetch is required.
         INEXACT_FETCH = 0,
 
-        // Index bounds are inexact, but no fetch is required
-        INEXACT_COVERED = 1,
+        // Index bounds are inexact, and a fetch may be required depending on the projection.
+        // For example, a count $in query on null + a regex can be covered, but a find query with
+        // the same filter and no projection cannot.
+        INEXACT_MAYBE_COVERED = 1,
+
+        // Index bounds are exact, but a fetch may be required depending on the projection.
+        // For example, a find query on null may be covered, depending on which fields we project
+        // out.
+        EXACT_MAYBE_COVERED = 2,
+
+        // Index bounds are inexact, but no fetch is required.
+        INEXACT_COVERED = 3,
 
         // Index bounds are exact.
-        EXACT = 2
+        EXACT = 4
     };
 
     /**
@@ -301,6 +313,11 @@ private:
                                     OrderedIntervalList* oilOut,
                                     BoundsTightness* tightnessOut,
                                     interval_evaluation_tree::Builder* ietBuilder);
+
+    /**
+     * Helper method for merging interval tightness for $in expressions.
+     */
+    static void _mergeTightness(const BoundsTightness& tightness, BoundsTightness& tightnessOut);
 };
 
 }  // namespace mongo

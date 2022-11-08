@@ -3,7 +3,9 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   requires_non_retryable_writes,
- *   requires_fcv_52
+ *   requires_fcv_60,
+ *   # This test could produce unexpected explain output if additional indexes are created.
+ *   assumes_no_implicit_index_creation,
  * ]
  */
 (function() {
@@ -57,12 +59,22 @@ function validateStages({cmdObj, expectedStages, isAgg}) {
  */
 function validateFindCmdOutputAndPlan({filter, projection, expectedStages, expectedOutput}) {
     const cmdObj = {find: coll.getName(), filter: filter, projection: projection};
+
+    // Compare index output with expected output.
     if (expectedOutput) {
         const res = assert.commandWorked(coll.runCommand(cmdObj));
         const ouputArray = new DBCommandCursor(coll.getDB(), res).toArray();
         assert(arrayEq(expectedOutput, ouputArray), ouputArray);
     }
+
+    // Validate explain.
     validateStages({cmdObj, expectedStages});
+
+    // Verify that we get the same output as we expect without an index.
+    const noIndexCmdObj = Object.assign(cmdObj, {hint: {$natural: 1}});
+    const resNoIndex = assert.commandWorked(coll.runCommand(noIndexCmdObj));
+    const noIndexOutArr = new DBCommandCursor(coll.getDB(), resNoIndex).toArray();
+    assert(arrayEq(expectedOutput, noIndexOutArr), noIndexOutArr);
 }
 
 /**
@@ -71,10 +83,18 @@ function validateFindCmdOutputAndPlan({filter, projection, expectedStages, expec
  * are present in the plan returned.
  */
 function validateSimpleCountCmdOutputAndPlan({filter, expectedStages, expectedCount}) {
+    // Compare index output with expected output.
     const cmdObj = {count: coll.getName(), query: filter};
     const res = assert.commandWorked(coll.runCommand(cmdObj));
     assert.eq(res.n, expectedCount);
+
+    // Validate explain.
     validateStages({cmdObj, expectedStages});
+
+    // Verify that we get the same output with and without an index.
+    const noIndexCmdObj = Object.assign(cmdObj, {hint: {$natural: 1}});
+    const resNoIndex = assert.commandWorked(coll.runCommand(noIndexCmdObj));
+    assert.eq(resNoIndex.n, expectedCount);
 }
 
 /**
@@ -88,11 +108,33 @@ function validateCountAggCmdOutputAndPlan({filter, expectedStages, expectedCount
         pipeline: pipeline || [{$match: filter}, {$count: "count"}],
         cursor: {},
     };
+
+    // Compare index output with expected output.
     const cmdRes = assert.commandWorked(coll.runCommand(cmdObj));
     const countRes = cmdRes.cursor.firstBatch;
     assert.eq(countRes.length, 1, cmdRes);
     assert.eq(countRes[0].count, expectedCount, countRes);
+
+    // Validate explain.
     validateStages({cmdObj, expectedStages, isAgg: true});
+
+    // Verify that we get the same output as we expect without an index.
+    const noIndexCmdObj = Object.assign(cmdObj, {hint: {$natural: 1}});
+    const resNoIndex = assert.commandWorked(coll.runCommand(noIndexCmdObj));
+    const countResNoIndex = resNoIndex.cursor.firstBatch;
+    assert.eq(countResNoIndex.length, 1, cmdRes);
+    assert.eq(countResNoIndex[0].count, expectedCount, countRes);
+}
+
+/**
+ * Same as above, but uses a $group count.
+ */
+function validateGroupCountAggCmdOutputAndPlan({filter, expectedStages, expectedCount}) {
+    validateCountAggCmdOutputAndPlan({
+        expectedStages,
+        expectedCount,
+        pipeline: [{$match: filter}, {$group: {_id: 0, count: {$count: {}}}}]
+    });
 }
 
 assert.commandWorked(coll.createIndex({a: 1, _id: 1}));
@@ -152,7 +194,7 @@ validateFindCmdOutputAndPlan({
     expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
 });
 
-// Same as above, but special case for null and empty array predicate.
+// We can cover a $in with null and an empty array predicate.
 validateFindCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}},
     projection: {_id: 1},
@@ -163,6 +205,21 @@ validateSimpleCountCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}},
     expectedCount: 4,
     expectedStages: {"IXSCAN": 1, "FETCH": 0},
+});
+
+// We cannot cover a $in with null and an array predicate.
+// TODO SERVER-71058: It should be possible to cover this case and the more general case of matching
+// an array on a non-multikey index.
+validateFindCmdOutputAndPlan({
+    filter: {a: {$in: [null, ["a"]]}},
+    projection: {_id: 1},
+    expectedOutput: [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}],
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {a: {$in: [null, ["a"]]}},
+    expectedCount: 4,
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "COUNT": 1},
 });
 
 // Verify that a more complex projection that only relies on the _id field does not need a FETCH.
@@ -690,5 +747,266 @@ validateCountAggCmdOutputAndPlan({
     filter: {a: null},
     expectedCount: 4,
     expectedStages: {"OR": 1, "COUNT_SCAN": 2, "IXSCAN": 0, "FETCH": 0},
+});
+
+// Validate that we can use the optimization when we have regex without array elements in a $in or
+// $or. See SERVER-70436 for more details.
+coll.drop();
+
+assert.commandWorked(coll.insertMany([
+    {_id: 1, a: '123456'},
+    {_id: 2, a: '1234567'},
+    {_id: 3, a: ' 12345678'},
+    {_id: 4, a: '444456'},
+    {_id: 5, a: ''},
+    {_id: 6, a: null},
+    {_id: 7},
+]));
+
+assert.commandWorked(coll.createIndex({a: 1, _id: 1}));
+
+// TODO SERVER-70998: Can apply optimization in case without regex; however, we still can't use a
+// COUNT_SCAN in this case.
+validateFindCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: ""}]},
+    projection: {_id: 1},
+    expectedOutput: [{_id: 5}, {_id: 6}, {_id: 7}],
+    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: ""}]},
+    expectedCount: 3,
+    expectedStages: {"COUNT": 1, "IXSCAN": 1, "FETCH": 0},
+});
+validateGroupCountAggCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: ""}]},
+    expectedCount: 3,
+    expectedStages: {"IXSCAN": 1, "FETCH": 0},
+});
+
+// Can still apply optimization when we have regex.
+validateFindCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: {$regex: "^$"}}]},
+    projection: {_id: 1},
+    expectedOutput: [{_id: 5}, {_id: 6}, {_id: 7}],
+    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: {$regex: "^$"}}]},
+    expectedCount: 3,
+    expectedStages: {"IXSCAN": 1, "FETCH": 0, "COUNT": 1},
+});
+validateGroupCountAggCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: {$regex: "^$"}}]},
+    expectedCount: 3,
+    expectedStages: {"IXSCAN": 1, "FETCH": 0},
+});
+
+// Now test case with a multikey index. We can't leverage the optimization here.
+assert.commandWorked(coll.insert({_id: 8, a: [1, 2, 3]}));
+assert.commandWorked(coll.insert({_id: 9, a: []}));
+
+validateFindCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: []}, {a: {$regex: "^$"}}]},
+    projection: {_id: 1},
+    expectedOutput: [{_id: 5}, {_id: 6}, {_id: 7}, {_id: 9}],
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: []}, {a: {$regex: "^$"}}]},
+    expectedCount: 4,
+    expectedStages: {"COUNT": 1, "IXSCAN": 1, "FETCH": 1},
+});
+validateGroupCountAggCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: []}, {a: {$regex: "^$"}}]},
+    expectedCount: 4,
+    expectedStages: {"IXSCAN": 1, "FETCH": 1},
+});
+
+// We also shouldn't cover queries on multikey indexes where $in includes an array, as we will still
+// need a filter after the IXSCAN to correctly return
+validateFindCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: []}, {a: [2]}]},
+    projection: {_id: 1},
+    expectedOutput: [{_id: 6}, {_id: 7}, {_id: 9}],
+    expectedStages: {"IXSCAN": 1, "FETCH": 1},
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: []}, {a: [2]}]},
+    expectedCount: 3,
+    expectedStages: {"IXSCAN": 1, "FETCH": 1},
+});
+validateGroupCountAggCmdOutputAndPlan({
+    filter: {$or: [{a: null}, {a: []}, {a: [2]}]},
+    expectedCount: 3,
+    expectedStages: {"IXSCAN": 1, "FETCH": 1},
+});
+
+// Validate that when we have a dotted path, we return the correct results for null queries.
+coll.drop();
+assert.commandWorked(coll.insertMany([
+    {_id: 1, a: 1},
+    {_id: 2, a: null},
+    {_id: 3},
+    {_id: 4, a: {b: 1}},
+    {_id: 5, a: {b: null}},
+    {_id: 6, a: {c: 1}},
+]));
+assert.commandWorked(coll.createIndex({"a.b": 1, _id: 1}));
+
+validateFindCmdOutputAndPlan({
+    filter: {"a.b": null},
+    projection: {_id: 1},
+    expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 5}, {_id: 6}],
+    expectedStages: {"IXSCAN": 1, "PROJECTION_COVERED": 1, "FETCH": 0},
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {"a.b": null},
+    expectedCount: 5,
+    expectedStages: {"OR": 1, "COUNT_SCAN": 2, "IXSCAN": 0, "FETCH": 0},
+});
+validateGroupCountAggCmdOutputAndPlan({
+    filter: {"a.b": null},
+    expectedCount: 5,
+    expectedStages: {"OR": 1, "COUNT_SCAN": 2, "IXSCAN": 0, "FETCH": 0},
+});
+
+validateFindCmdOutputAndPlan({
+    filter: {a: {b: null}},
+    projection: {_id: 1},
+    expectedOutput: [{_id: 5}],
+    expectedStages: {"COLLSCAN": 1, "PROJECTION_SIMPLE": 1},
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {a: {b: null}},
+    expectedCount: 1,
+    expectedStages: {"COLLSCAN": 1},
+});
+validateGroupCountAggCmdOutputAndPlan({
+    filter: {a: {b: null}},
+    expectedCount: 1,
+    expectedStages: {"COLLSCAN": 1},
+});
+
+// Still need fetch if we don't have a sufficiently restrictive projection.
+validateFindCmdOutputAndPlan({
+    filter: {"a.b": null},
+    projection: {_id: 1, a: 1},
+    expectedOutput: [
+        {_id: 1, a: 1},
+        {_id: 2, a: null},
+        {_id: 3},
+        {_id: 5, a: {b: null}},
+        {_id: 6, a: {c: 1}},
+    ],
+    expectedStages: {"IXSCAN": 1, "FETCH": 1},
+});
+
+// Make index multikey, and test case where field b is nested in an array.
+assert.commandWorked(coll.insertMany([
+    {_id: 7, a: [{b: null}]},
+    {_id: 8, a: [{b: []}]},
+    {_id: 9, a: [{b: [1, 2, 3]}]},
+    {_id: 10, a: [{b: 123}]},
+    {_id: 11, a: [{c: 123}]},
+    {_id: 12, a: []},
+    {_id: 13, a: [{}]},
+    {_id: 14, a: [1, 2, 3]},
+    {_id: 15, a: [{b: 1}, {c: 2}, {b: 3}]},
+    {_id: 16, a: [null]},
+]));
+
+validateFindCmdOutputAndPlan({
+    filter: {"a.b": null},
+    projection: {_id: 1},
+    expectedOutput: [
+        {_id: 1},
+        {_id: 2},
+        {_id: 3},
+        {_id: 5},
+        {_id: 6},
+        {_id: 7},
+        {_id: 11},
+        {_id: 13},
+        {_id: 15}
+    ],
+    expectedStages: {"IXSCAN": 1, "PROJECTION_SIMPLE": 1, "FETCH": 1},
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {"a.b": null},
+    expectedCount: 9,
+    expectedStages: {"COUNT": 1, "IXSCAN": 1, "FETCH": 1},
+});
+validateGroupCountAggCmdOutputAndPlan({
+    filter: {"a.b": null},
+    expectedCount: 9,
+    expectedStages: {"IXSCAN": 1, "FETCH": 1},
+});
+
+validateFindCmdOutputAndPlan({
+    filter: {a: {b: null}},
+    projection: {_id: 1},
+    expectedOutput: [{_id: 5}, {_id: 7}],
+    expectedStages: {
+        "COLLSCAN": 1,
+        "PROJECTION_SIMPLE": 1,
+    },
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {a: {b: null}},
+    expectedCount: 2,
+    expectedStages: {"COLLSCAN": 1},
+});
+validateGroupCountAggCmdOutputAndPlan({
+    filter: {a: {b: null}},
+    expectedCount: 2,
+    expectedStages: {"COLLSCAN": 1},
+});
+
+validateFindCmdOutputAndPlan({
+    filter: {a: [{b: null}]},
+    projection: {_id: 1},
+    expectedOutput: [{_id: 7}],
+    expectedStages: {"COLLSCAN": 1, "PROJECTION_SIMPLE": 1},
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {a: [{b: null}]},
+    expectedCount: 1,
+    expectedStages: {"COLLSCAN": 1},
+});
+validateGroupCountAggCmdOutputAndPlan({
+    filter: {a: [{b: null}]},
+    expectedCount: 1,
+    expectedStages: {"COLLSCAN": 1},
+});
+
+// We still need a FETCH for composite paths, because both {a: [1,2,3]} and {"a.b": null} generate
+// null index keys, but the former should not match the predicate below.
+validateFindCmdOutputAndPlan({
+    filter: {"a.b": {$in: [null, []]}},
+    projection: {_id: 1},
+    expectedOutput: [
+        {_id: 1},
+        {_id: 2},
+        {_id: 3},
+        {_id: 5},
+        {_id: 6},
+        {_id: 7},
+        {_id: 8},
+        {_id: 11},
+        {_id: 13},
+        {_id: 15}
+    ],
+    expectedStages: {"IXSCAN": 1, "PROJECTION_SIMPLE": 1, "FETCH": 1},
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {"a.b": {$in: [null, []]}},
+    expectedCount: 10,
+    expectedStages: {"IXSCAN": 1, "FETCH": 1},
+});
+validateGroupCountAggCmdOutputAndPlan({
+    filter: {"a.b": {$in: [null, []]}},
+    expectedCount: 10,
+    expectedStages: {"IXSCAN": 1, "FETCH": 1},
 });
 })();

@@ -434,6 +434,7 @@ std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
     }
     next->_hasNull = _hasNull;
     next->_hasEmptyArray = _hasEmptyArray;
+    next->_hasNonEmptyArrayOrObject = _hasNonEmptyArrayOrObject;
     next->_equalitySet = _equalitySet;
     next->_originalEqualityVector = _originalEqualityVector;
     next->_equalityStorage = _equalityStorage;
@@ -577,6 +578,8 @@ Status InMatchExpression::setEqualities(std::vector<BSONElement> equalities) {
             _hasNull = true;
         } else if (equality.type() == BSONType::Array && equality.Obj().isEmpty()) {
             _hasEmptyArray = true;
+        } else if (equality.type() == BSONType::Array || equality.type() == BSONType::Object) {
+            _hasNonEmptyArrayOrObject = true;
         }
     }
 

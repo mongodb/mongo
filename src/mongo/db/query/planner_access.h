@@ -145,11 +145,9 @@ private:
     struct ScanBuildingState {
         ScanBuildingState(MatchExpression* theRoot,
                           const std::vector<IndexEntry>& indexList,
-                          bool inArrayOp,
-                          bool isCoveredNull = false)
+                          bool inArrayOp)
             : root(theRoot),
               inArrayOperator(inArrayOp),
-              isCoveredNullQuery(isCoveredNull),
               indices(indexList),
               currentScan(nullptr),
               curChild(0),
@@ -187,9 +185,6 @@ private:
 
         // Are we inside an array operator such as $elemMatch or $all?
         bool inArrayOperator;
-
-        // Is this a covered null query?
-        bool isCoveredNullQuery;
 
         // A list of relevant indices which 'root' may be tagged to use.
         const std::vector<IndexEntry>& indices;

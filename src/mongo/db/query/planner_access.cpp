@@ -1114,47 +1114,13 @@ std::vector<std::unique_ptr<QuerySolutionNode>> QueryPlannerAccess::collapseEqui
 }
 
 /**
- * Returns true if this is a null query that can retrieve all the information it needs directly from
- * the index, and so does not need a FETCH stage on top of it. Returns false otherwise.
+ * This helper determines if a query can be covered depending on the query projection.
  */
-bool isCoveredNullQuery(const CanonicalQuery& query,
-                        MatchExpression* root,
-                        IndexTag* tag,
-                        const vector<IndexEntry>& indices,
-                        const QueryPlannerParams& params) {
-    // Sparse indexes and hashed indexes should not use this optimization as they will require a
-    // FETCH stage with a filter.
-    if (indices[tag->index].sparse || indices[tag->index].type == IndexType::INDEX_HASHED) {
-        return false;
-    }
-
-    // When the index is not multikey, we can support a query on an indexed field searching for null
-    // values. This optimization can only be done when the index is not multikey, otherwise empty
-    // arrays in the collection will be treated as null/undefined by the index. When the index is
-    // multikey, we can support a query searching for both null and empty array values.
-    const auto multikeyIndex = indices[tag->index].multikey;
-    if (root->matchType() == MatchExpression::MatchType::MATCH_IN) {
-        // Check that the query matches null values, if the index is not multikey, or null and empty
-        // array values, if the index is multikey. Note that the query may match values other than
-        // null (and empty array).
-        const auto node = static_cast<const InMatchExpression*>(root);
-        if (!node->hasNull() || (multikeyIndex && !node->hasEmptyArray())) {
-            return false;
-        }
-    } else if (ComparisonMatchExpressionBase::isEquality(root->matchType()) && !multikeyIndex) {
-        // Check that the query matches null values.
-        const auto node = static_cast<const ComparisonMatchExpressionBase*>(root);
-        if (node->getData().type() != BSONType::jstNULL) {
-            return false;
-        }
-    } else {
-        return false;
-    }
-
+bool projNeedsFetch(const CanonicalQuery& query, const QueryPlannerParams& params) {
     // If nothing is being projected, the query is fully covered without a fetch.
     // This is trivially true for a count query.
     if (params.options & QueryPlannerParams::Options::IS_COUNT) {
-        return true;
+        return false;
     }
 
     // This optimization can only be used for find when the index covers the projection completely.
@@ -1163,7 +1129,7 @@ bool isCoveredNullQuery(const CanonicalQuery& query,
     // in the multikey case). Hence, only find queries projecting _id are covered.
     auto proj = query.getProj();
     if (!proj) {
-        return false;
+        return true;
     }
 
     // We can cover projections on _id and generated fields and expressions depending only on _id.
@@ -1175,10 +1141,38 @@ bool isCoveredNullQuery(const CanonicalQuery& query,
         // Note that it is not possible to project onto dotted paths of _id here, since they may be
         // null or missing, and the index cannot differentiate between the two cases, so we would
         // still need a FETCH stage.
-        return projFields.size() == 1 && *projFields.begin() == "_id";
+        if (projFields.size() == 1 && *projFields.begin() == "_id") {
+            return false;
+        }
     }
 
-    return false;
+    return true;
+}
+
+/**
+ * This helper updates a MAYBE_COVERED query tightness to one of EXACT, INEXACT_COVERED, or
+ * INEXACT_FETCH, depending on whether we need a FETCH/filter to answer the query projection.
+ */
+void refineTightnessForMaybeCoveredQuery(const CanonicalQuery& query,
+                                         const QueryPlannerParams& params,
+                                         IndexBoundsBuilder::BoundsTightness& tightnessOut) {
+    // We need to refine the tightness in case we have a "MAYBE_COVERED" tightness bound which
+    // depends on the query's projection. We will not have information about the projection
+    // later on in order to make this determination, so we do it here.
+    const bool noFetchNeededForProj = !projNeedsFetch(query, params);
+    if (tightnessOut == IndexBoundsBuilder::EXACT_MAYBE_COVERED) {
+        if (noFetchNeededForProj) {
+            tightnessOut = IndexBoundsBuilder::EXACT;
+        } else {
+            tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+        }
+    } else if (tightnessOut == IndexBoundsBuilder::INEXACT_MAYBE_COVERED) {
+        if (noFetchNeededForProj) {
+            tightnessOut = IndexBoundsBuilder::INEXACT_COVERED;
+        } else {
+            tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+        }
+    }
 }
 
 bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
@@ -1222,11 +1216,6 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
         // If we're here, we now know that 'child' can use an index directly and the index is
         // over the child's field.
 
-        // We need to track if this is a covered null query so that we can have this information
-        // at hand when handling the filter on an indexed AND.
-        scanState.isCoveredNullQuery =
-            isCoveredNullQuery(query, child, scanState.ixtag, indices, params);
-
         // If 'child' is a NOT, then the tag we're interested in is on the NOT's
         // child node.
         if (MatchExpression::NOT == child->matchType()) {
@@ -1259,6 +1248,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
             verify(scanState.currentIndexNumber == scanState.ixtag->index);
             scanState.tightness = IndexBoundsBuilder::INEXACT_FETCH;
             mergeWithLeafNode(child, &scanState);
+            refineTightnessForMaybeCoveredQuery(query, params, scanState.tightness);
             handleFilter(&scanState);
         } else {
             if (nullptr != scanState.currentScan.get()) {
@@ -1278,6 +1268,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
                                                  &scanState.tightness,
                                                  scanState.getCurrentIETBuilder());
 
+            refineTightnessForMaybeCoveredQuery(query, params, scanState.tightness);
             handleFilter(&scanState);
         }
     }
@@ -1693,6 +1684,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
                 return soln;
             }
 
+            // We may be able to avoid adding an extra fetch stage even though the bounds are
+            // inexact, for instance if the query is counting null values on an indexed field
+            // without projecting that field. We therefore convert "MAYBE_COVERED" bounds into
+            // either EXACT or INEXACT, depending on the query projection.
+            refineTightnessForMaybeCoveredQuery(query, params, tightness);
+
             // If the bounds are exact, the set of documents that satisfy the predicate is
             // exactly equal to the set of documents that the scan provides.
             //
@@ -1700,11 +1697,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
             // superset of documents that satisfy the predicate, and we must check the
             // predicate.
 
-            // We may also be able to avoid adding an extra fetch stage even though the bounds are
-            // inexact because the query is counting null values on an indexed field without
-            // projecting that field.
-            if (tightness == IndexBoundsBuilder::EXACT ||
-                isCoveredNullQuery(query, root, tag, indices, params)) {
+            if (tightness == IndexBoundsBuilder::EXACT) {
                 return soln;
             } else if (tightness == IndexBoundsBuilder::INEXACT_COVERED &&
                        !indices[tag->index].multikey) {
@@ -1850,10 +1843,9 @@ void QueryPlannerAccess::handleFilterAnd(ScanBuildingState* scanState) {
         // should always be affixed as a filter. We keep 'curChild' in the $and
         // for affixing later.
         ++scanState->curChild;
-    } else if (scanState->tightness == IndexBoundsBuilder::EXACT || scanState->isCoveredNullQuery) {
-        // The tightness of the bounds is exact or we are dealing with a covered null query.
-        // Either way, we want to remove this child so that when control returns to handleIndexedAnd
-        // we know that we don't need it to create a FETCH stage.
+    } else if (scanState->tightness == IndexBoundsBuilder::EXACT) {
+        // The tightness of the bounds is exact. We want to remove this child so that when control
+        // returns to handleIndexedAnd we know that we don't need it to create a FETCH stage.
         root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
     } else if (scanState->tightness == IndexBoundsBuilder::INEXACT_COVERED &&
                (INDEX_TEXT == index.type || !index.multikey)) {
