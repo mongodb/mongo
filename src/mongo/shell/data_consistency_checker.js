@@ -178,6 +178,58 @@ var {DataConsistencyChecker} = (function() {
             return {docsWithDifferentContents, docsMissingOnFirst, docsMissingOnSecond};
         }
 
+        // Like getDiff, but for index specs from listIndexes.  Index specs may not be in the
+        // same order on different nodes, and their primary key is "name", not "_id".
+        static getDiffIndexes(cursor1, cursor2) {
+            let map1 = {};
+            let map2 = {};
+            let indexesMissingOnFirst = [];
+            let indexesMissingOnSecond = [];
+            let indexesWithDifferentSpecs = [];
+            while (cursor1.hasNext()) {
+                let spec = cursor1.next();
+                map1[spec.name] = spec;
+            }
+            while (cursor2.hasNext()) {
+                let spec = cursor2.next();
+                if (!map1.hasOwnProperty(spec.name)) {
+                    indexesMissingOnFirst.push(spec);
+                } else {
+                    const ordering = bsonWoCompare(map1[spec.name], spec);
+                    if (ordering != 0) {
+                        indexesWithDifferentSpecs.push({first: map1[spec.name], second: spec});
+                    }
+                    map2[spec.name] = spec;
+                }
+            }
+            let map1keys = Object.keys(map1);
+            map1keys.forEach(function(key) {
+                if (!map2.hasOwnProperty(key)) {
+                    indexesMissingOnSecond.push(map1[key]);
+                }
+            });
+            return {indexesWithDifferentSpecs, indexesMissingOnFirst, indexesMissingOnSecond};
+        }
+
+        // Since listIndexes does not accept readAtClusterTime, we can only use this in the
+        // foreground dbchecks, not background ones.
+        static getIndexDiffUsingSessions(sourceSession, syncingSession, dbName, collNameOrUUID) {
+            const sourceDB = sourceSession.getDatabase(dbName);
+            const syncingDB = syncingSession.getDatabase(dbName);
+
+            const commandObj = {listIndexes: collNameOrUUID};
+            const sourceCursor = new DBCommandCursor(sourceDB, sourceDB.runCommand(commandObj));
+            const syncingCursor = new DBCommandCursor(syncingDB, syncingDB.runCommand(commandObj));
+            const diff = this.getDiffIndexes(sourceCursor, syncingCursor);
+
+            return {
+                indexesWithDifferentSpecs: diff.indexesWithDifferentSpecs.map(
+                    ({first, second}) => ({sourceNode: first, syncingNode: second})),
+                indexesMissingOnSource: diff.indexesMissingOnFirst,
+                indexesMissingOnSyncing: diff.indexesMissingOnSecond
+            };
+        }
+
         static getCollectionDiffUsingSessions(
             sourceSession, syncingSession, dbName, collNameOrUUID, readAtClusterTime) {
             const sourceDB = sourceSession.getDatabase(dbName);
@@ -229,7 +281,8 @@ var {DataConsistencyChecker} = (function() {
             return true;
         }
 
-        static dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, collName) {
+        static dumpCollectionDiff(
+            collectionPrinted, sourceCollInfos, syncingCollInfos, collName, indexDiffs) {
             print('Dumping collection: ' + sourceCollInfos.ns(collName));
 
             const sourceExists = sourceCollInfos.print(collectionPrinted, collName);
@@ -268,6 +321,32 @@ var {DataConsistencyChecker} = (function() {
                 print(
                     `The following documents are missing on the syncing node ${syncingNode.host}:`);
                 print(diff.docsMissingOnSyncing.map(doc => tojsononeline(doc)).join('\n'));
+            }
+
+            if (indexDiffs) {
+                this.dumpIndexDiffs(sourceNode, syncingNode, indexDiffs);
+            }
+        }
+
+        static dumpIndexDiffs(sourceNode, syncingNode, diff) {
+            for (let {
+                     sourceNode: sourceSpec,
+                     syncingNode: syncingSpec,
+                 } of diff.indexesWithDifferentSpecs) {
+                print(`Mismatching indexes between the source node ${sourceNode.host}` +
+                      ` and the syncing node ${syncingNode.host}:`);
+                print('    sourceNode:   ' + tojsononeline(sourceSpec));
+                print('    syncingNode: ' + tojsononeline(syncingSpec));
+            }
+
+            if (diff.indexesMissingOnSource.length > 0) {
+                print(`The following indexes are missing on the source node ${sourceNode.host}:`);
+                print(diff.indexesMissingOnSource.map(spec => tojsononeline(spec)).join('\n'));
+            }
+
+            if (diff.indexesMissingOnSyncing.length > 0) {
+                print(`The following indexes are missing on the syncing node ${syncingNode.host}:`);
+                print(diff.indexesMissingOnSyncing.map(spec => tojsononeline(spec)).join('\n'));
             }
         }
 
@@ -467,12 +546,27 @@ var {DataConsistencyChecker} = (function() {
                     reasons.push('ns');
                 }
 
+                let indexSpecsDiffer = false;
+                let indexDiffs;
+                if (syncingHasIndexes) {
+                    const sourceNode = sourceCollInfos.conn;
+                    const syncingNode = syncingCollInfos.conn;
+
+                    const sourceSession = sourceNode.getDB('test').getSession();
+                    const syncingSession = syncingNode.getDB('test').getSession();
+                    indexDiffs = this.getIndexDiffUsingSessions(
+                        sourceSession, syncingSession, sourceCollInfos.dbName, collName);
+                    indexSpecsDiffer = indexDiffs.indexesMissingOnSource.length > 0 ||
+                        indexDiffs.indexesMissingOnSyncing.length > 0 ||
+                        indexDiffs.indexesWithDifferentSpecs.length > 0;
+                }
                 if (skipIndexCountCheck(sourceCollInfos, syncingCollInfos, collName)) {
                     prettyPrint(`Skipping comparison of collStats.nindex for clustered collection ${
                         dbName}.${collName}. Versions ${sourceCollInfos.binVersion} and ${
                         syncingCollInfos.binVersion} are expected to differ in the nindex count.`);
                 } else if (syncingHasIndexes &&
-                           sourceCollStats.nindexes !== syncingCollStats.nindexes) {
+                           (sourceCollStats.nindexes !== syncingCollStats.nindexes ||
+                            indexSpecsDiffer)) {
                     reasons.push('indexes');
                 }
 
@@ -489,7 +583,7 @@ var {DataConsistencyChecker} = (function() {
                 prettyPrint(`the two nodes have different states for the collection ${dbName}.${
                     collName}: ${reasons.join(', ')}`);
                 this.dumpCollectionDiff(
-                    collectionPrinted, sourceCollInfos, syncingCollInfos, collName);
+                    collectionPrinted, sourceCollInfos, syncingCollInfos, collName, indexDiffs);
                 success = false;
             });
 
