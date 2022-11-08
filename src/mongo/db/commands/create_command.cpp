@@ -196,7 +196,7 @@ public:
                         repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
                             repl::ReplicationCoordinator::Mode::modeReplSet);
 
-                if (hasQueryType(cmd.getEncryptedFields().get(), QueryTypeEnum::Range)) {
+                if (hasQueryType(cmd.getEncryptedFields().get(), QueryTypeEnum::RangePreview)) {
                     uassert(
                         6775220,
                         "Queryable Encryption Range support is only supported when FCV supports "

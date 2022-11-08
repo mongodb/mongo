@@ -1917,7 +1917,7 @@ void FLEClientCrypto::validateDocument(const BSONObj& doc,
                     subCdr, keyVault);
                 auto tag = EDCServerCollection::generateTag(ieev);
                 tags.insert({tag, field.first});
-            } else if (hasQueryType(configField->second, QueryTypeEnum::Range)) {
+            } else if (hasQueryType(configField->second, QueryTypeEnum::RangePreview)) {
                 uassert(6775316,
                         str::stream()
                             << "Field '" << field.first << "' is marked as range but not indexed",

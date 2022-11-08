@@ -699,12 +699,12 @@ private:
                     opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
                         auto& efc = collection->getCollectionOptions().encryptedFieldConfig;
 
-                        uassert(
-                            ErrorCodes::CannotDowngrade,
-                            str::stream()
-                                << "Cannot downgrade the cluster as collection " << collection->ns()
-                                << " has 'encryptedFields' with range indexes",
-                            !(efc.has_value() && hasQueryType(efc.get(), QueryTypeEnum::Range)));
+                        uassert(ErrorCodes::CannotDowngrade,
+                                str::stream() << "Cannot downgrade the cluster as collection "
+                                              << collection->ns()
+                                              << " has 'encryptedFields' with range indexes",
+                                !(efc.has_value() &&
+                                  hasQueryType(efc.get(), QueryTypeEnum::RangePreview)));
                         return true;
                     });
             }

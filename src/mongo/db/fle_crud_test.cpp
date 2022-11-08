@@ -407,7 +407,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig(
                         ,
             "path": "encrypted",
             "bsonType": "int",
-            "queries": {"queryType": "range", "min": 0, "max": 15, "sparsity": 1}
+            "queries": {"queryType": "rangePreview", "min": 0, "max": 15, "sparsity": 1}
 
         }
     ]

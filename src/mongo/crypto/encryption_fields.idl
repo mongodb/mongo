@@ -53,7 +53,7 @@ enums:
         type: string
         values:
             Equality: "equality"
-            Range: "range"
+            RangePreview: "rangePreview"
 
 feature_flags:
     featureFlagFLE2Range:

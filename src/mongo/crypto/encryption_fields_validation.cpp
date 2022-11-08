@@ -183,7 +183,7 @@ void validateEncryptedField(const EncryptedField* field) {
                         "The field 'max' is not allowed for equality index but is present",
                         !encryptedIndex.getMax().has_value());
                 break;
-            case QueryTypeEnum::Range: {
+            case QueryTypeEnum::RangePreview: {
                 validateRangeIndex(fieldType, encryptedIndex);
                 break;
             }

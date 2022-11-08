@@ -27,7 +27,7 @@ function runTest(targetFCV) {
                     "path": "first",
                     "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
                     "bsonType": "int",
-                    "queries": {"queryType": "range", "min": 1, "max": 2, "sparsity": 1}
+                    "queries": {"queryType": "rangePreview", "min": 1, "max": 2, "sparsity": 1}
                 },
             ]
         }
