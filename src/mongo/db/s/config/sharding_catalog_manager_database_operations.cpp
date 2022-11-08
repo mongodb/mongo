@@ -37,6 +37,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/server_options.h"
@@ -266,6 +267,51 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     uassertStatusOK(cmdResponse.commandStatus);
 
     return database;
+}
+
+void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
+                                               const StringData& dbName,
+                                               const DatabaseVersion& expectedDbVersion,
+                                               const ShardId& toShard) {
+    // Hold the shard lock until the entire commit finishes to serialize with removeShard.
+    Lock::SharedLock shardLock(opCtx->lockState(), _kShardMembershipLock);
+
+    const auto updateOp = [&] {
+        const auto query = [&] {
+            BSONObjBuilder bsonBuilder;
+            bsonBuilder.append(DatabaseType::kNameFieldName, dbName);
+            // Include the version in the update filter to be resilient to potential network retries
+            // and delayed messages.
+            for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {
+                const auto dottedFieldName = DatabaseType::kVersionFieldName + "." + fieldName;
+                bsonBuilder.appendAs(fieldValue, dottedFieldName);
+            }
+            return bsonBuilder.obj();
+        }();
+
+        const auto update = [&] {
+            const auto newDbVersion = expectedDbVersion.makeUpdated();
+
+            BSONObjBuilder bsonBuilder;
+            bsonBuilder.append(DatabaseType::kPrimaryFieldName, toShard);
+            bsonBuilder.append(DatabaseType::kVersionFieldName, newDbVersion.toBSON());
+            return BSON("$set" << bsonBuilder.obj());
+        }();
+
+        write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigDatabasesNamespace);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+            return entry;
+        }()});
+
+        return updateOp;
+    }();
+
+    DBDirectClient dbClient(opCtx);
+    const auto commandResponse = dbClient.runCommand(updateOp.serialize({}));
+    uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
 }
 
 }  // namespace mongo

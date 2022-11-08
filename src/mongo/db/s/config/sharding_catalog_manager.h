@@ -396,6 +396,15 @@ public:
         // # TODO SERVER-63983: remove enableSharding paramter when 6.0 becomes lastLTS
         bool enableSharding = false);
 
+    /**
+     * Updates the metadata in config.databases collection with the new primary shard for the given
+     * database. This also advances the database's lastmod.
+     */
+    void commitMovePrimary(OperationContext* opCtx,
+                           const StringData& dbName,
+                           const DatabaseVersion& expectedDbVersion,
+                           const ShardId& toShard);
+
     //
     // Collection Operations
     //
