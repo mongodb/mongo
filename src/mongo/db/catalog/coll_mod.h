@@ -48,6 +48,18 @@ class OperationContext;
 void addCollectionUUIDs(OperationContext* opCtx);
 
 /**
+ * Checks if the collMod request is converting an index to unique.
+ */
+bool isCollModIndexUniqueConversion(const CollModRequest& request);
+
+/**
+ * Constructs a valid collMod dry-run request from the original request.
+ * The 'dryRun' option can only be used with the index 'unique' option, so we assume 'request' must
+ * have the 'unique' option. The function will also remove other options from the original request.
+ */
+CollModRequest makeCollModDryRunRequest(const CollModRequest& request);
+
+/**
  * Performs the collection modification described in "cmd" on the collection "ns".
  */
 Status processCollModCommand(OperationContext* opCtx,
