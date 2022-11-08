@@ -79,8 +79,9 @@ boost::optional<BSONObj> ChangeStreamProxyStage::getNextBson() {
 }
 
 BSONObj ChangeStreamProxyStage::_validateAndConvertToBSON(const Document& event) const {
-    // If we are producing output to be merged on mongoS, then no stages can have modified the _id.
-    if (_includeMetaData) {
+    // If we are producing output to be merged on mongoS, then the _id cannot have been modified by
+    // any stage.
+    if (_includeMetaData && !_pipeline->getContext()->forPerShardCursor) {
         return event.toBsonWithMetaData();
     }
     // Confirm that the document _id field matches the original resume token in the sort key field.
@@ -97,6 +98,13 @@ BSONObj ChangeStreamProxyStage::_validateAndConvertToBSON(const Document& event)
                           << BSON("_id" << resumeToken) << " but found: "
                           << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
             idField.binaryEqual(resumeToken));
+    // If we are producing output to be merged on mongos, then metadata must also be returned. We
+    // must do the above check first since if the request is for a per shard cursor, a project can
+    // be pushed down to a shard.
+    if (_pipeline->getContext()->forPerShardCursor) {
+        return event.toBsonWithMetaData();
+    }
+
     return eventBSON;
 }
 

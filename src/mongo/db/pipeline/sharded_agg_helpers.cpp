@@ -77,27 +77,49 @@ BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
                                          const AggregationRequest& request,
                                          const boost::optional<RuntimeConstants>& constants,
                                          Pipeline* pipeline,
-                                         BSONObj collationObj) {
+                                         BSONObj collationObj,
+                                         bool forPerShardCursor,
+                                         boost::optional<int> overrideBatchSize) {
     // Create the command for the shards.
-    MutableDocument targetedCmd(request.serializeToCommandObj());
+    auto serializedCommand = request.serializeToCommandObj();
+    MutableDocument targetedCmd(serializedCommand);
     if (pipeline) {
         targetedCmd[AggregationRequest::kPipelineName] = Value(pipeline->serialize());
     }
+    if (forPerShardCursor) {
+        // If this is a change stream aggregation, set the 'mergeByPBRT' flag on the command. This
+        // notifies the shards that the mongoS is capable of merging streams based on resume token.
+        // TODO SERVER-38539: the 'mergeByPBRT' flag is no longer necessary in 4.4.
+        targetedCmd[AggregationRequest::kMergeByPBRTName] = Value(true);
+    }
+
+    if (overrideBatchSize.has_value()) {
+        if (serializedCommand[AggregationRequest::kCursorName].missing()) {
+            targetedCmd[AggregationRequest::kCursorName] =
+                Value(DOC(AggregationRequest::kBatchSizeName << Value(*overrideBatchSize)));
+        } else {
+            targetedCmd[AggregationRequest::kCursorName][AggregationRequest::kBatchSizeName] =
+                Value(*overrideBatchSize);
+        }
+    }
 
     return genericTransformForShards(
-        std::move(targetedCmd), opCtx, request, constants, collationObj);
+        std::move(targetedCmd), opCtx, request, constants, collationObj, forPerShardCursor);
 }
 
 BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   OperationContext* opCtx,
                                   const AggregationRequest& request,
                                   const boost::optional<RuntimeConstants>& constants,
-                                  BSONObj collationObj) {
+                                  BSONObj collationObj,
+                                  bool forPerShardCursor) {
     if (constants) {
         cmdForShards[AggregationRequest::kRuntimeConstants] = Value(constants.get().toBSON());
     }
 
-    cmdForShards[AggregationRequest::kFromMongosName] = Value(true);
+    if (!forPerShardCursor) {
+        cmdForShards[AggregationRequest::kFromMongosName] = Value(true);
+    }
     // If this is a request for an aggregation explain, then we must wrap the aggregate inside an
     // explain command.
     if (auto explainVerbosity = request.getExplain()) {
@@ -286,8 +308,13 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                          exchangeSpec,
                                          expCtx->getRuntimeConstants(),
                                          true)
-        : createPassthroughCommandForShard(
-              opCtx, aggRequest, expCtx->getRuntimeConstants(), pipeline.get(), collationObj);
+        : createPassthroughCommandForShard(opCtx,
+                                           aggRequest,
+                                           expCtx->getRuntimeConstants(),
+                                           pipeline.get(),
+                                           collationObj,
+                                           false,
+                                           boost::none);
 
     // In order for a $changeStream to work reliably, we need the shard registry to be at least as
     // current as the logical time at which the pipeline was serialized to 'targetedCommand' above.

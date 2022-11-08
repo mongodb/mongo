@@ -117,13 +117,16 @@ BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
                                          const AggregationRequest& request,
                                          const boost::optional<RuntimeConstants>& constants,
                                          Pipeline* pipeline,
-                                         BSONObj collationObj);
+                                         BSONObj collationObj,
+                                         bool forPerShardCursor,
+                                         boost::optional<int> overrideBatchSize);
 
 BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   OperationContext* opCtx,
                                   const AggregationRequest& request,
                                   const boost::optional<RuntimeConstants>& constants,
-                                  BSONObj collationObj);
+                                  BSONObj collationObj,
+                                  bool forPerShardCursor = false);
 
 /**
  * For a sharded collection, establishes remote cursors on each shard that may have results, and

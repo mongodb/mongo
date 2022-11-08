@@ -56,6 +56,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     needsMerge = request.needsMerge();
     mergeByPBRT = request.mergeByPBRT();
     allowDiskUse = request.shouldAllowDiskUse();
+    forPerShardCursor = request.getPassthroughToShard().has_value();
     bypassDocumentValidation = request.shouldBypassDocumentValidation();
     ns = request.getNamespaceString();
     mongoProcessInterface = std::move(processInterface);

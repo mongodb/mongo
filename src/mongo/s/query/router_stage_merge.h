@@ -67,6 +67,10 @@ public:
         return _resultsMerger.getNumRemotes();
     }
 
+    BSONObj getPostBatchResumeToken() final {
+        return _resultsMerger.getHighWaterMark();
+    }
+
 protected:
     Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final {
         return _resultsMerger.setAwaitDataTimeout(awaitDataTimeout);

@@ -121,7 +121,8 @@ private:
                                  const AggregationRequest&,
                                  const LiteParsedPipeline&,
                                  const PrivilegeVector& privileges,
-                                 BSONObjBuilder* result);
+                                 BSONObjBuilder* result,
+                                 bool forPerShardCursor);
 };
 
 }  // namespace mongo

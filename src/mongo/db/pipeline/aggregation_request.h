@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/runtime_constants_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
@@ -64,6 +65,7 @@ public:
     static constexpr StringData kHintName = "hint"_sd;
     static constexpr StringData kCommentName = "comment"_sd;
     static constexpr StringData kExchangeName = "exchange"_sd;
+    static constexpr StringData kPassthroughToShardName = "$_passthroughToShard"_sd;
     static constexpr StringData kRuntimeConstants = "runtimeConstants"_sd;
     static constexpr StringData kUseNewUpsert = "useNewUpsert"_sd;
 
@@ -243,6 +245,10 @@ public:
         return _useNewUpsert;
     }
 
+    boost::optional<ShardId> getPassthroughToShard() const {
+        return _passthroughToShard;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -319,6 +325,10 @@ public:
         _useNewUpsert = useNewUpsert;
     }
 
+    void setPassthroughToShard(boost::optional<ShardId> shardId) {
+        _passthroughToShard = shardId;
+    }
+
 private:
     // Required fields.
     const NamespaceString _nss;
@@ -376,5 +386,7 @@ private:
     // Indicates whether the aggregation may use the new 'upsertSupplied' mechanism when running
     // $merge stages. Versions of mongoS from 4.2.2 onwards always set this flag.
     bool _useNewUpsert = false;
+
+    boost::optional<ShardId> _passthroughToShard;
 };
 }  // namespace mongo

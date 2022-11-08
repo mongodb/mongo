@@ -58,7 +58,8 @@ PipelineProxyStage::PipelineProxyStage(OperationContext* opCtx,
                                        const char* stageTypeName)
     : PlanStage(stageTypeName, opCtx),
       _pipeline(std::move(pipeline)),
-      _includeMetaData(_pipeline->getContext()->needsMerge),  // send metadata to merger
+      _includeMetaData(_pipeline->getContext()->needsMerge ||
+                       _pipeline->getContext()->forPerShardCursor),  // send metadata to merger
       _ws(ws) {
     // We take over responsibility for disposing of the Pipeline, since it is required that
     // doDispose() will be called before destruction of this PipelineProxyStage.

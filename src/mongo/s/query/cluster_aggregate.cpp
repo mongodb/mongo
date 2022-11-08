@@ -42,6 +42,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -863,6 +864,28 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         resolveInvolvedNamespaces(opCtx, litePipe, request.getNamespaceString());
 
     auto status = [&]() {
+        if (request.getPassthroughToShard().has_value()) {
+            uassert(6273801,
+                    "per shard cursor pipeline must contain $changeStream",
+                    litePipe.hasChangeStream());
+
+            // Make sure the rest of the pipeline can be pushed down.
+            auto pipeline = request.getPipeline();
+            std::vector<BSONObj> nonChangeStreamPart(pipeline.begin() + 1, pipeline.end());
+            LiteParsedPipeline nonChangeStreamLite(
+                AggregationRequest(request.getNamespaceString(), nonChangeStreamPart));
+            uassert(6273802,
+                    "$_passthroughToShard specified with a stage that is not allowed to "
+                    "passthrough from mongos",
+                    nonChangeStreamLite.allowedToPassthroughFromMongos());
+            ShardId shardId = *request.getPassthroughToShard();
+            uassert(6273803,
+                    "$_passthroughToShard not supported for queries against config replica set",
+                    shardId != ShardRegistry::kConfigServerShardId);
+
+            return aggPassthrough(
+                opCtx, namespaces, shardId, request, litePipe, privileges, result, true);
+        }
         // A pipeline is allowed to passthrough to the primary shard iff the following conditions
         // are met:
         //
@@ -874,7 +897,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             litePipe.allowedToPassthroughFromMongos() && !involvesShardedCollections) {
             const auto primaryShardId = routingInfo->db().primary()->getId();
             return aggPassthrough(
-                opCtx, namespaces, primaryShardId, request, litePipe, privileges, result);
+                opCtx, namespaces, primaryShardId, request, litePipe, privileges, result, false);
         }
 
         // Populate the collection UUID and the appropriate collation to use.
@@ -967,19 +990,30 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                                         const AggregationRequest& aggRequest,
                                         const LiteParsedPipeline& liteParsedPipeline,
                                         const PrivilegeVector& privileges,
-                                        BSONObjBuilder* out) {
+                                        BSONObjBuilder* out,
+                                        bool forPerShardCursor) {
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
     BSONObj cmdObj = CommandHelpers::filterCommandRequestForPassthrough(
         sharded_agg_helpers::createPassthroughCommandForShard(
-            opCtx, aggRequest, boost::none, nullptr, BSONObj()));
+            opCtx,
+            aggRequest,
+            boost::none,
+            nullptr,
+            BSONObj(),
+            forPerShardCursor,
+            forPerShardCursor ? boost::optional<int>(0) : boost::none));
+
+    uassert(6900400,
+            "shouldn't have fromMongos set for per shard cursor",
+            !forPerShardCursor || cmdObj[AggregationRequest::kFromMongosName].eoo());
 
     MultiStatementTransactionRequestsSender ars(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
         namespaces.executionNss.db().toString(),
         {{shardId,
-          shardId != ShardRegistry::kConfigServerShardId
+          shardId != ShardRegistry::kConfigServerShardId && !forPerShardCursor
               ? appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED())
               : std::move(cmdObj)}},
         ReadPreferenceSetting::get(opCtx),
@@ -1005,16 +1039,18 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         auto tailMode = liteParsedPipeline.hasChangeStream()
             ? TailableModeEnum::kTailableAndAwaitData
             : TailableModeEnum::kNormal;
-        result = uassertStatusOK(
-            storePossibleCursor(opCtx,
-                                shardId,
-                                *response.shardHostAndPort,
-                                response.swResponse.getValue().data,
-                                namespaces.requestedNss,
-                                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                Grid::get(opCtx)->getCursorManager(),
-                                privileges,
-                                tailMode));
+        result = uassertStatusOK(storePossibleCursor(
+            opCtx,
+            shardId,
+            *response.shardHostAndPort,
+            response.swResponse.getValue().data,
+            namespaces.requestedNss,
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+            Grid::get(opCtx)->getCursorManager(),
+            privileges,
+            tailMode,
+            forPerShardCursor ? boost::optional<BSONObj>(change_stream_constants::kSortSpec)
+                              : boost::none));
     }
 
     // First append the properly constructed writeConcernError. It will then be skipped
