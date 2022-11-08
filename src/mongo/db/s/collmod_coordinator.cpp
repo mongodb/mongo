@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/collmod_coordinator.h"
 
+#include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -313,6 +314,28 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     auto primaryShardOwningChunk = std::find(shardsOwningChunks.begin(),
                                                              shardsOwningChunks.end(),
                                                              _shardingInfo->primaryShard);
+
+                    // If trying to convert an index to unique, executes a dryRun first to find any
+                    // duplicates without actually changing the indexes to avoid inconsistent index
+                    // specs on different shards.
+                    // Example:
+                    //   Shard0: {_id: 0, a: 1}
+                    //   Shard1: {_id: 1, a: 2}, {_id: 2, a: 2}
+                    //   When trying to convert index {a: 1} to unique, the dry run will return the
+                    //   duplicate errors to the user without converting the indexes.
+                    if (isCollModIndexUniqueConversion(_request)) {
+                        // The 'dryRun' option only works with 'unique' index option. We need to
+                        // strip out other incompatible options.
+                        auto dryRunRequest =
+                            ShardsvrCollModParticipant{nss(), makeCollModDryRunRequest(_request)};
+                        sharding_ddl_util::sendAuthenticatedCommandToShards(
+                            opCtx,
+                            nss().db(),
+                            CommandHelpers::appendMajorityWriteConcern(dryRunRequest.toBSON({})),
+                            shardsOwningChunks,
+                            **executor);
+                    }
+
                     // A view definition will only be present on the primary shard. So we pass an
                     // addition 'performViewChange' flag only to the primary shard.
                     if (primaryShardOwningChunk != shardsOwningChunks.end()) {
