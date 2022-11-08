@@ -740,20 +740,54 @@ std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& 
     MONGO_UNREACHABLE;
 }
 
-std::unique_ptr<sbe::EExpression> generatePerColumnFilterExpr(StageBuilderState& state,
-                                                              const MatchExpression* me,
-                                                              sbe::value::SlotId inputSlot) {
-    auto lambdaFrameId = state.frameIdGenerator->generate();
-    auto lambdaParam = sbe::EVariable{lambdaFrameId, 0};
+std::unique_ptr<sbe::EExpression> generateLeafExpr(StageBuilderState& state,
+                                                   const MatchExpression* me,
+                                                   sbe::FrameId lambdaFrameId,
+                                                   sbe::value::SlotId inputSlot) {
+    sbe::EVariable lambdaParam = sbe::EVariable{lambdaFrameId, 0};
 
     auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(
         lambdaFrameId, generatePerColumnPredicate(state, me, lambdaParam));
 
-    auto traverseFuncName = (me->matchType() == MatchExpression::EXISTS ||
-                             me->matchType() == MatchExpression::TYPE_OPERATOR)
+    const MatchExpression::MatchType mt = me->matchType();
+    auto traverserName = (mt == MatchExpression::EXISTS || mt == MatchExpression::TYPE_OPERATOR)
         ? "traverseCsiCellTypes"
         : "traverseCsiCellValues";
-    return makeFunction(traverseFuncName, makeVariable(inputSlot), std::move(lambdaExpr));
+    return makeFunction(traverserName, makeVariable(inputSlot), std::move(lambdaExpr));
+}
+
+std::unique_ptr<sbe::EExpression> generatePerColumnLogicalAndExpr(StageBuilderState& state,
+                                                                  const AndMatchExpression* me,
+                                                                  sbe::FrameId lambdaFrameId,
+                                                                  sbe::value::SlotId inputSlot) {
+    const auto cTerms = me->numChildren();
+    tassert(7072600, "AND should have at least one child", cTerms > 0);
+
+    auto logical = generateLeafExpr(state, me->getChild(cTerms - 1), lambdaFrameId, inputSlot);
+    if (cTerms == 1)
+        return logical;
+
+    // TODO SERVER-70110: Replace the right-handed tree with a folded AND node when it becomes
+    // available.
+    for (int i = cTerms - 2; i >= 0; i--) {
+        logical = makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                               generateLeafExpr(state, me->getChild(i), lambdaFrameId, inputSlot),
+                               std::move(logical));
+    }
+    return logical;
+}
+
+std::unique_ptr<sbe::EExpression> generatePerColumnFilterExpr(StageBuilderState& state,
+                                                              const MatchExpression* me,
+                                                              sbe::value::SlotId inputSlot) {
+    auto lambdaFrameId = state.frameIdGenerator->generate();
+
+    if (me->matchType() == MatchExpression::AND) {
+        return generatePerColumnLogicalAndExpr(
+            state, checked_cast<const AndMatchExpression*>(me), lambdaFrameId, inputSlot);
+    }
+
+    return generateLeafExpr(state, me, lambdaFrameId, inputSlot);
 }
 }  // namespace
 

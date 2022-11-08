@@ -806,6 +806,67 @@ function testInExpr(test) {
     }
 }());
 
+// Check match expressions that use logical AND for predicates on the same path.
+(function testPerPathFilters_SupportedMatchExpressions_And() {
+    let expected = [];
+    let actual = [];
+    let errMsg = "";
+    coll_filters.drop();
+
+    const docs = [
+        {_id: 1, x: 1, n: 1},
+        {_id: 2, x: 5, n: 2},
+        {_id: 3, x: 10, n: 3},
+
+        {_id: 11, x: ["string", 1], n: 11},
+        {_id: 12, x: ["string", 5], n: 12},
+        {_id: 13, x: ["string", 10], n: 13},
+
+        {_id: 21, x: [1, 2], n: 21},
+        {_id: 22, x: [1, 10], n: 22},
+    ];
+    coll_filters.insert(docs);
+    assert.commandWorked(coll_filters.createIndex({"$**": "columnstore"}));
+
+    errMsg = "AND of terms that only traverse cell values";
+    actual = coll_filters.find({x: {$gt: 4, $lt: 7}}, {_id: 1}).toArray();
+    expected = [{_id: 2}, {_id: 12}, {_id: 22}];
+    assert(resultsEq(actual, expected),
+           `actual=${tojson(actual)}, expected=${tojson(expected)} ${errMsg}`);
+
+    errMsg = "Another AND over values to highlight array semantics";
+    actual = coll_filters.find({x: {$lt: 5, $gt: 5}}, {_id: 1}).toArray();
+    expected = [{_id: 22}];
+    assert(resultsEq(actual, expected),
+           `actual=${tojson(actual)}, expected=${tojson(expected)} ${errMsg}`);
+
+    errMsg = "AND of terms that traverse both cell types and values";
+    actual = coll_filters.find({x: {$type: "string", $gt: 4, $lte: 10}}, {_id: 1}).toArray();
+    expected = [{_id: 12}, {_id: 13}];
+    assert(resultsEq(actual, expected),
+           `actual=${tojson(actual)}, expected=${tojson(expected)} ${errMsg}`);
+
+    errMsg = "Nested ANDs";
+    actual = coll_filters
+                 .find({$and: [{x: {$type: "string"}}, {$and: [{x: {$gt: 4}}, {n: {$lt: 13}}]}]},
+                       {_id: 1})
+                 .toArray();
+    expected = [{_id: 12}];
+    assert(resultsEq(actual, expected),
+           `actual=${tojson(actual)}, expected=${tojson(expected)} ${errMsg}`);
+
+    // OR isn't supported for pushing down but it shouldn't cause any problems, when nested under
+    // AND (the OR term of the filter will be applied as residual).
+    errMsg = "OR under AND";
+    actual = coll_filters
+                 .find({$and: [{x: {$type: "string"}}, {$or: [{x: {$gt: 5}}, {n: {$lt: 12}}]}]},
+                       {_id: 1})
+                 .toArray();
+    expected = [{_id: 11}, {_id: 13}];
+    assert(resultsEq(actual, expected),
+           `actual=${tojson(actual)}, expected=${tojson(expected)} ${errMsg}`);
+})();
+
 // Check translation of other MQL match expressions.
 (function testPerPathFilters_SupportedMatchExpressions_Oddballs() {
     const docs = [

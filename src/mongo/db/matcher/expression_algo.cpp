@@ -477,11 +477,6 @@ std::unique_ptr<MatchExpression> tryAddExpr(StringData path,
     if (FieldRef(path).hasNumericPathComponents())
         return me->shallowClone();
 
-    // (TODO SERVER-70726) addExpr will rightfully create AND for expressions on the same path, but
-    // we cannot translate AND into EExpressions yet.
-    if (out.find(path) != out.end())
-        return me->shallowClone();
-
     addExpr(path, me->shallowClone(), out);
     return nullptr;
 }

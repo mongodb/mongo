@@ -2179,6 +2179,63 @@ TEST(SplitMatchExpressionForColumns, SupportsTypePredicatesArray) {
     ASSERT(residual == nullptr);
 }
 
+TEST(SplitMatchExpressionForColumns, SupportsCombiningPredicatesWithAnd) {
+    ParsedMatchExpression compoundFilter(
+        "{"
+        " albatross: {$gte: 100},"
+        " albatross: {$lt: 200},"
+        " albatross: {$mod: [2, 0]}"
+        "}");
+    auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(compoundFilter.get());
+    ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+    ASSERT(splitUp.contains("albatross"));
+    ASSERT(splitUp["albatross"]->matchType() == MatchExpression::AND)
+        << splitUp.at("albatross")->toString();
+
+    // Don't care about the order of terms in AND.
+    auto andExpr = splitUp.at("albatross").get();
+    ASSERT_EQ(splitUp.at("albatross")->numChildren(), 3) << splitUp.at("albatross")->toString();
+    stdx::unordered_set<MatchExpression::MatchType> terms;
+    for (int i = 0; i < 3; i++) {
+        auto mt = andExpr->getChild(i)->matchType();
+        ASSERT(terms.insert(mt).second) << mt;
+    }
+    ASSERT(terms.count(MatchExpression::GTE) == 1) << "Should have GTE term";
+    ASSERT(terms.count(MatchExpression::LT) == 1) << "Should have LT term";
+    ASSERT(terms.count(MatchExpression::MOD) == 1) << "Should have MOD term";
+
+    ASSERT(residual == nullptr);
+}
+
+TEST(SplitMatchExpressionForColumns, SupportsAndFlattensNestedAnd) {
+    ParsedMatchExpression compoundFilter(
+        "{"
+        " $and: ["
+        "   {albatross: {$gte: 100}},"
+        "   {$and: [{albatross: {$lt: 200}}, {albatross: {$mod: [2, 0]}}]}"
+        " ]"
+        "}");
+    auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(compoundFilter.get());
+    ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+    ASSERT(splitUp.contains("albatross"));
+    ASSERT(splitUp["albatross"]->matchType() == MatchExpression::AND)
+        << splitUp.at("albatross")->toString();
+
+    // Don't care about the order of terms in AND.
+    auto andExpr = splitUp.at("albatross").get();
+    ASSERT_EQ(splitUp.at("albatross")->numChildren(), 3) << splitUp.at("albatross")->toString();
+    stdx::unordered_set<MatchExpression::MatchType> terms;
+    for (int i = 0; i < 3; i++) {
+        auto mt = andExpr->getChild(i)->matchType();
+        ASSERT(terms.insert(mt).second) << mt;
+    }
+    ASSERT(terms.count(MatchExpression::GTE) == 1) << "Should have GTE term";
+    ASSERT(terms.count(MatchExpression::LT) == 1) << "Should have LT term";
+    ASSERT(terms.count(MatchExpression::MOD) == 1) << "Should have MOD term";
+
+    ASSERT(residual == nullptr);
+}
+
 TEST(SplitMatchExpressionForColumns, DoesNotSupportNotQueries) {
     {
         ParsedMatchExpression notEqFilter("{albatross: {$not: {$eq: 2}}}");

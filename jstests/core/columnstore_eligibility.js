@@ -65,6 +65,19 @@ assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 explain = coll.find({a: 2}, {_id: 0, a: 1}).explain();
 assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 
+// A complex predicate.
+explain = coll.find({
+                  $and: [
+                      {a: {$gt: 2, $mod: [2, 0]}},
+                      {$or: [{a: {$lte: 0}}, {b: 42}]},
+                      {a: {$type: "number"}},
+                      {b: {$in: [0, 3, []]}}
+                  ]
+              },
+                    {_id: 1})
+              .explain();
+assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
 // Scan the "a.b" column with a predicate. Dotted paths are supported even if there are arrays
 // encountered. See IS_SPARSE Encoding for more details.
 explain = coll.find({'a.b': 2}, {_id: 0, 'a.b': 1}).explain();
