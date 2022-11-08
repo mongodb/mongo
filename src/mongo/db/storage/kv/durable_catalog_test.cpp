@@ -547,6 +547,13 @@ public:
         // in the thread is fully committed to the storage engine.
         {
             Lock::GlobalLock globalLock{operationContext(), MODE_IX};
+            // First confirm that we can observe the multikey write set by the other thread.
+            MultikeyPaths paths;
+            ASSERT_TRUE(collection->isIndexMultikey(
+                operationContext(), indexEntry->descriptor()->indexName(), &paths));
+            assertMultikeyPathsAreEqual(paths, first);
+
+            // Then perform our own multikey write.
             WriteUnitOfWork wuow(operationContext());
             collection->setIndexIsMultikey(
                 operationContext(), indexEntry->descriptor()->indexName(), second);

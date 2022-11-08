@@ -108,6 +108,7 @@ public:
         mutable Mutex multikeyMutex;
         mutable bool multikey = false;
         mutable MultikeyPaths multikeyPaths;
+        mutable AtomicWord<int32_t> concurrentWriters;
     };
 
     struct MetaData {

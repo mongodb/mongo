@@ -1932,89 +1932,107 @@ boost::optional<UUID> CollectionImpl::getIndexBuildUUID(StringData indexName) co
 bool CollectionImpl::isIndexMultikey(OperationContext* opCtx,
                                      StringData indexName,
                                      MultikeyPaths* multikeyPaths) const {
-    auto isMultikey =
-        [this, multikeyPaths, indexName](const BSONCollectionCatalogEntry::MetaData& metadata) {
-            int offset = metadata.findIndexOffset(indexName);
-            invariant(offset >= 0,
-                      str::stream() << "cannot get multikey for index " << indexName << " @ "
-                                    << getCatalogId() << " : " << metadata.toBSON());
+    int offset = _metadata->findIndexOffset(indexName);
+    invariant(offset >= 0,
+              str::stream() << "cannot get multikey for index " << indexName << " @ "
+                            << getCatalogId() << " : " << _metadata->toBSON());
 
-            const auto& index = metadata.indexes[offset];
+    // If we have uncommitted multikey writes we need to check here to read our own writes
+    const auto& uncommittedMultikeys = UncommittedMultikey::get(opCtx).resources();
+    if (uncommittedMultikeys) {
+        if (auto it = uncommittedMultikeys->find(this); it != uncommittedMultikeys->end()) {
+            const auto& index = it->second.indexes[offset];
+            if (multikeyPaths && !index.multikeyPaths.empty()) {
+                *multikeyPaths = index.multikeyPaths;
+            }
+            return index.multikey;
+        }
+    }
+
+    // Otherwise read from the metadata cache if there are no concurrent multikey writers
+    {
+        const auto& index = _metadata->indexes[offset];
+        // Check for concurrent writers, this can race with writers where it can be set immediately
+        // after checking. This is fine we know that the reader in that case opened its snapshot
+        // before the writer and we do not need to observe its result.
+        if (index.concurrentWriters.load() == 0) {
             stdx::lock_guard lock(index.multikeyMutex);
             if (multikeyPaths && !index.multikeyPaths.empty()) {
                 *multikeyPaths = index.multikeyPaths;
             }
-
             return index.multikey;
-        };
-
-    const auto& uncommittedMultikeys = UncommittedMultikey::get(opCtx).resources();
-    if (uncommittedMultikeys) {
-        if (auto it = uncommittedMultikeys->find(this); it != uncommittedMultikeys->end()) {
-            return isMultikey(it->second);
         }
     }
 
-    return isMultikey(*_metadata);
+    // We need to read from the durable catalog if there are concurrent multikey writers to avoid
+    // reading between the multikey write committing in the storage engine but before its onCommit
+    // handler made the write visible for readers.
+    auto snapshotMetadata = DurableCatalog::get(opCtx)->getMetaData(opCtx, getCatalogId());
+    int snapshotOffset = snapshotMetadata->findIndexOffset(indexName);
+    invariant(snapshotOffset >= 0,
+              str::stream() << "cannot get multikey for index " << indexName << " @ "
+                            << getCatalogId() << " : " << _metadata->toBSON());
+    const auto& index = snapshotMetadata->indexes[snapshotOffset];
+    if (multikeyPaths && !index.multikeyPaths.empty()) {
+        *multikeyPaths = index.multikeyPaths;
+    }
+    return index.multikey;
 }
 
 bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
                                         StringData indexName,
                                         const MultikeyPaths& multikeyPaths) const {
 
-    auto setMultikey = [this, name = indexName.toString(), multikeyPaths](
-                           const BSONCollectionCatalogEntry::MetaData& metadata) {
-        int offset = metadata.findIndexOffset(name);
-        invariant(offset >= 0,
-                  str::stream() << "cannot set index " << name << " as multikey @ "
-                                << getCatalogId() << " : " << metadata.toBSON());
+    int offset = _metadata->findIndexOffset(indexName);
+    invariant(offset >= 0,
+              str::stream() << "cannot set multikey for index " << indexName << " @ "
+                            << getCatalogId() << " : " << _metadata->toBSON());
 
-        {
-            const auto& index = metadata.indexes[offset];
-            stdx::lock_guard lock(index.multikeyMutex);
+    auto setMultikey = [offset,
+                        multikeyPaths](const BSONCollectionCatalogEntry::MetaData& metadata) {
+        auto* index = &metadata.indexes[offset];
+        stdx::lock_guard lock(index->multikeyMutex);
 
-            const bool tracksPathLevelMultikeyInfo =
-                !metadata.indexes[offset].multikeyPaths.empty();
-            if (tracksPathLevelMultikeyInfo) {
-                invariant(!multikeyPaths.empty());
-                invariant(multikeyPaths.size() == metadata.indexes[offset].multikeyPaths.size());
-            } else {
-                invariant(multikeyPaths.empty());
+        const bool tracksPathLevelMultikeyInfo = !metadata.indexes[offset].multikeyPaths.empty();
+        if (tracksPathLevelMultikeyInfo) {
+            invariant(!multikeyPaths.empty());
+            invariant(multikeyPaths.size() == metadata.indexes[offset].multikeyPaths.size());
+        } else {
+            invariant(multikeyPaths.empty());
 
-                if (metadata.indexes[offset].multikey) {
-                    // The index is already set as multikey and we aren't tracking path-level
-                    // multikey information for it. We return false to indicate that the index
-                    // metadata is unchanged.
-                    return false;
+            if (metadata.indexes[offset].multikey) {
+                // The index is already set as multikey and we aren't tracking path-level
+                // multikey information for it. We return false to indicate that the index
+                // metadata is unchanged.
+                return false;
+            }
+        }
+
+        index->multikey = true;
+
+        if (tracksPathLevelMultikeyInfo) {
+            bool newPathIsMultikey = false;
+            bool somePathIsMultikey = false;
+
+            // Store new path components that cause this index to be multikey in catalog's
+            // index metadata.
+            for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+                MultikeyComponents& indexMultikeyComponents = index->multikeyPaths[i];
+                for (const auto multikeyComponent : multikeyPaths[i]) {
+                    auto result = indexMultikeyComponents.insert(multikeyComponent);
+                    newPathIsMultikey = newPathIsMultikey || result.second;
+                    somePathIsMultikey = true;
                 }
             }
 
-            index.multikey = true;
+            // If all of the sets in the multikey paths vector were empty, then no component
+            // of any indexed field caused the index to be multikey. setIndexIsMultikey()
+            // therefore shouldn't have been called.
+            invariant(somePathIsMultikey);
 
-            if (tracksPathLevelMultikeyInfo) {
-                bool newPathIsMultikey = false;
-                bool somePathIsMultikey = false;
-
-                // Store new path components that cause this index to be multikey in catalog's
-                // index metadata.
-                for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-                    MultikeyComponents& indexMultikeyComponents = index.multikeyPaths[i];
-                    for (const auto multikeyComponent : multikeyPaths[i]) {
-                        auto result = indexMultikeyComponents.insert(multikeyComponent);
-                        newPathIsMultikey = newPathIsMultikey || result.second;
-                        somePathIsMultikey = true;
-                    }
-                }
-
-                // If all of the sets in the multikey paths vector were empty, then no component
-                // of any indexed field caused the index to be multikey. setIndexIsMultikey()
-                // therefore shouldn't have been called.
-                invariant(somePathIsMultikey);
-
-                if (!newPathIsMultikey) {
-                    // We return false to indicate that the index metadata is unchanged.
-                    return false;
-                }
+            if (!newPathIsMultikey) {
+                // We return false to indicate that the index metadata is unchanged.
+                return false;
             }
         }
         return true;
@@ -2068,8 +2086,44 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
 
     DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *metadata);
 
+    // RAII Helper object to ensure we decrement the concurrent counter if and only if we
+    // incremented it in a preCommit handler.
+    class ConcurrentMultikeyWriteTracker {
+    public:
+        ConcurrentMultikeyWriteTracker(
+            std::shared_ptr<const BSONCollectionCatalogEntry::MetaData> meta, int indexOffset)
+            : metadata(std::move(meta)), offset(indexOffset) {}
+
+        ~ConcurrentMultikeyWriteTracker() {
+            if (hasIncremented) {
+                metadata->indexes[offset].concurrentWriters.fetchAndSubtract(1);
+            }
+        }
+
+        void preCommit() {
+            metadata->indexes[offset].concurrentWriters.fetchAndAdd(1);
+            hasIncremented = true;
+        }
+
+    private:
+        std::shared_ptr<const BSONCollectionCatalogEntry::MetaData> metadata;
+        int offset;
+        bool hasIncremented = false;
+    };
+
+    auto concurrentWriteTracker =
+        std::make_shared<ConcurrentMultikeyWriteTracker>(_metadata, offset);
+
+    // Mark this index that there is an ongoing multikey write. This forces readers to read from the
+    // durable catalog to determine if the index is multikey or not.
+    opCtx->recoveryUnit()->registerPreCommitHook(
+        [concurrentWriteTracker](OperationContext*) { concurrentWriteTracker->preCommit(); });
+
+    // Capture a reference to 'concurrentWriteTracker' to extend the lifetime of this object until
+    // commiting/rolling back the transaction is fully complete.
     opCtx->recoveryUnit()->onCommit(
-        [this, uncommittedMultikeys, setMultikey = std::move(setMultikey)](auto ts) {
+        [this, uncommittedMultikeys, setMultikey = std::move(setMultikey), concurrentWriteTracker](
+            auto ts) {
             // Merge in changes to this index, other indexes may have been updated since we made our
             // copy. Don't check for result as another thread could be setting multikey at the same
             // time
