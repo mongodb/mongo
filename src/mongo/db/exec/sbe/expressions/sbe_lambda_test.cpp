@@ -52,7 +52,11 @@ TEST_F(SBELambdaTest, TraverseP_AddOneToArray) {
                        value::bitcastFrom<const char*>(bsonArr.objdata()));
     auto [tag, val] = runCompiledExpression(compiledExpr.get());
     value::ValueGuard guard(tag, val);
-    ASSERT_THAT(std::make_pair(tag, val), ValueEq(makeArray(BSON_ARRAY(2 << 3 << 4))));
+
+    auto [tagExpected, valExpected] = makeArray(BSON_ARRAY(2 << 3 << 4));
+    value::ValueGuard expectedGuard(tagExpected, valExpected);
+
+    ASSERT_THAT(std::make_pair(tag, val), ValueEq(std::make_pair(tagExpected, valExpected)));
 }
 
 TEST_F(SBELambdaTest, TraverseF_OpEq) {
