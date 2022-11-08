@@ -63,18 +63,12 @@ function verifySlowQueryLog(db, expectedComment, queryFramework) {
 
 // Ensure the profile filter contains the correct information about the queryFramework used.
 function verifyProfiler(expectedComment, queryFramework) {
-    const profileEntryFilter = {ns: "query_engine_stats.collection"};
+    const profileEntryFilter = {
+        ns: "query_engine_stats.collection",
+        "command.comment": expectedComment
+    };
     const profileObj = getLatestProfilerEntry(db, profileEntryFilter);
-    try {
-        assert.eq(profileObj.command.comment, expectedComment);
-        if (queryFramework) {
-            assert.eq(profileObj.queryFramework, queryFramework);
-        }
-    } catch (e) {
-        print('failed to find [{ "queryFramework" : "' + queryFramework + '", { "comment" : "' +
-              expectedComment + '"} }] in the latest profiler entry.');
-        throw (e);
-    }
+    assert.eq(profileObj.queryFramework, queryFramework);
 }
 
 // Create an object with the correct queryFramework counter values after the specified type of
@@ -155,9 +149,25 @@ verifySlowQueryLog(db, queryComment, framework.find.classic);
 compareQueryEngineCounters(expectedCounters);
 verifyProfiler(queryComment, framework.find.classic);
 
+// Find with getMore.
+queryComment = "findClassicGetMore";
+let cursor = coll.find({a: {$gt: 2}}).comment(queryComment).batchSize(1);
+cursor.next();  // initial query
+verifyProfiler(queryComment, framework.find.classic);
+cursor.next();  // getMore performed
+verifyProfiler(queryComment, framework.find.classic);
+
+// Aggregation with getMore.
+queryComment = "aggClassicGetMore";
+cursor = coll.aggregate([{$match: {a: {$gt: 2}}}], {comment: queryComment, batchSize: 1});
+cursor.next();  // initial query
+verifyProfiler(queryComment, framework.find.classic);
+cursor.next();  // getMore performed
+verifyProfiler(queryComment, framework.find.classic);
+
 // Turn SBE on.
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
 
 // Run a find command.
 expectedCounters = generateExpectedCounters(framework.find.sbe);
@@ -189,6 +199,28 @@ assert.eq(coll.aggregate(
           0);
 verifySlowQueryLog(db, queryComment, framework.find.sbe);
 compareQueryEngineCounters(expectedCounters);
+verifyProfiler(queryComment, framework.find.sbe);
+
+// SBE find with getMore.
+queryComment = "findSBEGetMore";
+cursor = coll.find({a: {$gt: 2}}).comment(queryComment).batchSize(1);
+cursor.next();  // initial query
+verifyProfiler(queryComment, framework.find.sbe);
+cursor.next();  // getMore performed
+verifyProfiler(queryComment, framework.find.sbe);
+
+// SBE aggregation with getMore.
+queryComment = "aggSBEGetMore";
+cursor = coll.aggregate(
+    [
+        {$_internalInhibitOptimization: {}},
+        {$group: {_id: "$a", acc: {$sum: "$b"}}},
+        {$match: {acc: {$gt: 0}}}
+    ],
+    {comment: queryComment, batchSize: 1});
+cursor.next();  // initial query
+verifyProfiler(queryComment, framework.find.sbe);
+cursor.next();  // getMore performed
 verifyProfiler(queryComment, framework.find.sbe);
 
 MongoRunner.stopMongod(conn);
@@ -227,6 +259,22 @@ assert.eq(coll.find({a: {$mod: [4, 0]}}).comment(queryComment).itcount(), 1);
 verifySlowQueryLog(db, queryComment, framework.find.sbe);
 compareQueryEngineCounters(expectedCounters);
 verifyProfiler(queryComment, framework.find.sbe);
+
+// CQF find with getMore.
+queryComment = "findCQFGetMore";
+cursor = coll.find({a: {$gt: 2}}).comment(queryComment).batchSize(1);
+cursor.next();  // initial query
+verifyProfiler(queryComment, "cqf");
+cursor.next();  // getMore performed
+verifyProfiler(queryComment, "cqf");
+
+// CQF aggregation with getMore.
+queryComment = "aggCQFGetMore";
+cursor = coll.aggregate([{$match: {a: {$gt: 2}}}], {comment: queryComment, batchSize: 1});
+cursor.next();  // initial query
+verifyProfiler(queryComment, "cqf");
+cursor.next();  // getMore performed
+verifyProfiler(queryComment, "cqf");
 
 MongoRunner.stopMongod(conn);
 })();

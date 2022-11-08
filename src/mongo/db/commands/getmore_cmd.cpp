@@ -572,6 +572,8 @@ public:
                     curOp->setOriginatingCommand_inlock(originatingCommand);
                 }
 
+                curOp->debug().queryFramework = exec->getQueryFramework();
+
                 // Update the genericCursor stored in curOp with the new cursor stats.
                 curOp->setGenericCursor_inlock(cursorPin->toGenericCursor());
             }

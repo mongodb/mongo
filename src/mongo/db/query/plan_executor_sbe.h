@@ -50,7 +50,8 @@ public:
                     bool returnOwnedBson,
                     NamespaceString nss,
                     bool isOpen,
-                    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
+                    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+                    bool generatedByBonsai);
 
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();
@@ -147,6 +148,11 @@ public:
         return _isSaveRecoveryUnitAcrossCommandsEnabled;
     }
 
+    PlanExecutor::QueryFramework getQueryFramework() const override final {
+        return _generatedByBonsai ? PlanExecutor::QueryFramework::kCQF
+                                  : PlanExecutor::QueryFramework::kSBEOnly;
+    }
+
 private:
     template <typename ObjectType>
     ExecState getNextImpl(ObjectType* out, RecordId* dlOut);
@@ -205,6 +211,9 @@ private:
     bool _isDisposed{false};
 
     bool _isSaveRecoveryUnitAcrossCommandsEnabled = false;
+
+    // Indicates whether this executor was constructed via Bonsai/CQF.
+    bool _generatedByBonsai{false};
 };
 
 /**

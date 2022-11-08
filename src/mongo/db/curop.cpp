@@ -894,10 +894,20 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->addDeepCopy("planCacheKey", zeroPaddedHex(*planCacheKey));
     }
 
-    if (classicEngineUsed) {
-        pAttrs->add("queryFramework", classicEngineUsed.value() ? "classic" : "sbe");
-    } else if (cqfUsed) {
-        pAttrs->add("queryFramework", "cqf");
+    switch (queryFramework) {
+        case PlanExecutor::QueryFramework::kClassicOnly:
+        case PlanExecutor::QueryFramework::kClassicHybrid:
+            pAttrs->add("queryFramework", "classic");
+            break;
+        case PlanExecutor::QueryFramework::kSBEOnly:
+        case PlanExecutor::QueryFramework::kSBEHybrid:
+            pAttrs->add("queryFramework", "sbe");
+            break;
+        case PlanExecutor::QueryFramework::kCQF:
+            pAttrs->add("queryFramework", "cqf");
+            break;
+        case PlanExecutor::QueryFramework::kUnknown:
+            break;
     }
 
     if (!errInfo.isOK()) {
@@ -1070,10 +1080,20 @@ void OpDebug::append(OperationContext* opCtx,
         b.append("planCacheKey", zeroPaddedHex(*planCacheKey));
     }
 
-    if (classicEngineUsed) {
-        b.append("queryFramework", classicEngineUsed.value() ? "classic" : "sbe");
-    } else if (cqfUsed) {
-        b.append("queryFramework", "cqf");
+    switch (queryFramework) {
+        case PlanExecutor::QueryFramework::kClassicOnly:
+        case PlanExecutor::QueryFramework::kClassicHybrid:
+            b.append("queryFramework", "classic");
+            break;
+        case PlanExecutor::QueryFramework::kSBEOnly:
+        case PlanExecutor::QueryFramework::kSBEHybrid:
+            b.append("queryFramework", "sbe");
+            break;
+        case PlanExecutor::QueryFramework::kCQF:
+            b.append("queryFramework", "cqf");
+            break;
+        case PlanExecutor::QueryFramework::kUnknown:
+            break;
     }
 
     {
@@ -1341,10 +1361,20 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
 
     addIfNeeded("queryFramework", [](auto field, auto args, auto& b) {
-        if (args.op.classicEngineUsed) {
-            b.append("queryFramework", args.op.classicEngineUsed.value() ? "classic" : "sbe");
-        } else if (args.op.cqfUsed) {
-            b.append("queryFramework", "cqf");
+        switch (args.op.queryFramework) {
+            case PlanExecutor::QueryFramework::kClassicOnly:
+            case PlanExecutor::QueryFramework::kClassicHybrid:
+                b.append("queryFramework", "classic");
+                break;
+            case PlanExecutor::QueryFramework::kSBEOnly:
+            case PlanExecutor::QueryFramework::kSBEHybrid:
+                b.append("queryFramework", "sbe");
+                break;
+            case PlanExecutor::QueryFramework::kCQF:
+                b.append("queryFramework", "cqf");
+                break;
+            case PlanExecutor::QueryFramework::kUnknown:
+                break;
         }
     });
 

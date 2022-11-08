@@ -608,9 +608,6 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
                                 request,
                                 hasGeoNearStage,
                                 liteParsedPipeline.hasChangeStream())) {
-        // Mark that this query does not use DocumentSource.
-        curOp->debug().documentSourceUsed = false;
-
         // This pipeline is currently empty, but once completed it will have only one source,
         // which is a DocumentSourceCursor. Instead of creating a whole pipeline to do nothing
         // more than forward the results of its cursor document source, we can use the
@@ -618,9 +615,6 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
         // have gotten from find command.
         execs.emplace_back(std::move(attachExecutorCallback.second));
     } else {
-        // Mark that this query uses DocumentSource.
-        curOp->debug().documentSourceUsed = true;
-
         getSearchHelpers(expCtx->opCtx->getServiceContext())
             ->injectSearchShardFiltererIfNeeded(pipeline.get());
 
@@ -1017,6 +1011,7 @@ Status runAggregate(OperationContext* opCtx,
             auto planSummary = execs[0]->getPlanExplainer().getPlanSummary();
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setPlanSummary_inlock(std::move(planSummary));
+            curOp->debug().queryFramework = execs[0]->getQueryFramework();
         }
     }
 

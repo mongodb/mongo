@@ -171,6 +171,8 @@ public:
         return _pipeline->getTypeString();
     }
 
+    PlanExecutor::QueryFramework getQueryFramework() const override final;
+
 private:
     /**
      * Obtains the next document from the underlying Pipeline, and does change streams-related

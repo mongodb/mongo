@@ -127,6 +127,10 @@ public:
     LockPolicy lockPolicy() const final;
     const PlanExplainer& getPlanExplainer() const final;
 
+    PlanExecutor::QueryFramework getQueryFramework() const override final {
+        return PlanExecutor::QueryFramework::kClassicOnly;
+    }
+
     /**
      * Same as restoreState() but without the logic to retry if a WriteConflictException is thrown.
      *

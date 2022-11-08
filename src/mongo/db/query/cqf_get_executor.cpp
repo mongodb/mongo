@@ -364,7 +364,8 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
         QueryPlannerParams::Options::DEFAULT,
         nss,
         std::move(yieldPolicy),
-        false /*isFromPlanCache*/));
+        false /*isFromPlanCache*/,
+        true /* generatedByBonsai */));
     return planExec;
 }
 
@@ -656,9 +657,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     }
 
     validateCommandOptions(canonicalQuery.get(), collection, indexHint, involvedCollections);
-
-    auto curOp = CurOp::get(opCtx);
-    curOp->debug().cqfUsed = true;
 
     const bool requireRID = canonicalQuery ? canonicalQuery->getForceGenerateRecordId() : false;
     const bool collectionExists = collection != nullptr;

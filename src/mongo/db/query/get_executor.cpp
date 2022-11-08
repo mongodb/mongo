@@ -1171,11 +1171,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const QueryPlannerParams& plannerParams) {
-    // Mark that this query uses the classic engine, unless this has already been set.
-    OpDebug& opDebug = CurOp::get(opCtx)->debug();
-    if (!opDebug.classicEngineUsed) {
-        opDebug.classicEngineUsed = true;
-    }
     auto ws = std::make_unique<WorkingSet>();
     ClassicPrepareExecutionHelper helper{
         opCtx, collection, ws.get(), canonicalQuery.get(), nullptr, plannerParams};
@@ -1283,9 +1278,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     // Now that we know what executor we are going to use, fill in some opDebug information, unless
     // it has already been filled by an outer pipeline.
     OpDebug& opDebug = CurOp::get(opCtx)->debug();
-    if (!opDebug.classicEngineUsed) {
-        opDebug.classicEngineUsed = false;
-    }
     const auto& mainColl = collections.getMainCollection();
     if (mainColl) {
         auto planCacheKey = plan_cache_key_factory::make(*cq, collections);
@@ -1375,7 +1367,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        plannerParams.options,
                                        std::move(nss),
                                        std::move(yieldPolicy),
-                                       planningResult->isRecoveredFromPlanCache());
+                                       planningResult->isRecoveredFromPlanCache(),
+                                       false /* generatedByBonsai */);
 }
 
 /**
@@ -1472,43 +1465,52 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const QueryPlannerParams& plannerParams) {
-    invariant(canonicalQuery);
-    const auto& mainColl = collections.getMainCollection();
-    canonicalQuery->setSbeCompatible(
-        isQuerySbeCompatible(&mainColl, canonicalQuery.get(), plannerParams.options));
+    auto exec = [&]() {
+        invariant(canonicalQuery);
+        const auto& mainColl = collections.getMainCollection();
+        canonicalQuery->setSbeCompatible(
+            isQuerySbeCompatible(&mainColl, canonicalQuery.get(), plannerParams.options));
 
-    if (isEligibleForBonsai(*canonicalQuery, opCtx, mainColl)) {
-        return getSBEExecutorViaCascadesOptimizer(mainColl, std::move(canonicalQuery));
-    }
-
-    // Use SBE if 'canonicalQuery' is SBE compatible.
-    if (!canonicalQuery->getForceClassicEngine() && canonicalQuery->isSbeCompatible()) {
-        auto statusWithExecutor = attemptToGetSlotBasedExecutor(opCtx,
-                                                                collections,
-                                                                std::move(canonicalQuery),
-                                                                extractAndAttachPipelineStages,
-                                                                yieldPolicy,
-                                                                plannerParams);
-        if (!statusWithExecutor.isOK()) {
-            return statusWithExecutor.getStatus();
+        if (isEligibleForBonsai(*canonicalQuery, opCtx, mainColl)) {
+            return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
+                getSBEExecutorViaCascadesOptimizer(mainColl, std::move(canonicalQuery)));
         }
-        auto& maybeExecutor = statusWithExecutor.getValue();
-        if (stdx::holds_alternative<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
-                maybeExecutor)) {
-            return std::move(
-                stdx::get<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(maybeExecutor));
-        } else {
-            // The query is not eligible for SBE execution - reclaim the canonical query and fall
-            // back to classic.
-            tassert(7087103,
-                    "return value must contain canonical query if not executor",
-                    stdx::holds_alternative<std::unique_ptr<CanonicalQuery>>(maybeExecutor));
-            canonicalQuery = std::move(stdx::get<std::unique_ptr<CanonicalQuery>>(maybeExecutor));
-        }
-    }
 
-    return getClassicExecutor(
-        opCtx, mainColl, std::move(canonicalQuery), yieldPolicy, plannerParams);
+        // Use SBE if 'canonicalQuery' is SBE compatible.
+        if (!canonicalQuery->getForceClassicEngine() && canonicalQuery->isSbeCompatible()) {
+            auto statusWithExecutor = attemptToGetSlotBasedExecutor(opCtx,
+                                                                    collections,
+                                                                    std::move(canonicalQuery),
+                                                                    extractAndAttachPipelineStages,
+                                                                    yieldPolicy,
+                                                                    plannerParams);
+            if (!statusWithExecutor.isOK()) {
+                return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
+                    statusWithExecutor.getStatus());
+            }
+            auto& maybeExecutor = statusWithExecutor.getValue();
+            if (stdx::holds_alternative<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
+                    maybeExecutor)) {
+                return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
+                    std::move(stdx::get<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
+                        maybeExecutor)));
+            } else {
+                // The query is not eligible for SBE execution - reclaim the canonical query and
+                // fall back to classic.
+                tassert(7087103,
+                        "return value must contain canonical query if not executor",
+                        stdx::holds_alternative<std::unique_ptr<CanonicalQuery>>(maybeExecutor));
+                canonicalQuery =
+                    std::move(stdx::get<std::unique_ptr<CanonicalQuery>>(maybeExecutor));
+            }
+        }
+        return getClassicExecutor(
+            opCtx, mainColl, std::move(canonicalQuery), yieldPolicy, plannerParams);
+    }();
+    if (exec.isOK()) {
+        CurOp::get(opCtx)->debug().queryFramework = exec.getValue()->getQueryFramework();
+    }
+    return exec;
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(

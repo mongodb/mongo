@@ -315,7 +315,8 @@ DocumentSourceCursor::DocumentSourceCursor(
     : DocumentSource(kStageName, pCtx),
       _currentBatch(cursorType),
       _exec(std::move(exec)),
-      _trackOplogTS(trackOplogTimestamp) {
+      _trackOplogTS(trackOplogTimestamp),
+      _queryFramework(_exec->getQueryFramework()) {
     // It is illegal for both 'kEmptyDocuments' and 'trackOplogTimestamp' to be set.
     invariant(!(cursorType == CursorType::kEmptyDocuments && trackOplogTimestamp));
 

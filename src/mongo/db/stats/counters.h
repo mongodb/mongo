@@ -323,31 +323,40 @@ public:
         auto& debug = curop->debug();
         const BSONObj& cmdObj = curop->opDescription();
         auto cmdName = cmdObj.firstElementFieldNameStringData();
-        if (cmdName == "find" && debug.classicEngineUsed) {
-            if (debug.classicEngineUsed.get()) {
-                classicFindQueryCounter.increment();
-            } else {
-                sbeFindQueryCounter.increment();
+
+        if (cmdName == "find") {
+            switch (debug.queryFramework) {
+                case PlanExecutor::QueryFramework::kClassicOnly:
+                    classicFindQueryCounter.increment();
+                    break;
+                case PlanExecutor::QueryFramework::kSBEOnly:
+                    sbeFindQueryCounter.increment();
+                    break;
+                case PlanExecutor::QueryFramework::kCQF:
+                    cqfFindQueryCounter.increment();
+                    break;
+                default:
+                    break;
             }
-        } else if (cmdName == "aggregate" && debug.classicEngineUsed && debug.documentSourceUsed) {
-            if (debug.classicEngineUsed.get()) {
-                if (debug.documentSourceUsed.get()) {
-                    classicHybridAggregationCounter.increment();
-                } else {
+        } else if (cmdName == "aggregate") {
+            switch (debug.queryFramework) {
+                case PlanExecutor::QueryFramework::kClassicOnly:
                     classicOnlyAggregationCounter.increment();
-                }
-            } else {
-                if (debug.documentSourceUsed.get()) {
-                    sbeHybridAggregationCounter.increment();
-                } else {
+                    break;
+                case PlanExecutor::QueryFramework::kClassicHybrid:
+                    classicHybridAggregationCounter.increment();
+                    break;
+                case PlanExecutor::QueryFramework::kSBEOnly:
                     sbeOnlyAggregationCounter.increment();
-                }
-            }
-        } else if (debug.cqfUsed) {
-            if (cmdName == "find") {
-                cqfFindQueryCounter.increment();
-            } else {
-                cqfAggregationQueryCounter.increment();
+                    break;
+                case PlanExecutor::QueryFramework::kSBEHybrid:
+                    sbeHybridAggregationCounter.increment();
+                    break;
+                case PlanExecutor::QueryFramework::kCQF:
+                    cqfAggregationQueryCounter.increment();
+                    break;
+                case PlanExecutor::QueryFramework::kUnknown:
+                    break;
             }
         }
     }

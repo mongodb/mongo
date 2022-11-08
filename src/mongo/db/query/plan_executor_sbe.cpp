@@ -54,7 +54,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  bool returnOwnedBson,
                                  NamespaceString nss,
                                  bool isOpen,
-                                 std::unique_ptr<PlanYieldPolicySBE> yieldPolicy)
+                                 std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+                                 bool generatedByBonsai)
     : _state{isOpen ? State::kOpened : State::kClosed},
       _opCtx(opCtx),
       _nss(std::move(nss)),
@@ -64,7 +65,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _solution{std::move(candidates.winner().solution)},
       _stash{std::move(candidates.winner().results)},
       _cq{std::move(cq)},
-      _yieldPolicy(std::move(yieldPolicy)) {
+      _yieldPolicy(std::move(yieldPolicy)),
+      _generatedByBonsai(generatedByBonsai) {
     invariant(!_nss.isEmpty());
     invariant(_root);
 

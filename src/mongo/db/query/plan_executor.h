@@ -384,6 +384,30 @@ public:
     virtual boost::optional<StringData> getExecutorType() const {
         return boost::none;
     }
+
+    /**
+     * Describes the query framework which an executor used.
+     */
+    enum class QueryFramework {
+        // Null value.
+        kUnknown,
+        // The entirety of this plan was executed in the classic execution engine.
+        kClassicOnly,
+        // This plan was executed using classic document source and any find pushdown was executed
+        // in the classic execution engine.
+        kClassicHybrid,
+        // The entirety of this plan was exectued in SBE via stage builders.
+        kSBEOnly,
+        // A portion of this plan was executed in SBE via stage builders.
+        kSBEHybrid,
+        // The entirely of this plan was executed using CQF. Hybrid CQF plans are not possible.
+        kCQF
+    };
+
+    /**
+     * Returns the query framework that this executor used.
+     */
+    virtual QueryFramework getQueryFramework() const = 0;
 };
 
 }  // namespace mongo

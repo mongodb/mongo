@@ -252,4 +252,22 @@ void PlanExecutorPipeline::markAsKilled(Status killStatus) {
     }
 }
 
+PlanExecutor::QueryFramework PlanExecutorPipeline::getQueryFramework() const {
+    // If this executor has a $cursor source at the front, use the query framework of that executor
+    // backing the cursor stage in order to determine whether the current pipeline is a hybrid plan.
+    if (auto cursor = dynamic_cast<DocumentSourceCursor*>(_pipeline->peekFront())) {
+        switch (cursor->getQueryFramework()) {
+            case PlanExecutor::QueryFramework::kClassicOnly:
+                return PlanExecutor::QueryFramework::kClassicHybrid;
+            case PlanExecutor::QueryFramework::kSBEOnly:
+                return PlanExecutor::QueryFramework::kSBEHybrid;
+            default:
+                MONGO_UNREACHABLE_TASSERT(6884701);
+        }
+    }
+    // If this executor doesn't have a $cursor source, then return classicOnly as it cannot be a
+    // hybrid plan.
+    return PlanExecutor::QueryFramework::kClassicOnly;
+}
+
 }  // namespace mongo

@@ -266,17 +266,8 @@ public:
     // The hash of the query's "stable" key. This represents the query's shape.
     boost::optional<uint32_t> queryHash;
 
-    // Has a value if this operation is a query. True if the execution tree for the find part of the
-    // query was built exclusively using the classic query engine, false if any part was built using
-    // SBE.
-    boost::optional<bool> classicEngineUsed;
-
-    // Has a value if this operation is an aggregation query. True if `DocumentSources` were
-    // involved in the execution tree for this query, false if they were not.
-    boost::optional<bool> documentSourceUsed;
-
-    // Indicates whether this operation used the common query framework (CQF).
-    bool cqfUsed{false};
+    // The query framework that this operation used. Will be unknown for non query operations.
+    PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
 
     // Tracks the amount of indexed loop joins in a pushed down lookup stage.
     int indexedLoopJoin{0};

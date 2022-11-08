@@ -130,7 +130,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     size_t plannerOptions,
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
-    bool planIsFromCache) {
+    bool planIsFromCache,
+    bool generatedByBonsai) {
     auto&& [rootStage, data] = root;
 
     LOGV2_DEBUG(4822860,
@@ -153,7 +154,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                  std::move(nss),
                                  false,
-                                 std::move(yieldPolicy)),
+                                 std::move(yieldPolicy),
+                                 generatedByBonsai),
              PlanExecutor::Deleter{opCtx}}};
 }
 
@@ -179,7 +181,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                  std::move(nss),
                                  true,
-                                 std::move(yieldPolicy)),
+                                 std::move(yieldPolicy),
+                                 false),
              PlanExecutor::Deleter{opCtx}}};
 }
 

@@ -126,6 +126,10 @@ public:
         return _exec->getPlanExplainer().getVersion();
     }
 
+    PlanExecutor::QueryFramework getQueryFramework() const {
+        return _queryFramework;
+    }
+
     BSONObj serializeToBSONForDebug() const final {
         // Feel free to add any useful information here. For now this has not been useful for
         // debugging so is left empty.
@@ -271,6 +275,8 @@ private:
 
     // Specific stats for $cursor stage.
     DocumentSourceCursorStats _stats;
+
+    PlanExecutor::QueryFramework _queryFramework;
 };
 
 }  // namespace mongo
