@@ -35,17 +35,29 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/transaction/retryable_writes_stats.h"
-#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
-#include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
+
+namespace {
+
+/**
+ * Remove all indexes by uuid.
+ */
+void deleteGlobalIndexes(OperationContext* opCtx,
+                         const CollectionPtr& collection,
+                         const UUID& uuid) {
+    mongo::deleteObjects(opCtx,
+                         collection,
+                         NamespaceString::kShardIndexCatalogNamespace,
+                         BSON(IndexCatalogType::kCollectionUUIDFieldName << uuid),
+                         false);
+}
+}  // namespace
 
 void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                                             const NamespaceString& userCollectionNss,
@@ -72,7 +84,7 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                 BSONObj collectionDoc;
                 bool docExists =
                     Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
-                if (docExists &&
+                if (docExists && !collectionDoc[CollectionType::kIndexVersionFieldName].eoo() &&
                     lastmod <= collectionDoc[CollectionType::kIndexVersionFieldName].timestamp()) {
                     LOGV2_DEBUG(
                         6712300,
@@ -142,7 +154,7 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                 BSONObj collectionDoc;
                 bool docExists =
                     Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
-                if (docExists &&
+                if (docExists && !collectionDoc[CollectionType::kIndexVersionFieldName].eoo() &&
                     lastmod <= collectionDoc[CollectionType::kIndexVersionFieldName].timestamp()) {
                     LOGV2_DEBUG(
                         6712301,
@@ -173,11 +185,12 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
 
             {
                 repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
-                auto idStr = format(FMT_STRING("{}_{}"), collectionUUID.toString(), indexName);
                 mongo::deleteObjects(opCtx,
                                      idxColl.getCollection(),
                                      NamespaceString::kShardIndexCatalogNamespace,
-                                     BSON("_id" << idStr),
+                                     BSON(IndexCatalogType::kCollectionUUIDFieldName
+                                          << collectionUUID << IndexCatalogType::kNameFieldName
+                                          << indexName),
                                      true);
             }
 
@@ -188,6 +201,129 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                                          << indexName << IndexCatalogType::kLastmodFieldName
                                          << lastmod << IndexCatalogType::kCollectionUUIDFieldName
                                          << collectionUUID));
+
+            opCtx->getServiceContext()
+                ->getOpObserver()
+                ->onModifyShardedCollectionGlobalIndexCatalogEntry(
+                    opCtx, userCollectionNss, idxColl->uuid(), entryObj);
+            wunit.commit();
+        });
+}
+
+void replaceGlobalIndexes(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const UUID& uuid,
+                          const Timestamp& indexVersion,
+                          const std::vector<IndexCatalogType>& indexes) {
+    writeConflictRetry(
+        opCtx, "ReplaceIndexCatalog", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
+            WriteUnitOfWork wunit(opCtx);
+            AutoGetCollection collsColl(
+                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
+            {
+                // Set final indexVersion
+                const auto query = BSON(CollectionType::kNssFieldName
+                                        << nss.ns() << CollectionType::kUuidFieldName << uuid);
+
+                // Update the document (or create it) with the new index version
+                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
+                auto request = UpdateRequest();
+                request.setNamespaceString(NamespaceString::kShardCollectionCatalogNamespace);
+                request.setQuery(query);
+                request.setUpdateModification(BSON(CollectionType::kNssFieldName
+                                                   << nss.ns() << CollectionType::kUuidFieldName
+                                                   << uuid << CollectionType::kIndexVersionFieldName
+                                                   << indexVersion));
+                request.setUpsert(true);
+                request.setFromOplogApplication(true);
+                mongo::update(opCtx, collsColl.getDb(), request);
+            }
+
+            AutoGetCollection idxColl(opCtx, NamespaceString::kShardIndexCatalogNamespace, MODE_IX);
+            BSONArrayBuilder indexesBSON;
+            {
+                // Clear old indexes.
+                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
+                deleteGlobalIndexes(opCtx, idxColl.getCollection(), uuid);
+
+                // Add new indexes.
+                for (const auto& i : indexes) {
+                    // Attach a custom generated _id.
+                    auto indexBSON = i.toBSON();
+                    BSONObjBuilder builder(indexBSON);
+                    auto idStr =
+                        format(FMT_STRING("{}_{}"), uuid.toString(), i.getName().toString());
+                    builder.append("_id", idStr);
+                    uassertStatusOK(
+                        collection_internal::insertDocument(opCtx,
+                                                            idxColl.getCollection(),
+                                                            InsertStatement{builder.done()},
+                                                            nullptr,
+                                                            false));
+
+                    indexesBSON.append(indexBSON);
+                }
+            }
+            auto entryObj = BSON("op"
+                                 << "r"
+                                 << "entry"
+                                 << BSON(IndexCatalogType::kCollectionUUIDFieldName
+                                         << uuid << CollectionType::kNssFieldName << nss.toString()
+                                         << "v" << indexVersion << "i" << indexesBSON.arr()));
+
+            opCtx->getServiceContext()
+                ->getOpObserver()
+                ->onModifyShardedCollectionGlobalIndexCatalogEntry(
+                    opCtx, nss, idxColl->uuid(), entryObj);
+            wunit.commit();
+        });
+}
+
+void clearGlobalIndexes(OperationContext* opCtx,
+                        const NamespaceString& userCollectionNss,
+                        const UUID& collectionUUID) {
+    writeConflictRetry(
+        opCtx, "ClearIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
+            WriteUnitOfWork wunit(opCtx);
+            AutoGetCollection collsColl(
+                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
+            {
+                // First unset the index version.
+                const auto query = BSON(CollectionType::kNssFieldName
+                                        << userCollectionNss.ns() << CollectionType::kUuidFieldName
+                                        << collectionUUID);
+                BSONObj collectionDoc;
+                bool docExists =
+                    Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
+                // Return if there is nothing to clear.
+                if (!docExists || collectionDoc[CollectionType::kIndexVersionFieldName].eoo()) {
+                    return;
+                }
+                // Update the document (or create it) with the new index version
+                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
+                auto request = UpdateRequest();
+                request.setNamespaceString(NamespaceString::kShardCollectionCatalogNamespace);
+                request.setQuery(query);
+                request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
+                    BSON("$unset" << BSON(CollectionType::kIndexVersionFieldName << 1))));
+                request.setUpsert(true);
+                request.setFromOplogApplication(true);
+                mongo::update(opCtx, collsColl.getDb(), request);
+            }
+
+            AutoGetCollection idxColl(opCtx, NamespaceString::kShardIndexCatalogNamespace, MODE_IX);
+
+            BSONArrayBuilder queryIds;
+            {
+                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
+                deleteGlobalIndexes(opCtx, idxColl.getCollection(), collectionUUID);
+            }
+            auto entryObj = BSON("op"
+                                 << "c"
+                                 << "entry"
+                                 << BSON(IndexCatalogType::kCollectionUUIDFieldName
+                                         << collectionUUID << CollectionType::kNssFieldName
+                                         << userCollectionNss.toString()));
 
             opCtx->getServiceContext()
                 ->getOpObserver()

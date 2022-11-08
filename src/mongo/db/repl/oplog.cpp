@@ -1108,26 +1108,53 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
          auto entryObj = entry.getObject();
          try {
-             if (entry.getObject()["op"].str() == "i") {
-                 auto indexEntry = IndexCatalogType::parse(
-                     IDLParserContext("OplogModifyCatalogEntryContext"), entryObj["entry"].Obj());
-                 addGlobalIndexCatalogEntryToCollection(opCtx,
-                                                        entry.getNss(),
-                                                        indexEntry.getName().toString(),
-                                                        indexEntry.getKeyPattern(),
-                                                        indexEntry.getOptions(),
-                                                        indexEntry.getCollectionUUID(),
-                                                        indexEntry.getLastmod(),
-                                                        indexEntry.getIndexCollectionUUID());
-
-             } else {
-                 removeGlobalIndexCatalogEntryFromCollection(
-                     opCtx,
-                     entry.getNss(),
-                     uassertStatusOK(UUID::parse(
-                         entryObj["entry"][IndexCatalogType::kCollectionUUIDFieldName])),
-                     entryObj["entry"][IndexCatalogType::kNameFieldName].str(),
-                     entryObj["entry"][IndexCatalogType::kLastmodFieldName].timestamp());
+             switch (entry.getObject()["op"].String()[0]) {
+                 case 'i': {
+                     auto indexEntry =
+                         IndexCatalogType::parse(IDLParserContext("OplogModifyCatalogEntryContext"),
+                                                 entryObj["entry"].Obj());
+                     addGlobalIndexCatalogEntryToCollection(opCtx,
+                                                            entry.getNss(),
+                                                            indexEntry.getName().toString(),
+                                                            indexEntry.getKeyPattern(),
+                                                            indexEntry.getOptions(),
+                                                            indexEntry.getCollectionUUID(),
+                                                            indexEntry.getLastmod(),
+                                                            indexEntry.getIndexCollectionUUID());
+                 } break;
+                 case 'd':
+                     removeGlobalIndexCatalogEntryFromCollection(
+                         opCtx,
+                         entry.getNss(),
+                         uassertStatusOK(UUID::parse(
+                             entryObj["entry"][IndexCatalogType::kCollectionUUIDFieldName])),
+                         entryObj["entry"][IndexCatalogType::kNameFieldName].str(),
+                         entryObj["entry"][IndexCatalogType::kLastmodFieldName].timestamp());
+                     break;
+                 case 'r': {
+                     std::vector<IndexCatalogType> indexes;
+                     for (const auto& entryBSON : entryObj["entry"]["i"].Array()) {
+                         indexes.push_back(IndexCatalogType::parse(
+                             IDLParserContext("OplogModifyCatalogEntryContext"), entryBSON.Obj()));
+                     }
+                     auto indexVersion = entryObj["entry"]["v"].timestamp();
+                     replaceGlobalIndexes(
+                         opCtx,
+                         entry.getNss(),
+                         uassertStatusOK(UUID::parse(
+                             entryObj["entry"][IndexCatalogType::kCollectionUUIDFieldName])),
+                         indexVersion,
+                         indexes);
+                 } break;
+                 case 'c':
+                     clearGlobalIndexes(
+                         opCtx,
+                         entry.getNss(),
+                         uassertStatusOK(UUID::parse(
+                             entryObj["entry"][IndexCatalogType::kCollectionUUIDFieldName])));
+                     break;
+                 default:
+                     MONGO_UNREACHABLE;
              }
          } catch (const DBException& ex) {
              LOGV2_ERROR(6712302,

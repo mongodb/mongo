@@ -42,10 +42,10 @@ structs:
                 type: string
                 description: "Index name"
             keyPattern:
-                type: object
+                type: object_owned
                 description: "Index field description"
             options:
-                type: object
+                type: object_owned
                 description: "Index options"
             lastmod:
                 type: timestamp

@@ -193,7 +193,6 @@ public:
         const boost::optional<ChunkManager>& cm,
         boost::optional<Timestamp> afterClusterTime);
 
-
     /**
      * Creates the collection on the shard and clones the indexes and options.
      */

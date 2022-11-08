@@ -255,6 +255,13 @@ public:
      */
     void clearIndexes(OperationContext* opCtx);
 
+    /**
+     * Clears all the indexes and set the new indexes and index version.
+     */
+    void replaceIndexes(OperationContext* opCtx,
+                        const std::vector<IndexCatalogType>& indexes,
+                        const CollectionIndexes& collectionIndexes);
+
 private:
     struct ShardVersionRecoverOrRefresh {
     public:

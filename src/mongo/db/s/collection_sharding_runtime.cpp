@@ -542,6 +542,19 @@ void CollectionShardingRuntime::clearIndexes(OperationContext* opCtx) {
     _globalIndexesInfo = boost::none;
 }
 
+void CollectionShardingRuntime::replaceIndexes(OperationContext* opCtx,
+                                               const std::vector<IndexCatalogType>& indexes,
+                                               const CollectionIndexes& collectionIndexes) {
+    if (_globalIndexesInfo) {
+        _globalIndexesInfo = boost::none;
+    }
+    IndexCatalogTypeMap indexMap;
+    for (const auto& index : indexes) {
+        indexMap.emplace(index.getName(), index);
+    }
+    _globalIndexesInfo.emplace(collectionIndexes, std::move(indexMap));
+}
+
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
                                                      NamespaceString nss,
                                                      BSONObj reason)

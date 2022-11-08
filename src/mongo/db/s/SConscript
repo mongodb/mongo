@@ -66,9 +66,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/ops/write_ops',
-        '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/shard_role',
-        '$BUILD_DIR/mongo/db/transaction/transaction',
         '$BUILD_DIR/mongo/s/common_s',
     ],
 )

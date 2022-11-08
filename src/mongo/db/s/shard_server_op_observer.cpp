@@ -527,30 +527,67 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
         1,
         "Updating sharding in-memory state onModifyShardedCollectionGlobalIndexCatalogEntry",
         "indexDoc"_attr = indexDoc);
-    if (indexDoc["op"].str() == "i") {
-        auto indexEntry = IndexCatalogType::parse(
-            IDLParserContext("onModifyShardedCollectionGlobalIndexCatalogEntry"),
-            indexDoc["entry"].Obj());
-        auto indexVersion = indexDoc["entry"][IndexCatalogType::kLastmodFieldName].timestamp();
-        auto uuid = uassertStatusOK(
-            UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
-        opCtx->recoveryUnit()->onCommit([opCtx, nss, indexVersion, indexEntry, uuid](auto _) {
-            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-            CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                opCtx, nss, CSRAcquisitionMode::kExclusive)
-                ->addIndex(opCtx, indexEntry, {uuid, indexVersion});
-        });
-    } else {
-        auto indexName = indexDoc["entry"][IndexCatalogType::kNameFieldName].str();
-        auto indexVersion = indexDoc["entry"][IndexCatalogType::kLastmodFieldName].timestamp();
-        auto uuid = uassertStatusOK(
-            UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
-        opCtx->recoveryUnit()->onCommit([opCtx, nss, indexName, indexVersion, uuid](auto _) {
-            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-            CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                opCtx, nss, CSRAcquisitionMode::kExclusive)
-                ->removeIndex(opCtx, indexName, {uuid, indexVersion});
-        });
+    auto op = indexDoc["op"].String();
+    invariant(op.size() > 0);
+    switch (op[0]) {
+        case 'i': {
+            auto indexEntry = IndexCatalogType::parse(
+                IDLParserContext("onModifyShardedCollectionGlobalIndexCatalogEntry"),
+                indexDoc["entry"].Obj());
+            auto indexVersion = indexDoc["entry"][IndexCatalogType::kLastmodFieldName].timestamp();
+            auto uuid = uassertStatusOK(
+                UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
+            opCtx->recoveryUnit()->onCommit([opCtx, nss, uuid, indexVersion, indexEntry](auto _) {
+                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                    opCtx, nss, CSRAcquisitionMode::kExclusive);
+                scsr->addIndex(opCtx, indexEntry, {uuid, indexVersion});
+            });
+            break;
+        }
+        case 'd': {
+            auto indexName = indexDoc["entry"][IndexCatalogType::kNameFieldName].str();
+            auto indexVersion = indexDoc["entry"][IndexCatalogType::kLastmodFieldName].timestamp();
+            auto uuid = uassertStatusOK(
+                UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
+            opCtx->recoveryUnit()->onCommit([opCtx, nss, indexName, indexVersion, uuid](auto _) {
+                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                    opCtx, nss, CSRAcquisitionMode::kExclusive);
+                scsr->removeIndex(opCtx, indexName, {uuid, indexVersion});
+            });
+            break;
+        }
+        case 'r': {
+            std::vector<IndexCatalogType> indexes;
+            for (const auto& i : indexDoc["entry"]["i"].Array()) {
+                auto indexEntry = IndexCatalogType::parse(
+                    IDLParserContext("onModifyShardedCollectionGlobalIndexCatalogEntry"), i.Obj());
+                indexes.push_back(indexEntry);
+            }
+
+            auto indexVersion = indexDoc["entry"][IndexCatalogType::kLastmodFieldName].timestamp();
+            auto uuid = uassertStatusOK(
+                UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
+            opCtx->recoveryUnit()->onCommit([opCtx, nss, uuid, indexVersion, indexes](auto _) {
+                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                    opCtx, nss, CSRAcquisitionMode::kExclusive);
+                scsr->replaceIndexes(opCtx, indexes, {uuid, indexVersion});
+            });
+            break;
+        }
+        case 'c':
+            opCtx->recoveryUnit()->onCommit([opCtx, nss](auto _) {
+                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                    opCtx, nss, CSRAcquisitionMode::kExclusive);
+                scsr->clearIndexes(opCtx);
+            });
+
+            break;
+        default:
+            MONGO_UNREACHABLE;
     }
 }
 

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 
 namespace mongo {
 
@@ -59,5 +60,22 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                                                  const UUID& collectionUUID,
                                                  const std::string& indexName,
                                                  const Timestamp& lastmod);
+
+/**
+ * Removes all the indexes and the current index version, and replace them for the specified indexes
+ * and indexVersion.
+ */
+void replaceGlobalIndexes(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const UUID& uuid,
+                          const Timestamp& indexVersion,
+                          const std::vector<IndexCatalogType>& indexes);
+
+/**
+ * Removes all the indexes and unset the current index version.
+ */
+void clearGlobalIndexes(OperationContext* opCtx,
+                        const NamespaceString& userCollectionNss,
+                        const UUID& collectionUUID);
 
 }  // namespace mongo

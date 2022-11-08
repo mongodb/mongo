@@ -54,6 +54,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/global_index_ddl_util.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -74,6 +75,7 @@
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -87,7 +89,6 @@
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
-
 
 namespace mongo {
 namespace {
@@ -291,6 +292,32 @@ bool migrationRecipientRecoveryDocumentExists(OperationContext* opCtx,
     return store.count(opCtx,
                        BSON(MigrationRecipientRecoveryDocument::kMigrationSessionIdFieldName
                             << sessionId.toString())) > 0;
+}
+
+void replaceGlobalIndexesInShardIfNeeded(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const UUID& uuid) {
+    auto currentShardHasAnyChunks = [&]() -> bool {
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+            opCtx, nss, CSRAcquisitionMode::kShared);
+        const auto optMetadata = scsr->getCurrentMetadataIfKnown();
+        return optMetadata && optMetadata->currentShardHasAnyChunks();
+    }();
+
+    // Early return, this shard already contains chunks, so there is no need for consolidate.
+    if (currentShardHasAnyChunks) {
+        return;
+    }
+
+    auto [collection, indexes] = Grid::get(opCtx)->catalogClient()->getCollectionAndGlobalIndexes(
+        opCtx, nss, {repl::ReadConcernLevel::kSnapshotReadConcern});
+    if (collection.getIndexVersion()) {
+        replaceGlobalIndexes(
+            opCtx, nss, uuid, collection.getIndexVersion()->indexVersion(), indexes);
+    } else {
+        clearGlobalIndexes(opCtx, nss, uuid);
+    }
 }
 
 // Enabling / disabling these fail points pauses / resumes MigrateStatus::_go(), the thread which
@@ -1266,6 +1293,13 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             _dropLocalIndexesIfNecessary(altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes);
             cloneCollectionIndexesAndOptions(
                 altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes);
+
+            // Get the global indexes and install them.
+            if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                replaceGlobalIndexesInShardIfNeeded(
+                    altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes.uuid);
+            }
 
             timing->done(2);
             migrateThreadHangAtStep2.pauseWhileSet();
