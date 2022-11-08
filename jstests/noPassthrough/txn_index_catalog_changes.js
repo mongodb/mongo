@@ -31,18 +31,15 @@ const db = primary.getDB('test');
 
     // Start a transaction whose snapshot predates the completion of the index build, and which
     // reserves an oplog entry after the index build commits.
-    try {
-        const s1 = db.getMongo().startSession();
-        s1.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
-        s1.getDatabase('test').c.insertOne({_id: 1, num: 1});
+    const s1 = db.getMongo().startSession();
+    s1.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
 
-        // Transaction should have failed.
-        assert(0);
-    } catch (e) {
-        assert(e.hasOwnProperty("errorLabels"), tojson(e));
-        assert.contains("TransientTransactionError", e.errorLabels, tojson(e));
-        assert.eq(e["code"], ErrorCodes.WriteConflict, tojson(e));
-    }
+    const res = assert.commandFailedWithCode(s1.getDatabase('test').c.insert({_id: 1, num: 1}),
+                                             ErrorCodes.WriteConflict);
+    assert(res.hasOwnProperty("errorLabels"), tojson(res));
+    assert.contains("TransientTransactionError", res.errorLabels, tojson(res));
+
+    assert.commandFailedWithCode(s1.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 }
 
 db.c.drop();
@@ -62,18 +59,15 @@ db.c.drop();
 
     // Start a transaction whose snapshot predates the completion of the index build, and which
     // reserves an oplog entry after the index build commits.
-    try {
-        const s1 = db.getMongo().startSession();
-        s1.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
-        s1.getDatabase('test').c.deleteOne({_id: 0});
+    const s1 = db.getMongo().startSession();
+    s1.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
 
-        // Transaction should have failed.
-        assert(0);
-    } catch (e) {
-        assert(e.hasOwnProperty("errorLabels"), tojson(e));
-        assert.contains("TransientTransactionError", e.errorLabels, tojson(e));
-        assert.eq(e["code"], ErrorCodes.WriteConflict, tojson(e));
-    }
+    const res = assert.commandFailedWithCode(s1.getDatabase('test').c.remove({_id: 0}),
+                                             ErrorCodes.WriteConflict);
+    assert(res.hasOwnProperty("errorLabels"), tojson(res));
+    assert.contains("TransientTransactionError", res.errorLabels, tojson(res));
+
+    assert.commandFailedWithCode(s1.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 }
 
 replTest.stopSet();
