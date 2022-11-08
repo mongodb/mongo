@@ -351,41 +351,29 @@ TEST_F(KVEngineTestHarness, AllDurableTimestamp) {
         Timestamp t52(5, 2);
         Timestamp t61(6, 1);
 
-        Timestamp allDurable = engine->getAllDurableTimestamp();
-        ASSERT_EQ(allDurable, Timestamp(StorageEngine::kMinimumTimestamp));
+        ASSERT_EQ(engine->getAllDurableTimestamp(), Timestamp(StorageEngine::kMinimumTimestamp));
 
         auto opCtx1 = opCtxs[0].second.get();
         WriteUnitOfWork uow1(opCtx1);
         ASSERT_OK(rs->insertRecord(opCtx1, "abc", 4, t51));
 
-        Timestamp lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GT(allDurable, lastAllDurable);
-        ASSERT_EQ(allDurable, t51);
+        // TODO (SERVER-71148): The all_durable timestamp should be t51-1 here.
+        ASSERT_EQ(engine->getAllDurableTimestamp(), t51);
 
         auto opCtx2 = opCtxs[1].second.get();
         WriteUnitOfWork uow2(opCtx2);
         ASSERT_OK(rs->insertRecord(opCtx2, "abc", 4, t61));
         uow2.commit();
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_EQ(allDurable, lastAllDurable);
-        ASSERT_EQ(allDurable, t51);
+        ASSERT_EQ(engine->getAllDurableTimestamp(), t51 - 1);
 
         ASSERT_OK(rs->insertRecord(opCtx1, "abc", 4, t52));
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_EQ(allDurable, lastAllDurable);
-        ASSERT_EQ(allDurable, t51);
+        ASSERT_EQ(engine->getAllDurableTimestamp(), t51 - 1);
 
         uow1.commit();
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GT(allDurable, lastAllDurable);
-        ASSERT_EQ(allDurable, t61);
+        ASSERT_EQ(engine->getAllDurableTimestamp(), t61);
     }
 }
 
@@ -461,11 +449,12 @@ TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
  * | Session 1            | Session 2            | GlobalActor                      |
  * |----------------------+----------------------+----------------------------------|
  * | Begin                |                      |                                  |
- * | Commit :commit 10    |                      |                                  |
+ * | Timestamp :commit 10 |                      |                                  |
+ * | Commit               |                      |                                  |
  * |                      |                      | QueryTimestamp :all_durable (10) |
  * | Begin                |                      |                                  |
  * | Timestamp :commit 20 |                      |                                  |
- * |                      |                      | QueryTimestamp :all_durable (19) |
+ * |                      |                      | QueryTimestamp :all_durable (10) |
  * |                      | Begin                |                                  |
  * |                      | Timestamp :commit 30 |                                  |
  * |                      | Commit               |                                  |
@@ -474,7 +463,7 @@ TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
  * |                      |                      | QueryTimestamp :all_durable (30) |
  * | Begin                |                      |                                  |
  * | Timestamp :commit 25 |                      |                                  |
- * |                      |                      | QueryTimestamp :all_durable (30) |
+ * |                      |                      | QueryTimestamp :all_durable (24) |
  */
 TEST_F(KVEngineTestHarness, AllDurable) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
@@ -498,27 +487,20 @@ TEST_F(KVEngineTestHarness, AllDurable) {
         const Timestamp kInsertTimestamp3 = Timestamp(30, 30);
         const Timestamp kInsertTimestamp4 = Timestamp(25, 25);
 
-        Timestamp allDurable = engine->getAllDurableTimestamp();
         auto opCtx1 = opCtxs[0].second.get();
         WriteUnitOfWork uow1(opCtx1);
         auto swRid = rs->insertRecord(opCtx1, "abc", 4, kInsertTimestamp1);
         ASSERT_OK(swRid);
         uow1.commit();
 
-        Timestamp lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LTE(allDurable, kInsertTimestamp1);
+        ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp1);
 
         auto opCtx2 = opCtxs[1].second.get();
         WriteUnitOfWork uow2(opCtx2);
         swRid = rs->insertRecord(opCtx2, "abc", 4, kInsertTimestamp2);
         ASSERT_OK(swRid);
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LT(allDurable, kInsertTimestamp2);
+        ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp1);
 
         auto opCtx3 = opCtxs[2].second.get();
         WriteUnitOfWork uow3(opCtx3);
@@ -526,27 +508,19 @@ TEST_F(KVEngineTestHarness, AllDurable) {
         ASSERT_OK(swRid);
         uow3.commit();
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LT(allDurable, kInsertTimestamp2);
+        ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp2 - 1);
 
         uow2.commit();
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LTE(allDurable, kInsertTimestamp3);
+        ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp3);
 
         auto opCtx4 = opCtxs[3].second.get();
         WriteUnitOfWork uow4(opCtx4);
         swRid = rs->insertRecord(opCtx4, "abc", 4, kInsertTimestamp4);
         ASSERT_OK(swRid);
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LTE(allDurable, kInsertTimestamp3);
+        ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp4 - 1);
+
         uow4.commit();
     }
 }

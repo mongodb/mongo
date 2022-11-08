@@ -547,10 +547,6 @@ private:
 
     std::unique_ptr<WiredTigerEngineRuntimeConfigParameter> _runTimeConfigParam;
 
-    mutable Mutex _highestDurableTimestampMutex =
-        MONGO_MAKE_LATCH("WiredTigerKVEngine::_highestDurableTimestampMutex");
-    mutable unsigned long long _highestSeenDurableTimestamp = StorageEngine::kMinimumTimestamp;
-
     mutable Mutex _oldestTimestampPinRequestsMutex =
         MONGO_MAKE_LATCH("WiredTigerKVEngine::_oldestTimestampPinRequestsMutex");
     std::map<std::string, Timestamp> _oldestTimestampPinRequests;

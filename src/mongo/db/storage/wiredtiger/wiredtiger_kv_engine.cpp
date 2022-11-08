@@ -560,10 +560,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
             setStableTimestamp(_recoveryTimestamp, false);
 
             _sessionCache->snapshotManager().setLastApplied(_recoveryTimestamp);
-            {
-                stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
-                _highestSeenDurableTimestamp = _recoveryTimestamp.asULL();
-            }
         }
     }
 
@@ -2125,25 +2121,6 @@ void WiredTigerKVEngine::setJournalListener(JournalListener* jl) {
     return _sessionCache->setJournalListener(jl);
 }
 
-namespace {
-uint64_t _fetchAllDurableValue(WT_CONNECTION* conn) {
-    // Fetch the latest all_durable value from the storage engine. This value will be a timestamp
-    // that has no holes (uncommitted transactions with lower timestamps) behind it.
-    char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-    invariantWTOK(conn->query_timestamp(conn, buf, "get=all_durable"), nullptr);
-
-    uint64_t tmp;
-    fassert(38002, NumberParser().base(16)(buf, &tmp));
-    if (tmp == 0) {
-        // Treat this as lowest possible timestamp; we need to see all preexisting data but no new
-        // (timestamped) data.
-        return StorageEngine::kMinimumTimestamp;
-    }
-
-    return tmp;
-}
-}  // namespace
-
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool force) {
     if (MONGO_unlikely(WTPauseStableTimestamp.shouldFail())) {
         return;
@@ -2179,8 +2156,6 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
         stableTSConfigString =
             "force=true,oldest_timestamp={0:x},durable_timestamp={0:x},stable_timestamp={0:x}"_format(
                 ts);
-        stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
-        _highestSeenDurableTimestamp = ts;
     } else {
         stableTSConfigString = "stable_timestamp={:x}"_format(ts);
     }
@@ -2255,8 +2230,7 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
                 newOldestTimestamp.asULL());
         invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString.c_str()), nullptr);
         _oldestTimestamp.store(newOldestTimestamp.asULL());
-        stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
-        _highestSeenDurableTimestamp = newOldestTimestamp.asULL();
+
         LOGV2_DEBUG(22342,
                     2,
                     "oldest_timestamp and durable_timestamp force set to {newOldestTimestamp}",
@@ -2400,27 +2374,23 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
                 str::stream() << "Error rolling back to stable. Err: " << wiredtiger_strerror(ret)};
     }
 
-    {
-        // Rollback the highest seen durable timestamp to the stable timestamp.
-        stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
-        _highestSeenDurableTimestamp = stableTimestamp.asULL();
-    }
-
     _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri);
 
     return {stableTimestamp};
 }
 
 Timestamp WiredTigerKVEngine::getAllDurableTimestamp() const {
-    auto ret = _fetchAllDurableValue(_conn);
+    // Fetch the latest all_durable value from the storage engine. This value will be a timestamp
+    // that has no holes (uncommitted transactions with lower timestamps) behind it.
+    char buf[(2 * 8 /* bytes in hex */) + 1 /* null terminator */];
+    invariantWTOK(_conn->query_timestamp(_conn, buf, "get=all_durable"), nullptr);
 
-    stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
-    if (ret < _highestSeenDurableTimestamp) {
-        ret = _highestSeenDurableTimestamp;
-    } else {
-        _highestSeenDurableTimestamp = ret;
-    }
-    return Timestamp(ret);
+    uint64_t ts;
+    fassert(38002, NumberParser{}.base(16)(buf, &ts));
+
+    // If all_durable is 0, treat this as lowest possible timestamp; we need to see all pre-existing
+    // data but no new (timestamped) data.
+    return Timestamp{ts == 0 ? StorageEngine::kMinimumTimestamp : ts};
 }
 
 boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {
