@@ -344,7 +344,6 @@ void HashAggStage::open(bool reOpen) {
 
         // A default value for spilling a key to the record store.
         value::MaterializedRow defaultVal{_outAggAccessors.size()};
-        bool updateAggStateHt = false;
         MemoryCheckData memoryCheckData;
 
         while (_children[0]->getNext() == PlanState::ADVANCED) {
@@ -357,19 +356,17 @@ void HashAggStage::open(bool reOpen) {
             }
 
 
-            if (_htIt = _ht->find(key); !_recordStore && _htIt == _ht->end()) {
-                // The memory limit hasn't been reached yet, insert a new key in '_ht' by copying
-                // the key. Note as a future optimization, we should avoid the lookup in the find()
-                // call and the emplace.
-                key.makeOwned();
-                auto [it, _] = _ht->emplace(std::move(key), value::MaterializedRow{0});
-                // Initialize accumulators.
-                it->second.resize(_outAggAccessors.size());
-                _htIt = it;
-            }
-            updateAggStateHt = _htIt != _ht->end();
-
-            if (updateAggStateHt) {
+            if (_htIt = _ht->find(key); !_recordStore || _htIt != _ht->end()) {
+                if (_htIt == _ht->end()) {
+                    // The memory limit hasn't been reached yet, insert a new key in '_ht' by
+                    // copying the key. Note as a future optimization, we should avoid the lookup in
+                    // the find() call and the emplace.
+                    key.makeOwned();
+                    auto [it, _] = _ht->emplace(std::move(key), value::MaterializedRow{0});
+                    // Initialize accumulators.
+                    it->second.resize(_outAggAccessors.size());
+                    _htIt = it;
+                }
                 // Accumulate state in '_ht' by pointing the '_outAggAccessors' the
                 // '_outHashAggAccessors'.
                 for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
@@ -381,9 +378,7 @@ void HashAggStage::open(bool reOpen) {
                 // The memory limit has been reached and the key wasn't in the '_ht' so we need
                 // to spill it to the '_recordStore'.
                 KeyString::Builder kb{KeyString::Version::kLatestVersion};
-                // 'key' is moved only when 'updateAggStateHt' ends up "true", so it's safe to
-                // ignore the warning.
-                key.serializeIntoKeyString(kb);  // NOLINT(bugprone-use-after-move)
+                key.serializeIntoKeyString(kb);
                 auto typeBits = kb.getTypeBits();
 
                 auto rid = RecordId(kb.getBuffer(), kb.getSize());
