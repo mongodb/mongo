@@ -131,6 +131,10 @@ assertNotSupportedByBonsai({find: coll.getName(), filter: {'a.0.b': 5}});
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}, projection: {'a.0': 1}});
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}, projection: {'a.5.c': 0}});
 
+// Positional projection is not supported. Note that this syntax is only possible in the projection
+// of a find command.
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, projection: {'a.$': 5}}, true);
+
 // Test for unsupported expressions within a branching expression such as $or.
 assertNotSupportedByBonsai({find: coll.getName(), filter: {$or: [{'a.0': 5}, {a: 1}]}});
 assertNotSupportedByBonsai({find: coll.getName(), filter: {$or: [{a: 5}, {a: {$mod: [4, 0]}}]}});

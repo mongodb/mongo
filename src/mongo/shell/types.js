@@ -170,7 +170,7 @@ Array.shuffle = function(arr) {
     return arr;
 };
 
-Array.tojson = function(a, indent, nolint, depth) {
+Array.tojson = function(a, indent, nolint, depth, sortKeys) {
     if (!Array.isArray(a)) {
         throw new Error("The first argument to Array.tojson must be an array");
     }
@@ -200,7 +200,7 @@ Array.tojson = function(a, indent, nolint, depth) {
         indent += "\t";
 
     for (var i = 0; i < a.length; i++) {
-        s += indent + tojson(a[i], indent, nolint, depth + 1);
+        s += indent + tojson(a[i], indent, nolint, depth + 1, sortKeys);
         if (i < a.length - 1) {
             s += "," + elementSeparator;
         }
@@ -642,7 +642,7 @@ tojson = function(x, indent, nolint, depth, sortKeys) {
         case "boolean":
             return "" + x;
         case "object": {
-            var s = tojsonObject(x, indent, nolint, depth);
+            var s = tojsonObject(x, indent, nolint, depth, sortKeys);
             if ((nolint == null || nolint == true) && s.length < 80 &&
                 (indent == null || indent.length == 0)) {
                 s = s.replace(/[\t\r\n]+/gm, " ");
@@ -671,12 +671,12 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
         indent = "";
 
     if (typeof (x.tojson) == "function" && x.tojson != tojson) {
-        return x.tojson(indent, nolint, depth);
+        return x.tojson(indent, nolint, depth, sortKeys);
     }
 
     if (x.constructor && typeof (x.constructor.tojson) == "function" &&
         x.constructor.tojson != tojson) {
-        return x.constructor.tojson(x, indent, nolint, depth);
+        return x.constructor.tojson(x, indent, nolint, depth, sortKeys);
     }
 
     if (x instanceof Error) {
@@ -719,7 +719,8 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
         if (typeof DBCollection != 'undefined' && val == DBCollection.prototype)
             continue;
 
-        fieldStrings.push(indent + "\"" + k + "\" : " + tojson(val, indent, nolint, depth + 1));
+        fieldStrings.push(indent + "\"" + k +
+                          "\" : " + tojson(val, indent, nolint, depth + 1, sortKeys));
     }
 
     if (fieldStrings.length > 0) {
