@@ -145,10 +145,20 @@ private:
     }
 
     /**
-     * Updates CSRS metadata in config.databases collection to move the given primary database on
-     * its new shard.
+     * Invokes the _configsvrCommitMovePrimary command of the config server to reassign the primary
+     * shard of the database.
      */
-    Status _commitOnConfig(OperationContext* opCtx);
+    Status _commitOnConfig(OperationContext* opCtx, const DatabaseVersion& expectedDbVersion);
+
+    /**
+     * Updates the config server's metadata in config.databases collection to reassign the primary
+     * shard of the database.
+     *
+     * This logic is not synchronized with the removeShard command and simultaneous invocations of
+     * movePrimary and removeShard can lead to data loss.
+     */
+    Status _fallbackCommitOnConfig(OperationContext* opCtx,
+                                   const DatabaseVersion& expectedDbVersion);
 
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.
