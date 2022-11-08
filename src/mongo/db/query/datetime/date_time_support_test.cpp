@@ -2969,5 +2969,13 @@ TEST(ParseDayOfWeek, Basic) {
     ASSERT(DayOfWeek::saturday == parseDayOfWeek("SAT"));
     ASSERT_THROWS_CODE(parseDayOfWeek(""), AssertionException, ErrorCodes::FailedToParse);
 }
+
+TEST(TimeZoneToString, Basic) {
+    // Just asserting that these do not throw exceptions.
+    ASSERT_EQ(kDefaultTimeZoneDatabase.getTimeZone("UTC").toString(), "TimeZone(UTC)");
+    ASSERT_EQ(kDefaultTimeZoneDatabase.getTimeZone("America/New_York").toString(),
+              "TimeZone(name=America/New_York)");
+    ASSERT_EQ(kDefaultTimeZoneDatabase.getTimeZone("+02").toString(), "TimeZone(utcOffset=7200s)");
+}
 }  // namespace
 }  // namespace mongo

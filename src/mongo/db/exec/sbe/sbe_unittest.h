@@ -43,6 +43,8 @@ using namespace mongo::unittest::match;
 
 using TypedValue = std::pair<value::TypeTags, value::Value>;
 
+extern unittest::GoldenTestConfig goldenTestConfigSbe;
+
 /** SBE Value Equal to. */
 class ValueEq : public Matcher {
 public:

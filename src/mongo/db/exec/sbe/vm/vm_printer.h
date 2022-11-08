@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,50 +29,26 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/golden_test_base.h"
-#include "mongo/unittest/test_info.h"
-#include "mongo/unittest/unittest.h"
+#include <ostream>
 
-namespace mongo::unittest {
+#include "mongo/db/exec/sbe/vm/vm.h"
 
-namespace fs = ::boost::filesystem;
+namespace mongo::sbe::vm {
 
-class GoldenTestContext : public GoldenTestContextBase {
+class CodeFragmentPrinter {
 public:
-    /** Format of the test header*/
-    enum HeaderFormat {
-        /** A simple text header, suitable for unstructured text output.*/
-        Text,
+    enum PrintFormat {
+        /** Debug format, that prints all memory pointers. */
+        Debug,
+        /** Stable format, that prints relative offsets and masks other memory pointers. */
+        Stable
     };
 
-    explicit GoldenTestContext(
-        const GoldenTestConfig* config,
-        const TestInfo* testInfo = UnitTest::getInstance()->currentTestInfo(),
-        bool validateOnClose = true)
-        : GoldenTestContextBase(
-              config,
-              fs::path(sanitizeName(testInfo->suiteName().toString())) /
-                  fs::path(sanitizeName(testInfo->testName().toString()) + ".txt"),
-              validateOnClose,
-              [this](auto const&... args) { return onError(args...); }),
-          _testInfo(testInfo) {}
+    CodeFragmentPrinter(PrintFormat format) : _format(format) {}
 
-    /**
-     * Prints the test header in a specified format.
-     */
-    void printTestHeader(HeaderFormat format);
-
-    // Disable move/copy because onError captures 'this' address.
-    GoldenTestContext(GoldenTestContext&&) = delete;
-
-protected:
-    void onError(const std::string& message,
-                 const std::string& actualStr,
-                 const boost::optional<std::string>& expectedStr);
+    void print(std::ostream& os, const CodeFragment& code) const;
 
 private:
-    const TestInfo* _testInfo;
+    PrintFormat _format;
 };
-
-}  // namespace mongo::unittest
+}  // namespace mongo::sbe::vm

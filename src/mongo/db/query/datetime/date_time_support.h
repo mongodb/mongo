@@ -352,6 +352,9 @@ public:
         return _utcOffset;
     }
 
+    /** Returns the human readable string represenation of this time zone. */
+    std::string toString() const;
+
 private:
     /**
      * Only works with 1 <= spaces <= 4 and 0 <= number <= 9999. If spaces is less than the digit
@@ -482,8 +485,6 @@ public:
     TimeZoneDatabase(std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> timeZoneDatabase);
 
     std::vector<std::string> getTimeZoneStrings() const;
-
-    std::string toString() const;
 
 private:
     struct TimelibTZInfoDeleter {

@@ -27,9 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/sbe/vm/vm_printer.h"
+#include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/pcre.h"
 
@@ -439,7 +442,7 @@ static const std::string kPcPointerRangePattern{"(\\[" + kAddrPattern + ")-(" + 
  * using an empty string.
  */
 std::string instrPattern(std::string op, std::string args) {
-    return "(" + kAddrPattern + ": " + op + "\\(" + args + "\\); )";
+    return "(" + kAddrPattern + ": " + op + "\\(" + args + "\\);\\n)";
 }
 }  // namespace
 
@@ -463,44 +466,29 @@ TEST(SBEVM, CodeFragmentToString) {
     }
 }
 
-TEST(SBEVM, CodeFragmentToStringArgs) {
-    {
-        vm::CodeFragment code;
-        std::string toStringPattern{kAddrPattern};
+TEST(SBEVM, CodeFragmentPrintStable) {
+    GoldenTestContext ctx(&goldenTestConfigSbe);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
 
-        code.appendFillEmpty(vm::Instruction::Null);
-        toStringPattern += instrPattern("fillEmptyImm", "k: Null");
-        code.appendFillEmpty(vm::Instruction::False);
-        toStringPattern += instrPattern("fillEmptyImm", "k: False");
-        code.appendFillEmpty(vm::Instruction::True);
-        toStringPattern += instrPattern("fillEmptyImm", "k: True");
+    auto& os = ctx.outStream();
 
-        code.appendTraverseP(0xAA, vm::Instruction::Nothing);
-        auto offsetP1 = 0xAA - code.instrs().size();
-        toStringPattern +=
-            instrPattern("traversePImm", "k: Nothing, offset: " + std::to_string(offsetP1));
-        code.appendTraverseP(0xAA, vm::Instruction::Int32One);
-        auto offsetP2 = 0xAA - code.instrs().size();
-        toStringPattern +=
-            instrPattern("traversePImm", "k: 1, offset: " + std::to_string(offsetP2));
-        code.appendTraverseF(0xBB, vm::Instruction::True);
-        auto offsetF = 0xBB - code.instrs().size();
-        toStringPattern +=
-            instrPattern("traverseFImm", "k: True, offset: " + std::to_string(offsetF));
+    vm::CodeFragment code;
+    code.appendFillEmpty(vm::Instruction::Null);
+    code.appendFillEmpty(vm::Instruction::False);
+    code.appendFillEmpty(vm::Instruction::True);
+    code.appendTraverseP(0xAA, vm::Instruction::Nothing);
+    code.appendTraverseP(0xAA, vm::Instruction::Int32One);
+    code.appendTraverseF(0xBB, vm::Instruction::True);
+    code.appendGetField({}, "Hello world!"_sd);
+    code.appendAdd({}, {});
 
-        code.appendGetField({}, "Hello world!"_sd);
-        toStringPattern +=
-            instrPattern("getFieldImm", "popParam: 1, offsetParam: 0, value: \"Hello world!\"");
+    TimeZoneDatabase timezoneDB;
+    code.appendDateTrunc(
+        TimeUnit::day, 1, timezoneDB.getTimeZone("America/New_York"_sd), DayOfWeek::monday);
 
-        code.appendAdd({}, {});
-        toStringPattern += instrPattern("add", "popLhs: 1, offsetLhs: 0, popRhs: 1, offsetRhs: 0");
-
-        std::string instrs = code.toString();
-
-        static const pcre::Regex validToStringOutput{toStringPattern};
-
-        ASSERT_TRUE(!!validToStringOutput.matchView(instrs));
-    }
+    vm::CodeFragmentPrinter printer(vm::CodeFragmentPrinter::PrintFormat::Stable);
+    printer.print(os, code);
+    os << std::endl;
 }
 
 namespace {

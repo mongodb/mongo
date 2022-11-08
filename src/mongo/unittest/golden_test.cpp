@@ -52,6 +52,14 @@ namespace fs = ::boost::filesystem;
 
 using namespace fmt::literals;
 
+void GoldenTestContext::printTestHeader(HeaderFormat format) {
+    switch (format) {
+        case HeaderFormat::Text:
+            outStream() << "# Golden test output of " << _testInfo->suiteName() << "/"
+                        << _testInfo->testName() << std::endl;
+    }
+}
+
 void GoldenTestContext::onError(const std::string& message,
                                 const std::string& actualStr,
                                 const boost::optional<std::string>& expectedStr) {

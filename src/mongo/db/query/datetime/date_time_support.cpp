@@ -608,6 +608,20 @@ StatusWith<std::string> TimeZone::formatDate(StringData format, Date_t date) con
         return formatted.str();
 }
 
+std::string TimeZone::toString() const {
+    std::stringstream ss;
+    ss << "TimeZone(";
+    if (isTimeZoneIDZone()) {
+        ss << "name=" << _tzInfo->name;
+    } else if (_utcOffset != Seconds::zero()) {
+        ss << "utcOffset=" << _utcOffset;
+    } else {
+        ss << "UTC";
+    }
+    ss << ")";
+    return ss.str();
+}
+
 namespace {
 constexpr auto kMonthsInOneYear = 12LL;
 constexpr auto kDaysInNonLeapYear = 365LL;

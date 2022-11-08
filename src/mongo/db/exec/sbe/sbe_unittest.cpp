@@ -27,52 +27,10 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/exec/sbe/sbe_unittest.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/golden_test_base.h"
-#include "mongo/unittest/test_info.h"
-#include "mongo/unittest/unittest.h"
+namespace mongo::sbe {
 
-namespace mongo::unittest {
+unittest::GoldenTestConfig goldenTestConfigSbe{"src/mongo/db/test_output/exec/sbe"};
 
-namespace fs = ::boost::filesystem;
-
-class GoldenTestContext : public GoldenTestContextBase {
-public:
-    /** Format of the test header*/
-    enum HeaderFormat {
-        /** A simple text header, suitable for unstructured text output.*/
-        Text,
-    };
-
-    explicit GoldenTestContext(
-        const GoldenTestConfig* config,
-        const TestInfo* testInfo = UnitTest::getInstance()->currentTestInfo(),
-        bool validateOnClose = true)
-        : GoldenTestContextBase(
-              config,
-              fs::path(sanitizeName(testInfo->suiteName().toString())) /
-                  fs::path(sanitizeName(testInfo->testName().toString()) + ".txt"),
-              validateOnClose,
-              [this](auto const&... args) { return onError(args...); }),
-          _testInfo(testInfo) {}
-
-    /**
-     * Prints the test header in a specified format.
-     */
-    void printTestHeader(HeaderFormat format);
-
-    // Disable move/copy because onError captures 'this' address.
-    GoldenTestContext(GoldenTestContext&&) = delete;
-
-protected:
-    void onError(const std::string& message,
-                 const std::string& actualStr,
-                 const boost::optional<std::string>& expectedStr);
-
-private:
-    const TestInfo* _testInfo;
-};
-
-}  // namespace mongo::unittest
+}  // namespace mongo::sbe

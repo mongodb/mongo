@@ -891,7 +891,6 @@ public:
     void appendApplyClassicMatcher(const MatchExpression*);
 
     void fixup(int offset);
-
     // For printing from an interactive debugger.
     std::string toString() const;
 

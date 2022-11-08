@@ -34,6 +34,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 #include "mongo/db/exec/sbe/util/stage_results_printer.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
@@ -41,8 +42,6 @@
 #include "mongo/unittest/golden_test.h"
 #include "mongo/util/assert_util.h"
 namespace mongo::sbe {
-
-unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/exec/sbe"};
 
 class HashLookupStageTest : public PlanStageTestFixture {
 public:
@@ -248,7 +247,7 @@ private:
 };
 
 TEST_F(HashLookupStageTest, BasicTests) {
-    unittest::GoldenTestContext gctx(&goldenTestConfig);
+    unittest::GoldenTestContext gctx(&goldenTestConfigSbe);
 
     runVariation(gctx,
                  "simple scalar key",
