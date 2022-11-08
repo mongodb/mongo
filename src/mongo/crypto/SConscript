@@ -150,3 +150,30 @@ env.CppUnitTest(
         'sha_block_${MONGO_CRYPTO}',
     ],
 )
+
+env.Library(
+    target='jwt',
+    source=[
+        'jwt_types.idl',
+        'jwk_manager.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        "$BUILD_DIR/mongo/client/sasl_client",
+        '$BUILD_DIR/mongo/util/net/http_client_impl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.CppUnitTest(
+    target='jwt_test',
+    source=[
+        'jwt_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'jwt',
+    ],
+)
