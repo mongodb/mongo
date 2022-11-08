@@ -181,7 +181,7 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
     WT_DATA_HANDLE *tier;
     WT_DECL_RET;
     WT_TIERED *tiered;
-    u_int i;
+    u_int i, localid;
     const char *filename, *name;
     bool exist, locked, remove_files, remove_shared;
 
@@ -208,9 +208,10 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
      * metadata only.
      */
     tier = tiered->tiers[WT_TIERED_INDEX_LOCAL].tier;
+    localid = tiered->current_id;
     if (tier != NULL) {
         __wt_verbose_debug2(
-          session, WT_VERB_TIERED, "DROP_TIERED: drop local object %s", tier->name);
+          session, WT_VERB_TIERED, "DROP_TIERED: drop %u local object %s", localid, tier->name);
         WT_WITHOUT_DHANDLE(session,
           WT_WITH_HANDLE_LIST_WRITE_LOCK(
             session, ret = __wt_conn_dhandle_close_all(session, tier->name, true, force)));
@@ -235,7 +236,9 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
         WT_ERR(ret);
         WT_ERR(__wt_metadata_remove(session, tier->name));
         tiered->tiers[WT_TIERED_INDEX_SHARED].tier = NULL;
-    }
+    } else
+        /* If we don't have a shared tier we better be on the first object. */
+        WT_ASSERT(session, localid == 1);
 
     /*
      * We remove all metadata entries for both the file and object versions of an object. The local

@@ -174,6 +174,10 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
 
     WT_ASSERT(session, (op == WT_TIERED_WORK_FLUSH || op == WT_TIERED_WORK_FLUSH_FINISH));
     tmp = NULL;
+    if (tiered->bstorage == NULL) {
+        __wt_verbose(session, WT_VERB_TIERED, "DO_OP: tiered %p NULL bstorage.", (void *)tiered);
+        WT_ASSERT(session, tiered->bstorage != NULL);
+    }
     storage_source = tiered->bstorage->storage_source;
     bucket_fs = tiered->bstorage->file_system;
 
@@ -366,6 +370,7 @@ __tiered_server(void *arg)
     WT_ITEM path, tmp;
     WT_SESSION_IMPL *session;
     uint64_t cond_time, time_start, time_stop, timediff;
+    const char *msg;
     bool signalled;
 
     session = arg;
@@ -396,8 +401,11 @@ __tiered_server(void *arg)
          *  - Remove any cached objects that are aged out.
          */
         if (timediff >= conn->tiered_interval || signalled) {
+            msg = "tier_storage_copy";
             WT_ERR(__tier_storage_copy(session));
+            msg = "tier_storage_finish";
             WT_ERR(__tier_storage_finish(session));
+            msg = "tier_storage_remove";
             WT_ERR(__tier_storage_remove(session, false));
             time_start = time_stop;
         }
@@ -405,7 +413,7 @@ __tiered_server(void *arg)
 
     if (0) {
 err:
-        WT_IGNORE_RET(__wt_panic(session, ret, "storage server error"));
+        WT_IGNORE_RET(__wt_panic(session, ret, "storage server error from %s", msg));
     }
     __wt_buf_free(session, &path);
     __wt_buf_free(session, &tmp);
