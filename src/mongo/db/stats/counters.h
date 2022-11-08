@@ -453,4 +453,9 @@ extern OperatorCounters operatorCountersGroupAccumulatorExpressions;
 // Global counters for accumulator expressions apply to $setWindowFields.
 extern OperatorCounters operatorCountersWindowAccumulatorExpressions;
 
+// Track the number of {multi:true} updates.
+extern Counter64 updateManyCount;
+// Track the number of deleteMany calls.
+extern Counter64 deleteManyCount;
+
 }  // namespace mongo

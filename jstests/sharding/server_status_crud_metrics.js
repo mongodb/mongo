@@ -26,15 +26,14 @@ assert.commandWorked(unshardedColl.insert({x: 1, _id: 1}));
 // Verification for 'updateOneOpStyleBroadcastWithExactIDCount' metric.
 
 // Should increment the metric as the update cannot target single shard and are {multi:false}.
-assert.commandWorked(testDB.coll.update({_id: "missing"}, {$set: {a: 1}}, {multi: false}));
-assert.commandWorked(testDB.coll.update({_id: 1}, {$set: {a: 2}}, {multi: false}));
+assert.commandWorked(testColl.update({_id: "missing"}, {$set: {a: 1}}, {multi: false}));
+assert.commandWorked(testColl.update({_id: 1}, {$set: {a: 2}}, {multi: false}));
 
 // Should increment the metric because we broadcast by _id, even though the update subsequently
 // fails on the individual shard.
-assert.commandFailedWithCode(testDB.coll.update({_id: 1}, {$set: {x: 2}}, {multi: false}), 31025);
-assert.commandFailedWithCode(
-    testDB.coll.update({_id: 1}, {$set: {x: 12}, $hello: 1}, {multi: false}),
-    ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 2}}, {multi: false}), 31025);
+assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 12}, $hello: 1}, {multi: false}),
+                             ErrorCodes.FailedToParse);
 
 let mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 
@@ -42,21 +41,21 @@ let mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 assert.eq(4, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
 
 // Shouldn't increment the metric when {multi:true}.
-assert.commandWorked(testDB.coll.update({_id: 1}, {$set: {a: 3}}, {multi: true}));
-assert.commandWorked(testDB.coll.update({}, {$set: {a: 3}}, {multi: true}));
+assert.commandWorked(testColl.update({_id: 1}, {$set: {a: 3}}, {multi: true}));
+assert.commandWorked(testColl.update({}, {$set: {a: 3}}, {multi: true}));
 
 // Shouldn't increment the metric when update can target single shard.
-assert.commandWorked(testDB.coll.update({x: 11}, {$set: {a: 2}}, {multi: false}));
-assert.commandWorked(testDB.coll.update({x: 1}, {$set: {a: 2}}, {multi: false}));
+assert.commandWorked(testColl.update({x: 11}, {$set: {a: 2}}, {multi: false}));
+assert.commandWorked(testColl.update({x: 1}, {$set: {a: 2}}, {multi: false}));
 
 // Shouldn't increment the metric for replacement style updates.
-assert.commandWorked(testDB.coll.update({_id: 1}, {x: 1, a: 2}));
-assert.commandWorked(testDB.coll.update({x: 1}, {x: 1, a: 1}));
+assert.commandWorked(testColl.update({_id: 1}, {x: 1, a: 2}));
+assert.commandWorked(testColl.update({x: 1}, {x: 1, a: 1}));
 
 // Shouldn't increment the metric when routing fails.
-assert.commandFailedWithCode(testDB.coll.update({}, {$set: {x: 2}}, {multi: false}),
+assert.commandFailedWithCode(testColl.update({}, {$set: {x: 2}}, {multi: false}),
                              ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(testDB.coll.update({_id: 1}, {$set: {x: 2}}, {upsert: true}),
+assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 2}}, {upsert: true}),
                              ErrorCodes.ShardKeyNotFound);
 
 // Shouldn't increment the metrics for unsharded collection.
@@ -65,7 +64,7 @@ assert.commandWorked(unshardedColl.update({_id: 1}, {$set: {a: 2}}, {multi: fals
 
 // Shouldn't incement the metrics when query had invalid operator.
 assert.commandFailedWithCode(
-    testDB.coll.update({_id: 1, $invalidOperator: 1}, {$set: {a: 2}}, {multi: false}),
+    testColl.update({_id: 1, $invalidOperator: 1}, {$set: {a: 2}}, {multi: false}),
     ErrorCodes.BadValue);
 
 mongosServerStatus = testDB.adminCommand({serverStatus: 1});
