@@ -31,6 +31,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -163,12 +164,20 @@ protected:
         return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(value)};
     }
 
-    std::pair<value::TypeTags, value::Value> makeBool(bool value) {
+    static std::pair<value::TypeTags, value::Value> makeBool(bool value) {
         return {value::TypeTags::Boolean, value::bitcastFrom<bool>(value)};
     }
 
-    std::pair<value::TypeTags, value::Value> makeTimestamp(Timestamp timestamp) {
+    static std::pair<value::TypeTags, value::Value> makeTimestamp(Timestamp timestamp) {
         return {value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(timestamp.asULL())};
+    }
+
+    static std::unique_ptr<EConstant> makeC(value::TypeTags tag, value::Value value) {
+        return std::make_unique<EConstant>(tag, value);
+    }
+
+    static std::unique_ptr<EConstant> makeC(const TypedValue p) {
+        return makeC(p.first, p.second);
     }
 
 private:
