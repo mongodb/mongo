@@ -33,7 +33,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/concurrency/ticketholder_params_gen.h"
 
 #include <iostream>
 
@@ -379,13 +378,15 @@ void SemaphoreTicketHolder::_resize(int newSize, int oldSize) noexcept {
 }
 #endif
 
-PriorityTicketHolder::PriorityTicketHolder(int numTickets, ServiceContext* serviceContext)
+PriorityTicketHolder::PriorityTicketHolder(int numTickets,
+                                           int lowPriorityBypassThreshold,
+                                           ServiceContext* serviceContext)
     : TicketHolderWithQueueingStats(numTickets, serviceContext),
       _queues{Queue(this, QueueType::kLowPriority),
               Queue(this, QueueType::kNormalPriority),
               Queue(this, QueueType::kImmediatePriority)},
+      _lowPriorityBypassThreshold(lowPriorityBypassThreshold),
       _serviceContext(serviceContext) {
-
     _ticketsAvailable.store(numTickets);
     _enqueuedElements.store(0);
 }
@@ -400,8 +401,14 @@ int PriorityTicketHolder::queued() const {
     return _enqueuedElements.loadRelaxed();
 }
 
-std::int64_t PriorityTicketHolder::promoted() const {
-    return _promotedElements.loadRelaxed();
+void PriorityTicketHolder::updateLowPriorityAdmissionBypassThreshold(
+    const int& newBypassThreshold) {
+    UniqueLockGuard uniqueQueueLock(_queueMutex);
+    _lowPriorityBypassThreshold = newBypassThreshold;
+}
+
+std::int64_t PriorityTicketHolder::expedited() const {
+    return _expeditedLowPriorityAdmissions.loadRelaxed();
 }
 
 std::int64_t PriorityTicketHolder::bypassed() const {
@@ -423,14 +430,9 @@ void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) no
     //
     // Under this lock the queues cannot be modified in terms of someone attempting to enqueue on
     // them, only waking threads is allowed.
-    ReleaserLockGuard releaserLock(_queueMutex);  // NOLINT
+    SharedLockGuard sharedQueueLock(_queueMutex);
     _ticketsAvailable.addAndFetch(1);
-    if (std::all_of(_queues.begin(), _queues.end(), [](const Queue& queue) {
-            return queue.queuedElems() == 0;
-        })) {
-        return;
-    }
-    _dequeueWaitingThread(releaserLock);
+    _dequeueWaitingThread(sharedQueueLock);
 }
 
 bool PriorityTicketHolder::_tryAcquireTicket() {
@@ -465,33 +467,24 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationC
     auto queueType = _queueType(admCtx);
     auto& queue = _getQueue(queueType);
 
-    AdmissionStatus admissionStatus;
+    bool assigned;
     {
-        EnqueuerLockGuard enqueuerLock(_queueMutex);
+        UniqueLockGuard uniqueQueueLock(_queueMutex);
 
         _enqueuedElements.addAndFetch(1);
         ON_BLOCK_EXIT([&] { _enqueuedElements.subtractAndFetch(1); });
 
-        admissionStatus = queue.enqueue(opCtx, enqueuerLock, until, waitMode);
-
-        if (admissionStatus == AdmissionStatus::kNeedsPromotion) {
-            invariant(queueType == QueueType::kLowPriority);
-
-            _promotedElements.fetchAndAdd(1);
-            auto& normalPriorityQueue = _getQueue(QueueType::kNormalPriority);
-            admissionStatus = normalPriorityQueue.enqueue(opCtx, enqueuerLock, until, waitMode);
-        }
+        assigned = queue.enqueue(opCtx, uniqueQueueLock, until, waitMode);
     }
 
-    if (admissionStatus == AdmissionStatus::kReadyToAcquire) {
+    if (assigned) {
         return Ticket{this, admCtx};
     } else {
         return boost::none;
     }
 }
 
-bool PriorityTicketHolder::_hasToWaitForHigherPriority(const EnqueuerLockGuard& lk,
-                                                       QueueType queue) {
+bool PriorityTicketHolder::_hasToWaitForHigherPriority(const UniqueLockGuard& lk, QueueType queue) {
     switch (queue) {
         case QueueType::kLowPriority: {
             const auto& normalQueue = _getQueue(QueueType::kNormalPriority);
@@ -511,9 +504,9 @@ void PriorityTicketHolder::_resize(int newSize, int oldSize) noexcept {
     if (difference > 0) {
         // As we're adding tickets the waiting threads need to be notified that there are new
         // tickets available.
-        ReleaserLockGuard releaserLock(_queueMutex);
+        SharedLockGuard sharedQueueLock(_queueMutex);
         for (int i = 0; i < difference; i++) {
-            _dequeueWaitingThread(releaserLock);
+            _dequeueWaitingThread(sharedQueueLock);
         }
     }
 
@@ -521,7 +514,7 @@ void PriorityTicketHolder::_resize(int newSize, int oldSize) noexcept {
     // have to wait until the current ticket holders release their tickets.
 }
 
-bool PriorityTicketHolder::Queue::attemptToDequeue(const ReleaserLockGuard& releaserLock) {
+bool PriorityTicketHolder::Queue::attemptToDequeue(const SharedLockGuard& sharedQueueLock) {
     auto threadsToBeWoken = _threadsToBeWoken.load();
     while (threadsToBeWoken < _queuedThreads) {
         auto canDequeue = _threadsToBeWoken.compareAndSwap(&threadsToBeWoken, threadsToBeWoken + 1);
@@ -533,7 +526,7 @@ bool PriorityTicketHolder::Queue::attemptToDequeue(const ReleaserLockGuard& rele
     return false;
 }
 
-void PriorityTicketHolder::Queue::_signalThreadWoken(const EnqueuerLockGuard& enqueuerLock) {
+void PriorityTicketHolder::Queue::_signalThreadWoken(const UniqueLockGuard& uniqueQueueLock) {
     auto currentThreadsToBeWoken = _threadsToBeWoken.load();
     while (currentThreadsToBeWoken > 0) {
         if (_threadsToBeWoken.compareAndSwap(&currentThreadsToBeWoken,
@@ -543,11 +536,10 @@ void PriorityTicketHolder::Queue::_signalThreadWoken(const EnqueuerLockGuard& en
     }
 }
 
-PriorityTicketHolder::AdmissionStatus PriorityTicketHolder::Queue::enqueue(
-    OperationContext* opCtx,
-    EnqueuerLockGuard& enqueuerLock,
-    const Date_t& until,
-    WaitMode waitMode) {
+bool PriorityTicketHolder::Queue::enqueue(OperationContext* opCtx,
+                                          UniqueLockGuard& uniqueQueueLock,
+                                          const Date_t& until,
+                                          WaitMode waitMode) {
     _queuedThreads++;
     // Before exiting we remove ourselves from the count of queued threads, we are still holding the
     // lock here so this is safe.
@@ -568,70 +560,61 @@ PriorityTicketHolder::AdmissionStatus PriorityTicketHolder::Queue::enqueue(
         // woken after the condition variable wait, not before which is where the predicate would
         // go.
         while (_holder->_ticketsAvailable.load() <= 0 ||
-               _holder->_hasToWaitForHigherPriority(enqueuerLock, _queueType)) {
+               _holder->_hasToWaitForHigherPriority(uniqueQueueLock, _queueType)) {
             // This method must be called after getting woken in all cases, so we use a ScopeGuard
             // to handle exceptions as well as early returns.
-            ON_BLOCK_EXIT([&] { _signalThreadWoken(enqueuerLock); });
+            ON_BLOCK_EXIT([&] { _signalThreadWoken(uniqueQueueLock); });
             auto waitResult =
-                clockSource->waitForConditionUntil(_cv, enqueuerLock, deadline, baton);
+                clockSource->waitForConditionUntil(_cv, uniqueQueueLock, deadline, baton);
             // We check if the operation has been interrupted (timeout, killed, etc.) here.
             if (waitMode == WaitMode::kInterruptible) {
                 opCtx->checkForInterrupt();
             }
             if (waitResult == stdx::cv_status::timeout)
-                return AdmissionStatus::kInterrupted;
-
-            bool needsPromotion = _signalPromotion.swap(false);
-            if (needsPromotion) {
-                // The thread is woken for promotion, which is different than a thread woken to
-                // acquire a ticket / a product of an interruption.
-                return PriorityTicketHolder::AdmissionStatus::kNeedsPromotion;
-            }
+                return false;
         }
     } while (!_holder->_tryAcquireTicket());
-    return AdmissionStatus::kReadyToAcquire;
+    return true;
 }
 
-void PriorityTicketHolder::Queue::signalPromoteSingleOp(const ReleaserLockGuard& releaserLock) {
-    // Only signal a promotion if there exists an operation to promote.
-    //
-    // Additionally, only modify _signalPromotion if it was false to begin. This prevents the
-    // following race (as multiple releasers may call this code concurrently):
-    //      . ReleaserA attempts to dequeue, succeeds, _signalPromotion is set to true
-    //      . ReleaserB attempts to dequeue, fails, _signalPromotion is set to false before the
-    //      woken thread has a chance to check whether it should be promoted.
-    //
-    //
-    bool permittedOriginalValue = false;
-    _signalPromotion.compareAndSwap(&permittedOriginalValue, attemptToDequeue(releaserLock));
-}
-
-void PriorityTicketHolder::_dequeueWaitingThread(const ReleaserLockGuard& releaserLock) {
-    // There should never be anything to dequeue from 'QueueType::kImmediatePriority' since
-    // 'kImmediate' operations should always bypass the need to queue.
-    auto& normalPriorityQueue = _getQueue(QueueType::kNormalPriority);
-    if (!normalPriorityQueue.attemptToDequeue(releaserLock)) {
-        _getQueue(QueueType::kLowPriority).attemptToDequeue(releaserLock);
-        return;
-    }
-
+void PriorityTicketHolder::_dequeueWaitingThread(const SharedLockGuard& sharedQueueLock) {
+    // There are only 2 possible queues to dequeue from - the low priority and normal priority
+    // queues. There will never be anything to dequeue from the immediate priority queue, given
+    // immediate priority operations will never wait for ticket admission.
     auto& lowPriorityQueue = _getQueue(QueueType::kLowPriority);
-    if (lowPriorityQueue.queuedElems() == 0) {
-        // Dequeueing from the normal queue didn't bypass any operations waiting in the low priority
-        // queue, return early.
+    auto& normalPriorityQueue = _getQueue(QueueType::kNormalPriority);
+
+    // There is a guarantee that the number of queued elements cannot change while holding the
+    // shared queue lock.
+    auto lowQueueCount = lowPriorityQueue.queuedElems();
+    auto normalQueueCount = normalPriorityQueue.queuedElems();
+
+    if (lowQueueCount == 0 && normalQueueCount == 0) {
+        return;
+    }
+    if (lowQueueCount == 0) {
+        normalPriorityQueue.attemptToDequeue(sharedQueueLock);
+        return;
+    }
+    if (normalQueueCount == 0) {
+        lowPriorityQueue.attemptToDequeue(sharedQueueLock);
         return;
     }
 
-    // To prevent starvation, record the number of times operations in the low priority queue are
-    // bypassed in favor of dequeueing from the normal queue. If operations are bypassed enough, it
-    // may be time to promote a low priority operation to give it a chance to eventually run.
-    //
-    // A value of 0 implies low priority operations are never to be promoted.
-    if (auto lowPriorityOperationPromotionRate = gLowPriorityOperationPromotionRate.load();
-        lowPriorityOperationPromotionRate > 0) {
-        if (_lowPriorityBypassCount.addAndFetch(1) % lowPriorityOperationPromotionRate == 0) {
-            lowPriorityQueue.signalPromoteSingleOp(releaserLock);
+    // Both queues are non-empty, and the low priority queue is bypassed for dequeue in favor of the
+    // normal priority queue until the bypass threshold is met.
+    if (_lowPriorityBypassThreshold > 0 &&
+        _lowPriorityBypassCount.addAndFetch(1) % _lowPriorityBypassThreshold == 0) {
+        if (lowPriorityQueue.attemptToDequeue(sharedQueueLock)) {
+            _expeditedLowPriorityAdmissions.addAndFetch(1);
+        } else {
+            normalPriorityQueue.attemptToDequeue(sharedQueueLock);
         }
+        return;
+    }
+
+    if (!normalPriorityQueue.attemptToDequeue(sharedQueueLock)) {
+        lowPriorityQueue.attemptToDequeue(sharedQueueLock);
     }
 }
 
@@ -640,7 +623,7 @@ void PriorityTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
         BSONObjBuilder bbb(b.subobjStart("lowPriority"));
         const auto& lowPriorityTicketStats = _getQueue(QueueType::kLowPriority).getStatsToUse();
         appendCommonQueueImplStats(bbb, lowPriorityTicketStats);
-        bbb.append("promoted", promoted());
+        bbb.append("expedited", expedited());
         bbb.append("bypassCount", bypassed());
         bbb.done();
     }

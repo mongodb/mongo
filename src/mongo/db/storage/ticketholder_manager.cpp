@@ -42,41 +42,63 @@ namespace mongo {
 
 Status TicketHolderManager::updateConcurrentWriteTransactions(const int& newWriteTransactions) {
     if (auto client = Client::getCurrent()) {
-        if (auto svcCtx = client->getServiceContext()) {
-            auto ticketHolderManager = TicketHolderManager::get(svcCtx);
-            auto& writer = ticketHolderManager->_writeTicketHolder;
-            if (writer) {
-                writer->resize(newWriteTransactions);
-                return Status::OK();
-            }
-            LOGV2_WARNING(6754202,
-                          "Attempting to update concurrent write transactions limit before the "
-                          "write TicketHolder is initialized");
-            return Status(ErrorCodes::IllegalOperation,
-                          "Attempting to update concurrent write transactions limit before the "
-                          "write TicketHolder is initialized");
+        auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
+        auto& writer = ticketHolderManager->_writeTicketHolder;
+        if (writer) {
+            writer->resize(newWriteTransactions);
+            return Status::OK();
         }
+        LOGV2_WARNING(6754202,
+                      "Attempting to update concurrent write transactions limit before the "
+                      "write TicketHolder is initialized");
+        return Status(ErrorCodes::IllegalOperation,
+                      "Attempting to update concurrent write transactions limit before the "
+                      "write TicketHolder is initialized");
     }
     return Status::OK();
 };
 
 Status TicketHolderManager::updateConcurrentReadTransactions(const int& newReadTransactions) {
     if (auto client = Client::getCurrent()) {
-        if (auto svcCtx = client->getServiceContext()) {
-            auto ticketHolderManager = TicketHolderManager::get(svcCtx);
-            auto& reader = ticketHolderManager->_readTicketHolder;
-            if (reader) {
-                reader->resize(newReadTransactions);
-                return Status::OK();
-            }
-
-            LOGV2_WARNING(6754201,
-                          "Attempting to update concurrent read transactions limit before the read "
-                          "TicketHolder is initialized");
-            return Status(ErrorCodes::IllegalOperation,
-                          "Attempting to update concurrent read transactions limit before the read "
-                          "TicketHolder is initialized");
+        auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
+        auto& reader = ticketHolderManager->_readTicketHolder;
+        if (reader) {
+            reader->resize(newReadTransactions);
+            return Status::OK();
         }
+
+        LOGV2_WARNING(6754201,
+                      "Attempting to update concurrent read transactions limit before the read "
+                      "TicketHolder is initialized");
+        return Status(ErrorCodes::IllegalOperation,
+                      "Attempting to update concurrent read transactions limit before the read "
+                      "TicketHolder is initialized");
+    }
+    return Status::OK();
+}
+
+Status TicketHolderManager::updateLowPriorityAdmissionBypassThreshold(
+    const int& newBypassThreshold) {
+    if (auto client = Client::getCurrent()) {
+        auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
+        auto reader = dynamic_cast<PriorityTicketHolder*>(
+            ticketHolderManager->getTicketHolder(LockMode::MODE_IS));
+        auto writer = dynamic_cast<PriorityTicketHolder*>(
+            ticketHolderManager->getTicketHolder(LockMode::MODE_IX));
+
+        if (reader && writer) {
+            reader->updateLowPriorityAdmissionBypassThreshold(newBypassThreshold);
+            writer->updateLowPriorityAdmissionBypassThreshold(newBypassThreshold);
+            return Status::OK();
+        }
+
+        // The 'lowPriorityAdmissionBypassThreshold' only impacts PriorityTicketHolders.
+        LOGV2_WARNING(7092700,
+                      "Attempting to update lowPriorityAdmissionBypassThreshold when the "
+                      "Ticketholders are not initalized to be PriorityTicketholders");
+        return Status(ErrorCodes::IllegalOperation,
+                      "Attempting to update lowPriorityAdmissionBypassThreshold when the "
+                      "TicketHolders are not initalized to be PriorityTicketholders");
     }
     return Status::OK();
 }

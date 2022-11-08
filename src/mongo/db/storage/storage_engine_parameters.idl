@@ -59,6 +59,22 @@ server_parameters:
     validator:
       gte: 5
 
+  lowPriorityAdmissionBypassThreshold:
+    description: >-
+        Only applicable when Deprioritization is enabled for global lock ticket admission. Limits
+        the number of consecutive times a queue of low-priority operations is bypassed in favor of
+        waking normal-priority operations for ticket admission. Once the threshold is met, an
+        operation from the low-priority queue will be woken for ticket admission.
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int>
+    cpp_varname: gLowPriorityAdmissionBypassThreshold
+    on_update: "TicketHolderManager::updateLowPriorityAdmissionBypassThreshold"
+    # 0 means low priority operations will never be admitted when there are normal priority
+    # operations waiting for ticket admission.
+    default: 500
+    validator:
+      gte: 0
+
 feature_flags:
   featureFlagEnableExecutionControl:
     description: Enables the new execution control queueing policy

@@ -44,6 +44,7 @@ namespace {
 static int kTickets = 128;
 static int kThreadMin = 16;
 static int kThreadMax = 1024;
+static int kLowPriorityAdmissionBypassThreshold = 100;
 static TicketHolder::WaitMode waitMode = TicketHolder::WaitMode::kUninterruptible;
 
 template <typename TicketHolderImpl>
@@ -55,7 +56,13 @@ public:
 
 
     TicketHolderFixture(int threads, ServiceContext* serviceContext) {
-        ticketHolder = std::make_unique<TicketHolderImpl>(kTickets, serviceContext);
+        if constexpr (std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {
+            ticketHolder = std::make_unique<TicketHolderImpl>(
+                kTickets, kLowPriorityAdmissionBypassThreshold, serviceContext);
+        } else {
+            ticketHolder = std::make_unique<TicketHolderImpl>(kTickets, serviceContext);
+        }
+
         for (int i = 0; i < threads; ++i) {
             clients.push_back(
                 serviceContext->makeClient(str::stream() << "test client for thread " << i));
@@ -63,6 +70,7 @@ public:
         }
     }
 };
+
 
 static Mutex isReadyMutex;
 static stdx::condition_variable isReadyCv;

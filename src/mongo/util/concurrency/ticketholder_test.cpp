@@ -49,6 +49,10 @@
 namespace {
 using namespace mongo;
 
+// By default, tests will create a PriorityTicketHolder where low priority admissions can be
+// bypassed an unlimited amount of times in favor of normal priority admissions.
+static constexpr int kDefaultLowPriorityAdmissionBypassThreshold = 0;
+
 class TicketHolderTest : public ServiceContextTest {
     void setUp() override {
         ServiceContextTest::setUp();
@@ -84,12 +88,8 @@ void assertSoon(std::function<void()> predicate, Milliseconds timeout = kWaitTim
     }
 }
 
-template <class H>
-void basicTimeout(OperationContext* opCtx) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+void basicTimeout(OperationContext* opCtx, std::unique_ptr<TicketHolderWithQueueingStats> holder) {
     auto mode = TicketHolder::WaitMode::kInterruptible;
-    std::unique_ptr<TicketHolderWithQueueingStats> holder = std::make_unique<H>(1, &serviceContext);
     ASSERT_EQ(holder->used(), 0);
     ASSERT_EQ(holder->available(), 1);
     ASSERT_EQ(holder->outof(), 1);
@@ -159,10 +159,17 @@ void basicTimeout(OperationContext* opCtx) {
 }
 
 TEST_F(TicketHolderTest, BasicTimeoutSemaphore) {
-    basicTimeout<SemaphoreTicketHolder>(_opCtx.get());
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    basicTimeout(_opCtx.get(), std::make_unique<SemaphoreTicketHolder>(1, &serviceContext));
 }
+
 TEST_F(TicketHolderTest, BasicTimeoutPriority) {
-    basicTimeout<PriorityTicketHolder>(_opCtx.get());
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    basicTimeout(_opCtx.get(),
+                 std::make_unique<PriorityTicketHolder>(
+                     1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext));
 }
 
 class Stats {
@@ -204,15 +211,12 @@ struct MockAdmission {
     boost::optional<Ticket> ticket;
 };
 
-template <class H>
-void resizeTest(OperationContext* opCtx, bool testWithOutstandingImmediateOperation = false) {
-    // Verify that resize operations don't alter metrics outside of those linked to the number of
-    // tickets.
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
-    auto mode = TicketHolder::WaitMode::kInterruptible;
-    std::unique_ptr<TicketHolderWithQueueingStats> holder = std::make_unique<H>(1, &serviceContext);
+// Verify that resize operations don't alter metrics outside of those linked to the number of
+// tickets.
+void resizeTest(OperationContext* opCtx,
+                std::unique_ptr<TicketHolderWithQueueingStats> holder,
+                TickSourceMock<Microseconds>* tickSource,
+                bool testWithOutstandingImmediateOperation = false) {
     Stats stats(holder.get());
 
     // An outstanding kImmediate priority operation should not impact resize statistics.
@@ -226,6 +230,7 @@ void resizeTest(OperationContext* opCtx, bool testWithOutstandingImmediateOperat
 
     AdmissionContext admCtx;
     admCtx.setPriority(AdmissionContext::Priority::kNormal);
+    auto mode = TicketHolder::WaitMode::kInterruptible;
 
     auto ticket =
         holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds{500}, mode);
@@ -266,22 +271,53 @@ void resizeTest(OperationContext* opCtx, bool testWithOutstandingImmediateOperat
 }
 
 TEST_F(TicketHolderTest, ResizeStatsSemaphore) {
-    resizeTest<SemaphoreTicketHolder>(_opCtx.get());
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
+
+    resizeTest(
+        _opCtx.get(), std::make_unique<SemaphoreTicketHolder>(1, &serviceContext), tickSource);
 }
+
 TEST_F(TicketHolderTest, ResizeStatsPriority) {
-    resizeTest<PriorityTicketHolder>(_opCtx.get());
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
+
+    resizeTest(_opCtx.get(),
+               std::make_unique<PriorityTicketHolder>(
+                   1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext),
+               tickSource);
 }
+
 TEST_F(TicketHolderTest, ResizeStatsSemaphoreWithOutstandingImmediatePriority) {
-    resizeTest<SemaphoreTicketHolder>(_opCtx.get(), true);
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
+
+    resizeTest(_opCtx.get(),
+               std::make_unique<SemaphoreTicketHolder>(1, &serviceContext),
+               tickSource,
+               true);
 }
+
 TEST_F(TicketHolderTest, ResizeStatsPriorityWithOutstandingImmediatePriority) {
-    resizeTest<PriorityTicketHolder>(_opCtx.get(), true);
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
+
+    resizeTest(_opCtx.get(),
+               std::make_unique<PriorityTicketHolder>(
+                   1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext),
+               tickSource,
+               true);
 }
 
 TEST_F(TicketHolderTest, PriorityTwoQueuedOperations) {
     ServiceContext serviceContext;
     serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    PriorityTicketHolder holder(1, &serviceContext);
+    PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
+
     Stats stats(&holder);
 
     {
@@ -366,7 +402,7 @@ TEST_F(TicketHolderTest, PriorityTwoQueuedOperations) {
 TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
     ServiceContext serviceContext;
     serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    PriorityTicketHolder holder(1, &serviceContext);
+    PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
     Stats stats(&holder);
 
     {
@@ -488,7 +524,7 @@ TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
 TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
     ServiceContext serviceContext;
     serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    PriorityTicketHolder holder(1, &serviceContext);
+    PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
     Stats stats(&holder);
 
     {
@@ -592,7 +628,7 @@ TEST_F(TicketHolderTest, PriorityBasicMetrics) {
     ServiceContext serviceContext;
     serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
     auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
-    PriorityTicketHolder holder(1, &serviceContext);
+    PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
     Stats stats(&holder);
 
     MockAdmission lowPriorityAdmission(this->getServiceContext(), AdmissionContext::Priority::kLow);
@@ -697,7 +733,7 @@ TEST_F(TicketHolderTest, PrioritImmediateMetrics) {
     ServiceContext serviceContext;
     serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
     auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
-    PriorityTicketHolder holder(1, &serviceContext);
+    PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
     Stats stats(&holder);
 
     MockAdmission lowPriorityAdmission(this->getServiceContext(), AdmissionContext::Priority::kLow);
@@ -780,7 +816,7 @@ TEST_F(TicketHolderTest, PriorityCanceled) {
     ServiceContext serviceContext;
     serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
     auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
-    PriorityTicketHolder holder(1, &serviceContext);
+    PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
     Stats stats(&holder);
     {
         MockAdmission lowPriorityAdmission(this->getServiceContext(),
@@ -847,13 +883,11 @@ TEST_F(TicketHolderTest, PriorityCanceled) {
     ASSERT_EQ(immediatePriorityStats.getIntField("newAdmissions"), 0);
 }
 
-TEST_F(TicketHolderTest, PriorityPromotionBasic) {
+TEST_F(TicketHolderTest, LowPriorityExpedited) {
     ServiceContext serviceContext;
     serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    auto lowPriorityPromotionRate = 2;
-    RAIIServerParameterControllerForTest _promotionController("lowPriorityOperationPromotionRate",
-                                                              lowPriorityPromotionRate);
-    PriorityTicketHolder holder(1, &serviceContext);
+    auto lowPriorityBypassThreshold = 2;
+    PriorityTicketHolder holder(1, lowPriorityBypassThreshold, &serviceContext);
     Stats stats(&holder);
 
     // Use the GlobalServiceContext to create MockAdmissions.
@@ -893,7 +927,7 @@ TEST_F(TicketHolderTest, PriorityPromotionBasic) {
     initialAdmission.ticket.reset();
 
     assertSoon([&] {
-        ASSERT_EQ(holder.promoted(), 1);
+        ASSERT_EQ(holder.expedited(), 1);
         ASSERT(lowPriorityAdmission.ticket);
     });
 
@@ -919,7 +953,7 @@ TEST_F(TicketHolderTest, PriorityPromotionBasic) {
     ASSERT_EQ(lowPriorityStats.getIntField("totalTimeQueuedMicros"), 0);
     ASSERT_EQ(lowPriorityStats.getIntField("newAdmissions"), 1);
     ASSERT_EQ(lowPriorityStats.getIntField("canceled"), 0);
-    ASSERT_EQ(lowPriorityStats.getIntField("promoted"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("expedited"), 1);
 
     auto normalPriorityStats = currentStats.getObjectField("normalPriority");
     ASSERT_EQ(normalPriorityStats.getIntField("addedToQueue"), queuedNormalAdmissionsCount);

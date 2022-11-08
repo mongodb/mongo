@@ -59,6 +59,13 @@ public:
     static Status updateConcurrentWriteTransactions(const int& newWriteTransactions);
     static Status updateConcurrentReadTransactions(const int& newReadTransactions);
 
+    // The 'lowPriorityAdmissionBypassThreshold' is only applicable when ticket admission is
+    // controlled via PriorityTicketHolders.
+    //
+    // Returns Status::OK() and updates the 'lowPriorityAdmissionBypassThreshold' provided all
+    // TicketHolders are initialized and of type PriorityTicketHolders. Otherwise, returns an error.
+    static Status updateLowPriorityAdmissionBypassThreshold(const int& newBypassThreshold);
+
     static TicketHolderManager* get(ServiceContext* svcCtx);
 
     static void use(ServiceContext* svcCtx,
