@@ -74,33 +74,33 @@ TEST(CollModOptionTest, makeDryRunRequest) {
     auto request = CollModRequest::parse(ctx, requestObj);
     auto dryRunRequest = makeCollModDryRunRequest(request);
     ASSERT_TRUE(dryRunRequest.getIndex()->getKeyPattern()->binaryEqual(fromjson("{a: 1}")));
-    ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() || *dryRunRequest.getIndex()->getUnique());
-    ASSERT_TRUE(dryRunRequest.getDryRun() || *dryRunRequest.getDryRun());
+    ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() && *dryRunRequest.getIndex()->getUnique());
+    ASSERT_TRUE(dryRunRequest.getDryRun() && *dryRunRequest.getDryRun());
 
     requestObj = fromjson("{index: {keyPattern: {a: 1}, unique: true, hidden: true}}");
     request = CollModRequest::parse(ctx, requestObj);
     dryRunRequest = makeCollModDryRunRequest(request);
     ASSERT_TRUE(dryRunRequest.getIndex()->getKeyPattern()->binaryEqual(fromjson("{a: 1}")));
-    ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() || *dryRunRequest.getIndex()->getUnique());
+    ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() && *dryRunRequest.getIndex()->getUnique());
     ASSERT_FALSE(dryRunRequest.getIndex()->getHidden());
-    ASSERT_TRUE(dryRunRequest.getDryRun() || *dryRunRequest.getDryRun());
+    ASSERT_TRUE(dryRunRequest.getDryRun() && *dryRunRequest.getDryRun());
 
     requestObj = fromjson(
         "{index: {keyPattern: {a: 1}, unique: true, hidden: true}, validationAction: 'warn'}");
     request = CollModRequest::parse(ctx, requestObj);
     dryRunRequest = makeCollModDryRunRequest(request);
     ASSERT_TRUE(dryRunRequest.getIndex()->getKeyPattern()->binaryEqual(fromjson("{a: 1}")));
-    ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() || *dryRunRequest.getIndex()->getUnique());
+    ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() && *dryRunRequest.getIndex()->getUnique());
     ASSERT_FALSE(dryRunRequest.getIndex()->getHidden());
     ASSERT_FALSE(dryRunRequest.getValidationAction());
-    ASSERT_TRUE(dryRunRequest.getDryRun() || *dryRunRequest.getDryRun());
+    ASSERT_TRUE(dryRunRequest.getDryRun() && *dryRunRequest.getDryRun());
 
     requestObj = fromjson("{index: {keyPattern: {a: 1}, unique: true}, dryRun: false}");
     request = CollModRequest::parse(ctx, requestObj);
     dryRunRequest = makeCollModDryRunRequest(request);
     ASSERT_TRUE(dryRunRequest.getIndex()->getKeyPattern()->binaryEqual(fromjson("{a: 1}")));
-    ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() || *dryRunRequest.getIndex()->getUnique());
-    ASSERT_TRUE(dryRunRequest.getDryRun() || *dryRunRequest.getDryRun());
+    ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() && *dryRunRequest.getIndex()->getUnique());
+    ASSERT_TRUE(dryRunRequest.getDryRun() && *dryRunRequest.getDryRun());
 }
 }  // namespace
 }  // namespace mongo
