@@ -841,6 +841,7 @@ public:
         CollectionOptions options;
         options.uuid.emplace(UUID::gen());
 
+        // Adds the collection to the durable catalog.
         auto storageEngine = getServiceContext()->getStorageEngine();
         std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
             uassertStatusOK(storageEngine->getCatalog()->createCollection(
@@ -851,6 +852,7 @@ public:
         ownedCollection->init(opCtx);
         ownedCollection->setCommitted(false);
 
+        // Adds the collection to the in-memory catalog.
         CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
 
         wuow.commit();
@@ -871,12 +873,32 @@ public:
 
         WriteUnitOfWork wuow(opCtx);
 
+        Collection* writableCollection = collection.getWritableCollection(opCtx);
+
+        // Drop all remaining indexes before dropping the collection.
+        std::vector<std::string> indexNames;
+        writableCollection->getAllIndexes(&indexNames);
+        for (const auto& indexName : indexNames) {
+            IndexCatalog* indexCatalog = writableCollection->getIndexCatalog();
+            auto indexDescriptor = indexCatalog->findIndexByName(
+                opCtx, indexName, IndexCatalog::InclusionPolicy::kReady);
+
+            // This also adds the index ident to the drop-pending reaper.
+            ASSERT_OK(indexCatalog->dropIndex(opCtx, writableCollection, indexDescriptor));
+        }
+
         // Add the collection ident to the drop-pending reaper.
         opCtx->getServiceContext()->getStorageEngine()->addDropPendingIdent(
             timestamp, collection->getRecordStore()->getSharedIdent());
 
+        // Drops the collection from the durable catalog.
+        auto storageEngine = getServiceContext()->getStorageEngine();
+        uassertStatusOK(
+            storageEngine->getCatalog()->dropCollection(opCtx, writableCollection->getCatalogId()));
+
+        // Drops the collection from the in-memory catalog.
         CollectionCatalog::get(opCtx)->dropCollection(
-            opCtx, collection.getWritableCollection(opCtx), /*isDropPending=*/true);
+            opCtx, writableCollection, /*isDropPending=*/true);
         wuow.commit();
     }
 
@@ -1370,26 +1392,32 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionWithReaper) {
                   *storageEngine->getDropPendingIdents().begin());
     }
 
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
-    auto openedColl =
-        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createCollectionTs);
-    ASSERT(openedColl);
-    ASSERT_EQ(coll->getSharedIdent(), openedColl->getSharedIdent());
+    {
+        OneOffRead oor(opCtx.get(), createCollectionTs);
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+        auto openedColl = CollectionCatalog::get(opCtx.get())
+                              ->openCollection(opCtx.get(), nss, createCollectionTs);
+        ASSERT(openedColl);
+        ASSERT_EQ(coll->getSharedIdent(), openedColl->getSharedIdent());
 
-    // The ident is now expired and should be removed the next time the ident reaper runs.
-    coll.reset();
-    openedColl.reset();
+        // The ident is now expired and should be removed the next time the ident reaper runs.
+        coll.reset();
+        openedColl.reset();
+    }
 
-    // Remove the collection reference in UncommittedCatalogUpdates.
-    opCtx->recoveryUnit()->abandonSnapshot();
+    {
+        // Remove the collection reference in UncommittedCatalogUpdates.
+        opCtx->recoveryUnit()->abandonSnapshot();
 
-    storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
-    ASSERT_EQ(0, storageEngine->getDropPendingIdents().size());
+        storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
+        ASSERT_EQ(0, storageEngine->getDropPendingIdents().size());
 
-    // Now we fail to open the collection as the ident has been removed.
-    OneOffRead oor(opCtx.get(), createCollectionTs);
-    ASSERT(
-        !CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createCollectionTs));
+        // Now we fail to open the collection as the ident has been removed.
+        OneOffRead oor(opCtx.get(), createCollectionTs);
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+        ASSERT(!CollectionCatalog::get(opCtx.get())
+                    ->openCollection(opCtx.get(), nss, createCollectionTs));
+    }
 }
 
 TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionWithReaper) {

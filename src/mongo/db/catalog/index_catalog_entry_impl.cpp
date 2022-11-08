@@ -90,7 +90,6 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
         timeseries::doesBucketsIndexIncludeMeasurement(
             opCtx, collection->ns(), *collection->getTimeseriesOptions(), _descriptor->infoObj());
 
-    auto nss = DurableCatalog::get(opCtx)->getEntry(_catalogId).nss;
     const BSONObj& collation = _descriptor->collation();
     if (!collation.isEmpty()) {
         auto statusWithCollator =
@@ -106,7 +105,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
         const BSONObj& filter = _descriptor->partialFilterExpression();
 
         _expCtxForFilter = make_intrusive<ExpressionContext>(
-            opCtx, CollatorInterface::cloneCollator(_collator.get()), nss);
+            opCtx, CollatorInterface::cloneCollator(_collator.get()), collection->ns());
 
         // Parsing the partial filter expression is not expected to fail here since the
         // expression would have been successfully parsed upstream during index creation.
@@ -118,7 +117,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
         LOGV2_DEBUG(20350,
                     2,
                     "have filter expression for {namespace} {indexName} {filter}",
-                    "namespace"_attr = nss,
+                    "namespace"_attr = collection->ns(),
                     "indexName"_attr = _descriptor->indexName(),
                     "filter"_attr = redact(filter));
     }
