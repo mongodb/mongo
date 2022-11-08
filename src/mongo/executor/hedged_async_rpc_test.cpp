@@ -774,6 +774,48 @@ TEST_F(HedgedAsyncRPCTest, HedgedFailsWithFatalErrorAuthoritativeCanceled) {
     ASSERT_EQ(remoteError.getRemoteCommandResult(), fatalInternalErrorStatus);
 }
 
+/*
+ * Tests that 'sendHedgedCommand' will appropriately retry multiple times under the conditions
+ * defined by the retry policy, with a dynmically changing wait-time between retries.
+ */
+TEST_F(HedgedAsyncRPCTest, DynamicDelayBetweenRetries) {
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+
+    // Define a retry policy that simply decides to always retry a command three additional times,
+    // with a different delay between each retry.
+    std::shared_ptr<TestRetryPolicy> testPolicy = std::make_shared<TestRetryPolicy>();
+    const auto maxNumRetries = 3;
+    const std::array<Milliseconds, maxNumRetries> retryDelays{
+        Milliseconds(100), Milliseconds(50), Milliseconds(10)};
+    testPolicy->setMaxNumRetries(maxNumRetries);
+    testPolicy->pushRetryDelay(retryDelays[0]);
+    testPolicy->pushRetryDelay(retryDelays[1]);
+    testPolicy->pushRetryDelay(retryDelays[2]);
+
+    auto resultFuture = sendHedgedCommandWithHosts(helloCmd, kTwoHosts, testPolicy);
+
+    const auto onCommandFunc = [&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        return helloReply.toBSON();
+    };
+
+    // Schedule 1 response to the initial attempt, and then two for the following retries.
+    // Advance the clock appropriately based on each retry delay.
+    for (auto i = 0; i < maxNumRetries; i++) {
+        scheduleRequestAndAdvanceClockForRetry(testPolicy, onCommandFunc, retryDelays[i]);
+    }
+    // Schedule a response to the final retry. No need to advance clock since no more
+    // retries should be attemped after this third one.
+    onCommand(onCommandFunc);
+
+    // Wait until the RPC attempt is done, including all retries. Ignore the result.
+    resultFuture.wait();
+
+    ASSERT_EQ(maxNumRetries, testPolicy->getNumRetriesPerformed());
+}
+
 }  // namespace
 }  // namespace async_rpc
 }  // namespace mongo

@@ -188,7 +188,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
             return token.isCanceled() ||
                 !retryPolicy->recordAndEvaluateRetry(swResponse.getStatus());
         })
-        .withDelayBetweenIterations(retryPolicy->getNextRetryDelay())
+        .withBackoffBetweenIterations(detail::RetryDelayAsBackoff(retryPolicy.get()))
         .on(exec, CancellationToken::uncancelable())
         .onCompletion([hedgeCancellationToken](StatusWith<SingleResponse> result) mutable {
             hedgeCancellationToken.cancel();
