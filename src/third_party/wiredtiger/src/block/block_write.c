@@ -39,9 +39,8 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
      * backups, which only copies log files, or targeted backups, stops all block truncation
      * unnecessarily). We may want a more targeted solution at some point.
      */
-    if (conn->hot_backup_start == 0) {
+    if (conn->hot_backup_start == 0)
         WT_WITH_HOTBACKUP_READ_LOCK(session, ret = __wt_ftruncate(session, block->fh, len), NULL);
-    }
 
     /*
      * The truncate may fail temporarily or permanently (for example, there may be a file mapping if
@@ -151,10 +150,12 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FH *fh, wt_off_t
     }
 
     /*
-     * The extend might fail (for example, the file is mapped into memory), or discover file
-     * extension isn't supported; both are OK.
+     * The extend might fail (for example, the file is mapped into memory or a backup is in
+     * progress), or discover file extension isn't supported; both are OK.
      */
-    ret = __wt_fextend(session, fh, block->extend_size);
+    if (S2C(session)->hot_backup_start == 0)
+        WT_WITH_HOTBACKUP_READ_LOCK(
+          session, ret = __wt_fextend(session, fh, block->extend_size), NULL);
     return (ret == EBUSY || ret == ENOTSUP ? 0 : ret);
 }
 
