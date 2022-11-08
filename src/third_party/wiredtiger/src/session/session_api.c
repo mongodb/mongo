@@ -1427,10 +1427,14 @@ int
 __wt_session_range_truncate(
   WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *start, WT_CURSOR *stop)
 {
+    WT_DECL_ITEM(orig_start_key);
+    WT_DECL_ITEM(orig_stop_key);
     WT_DECL_RET;
+    WT_ITEM start_key, stop_key;
     int cmp;
     bool local_start;
 
+    orig_start_key = orig_stop_key = NULL;
     local_start = false;
     if (uri != NULL) {
         WT_ASSERT(session, WT_BTREE_PREFIX(uri));
@@ -1459,8 +1463,8 @@ __wt_session_range_truncate(
         WT_ERR(__wt_bad_object_type(session, stop->uri));
 
     /*
-     * If both cursors set, check they're correctly ordered with respect to each other. We have to
-     * test this before any search, the search can change the initial cursor position.
+     * If both cursors are set, check they're correctly ordered with respect to each other. We have
+     * to test this before any search, the search can change the initial cursor position.
      *
      * Rather happily, the compare routine will also confirm the cursors reference the same object
      * and the keys are set.
@@ -1473,6 +1477,22 @@ __wt_session_range_truncate(
         if (cmp > 0)
             WT_ERR_MSG(
               session, EINVAL, "the start cursor position is after the stop cursor position");
+    }
+
+    /*
+     * Use temporary buffers to store the original start and stop keys. We track the original keys
+     * for writing the truncate operation in the write-ahead log.
+     */
+    if (!local_start && start != NULL) {
+        WT_ERR(__wt_cursor_get_raw_key(start, &start_key));
+        WT_ERR(__wt_scr_alloc(session, 0, &orig_start_key));
+        WT_ERR(__wt_buf_set(session, orig_start_key, start_key.data, start_key.size));
+    }
+
+    if (stop != NULL) {
+        WT_ERR(__wt_cursor_get_raw_key(stop, &stop_key));
+        WT_ERR(__wt_scr_alloc(session, 0, &orig_stop_key));
+        WT_ERR(__wt_buf_set(session, orig_stop_key, stop_key.data, stop_key.size));
     }
 
     /*
@@ -1522,7 +1542,8 @@ __wt_session_range_truncate(
             goto done;
     }
 
-    WT_ERR(__wt_schema_range_truncate(session, start, stop));
+    WT_ERR(
+      __wt_schema_range_truncate(session, start, stop, orig_start_key, orig_stop_key, local_start));
 
 done:
 err:
@@ -1534,10 +1555,16 @@ err:
      */
     if (local_start)
         WT_TRET(start->close(start));
-    else if (start != NULL)
+    else if (start != NULL) {
+        /* Clear the temporary buffer that was storing the original start key. */
+        __wt_scr_free(session, &orig_start_key);
         WT_TRET(start->reset(start));
-    if (stop != NULL)
+    }
+    if (stop != NULL) {
+        /* Clear the temporary buffer that was storing the original stop key. */
+        __wt_scr_free(session, &orig_stop_key);
         WT_TRET(stop->reset(stop));
+    }
     return (ret);
 }
 

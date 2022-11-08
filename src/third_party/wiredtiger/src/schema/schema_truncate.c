@@ -156,7 +156,8 @@ __wt_range_truncate(WT_CURSOR *start, WT_CURSOR *stop)
  *     WT_SESSION::truncate with a range.
  */
 int
-__wt_schema_range_truncate(WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
+__wt_schema_range_truncate(WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop,
+  WT_ITEM *orig_start_key, WT_ITEM *orig_stop_key, bool local_start)
 {
     WT_DATA_SOURCE *dsrc;
     WT_DECL_RET;
@@ -171,7 +172,8 @@ __wt_schema_range_truncate(WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR
         if (stop != NULL)
             WT_ERR(__cursor_needkey(stop));
         WT_WITH_BTREE(session, CUR2BT(start),
-          ret = __wt_btcur_range_truncate((WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop));
+          ret = __wt_btcur_range_truncate((WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop,
+            orig_start_key, orig_stop_key, local_start));
     } else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __wt_table_range_truncate((WT_CURSOR_TABLE *)start, (WT_CURSOR_TABLE *)stop);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL && dsrc->range_truncate != NULL)
