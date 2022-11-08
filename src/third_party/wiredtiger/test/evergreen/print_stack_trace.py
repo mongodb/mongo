@@ -143,6 +143,13 @@ def main():
         start = output.find('execfn: ')
         # Fetch the value of execfn. This is the executable path!
         executable_path = re.search(r'\'.*?\'', output[start:]).group(0)
+        executable_path = executable_path.replace("'", "" )
+
+        # If the core dump comes from a Python test, we don't need to construct the executable path.
+        if "python" not in executable_path.lower():
+            # The executable is where the core dump is.
+            dirname = core_file_path.rsplit('/', 1)[0]
+            executable_path = dirname + '/' + executable_path
 
         if sys.platform.startswith('linux'):
             dbg = GDBDumper()
