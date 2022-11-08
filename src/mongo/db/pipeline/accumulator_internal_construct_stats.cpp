@@ -51,6 +51,7 @@ REGISTER_ACCUMULATOR(
     _internalConstructStats,
     genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorInternalConstructStats>);
 
+
 AccumulatorInternalConstructStats::AccumulatorInternalConstructStats(
     ExpressionContext* const expCtx)
     : AccumulatorState(expCtx), _count(0.0) {
@@ -67,12 +68,17 @@ intrusive_ptr<AccumulatorState> AccumulatorInternalConstructStats::create(
 void AccumulatorInternalConstructStats::processInternal(const Value& input, bool merging) {
     uassert(8423375, "Can not merge analyze pipelines", !merging);
 
-    _count++;
     const auto& doc = input.getDocument();
     auto key = doc["key"];
     auto valArray = doc["val"];
+
+    // its either empty or a different key.
+    if (valArray.getArray().empty()) {
+        return;
+    }
+    _count++;
     for (const auto& val : valArray.getArray()) {
-        LOGV2_DEBUG(6735800, 4, "Extracted document", "val"_attr = val);
+        LOGV2_DEBUG(6735800, 4, "Extracted document", "val"_attr = val, "key"_attr = key);
         _values.emplace_back(ce::SBEValue(mongo::optimizer::convertFrom(val)));
     }
 
@@ -108,13 +114,14 @@ Value AccumulatorInternalConstructStats::getValue(bool toBeMerged) {
         histogramBuilder.doneFast();
     }
     pathBuilder.doneFast();
+
     return Value(pathBuilder.obj());
 }
 
 void AccumulatorInternalConstructStats::reset() {
-    _memUsageBytes = sizeof(*this);
     _count = 0.0;
     _values.clear();
+    _memUsageBytes = sizeof(*this);
 }
 
 }  // namespace mongo

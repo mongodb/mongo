@@ -361,6 +361,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface',
+        '$BUILD_DIR/mongo/db/query/ce/query_ce_histogram',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/cursor_response_idl',
         '$BUILD_DIR/mongo/db/query_exec',

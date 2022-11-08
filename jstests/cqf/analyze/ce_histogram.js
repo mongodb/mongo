@@ -101,16 +101,13 @@ function verifyCEForMatch({coll, predicate, expected, hint}) {
 function verifyCEForNDV(ndv) {
     /**
      * For this test we create one collection and with an index for each field. We use a new
-     * collection name for each ndv and for each field because of two problems.
-     *  1. SERVER-70855: Re-running the analyze command does update the statistics collection
-     * correctly; however, CollectionStatistics caches a stale histogram generated for the previous
-     * 'ndv'.
-     *  2. SERVER-70856: We also can't currently have multiple histograms on a collection because
+     * collection name for each field because until SERVER-70856 is fixed we can't have multiple
+     * histograms on a collection because
      * there is no logic to correctly filter on field name, which means we will always retrieve the
      * first histogram generated for the collection (regardless of which field we care about), even
      * though we have correct histograms in the system collection for all fields.
      *
-     * TODO: rewrite this test to reuse the same collection once 1) & 2) are addressed.
+     * TODO: rewrite this test to reuse the same collection SERVER-70856 is addressed.
      */
     for (const field of fields) {
         // We can't use forceBonsai here because the new optimizer doesn't know how to handle the
@@ -118,7 +115,7 @@ function verifyCEForNDV(ndv) {
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 
-        const collName = `ce_histogram_${field}_${ndv}`;
+        const collName = `ce_histogram_${field}`;
         const coll = db[collName];
         coll.drop();
         assert.commandWorked(coll.createIndex({[field]: 1}));
@@ -156,7 +153,6 @@ function verifyCEForNDV(ndv) {
 
         // Set up histogram for test collection.
         const stats = db.system.statistics[collName];
-        stats.drop();
 
         const res = db.runCommand({analyze: collName, key: field});
         assert.commandWorked(res);

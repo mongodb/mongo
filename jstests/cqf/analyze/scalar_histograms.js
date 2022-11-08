@@ -20,13 +20,7 @@ assert.commandWorked(
 const coll = db.cqf_analyze_scalar_hist;
 const stats_coll = db.system.statistics.cqf_analyze_scalar_hist;
 
-const setup = () => {
-    coll.drop();
-    stats_coll.drop();
-};
-
-const testAnalayzeStats = (key, docs, count) => {
-    setup();
+const testAnalyzeStats = (key, docs, count) => {
     // Populate with documents.
     coll.insertMany(docs);
 
@@ -41,20 +35,28 @@ const testAnalayzeStats = (key, docs, count) => {
 };
 
 // Single document single path component.
-testAnalayzeStats("a", [{a: 1}], 1);
+testAnalyzeStats("a", [{a: 1}], 1);
+let stats_doc = stats_coll.findOne({_id: "a"});
+assert.eq(stats_doc.statistics.scalarHistogram.bounds[0], 1);
+
+// Reanalyze the same path.
+coll.drop();
+testAnalyzeStats("a", [{a: 2}], 1);
+stats_doc = stats_coll.findOne({_id: "a"});
+assert.eq(stats_doc.statistics.scalarHistogram.bounds[0], 2);
 
 // Multiple documents single path component.
 let docs = [];
-for (let i = 1; i < 1001; i++) {
-    docs.push({a: i});
+for (let i = 1; i < 11; i++) {
+    docs.push({b: i});
 }
-testAnalayzeStats("a", docs, 1000);
+testAnalyzeStats("b", docs, 10);
 
 docs = [];
 for (let i = 9; ++i < 36;) {
-    docs.push({b: i.toString(36).repeat(10)});
+    docs.push({c: i.toString(36).repeat(10)});
 }
-testAnalayzeStats("b", docs, 26);
+testAnalyzeStats("c", docs, 26);
 
 assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));

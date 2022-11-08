@@ -67,6 +67,8 @@ public:
                                                              const NamespaceString& nss,
                                                              const std::string& path);
 
+    Status invalidatePath(const NamespaceString& nss, const std::string& path);
+
 private:
     /**
      * The executor is used by the cache.
