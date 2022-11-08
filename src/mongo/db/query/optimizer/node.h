@@ -105,7 +105,6 @@ public:
     }
 
     const ProjectionName& getProjectionName() const;
-    const ProjectionType& getProjection() const;
 
     const std::string& getScanDefName() const;
 

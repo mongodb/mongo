@@ -43,13 +43,8 @@
 namespace mongo::optimizer {
 namespace {
 
-struct QueryTest {
-    std::string query;
-    std::string expectedPlan;
-};
-
-std::string optimizedQueryPlan(const std::string& query,
-                               const opt::unordered_map<std::string, IndexDefinition>& indexes) {
+ABT optimizedQueryPlan(const std::string& query,
+                       const opt::unordered_map<std::string, IndexDefinition>& indexes) {
     PrefixId prefixId;
     std::string scanDefName = "coll";
     Metadata metadata = {{{scanDefName, createScanDef({}, indexes)}}};
@@ -66,188 +61,196 @@ std::string optimizedQueryPlan(const std::string& query,
     ABT optimized = translated;
     phaseManager.getHints()._disableScan = true;
     phaseManager.optimize(optimized);
-    return ExplainGenerator::explainV2(optimized);
+    return optimized;
 }
 
 TEST(IntervalIntersection, SingleFieldIntersection) {
     opt::unordered_map<std::string, IndexDefinition> testIndex = {
         {"index1", makeIndexDefinition("a0", CollationOp::Ascending, /*Not multikey*/ false)}};
 
-    std::vector<QueryTest> queryTests = {
-        {"{a0: {$gt:14, $lt:21}}",
-         "Root []\n"
-         "|   |   projections: \n"
-         "|   |       scan_0\n"
-         "|   RefBlock: \n"
-         "|       Variable [scan_0]\n"
-         "BinaryJoin [joinType: Inner, {rid_0}]\n"
-         "|   |   Const [true]\n"
-         "|   LimitSkip []\n"
-         "|   |   limitSkip:\n"
-         "|   |       limit: 1\n"
-         "|   |       skip: 0\n"
-         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
-         "|   |   BindBlock:\n"
-         "|   |       [scan_0]\n"
-         "|   |           Source []\n"
-         "|   RefBlock: \n"
-         "|       Variable [rid_0]\n"
-         "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: "
-         "{(Const [14], Const [21])}]\n"
-         "    BindBlock:\n"
-         "        [rid_0]\n"
-         "            Source []\n"},
-        {"{$and: [{a0: {$gt:14}}, {a0: {$lt: 21}}]}",
-         "Root []\n"
-         "|   |   projections: \n"
-         "|   |       scan_0\n"
-         "|   RefBlock: \n"
-         "|       Variable [scan_0]\n"
-         "BinaryJoin [joinType: Inner, {rid_0}]\n"
-         "|   |   Const [true]\n"
-         "|   LimitSkip []\n"
-         "|   |   limitSkip:\n"
-         "|   |       limit: 1\n"
-         "|   |       skip: 0\n"
-         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
-         "|   |   BindBlock:\n"
-         "|   |       [scan_0]\n"
-         "|   |           Source []\n"
-         "|   RefBlock: \n"
-         "|       Variable [rid_0]\n"
-         "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: "
-         "{(Const [14], Const [21])}]\n"
-         "    BindBlock:\n"
-         "        [rid_0]\n"
-         "            Source []\n"},
-        {"{$or: [{$and: [{a0: {$gt:9, $lt:999}}, {a0: {$gt: 0, $lt: 12}}]},"
-         "       {$and: [{a0: {$gt:40, $lt:997}}, {a0: {$gt:0, $lt: 44}}]}]}",
-         "Root []\n"
-         "|   |   projections: \n"
-         "|   |       scan_0\n"
-         "|   RefBlock: \n"
-         "|       Variable [scan_0]\n"
-         "BinaryJoin [joinType: Inner, {rid_0}]\n"
-         "|   |   Const [true]\n"
-         "|   LimitSkip []\n"
-         "|   |   limitSkip:\n"
-         "|   |       limit: 1\n"
-         "|   |       skip: 0\n"
-         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
-         "|   |   BindBlock:\n"
-         "|   |       [scan_0]\n"
-         "|   |           Source []\n"
-         "|   RefBlock: \n"
-         "|       Variable [rid_0]\n"
-         "GroupBy []\n"
-         "|   |   groupings: \n"
-         "|   |       RefBlock: \n"
-         "|   |           Variable [rid_0]\n"
-         "|   aggregations: \n"
-         "Union []\n"
-         "|   |   BindBlock:\n"
-         "|   |       [rid_0]\n"
-         "|   |           Source []\n"
-         "|   IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: "
-         "{(Const [9], Const [12])}]\n"
-         "|       BindBlock:\n"
-         "|           [rid_0]\n"
-         "|               Source []\n"
-         "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: {(Const "
-         "[40], Const [44])}]\n"
-         "    BindBlock:\n"
-         "        [rid_0]\n"
-         "            Source []\n"},
-        // Contradictions
-        // Empty interval
-        {"{$and: [{a0: {$gt:20}}, {a0: {$lt: 20}}]}",
-         "Root []\n"
-         "|   |   projections: \n"
-         "|   |       scan_0\n"
-         "|   RefBlock: \n"
-         "|       Variable [scan_0]\n"
-         "Evaluation []\n"
-         "|   BindBlock:\n"
-         "|       [scan_0]\n"
-         "|           Const [Nothing]\n"
-         "LimitSkip []\n"
-         "|   limitSkip:\n"
-         "|       limit: 0\n"
-         "|       skip: 0\n"
-         "CoScan []\n"},
-        // One conjunct non-empty, one conjunct empty
-        {"{$or: [{$and: [{a0: {$gt:9}}, {a0: {$lt: 12}}]}, {$and: [{a0: {$gt:44}}, {a0: {$lt: "
-         "40}}]}]}",
-         "Root []\n"
-         "|   |   projections: \n"
-         "|   |       scan_0\n"
-         "|   RefBlock: \n"
-         "|       Variable [scan_0]\n"
-         "BinaryJoin [joinType: Inner, {rid_0}]\n"
-         "|   |   Const [true]\n"
-         "|   LimitSkip []\n"
-         "|   |   limitSkip:\n"
-         "|   |       limit: 1\n"
-         "|   |       skip: 0\n"
-         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
-         "|   |   BindBlock:\n"
-         "|   |       [scan_0]\n"
-         "|   |           Source []\n"
-         "|   RefBlock: \n"
-         "|       Variable [rid_0]\n"
-         "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: "
-         "{(Const [9], Const [12])}]\n"
-         "    BindBlock:\n"
-         "        [rid_0]\n"
-         "            Source []\n"},
-        // Both conjuncts empty, whole disjunct empty
-        {"{$or: [{$and: [{a0: {$gt:15}}, {a0: {$lt: 10}}]}, {$and: [{a0: {$gt:44}}, {a0: {$lt: "
-         "40}}]}]}",
-         "Root []\n"
-         "|   |   projections: \n"
-         "|   |       scan_0\n"
-         "|   RefBlock: \n"
-         "|       Variable [scan_0]\n"
-         "Evaluation []\n"
-         "|   BindBlock:\n"
-         "|       [scan_0]\n"
-         "|           Const [Nothing]\n"
-         "LimitSkip []\n"
-         "|   limitSkip:\n"
-         "|       limit: 0\n"
-         "|       skip: 0\n"
-         "CoScan []\n"},
-        {"{$or: [{$and: [{a0: {$gt:12}}, {a0: {$lt: 12}}]}, {$and: [{a0: {$gte:42}}, {a0: {$lt: "
-         "42}}]}]}",
-         "Root []\n"
-         "|   |   projections: \n"
-         "|   |       scan_0\n"
-         "|   RefBlock: \n"
-         "|       Variable [scan_0]\n"
-         "Evaluation []\n"
-         "|   BindBlock:\n"
-         "|       [scan_0]\n"
-         "|           Const [Nothing]\n"
-         "LimitSkip []\n"
-         "|   limitSkip:\n"
-         "|       limit: 0\n"
-         "|       skip: 0\n"
-         "CoScan []\n"},
-    };
+    const std::string q1Text = "{a0: {$gt:14, $lt:21}}";
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [scan_0]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: "
+        "{(Const [14], Const [21])}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimizedQueryPlan(q1Text, testIndex));
 
-    /*
-    std::cout << "\nExpected query plans:\n\n";
-    for (auto& qt : queryTests) {
-        std::cout << optimizedQueryPlan(qt.query, testIndex) << std::endl << std::endl;
-    }
-    */
-    ASSERT_EQ(queryTests[0].expectedPlan, optimizedQueryPlan(queryTests[0].query, testIndex));
-    ASSERT_EQ(queryTests[1].expectedPlan, optimizedQueryPlan(queryTests[1].query, testIndex));
-    ASSERT_EQ(queryTests[2].expectedPlan, optimizedQueryPlan(queryTests[2].query, testIndex));
-    ASSERT_EQ(queryTests[3].expectedPlan, optimizedQueryPlan(queryTests[3].query, testIndex));
-    ASSERT_EQ(queryTests[4].expectedPlan, optimizedQueryPlan(queryTests[4].query, testIndex));
-    ASSERT_EQ(queryTests[5].expectedPlan, optimizedQueryPlan(queryTests[5].query, testIndex));
-    ASSERT_EQ(queryTests[6].expectedPlan, optimizedQueryPlan(queryTests[6].query, testIndex));
+    const std::string q2Text = "{$and: [{a0: {$gt:14}}, {a0: {$lt: 21}}]}";
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [scan_0]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: "
+        "{(Const [14], Const [21])}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimizedQueryPlan(q2Text, testIndex));
+
+    const std::string q3Text =
+        "{$or: [{$and: [{a0: {$gt:9, $lt:999}}, {a0: {$gt: 0, $lt: 12}}]}, {$and: [{a0: {$gt:40, "
+        "$lt:997}}, {a0: {$gt:0, $lt: 44}}]}]}";
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [scan_0]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "GroupBy []\n"
+        "|   |   groupings: \n"
+        "|   |       RefBlock: \n"
+        "|   |           Variable [rid_0]\n"
+        "|   aggregations: \n"
+        "Union []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [rid_0]\n"
+        "|   |           Source []\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: {(Co"
+        "nst [40], Const [44])}]\n"
+        "|       BindBlock:\n"
+        "|           [rid_0]\n"
+        "|               Source []\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: {(Const "
+        "[9], Const [12])}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimizedQueryPlan(q3Text, testIndex));
+
+    // Contradiction: empty interval.
+    const std::string q4Text = "{$and: [{a0: {$gt:20}}, {a0: {$lt: 20}}]}";
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [scan_0]\n"
+        "|           Const [Nothing]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 0\n"
+        "|       skip: 0\n"
+        "CoScan []\n",
+        optimizedQueryPlan(q4Text, testIndex));
+
+    // Contradiction: one conjunct non-empty, one conjunct empty.
+    const std::string q5Text =
+        "{$or: [{$and: [{a0: {$gt:9}}, {a0: {$lt: 12}}]}, {$and: [{a0: {$gt:44}}, {a0: {$lt: "
+        "40}}]}]}";
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [scan_0]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: "
+        "{(Const [9], Const [12])}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimizedQueryPlan(q5Text, testIndex));
+
+    // Contradiction: both conjuncts empty, whole disjunct empty.
+    const std::string q6Text =
+        "{$or: [{$and: [{a0: {$gt:15}}, {a0: {$lt: 10}}]}, {$and: [{a0: {$gt:44}}, {a0: {$lt: "
+        "40}}]}]}";
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [scan_0]\n"
+        "|           Const [Nothing]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 0\n"
+        "|       skip: 0\n"
+        "CoScan []\n",
+        optimizedQueryPlan(q6Text, testIndex));
+
+    // Contradiction.
+    const std::string q7Text =
+        "{$or: [{$and: [{a0: {$gt:12}}, {a0: {$lt: 12}}]}, {$and: [{a0: {$gte:42}}, {a0: {$lt: "
+        "42}}]}]}";
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [scan_0]\n"
+        "|           Const [Nothing]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 0\n"
+        "|       skip: 0\n"
+        "CoScan []\n",
+        optimizedQueryPlan(q7Text, testIndex));
 }
 
 TEST(IntervalIntersection, MultiFieldIntersection) {
@@ -257,129 +260,82 @@ TEST(IntervalIntersection, MultiFieldIntersection) {
     opt::unordered_map<std::string, IndexDefinition> testIndex = {
         {"index1", makeCompositeIndexDefinition(indexFields, false /*isMultiKey*/)}};
 
-    std::vector<QueryTest> queryTests = {
-        {"{$and: [{a0: {$gt: 11}}, {a0: {$lt: 14}}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}",
-         "Root []\n"
-         "|   |   projections: \n"
-         "|   |       scan_0\n"
-         "|   RefBlock: \n"
-         "|       Variable [scan_0]\n"
-         "Evaluation []\n"
-         "|   BindBlock:\n"
-         "|       [scan_0]\n"
-         "|           Const [Nothing]\n"
-         "LimitSkip []\n"
-         "|   limitSkip:\n"
-         "|       limit: 0\n"
-         "|       skip: 0\n"
-         "CoScan []\n"},
-        {"{$and: [{a0: {$gt: 14}}, {a0: {$lt: 11}}, {b0: {$gt: 12}}, {b0: {$lt: 21}}]}",
-         "Root []\n"
-         "|   |   projections: \n"
-         "|   |       scan_0\n"
-         "|   RefBlock: \n"
-         "|       Variable [scan_0]\n"
-         "Filter []\n"
-         "|   FunctionCall [traverseF]\n"
-         "|   |   |   Const [false]\n"
-         "|   |   LambdaAbstraction [valCmp4]\n"
-         "|   |   BinaryOp [Lt]\n"
-         "|   |   |   Const [0]\n"
-         "|   |   BinaryOp [Cmp3w]\n"
-         "|   |   |   Const [21]\n"
-         "|   |   Variable [valCmp4]\n"
-         "|   FunctionCall [getField]\n"
-         "|   |   Const [\"b0\"]\n"
-         "|   Const [Nothing]\n"
-         "Filter []\n"
-         "|   FunctionCall [traverseF]\n"
-         "|   |   |   Const [false]\n"
-         "|   |   LambdaAbstraction [valCmp1]\n"
-         "|   |   BinaryOp [Gt]\n"
-         "|   |   |   Const [0]\n"
-         "|   |   BinaryOp [Cmp3w]\n"
-         "|   |   |   Const [12]\n"
-         "|   |   Variable [valCmp1]\n"
-         "|   FunctionCall [getField]\n"
-         "|   |   Const [\"b0\"]\n"
-         "|   Const [Nothing]\n"
-         "Evaluation []\n"
-         "|   BindBlock:\n"
-         "|       [scan_0]\n"
-         "|           Const [Nothing]\n"
-         "LimitSkip []\n"
-         "|   limitSkip:\n"
-         "|       limit: 0\n"
-         "|       skip: 0\n"
-         "CoScan []\n"},
-        {"{$and: [{a0: {$gt: 14}}, {a0: {$lt: 11}}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}",
-         "Root []\n"
-         "|   |   projections: \n"
-         "|   |       scan_0\n"
-         "|   RefBlock: \n"
-         "|       Variable [scan_0]\n"
-         "Filter []\n"
-         "|   FunctionCall [traverseF]\n"
-         "|   |   |   Const [false]\n"
-         "|   |   LambdaAbstraction [valCmp10]\n"
-         "|   |   BinaryOp [Lt]\n"
-         "|   |   |   Const [0]\n"
-         "|   |   BinaryOp [Cmp3w]\n"
-         "|   |   |   Const [12]\n"
-         "|   |   Variable [valCmp10]\n"
-         "|   FunctionCall [getField]\n"
-         "|   |   Const [\"b0\"]\n"
-         "|   Const [Nothing]\n"
-         "Filter []\n"
-         "|   FunctionCall [traverseF]\n"
-         "|   |   |   Const [false]\n"
-         "|   |   LambdaAbstraction [valCmp7]\n"
-         "|   |   BinaryOp [Gt]\n"
-         "|   |   |   Const [0]\n"
-         "|   |   BinaryOp [Cmp3w]\n"
-         "|   |   |   Const [21]\n"
-         "|   |   Variable [valCmp7]\n"
-         "|   FunctionCall [getField]\n"
-         "|   |   Const [\"b0\"]\n"
-         "|   Const [Nothing]\n"
-         "Evaluation []\n"
-         "|   BindBlock:\n"
-         "|       [scan_0]\n"
-         "|           Const [Nothing]\n"
-         "LimitSkip []\n"
-         "|   limitSkip:\n"
-         "|       limit: 0\n"
-         "|       skip: 0\n"
-         "CoScan []\n"},
-        {"{$and: [{a0: 42}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}",
-         "Root []\n"
-         "|   |   projections: \n"
-         "|   |       scan_0\n"
-         "|   RefBlock: \n"
-         "|       Variable [scan_0]\n"
-         "Evaluation []\n"
-         "|   BindBlock:\n"
-         "|       [scan_0]\n"
-         "|           Const [Nothing]\n"
-         "LimitSkip []\n"
-         "|   limitSkip:\n"
-         "|       limit: 0\n"
-         "|       skip: 0\n"
-         "CoScan []\n"},
-    };
+    // Note those are queries below are contradictions.
 
-    /*std::cout << "\nExpected query plans:\n\n";
-    for (auto& qt : queryTests) {
-        std::cout << optimizedQueryPlan(qt.query, testIndex) << std::endl << std::endl;
-    }*/
+    const std::string q1Text =
+        "{$and: [{a0: {$gt: 11}}, {a0: {$lt: 14}}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}";
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [scan_0]\n"
+        "|           Const [Nothing]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 0\n"
+        "|       skip: 0\n"
+        "CoScan []\n",
+        optimizedQueryPlan(q1Text, testIndex));
 
-    ASSERT_EQ(queryTests[0].expectedPlan, optimizedQueryPlan(queryTests[0].query, testIndex));
-    // TODO: these tests contain an escaped string literal in the explain output, which causes
-    // failure in other tests by not escaping string literals as in the expected explain.
-    // Most likely there is some shared state in the SBE printer that gets messed up.
-    // ASSERT_EQ(queryTests[1].expectedPlan, optimizedQueryPlan(queryTests[1].query, testIndex));
-    // ASSERT_EQ(queryTests[2].expectedPlan, optimizedQueryPlan(queryTests[2].query, testIndex));
-    // ASSERT_EQ(queryTests[3].expectedPlan, optimizedQueryPlan(queryTests[3].query, testIndex));
+    const std::string q2Text =
+        "{$and: [{a0: {$gt: 14}}, {a0: {$lt: 11}}, {b0: {$gt: 12}}, {b0: {$lt: 21}}]}";
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [scan_0]\n"
+        "|           Const [Nothing]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 0\n"
+        "|       skip: 0\n"
+        "CoScan []\n",
+        optimizedQueryPlan(q2Text, testIndex));
+
+    const std::string q3Text =
+        "{$and: [{a0: {$gt: 14}}, {a0: {$lt: 11}}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}";
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [scan_0]\n"
+        "|           Const [Nothing]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 0\n"
+        "|       skip: 0\n"
+        "CoScan []\n",
+        optimizedQueryPlan(q3Text, testIndex));
+
+    const std::string q4Text = "{$and: [{a0: 42}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}";
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [scan_0]\n"
+        "|           Const [Nothing]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 0\n"
+        "|       skip: 0\n"
+        "CoScan []\n",
+        optimizedQueryPlan(q4Text, testIndex));
 }
 
 TEST(IntervalIntersection, VariableIntervals) {

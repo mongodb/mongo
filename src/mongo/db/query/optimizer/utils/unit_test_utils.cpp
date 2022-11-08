@@ -153,8 +153,8 @@ bool handleAutoUpdate(const std::string& expected,
 
     const size_t replacementEndLine = lineNumber + totalDelta;
     // Treat an empty string as needing one line. Adjust for line delta.
-    const size_t replacementStartLine =
-        replacementEndLine - (expectedFormatted.empty() ? 1 : expectedFormatted.size());
+    const size_t expectedDelta = expectedFormatted.empty() ? 1 : expectedFormatted.size();
+    const size_t replacementStartLine = replacementEndLine - expectedDelta;
 
     const std::string tempFileName = fileName + kTempFileSuffix;
     std::string line;
@@ -190,8 +190,8 @@ bool handleAutoUpdate(const std::string& expected,
     }
 
     // Add the current delta.
-    lineDeltas.emplace_back(
-        lineNumber, static_cast<int64_t>(actualFormatted.size()) - expectedFormatted.size());
+    lineDeltas.emplace_back(lineNumber,
+                            static_cast<int64_t>(actualFormatted.size()) - expectedDelta);
 
     // Do not assert in order to allow multiple tests to be updated.
     return true;

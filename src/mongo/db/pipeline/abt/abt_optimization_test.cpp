@@ -42,8 +42,7 @@ unittest::GoldenTestConfig goldenTestConfigABTOptimization{"src/mongo/db/test_ou
 TEST(ABTTranslate, OptimizePipelineTests) {
     unittest::GoldenTestContext gctx(&goldenTestConfigABTOptimization);
 
-    // TODO SERVER-70028: the $or and $in explains below should be equal after 70028 is complete.
-    testABTTranslationAndOptimization(
+    const auto explainedOr = testABTTranslationAndOptimization(
         gctx,
         "optimized $match with $or: pipeline is able to use a SargableNode with a disjunction of "
         "point intervals.",
@@ -53,7 +52,7 @@ TEST(ABTTranslate, OptimizePipelineTests) {
         {{{"collection",
            createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}});
 
-    testABTTranslationAndOptimization(
+    const auto explainedIn = testABTTranslationAndOptimization(
         gctx,
         "optimized $match with $in and a list of equalities becomes a comparison to an EqMember "
         "list.",
@@ -62,6 +61,9 @@ TEST(ABTTranslate, OptimizePipelineTests) {
         {OptPhase::MemoSubstitutionPhase},
         {{{"collection",
            createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}});
+
+    // The disjunction on a single field should translate to the same plan as the "in" query.
+    ASSERT_EQ(explainedOr, explainedIn);
 
     testABTTranslationAndOptimization(
         gctx,

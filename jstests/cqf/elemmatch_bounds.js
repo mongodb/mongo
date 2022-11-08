@@ -110,8 +110,7 @@ result = run({
         "nodeType": "Root",
         "child": {
             "nodeType": "Filter",
-            "filter":
-                "fillEmpty(traverseF(getField(scan_0, \"a\"), (inputGet_6 -> let inputComposeM_1 = getField(inputGet_6, \"b\") in if fillEmpty(traverseF(inputComposeM_1, (valCmp_2 -> (valCmp_2 == 2)), false), false) then isArray(inputComposeM_1) else false), false), false)",
+            "filter": {"nodeType": "FunctionCall"},
             "child": {
                 "nodeType": "BinaryJoin",
                 "leftChild":
@@ -139,7 +138,7 @@ result = run({
             },
             "rightChild": {
                 "nodeType": "Filter",
-                "filter": "fillEmpty(isArray(evalTemp_4), false)",
+                "filter": {"nodeType": "FunctionCall"},
                 "child": {"nodeType": "LimitSkip", "child": {"nodeType": "Seek"}}
             }
         }
@@ -156,8 +155,7 @@ result = run({
         "nodeType": "Root",
         "child": {
             "nodeType": "Filter",
-            "filter":
-                "fillEmpty(traverseF(getField(scan_0, \"a\"), (inputGet_6 -> let inputComposeM_8 = getField(inputGet_6, \"b\") in if fillEmpty(traverseF(inputComposeM_8, (inputComposeM_7 -> if fillEmpty(if fillEmpty(((inputComposeM_7 <=> 3) < NumberLong(0)), false) then ((inputComposeM_7 <=> NaN) >= NumberLong(0)) else false, false) then if fillEmpty(((inputComposeM_7 <=> 1) > NumberLong(0)), false) then ((inputComposeM_7 <=> \"\") < NumberLong(0)) else false else false), false), false) then isArray(inputComposeM_8) else false), false), false)",
+            "filter": {"nodeType": "FunctionCall"},
             "child": {
                 "nodeType": "BinaryJoin",
                 "leftChild": {
@@ -183,16 +181,14 @@ result = run({
         "nodeType": "Root",
         "child": {
             "nodeType": "Filter",
-            "filter":
-                "fillEmpty(traverseF(getField(scan_0, \"c\"), (inputComposeM_1 -> if fillEmpty(traverseF(inputComposeM_1, (valCmp_3 -> (valCmp_3 == 2)), false), false) then isArray(inputComposeM_1) else false), false), false)",
+            "filter": {"nodeType": "FunctionCall"},
             "child": {
                 "nodeType": "BinaryJoin",
                 "leftChild": {
                     "nodeType": "Unique",
                     "child": {
                         "nodeType": "Filter",
-                        "filter":
-                            "fillEmpty(traverseF(evalTemp_6, (valCmp_2 -> (valCmp_2 == 2)), false), false)",
+                        "filter": {"nodeType": "FunctionCall"},
                         "child": {
                             "nodeType": "IndexScan",
                             "indexDefName": "c_1",
@@ -202,7 +198,7 @@ result = run({
                 },
                 "rightChild": {
                     "nodeType": "Filter",
-                    "filter": "fillEmpty(isArray(evalTemp_2), false)",
+                    "filter": {"nodeType": "FunctionCall"},
                     "child": {"nodeType": "LimitSkip", "child": {"nodeType": "Seek"}}
                 }
             }

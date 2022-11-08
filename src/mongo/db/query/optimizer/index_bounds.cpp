@@ -30,6 +30,7 @@
 #include "mongo/db/query/optimizer/index_bounds.h"
 
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/utils/abt_compare.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 
@@ -155,52 +156,8 @@ bool PartialSchemaRequirement::mayReturnNull(const ConstFoldFn& constFold) const
     return _boundProjectionName && checkMaybeHasNull(getIntervals(), constFold);
 };
 
-/**
- * Helper class used to compare PartialSchemaKey objects.
- */
-class IndexPath3WCompare {
-public:
-    IndexPath3WCompare() {}
-
-    int compareTags(const ABT& n, const ABT& other) {
-        const auto t1 = n.tagOf();
-        const auto t2 = other.tagOf();
-        return (t1 == t2) ? 0 : ((t1 < t2) ? -1 : 1);
-    }
-
-    int operator()(const ABT& n, const PathGet& node, const ABT& other) {
-        if (auto otherGet = other.cast<PathGet>(); otherGet != nullptr) {
-            const int varCmp = node.name().compare(otherGet->name());
-            return (varCmp == 0) ? node.getPath().visit(*this, otherGet->getPath()) : varCmp;
-        }
-        return compareTags(n, other);
-    }
-
-    int operator()(const ABT& n, const PathTraverse& node, const ABT& other) {
-        if (auto otherTraverse = other.cast<PathTraverse>(); otherTraverse != nullptr) {
-            return node.getPath().visit(*this, otherTraverse->getPath());
-        }
-        return compareTags(n, other);
-    }
-
-    int operator()(const ABT& n, const PathIdentity& node, const ABT& other) {
-        return compareTags(n, other);
-    }
-
-    template <typename T, typename... Ts>
-    int operator()(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
-        uasserted(6624079, "Unexpected node type");
-        return 0;
-    }
-
-    static int compare(const ABT& node, const ABT& other) {
-        IndexPath3WCompare instance;
-        return node.visit(instance, other);
-    }
-};
-
 bool IndexPath3WComparator::operator()(const ABT& path1, const ABT& path2) const {
-    return IndexPath3WCompare::compare(path1, path2) < 0;
+    return compareExprAndPaths(path1, path2) < 0;
 }
 
 bool PartialSchemaKeyLessComparator::operator()(const PartialSchemaKey& k1,
@@ -209,7 +166,7 @@ bool PartialSchemaKeyLessComparator::operator()(const PartialSchemaKey& k1,
     if (projCmp != 0) {
         return projCmp < 0;
     }
-    return IndexPath3WCompare::compare(k1._path, k2._path) < 0;
+    return compareExprAndPaths(k1._path, k2._path) < 0;
 }
 
 ResidualRequirement::ResidualRequirement(PartialSchemaKey key,

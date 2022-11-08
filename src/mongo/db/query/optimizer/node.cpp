@@ -67,10 +67,6 @@ const ProjectionName& ScanNode::getProjectionName() const {
     return binder().names()[0];
 }
 
-const ProjectionType& ScanNode::getProjection() const {
-    return binder().exprs()[0];
-}
-
 const std::string& ScanNode::getScanDefName() const {
     return _scanDefName;
 }

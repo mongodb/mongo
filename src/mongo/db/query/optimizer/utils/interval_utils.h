@@ -69,6 +69,24 @@ bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                                  bool reverseSource = false);
 
 /**
+ * Converts intervals into a normal form. Atoms are compared using the ABT comparison order. Atoms
+ * precede Cojunctions and those precede Disjunctions.
+ *
+ * For example:
+ *         Disj
+ *   Conj    3    Disj
+ *  1   2        Conj  4
+ *               6  5
+ *
+ *   becomes:
+ *            Disj
+ *      3    Conj    Disj
+ *           1  2   4  Conj
+ *                      5  6
+ */
+void normalizeIntervals(IntervalReqExpr::Node& intervals);
+
+/**
  * Analyze the given interval, and convert it into a PathCompare EqMember if possible.
  */
 boost::optional<ABT> coerceIntervalToPathCompareEqMember(const IntervalReqExpr::Node& interval);

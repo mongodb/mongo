@@ -32,7 +32,6 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
-#include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
@@ -815,12 +814,15 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
         result.insert(std::move(*prevEntry));
     }
 
-    // Intersect intervals.
+    // Intersect and normalize intervals.
     for (auto& [key, req] : result) {
         auto resultIntervals = req.getIntervals();
         if (!intersectFn(resultIntervals)) {
             return true;
         }
+
+        normalizeIntervals(resultIntervals);
+
         req = {req.getBoundProjectionName(), std::move(resultIntervals), req.getIsPerfOnly()};
     }
 

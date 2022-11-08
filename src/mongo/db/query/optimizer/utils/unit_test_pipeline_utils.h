@@ -58,8 +58,9 @@ ABT translatePipeline(const std::string& pipelineStr, std::string scanDefName = 
  * This function translates the given pipeline string to an ABT and (if optimization phases are
  * provided) optimizes the ABT using the parameters specified. It then writes the output to a file
  * that will be compared to the golden testing file for the test file.
+ * The function returns the explained optimized plan.
  **/
-void testABTTranslationAndOptimization(
+std::string testABTTranslationAndOptimization(
     unittest::GoldenTestContext& gctx,
     const std::string& variationName,
     const std::string& pipelineStr,

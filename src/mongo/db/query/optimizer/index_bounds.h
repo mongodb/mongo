@@ -123,7 +123,7 @@ private:
 };
 
 /**
- * This comparator can only compare paths with Get, Traverse, and Id.
+ * This comparator is used to compare paths with Get, Traverse, and Id.
  */
 struct IndexPath3WComparator {
     bool operator()(const ABT& path1, const ABT& path2) const;

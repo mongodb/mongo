@@ -54,7 +54,7 @@ function leftmostLeafStage(node) {
  * Get a very simplified version of a plan, which only includes nodeType and nesting structure.
  */
 function getPlanSkeleton(node, options = {}) {
-    const {extraKeepKeys = [], keepKeysDeep = []} = options;
+    const {extraKeepKeys = [], keepKeysDeep = [], printFilter = false} = options;
 
     const keepKeys = [
         'nodeType',
@@ -81,7 +81,7 @@ function getPlanSkeleton(node, options = {}) {
                         return [key, node[key]];
                     } else if (key === 'interval') {
                         return [key, prettyInterval(node[key])];
-                    } else if (key === 'filter') {
+                    } else if (key === 'filter' && printFilter) {
                         return [key, prettyExpression(node[key])];
                     } else {
                         return [key, getPlanSkeleton(node[key], options)];

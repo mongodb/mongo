@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/utils/abt_compare.h"
 
 
 namespace mongo::optimizer {
@@ -326,6 +327,47 @@ bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
     targetIntervals = CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Disjunction>(
         std::move(newDisjunction));
     return true;
+}
+
+/**
+ * Transport which updates an interval to be in a normal form. Children of each conjunction and
+ * disjunction node are consistently ordered. We order the Atoms first by low bound, then by high
+ * bound.
+ */
+class IntervalNormalizer {
+public:
+    void transport(const IntervalReqExpr::Atom& node) {
+        // Noop.
+    }
+
+    void transport(IntervalReqExpr::Conjunction& node,
+                   std::vector<IntervalReqExpr::Node>& children) {
+        sortChildren(children);
+    }
+
+    void transport(IntervalReqExpr::Disjunction& node,
+                   std::vector<IntervalReqExpr::Node>& children) {
+        sortChildren(children);
+    }
+
+    void normalize(IntervalReqExpr::Node& intervals) {
+        return algebra::transport<false>(intervals, *this);
+    }
+
+private:
+    void sortChildren(std::vector<IntervalReqExpr::Node>& children) {
+        struct Comparator {
+            bool operator()(const IntervalReqExpr::Node& i1,
+                            const IntervalReqExpr::Node& i2) const {
+                return compareIntervalExpr(i1, i2) < 0;
+            }
+        };
+        std::sort(children.begin(), children.end(), Comparator{});
+    }
+};
+
+void normalizeIntervals(IntervalReqExpr::Node& intervals) {
+    IntervalNormalizer{}.normalize(intervals);
 }
 
 boost::optional<ABT> coerceIntervalToPathCompareEqMember(const IntervalReqExpr::Node& interval) {

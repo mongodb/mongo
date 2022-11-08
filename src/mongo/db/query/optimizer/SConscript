@@ -25,6 +25,7 @@ env.Library(
         "props.cpp",
         "reference_tracker.cpp",
         "syntax/expr.cpp",
+        "utils/abt_compare.cpp",
         "utils/abt_hash.cpp",
         "utils/ce_math.cpp",
         "utils/interval_utils.cpp",

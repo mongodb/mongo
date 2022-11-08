@@ -32,6 +32,7 @@
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/unittest/unittest.h"
@@ -781,6 +782,75 @@ TEST(Explain, ExplainBsonForConstant) {
         "    value: 3\n"
         "}\n",
         cNode);
+}
+
+TEST(IntervalNormalize, Basic) {
+    auto intervalExpr =
+        IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
+            IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::NodeVector{
+                IntervalReqExpr::make<IntervalReqExpr::Atom>(
+                    IntervalRequirement{{true /*inclusive*/, Constant::int64(3)},
+                                        {true /*inclusive*/, Constant::int64(4)}}),
+                IntervalReqExpr::make<IntervalReqExpr::Atom>(
+                    IntervalRequirement{{true /*inclusive*/, Constant::int64(1)},
+                                        {true /*inclusive*/, Constant::int64(2)}})}),
+            IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
+                IntervalReqExpr::make<IntervalReqExpr::Atom>(
+                    IntervalRequirement{{true /*inclusive*/, Constant::int64(3)},
+                                        {true /*inclusive*/, Constant::int64(4)}}),
+                IntervalReqExpr::make<IntervalReqExpr::Atom>(
+                    IntervalRequirement{{false /*inclusive*/, Constant::int64(3)},
+                                        {true /*inclusive*/, Constant::int64(4)}}),
+                IntervalReqExpr::make<IntervalReqExpr::Atom>(
+                    IntervalRequirement{{true /*inclusive*/, Constant::int64(3)},
+                                        {true /*inclusive*/, Constant::int64(2)}})}),
+            IntervalReqExpr::make<IntervalReqExpr::Atom>(
+                IntervalRequirement{{true /*inclusive*/, Constant::int64(5)},
+                                    {true /*inclusive*/, Constant::int64(6)}})});
+
+    ASSERT_EQ(
+        "{\n"
+        "    {\n"
+        "        {[Const [3], Const [4]]}\n"
+        "     ^ \n"
+        "        {[Const [1], Const [2]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[Const [3], Const [4]]}\n"
+        "     U \n"
+        "        {(Const [3], Const [4]]}\n"
+        "     U \n"
+        "        {[Const [3], Const [2]]}\n"
+        "    }\n"
+        " U \n"
+        "    {[Const [5], Const [6]]}\n"
+        "}\n",
+        ExplainGenerator::explainIntervalExpr(intervalExpr));
+
+    normalizeIntervals(intervalExpr);
+
+    // Demonstrate that Atoms are sorted first, then conjunctions and disjunctions. Atoms are sorted
+    // first on the lower then on the upper bounds.
+    ASSERT_EQ(
+        "{\n"
+        "    {[Const [5], Const [6]]}\n"
+        " U \n"
+        "    {\n"
+        "        {[Const [1], Const [2]]}\n"
+        "     ^ \n"
+        "        {[Const [3], Const [4]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {(Const [3], Const [4]]}\n"
+        "     U \n"
+        "        {[Const [3], Const [2]]}\n"
+        "     U \n"
+        "        {[Const [3], Const [4]]}\n"
+        "    }\n"
+        "}\n",
+        ExplainGenerator::explainIntervalExpr(intervalExpr));
 }
 
 }  // namespace

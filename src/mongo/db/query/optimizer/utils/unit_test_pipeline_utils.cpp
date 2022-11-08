@@ -222,7 +222,7 @@ ABT optimizeABT(ABT abt,
     return optimized;
 }
 
-void testABTTranslationAndOptimization(
+std::string testABTTranslationAndOptimization(
     unittest::GoldenTestContext& gctx,
     const std::string& variationName,
     const std::string& pipelineStr,
@@ -248,15 +248,17 @@ void testABTTranslationAndOptimization(
 
     ABT translated = translatetoABT(pipelineStr, scanDefName, metadata, involvedNss);
 
+    std::string explained;
     if (optimizePipeline) {
         ABT optimized =
             optimizeABT(translated, phaseSet, metadata, pathToInterval, phaseManagerDisableScan);
-        stream << ExplainGenerator::explainV2(optimized) << std::endl;
+        explained = ExplainGenerator::explainV2(optimized);
     } else {
-        stream << ExplainGenerator::explainV2(translated) << std::endl;
+        explained = ExplainGenerator::explainV2(translated);
     }
 
-    stream << std::endl;
+    stream << explained << std::endl << std::endl;
+    return explained;
 }
 
 }  // namespace mongo::optimizer
