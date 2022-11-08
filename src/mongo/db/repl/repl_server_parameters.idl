@@ -549,7 +549,6 @@ server_parameters:
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<int>
         cpp_varname: tenantMigrationBlockingStateTimeoutMS
-        # TODO: SERVER-53571 determine the best default timeout.
         default: 3600000
         validator:
             gte: 1
