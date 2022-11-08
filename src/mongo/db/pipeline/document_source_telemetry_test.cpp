@@ -54,71 +54,71 @@ public:
 };
 
 TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfSpecIsNotObject) {
-    const auto specObj = fromjson("{$telemetry: 1}");
-    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(specObj.firstElement(), getExpCtx()),
+    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
+                           fromjson("{$telemetry: 1}").firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::FailedToParse);
 }
 
 TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfNotRunOnAdmin) {
-    const auto specObj = fromjson("{$telemetry: {}}");
     getExpCtx()->ns =
         NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(boost::none, "foo"));
-    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(specObj.firstElement(), getExpCtx()),
+    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
+                           fromjson("{$telemetry: {}}").firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfNotRunWithAggregateOne) {
-    const auto specObj = fromjson("{$telemetry: {}}");
     getExpCtx()->ns = NamespaceString("admin.foo");
-    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(specObj.firstElement(), getExpCtx()),
+    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
+                           fromjson("{$telemetry: {}}").firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseClearEntriesIfNotBoolean) {
-    const auto specObj = fromjson("{$telemetry: {clearEntries: 1}}");
-    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(specObj.firstElement(), getExpCtx()),
+    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
+                           fromjson("{$telemetry: {clearEntries: 1}}").firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfUnrecognisedParameterSpecified) {
-    const auto specObj = fromjson("{$telemetry: {foo: true}}");
-    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(specObj.firstElement(), getExpCtx()),
+    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
+                           fromjson("{$telemetry: {foo: true}}").firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::FailedToParse);
 }
 
 TEST_F(DocumentSourceTelemetryTest, ShouldParseAndSerializeNonDefaultOptionalArguments) {
-    const auto elem = fromjson("{$telemetry: {clearEntries: true}}").firstElement();
-    const auto parsed = DocumentSourceTelemetry::createFromBson(elem, getExpCtx());
-    const auto telemetry = static_cast<DocumentSourceTelemetry*>(parsed.get());
-    const auto expectedOutput = Document{{"$telemetry", Document{{"clearEntries", true}}}};
-    ASSERT_DOCUMENT_EQ(telemetry->serialize().getDocument(), expectedOutput);
+    auto obj = fromjson("{$telemetry: {clearEntries: true}}");
+    auto doc = DocumentSourceTelemetry::createFromBson(obj.firstElement(), getExpCtx());
+    auto telemetryOp = static_cast<DocumentSourceTelemetry*>(doc.get());
+    auto expected = Document{{"$telemetry", Document{{"clearEntries", true}}}};
+    ASSERT_DOCUMENT_EQ(telemetryOp->serialize().getDocument(), expected);
 }
 
 TEST_F(DocumentSourceTelemetryTest, ShouldParseAndSerializeDefaultOptionalArguments) {
-    const auto elem = fromjson("{$telemetry: {clearEntries: false}}").firstElement();
-    const auto parsed = DocumentSourceTelemetry::createFromBson(elem, getExpCtx());
-    const auto telemetry = static_cast<DocumentSourceTelemetry*>(parsed.get());
-    const auto expectedOutput = Document{{"$telemetry", Document{{"clearEntries", false}}}};
-    ASSERT_DOCUMENT_EQ(telemetry->serialize().getDocument(), expectedOutput);
+    auto obj = fromjson("{$telemetry: {clearEntries: false}}");
+    auto doc = DocumentSourceTelemetry::createFromBson(obj.firstElement(), getExpCtx());
+    auto telemetryOp = static_cast<DocumentSourceTelemetry*>(doc.get());
+    auto expected = Document{{"$telemetry", Document{{"clearEntries", false}}}};
+    ASSERT_DOCUMENT_EQ(telemetryOp->serialize().getDocument(), expected);
 }
 
 TEST_F(DocumentSourceTelemetryTest, ShouldSerializeOmittedOptionalArguments) {
-    const auto elem = fromjson("{$telemetry: {}}").firstElement();
-    const auto parsed = DocumentSourceTelemetry::createFromBson(elem, getExpCtx());
-    const auto telemetry = static_cast<DocumentSourceTelemetry*>(parsed.get());
-    const auto expectedOutput = Document{{"$telemetry", Document{{"clearEntries", false}}}};
-    ASSERT_DOCUMENT_EQ(telemetry->serialize().getDocument(), expectedOutput);
+    auto obj = fromjson("{$telemetry: {}}");
+    auto doc = DocumentSourceTelemetry::createFromBson(obj.firstElement(), getExpCtx());
+    auto telemetryOp = static_cast<DocumentSourceTelemetry*>(doc.get());
+    auto expected = Document{{"$telemetry", Document{{"clearEntries", false}}}};
+    ASSERT_DOCUMENT_EQ(telemetryOp->serialize().getDocument(), expected);
 }
 
-TEST_F(DocumentSourceTelemetryTest, ShouldReturnEOFImmediatelyIfNoCurrentOps) {
-    const auto elem = fromjson("{$telemetry: {}}").firstElement();
-    const auto telemetry = DocumentSourceTelemetry::createFromBson(elem, getExpCtx());
-    ASSERT_THROWS_CODE(telemetry->getNext(), AssertionException, ErrorCodes::NotImplemented);
+TEST_F(DocumentSourceTelemetryTest, GetNextNotImplemented) {
+    auto telemetryOp = DocumentSourceTelemetry::createFromBson(
+        fromjson("{$telemetry: {}}").firstElement(), getExpCtx());
+    ASSERT_THROWS_CODE(telemetryOp->getNext(), AssertionException, ErrorCodes::NotImplemented);
 }
 
 }  // namespace
