@@ -1563,5 +1563,508 @@ TEST(LogicalRewriter, RemoveNoopFilter) {
         latest);
 }
 
+TEST(LogicalRewriter, NotPushdownToplevel) {
+    using namespace properties;
+    PrefixId prefixId;
+
+    ABT scanNode = make<ScanNode>("scan_0", "coll");
+
+    ABT abEq3 = make<PathGet>(
+        "a",
+        make<PathTraverse>(
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)),
+                                             PathTraverse::kSingleLevel)),
+            PathTraverse::kSingleLevel));
+    ABT filterNode = make<FilterNode>(
+        make<UnaryOp>(Operations::Not, make<EvalFilter>(abEq3, make<Variable>("scan_0"))),
+        std::move(scanNode));
+
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"scan_0"}},
+                                  std::move(filterNode));
+
+    auto phaseManager = makePhaseManager(
+        {OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
+        prefixId,
+        Metadata{{
+            {"coll",
+             createScanDef(
+                 {},
+                 {{"index1",
+                   IndexDefinition{// collation
+                                   {{makeIndexPath(FieldPathType{"a", "b"}, false /*isMultiKey*/),
+                                     CollationOp::Ascending}},
+                                   false /*isMultiKey*/,
+                                   {DistributionType::Centralized},
+                                   {} /*partialReqMap*/}}})},
+        }},
+        DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // TODO SERVER-70224 We remove the Traverse nodes, and combine the Not ... Eq into Neq.
+    // For now we only remove Traverse nodes.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   UnaryOp [Not]\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathGet [b]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [3]\n"
+        "Scan [coll]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        latest);
+}
+
+TEST(LogicalRewriter, NotPushdownUnderLambdaSuccess) {
+    // Example translation of {a: {$elemMatch: {b: {$ne: 2}}}}
+    ABT scanNode = make<ScanNode>("scan_0", "coll");
+    ABT path = make<PathGet>(
+        "a",
+        make<PathComposeM>(
+            make<PathArr>(),
+            make<PathTraverse>(
+                make<PathComposeM>(
+                    make<PathComposeA>(make<PathArr>(), make<PathObj>()),
+                    make<PathLambda>(make<LambdaAbstraction>(
+                        "match_0_not_0",
+                        make<UnaryOp>(Operations::Not,
+                                      make<EvalFilter>(
+                                          make<PathGet>("b",
+                                                        make<PathTraverse>(
+                                                            make<PathCompare>(Operations::Eq,
+                                                                              Constant::int64(2)),
+                                                            PathTraverse::kSingleLevel)),
+                                          make<Variable>("match_0_not_0")))))),
+                PathTraverse::kSingleLevel)));
+    ABT filterNode =
+        make<FilterNode>(make<EvalFilter>(path, make<Variable>("scan_0")), std::move(scanNode));
+
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"scan_0"}},
+                                  std::move(filterNode));
+
+    PrefixId prefixId;
+    auto phaseManager = makePhaseManager(
+        {OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
+        prefixId,
+        Metadata{{
+            {"coll",
+             createScanDef(
+                 {},
+                 {{"index1",
+                   IndexDefinition{// collation
+                                   {{makeIndexPath(FieldPathType{"a", "b"}, false /*isMultiKey*/),
+                                     CollationOp::Ascending}},
+                                   false /*isMultiKey*/,
+                                   {DistributionType::Centralized},
+                                   {} /*partialReqMap*/}}})},
+        }},
+        DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // TODO SERVER-70224 All the Traverses should be eliminated, and the Not ... Eq combined as Neq.
+    // For now we only remove the Traverse nodes.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathLambda []\n"
+        "|   LambdaAbstraction [match_0_not_0]\n"
+        "|   UnaryOp [Not]\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [match_0_not_0]\n"
+        "|   PathGet [b]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [2]\n"
+        "Sargable [Complete]\n"
+        "|   |   |   |   |   requirementsMap: \n"
+        "|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathIdentity []', inte"
+        "rvals: {{{[Const [[]], Const [BinData(0, )])}}}\n"
+        "|   |   |   |   candidateIndexes: \n"
+        "|   |   |   scanParams: \n"
+        "|   |   |       {'a': evalTemp_2}\n"
+        "|   |   |           residualReqs: \n"
+        "|   |   |               refProjection: evalTemp_2, path: 'PathIdentity []', intervals: {"
+        "{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0\n"
+        "|   |   BindBlock:\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Scan [coll]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        latest);
+}
+
+TEST(LogicalRewriter, NotPushdownUnderLambdaKeepOuterTraverse) {
+    // Like 'NotPushdownUnderLambdaSuccess', but 'a' is multikey,
+    // so we can only remove the inner traverse, at 'a.b'.
+    ABT scanNode = make<ScanNode>("scan_0", "coll");
+    ABT path = make<PathGet>(
+        "a",
+        make<PathComposeM>(
+            make<PathArr>(),
+            make<PathTraverse>(
+                make<PathComposeM>(
+                    make<PathComposeA>(make<PathArr>(), make<PathObj>()),
+                    make<PathLambda>(make<LambdaAbstraction>(
+                        "match_0_not_0",
+                        make<UnaryOp>(Operations::Not,
+                                      make<EvalFilter>(
+                                          make<PathGet>("b",
+                                                        make<PathTraverse>(
+                                                            make<PathCompare>(Operations::Eq,
+                                                                              Constant::int64(2)),
+                                                            PathTraverse::kSingleLevel)),
+                                          make<Variable>("match_0_not_0")))))),
+                PathTraverse::kSingleLevel)));
+    ABT filterNode =
+        make<FilterNode>(make<EvalFilter>(path, make<Variable>("scan_0")), std::move(scanNode));
+
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"scan_0"}},
+                                  std::move(filterNode));
+
+    PrefixId prefixId;
+    auto phaseManager = makePhaseManager(
+        {OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
+        prefixId,
+        Metadata{{
+            {"coll",
+             createScanDef(
+                 {},
+                 {{"index1",
+                   IndexDefinition{
+                       // collation
+                       {{make<PathGet>("a",
+                                       make<PathTraverse>(make<PathGet>("b", make<PathIdentity>()),
+                                                          PathTraverse::kSingleLevel)),
+                         CollationOp::Ascending}},
+                       false /*isMultiKey*/,
+                       {DistributionType::Centralized},
+                       {} /*partialReqMap*/}}})},
+        }},
+        DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // TODO SERVER-70224 The inner Traverses should be eliminated, and the Not ... Eq combined as
+    // Neq. We have to keep the outer traverse since 'a' is multikey. (Until SERVER-70224, we only
+    // remove Traverse nodes.)
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathLambda []\n"
+        "|   |   LambdaAbstraction [match_0_not_0]\n"
+        "|   |   UnaryOp [Not]\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [match_0_not_0]\n"
+        "|   |   PathGet [b]\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [2]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathObj []\n"
+        "|   PathArr []\n"
+        "Sargable [Complete]\n"
+        "|   |   |   |   |   requirementsMap: \n"
+        "|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathIdentity []', inte"
+        "rvals: {{{[Const [[]], Const [BinData(0, )])}}}\n"
+        "|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathI"
+        "dentity []', intervals: {{{[Const [{}], Const [[]])}} U {{[Const [[]], Const [BinData(0,"
+        " )])}}}, perfOnly\n"
+        "|   |   |   |   candidateIndexes: \n"
+        "|   |   |   scanParams: \n"
+        "|   |   |       {'a': evalTemp_1}\n"
+        "|   |   |           residualReqs: \n"
+        "|   |   |               refProjection: evalTemp_1, path: 'PathIdentity []', intervals: {"
+        "{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0\n"
+        "|   |   BindBlock:\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Scan [coll]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        latest);
+}
+
+TEST(LogicalRewriter, RemoveTraverseSplitComposeM) {
+    // When we have a filter with Traverse above ComposeM, we can't immediately
+    // split the ComposeM into a top-level conjunction.  But if we can use multikeyness
+    // to remove the Traverse first, then we can split it.
+
+    // This query is similar to $elemMatch, but without the PathArr constraint.
+    ABT scanNode = make<ScanNode>("scan_0", "coll");
+    ABT path = make<PathGet>(
+        "a",
+        make<PathTraverse>(
+            make<PathGet>(
+                "b",
+                make<PathTraverse>(
+                    make<PathComposeM>(make<PathCompare>(Operations::Gt, Constant::int64(3)),
+                                       make<PathCompare>(Operations::Lt, Constant::int64(8))),
+                    PathTraverse::kSingleLevel)),
+            PathTraverse::kSingleLevel));
+    ABT filterNode =
+        make<FilterNode>(make<EvalFilter>(path, make<Variable>("scan_0")), std::move(scanNode));
+
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"scan_0"}},
+                                  std::move(filterNode));
+
+    PrefixId prefixId;
+    auto phaseManager = makePhaseManager(
+        {OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
+        prefixId,
+        Metadata{{
+            {"coll",
+             createScanDef(
+                 {},
+                 {{"index1",
+                   IndexDefinition{// collation
+                                   {{makeIndexPath(FieldPathType{"a", "b"}, false /*isMultiKey*/),
+                                     CollationOp::Ascending}},
+                                   false /*isMultiKey*/,
+                                   {DistributionType::Centralized},
+                                   {} /*partialReqMap*/}}})},
+        }},
+        DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // We should end up with a Sargable node and no residual Filter.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Sargable [Complete]\n"
+        "|   |   |   |   |   requirementsMap: \n"
+        "|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathGet [b] "
+        "PathIdentity []', intervals: {{{(Const [3], Const [8])}}}\n"
+        "|   |   |   |   candidateIndexes: \n"
+        "|   |   |   |       candidateId: 1, index1, {}, {0}, {{{(Const [3], Const [8])}}}\n"
+        "|   |   |   scanParams: \n"
+        "|   |   |       {'a': evalTemp_2}\n"
+        "|   |   |           residualReqs: \n"
+        "|   |   |               refProjection: evalTemp_2, path: 'PathGet [b] PathIdentity []', "
+        "intervals: {{{(Const [3], Const [8])}}}, entryIndex: 0\n"
+        "|   |   BindBlock:\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Scan [coll]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        latest);
+}
+
+TEST(LogicalRewriter, TraverseComposeMTraverse) {
+    // When we have a filter with Get a (Traverse (ComposeM _ (Traverse ...))), we should not
+    // simplify under the inner Traverse, because MultikeynessTrie contains no information about
+    // doubly-nested arrays.
+
+    ABT scanNode = make<ScanNode>("scan_0", "coll");
+    ABT path = make<PathGet>(
+        "a",
+        make<PathTraverse>(
+            make<PathComposeM>(
+                make<PathComposeA>(make<PathArr>(), make<PathObj>()),
+                make<PathTraverse>(
+                    make<PathGet>(
+                        "b",
+                        make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(3)),
+                                           PathTraverse::kSingleLevel)),
+                    PathTraverse::kSingleLevel)),
+            PathTraverse::kSingleLevel));
+
+    ABT filterNode =
+        make<FilterNode>(make<EvalFilter>(path, make<Variable>("scan_0")), std::move(scanNode));
+
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"scan_0"}},
+                                  std::move(filterNode));
+
+    PrefixId prefixId;
+    auto phaseManager = makePhaseManager(
+        {OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
+        prefixId,
+        Metadata{{
+            {"coll",
+             createScanDef({},
+                           {{"index1",
+                             IndexDefinition{
+                                 // collation
+                                 {{make<PathGet>("a",
+                                                 make<PathTraverse>(
+                                                     // 'a' is multikey, but 'a.b' is non-multikey.
+                                                     make<PathGet>("b", make<PathIdentity>()),
+                                                     PathTraverse::kSingleLevel)),
+                                   CollationOp::Ascending}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {} /*partialReqMap*/}}})},
+        }},
+        DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // The resulting Filter node should keep all the Traverse nodes:
+    // - Keep the outermost two because 'a' is multikey.
+    // - Keep the innermost because we don't know anything about the contents
+    //   of doubly-nested arrays.
+    // (We may also get a perfOnly Sargable node; that's not the point of this test.)
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathTraverse [1]\n"
+        "|   |   PathGet [b]\n"
+        "|   |   PathTraverse [1]\n"
+        "|   |   PathCompare [Gt]\n"
+        "|   |   Const [3]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathObj []\n"
+        "|   PathArr []\n"
+        "Sargable [Complete]\n"
+        "|   |   |   |   |   requirementsMap: \n"
+        "|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathI"
+        "dentity []', intervals: {{{[Const [{}], Const [[]])}} U {{[Const [[]], Const [BinData(0,"
+        " )])}}}, perfOnly\n"
+        "|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathT"
+        "raverse [1] PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{>Const [3]}}}, "
+        "perfOnly\n"
+        "|   |   |   |   candidateIndexes: \n"
+        "|   |   |   scanParams: \n"
+        "|   |   |       {}\n"
+        "|   |   BindBlock:\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Scan [coll]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        latest);
+}
+
+TEST(LogicalRewriter, RelaxComposeM) {
+    // When we have a ComposeM that:
+    // - cannot be split into a top-level conjunction, and
+    // - has a sargable predicate on only one side
+    // then we generate a Sargable node with a perfOnly predicate.
+
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    ABT path = make<PathGet>(
+        "a",
+        make<PathTraverse>(
+            make<PathComposeM>(
+                // One side is sargable.
+                make<PathGet>("b", make<PathCompare>(Operations::Gt, Constant::int64(0))),
+                // One side is not sargable.
+                // A common example is Traverse inside Not: we can't push Not
+                // to the leaf because Traverse is a disjunction (over array elements).
+                make<PathLambda>(make<LambdaAbstraction>(
+                    "x",
+                    make<UnaryOp>(
+                        Operations::Not,
+                        make<EvalFilter>(
+                            make<PathGet>("b",
+                                          make<PathTraverse>(
+                                              make<PathCompare>(Operations::Eq, Constant::int64(3)),
+                                              PathTraverse::kSingleLevel)),
+                            make<Variable>("x")))))),
+            PathTraverse::kSingleLevel));
+
+    ABT filterNode = make<FilterNode>(make<EvalFilter>(std::move(path), make<Variable>("root")),
+                                      std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
+
+    PrefixId prefixId;
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         {{{"c1", createScanDef({}, {})}}},
+                                         DebugInfo::kDefaultForTests,
+                                         {} /*hints*/);
+
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
+
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathLambda []\n"
+        "|   |   LambdaAbstraction [x]\n"
+        "|   |   UnaryOp [Not]\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [x]\n"
+        "|   |   PathGet [b]\n"
+        "|   |   PathTraverse [1]\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [3]\n"
+        "|   PathGet [b]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [0]\n"
+        "Sargable [Complete]\n"
+        "|   |   |   |   |   requirementsMap: \n"
+        "|   |   |   |   |       refProjection: root, path: 'PathGet [a] PathTraverse [1] PathGet"
+        " [b] PathIdentity []', intervals: {{{>Const [0]}}}, perfOnly\n"
+        "|   |   |   |   candidateIndexes: \n"
+        "|   |   |   scanParams: \n"
+        "|   |   |       {}\n"
+        "|   |   BindBlock:\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Scan [c1]\n"
+        "    BindBlock:\n"
+        "        [root]\n"
+        "            Source []\n",
+        optimized);
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

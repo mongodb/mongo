@@ -669,7 +669,8 @@ struct SubstituteConvert<LimitSkipNode> {
 
 static void convertFilterToSargableNode(ABT::reference_type node,
                                         const FilterNode& filterNode,
-                                        RewriteContext& ctx) {
+                                        RewriteContext& ctx,
+                                        const ProjectionName& scanProjName) {
     using namespace properties;
 
     const LogicalProps& props = ctx.getAboveLogicalProps();
@@ -677,7 +678,6 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         // Can only convert to sargable node if we have indexing availability.
         return;
     }
-
     const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(props);
     const ScanDefinition& scanDef =
         ctx.getMetadata()._scanDefs.at(indexingAvailability.getScanDefName());
@@ -717,7 +717,6 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return;
     }
 
-    const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
     bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
         scanProjName, scanDef.getMultikeynessTrie(), conversion->_reqMap, ctx.getConstFold());
     if (hasEmptyInterval) {
@@ -764,6 +763,45 @@ static ABT appendFieldPath(const FieldPathType& fieldPath, ABT input) {
     return input;
 }
 
+/**
+ * Attempt to remove Traverse nodes from a FilterNode.
+ *
+ * If we succeed, add a replacement node to the RewriteContext and return true.
+ */
+static bool simplifyFilterPath(const FilterNode& filterNode,
+                               RewriteContext& ctx,
+                               const ProjectionName& scanProjName,
+                               const MultikeynessTrie& trie) {
+    // Expect the filter to be EvalFilter, or UnaryOp [Not] EvalFilter.
+    const ABT& filter = filterNode.getFilter();
+    const bool toplevelNot =
+        filter.is<UnaryOp>() && filter.cast<UnaryOp>()->op() == Operations::Not;
+    const ABT& argument = toplevelNot ? filter.cast<UnaryOp>()->getChild() : filter;
+    if (const auto* evalFilter = argument.cast<EvalFilter>()) {
+        if (const auto* variable = evalFilter->getInput().cast<Variable>()) {
+            // If EvalFilter is applied to the whole-document binding then
+            // we can simplify the path using what we know about the multikeyness
+            // of the collection.
+            if (variable->name() != scanProjName) {
+                return false;
+            }
+
+            ABT path = evalFilter->getPath();
+            if (simplifyTraverseNonArray(path, trie)) {
+                ABT newPredicate = make<EvalFilter>(std::move(path), evalFilter->getInput());
+                if (toplevelNot) {
+                    newPredicate = make<UnaryOp>(Operations::Not, std::move(newPredicate));
+                }
+                ctx.addNode(make<FilterNode>(std::move(newPredicate), filterNode.getChild()),
+                            true /*substitute*/);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 template <>
 struct SubstituteConvert<FilterNode> {
     void operator()(ABT::reference_type node, RewriteContext& ctx) {
@@ -773,7 +811,7 @@ struct SubstituteConvert<FilterNode> {
         // followed by a PathComposeM, then split into two filter nodes at the composition and
         // retain the prefix for each.
         // TODO: consider using a standalone rewrite.
-        if (auto evalFilter = filterNode.getFilter().cast<EvalFilter>(); evalFilter != nullptr) {
+        if (auto* evalFilter = filterNode.getFilter().cast<EvalFilter>()) {
             ABT::reference_type pathRef = evalFilter->getPath().ref();
             FieldPathType fieldPath;
             for (;;) {
@@ -801,7 +839,27 @@ struct SubstituteConvert<FilterNode> {
             }
         }
 
-        convertFilterToSargableNode(node, filterNode, ctx);
+
+        using namespace properties;
+        const LogicalProps& props = ctx.getAboveLogicalProps();
+        if (!hasProperty<IndexingAvailability>(props)) {
+            return;
+        }
+        const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(props);
+        const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
+
+        const ScanDefinition& scanDef =
+            ctx.getMetadata()._scanDefs.at(indexingAvailability.getScanDefName());
+        if (!scanDef.exists()) {
+            return;
+        }
+        const MultikeynessTrie& trie = scanDef.getMultikeynessTrie();
+
+        if (simplifyFilterPath(filterNode, ctx, scanProjName, trie)) {
+            return;
+        }
+
+        convertFilterToSargableNode(node, filterNode, ctx, scanProjName);
     }
 };
 

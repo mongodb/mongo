@@ -250,11 +250,28 @@ public:
 
     template <bool isMultiplicative>
     static ResultType handleComposition(ResultType leftResult, ResultType rightResult) {
-        if (!leftResult || !rightResult) {
+        const bool leftHasReqMap = leftResult && !leftResult->_bound;
+        const bool rightHasReqMap = rightResult && !rightResult->_bound;
+        if (!leftHasReqMap && !rightHasReqMap) {
+            // Neither side is sargable.
             return {};
         }
-        if (leftResult->_bound || rightResult->_bound) {
-            return {};
+        if constexpr (isMultiplicative) {
+            // If one side is sargable but not both, we can keep just the sargable side.
+            // This is a looser predicate than the original (because X >= (X AND Y)), so
+            // keep the original.
+            if (!leftHasReqMap) {
+                rightResult->_retainPredicate = true;
+                return rightResult;
+            }
+            if (!rightHasReqMap) {
+                leftResult->_retainPredicate = true;
+                return leftResult;
+            }
+        } else {
+            if (!leftHasReqMap || !rightHasReqMap) {
+                return {};
+            }
         }
 
         auto& leftReqMap = leftResult->_reqMap;
@@ -702,19 +719,26 @@ bool checkPathContainsTraverse(const ABT& path) {
  */
 class MultikeynessSimplifier {
 public:
-    bool operator()(ABT&, PathIdentity&, const MultikeynessTrie&) {
+    bool operator()(ABT&, PathIdentity&, const MultikeynessTrie&, bool /*skippedParentTraverse*/) {
         // No simplifications apply here.
         return false;
     }
-    bool operator()(ABT& path, PathGet& get, const MultikeynessTrie& trie) {
+
+    bool operator()(ABT& path,
+                    PathGet& get,
+                    const MultikeynessTrie& trie,
+                    bool skippedParentTraverse) {
         if (auto it = trie.children.find(get.name()); it != trie.children.end()) {
-            return get.getPath().visit(*this, it->second);
+            return get.getPath().visit(*this, it->second, false /*skippedParentTraverse*/);
         } else {
             return false;
         }
     }
-    bool operator()(ABT& path, PathTraverse& traverse, const MultikeynessTrie& trie) {
-        // TODO SERVER-69591 Simplify non-Sargable paths.
+
+    bool operator()(ABT& path,
+                    PathTraverse& traverse,
+                    const MultikeynessTrie& trie,
+                    bool skippedParentTraverse) {
         tassert(6859603,
                 "Unexpected maxDepth for Traverse in MultikeynessSimplifier",
                 traverse.getMaxDepth() == PathTraverse::kSingleLevel);
@@ -723,35 +747,78 @@ public:
             // This path is never applied to an array: we can remove any number of Traverse nodes,
             // of any maxDepth.
             path = std::exchange(traverse.getPath(), make<Blackhole>());
-            path.visit(*this, trie);
+            // The parent can't have been a Traverse that we skipped, because we would have
+            // removed it, because !trie.isMultiKey.
+            invariant(!skippedParentTraverse);
+            path.visit(*this, trie, false /*skippedParentTraverse*/);
             return true;
-        } else if (traverse.getMaxDepth() == PathTraverse::kSingleLevel &&
-                   traverse.getPath().is<PathGet>()) {
+        } else if (traverse.getMaxDepth() == PathTraverse::kSingleLevel && !skippedParentTraverse) {
             // This path is possibly multikey, so we can't remove any Traverse nodes.
             // But each edge in the trie represents a 'Traverse [1] Get [a]', so we can
             // skip a single Traverse [1] node.
-            return traverse.getPath().visit(*this, trie);
+            return traverse.getPath().visit(*this, trie, true /*skippedParentTraverse*/);
         } else {
             // We have no information about multikeyness of the child path.
             return false;
         }
     }
+
+    bool operator()(ABT& path,
+                    PathLambda& pathLambda,
+                    const MultikeynessTrie& trie,
+                    bool skippedParentTraverse) {
+        // Look for PathLambda Lambda [tmp] UnaryOp [Not] EvalFilter <path> Variable [tmp],
+        // and simplify <path>.  This works because 'tmp' is the same variable name in both places,
+        // so <path> is applied to the same input as the PathLambda. (And the 'trie' tells us
+        // which parts of that input are not arrays.)
+
+        // In the future we may want to generalize this to skip over other expressions besides Not,
+        // as long as the Lambda and EvalFilter are connected by a variable.
+
+        if (auto* lambda = pathLambda.getLambda().cast<LambdaAbstraction>()) {
+            if (auto* unary = lambda->getBody().cast<UnaryOp>();
+                unary && unary->op() == Operations::Not) {
+                if (auto* evalFilter = unary->getChild().cast<EvalFilter>()) {
+                    if (auto* variable = evalFilter->getInput().cast<Variable>();
+                        variable && variable->name() == lambda->varName()) {
+                        return evalFilter->getPath().visit(
+                            *this, trie, false /*skippedParentTraverse*/);
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    bool operator()(ABT& path,
+                    PathComposeM& compose,
+                    const MultikeynessTrie& trie,
+                    bool skippedParentTraverse) {
+        const bool simplified1 = compose.getPath1().visit(*this, trie, skippedParentTraverse);
+        const bool simplified2 = compose.getPath2().visit(*this, trie, skippedParentTraverse);
+        return simplified1 || simplified2;
+    }
+
     template <typename T, typename... Ts>
     bool operator()(ABT& n, T& /*node*/, Ts&&...) {
-        // TODO SERVER-69591 Simplify non-Sargable paths.
-        tasserted(6859604, "Unexpected path element in MultikeynessSimplifier");
+        // Don't optimize a node we don't recognize.
+        return false;
 
         // Some other cases to consider:
         // - Remove PathArr for non-multikey paths.
-        // - Descend into conjunction and disjunction.
+        // - Descend into disjunction.
         // - Descend into PathLambda and simplify expressions, especially Not and EvalFilter.
     }
 
     static bool simplify(ABT& path, const MultikeynessTrie& trie) {
         MultikeynessSimplifier instance;
-        return path.visit(instance, trie);
+        return path.visit(instance, trie, false /*skippedParentTraverse*/);
     }
 };
+
+bool simplifyTraverseNonArray(ABT& path, const MultikeynessTrie& multikeynessTrie) {
+    return MultikeynessSimplifier::simplify(path, multikeynessTrie);
+}
 
 bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
                                    const MultikeynessTrie& multikeynessTrie,
@@ -776,7 +843,7 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
         PartialSchemaKey newKey = key;
         bool simplified = false;
         if (key._projectionName == scanProjName && checkPathContainsTraverse(newKey._path)) {
-            simplified |= MultikeynessSimplifier::simplify(newKey._path, multikeynessTrie);
+            simplified |= simplifyTraverseNonArray(newKey._path, multikeynessTrie);
         }
 
         if (prevEntry) {

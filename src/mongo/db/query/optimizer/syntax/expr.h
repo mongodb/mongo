@@ -167,6 +167,9 @@ public:
     const ABT& getChild() const {
         return get<0>();
     }
+    ABT& getChild() {
+        return get<0>();
+    }
 };
 
 /**
@@ -416,6 +419,9 @@ public:
     }
 
     const ABT& getInput() const {
+        return get<1>();
+    }
+    ABT& getInput() {
         return get<1>();
     }
 };

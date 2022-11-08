@@ -204,6 +204,14 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
     const ABT& expr, bool isFilterContext, const PathToIntervalFn& pathToInterval);
 
 /**
+ * Given a path and a MultikeynessTrie describing the path's input,
+ * removes any Traverse nodes that we know will never encounter an array.
+ *
+ * Returns true if any changes were made to the ABT.
+ */
+bool simplifyTraverseNonArray(ABT& path, const MultikeynessTrie& multikeynessTrie);
+
+/**
  * Given a set of non-multikey paths, remove redundant Traverse elements from paths in a Partial
  * Schema Requirement structure. Returns true if we have an empty result after simplification.
  */

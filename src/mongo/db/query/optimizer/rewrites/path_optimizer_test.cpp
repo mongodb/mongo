@@ -51,6 +51,21 @@ TEST(Path, Const) {
     ASSERT_EQ(result->getValueInt64(), 2);
 }
 
+TEST(Path, ConstFilter) {
+    auto tree = make<EvalFilter>(make<PathConstant>(Constant::int64(2)), make<Variable>("ptest"));
+    auto env = VariableEnvironment::build(tree);
+
+    auto fusor = PathFusion(env);
+    fusor.optimize(tree);
+
+    // The result must be Constant.
+    auto result = tree.cast<Constant>();
+    ASSERT(result != nullptr);
+
+    // And the value must be 2
+    ASSERT_EQ(result->getValueInt64(), 2);
+}
+
 TEST(Path, GetConst) {
     // Get "any" Const 2
     auto tree = make<EvalPath>(make<PathGet>("any", make<PathConstant>(Constant::int64(2))),

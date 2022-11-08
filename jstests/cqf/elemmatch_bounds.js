@@ -63,7 +63,7 @@ assert.commandWorked(coll.createIndex({'c': 1}));
 function run({pipeline, plan: expectedPlan}) {
     const explain = coll.explain().aggregate(pipeline);
     const plan = getPlanSkeleton(explain.queryPlanner.winningPlan.optimizerPlan, {
-        extraKeepKeys: ['indexDefName', 'interval', 'filter'],
+        extraKeepKeys: ['indexDefName', 'interval'],
     });
     assert.eq(plan, expectedPlan, plan);
 
@@ -109,13 +109,18 @@ result = run({
     plan: {
         "nodeType": "Root",
         "child": {
-            "nodeType": "Filter",
-            "filter": {"nodeType": "BinaryOp"},
-            "child": {
-                "nodeType": "BinaryJoin",
-                "leftChild":
-                    {"nodeType": "IndexScan", "indexDefName": "a.b_1", "interval": "[ 2, 2 ]"},
-                "rightChild": {"nodeType": "LimitSkip", "child": {"nodeType": "Seek"}}
+            "nodeType": "BinaryJoin",
+            "leftChild": {
+                "nodeType": "IndexScan",
+                "indexDefName": "a.b_1",
+                "interval": "[ 2, 2 ]",
+            },
+            "rightChild": {
+                "nodeType": "Filter",
+                "child": {
+                    "nodeType": "LimitSkip",
+                    "child": {"nodeType": "Seek"},
+                },
             }
         }
     },
@@ -138,7 +143,6 @@ result = run({
             },
             "rightChild": {
                 "nodeType": "Filter",
-                "filter": {"nodeType": "BinaryOp"},
                 "child": {"nodeType": "LimitSkip", "child": {"nodeType": "Seek"}}
             }
         }
@@ -154,16 +158,14 @@ result = run({
     plan: {
         "nodeType": "Root",
         "child": {
-            "nodeType": "Filter",
-            "filter": {"nodeType": "BinaryOp"},
-            "child": {
-                "nodeType": "BinaryJoin",
-                "leftChild": {
-                    "nodeType": "Unique",
-                    "child":
-                        {"nodeType": "IndexScan", "indexDefName": "a.b_1", "interval": "( 1, 3 )"}
-                },
-                "rightChild": {"nodeType": "LimitSkip", "child": {"nodeType": "Seek"}}
+            "nodeType": "BinaryJoin",
+            "leftChild": {
+                "nodeType": "Unique",
+                "child": {"nodeType": "IndexScan", "indexDefName": "a.b_1", "interval": "( 1, 3 )"}
+            },
+            "rightChild": {
+                "nodeType": "Filter",
+                "child": {"nodeType": "LimitSkip", "child": {"nodeType": "Seek"}}
             }
         }
     },
@@ -181,14 +183,12 @@ result = run({
         "nodeType": "Root",
         "child": {
             "nodeType": "Filter",
-            "filter": {"nodeType": "BinaryOp"},
             "child": {
                 "nodeType": "BinaryJoin",
                 "leftChild": {
                     "nodeType": "Unique",
                     "child": {
                         "nodeType": "Filter",
-                        "filter": {"nodeType": "BinaryOp"},
                         "child": {
                             "nodeType": "IndexScan",
                             "indexDefName": "c_1",
@@ -198,7 +198,6 @@ result = run({
                 },
                 "rightChild": {
                     "nodeType": "Filter",
-                    "filter": {"nodeType": "BinaryOp"},
                     "child": {"nodeType": "LimitSkip", "child": {"nodeType": "Seek"}}
                 }
             }

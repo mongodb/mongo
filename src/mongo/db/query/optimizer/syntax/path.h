@@ -88,6 +88,9 @@ public:
     const ABT& getLambda() const {
         return get<0>();
     }
+    ABT& getLambda() {
+        return get<0>();
+    }
 };
 
 /**
@@ -367,8 +370,14 @@ public:
     const ABT& getPath1() const {
         return get<0>();
     }
+    ABT& getPath1() {
+        return get<0>();
+    }
 
     const ABT& getPath2() const {
+        return get<1>();
+    }
+    ABT& getPath2() {
         return get<1>();
     }
 };
