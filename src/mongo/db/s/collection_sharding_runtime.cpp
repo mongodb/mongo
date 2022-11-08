@@ -31,11 +31,16 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/sbe_plan_cache.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/duration.h"
 
@@ -200,6 +205,15 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
 
     stdx::lock_guard lk(_metadataManagerLock);
 
+    // If the collection was sharded and the new metadata represents a new collection we might need
+    // to clean up some sharding-related state
+    if (_metadataManager) {
+        const auto oldShardVersion = _metadataManager->getActiveShardVersion();
+        const auto newShardVersion = newMetadata.getShardVersion();
+        if (!oldShardVersion.isSameCollection(newShardVersion))
+            _cleanupBeforeInstallingNewCollectionMetadata(lk, opCtx);
+    }
+
     if (!newMetadata.isSharded()) {
         LOGV2(21917,
               "Marking collection {namespace} as unsharded",
@@ -211,7 +225,9 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
         return;
     }
 
+    // At this point we know that the new metadata is associated to a sharded collection.
     _metadataType = MetadataType::kSharded;
+
     if (!_metadataManager || !newMetadata.uuidMatches(_metadataManager->getCollectionUuid())) {
         _metadataManager = std::make_shared<MetadataManager>(
             opCtx->getServiceContext(), _nss, _rangeDeleterExecutor, newMetadata);
@@ -222,7 +238,7 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
 }
 
 void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
-                                                        bool clearMetadataManager) {
+                                                        bool collIsDropped) {
     if (_shardVersionInRecoverOrRefresh) {
         _shardVersionInRecoverOrRefresh->cancellationSource.cancel();
     }
@@ -234,20 +250,25 @@ void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
                     "Clearing metadata for collection {namespace}",
                     "Clearing collection metadata",
                     "namespace"_attr = _nss,
-                    "clearMetadataManager"_attr = clearMetadataManager);
+                    "collIsDropped"_attr = collIsDropped);
+
+        // If the collection is sharded and it's being dropped we might need to clean up some state.
+        if (collIsDropped)
+            _cleanupBeforeInstallingNewCollectionMetadata(lk, opCtx);
+
         _metadataType = MetadataType::kUnknown;
-        if (clearMetadataManager)
+        if (collIsDropped)
             _metadataManager.reset();
     }
 }
 
 void CollectionShardingRuntime::clearFilteringMetadata(OperationContext* opCtx) {
-    _clearFilteringMetadata(opCtx, /* clearMetadataManager */ false);
+    _clearFilteringMetadata(opCtx, /* collIsDropped */ false);
 }
 
 void CollectionShardingRuntime::clearFilteringMetadataForDroppedCollection(
     OperationContext* opCtx) {
-    _clearFilteringMetadata(opCtx, /* clearMetadataManager */ true);
+    _clearFilteringMetadata(opCtx, /* collIsDropped */ true);
 }
 
 SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const& range,
@@ -558,6 +579,61 @@ void CollectionCriticalSection::enterCommitPhase() {
         _opCtx, _nss, CSRAcquisitionMode::kExclusive);
     invariant(scopedCsr->getCurrentMetadataIfKnown());
     scopedCsr->enterCriticalSectionCommitPhase(_reason);
+}
+
+void CollectionShardingRuntime::_cleanupBeforeInstallingNewCollectionMetadata(
+    WithLock, OperationContext* opCtx) {
+    if (!_metadataManager) {
+        // The old collection metadata was unsharded, nothing to cleanup so far.
+        return;
+    }
+
+    if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
+        const auto oldUUID = _metadataManager->getCollectionUuid();
+        const auto oldShardVersion = _metadataManager->getActiveShardVersion();
+        ExecutorFuture<void>{Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()}
+            .then([svcCtx{opCtx->getServiceContext()}, oldUUID, oldShardVersion] {
+                ThreadClient tc{"CleanUpShardedMetadata", svcCtx};
+                {
+                    stdx::lock_guard<Client> lk{*tc.get()};
+                    tc->setSystemOperationKillableByStepdown(lk);
+                }
+                auto uniqueOpCtx{tc->makeOperationContext()};
+                auto opCtx{uniqueOpCtx.get()};
+
+                try {
+                    auto& planCache = sbe::getPlanCache(opCtx);
+                    planCache.removeIf([&](const sbe::PlanCacheKey& key,
+                                           const sbe::PlanCacheEntry& entry) -> bool {
+                        const auto matchingCollState =
+                            [&](const sbe::PlanCacheKeyCollectionState& entryCollState) {
+                                return entryCollState.uuid == oldUUID &&
+                                    entryCollState.shardVersion &&
+                                    entryCollState.shardVersion->epoch == oldShardVersion.epoch() &&
+                                    entryCollState.shardVersion->ts ==
+                                    oldShardVersion.getTimestamp();
+                            };
+
+                        // Check whether the main collection of this plan is the one being removed
+                        if (matchingCollState(key.getMainCollectionState()))
+                            return true;
+
+                        // Check whether a secondary collection is the one being removed
+                        for (const auto& secCollState : key.getSecondaryCollectionStates()) {
+                            if (matchingCollState(secCollState))
+                                return true;
+                        }
+
+                        return false;
+                    });
+                } catch (const DBException& ex) {
+                    LOGV2(6549200,
+                          "Interrupted deferred clean up of sharded metadata",
+                          "error"_attr = redact(ex));
+                }
+            })
+            .getAsync([](auto) {});
+    }
 }
 
 }  // namespace mongo

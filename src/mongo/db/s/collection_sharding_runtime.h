@@ -289,7 +289,13 @@ private:
     /**
      * Auxiliary function used to implement the different flavours of clearFilteringMetadata.
      */
-    void _clearFilteringMetadata(OperationContext* opCtx, bool clearFilteringMetadata);
+    void _clearFilteringMetadata(OperationContext* opCtx, bool collIsDropped);
+
+    /**
+     * This function cleans up some state associated with the current sharded metadata before it's
+     * replaced by the new metadata.
+     */
+    void _cleanupBeforeInstallingNewCollectionMetadata(WithLock, OperationContext* opCtx);
 
     // The service context under which this instance runs
     ServiceContext* const _serviceContext;

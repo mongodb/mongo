@@ -46,6 +46,8 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
+#include "mongo/stdx/chrono.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -60,7 +62,12 @@ protected:
     static CollectionMetadata makeShardedMetadata(OperationContext* opCtx,
                                                   UUID uuid = UUID::gen()) {
         const OID epoch = OID::gen();
-        const Timestamp timestamp(1, 1);
+        const Timestamp timestamp(Date_t::now());
+
+        // Sleeping some time here to guarantee that any upcoming call to this function generates a
+        // different timestamp
+        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(10));
+
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
         auto chunk = ChunkType(
             uuid, std::move(range), ChunkVersion({epoch, timestamp}, {1, 0}), ShardId("other"));
