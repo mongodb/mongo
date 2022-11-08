@@ -102,7 +102,11 @@ private:
  * TODO: We could move this into the util/ directory and do any cleanup necessary to make it
  * fully general.
  */
-template <class K, class V, class BudgetEstimator, class KeyHasher = std::hash<K>>
+template <class K,
+          class V,
+          class BudgetEstimator,
+          class KeyHasher = std::hash<K>,
+          class Eq = std::equal_to<K>>
 class LRUKeyValue {
 public:
     LRUKeyValue(size_t maxSize) : _budgetTracker{maxSize} {}
@@ -117,7 +121,7 @@ public:
     typedef typename KVList::iterator KVListIt;
     typedef typename KVList::const_iterator KVListConstIt;
 
-    typedef stdx::unordered_map<K, KVListIt, KeyHasher> KVMap;
+    typedef stdx::unordered_map<K, KVListIt, KeyHasher, Eq> KVMap;
     typedef typename KVMap::const_iterator KVMapConstIt;
 
     // These type declarations are required by the 'Partitioned' utility.

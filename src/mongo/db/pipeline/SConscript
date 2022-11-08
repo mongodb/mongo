@@ -339,6 +339,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/query/sort_pattern',
+        '$BUILD_DIR/mongo/db/query/telemetry',
         '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/db/repl/apply_ops_command_info',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
