@@ -431,6 +431,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         auto opCtx = harnessHelper->newOperationContext(client2.get());
         rs->cappedTruncateAfter(
             opCtx.get(), id1, false /* inclusive */, nullptr /* aboutToDelete callback */);
+        harnessHelper->getEngine()->setStableTimestamp(Timestamp(id1.getLong()), true /* force */);
     }
 
     rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
