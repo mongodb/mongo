@@ -261,6 +261,12 @@ config_bool(
 )
 
 config_bool(
+    ENABLE_CPPSUITE
+    "Build the cppsuite"
+    DEFAULT ON
+)
+
+config_bool(
     ENABLE_S3
     "Build the S3 storage extension"
     DEFAULT OFF
