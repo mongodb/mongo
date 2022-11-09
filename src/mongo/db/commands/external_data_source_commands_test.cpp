@@ -116,12 +116,13 @@ protected:
         return docs;
     }
 
-    // This verifies that a simple explain aggregate command works. Virtual collections are created
-    // even for explain aggregate command.
-    void verifyExplainAggCommand(DBDirectClient& client, const BSONObj& explainAggCmdObj) {
+    // This verifies that a simple aggregate command works with explain:true. Virtual collections
+    // are created even for explain aggregate command.
+    void verifyExplainAggCommand(DBDirectClient& client, const BSONObj& originalAggCommand) {
         // The first request.
         BSONObj res;
-        ASSERT_TRUE(client.runCommand(kDatabaseName, explainAggCmdObj.getOwned(), res))
+        ASSERT_TRUE(client.runCommand(
+            kDatabaseName, originalAggCommand.addFields(BSON("explain" << true)), res))
             << "Expected to succeed but failed. result = {}"_format(res.toString());
         // Sanity checks of result.
         ASSERT_EQ(res["ok"].Number(), 1.0)
@@ -130,32 +131,6 @@ protected:
 
     ServiceContext::UniqueOperationContext _uniqueOpCtx{makeOperationContext()};
     OperationContext* _opCtx{_uniqueOpCtx.get()};
-
-    BSONObj explainSingleNamedPipeAggCmdObj = fromjson(R"(
-{
-    aggregate: "coll",
-    pipeline: [],
-    explain: true,
-    $_externalDataSources: [{
-        collName: "coll",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
-    }]
-}
-    )");
-    BSONObj explainMultipleNamedPipesAggCmdObj = fromjson(R"(
-{
-    aggregate: "coll",
-    pipeline: [],
-    explain: true,
-    $_externalDataSources: [{
-        collName: "coll",
-        dataSources: [
-            {url: "file://named_pipe1", storageType: "pipe", fileType: "bson"},
-            {url: "file://named_pipe2", storageType: "pipe", fileType: "bson"}
-        ]
-    }]
-}
-    )");
 
     static constexpr auto kDatabaseName = "external_data_source";
 };
@@ -166,7 +141,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAggRequest) {
     PipeWaiter pw;
 
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter("named_pipe1");
+        NamedPipeOutput pipeWriter("EDSCTest_SimpleScanAggRequestPipe");
         pw.notify();
         pipeWriter.open();
         for (auto&& srcDoc : srcDocs) {
@@ -187,7 +162,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAggRequest) {
     cursor: {},
     $_externalDataSources: [{
         collName: "coll",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_SimpleScanAggRequestPipe", storageType: "pipe", fileType: "bson"}]
     }]
 }
     )");
@@ -211,7 +186,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAggRequest) {
 
     // The second request. This verifies that virtual collections are cleaned up after the
     // aggregation request is done.
-    verifyExplainAggCommand(client, explainSingleNamedPipeAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverMultipleNamedPipesAggRequest) {
@@ -224,8 +199,8 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverMultipleNamedPipesAggReques
     // simultaneously because writers will be blocked until the reader consumes data. So, we push
     // data into one named pipe after another.
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter1("named_pipe1");
-        NamedPipeOutput pipeWriter2("named_pipe2");
+        NamedPipeOutput pipeWriter1("EDSCTest_SimpleScanOverMultipleNamedPipesAggRequestPipe1");
+        NamedPipeOutput pipeWriter2("EDSCTest_SimpleScanOverMultipleNamedPipesAggRequestPipe2");
         pw.notify();
         pipeWriter1.open();
         for (auto&& srcDoc : srcDocs) {
@@ -253,8 +228,8 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverMultipleNamedPipesAggReques
     $_externalDataSources: [{
         collName: "coll",
         dataSources: [
-            {url: "file://named_pipe1", storageType: "pipe", fileType: "bson"},
-            {url: "file://named_pipe2", storageType: "pipe", fileType: "bson"}
+            {url: "file://EDSCTest_SimpleScanOverMultipleNamedPipesAggRequestPipe1", storageType: "pipe", fileType: "bson"},
+            {url: "file://EDSCTest_SimpleScanOverMultipleNamedPipesAggRequestPipe2", storageType: "pipe", fileType: "bson"}
         ]
     }]
 }
@@ -279,7 +254,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverMultipleNamedPipesAggReques
 
     // The second request. This verifies that virtual collections are cleaned up after the
     // aggregation request is done.
-    verifyExplainAggCommand(client, explainMultipleNamedPipesAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverLargeObjectsAggRequest) {
@@ -290,7 +265,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverLargeObjectsAggRequest) {
     PipeWaiter pw;
 
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter("named_pipe1");
+        NamedPipeOutput pipeWriter("EDSCTest_SimpleScanOverLargeObjectsAggRequestPipe");
         pw.notify();
         pipeWriter.open();
         for (auto&& srcDoc : srcDocs) {
@@ -311,7 +286,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverLargeObjectsAggRequest) {
     cursor: {},
     $_externalDataSources: [{
         collName: "coll",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_SimpleScanOverLargeObjectsAggRequestPipe", storageType: "pipe", fileType: "bson"}]
     }]
 }
     )");
@@ -335,19 +310,31 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverLargeObjectsAggRequest) {
 
     // The second request. This verifies that virtual collections are cleaned up after the
     // aggregation request is done.
-    verifyExplainAggCommand(client, explainSingleNamedPipeAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 
 // Tests that 'explain' flag works and also tests that the same aggregation request works with the
 // same $_externalDataSources again to see whether there are no remaining virtual collections left
 // behind after the aggregation request is done.
 TEST_F(ExternalDataSourceCommandsTest, ExplainAggRequest) {
+    auto aggCmdObj = fromjson(R"(
+{
+    aggregate: "coll",
+    pipeline: [],
+    cursor: {},
+    $_externalDataSources: [{
+        collName: "coll",
+        dataSources: [{url: "file://EDSCTest_ExplainAggRequestPipe", storageType: "pipe", fileType: "bson"}]
+    }]
+}
+    )");
+
     DBDirectClient client(_opCtx);
     // The first request.
-    verifyExplainAggCommand(client, explainSingleNamedPipeAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 
     // The second request.
-    verifyExplainAggCommand(client, explainSingleNamedPipeAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
@@ -357,7 +344,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
     PipeWaiter pw;
 
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter("named_pipe1");
+        NamedPipeOutput pipeWriter("EDSCTest_SimpleScanMultiBatchAggRequestPipe");
         pw.notify();
         pipeWriter.open();
         for (auto&& srcDoc : srcDocs) {
@@ -378,7 +365,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
     cursor: {},
     $_externalDataSources: [{
         collName: "coll",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_SimpleScanMultiBatchAggRequestPipe", storageType: "pipe", fileType: "bson"}]
     }]
 }
     )");
@@ -402,7 +389,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // multi-batch result for an aggregation request.
-    verifyExplainAggCommand(client, explainSingleNamedPipeAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
@@ -418,7 +405,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
     PipeWaiter pw;
 
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter("named_pipe1");
+        NamedPipeOutput pipeWriter("EDSCTest_SimpleMatchAggRequestPipe");
         pw.notify();
         pipeWriter.open();
         for (auto&& srcDoc : srcDocs) {
@@ -439,7 +426,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
     cursor: {},
     $_externalDataSources: [{
         collName: "coll",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_SimpleMatchAggRequestPipe", storageType: "pipe", fileType: "bson"}]
     }]
 }
     )");
@@ -461,7 +448,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, explainSingleNamedPipeAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAggRequest) {
@@ -470,7 +457,7 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAggRequest) {
     PipeWaiter pw;
 
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter("named_pipe1");
+        NamedPipeOutput pipeWriter("EDSCTest_ScanOverRandomInvalidDataAggRequestPipe");
         pw.notify();
         const size_t failPoint = std::rand() % nDocs;
         pipeWriter.open();
@@ -498,7 +485,7 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAggRequest) {
     cursor: {},
     $_externalDataSources: [{
         collName: "coll",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_ScanOverRandomInvalidDataAggRequestPipe", storageType: "pipe", fileType: "bson"}]
     }]
 }
     )");
@@ -512,7 +499,7 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request fails.
-    verifyExplainAggCommand(client, explainSingleNamedPipeAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAtSecondBatchAggRequest) {
@@ -522,7 +509,7 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAtSecondBatchAgg
     PipeWaiter pw;
 
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter("named_pipe1");
+        NamedPipeOutput pipeWriter("EDSCTest_ScanOverRandomInvalidDataAtSecondBatchAggRequestPipe");
         pw.notify();
         // The fail point occurs at the second batch.
         const size_t failPoint = 101 + std::rand() % (nDocs - 101);  // 200 >= failPoint >= 101
@@ -551,7 +538,7 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAtSecondBatchAgg
     cursor: {},
     $_externalDataSources: [{
         collName: "coll",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_ScanOverRandomInvalidDataAtSecondBatchAggRequestPipe", storageType: "pipe", fileType: "bson"}]
     }]
 }
     )");
@@ -579,7 +566,7 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAtSecondBatchAgg
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the getMore request for the aggregation results fails.
-    verifyExplainAggCommand(client, explainSingleNamedPipeAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
@@ -589,7 +576,7 @@ TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
     PipeWaiter pw;
 
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter("named_pipe1");
+        NamedPipeOutput pipeWriter("EDSCTest_KillCursorAfterAggRequestPipe");
         pw.notify();
         pipeWriter.open();
         for (auto&& srcDoc : srcDocs) {
@@ -610,7 +597,7 @@ TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
     cursor: {},
     $_externalDataSources: [{
         collName: "coll",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_KillCursorAfterAggRequestPipe", storageType: "pipe", fileType: "bson"}]
     }]
 }
     )");
@@ -639,7 +626,7 @@ TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the cursor for the aggregate request is killed.
-    verifyExplainAggCommand(client, explainSingleNamedPipeAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggRequest) {
@@ -648,7 +635,8 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggR
     PipeWaiter pw;
 
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter1("named_pipe1");
+        NamedPipeOutput pipeWriter1(
+            "EDSCTest_SimpleScanAndUnionWithMultipleSourcesAggRequestPipe1");
         pw.notify();
         pipeWriter1.open();
         for (auto&& srcDoc : srcDocs) {
@@ -656,7 +644,8 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggR
         }
         pipeWriter1.close();
 
-        NamedPipeOutput pipeWriter2("named_pipe2");
+        NamedPipeOutput pipeWriter2(
+            "EDSCTest_SimpleScanAndUnionWithMultipleSourcesAggRequestPipe2");
         pipeWriter2.open();
         for (auto&& srcDoc : srcDocs) {
             pipeWriter2.write(srcDoc.objdata(), srcDoc.objsize());
@@ -678,10 +667,10 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggR
     cursor: {},
     $_externalDataSources: [{
         collName: "coll1",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_SimpleScanAndUnionWithMultipleSourcesAggRequestPipe1", storageType: "pipe", fileType: "bson"}]
     }, {
         collName: "coll2",
-        dataSources: [{url: "file://named_pipe2", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_SimpleScanAndUnionWithMultipleSourcesAggRequestPipe2", storageType: "pipe", fileType: "bson"}]
     }]
 }
     )");
@@ -702,24 +691,9 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggR
     }
     ASSERT_EQ(resCnt, nDocs * 2);
 
-    auto explainAggCmdObj = fromjson(R"(
-{
-    aggregate: "coll1",
-    pipeline: [{$unionWith: "coll2"}],
-    explain: true,
-    $_externalDataSources: [{
-        collName: "coll1",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
-    }, {
-        collName: "coll2",
-        dataSources: [{url: "file://named_pipe2", storageType: "pipe", fileType: "bson"}]
-    }]
-}
-    )");
-
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, explainAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
@@ -758,7 +732,7 @@ TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
     PipeWaiter pw;
 
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter("named_pipe1");
+        NamedPipeOutput pipeWriter("EDSCTest_GroupAggRequestPipe");
         pw.notify();
         pipeWriter.open();
         for (auto&& srcDoc : srcDocs) {
@@ -779,7 +753,7 @@ TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
     cursor: {},
     $_externalDataSources: [{
         collName: "coll",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_GroupAggRequestPipe", storageType: "pipe", fileType: "bson"}]
     }]
 }
     )");
@@ -823,7 +797,7 @@ TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, explainSingleNamedPipeAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
@@ -851,8 +825,8 @@ TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
     // pipes and pushes data into the inner side first. To avoid racy condition, notify the reader
     // side after both named pipes are created. This order is geared toward hash join algorithm.
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter2("named_pipe2");
-        NamedPipeOutput pipeWriter1("named_pipe1");
+        NamedPipeOutput pipeWriter2("EDSCTest_LookupAggRequestPipe2");
+        NamedPipeOutput pipeWriter1("EDSCTest_LookupAggRequestPipe1");
         pw.notify();
 
         // Pushes data into the inner side (== coll2 with named_pipe2) first because the hash join
@@ -882,10 +856,10 @@ TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
     cursor: {},
     $_externalDataSources: [{
         collName: "coll1",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_LookupAggRequestPipe1", storageType: "pipe", fileType: "bson"}]
     }, {
         collName: "coll2",
-        dataSources: [{url: "file://named_pipe2", storageType: "pipe", fileType: "bson"}]
+        dataSources: [{url: "file://EDSCTest_LookupAggRequestPipe2", storageType: "pipe", fileType: "bson"}]
     }]
 }
     )");
@@ -930,24 +904,9 @@ TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
     }
     ASSERT_EQ(resCnt, expectedRes.size());
 
-    auto explainAggCmdObj = fromjson(R"(
-{
-    aggregate: "coll1",
-    pipeline: [{$lookup: {from: "coll2", localField: "a", foreignField: "a", as: "o"}}],
-    explain: true,
-    $_externalDataSources: [{
-        collName: "coll1",
-        dataSources: [{url: "file://named_pipe1", storageType: "pipe", fileType: "bson"}]
-    }, {
-        collName: "coll2",
-        dataSources: [{url: "file://named_pipe2", storageType: "pipe", fileType: "bson"}]
-    }]
-}
-    )");
-
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, explainAggCmdObj);
+    verifyExplainAggCommand(client, aggCmdObj);
 }
 }  // namespace
 }  // namespace mongo

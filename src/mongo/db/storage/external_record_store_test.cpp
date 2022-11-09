@@ -39,15 +39,14 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
+#include <sstream>
+#include <string>
 
 namespace mongo {
 using namespace fmt::literals;
 
-static const std::string pipePath1 = "named_pipe1";
-static const std::string pipePath2 = "named_pipe2";
 static const std::string nonExistingPath = "non-existing";
 static constexpr int kNumPipes = 2;
-static const std::string pipePaths[kNumPipes] = {pipePath1, pipePath2};
 
 class PipeWaiter {
 public:
@@ -124,8 +123,9 @@ TEST_F(ExternalRecordStoreTest, NamedPipeBasicRead) {
     auto srcBsonObj = BSON("a" << 1);
     auto count = srcBsonObj.objsize();
     PipeWaiter pw;
+    const auto pipePath = "ERSTest_NamedPipeBasicReadPipe";
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter(pipePath1);
+        NamedPipeOutput pipeWriter(pipePath);
         pw.notify();
         pipeWriter.open();
 
@@ -140,7 +140,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeBasicRead) {
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    auto inputStream = InputStream<NamedPipeInput>(pipePath1);
+    auto inputStream = InputStream<NamedPipeInput>(pipePath);
     for (int i = 0; i < 100; ++i) {
         int nRead = inputStream.readBytes(count, _buffer);
         ASSERT_EQ(nRead, count) << "Failed to read data up to {} bytes"_format(count);
@@ -153,8 +153,9 @@ TEST_F(ExternalRecordStoreTest, NamedPipeReadPartialData) {
     auto srcBsonObj = BSON("a" << 1);
     auto count = srcBsonObj.objsize();
     PipeWaiter pw;
+    const auto pipePath = "ERSTest_NamedPipeReadPartialDataPipe";
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter(pipePath1);
+        NamedPipeOutput pipeWriter(pipePath);
         pw.notify();
         pipeWriter.open();
         pipeWriter.write(srcBsonObj.objdata(), count);
@@ -165,7 +166,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeReadPartialData) {
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    auto inputStream = InputStream<NamedPipeInput>(pipePath1);
+    auto inputStream = InputStream<NamedPipeInput>(pipePath);
     // Requests more data than the pipe contains. Should only get the bytes it does contain.
     int nRead = inputStream.readBytes(kBufferSize, _buffer);
     ASSERT_EQ(nRead, count) << "Expected nRead == {} but got {}"_format(count, nRead);
@@ -178,8 +179,9 @@ TEST_F(ExternalRecordStoreTest, NamedPipeReadUntilProducerDone) {
     auto count = srcBsonObj.objsize();
     const auto nSent = std::rand() % 100;
     PipeWaiter pw;
+    const auto pipePath = "ERSTest_NamedPipeReadUntilProducerDonePipe";
     stdx::thread producer([&] {
-        NamedPipeOutput pipeWriter(pipePath1);
+        NamedPipeOutput pipeWriter(pipePath);
         pw.notify();
         pipeWriter.open();
 
@@ -194,7 +196,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeReadUntilProducerDone) {
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    auto inputStream = InputStream<NamedPipeInput>(pipePath1);
+    auto inputStream = InputStream<NamedPipeInput>(pipePath);
     auto nReceived = 0;
     while (true) {
         int nRead = inputStream.readBytes(count, _buffer);
@@ -230,6 +232,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes1) {
     // Create two pipes. The first has only "a" objects and the second has only "zed" objects.
     stdx::thread pipeThreads[kNumPipes];
     PipeWaiter pw[kNumPipes];
+    const std::string pipePaths[] = {"ERSTest_NamedPipeMultiplePipes1Pipe1",
+                                     "ERSTest_NamedPipeMultiplePipes1Pipe2"};
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
         pipeThreads[pipeIdx] = stdx::thread(
             createNamedPipe, &pw[pipeIdx], pipePaths[pipeIdx], kObjsPerPipe, bsonObjs[pipeIdx]);
@@ -328,6 +332,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes2) {
     long numToWrites[] = {(3 * groupsIn32Mb * numObjs), (5 * groupsIn32Mb * numObjs)};
     long numToWrite = 0;
 
+    const std::string pipePaths[] = {"ERSTest_NamedPipeMultiplePipes2Pipe1",
+                                     "ERSTest_NamedPipeMultiplePipes2Pipe2"};
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
         pipeThreads[pipeIdx] = stdx::thread(
             createNamedPipe, &pw[pipeIdx], pipePaths[pipeIdx], numToWrites[pipeIdx], bsonObjs);
@@ -412,6 +418,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes3) {
     long numToWrites[] = {19, 17};
     long numToWrite = 0;
 
+    const std::string pipePaths[] = {"ERSTest_NamedPipeMultiplePipes3Pipe1",
+                                     "ERSTest_NamedPipeMultiplePipes3Pipe2"};
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
         pipeThreads[pipeIdx] = stdx::thread(
             createNamedPipe, &pw[pipeIdx], pipePaths[pipeIdx], numToWrites[pipeIdx], bsonObjs);
@@ -474,9 +482,9 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes3) {
 // support multiple random number generators, so this reseeds the shared rand() generater with the
 // current time at the end as other tests in this file expect non-fixed seed randomosity.
 TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
-    std::srand(972134657);                         // set a fixed random seed
-    constexpr int kNumPipes = 100;                 // shadows the global
-    std::string pipePaths[kNumPipes];              // shadows the global
+    std::srand(972134657);          // set a fixed random seed
+    constexpr int kNumPipes = 100;  // shadows the global
+    std::string pipePaths[kNumPipes];
     stdx::thread pipeThreads[kNumPipes];           // pipe producer threads
     PipeWaiter pw[kNumPipes];                      // pipe waiters
     std::vector<BSONObj> pipeBsonObjs[kNumPipes];  // vector of BSON objects for each pipe
@@ -494,7 +502,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
 
     // Create the pipes.
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
-        pipePaths[pipeIdx] = "named_pipe{}"_format(pipeIdx);
+        pipePaths[pipeIdx] = "ERSTest_NamedPipeMultiplePipes4Pipe1{}"_format(pipeIdx);
         pipeThreads[pipeIdx] = stdx::thread(createNamedPipe,
                                             &pw[pipeIdx],
                                             pipePaths[pipeIdx],
