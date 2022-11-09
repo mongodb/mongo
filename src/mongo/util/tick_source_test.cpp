@@ -27,11 +27,18 @@
  *    it in the license file.
  */
 
+#include "mongo/util/tick_source.h"
+
+#include <chrono>  // NOLINT
+#include <fmt/chrono.h>
+#include <fmt/format.h>
+#include <vector>
+
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/system_tick_source.h"
-#include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
 
@@ -61,16 +68,19 @@ TEST(SystemTickSourceTest, TicksPerSecond) {
 }
 
 TEST(SystemTickSourceTest, GetTicks) {
+    using namespace fmt::literals;
+    using namespace std::chrono_literals;
     auto ts = makeSystemTickSource();
-    auto t0 = ts->getTicks();
-    for (int reps = 20; reps--;) {
-        static constexpr Milliseconds delay{200};
-        static constexpr Milliseconds err{20};
-        sleepFor(delay);
-        auto t1 = ts->getTicks();
-        ASSERT_THAT(ts->ticksTo<Milliseconds>(t1 - t0),
-                    m::AllOf(m::Ge(delay - err), m::Le(delay + err)));
-        t0 = t1;
+    auto tTick = 1.0s / ts->getTicksPerSecond();
+    for (int i = 0; i != 5; ++i) {
+        auto delay = 1000ms + 50ms * i;
+        auto n0 = ts->getTicks();
+        stdx::this_thread::sleep_for(delay);
+        auto n1 = ts->getTicks();
+        auto dt = (n1 - n0) * tTick;
+        double err = std::abs((dt - delay) / delay);
+        ASSERT_LT(err, 0.1) << " n0={}, n1={}, tTick={}, delay={}, dt={}"_format(
+            n0, n1, tTick, delay, dt);
     }
 }
 
