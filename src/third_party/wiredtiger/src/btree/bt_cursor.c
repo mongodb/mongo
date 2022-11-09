@@ -233,48 +233,96 @@ __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __wt_cursor_valid --
- *     Return if the cursor references an valid key/value pair.
+ * __cursor_valid_insert --
+ *     Check the insert list for a valid update.
  */
-int
-__wt_cursor_valid(
-  WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *valid, bool check_bounds)
+static int
+__cursor_valid_insert(WT_CURSOR_BTREE *cbt, WT_ITEM *key, bool *valid, bool check_bounds)
 {
-    WT_BTREE *btree;
-    WT_CELL *cell;
-    WT_COL *cip;
     WT_ITEM tmp_key;
+    WT_SESSION_IMPL *session;
+    bool key_out_of_bounds;
+
+    key_out_of_bounds = false;
+    session = CUR2S(cbt);
+
+    if (cbt->ins == NULL)
+        return (0);
+
+    if (check_bounds && WT_CURSOR_BOUNDS_SET(&cbt->iface)) {
+        /* Get the insert list key. */
+        if (key == NULL && CUR2BT(cbt)->type == BTREE_ROW) {
+            tmp_key.data = WT_INSERT_KEY(cbt->ins);
+            tmp_key.size = WT_INSERT_KEY_SIZE(cbt->ins);
+            WT_RET(__btcur_bounds_contains_key(
+              session, &cbt->iface, &tmp_key, WT_RECNO_OOB, &key_out_of_bounds, NULL));
+        } else
+            WT_RET(__btcur_bounds_contains_key(
+              session, &cbt->iface, key, cbt->recno, &key_out_of_bounds, NULL));
+
+        /* The key we found is out of bounds. */
+        if (key_out_of_bounds)
+            return (0);
+    }
+
+    WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
+    *valid =
+      cbt->upd_value->type != WT_UPDATE_INVALID && cbt->upd_value->type != WT_UPDATE_TOMBSTONE;
+    return (0);
+}
+
+/*
+ * __cursor_valid_ondisk --
+ *     Check the on-disk value or history store for a valid update.
+ */
+static int
+__cursor_valid_ondisk(WT_CURSOR_BTREE *cbt, WT_ITEM *key, WT_UPDATE *upd, bool *valid)
+{
+    WT_SESSION_IMPL *session;
+
+    session = CUR2S(cbt);
+
+    /*
+     * Check for an on-disk value or in the history store, passing in any update.
+     *
+     * Potentially checking an update chain twice (both here, and above if the insert list is set in
+     * the case of column-store), isn't a mistake. In a modify chain, if rollback-to-stable recovers
+     * a history store record into the update list, the base update may be in the update list and we
+     * must use it rather than falling back to the on-disk value as the base update.
+     */
+    WT_RET(__wt_txn_read(session, cbt, key, cbt->recno, upd));
+    *valid =
+      cbt->upd_value->type != WT_UPDATE_INVALID && cbt->upd_value->type != WT_UPDATE_TOMBSTONE;
+    return (0);
+}
+
+/*
+ * __cursor_valid_row --
+ *     Determine if a valid update is being referenced by the cursor for row-store.
+ */
+static int
+__cursor_valid_row(WT_CURSOR_BTREE *cbt, bool *valid, bool check_bounds)
+{
+    WT_DECL_ITEM(key);
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
     WT_UPDATE *upd;
     bool key_out_of_bounds;
 
     *valid = false;
-    key_out_of_bounds = false;
-
-    btree = CUR2BT(cbt);
-    page = cbt->ref->page;
     session = CUR2S(cbt);
     upd = NULL;
+    page = cbt->ref->page;
+    key_out_of_bounds = false;
+
+    /* For all row-store cases we can extract the key from cbt->tmp if the compare value is zero. */
+    if (cbt->compare == 0 && cbt->tmp != NULL)
+        key = cbt->tmp;
 
     /*
-     * We may be pointing to an insert object, and we may have a page with
-     * existing entries.  Insert objects always have associated update
-     * objects (the value).  Any update object may be deleted, or invisible
-     * to us.  In the case of an on-page entry, there is by definition a
-     * value that is visible to us, the original page cell.
+     * In the case of row-store, an insert object implies ignoring any page objects, no insert
+     * object can have the same key as an on-page object.
      *
-     * If we find a visible update structure, return our caller a reference
-     * to it because we don't want to repeatedly search for the update, it
-     * might suddenly become invisible (imagine a read-uncommitted session
-     * with another session's aborted insert), and we don't want to handle
-     * that potential error every time we look at the value.
-     *
-     * Unfortunately, the objects we might have and their relationships are
-     * different for the underlying page types.
-     *
-     * In the case of row-store, an insert object implies ignoring any page
-     * objects, no insert object can have the same key as an on-page object.
      * For row-store:
      *	if there's an insert object:
      *		if there's a visible update:
@@ -282,14 +330,71 @@ __wt_cursor_valid(
      *		else
      *			no exact match
      *	else
-     *		use the on-page object (which may have an associated
-     *		update object that may or may not be visible to us).
+     *		use the on-page object (which may have an associated update object that may or may
+     *		not be visible to us). If there are no entries, exit.
+     */
+    WT_RET(__cursor_valid_insert(cbt, key, valid, check_bounds));
+    if (*valid || cbt->ins != NULL || page->entries == 0)
+        return (0);
+
+    /*
+     * In case of prepare conflict, the slot might not have a valid value, if the update in the
+     * insert list of a new page scanned is in prepared state.
+     */
+    WT_ASSERT(session, cbt->slot == UINT32_MAX || cbt->slot < page->entries);
+
+    /*
+     * The key can be NULL only when we didn't find an exact match, copy the search found key into
+     * the temporary buffer for further use.
+     */
+    if (key == NULL) {
+        WT_RET(__wt_row_leaf_key(session, page, &page->pg_row[cbt->slot], cbt->tmp, true));
+        key = cbt->tmp;
+    }
+    if (check_bounds) {
+        WT_RET(__btcur_bounds_contains_key(
+          session, &cbt->iface, key, WT_RECNO_OOB, &key_out_of_bounds, NULL));
+        /* The key we found is out of bounds. */
+        if (key_out_of_bounds)
+            return (0);
+    }
+
+    /* Check for an update. */
+    upd = (page->modify != NULL && page->modify->mod_row_update != NULL) ?
+      page->modify->mod_row_update[cbt->slot] :
+      NULL;
+
+    return (__cursor_valid_ondisk(cbt, key, upd, valid));
+}
+
+/*
+ * __cursor_valid_col --
+ *     Determine if a valid update is being referenced by the cursor for col-store.
+ */
+static int
+__cursor_valid_col(WT_CURSOR_BTREE *cbt, bool *valid, bool check_bounds)
+{
+    WT_BTREE *btree;
+    WT_CELL *cell;
+    WT_COL *cip;
+    WT_PAGE *page;
+    WT_SESSION_IMPL *session;
+    WT_UPDATE *upd;
+    bool key_out_of_bounds;
+
+    *valid = false;
+    key_out_of_bounds = false;
+    btree = CUR2BT(cbt);
+    session = CUR2S(cbt);
+    page = cbt->ref->page;
+    upd = NULL;
+
+    /*
+     * Column-store is more complicated than row-store because an insert object can have the same
+     * key as an on-page object: updates to column-store rows are insert/object pairs, and an
+     * invisible update isn't the end as there may be an on-page object that is visible.
      *
-     * Column-store is more complicated because an insert object can have
-     * the same key as an on-page object: updates to column-store rows
-     * are insert/object pairs, and an invisible update isn't the end as
-     * there may be an on-page object that is visible.  This changes the
-     * logic to:
+     * For column-store:
      *	if there's an insert object:
      *		if there's a visible update:
      *			exact match
@@ -297,43 +402,17 @@ __wt_cursor_valid(
      *			use the on-page object
      *	else
      *		use the on-page object
-     *
-     * First, check for an insert object with a visible update (a visible
-     * update that's been deleted is not a valid key/value pair).
      */
-    if (cbt->ins != NULL) {
-        if (check_bounds && WT_CURSOR_BOUNDS_SET(&cbt->iface)) {
-            /* Get the insert list key. */
-            if (key == NULL && btree->type == BTREE_ROW) {
-                tmp_key.data = WT_INSERT_KEY(cbt->ins);
-                tmp_key.size = WT_INSERT_KEY_SIZE(cbt->ins);
-                WT_RET(__btcur_bounds_contains_key(
-                  session, &cbt->iface, &tmp_key, WT_RECNO_OOB, &key_out_of_bounds, NULL));
-            } else
-                WT_RET(__btcur_bounds_contains_key(
-                  session, &cbt->iface, key, cbt->recno, &key_out_of_bounds, NULL));
-
-            /* The key value pair we were trying to return weren't within the given bounds. */
-            if (key_out_of_bounds)
-                return (0);
-        }
-        WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
-        if (cbt->upd_value->type != WT_UPDATE_INVALID) {
-            if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
-                return (0);
-            *valid = true;
-            return (0);
-        }
-    }
+    WT_RET(__cursor_valid_insert(cbt, NULL, valid, check_bounds));
+    if (*valid)
+        return (0);
 
     /*
-     * If we don't have an insert object, or in the case of column-store, there's an insert object
-     * but no update was visible to us and the key on the page is the same as the insert object's
-     * key, and the slot as set by the search function is valid, we can use the original page
-     * information.
+     * In the case of column-store, there's an insert object but no update was visible to us and the
+     * key on the page is the same as the insert object's key, and the slot as set by the search
+     * function is valid, we can use the original page information.
      */
-    switch (btree->type) {
-    case BTREE_COL_FIX:
+    if (btree->type == BTREE_COL_FIX) {
         /*
          * If search returned an insert, we might be past the end of page in the append list, so
          * there's no on-disk value.
@@ -349,8 +428,7 @@ __wt_cursor_valid(
          * below that expect to handle it themselves, and then doesn't work.
          */
         upd = cbt->ins ? cbt->ins->upd : NULL;
-        break;
-    case BTREE_COL_VAR:
+    } else {
         /* The search function doesn't check for empty pages. */
         if (page->entries == 0)
             return (0);
@@ -396,65 +474,44 @@ __wt_cursor_valid(
          * even after checking the insert list above, is correct, see the comment below for details.
          */
         upd = cbt->ins ? cbt->ins->upd : NULL;
-        break;
-    case BTREE_ROW:
-        /* The search function doesn't check for empty pages. */
-        if (page->entries == 0)
-            return (0);
-        /*
-         * In case of prepare conflict, the slot might not have a valid value, if the update in the
-         * insert list of a new page scanned is in prepared state.
-         */
-        WT_ASSERT(session, cbt->slot == UINT32_MAX || cbt->slot < page->entries);
+    }
 
-        /*
-         * See above: for row-store, no insert object can have the same key as an on-page object,
-         * we're done.
-         */
-        if (cbt->ins != NULL)
-            return (0);
+    return (__cursor_valid_ondisk(cbt, NULL, upd, valid));
+}
 
-        /* Paranoia. */
-        WT_ASSERT(session, recno == WT_RECNO_OOB);
+/*
+ * __wt_cursor_valid --
+ *     Return if the cursor references a valid key/value pair.
+ */
+int
+__wt_cursor_valid(WT_CURSOR_BTREE *cbt, bool *valid, bool check_bounds)
+{
+    *valid = false;
 
-        /*
-         * The key can be NULL only when we didn't find an exact match, copy the search found key
-         * into the temporary buffer for further use.
-         */
-        if (key == NULL) {
-            WT_RET(__wt_row_leaf_key(
-              session, cbt->ref->page, &cbt->ref->page->pg_row[cbt->slot], cbt->tmp, true));
-            key = cbt->tmp;
-        }
-        if (check_bounds) {
-            WT_RET(__btcur_bounds_contains_key(
-              session, &cbt->iface, key, WT_RECNO_OOB, &key_out_of_bounds, NULL));
-            /* The key value pair we were trying to return weren't within the given bounds. */
-            if (key_out_of_bounds)
-                return (0);
-        }
-
-        /* Check for an update. */
-        upd = (page->modify != NULL && page->modify->mod_row_update != NULL) ?
-          page->modify->mod_row_update[cbt->slot] :
-          NULL;
-        break;
+    /* If the cursor is operating in key only mode we don't need to do any more work. */
+    if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY)) {
+        *valid = true;
+        return (0);
     }
 
     /*
-     * Check for a value on disk or in the history store, passing in any update.
+     * We may be pointing to an insert object, and we may have a page with existing entries. Insert
+     * objects always have associated update objects (the value). Any update object may be deleted,
+     * or invisible to us. In the case of an on-page entry, it may also be invisible to us.
      *
-     * Potentially checking an update chain twice (both here, and above if the insert list is set in
-     * the case of column-store), isn't a mistake. In a modify chain, if rollback-to-stable recovers
-     * a history store record into the update list, the base update may be in the update list and we
-     * must use it rather than falling back to the on-disk value as the base update.
+     * Unfortunately, the objects we might have and their relationships are different for the
+     * underlying page types.
      */
-    WT_RET(__wt_txn_read(session, cbt, key, recno, upd));
-    if (cbt->upd_value->type != WT_UPDATE_INVALID) {
-        if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
-            return (0);
-        *valid = true;
+    switch (CUR2BT(cbt)->type) {
+    case BTREE_COL_VAR:
+    case BTREE_COL_FIX:
+        WT_RET(__cursor_valid_col(cbt, valid, check_bounds));
+        break;
+    case BTREE_ROW:
+        WT_RET(__cursor_valid_row(cbt, valid, check_bounds));
+        break;
     }
+
     return (0);
 }
 
@@ -720,6 +777,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
     cursor = &cbt->iface;
     key_out_of_bounds = false;
     session = CUR2S(cbt);
+    valid = false;
 
     WT_STAT_CONN_DATA_INCR(session, cursor_search);
 
@@ -746,52 +804,32 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
         WT_STAT_CONN_DATA_INCR(session, cursor_bounds_search_early_exit);
         WT_ERR(WT_NOTFOUND);
     }
+
     /*
      * If we have a page pinned, search it; if we don't have a page pinned, or the search of the
      * pinned page doesn't find an exact match, search from the root.
      */
-    valid = false;
     if (__cursor_page_pinned(cbt, true)) {
         __wt_txn_cursor_op(session);
 
-        if (btree->type == BTREE_ROW) {
+        if (btree->type == BTREE_ROW)
             WT_ERR(__cursor_row_search(cbt, false, cbt->ref, &leaf_found));
-            if (leaf_found && cbt->compare == 0) {
-                if (F_ISSET(cursor, WT_CURSTD_KEY_ONLY))
-                    valid = true;
-                else
-                    WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid, false));
-            }
-        } else {
+        else
             WT_ERR(__cursor_col_search(cbt, cbt->ref, &leaf_found));
-            if (leaf_found && cbt->compare == 0) {
-                if (F_ISSET(cursor, WT_CURSTD_KEY_ONLY))
-                    valid = true;
-                else
-                    WT_ERR(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid, false));
-            }
-        }
+
+        if (leaf_found && cbt->compare == 0)
+            WT_ERR(__wt_cursor_valid(cbt, &valid, false));
     }
     if (!valid) {
         WT_ERR(__wt_cursor_func_init(cbt, true));
 
-        if (btree->type == BTREE_ROW) {
+        if (btree->type == BTREE_ROW)
             WT_ERR(__cursor_row_search(cbt, false, NULL, NULL));
-            if (cbt->compare == 0) {
-                if (F_ISSET(cursor, WT_CURSTD_KEY_ONLY))
-                    valid = true;
-                else
-                    WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid, false));
-            }
-        } else {
+        else
             WT_ERR(__cursor_col_search(cbt, NULL, NULL));
-            if (cbt->compare == 0) {
-                if (F_ISSET(cursor, WT_CURSTD_KEY_ONLY))
-                    valid = true;
-                else
-                    WT_ERR(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid, false));
-            }
-        }
+
+        if (cbt->compare == 0)
+            WT_ERR(__wt_cursor_valid(cbt, &valid, false));
     }
 
     if (valid)
@@ -927,8 +965,7 @@ __btcur_search_near_row_pinned_page(WT_CURSOR_BTREE *cbt, bool *validp)
      */
     if (leaf_found &&
       (cbt->compare == 0 || (cbt->slot != 0 && cbt->slot != cbt->ref->page->entries - 1)))
-        WT_RET(__wt_cursor_valid(
-          cbt, (cbt->compare == 0 ? cbt->tmp : NULL), WT_RECNO_OOB, validp, true));
+        WT_RET(__wt_cursor_valid(cbt, validp, true));
 
     return (0);
 }
@@ -991,18 +1028,11 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
          * Set the "insert" flag for row-store search; we may intend to position the cursor at the
          * the end of the tree, rather than match an existing record. (LSM requires this semantic.)
          */
-        if (btree->type == BTREE_ROW) {
+        if (btree->type == BTREE_ROW)
             WT_ERR(__cursor_row_search(cbt, true, NULL, NULL));
-            /*
-             * If there's an exact match, the row-store search function built the key in the
-             * cursor's temporary buffer.
-             */
-            WT_ERR(__wt_cursor_valid(
-              cbt, (cbt->compare == 0 ? cbt->tmp : NULL), WT_RECNO_OOB, &valid, true));
-        } else {
+        else
             WT_ERR(__cursor_col_search(cbt, NULL, NULL));
-            WT_ERR(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid, true));
-        }
+        WT_ERR(__wt_cursor_valid(cbt, &valid, true));
     }
 
     /*
@@ -1191,7 +1221,7 @@ retry:
          * If not overwriting, fail if the key exists, else insert the key/value pair.
          */
         if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) && cbt->compare == 0) {
-            WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid, false));
+            WT_ERR(__wt_cursor_valid(cbt, &valid, false));
             if (valid)
                 goto duplicate;
         }
@@ -1223,7 +1253,7 @@ retry:
                  * Even so, we still have to call the cursor validity check function so we return
                  * the found value for any duplicate key, and for FLCS we need to set 0 explicitly.
                  */
-                WT_ERR(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid, false));
+                WT_ERR(__wt_cursor_valid(cbt, &valid, false));
                 if (valid)
                     goto duplicate;
                 if (btree->type == BTREE_COL_FIX) {
@@ -1439,8 +1469,7 @@ retry:
              * checking if the update is visible in __wt_cursor_valid, or we can miss conflicts.
              */
             WT_ERR(__curfile_update_check(cbt));
-            WT_WITH_UPDATE_VALUE_SKIP_BUF(
-              ret = __wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid, true));
+            WT_WITH_UPDATE_VALUE_SKIP_BUF(ret = __wt_cursor_valid(cbt, &valid, true));
             WT_ERR(ret);
             if (!valid)
                 WT_ERR(WT_NOTFOUND);
@@ -1457,8 +1486,7 @@ retry:
              */
             WT_ERR(__curfile_update_check(cbt));
 
-            WT_WITH_UPDATE_VALUE_SKIP_BUF(
-              ret = __wt_cursor_valid(cbt, NULL, cbt->recno, &valid, true));
+            WT_WITH_UPDATE_VALUE_SKIP_BUF(ret = __wt_cursor_valid(cbt, &valid, true));
             WT_ERR(ret);
             if (!valid && btree->type != BTREE_COL_FIX)
                 WT_ERR(WT_NOTFOUND);
@@ -1627,8 +1655,7 @@ retry:
         if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
             WT_ERR(__curfile_update_check(cbt));
             if (cbt->compare == 0) {
-                WT_WITH_UPDATE_VALUE_SKIP_BUF(
-                  ret = __wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid, false));
+                WT_WITH_UPDATE_VALUE_SKIP_BUF(ret = __wt_cursor_valid(cbt, &valid, false));
                 WT_ERR(ret);
                 if (!valid)
                     WT_ERR(WT_NOTFOUND);
@@ -1653,8 +1680,7 @@ retry:
                  * the FLCS cursor validity check cannot return "does not exist", the update is OK.
                  */
                 if (btree->type != BTREE_COL_FIX) {
-                    WT_WITH_UPDATE_VALUE_SKIP_BUF(
-                      ret = __wt_cursor_valid(cbt, NULL, cbt->recno, &valid, false));
+                    WT_WITH_UPDATE_VALUE_SKIP_BUF(ret = __wt_cursor_valid(cbt, &valid, false));
                     WT_ERR(ret);
                     if (!valid)
                         WT_ERR(WT_NOTFOUND);
@@ -2331,7 +2357,7 @@ __wt_btcur_bounds_position(
              */
             if (F_ISSET(
                   cursor, next ? WT_CURSTD_BOUND_LOWER_INCLUSIVE : WT_CURSTD_BOUND_UPPER_INCLUSIVE))
-                WT_RET(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid, false));
+                WT_RET(__wt_cursor_valid(cbt, &valid, false));
             else
                 *need_walkp = true;
         } else if ((cbt->compare > 0 && next) || (cbt->compare < 0 && !next)) {
@@ -2343,7 +2369,7 @@ __wt_btcur_bounds_position(
              * call to cursor valid and have it only check a single bound, but we would need to
              * indicate the bound and direction.
              */
-            WT_RET(__wt_cursor_valid(cbt, NULL, WT_RECNO_OOB, &valid, true));
+            WT_RET(__wt_cursor_valid(cbt, &valid, true));
         } else {
             /*
              * In the case of a next traversal we are positioned before the lower bounded, in the
@@ -2361,7 +2387,7 @@ __wt_btcur_bounds_position(
     } else {
         /* Column store bound comparisons are fast and don't require optimization. */
         WT_RET(__cursor_col_search(cbt, NULL, NULL));
-        WT_RET(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid, true));
+        WT_RET(__wt_cursor_valid(cbt, &valid, true));
     }
 
     /*

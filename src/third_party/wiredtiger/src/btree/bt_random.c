@@ -25,7 +25,7 @@ __random_insert_valid(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head, WT_INSERT 
     cbt->tmp->data = WT_INSERT_KEY(ins);
     cbt->tmp->size = WT_INSERT_KEY_SIZE(ins);
 
-    return (__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, validp, false));
+    return (__wt_cursor_valid(cbt, validp, false));
 }
 
 /*
@@ -41,7 +41,7 @@ __random_slot_valid(WT_CURSOR_BTREE *cbt, uint32_t slot, bool *validp)
     cbt->slot = slot;
     cbt->compare = 0;
 
-    return (__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, validp, false));
+    return (__wt_cursor_valid(cbt, validp, false));
 }
 
 /* Magic constant: 5000 entries in a skip list is enough to forcibly evict. */
