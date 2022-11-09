@@ -45,14 +45,6 @@ server_parameters:
             gte: 1
         default: 10
 
-    batchedExpiredChangeStreamPreImageRemoval:
-        description: >-
-            Specifies if expired pre-images are removed in batches rather than document-by-document.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: gBatchedExpiredChangeStreamPreImageRemoval
-        default: true
-
 structs:
     ChangeStreamPreImageId:
         description: Uniquely identifies a pre-image for a given node or replica set.

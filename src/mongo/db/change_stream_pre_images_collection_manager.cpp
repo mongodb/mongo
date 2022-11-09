@@ -236,7 +236,6 @@ size_t _deleteExpiredChangeStreamPreImagesCommon(OperationContext* opCtx,
                                                  const MatchExpression* filterPtr,
                                                  Timestamp maxRecordIdTimestamp) {
     size_t numberOfRemovals = 0;
-    const bool isBatchedRemoval = gBatchedExpiredChangeStreamPreImageRemoval.load();
     boost::optional<UUID> currentCollectionUUID = boost::none;
     while ((currentCollectionUUID =
                 findNextCollectionUUID(opCtx, &preImageColl, currentCollectionUUID))) {
@@ -249,9 +248,7 @@ size_t _deleteExpiredChangeStreamPreImagesCommon(OperationContext* opCtx,
                 params->isMulti = true;
 
                 std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams;
-                if (isBatchedRemoval) {
-                    batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
-                }
+                batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
                 RecordIdBound minRecordId(
                     toRecordId(ChangeStreamPreImageId(*currentCollectionUUID, Timestamp(), 0)));
                 RecordIdBound maxRecordId = RecordIdBound(
