@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
 #include <queue>
 
 #include "mongo/db/exec/document_value/document.h"
@@ -54,7 +55,8 @@ public:
 
     PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
                          std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                         ResumableScanType resumableScanType);
+                         ResumableScanType resumableScanType,
+                         Microseconds timeElapsedPlanning);
 
     CanonicalQuery* getCanonicalQuery() const override {
         return nullptr;

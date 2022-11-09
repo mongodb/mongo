@@ -660,7 +660,6 @@ boost::optional<double> getWinningPlanScore(PlanStage* root) {
 
 void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
     invariant(statsOut);
-
     // We can get some of the fields we need from the common stats stored in the
     // root stage of the plan tree.
     const CommonStats* common = _root->getCommonStats();
@@ -671,6 +670,7 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
     std::vector<const PlanStage*> stages;
     flattenExecTree(_root, &stages);
 
+    statsOut->planningTimeMicros = _timeElapsedPlanning;
     statsOut->totalKeysExamined = 0;
     statsOut->totalDocsExamined = 0;
 

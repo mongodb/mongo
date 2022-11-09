@@ -284,6 +284,10 @@ public:
     // Details of any error (whether from an exception or a command returning failure).
     Status errInfo = Status::OK();
 
+    // Amount of time spent planning the query. Begins after parsing and ends
+    // at creation of PlanExecutor.
+    Microseconds planningTime{0};
+
     // response info
     Microseconds executionTime{0};
     long long nreturned{-1};

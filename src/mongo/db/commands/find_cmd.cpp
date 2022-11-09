@@ -404,7 +404,7 @@ public:
             const bool isOplogNss = (parsedNss == NamespaceString::kRsOplogNamespace);
             auto findCommand =
                 parseCmdObjectToFindCommandRequest(opCtx, std::move(parsedNss), cmdObj);
-
+            opCtx->beginPlanningTimer();
             // Only allow speculative majority for internal commands that specify the correct flag.
             uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
                     "Majority read concern is not enabled.",

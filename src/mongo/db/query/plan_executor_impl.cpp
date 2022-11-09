@@ -32,6 +32,7 @@
 
 #include "mongo/db/query/plan_executor_impl.h"
 
+#include "mongo/util/duration.h"
 #include <memory>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -124,14 +125,15 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    const CollectionPtr& collection,
                                    bool returnOwnedBson,
                                    NamespaceString nss,
-                                   PlanYieldPolicy::YieldPolicy yieldPolicy)
+                                   PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                   Microseconds timeElapsedPlanning)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _expCtx(_cq ? _cq->getExpCtx() : expCtx),
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
-      _planExplainer(plan_explainer_factory::make(_root.get())),
+      _planExplainer(plan_explainer_factory::make(_root.get(), timeElapsedPlanning)),
       _mustReturnOwnedBson(returnOwnedBson),
       _nss(std::move(nss)) {
     invariant(!_expCtx || _expCtx->opCtx == _opCtx);

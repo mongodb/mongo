@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 /**
@@ -38,7 +39,8 @@ namespace mongo {
  */
 class PlanExplainerPipeline final : public PlanExplainer {
 public:
-    PlanExplainerPipeline(const Pipeline* pipeline) : _pipeline{pipeline} {}
+    PlanExplainerPipeline(const Pipeline* pipeline, Microseconds timeElapsedPlanning)
+        : PlanExplainer{timeElapsedPlanning}, _pipeline{pipeline} {}
 
     bool isMultiPlan() const final {
         return false;

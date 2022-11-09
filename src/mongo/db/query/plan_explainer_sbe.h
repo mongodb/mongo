@@ -35,6 +35,7 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 /**
@@ -49,8 +50,9 @@ public:
                      std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                      bool isMultiPlan,
                      bool isCachedPlan,
+                     Microseconds timeElapsedPlanning,
                      std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo)
-        : PlanExplainer{solution},
+        : PlanExplainer{solution, timeElapsedPlanning},
           _root{root},
           _rootData{data},
           _solution{solution},

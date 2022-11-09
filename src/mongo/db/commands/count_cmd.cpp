@@ -242,6 +242,7 @@ public:
 
         auto request = CountCommandRequest::parse(
             IDLParserContext("count", false /* apiStrict */, dbName.tenantId()), cmdObj);
+        opCtx->beginPlanningTimer();
         if (shouldDoFLERewrite(request)) {
             processFLECountD(opCtx, nss, &request);
         }

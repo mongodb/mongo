@@ -32,6 +32,8 @@
 
 #include "mongo/db/query/get_executor.h"
 
+#include "mongo/util/duration.h"
+#include "mongo/util/tick_source.h"
 #include <boost/optional.hpp>
 #include <limits>
 #include <memory>
@@ -108,6 +110,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/str.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -747,10 +750,8 @@ public:
                         "Only one plan is available",
                         "query"_attr = redact(_cq->toStringShort()),
                         "planSummary"_attr = result->getPlanSummary());
-
             return std::move(result);
         }
-
         return buildMultiPlan(std::move(solutions));
     }
 
@@ -1183,14 +1184,17 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
     invariant(root);
     // We must have a tree of stages in order to have a valid plan executor, but the query
     // solution may be null.
-    return plan_executor_factory::make(std::move(canonicalQuery),
-                                       std::move(ws),
-                                       std::move(root),
-                                       &collection,
-                                       yieldPolicy,
-                                       plannerParams.options,
-                                       {},
-                                       std::move(solution));
+    return plan_executor_factory::make(
+        std::move(canonicalQuery),
+        std::move(ws),
+        std::move(root),
+        &collection,
+        yieldPolicy,
+        plannerParams.options,
+        {},
+        std::move(solution),
+        /* metric stored in PlanExplainer via PlanExecutor construction*/
+        opCtx->getElapsedQueryPlanningTime());
 }
 
 /**
@@ -1316,25 +1320,27 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 
     // In some circumstances (e.g. when have multiple candidate plans or using a cached one), we
     // might need to execute the plan(s) to pick the best one or to confirm the choice.
-    if (auto planner = makeRuntimePlannerIfNeeded(opCtx,
-                                                  collections,
-                                                  cq.get(),
-                                                  solutions.size(),
-                                                  planningResult->decisionWorks(),
-                                                  planningResult->needsSubplanning(),
-                                                  yieldPolicy.get(),
-                                                  plannerParams.options,
-                                                  planStageData)) {
+    if (auto runTimePlanner = makeRuntimePlannerIfNeeded(opCtx,
+                                                         collections,
+                                                         cq.get(),
+                                                         solutions.size(),
+                                                         planningResult->decisionWorks(),
+                                                         planningResult->needsSubplanning(),
+                                                         yieldPolicy.get(),
+                                                         plannerParams.options,
+                                                         planStageData)) {
         // Do the runtime planning and pick the best candidate plan.
-        auto candidates = planner->plan(std::move(solutions), std::move(roots));
-
-        return plan_executor_factory::make(opCtx,
-                                           std::move(cq),
-                                           std::move(candidates),
-                                           collections,
-                                           plannerParams.options,
-                                           std::move(nss),
-                                           std::move(yieldPolicy));
+        auto candidates = runTimePlanner->plan(std::move(solutions), std::move(roots));
+        return plan_executor_factory::make(
+            opCtx,
+            std::move(cq),
+            std::move(candidates),
+            collections,
+            plannerParams.options,
+            std::move(nss),
+            std::move(yieldPolicy),
+            /* metric stored in PlanExplainer via PlanExecutor construction*/
+            opCtx->getElapsedQueryPlanningTime());
     }
     // No need for runtime planning, just use the constructed plan stage tree.
     invariant(solutions.size() == 1);
@@ -1358,17 +1364,20 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     // Prepare the SBE tree for execution.
     stage_builder::prepareSlotBasedExecutableTree(
         opCtx, root.get(), &data, *cq, collections, yieldPolicy.get(), true);
-    return plan_executor_factory::make(opCtx,
-                                       std::move(cq),
-                                       std::move(solutions[0]),
-                                       std::move(roots[0]),
-                                       {},
-                                       collections,
-                                       plannerParams.options,
-                                       std::move(nss),
-                                       std::move(yieldPolicy),
-                                       planningResult->isRecoveredFromPlanCache(),
-                                       false /* generatedByBonsai */);
+    return plan_executor_factory::make(
+        opCtx,
+        std::move(cq),
+        std::move(solutions[0]),
+        std::move(roots[0]),
+        {},
+        collections,
+        plannerParams.options,
+        std::move(nss),
+        std::move(yieldPolicy),
+        planningResult->isRecoveredFromPlanCache(),
+        false /* generatedByBonsai */,
+        /* metric stored in PlanExplainer via PlanExecutor construction*/
+        opCtx->getElapsedQueryPlanningTime());
 }
 
 /**
@@ -1521,6 +1530,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
     MultipleCollectionAccessor multi{collection};
+
     return getExecutor(opCtx,
                        multi,
                        std::move(canonicalQuery),
@@ -1540,6 +1550,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     bool permitYield,
     QueryPlannerParams plannerParams) {
+
     auto yieldPolicy = (permitYield && !opCtx->inMultiDocumentTransaction())
         ? PlanYieldPolicy::YieldPolicy::YIELD_AUTO
         : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY;
@@ -1563,6 +1574,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     bool permitYield,
     size_t plannerOptions) {
+
     MultipleCollectionAccessor multi{*coll};
     return getExecutorFind(opCtx,
                            multi,
@@ -1776,6 +1788,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     ClassicPrepareExecutionHelper helper{
         opCtx, collection, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
+
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
@@ -1972,6 +1985,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     ClassicPrepareExecutionHelper helper{
         opCtx, collection, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
+
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
@@ -2245,8 +2259,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     OperationContext* opCtx = expCtx->opCtx;
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
+
     findCommand->setFilter(request.getQuery());
     auto collation = request.getCollation().value_or(BSONObj());
     findCommand->setCollation(collation);
@@ -2326,6 +2340,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
+
     auto [root, querySolution] = executionResult.getValue()->extractResultData();
     invariant(root);
 
@@ -2334,14 +2349,17 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         expCtx.get(), collection, limit, skip, ws.get(), root.release());
     // We must have a tree of stages in order to have a valid plan executor, but the query
     // solution may be NULL. Takes ownership of all args other than 'collection' and 'opCtx'
-    return plan_executor_factory::make(std::move(cq),
-                                       std::move(ws),
-                                       std::move(root),
-                                       coll,
-                                       yieldPolicy,
-                                       plannerOptions,
-                                       NamespaceString(),
-                                       std::move(querySolution));
+    return plan_executor_factory::make(
+        std::move(cq),
+        std::move(ws),
+        std::move(root),
+        coll,
+        yieldPolicy,
+        plannerOptions,
+        NamespaceString(),
+        std::move(querySolution),
+        /* metric stored in PlanExplainer via PlanExecutor construction*/
+        opCtx->getElapsedQueryPlanningTime());
 }
 
 //

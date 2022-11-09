@@ -140,6 +140,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     // TODO SERVER-68721: create IDLParserContext with tenant id of dbName.
     auto parsedMr = MapReduceCommandRequest::parse(IDLParserContext("mapReduce"), cmd);
+    opCtx->beginPlanningTimer();
     auto expCtx = makeExpressionContext(opCtx, parsedMr, verbosity);
     auto runnablePipeline = [&]() {
         auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);

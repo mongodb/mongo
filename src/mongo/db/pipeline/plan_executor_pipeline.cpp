@@ -37,15 +37,17 @@
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
 PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
                                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                                           ResumableScanType resumableScanType)
+                                           ResumableScanType resumableScanType,
+                                           Microseconds timeElapsedPlanning)
     : _expCtx(std::move(expCtx)),
       _pipeline(std::move(pipeline)),
-      _planExplainer{_pipeline.get()},
+      _planExplainer{_pipeline.get(), timeElapsedPlanning},
       _resumableScanType{resumableScanType} {
     // Pipeline plan executors must always have an ExpressionContext.
     invariant(_expCtx);

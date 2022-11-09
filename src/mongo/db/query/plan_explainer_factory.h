@@ -36,9 +36,11 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/util/duration.h"
 
 namespace mongo::plan_explainer_factory {
 std::unique_ptr<PlanExplainer> make(PlanStage* root);
+std::unique_ptr<PlanExplainer> make(PlanStage* root, Microseconds timeElapsedPlanning);
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     const PlanEnumeratorExplainInfo& enumeratorInfo);
@@ -62,5 +64,6 @@ std::unique_ptr<PlanExplainer> make(
     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
     bool isMultiPlan,
     bool isFromPlanCache,
+    Microseconds timeElapsedPlanning,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo);
 }  // namespace mongo::plan_explainer_factory

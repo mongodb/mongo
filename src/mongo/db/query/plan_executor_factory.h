@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
 #include <queue>
 
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -73,7 +74,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions,
     NamespaceString nss = NamespaceString(),
-    std::unique_ptr<QuerySolution> qs = nullptr);
+    std::unique_ptr<QuerySolution> qs = nullptr,
+    Microseconds timeElapsedPlanning = Microseconds{0});
 
 /**
  * This overload is provided for executors that do not need a CanonicalQuery. For example, the
@@ -90,7 +92,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions,
     NamespaceString nss = NamespaceString(),
-    std::unique_ptr<QuerySolution> qs = nullptr);
+    std::unique_ptr<QuerySolution> qs = nullptr,
+    Microseconds timeElapsedPlanning = Microseconds{0});
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
@@ -102,7 +105,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const CollectionPtr* collection,
     size_t plannerOptions,
     NamespaceString nss,
-    PlanYieldPolicy::YieldPolicy yieldPolicy);
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    Microseconds timeElapsedPlanning);
 
 /**
  * Constructs a PlanExecutor for the query 'cq' which will execute the SBE plan 'root'. A yield
@@ -120,7 +124,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     bool isFromPlanCache,
-    bool generatedByBonsai);
+    bool generatedByBonsai,
+    Microseconds timeElapsedPlanning);
 
 /**
  * Similar to the factory function above in that it also constructs an executor for the winning SBE
@@ -134,7 +139,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     NamespaceString nss,
-    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
+    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+    Microseconds timeElapsedPlanning);
 
 /**
  * Constructs a plan executor for executing the given 'pipeline'.
@@ -142,6 +148,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    Microseconds timeElapsedPlanning = Microseconds{0},
     PlanExecutorPipeline::ResumableScanType resumableScanType =
         PlanExecutorPipeline::ResumableScanType::kNone);
 

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
 #include <queue>
 
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -50,6 +51,7 @@ public:
                     bool returnOwnedBson,
                     NamespaceString nss,
                     bool isOpen,
+                    Microseconds timeElapsedPlanning,
                     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
                     bool generatedByBonsai);
 

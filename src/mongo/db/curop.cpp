@@ -433,7 +433,6 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     // Obtain the total execution time of this operation.
     done();
     _debug.executionTime = duration_cast<Microseconds>(elapsedTimeExcludingPauses());
-
     const auto executionTimeMillis = durationCount<Milliseconds>(_debug.executionTime);
 
     if (_debug.isReplOplogGetMore) {
@@ -993,6 +992,7 @@ void OpDebug::report(OperationContext* opCtx,
     }
 
     pAttrs->add("durationMillis", durationCount<Milliseconds>(executionTime));
+    pAttrs->add("planningTimeMicros", durationCount<Microseconds>(planningTime));
 }
 
 #define OPDEBUG_APPEND_NUMBER2(b, x, y) \
@@ -1156,6 +1156,7 @@ void OpDebug::append(OperationContext* opCtx,
     }
 
     b.appendNumber("millis", durationCount<Milliseconds>(executionTime));
+    b.appendNumber("planningTimeMicros", durationCount<Microseconds>(planningTime));
 
     if (!curop.getPlanSummary().empty()) {
         b.append("planSummary", curop.getPlanSummary());
@@ -1466,6 +1467,10 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
         b.appendNumber(field, durationCount<Milliseconds>(args.op.executionTime));
     });
 
+    addIfNeeded("planningTimeMicros", [](auto field, auto args, auto& b) {
+        b.appendNumber(field, durationCount<Microseconds>(args.op.planningTime));
+    });
+
     addIfNeeded("planSummary", [](auto field, auto args, auto& b) {
         if (!args.curop.getPlanSummary().empty()) {
             b.append(field, args.curop.getPlanSummary());
@@ -1516,6 +1521,7 @@ void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     keysSorted = planSummaryStats.keysSorted;
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
     fromPlanCache = planSummaryStats.fromPlanCache;
+    planningTime = planSummaryStats.planningTimeMicros;
     replanReason = planSummaryStats.replanReason;
 }
 

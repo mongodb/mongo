@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
 #include <boost/optional.hpp>
 #include <queue>
 
@@ -97,7 +98,8 @@ public:
                      const CollectionPtr& collection,
                      bool returnOwnedBson,
                      NamespaceString nss,
-                     PlanYieldPolicy::YieldPolicy yieldPolicy);
+                     PlanYieldPolicy::YieldPolicy yieldPolicy,
+                     Microseconds timeElapsedPlanning);
 
     virtual ~PlanExecutorImpl();
     CanonicalQuery* getCanonicalQuery() const final;

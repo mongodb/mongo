@@ -193,7 +193,7 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
 TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     // 'basicFields' should always be present in the logs and profiler, for any operation.
     std::vector<std::string> basicFields{
-        "op", "ns", "command", "numYield", "locks", "millis", "flowControl"};
+        "op", "ns", "command", "numYield", "locks", "millis", "planningTimeMicros", "flowControl"};
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();

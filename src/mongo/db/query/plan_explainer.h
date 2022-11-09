@@ -35,6 +35,7 @@
 #include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 /**
@@ -57,10 +58,14 @@ public:
     using PlanStatsDetails = std::pair<BSONObj, boost::optional<PlanSummaryStats>>;
 
     PlanExplainer() {}
-    PlanExplainer(const QuerySolution* solution)
+    PlanExplainer(const QuerySolution* solution, Microseconds timeElapsedPlanning)
         : _enumeratorExplainInfo{solution ? solution->_enumeratorExplainInfo
-                                          : PlanEnumeratorExplainInfo{}} {}
+                                          : PlanEnumeratorExplainInfo{}},
+          _timeElapsedPlanning{timeElapsedPlanning} {}
+    PlanExplainer(Microseconds timeElapsedPlanning) : _timeElapsedPlanning{timeElapsedPlanning} {}
     PlanExplainer(const PlanEnumeratorExplainInfo& info) : _enumeratorExplainInfo{info} {}
+    PlanExplainer(const PlanEnumeratorExplainInfo& info, Microseconds timeElapsedPlanning)
+        : _enumeratorExplainInfo{info}, _timeElapsedPlanning{timeElapsedPlanning} {}
 
     virtual ~PlanExplainer() = default;
 
@@ -142,5 +147,6 @@ public:
 
 protected:
     PlanEnumeratorExplainInfo _enumeratorExplainInfo;
+    Microseconds _timeElapsedPlanning{0};
 };
 }  // namespace mongo

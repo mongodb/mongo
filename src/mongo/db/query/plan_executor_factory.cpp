@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/util/duration.h"
 #include <iostream>
 
 #include "mongo/platform/basic.h"
@@ -54,7 +55,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions,
     NamespaceString nss,
-    std::unique_ptr<QuerySolution> qs) {
+    std::unique_ptr<QuerySolution> qs,
+    Microseconds timeElapsedPlanning) {
     auto expCtx = cq->getExpCtx();
     return make(expCtx->opCtx,
                 std::move(ws),
@@ -65,8 +67,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 collection,
                 plannerOptions,
                 nss,
-                yieldPolicy);
+                yieldPolicy,
+                timeElapsedPlanning);
 }
+
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -76,7 +80,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions,
     NamespaceString nss,
-    std::unique_ptr<QuerySolution> qs) {
+    std::unique_ptr<QuerySolution> qs,
+    Microseconds timeElapsedPlanning) {
+
     return make(expCtx->opCtx,
                 std::move(ws),
                 std::move(rt),
@@ -86,7 +92,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 collection,
                 plannerOptions,
                 nss,
-                yieldPolicy);
+                yieldPolicy,
+                timeElapsedPlanning);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
@@ -99,8 +106,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const CollectionPtr* collection,
     size_t plannerOptions,
     NamespaceString nss,
-    PlanYieldPolicy::YieldPolicy yieldPolicy) {
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    Microseconds timeElapsedPlanning) {
     dassert(collection);
+
     try {
         auto execImpl = new PlanExecutorImpl(opCtx,
                                              std::move(ws),
@@ -111,7 +120,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                              *collection,
                                              plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                              std::move(nss),
-                                             yieldPolicy);
+                                             yieldPolicy,
+                                             timeElapsedPlanning);
         PlanExecutor::Deleter planDeleter(opCtx);
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(execImpl, std::move(planDeleter));
         return {std::move(exec)};
@@ -131,9 +141,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     bool planIsFromCache,
-    bool generatedByBonsai) {
+    bool generatedByBonsai,
+    Microseconds timeElapsedPlanning) {
     auto&& [rootStage, data] = root;
-
     LOGV2_DEBUG(4822860,
                 5,
                 "SBE plan",
@@ -154,6 +164,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                  std::move(nss),
                                  false,
+                                 timeElapsedPlanning,
                                  std::move(yieldPolicy),
                                  generatedByBonsai),
              PlanExecutor::Deleter{opCtx}}};
@@ -166,8 +177,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     NamespaceString nss,
-    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
-
+    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+    Microseconds timeElapsedPlanning) {
     LOGV2_DEBUG(4822861,
                 5,
                 "SBE plan",
@@ -181,6 +192,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                  std::move(nss),
                                  true,
+                                 timeElapsedPlanning,
                                  std::move(yieldPolicy),
                                  false),
              PlanExecutor::Deleter{opCtx}}};
@@ -189,9 +201,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    Microseconds timeElapsedPlanning,
     PlanExecutorPipeline::ResumableScanType resumableScanType) {
     auto* opCtx = expCtx->opCtx;
-    auto exec = new PlanExecutorPipeline(std::move(expCtx), std::move(pipeline), resumableScanType);
+    auto exec = new PlanExecutorPipeline(
+        std::move(expCtx), std::move(pipeline), resumableScanType, timeElapsedPlanning);
     return {exec, PlanExecutor::Deleter{opCtx}};
 }
 
