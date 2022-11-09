@@ -40,7 +40,7 @@ try {
     // It may be possible for this test to run in a passthrough where such a large transaction fills
     // up the cache and cannot commit. The transaction will be rolled-back with a WriteConflict as a
     // result.
-    if (e.code === ErrorCodes.WriteConflict && e.errmsg.startsWith("Cache full")) {
+    if (e.code === ErrorCodes.WriteConflict) {
         jsTestLog("Ignoring WriteConflict due to large transaction's size");
     } else {
         throw e;
