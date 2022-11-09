@@ -194,6 +194,8 @@ private:
     CancellationSource _commitMonitorCancellationSource;
 };
 
+class ReshardingCoordinator;
+
 class ReshardingCoordinatorService : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "ReshardingCoordinatorService"_sd;
@@ -202,7 +204,7 @@ public:
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
     ~ReshardingCoordinatorService() = default;
 
-    class ReshardingCoordinator;
+    friend ReshardingCoordinator;
 
     StringData getServiceName() const override {
         return kServiceName;
@@ -242,11 +244,11 @@ private:
     ServiceContext* _serviceContext;
 };
 
-class ReshardingCoordinatorService::ReshardingCoordinator final
-    : public PrimaryOnlyService::TypedInstance<ReshardingCoordinator> {
+class ReshardingCoordinator final
+    : public repl::PrimaryOnlyService::TypedInstance<ReshardingCoordinator> {
 public:
     explicit ReshardingCoordinator(
-        const ReshardingCoordinatorService* coordinatorService,
+        ReshardingCoordinatorService* coordinatorService,
         const ReshardingCoordinatorDocument& coordinatorDoc,
         std::shared_ptr<ReshardingCoordinatorExternalState> externalState,
         ServiceContext* serviceContext);
@@ -358,6 +360,19 @@ private:
      */
     ExecutorFuture<void> _onAbortCoordinatorAndParticipants(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const Status& status);
+
+    /**
+     * Checks if the new shard key is same as the existing one in order to return early and avoid
+     * redundant work.
+     */
+    ExecutorFuture<bool> _isReshardingOpRedundant(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * Runs resharding operation to completion from _initializeCoordinator().
+     */
+    ExecutorFuture<void> _runReshardingOp(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
      * Does the following writes:
@@ -516,10 +531,10 @@ private:
     // The unique key for a given resharding operation. InstanceID is an alias for BSONObj. The
     // value of this is the UUID that will be used as the collection UUID for the new sharded
     // collection. The object looks like: {_id: 'reshardingUUID'}
-    const InstanceID _id;
+    const repl::PrimaryOnlyService::InstanceID _id;
 
     // The primary-only service instance corresponding to the coordinator instance. Not owned.
-    const ReshardingCoordinatorService* const _coordinatorService;
+    ReshardingCoordinatorService* const _coordinatorService;
 
     ServiceContext* _serviceContext;
 

@@ -165,7 +165,7 @@ void ReshardingCleaner<Service, StateMachine, ReshardingDocument>::_waitOnMachin
 }
 
 template class ReshardingCleaner<ReshardingCoordinatorService,
-                                 ReshardingCoordinatorService::ReshardingCoordinator,
+                                 ReshardingCoordinator,
                                  ReshardingCoordinatorDocument>;
 
 template class ReshardingCleaner<ReshardingDonorService,
@@ -201,8 +201,7 @@ void ReshardingCoordinatorCleaner::_doClean(OperationContext* opCtx,
     _dropTemporaryReshardingCollection(opCtx, doc.getTempReshardingNss());
 }
 
-void ReshardingCoordinatorCleaner::_abortMachine(
-    ReshardingCoordinatorService::ReshardingCoordinator& machine) {
+void ReshardingCoordinatorCleaner::_abortMachine(ReshardingCoordinator& machine) {
     machine.abort();
 }
 

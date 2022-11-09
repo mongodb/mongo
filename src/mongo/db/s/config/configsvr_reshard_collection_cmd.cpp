@@ -127,8 +127,8 @@ public:
             }
 
             // Returns boost::none if there isn't any work to be done by the resharding operation.
-            auto instance = ([&]() -> boost::optional<std::shared_ptr<
-                                       const ReshardingCoordinatorService::ReshardingCoordinator>> {
+            auto instance = ([&]()
+                                 -> boost::optional<std::shared_ptr<const ReshardingCoordinator>> {
                 FixedFCVRegion fixedFcv(opCtx);
 
                 uassert(ErrorCodes::CommandNotSupported,
@@ -146,14 +146,6 @@ public:
                 const auto cm = uassertStatusOK(
                     Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
                         opCtx, nss));
-
-                const auto currentShardKey = cm.getShardKeyPattern().getKeyPattern();
-                if (SimpleBSONObjComparator::kInstance.evaluate(currentShardKey.toBSON() ==
-                                                                request().getKey())) {
-                    // There isn't any work to be done by the resharding operation since the
-                    // existing shard key matches the desired new shard key.
-                    return boost::none;
-                }
 
                 auto tempReshardingNss =
                     resharding::constructTemporaryReshardingNss(nss.db(), cm.getUUID());
@@ -203,9 +195,8 @@ public:
          * prevent generating a new resharding instance if the same command is issued consecutively
          * due to client disconnect etc.
          */
-        std::shared_ptr<const ReshardingCoordinatorService::ReshardingCoordinator>
-        getOrCreateReshardingCoordinator(OperationContext* opCtx,
-                                         const ReshardingCoordinatorDocument& coordinatorDoc);
+        std::shared_ptr<const ReshardingCoordinator> getOrCreateReshardingCoordinator(
+            OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
 
     private:
         NamespaceString ns() const override {
@@ -245,21 +236,20 @@ public:
 
 } configsvrReshardCollectionCmd;
 
-std::shared_ptr<const ReshardingCoordinatorService::ReshardingCoordinator>
+std::shared_ptr<const ReshardingCoordinator>
 ConfigsvrReshardCollectionCommand::Invocation::getOrCreateReshardingCoordinator(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
     try {
         auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
         auto service = registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
-        auto instance = ReshardingCoordinatorService::ReshardingCoordinator::getOrCreate(
-            opCtx, service, coordinatorDoc.toBSON());
+        auto instance = ReshardingCoordinator::getOrCreate(opCtx, service, coordinatorDoc.toBSON());
 
-        return std::shared_ptr<const ReshardingCoordinatorService::ReshardingCoordinator>(instance);
+        return std::shared_ptr<const ReshardingCoordinator>(instance);
     } catch (
         const ExceptionFor<ErrorCodes::ReshardingCoordinatorServiceConflictingOperationInProgress>&
             ex) {
         reshardCollectionJoinedExistingOperation.pauseWhileSet(opCtx);
-        return checked_pointer_cast<const ReshardingCoordinatorService::ReshardingCoordinator>(
+        return checked_pointer_cast<const ReshardingCoordinator>(
             ex.extraInfo<ReshardingCoordinatorServiceConflictingOperationInProgressInfo>()
                 ->getInstance());
 

@@ -233,6 +233,20 @@ void ReshardingCoordinatorObserver::interrupt(Status status) {
     }
 }
 
+void ReshardingCoordinatorObserver::fulfillPromisesBeforePersistingStateDoc() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    invariant(!_allDonorsReportedMinFetchTimestamp.getFuture().isReady());
+    invariant(!_allRecipientsFinishedCloning.getFuture().isReady());
+    invariant(!_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady());
+    invariant(!_allRecipientsDone.getFuture().isReady());
+    invariant(!_allDonorsDone.getFuture().isReady());
+    _allDonorsReportedMinFetchTimestamp.emplaceValue();
+    _allRecipientsFinishedCloning.emplaceValue();
+    _allRecipientsReportedStrictConsistencyTimestamp.emplaceValue();
+    _allRecipientsDone.emplaceValue();
+    _allDonorsDone.emplaceValue();
+}
+
 void ReshardingCoordinatorObserver::onCriticalSectionTimeout() {
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady()) {

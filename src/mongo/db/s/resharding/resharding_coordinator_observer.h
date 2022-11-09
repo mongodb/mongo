@@ -108,6 +108,12 @@ public:
      */
     void interrupt(Status status);
 
+    /**
+     * Fulfills all promises prematurely. To be called only if no state document has been persisted
+     * yet.
+     */
+    void fulfillPromisesBeforePersistingStateDoc();
+
 private:
     /**
      * Does work necessary for both recoverable errors (failover/stepdown) and unrecoverable errors

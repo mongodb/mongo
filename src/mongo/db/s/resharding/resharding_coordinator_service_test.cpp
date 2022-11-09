@@ -118,8 +118,6 @@ private:
 
 class ReshardingCoordinatorServiceTest : public ConfigServerTestFixture {
 public:
-    using ReshardingCoordinator = ReshardingCoordinatorService::ReshardingCoordinator;
-
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) {
         return std::make_unique<ReshardingCoordinatorServiceForTest>(serviceContext);
     }
@@ -206,17 +204,16 @@ public:
         return doc;
     }
 
-    std::shared_ptr<ReshardingCoordinatorService::ReshardingCoordinator> getCoordinator(
+    std::shared_ptr<ReshardingCoordinator> getCoordinator(
         OperationContext* opCtx, repl::PrimaryOnlyService::InstanceID instanceId) {
         auto coordinator = getCoordinatorIfExists(opCtx, instanceId);
         ASSERT_TRUE(bool(coordinator));
         return coordinator;
     }
 
-    std::shared_ptr<ReshardingCoordinatorService::ReshardingCoordinator> getCoordinatorIfExists(
+    std::shared_ptr<ReshardingCoordinator> getCoordinatorIfExists(
         OperationContext* opCtx, repl::PrimaryOnlyService::InstanceID instanceId) {
-        auto coordinatorOpt = ReshardingCoordinatorService::ReshardingCoordinator::lookup(
-            opCtx, _service, instanceId);
+        auto coordinatorOpt = ReshardingCoordinator::lookup(opCtx, _service, instanceId);
         if (!coordinatorOpt) {
             return nullptr;
         }
@@ -365,7 +362,7 @@ public:
         OID epoch,
         boost::optional<Timestamp> fetchTimestamp = boost::none) {
         return insertStateAndCatalogEntries(
-            state, epoch, _originalUUID, _originalNss, _tempNss, _newShardKey, fetchTimestamp);
+            state, epoch, _reshardingUUID, _originalNss, _tempNss, _newShardKey, fetchTimestamp);
     }
 
     ReshardingCoordinatorDocument insertStateAndCatalogEntries(
