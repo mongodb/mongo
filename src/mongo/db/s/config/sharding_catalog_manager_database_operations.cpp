@@ -50,6 +50,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 
@@ -292,42 +293,83 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
     // Hold the shard lock until the entire commit finishes to serialize with removeShard.
     Lock::SharedLock shardLock(opCtx, _kShardMembershipLock);
 
-    const auto updateOp = [&] {
-        const auto query = [&] {
-            BSONObjBuilder bsonBuilder;
-            bsonBuilder.append(DatabaseType::kNameFieldName, dbName.db());
-            // Include the version in the update filter to be resilient to potential network retries
-            // and delayed messages.
-            for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {
-                const auto dottedFieldName = DatabaseType::kVersionFieldName + "." + fieldName;
-                bsonBuilder.appendAs(fieldValue, dottedFieldName);
-            }
-            return bsonBuilder.obj();
+    const auto transactionChain = [opCtx, dbName, expectedDbVersion, toShard](
+                                      const txn_api::TransactionClient& txnClient,
+                                      ExecutorPtr txnExec) {
+        const auto updateDatabaseEntryOp = [&] {
+            const auto query = [&] {
+                BSONObjBuilder bsonBuilder;
+                bsonBuilder.append(DatabaseType::kNameFieldName, dbName.db());
+                // Include the version in the update filter to be resilient to potential network
+                // retries and delayed messages.
+                for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {
+                    const auto dottedFieldName = DatabaseType::kVersionFieldName + "." + fieldName;
+                    bsonBuilder.appendAs(fieldValue, dottedFieldName);
+                }
+                return bsonBuilder.obj();
+            }();
+
+            const auto update = [&] {
+                const auto newDbVersion = expectedDbVersion.makeUpdated();
+
+                BSONObjBuilder bsonBuilder;
+                bsonBuilder.append(DatabaseType::kPrimaryFieldName, toShard);
+                bsonBuilder.append(DatabaseType::kVersionFieldName, newDbVersion.toBSON());
+                return BSON("$set" << bsonBuilder.obj());
+            }();
+
+            write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigDatabasesNamespace);
+            updateOp.setUpdates({[&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(query);
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+                return entry;
+            }()});
+
+            return updateOp;
         }();
 
-        const auto update = [&] {
-            const auto newDbVersion = expectedDbVersion.makeUpdated();
+        return txnClient.runCRUDOp(updateDatabaseEntryOp, {})
+            .thenRunOn(txnExec)
+            .then([&txnClient, &txnExec, opCtx, &dbName, toShard](
+                      const BatchedCommandResponse& updateCatalogDatabaseEntryResponse) {
+                uassertStatusOK(updateCatalogDatabaseEntryResponse.toStatus());
 
-            BSONObjBuilder bsonBuilder;
-            bsonBuilder.append(DatabaseType::kPrimaryFieldName, toShard);
-            bsonBuilder.append(DatabaseType::kVersionFieldName, newDbVersion.toBSON());
-            return BSON("$set" << bsonBuilder.obj());
-        }();
+                // pre-check to guarantee idempotence: in case of a retry, the placement history
+                // entry may already exist
+                bool isHistoricalPlacementEnabled =
+                    feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
+                        serverGlobalParams.featureCompatibility);
+                if (!isHistoricalPlacementEnabled ||
+                    updateCatalogDatabaseEntryResponse.getNModified() == 0) {
+                    BatchedCommandResponse noOp;
+                    noOp.setN(0);
+                    noOp.setStatus(Status::OK());
+                    return SemiFuture<BatchedCommandResponse>(std::move(noOp));
+                }
 
-        write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigDatabasesNamespace);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(query);
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-            return entry;
-        }()});
+                const auto now = VectorClock::get(opCtx)->getTime();
+                const auto clusterTime = now.clusterTime().asTimestamp();
 
-        return updateOp;
-    }();
+                NamespacePlacementType placementInfo(
+                    NamespaceString(dbName), clusterTime, std::vector<mongo::ShardId>{toShard});
 
-    DBDirectClient dbClient(opCtx);
-    const auto commandResponse = dbClient.runCommand(updateOp.serialize({}));
-    uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
+                write_ops::InsertCommandRequest insertPlacementHistoryOp(
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace);
+                insertPlacementHistoryOp.setDocuments({placementInfo.toBSON()});
+
+                return txnClient.runCRUDOp(insertPlacementHistoryOp, {});
+            })
+            .thenRunOn(txnExec)
+            .then([](const BatchedCommandResponse& insertPlacementHistoryResponse) {
+                uassertStatusOK(insertPlacementHistoryResponse.toStatus());
+            })
+            .semi();
+    };
+
+    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
+    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr /*resourceYielder*/);
+    txn.run(opCtx, transactionChain);
 }
-
 }  // namespace mongo
