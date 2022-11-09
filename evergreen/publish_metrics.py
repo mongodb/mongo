@@ -1,4 +1,5 @@
 import datetime
+import subprocess
 import sys
 import os
 
@@ -9,7 +10,7 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from buildscripts.metrics.metrics_datatypes import ToolingMetrics
-from buildscripts.metrics.tooling_metrics_utils import _get_internal_tooling_metrics_client
+from buildscripts.metrics.tooling_metrics import _get_internal_tooling_metrics_client
 from evergreen.api import RetryingEvergreenApi
 
 # Check cluster connectivity

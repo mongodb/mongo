@@ -1,3 +1,5 @@
+import dataclasses
+import datetime
 import logging
 import os
 import asyncio
@@ -7,7 +9,7 @@ import pymongo
 
 from buildscripts.metrics.metrics_datatypes import ToolingMetrics
 
-logger = logging.getLogger('tooling_metrics_utils')
+logger = logging.getLogger('tooling_metrics_collection')
 
 INTERNAL_TOOLING_METRICS_HOSTNAME = "mongodb+srv://dev-metrics-pl-0.kewhj.mongodb.net"
 INTERNAL_TOOLING_METRICS_USERNAME = "internal_tooling_user"
@@ -39,7 +41,7 @@ def _git_user_exists() -> Optional[str]:
         return None
 
 
-def is_virtual_workstation() -> bool:
+def _is_virtual_workstation() -> bool:
     """Detect whether this is a MongoDB internal virtual workstation."""
     return _toolchain_exists() and _git_user_exists()
 
@@ -50,10 +52,14 @@ async def _save_metrics(metrics: ToolingMetrics) -> None:
     client.metrics.tooling_metrics.insert_one(metrics.dict())
 
 
-def save_tooling_metrics(tooling_metrics: ToolingMetrics) -> None:
+def save_tooling_metrics(utc_starttime: datetime) -> None:
     """Persist tooling metrics data to MongoDB Internal Atlas Cluster."""
     try:
-        asyncio.run(asyncio.wait_for(_save_metrics(tooling_metrics), timeout=1.0))
+        if not _is_virtual_workstation():
+            return
+        asyncio.run(
+            asyncio.wait_for(
+                _save_metrics(ToolingMetrics.get_tooling_metrics(utc_starttime)), timeout=1.0))
     except asyncio.TimeoutError as exc:
         logger.warning(
             "%s\nTimeout: Tooling metrics collection is not available -- this is a non-issue.\nIf this message persists, feel free to reach out to #server-development-platform",
