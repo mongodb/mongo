@@ -229,6 +229,12 @@ void batchInsertRangeDeletionTasks(OperationContext* opCtx,
         setFCVHangWhileInsertingRangeDeletionTasks.pauseWhileSet(opCtx);
     }
 }
+
+bool deletionTaskUuidMatchesFilteringMetadataUuid(CollectionShardingRuntime* csr,
+                                                  const UUID& deletionTaskUUID) {
+    return csr->getCurrentMetadataIfKnown() && csr->getCollectionDescription().isSharded() &&
+        csr->getCollectionDescription().uuidMatches(deletionTaskUUID);
+}
 }  // namespace
 
 std::shared_ptr<ThreadPool> getMigrationUtilExecutor() {
@@ -321,14 +327,6 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
     const auto serviceContext = opCtx->getServiceContext();
     return ExecutorFuture<void>(getMigrationUtilExecutor())
         .then([=] {
-            auto deletionTaskUuidMatchesFilteringMetadataUuid =
-                [](CollectionShardingRuntime* csr, const RangeDeletionTask& deletionTask) {
-                    return csr->getCurrentMetadataIfKnown() &&
-                        csr->getCollectionDescription().isSharded() &&
-                        csr->getCollectionDescription().uuidMatches(
-                            deletionTask.getCollectionUuid());
-                };
-
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);
             {
                 stdx::lock_guard<Client> lk(*tc.get());
@@ -349,7 +347,8 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                 boost::optional<AutoGetCollection> autoColl;
                 autoColl.emplace(opCtx, deletionTask.getNss(), MODE_IS);
                 auto csr = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
-                if (!deletionTaskUuidMatchesFilteringMetadataUuid(csr, deletionTask)) {
+                if (!deletionTaskUuidMatchesFilteringMetadataUuid(
+                        csr, deletionTask.getCollectionUuid())) {
                     // If the collection's filtering metadata is not known, is unsharded, or its
                     // UUID does not match the UUID of the deletion task, force a filtering
                     // metadata refresh once, because this node may have just stepped up and
@@ -386,7 +385,8 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                                        ? " has UUID that does not match UUID of the deletion task"
                                        : " is unsharded")
                                 : " is not known"),
-                    deletionTaskUuidMatchesFilteringMetadataUuid(csr, deletionTask));
+                    deletionTaskUuidMatchesFilteringMetadataUuid(csr,
+                                                                 deletionTask.getCollectionUuid()));
 
             // If the deletion task came from a setFCV to 4.4 upgrade then in large clusters the
             // logging can significantly slow down the upgrade if there are a large number (tens of
@@ -490,6 +490,11 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
             auto csr = CollectionShardingRuntime::get(opCtx, nss);
+            // Do not create range deletion tasks if the local collection's uuid does not match the
+            // one in the filtering metadata. This catalog inconsistency may happen in case of a
+            // local old incarnation of the collection (SERVER-17397).
+            if (!deletionTaskUuidMatchesFilteringMetadataUuid(csr, uuid))
+                return;
             csr->clearReceivingChunks();
         }
 
