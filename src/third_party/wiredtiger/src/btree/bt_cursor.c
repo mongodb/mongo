@@ -63,7 +63,8 @@ __btcur_bounds_search_near_reposition(WT_SESSION_IMPL *session, WT_CURSOR_BTREE 
     cursor = &cbt->iface;
     key_out_of_bounds = upper = false;
 
-    WT_ASSERT(session, WT_CURSOR_BOUNDS_SET(cursor));
+    if (!WT_CURSOR_BOUNDS_SET(cursor))
+        return (0);
 
     /*
      * Suppose a caller calls with the search key set to the lower bound but also specifies that the
@@ -547,60 +548,6 @@ __cursor_restart(WT_SESSION_IMPL *session, uint64_t *yield_count, uint64_t *slee
 }
 
 /*
- * __cursor_search_neighboring --
- *     Try after the search key, then before. At low isolation levels, new records could appear as
- *     we are stepping through the tree.
- */
-static int
-__cursor_search_neighboring(WT_CURSOR_BTREE *cbt, WT_CURFILE_STATE *state, int *exact)
-{
-    WT_BTREE *btree;
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    WT_SESSION_IMPL *session;
-
-    btree = CUR2BT(cbt);
-    cursor = &cbt->iface;
-    session = CUR2S(cbt);
-
-    while ((ret = __wt_btcur_next_prefix(cbt, &state->key, false)) != WT_NOTFOUND) {
-        WT_RET(ret);
-        if (btree->type == BTREE_ROW)
-            WT_RET(__wt_compare(session, btree->collator, &cursor->key, &state->key, exact));
-        else
-            *exact = cbt->recno < state->recno ? -1 : cbt->recno == state->recno ? 0 : 1;
-        if (*exact >= 0)
-            return (ret);
-    }
-
-    /*
-     * It is not necessary to go backwards when search_near is used with a prefix, as cursor row
-     * search places us on the first key of the prefix range. All the entries before the key we were
-     * placed on will not match the prefix.
-     *
-     * For example, if we search with the prefix "b", the cursor will be positioned at the first key
-     * starting with "b". All the entries before this one will start with "a", hence not matching
-     * the prefix.
-     */
-    if (F_ISSET(cursor, WT_CURSTD_PREFIX_SEARCH))
-        return (ret);
-
-    /*
-     * We walked to the end of the tree without finding a match. Walk backwards instead.
-     */
-    while ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND) {
-        WT_RET(ret);
-        if (btree->type == BTREE_ROW)
-            WT_RET(__wt_compare(session, btree->collator, &cursor->key, &state->key, exact));
-        else
-            *exact = cbt->recno < state->recno ? -1 : cbt->recno == state->recno ? 0 : 1;
-        if (*exact <= 0)
-            return (ret);
-    }
-    return (ret);
-}
-
-/*
  * __wt_btcur_reset --
  *     Invalidate the cursor position.
  */
@@ -889,6 +836,104 @@ err:
 }
 
 /*
+ * __btcur_search_neighboring --
+ *     Try after the search key, then before. At low isolation levels, new records could appear as
+ *     we are stepping through the tree.
+ */
+static int
+__btcur_search_neighboring(WT_CURSOR_BTREE *cbt, WT_CURFILE_STATE *state, int *exact)
+{
+    WT_BTREE *btree;
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    btree = CUR2BT(cbt);
+    cursor = &cbt->iface;
+    session = CUR2S(cbt);
+
+    while ((ret = __wt_btcur_next_prefix(cbt, &state->key, false)) != WT_NOTFOUND) {
+        WT_RET(ret);
+        if (btree->type == BTREE_ROW)
+            WT_RET(__wt_compare(session, btree->collator, &cursor->key, &state->key, exact));
+        else
+            *exact = cbt->recno < state->recno ? -1 : cbt->recno == state->recno ? 0 : 1;
+        if (*exact >= 0)
+            return (ret);
+    }
+
+    /*
+     * It is not necessary to go backwards when search_near is used with a prefix, as cursor row
+     * search places us on the first key of the prefix range. All the entries before the key we were
+     * placed on will not match the prefix.
+     *
+     * For example, if we search with the prefix "b", the cursor will be positioned at the first key
+     * starting with "b". All the entries before this one will start with "a", hence not matching
+     * the prefix.
+     */
+    if (F_ISSET(cursor, WT_CURSTD_PREFIX_SEARCH))
+        return (ret);
+
+    /*
+     * We walked to the end of the tree without finding a match. Walk backwards instead.
+     */
+    while ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND) {
+        WT_RET(ret);
+        if (btree->type == BTREE_ROW)
+            WT_RET(__wt_compare(session, btree->collator, &cursor->key, &state->key, exact));
+        else
+            *exact = cbt->recno < state->recno ? -1 : cbt->recno == state->recno ? 0 : 1;
+        if (*exact <= 0)
+            return (ret);
+    }
+    return (ret);
+}
+
+/*
+ * __btcur_search_near_row_pinned_page --
+ *     Search a row store pinned page before searching from the root in search near.
+ */
+static inline int
+__btcur_search_near_row_pinned_page(WT_CURSOR_BTREE *cbt, bool *validp)
+{
+    WT_SESSION_IMPL *session;
+    bool leaf_found;
+
+    leaf_found = false;
+    session = CUR2S(cbt);
+
+    /* We only do this search for row-store. */
+    if (CUR2BT(cbt)->type != BTREE_ROW || !__cursor_page_pinned(cbt, true))
+        return (0);
+
+    /* If we have a row-store page pinned, search it. */
+    __wt_txn_cursor_op(session);
+
+    /*
+     * Set the "insert" flag for row-store search; we may intend to position the cursor at the the
+     * end of the tree, rather than match an existing record. (LSM requires this semantic.)
+     */
+    WT_RET(__cursor_row_search(cbt, true, cbt->ref, &leaf_found));
+
+    /*
+     * Only use the pinned page search results if search returns an exact match or a slot other than
+     * the page's boundary slots, if that's not the case, a neighbor page might offer a better
+     * match. This test is simplistic as we're ignoring append lists (there may be no page slots or
+     * we might be legitimately positioned after the last page slot). Ignore those cases, it makes
+     * things too complicated.
+     *
+     * If there's an exact match, the row-store search function built the key in the cursor's
+     * temporary buffer.
+     */
+    if (leaf_found &&
+      (cbt->compare == 0 || (cbt->slot != 0 && cbt->slot != cbt->ref->page->entries - 1)))
+        WT_RET(__wt_cursor_valid(
+          cbt, (cbt->compare == 0 ? cbt->tmp : NULL), WT_RECNO_OOB, validp, true));
+
+    return (0);
+}
+
+/*
  * __wt_btcur_search_near --
  *     Search for a record in the tree.
  */
@@ -901,12 +946,13 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     int exact;
-    bool leaf_found, valid;
+    bool valid;
 
     btree = CUR2BT(cbt);
     cursor = &cbt->iface;
     session = CUR2S(cbt);
     exact = 0;
+    valid = false;
 
     WT_STAT_CONN_DATA_INCR(session, cursor_search_near);
 
@@ -928,41 +974,16 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
      * the search key is outside the bounds. Otherwise search near should behave as normal with an
      * additional bounds check after the call to row/col search.
      */
-    if (WT_CURSOR_BOUNDS_SET(cursor))
-        WT_ERR(__btcur_bounds_search_near_reposition(session, cbt));
+    WT_ERR(__btcur_bounds_search_near_reposition(session, cbt));
 
     /*
-     * If we have a row-store page pinned, search it; if we don't have a page pinned, or the search
-     * of the pinned page doesn't find an exact match, search from the root. Unlike
-     * WT_CURSOR.search, ignore pinned pages in the case of column-store, search-near isn't an
-     * interesting enough case for column-store to add the complexity needed to avoid the tree
-     * search.
+     * For row-store search the pinned page if there is one. Unlike WT_CURSOR.search, ignore pinned
+     * pages in the case of column-store, search-near isn't an interesting enough case for
+     * column-store to add the complexity needed to avoid the tree search.
      */
-    valid = false;
-    if (btree->type == BTREE_ROW && __cursor_page_pinned(cbt, true)) {
-        __wt_txn_cursor_op(session);
+    WT_ERR(__btcur_search_near_row_pinned_page(cbt, &valid));
 
-        /*
-         * Set the "insert" flag for row-store search; we may intend to position the cursor at the
-         * the end of the tree, rather than match an existing record. (LSM requires this semantic.)
-         */
-        WT_ERR(__cursor_row_search(cbt, true, cbt->ref, &leaf_found));
-
-        /*
-         * Only use the pinned page search results if search returns an exact match or a slot other
-         * than the page's boundary slots, if that's not the case, a neighbor page might offer a
-         * better match. This test is simplistic as we're ignoring append lists (there may be no
-         * page slots or we might be legitimately positioned after the last page slot). Ignore those
-         * cases, it makes things too complicated.
-         *
-         * If there's an exact match, the row-store search function built the key in the cursor's
-         * temporary buffer.
-         */
-        if (leaf_found &&
-          (cbt->compare == 0 || (cbt->slot != 0 && cbt->slot != cbt->ref->page->entries - 1)))
-            WT_ERR(__wt_cursor_valid(
-              cbt, (cbt->compare == 0 ? cbt->tmp : NULL), WT_RECNO_OOB, &valid, true));
-    }
+    /* The general case is that valid is false here as we didn't have a pinned page. */
     if (!valid) {
         WT_ERR(__wt_cursor_func_init(cbt, true));
 
@@ -1040,7 +1061,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
         F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
     } else {
         /* We didn't find an exact match, try to find the nearest one. */
-        WT_WITHOUT_EVICT_REPOSITION(ret = __cursor_search_neighboring(cbt, &state, &exact));
+        WT_WITHOUT_EVICT_REPOSITION(ret = __btcur_search_neighboring(cbt, &state, &exact));
         WT_ERR(ret);
     }
 
