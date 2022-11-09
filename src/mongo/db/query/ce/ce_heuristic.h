@@ -31,19 +31,19 @@
 
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 
-namespace mongo::optimizer::cascades {
+namespace mongo::ce {
 
 /**
  * Default cardinality estimation in the absence of statistics.
  * Relies purely on heuristics.
  * We currently do not use logical properties for heuristic ce.
  */
-class HeuristicCE : public CEInterface {
+class HeuristicCE : public optimizer::cascades::CEInterface {
 public:
-    CEType deriveCE(const Metadata& metadata,
-                    const Memo& memo,
-                    const properties::LogicalProps& /*logicalProps*/,
-                    ABT::reference_type logicalNodeRef) const override final;
+    optimizer::CEType deriveCE(const optimizer::Metadata& metadata,
+                               const optimizer::cascades::Memo& memo,
+                               const optimizer::properties::LogicalProps& /*logicalProps*/,
+                               optimizer::ABT::reference_type logicalNodeRef) const override final;
 };
 
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::ce

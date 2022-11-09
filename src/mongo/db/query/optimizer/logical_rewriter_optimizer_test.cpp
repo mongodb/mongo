@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
@@ -105,8 +104,8 @@ TEST(LogicalRewriter, Memo) {
     Metadata metadata{{{"test", {}}}};
     auto debugInfo = DebugInfo::kDefaultForTests;
     DefaultLogicalPropsDerivation lPropsDerivation;
-    HeuristicCE heuristicCE;
-    Memo::Context memoCtx{&metadata, &debugInfo, &lPropsDerivation, &heuristicCE};
+    auto ceDerivation = makeHeuristicCE();
+    Memo::Context memoCtx{&metadata, &debugInfo, &lPropsDerivation, ceDerivation.get()};
     Memo memo;
 
     ABT scanNode = make<ScanNode>("ptest", "test");

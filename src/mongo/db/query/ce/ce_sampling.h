@@ -32,25 +32,25 @@
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 
-namespace mongo::optimizer::cascades {
+namespace mongo::ce {
 
 class CESamplingTransportImpl;
 
-class CESamplingTransport : public CEInterface {
+class CESamplingTransport : public optimizer::cascades::CEInterface {
 public:
     CESamplingTransport(OperationContext* opCtx,
-                        OptPhaseManager phaseManager,
+                        optimizer::OptPhaseManager phaseManager,
                         int64_t numRecords,
-                        std::unique_ptr<CEInterface> fallbackCE);
+                        std::unique_ptr<optimizer::cascades::CEInterface> fallbackCE);
     ~CESamplingTransport();
 
-    CEType deriveCE(const Metadata& metadata,
-                    const Memo& memo,
-                    const properties::LogicalProps& logicalProps,
-                    ABT::reference_type logicalNodeRef) const final;
+    optimizer::CEType deriveCE(const optimizer::Metadata& metadata,
+                               const optimizer::cascades::Memo& memo,
+                               const optimizer::properties::LogicalProps& logicalProps,
+                               optimizer::ABT::reference_type logicalNodeRef) const final;
 
 private:
     std::unique_ptr<CESamplingTransportImpl> _impl;
 };
 
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::ce

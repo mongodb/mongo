@@ -31,27 +31,28 @@
 
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 
-namespace mongo::optimizer::cascades {
+namespace mongo::ce {
 
-using PartialSchemaSelHints =
-    std::map<PartialSchemaKey, SelectivityType, PartialSchemaKeyLessComparator>;
+using PartialSchemaSelHints = std::map<optimizer::PartialSchemaKey,
+                                       optimizer::SelectivityType,
+                                       optimizer::PartialSchemaKeyLessComparator>;
 
 /**
  * Estimation based on hints. The hints are organized in a PartialSchemaSelHints structure.
  * SargableNodes are estimated based on the matching PartialSchemaKeys.
  */
-class HintedCE : public CEInterface {
+class HintedCE : public optimizer::cascades::CEInterface {
 public:
     HintedCE(PartialSchemaSelHints hints) : _hints(std::move(hints)) {}
 
-    CEType deriveCE(const Metadata& metadata,
-                    const Memo& memo,
-                    const properties::LogicalProps& logicalProps,
-                    ABT::reference_type logicalNodeRef) const override final;
+    optimizer::CEType deriveCE(const optimizer::Metadata& metadata,
+                               const optimizer::cascades::Memo& memo,
+                               const optimizer::properties::LogicalProps& logicalProps,
+                               optimizer::ABT::reference_type logicalNodeRef) const override final;
 
 private:
     // Selectivity hints per PartialSchemaKey.
     PartialSchemaSelHints _hints;
 };
 
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::ce

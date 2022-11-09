@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"

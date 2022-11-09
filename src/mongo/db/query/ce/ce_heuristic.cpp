@@ -27,16 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
+#include "mongo/db/query/ce/ce_heuristic.h"
 
 #include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo::optimizer::cascades {
+namespace mongo::ce {
+namespace cascades = optimizer::cascades;
+namespace properties = optimizer::properties;
 
-using namespace properties;
-using namespace mongo::ce;
+using ABT = optimizer::ABT;
+using CEType = optimizer::CEType;
+using LogicalProps = properties::LogicalProps;
+using Memo = cascades::Memo;
+using Metadata = optimizer::Metadata;
 
 // Invalid estimate - an arbitrary negative value used for initialization.
 constexpr SelectivityType kInvalidSel = -1.0;
@@ -388,7 +393,8 @@ public:
     }
 
     CEType transport(const MemoLogicalDelegatorNode& node) {
-        return getPropertyConst<CardinalityEstimate>(_memo.getLogicalProps(node.getGroupId()))
+        return properties::getPropertyConst<properties::CardinalityEstimate>(
+                   _memo.getLogicalProps(node.getGroupId()))
             .getEstimate();
     }
 
@@ -587,4 +593,4 @@ CEType HeuristicCE::deriveCE(const Metadata& metadata,
     return card;
 }
 
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::ce

@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/ce/ce_heuristic.h"
 #include "mongo/db/query/ce/ce_test_utils.h"
-#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"

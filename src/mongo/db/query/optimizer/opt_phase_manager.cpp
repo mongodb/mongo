@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 
-#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path.h"
@@ -50,7 +49,8 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  PrefixId& prefixId,
                                  const bool requireRID,
                                  Metadata metadata,
-                                 std::unique_ptr<CEInterface> ceDerivation,
+                                 std::unique_ptr<CEInterface> explorationCE,
+                                 std::unique_ptr<CEInterface> substitutionCE,
                                  std::unique_ptr<CostingInterface> costDerivation,
                                  PathToIntervalFn pathToInterval,
                                  ConstFoldFn constFold,
@@ -62,7 +62,8 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
       _metadata(std::move(metadata)),
       _memo(),
       _logicalPropsDerivation(std::make_unique<DefaultLogicalPropsDerivation>()),
-      _ceDerivation(std::move(ceDerivation)),
+      _explorationCE(std::move(explorationCE)),
+      _substitutionCE(std::move(substitutionCE)),
       _costDerivation(std::move(costDerivation)),
       _pathToInterval(std::move(pathToInterval)),
       _constFold(std::move(constFold)),
@@ -70,7 +71,9 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
       _requireRID(requireRID),
       _ridProjections(),
       _prefixId(prefixId) {
-    uassert(6624093, "Empty Cost derivation", _costDerivation.get());
+    uassert(6624093, "Cost derivation is null", _costDerivation);
+    uassert(7088900, "Exploration CE is null", _explorationCE);
+    uassert(7088901, "Substitution CE is null", _substitutionCE);
 
     for (const auto& entry : _metadata._scanDefs) {
         _ridProjections.emplace(entry.first, _prefixId.getNextId("rid"));
@@ -153,8 +156,7 @@ void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
     }
 
     _memo.clear();
-    const bool useHeuristicCE = phase == OptPhase::MemoSubstitutionPhase;
-    HeuristicCE heuristicCE;
+    const bool useSubstitutionCE = phase == OptPhase::MemoSubstitutionPhase;
     logicalRewriter =
         std::make_unique<LogicalRewriter>(_metadata,
                                           _memo,
@@ -165,7 +167,7 @@ void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
                                           _pathToInterval,
                                           _constFold,
                                           *_logicalPropsDerivation,
-                                          useHeuristicCE ? heuristicCE : *_ceDerivation);
+                                          useSubstitutionCE ? *_substitutionCE : *_explorationCE);
     rootGroupId = logicalRewriter->addRootNode(input);
 
     if (runStandalone) {

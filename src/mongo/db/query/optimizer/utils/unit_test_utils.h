@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/query/ce/ce_hinted.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
@@ -121,6 +122,16 @@ IndexDefinition makeIndexDefinition(FieldNameType fieldName,
                                     bool isMultiKey = true);
 IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFields,
                                              bool isMultiKey = true);
+
+/**
+ * A factory function to create a heuristic-based cardinality estimator.
+ */
+std::unique_ptr<CEInterface> makeHeuristicCE();
+
+/**
+ * A factory function to create a hint-based cardinality estimator.
+ */
+std::unique_ptr<CEInterface> makeHintedCE(ce::PartialSchemaSelHints hints);
 
 /**
  * A convenience factory function to create costing.

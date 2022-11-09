@@ -32,15 +32,24 @@
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-namespace mongo::optimizer::cascades {
+namespace mongo::ce {
+namespace cascades = optimizer::cascades;
+namespace properties = optimizer::properties;
 
-using namespace properties;
+using ABT = optimizer::ABT;
+using CEType = optimizer::CEType;
+using LogicalProps = properties::LogicalProps;
+using OptPhaseManager = optimizer::OptPhaseManager;
+using Memo = cascades::Memo;
+using Metadata = optimizer::Metadata;
 
 class SamplingPlanExtractor {
 public:
@@ -49,37 +58,44 @@ public:
                           const size_t sampleSize)
         : _memo(memo), _sampleSize(sampleSize), _phaseManager(phaseManager) {}
 
-    void transport(ABT& n, const MemoLogicalDelegatorNode& node) {
+    void transport(ABT& n, const optimizer::MemoLogicalDelegatorNode& node) {
         n = extract(_memo.getLogicalNodes(node.getGroupId()).front());
     }
 
-    void transport(ABT& n, const ScanNode& /*node*/, ABT& /*binder*/) {
+    void transport(ABT& n, const optimizer::ScanNode& /*node*/, ABT& /*binder*/) {
         // We will lower the scan node in a sampling context here.
         // TODO: for now just return the documents in random order.
-        n = make<LimitSkipNode>(LimitSkipRequirement(_sampleSize, 0), std::move(n));
+        n = optimizer::make<optimizer::LimitSkipNode>(
+            properties::LimitSkipRequirement(_sampleSize, 0), std::move(n));
     }
 
-    void transport(ABT& n, const FilterNode& /*node*/, ABT& childResult, ABT& /*exprResult*/) {
+    void transport(ABT& n,
+                   const optimizer::FilterNode& /*node*/,
+                   ABT& childResult,
+                   ABT& /*exprResult*/) {
         // Skip over filters.
         n = childResult;
     }
 
     void transport(ABT& /*n*/,
-                   const EvaluationNode& /*node*/,
+                   const optimizer::EvaluationNode& /*node*/,
                    ABT& /*childResult*/,
                    ABT& /*exprResult*/) {
         // Keep Eval nodes.
     }
 
-    void transport(ABT& n, const SargableNode& node, ABT& childResult, ABT& refs, ABT& binds) {
+    void transport(
+        ABT& n, const optimizer::SargableNode& node, ABT& childResult, ABT& refs, ABT& binds) {
         ABT result = childResult;
         // Retain only output bindings without applying filters.
         for (const auto& [key, req] : node.getReqMap()) {
             if (const auto& boundProjName = req.getBoundProjectionName()) {
-                lowerPartialSchemaRequirement(
+                optimizer::lowerPartialSchemaRequirement(
                     key,
-                    PartialSchemaRequirement{
-                        boundProjName, IntervalReqExpr::makeSingularDNF(), req.getIsPerfOnly()},
+                    optimizer::PartialSchemaRequirement{
+                        boundProjName,
+                        optimizer::IntervalReqExpr::makeSingularDNF(),
+                        req.getIsPerfOnly()},
                     result,
                     _phaseManager.getPathToInterval());
             }
@@ -87,20 +103,20 @@ public:
         std::swap(n, result);
     }
 
-    void transport(ABT& n, const CollationNode& /*node*/, ABT& childResult, ABT& refs) {
+    void transport(ABT& n, const optimizer::CollationNode& /*node*/, ABT& childResult, ABT& refs) {
         // Skip over collation nodes.
         n = childResult;
     }
 
     template <typename T, typename... Ts>
     void transport(ABT& /*n*/, const T& /*node*/, Ts&&...) {
-        if constexpr (std::is_base_of_v<Node, T>) {
+        if constexpr (std::is_base_of_v<optimizer::Node, T>) {
             uasserted(6624242, "Should not be seeing other types of nodes here.");
         }
     }
 
     ABT extract(ABT node) {
-        algebra::transport<true>(node, *this);
+        optimizer::algebra::transport<true>(node, *this);
         return node;
     }
 
@@ -117,39 +133,40 @@ public:
     CESamplingTransportImpl(OperationContext* opCtx,
                             OptPhaseManager phaseManager,
                             const int64_t numRecords,
-                            std::unique_ptr<CEInterface> fallbackCE)
+                            std::unique_ptr<cascades::CEInterface> fallbackCE)
         : _phaseManager(std::move(phaseManager)),
           _opCtx(opCtx),
           _sampleSize(std::min<int64_t>(numRecords, kMaxSampleSize)),
           _fallbackCE(std::move(fallbackCE)) {}
 
     CEType transport(const ABT& n,
-                     const FilterNode& node,
+                     const optimizer::FilterNode& node,
                      const Metadata& metadata,
                      const Memo& memo,
                      const LogicalProps& logicalProps,
                      CEType childResult,
                      CEType /*exprResult*/) {
-        if (!hasProperty<IndexingAvailability>(logicalProps)) {
+        if (!properties::hasProperty<properties::IndexingAvailability>(logicalProps)) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
         }
 
         SamplingPlanExtractor planExtractor(memo, _phaseManager, _sampleSize);
         // Create a plan with all eval nodes so far and the filter last.
-        ABT abtTree = make<FilterNode>(node.getFilter(), planExtractor.extract(n));
+        ABT abtTree =
+            optimizer::make<optimizer::FilterNode>(node.getFilter(), planExtractor.extract(n));
 
         return estimateFilterCE(metadata, memo, logicalProps, n, std::move(abtTree), childResult);
     }
 
     CEType transport(const ABT& n,
-                     const SargableNode& node,
+                     const optimizer::SargableNode& node,
                      const Metadata& metadata,
                      const Memo& memo,
                      const LogicalProps& logicalProps,
                      CEType childResult,
                      CEType /*bindResult*/,
                      CEType /*refsResult*/) {
-        if (!hasProperty<IndexingAvailability>(logicalProps)) {
+        if (!properties::hasProperty<properties::IndexingAvailability>(logicalProps)) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
         }
 
@@ -171,12 +188,12 @@ public:
                 // Lower requirement without an output binding.
                 lowerPartialSchemaRequirement(
                     key,
-                    PartialSchemaRequirement{boost::none /*boundProjectionName*/,
-                                             req.getIntervals(),
-                                             req.getIsPerfOnly()},
+                    optimizer::PartialSchemaRequirement{boost::none /*boundProjectionName*/,
+                                                        req.getIntervals(),
+                                                        req.getIsPerfOnly()},
                     lowered,
                     _phaseManager.getPathToInterval());
-                uassert(6624243, "Expected a filter node", lowered.is<FilterNode>());
+                uassert(6624243, "Expected a filter node", lowered.is<optimizer::FilterNode>());
                 result =
                     estimateFilterCE(metadata, memo, logicalProps, n, std::move(lowered), result);
             }
@@ -195,7 +212,7 @@ public:
                      const Memo& memo,
                      const LogicalProps& logicalProps,
                      Ts&&...) {
-        if (canBeLogicalNode<T>()) {
+        if (optimizer::canBeLogicalNode<T>()) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
         }
         return 0.0;
@@ -203,9 +220,10 @@ public:
 
     CEType derive(const Metadata& metadata,
                   const Memo& memo,
-                  const properties::LogicalProps& logicalProps,
+                  const LogicalProps& logicalProps,
                   const ABT::reference_type logicalNodeRef) {
-        return algebra::transport<true>(logicalNodeRef, *this, metadata, memo, logicalProps);
+        return optimizer::algebra::transport<true>(
+            logicalNodeRef, *this, metadata, memo, logicalProps);
     }
 
 private:
@@ -235,38 +253,39 @@ private:
         return selectivity * childResult;
     }
 
-    std::pair<bool, SelectivityType> estimateSelectivity(ABT abtTree) {
+    std::pair<bool, optimizer::SelectivityType> estimateSelectivity(ABT abtTree) {
         // Add a group by to count number of documents.
-        const ProjectionName sampleSumProjection = "sum";
-        abtTree =
-            make<GroupByNode>(ProjectionNameVector{},
-                              ProjectionNameVector{sampleSumProjection},
-                              makeSeq(make<FunctionCall>("$sum", makeSeq(Constant::int64(1)))),
-                              std::move(abtTree));
-        abtTree = make<RootNode>(
-            properties::ProjectionRequirement{ProjectionNameVector{sampleSumProjection}},
+        const optimizer::ProjectionName sampleSumProjection = "sum";
+        abtTree = optimizer::make<optimizer::GroupByNode>(
+            optimizer::ProjectionNameVector{},
+            optimizer::ProjectionNameVector{sampleSumProjection},
+            optimizer::makeSeq(optimizer::make<optimizer::FunctionCall>(
+                "$sum", makeSeq(optimizer::Constant::int64(1)))),
+            std::move(abtTree));
+        abtTree = optimizer::make<optimizer::RootNode>(
+            properties::ProjectionRequirement{optimizer::ProjectionNameVector{sampleSumProjection}},
             std::move(abtTree));
 
 
         OPTIMIZER_DEBUG_LOG(6264806,
                             5,
                             "Estimate selectivity ABT",
-                            "explain"_attr = ExplainGenerator::explainV2(abtTree));
+                            "explain"_attr = optimizer::ExplainGenerator::explainV2(abtTree));
 
         _phaseManager.optimize(abtTree);
 
-        auto env = VariableEnvironment::build(abtTree);
-        SlotVarMap slotMap;
+        auto env = optimizer::VariableEnvironment::build(abtTree);
+        optimizer::SlotVarMap slotMap;
         boost::optional<sbe::value::SlotId> ridSlot;
         sbe::value::SlotIdGenerator ids;
-        SBENodeLowering g{env,
-                          slotMap,
-                          ridSlot,
-                          ids,
-                          _phaseManager.getMetadata(),
-                          _phaseManager.getNodeToGroupPropsMap(),
-                          _phaseManager.getRIDProjections(),
-                          true /*randomScan*/};
+        optimizer::SBENodeLowering g{env,
+                                     slotMap,
+                                     ridSlot,
+                                     ids,
+                                     _phaseManager.getMetadata(),
+                                     _phaseManager.getNodeToGroupPropsMap(),
+                                     _phaseManager.getRIDProjections(),
+                                     true /*randomScan*/};
         auto sbePlan = g.optimize(abtTree);
         tassert(6624261, "Unexpected rid slot", !ridSlot);
 
@@ -301,7 +320,7 @@ private:
 
     struct NodeRefHash {
         size_t operator()(const ABT& node) const {
-            return ABTHashGenerator::generate(node);
+            return optimizer::ABTHashGenerator::generate(node);
         }
     };
 
@@ -312,7 +331,8 @@ private:
     };
 
     // Cache a logical node reference to computed selectivity. Used for Filter and Sargable nodes.
-    opt::unordered_map<ABT, SelectivityType, NodeRefHash, NodeRefCompare> _selectivityCacheMap;
+    optimizer::opt::unordered_map<ABT, optimizer::SelectivityType, NodeRefHash, NodeRefCompare>
+        _selectivityCacheMap;
 
     OptPhaseManager _phaseManager;
 
@@ -320,13 +340,13 @@ private:
     OperationContext* _opCtx;
 
     const int64_t _sampleSize;
-    std::unique_ptr<CEInterface> _fallbackCE;
+    std::unique_ptr<cascades::CEInterface> _fallbackCE;
 };
 
 CESamplingTransport::CESamplingTransport(OperationContext* opCtx,
                                          OptPhaseManager phaseManager,
                                          const int64_t numRecords,
-                                         std::unique_ptr<CEInterface> fallbackCE)
+                                         std::unique_ptr<cascades::CEInterface> fallbackCE)
     : _impl(std::make_unique<CESamplingTransportImpl>(
           opCtx, std::move(phaseManager), numRecords, std::move(fallbackCE))) {}
 
@@ -339,4 +359,4 @@ CEType CESamplingTransport::deriveCE(const Metadata& metadata,
     return _impl->derive(metadata, memo, logicalProps, logicalNodeRef);
 }
 
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::ce

@@ -39,9 +39,15 @@
 
 #include "mongo/db/pipeline/abt/utils.h"
 
-namespace mongo::optimizer::cascades {
+namespace mongo::ce {
+namespace cascades = optimizer::cascades;
+namespace properties = optimizer::properties;
 
-using namespace properties;
+using ABT = optimizer::ABT;
+using CEType = optimizer::CEType;
+using LogicalProps = properties::LogicalProps;
+using Memo = cascades::Memo;
+using Metadata = optimizer::Metadata;
 
 namespace {
 
@@ -74,7 +80,7 @@ public:
     }
 };
 
-std::string serializePath(const optimizer::ABT& path) {
+std::string serializePath(const ABT& path) {
     PathDescribeTransport pdt;
     auto str = optimizer::algebra::transport<false>(path, pdt);
     return str;
@@ -84,8 +90,8 @@ std::string serializePath(const optimizer::ABT& path) {
 
 class CEHistogramTransportImpl {
 public:
-    CEHistogramTransportImpl(std::shared_ptr<ce::CollectionStatistics> stats,
-                             std::unique_ptr<CEInterface> fallbackCE)
+    CEHistogramTransportImpl(std::shared_ptr<CollectionStatistics> stats,
+                             std::unique_ptr<cascades::CEInterface> fallbackCE)
         : _stats(stats),
           _fallbackCE(std::move(fallbackCE)),
           _arrayOnlyInterval(*defaultConvertPathToInterval(make<PathArr>())) {}
@@ -93,7 +99,7 @@ public:
     ~CEHistogramTransportImpl() {}
 
     CEType transport(const ABT& n,
-                     const ScanNode& node,
+                     const optimizer::ScanNode& node,
                      const Memo& memo,
                      const LogicalProps& logicalProps,
                      CEType /*bindResult*/) {
@@ -252,16 +258,16 @@ public:
     }
 
 private:
-    std::shared_ptr<ce::CollectionStatistics> _stats;
-    std::unique_ptr<CEInterface> _fallbackCE;
+    std::shared_ptr<CollectionStatistics> _stats;
+    std::unique_ptr<cascades::CEInterface> _fallbackCE;
 
     // This is a special interval indicating that we expect to use $elemMatch semantics when
     // estimating the current path.
     const IntervalReqExpr::Node _arrayOnlyInterval;
 };
 
-CEHistogramTransport::CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats,
-                                           std::unique_ptr<CEInterface> fallbackCE)
+CEHistogramTransport::CEHistogramTransport(std::shared_ptr<CollectionStatistics> stats,
+                                           std::unique_ptr<cascades::CEInterface> fallbackCE)
     : _impl(std::make_unique<CEHistogramTransportImpl>(stats, std::move(fallbackCE))) {}
 
 CEHistogramTransport::~CEHistogramTransport() {}
@@ -273,4 +279,4 @@ CEType CEHistogramTransport::deriveCE(const Metadata& metadata,
     return algebra::transport<true>(logicalNodeRef, *this->_impl, metadata, memo, logicalProps);
 }
 
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::ce

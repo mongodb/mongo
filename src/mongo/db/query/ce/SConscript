@@ -5,6 +5,27 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target="query_ce_heuristic",
+    source=[
+        'ce_heuristic.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
+    ],
+)
+
+env.Library(
+    target="query_ce_hinted",
+    source=[
+        'ce_hinted.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
+        'query_ce_heuristic',
+    ],
+)
+
+env.Library(
     target="query_ce_histogram",
     source=[
         'ce_histogram.cpp',
@@ -70,6 +91,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/exec/sbe/sbe_abt_test_util',
         '$BUILD_DIR/mongo/db/query/optimizer/unit_test_pipeline_utils',
         "$BUILD_DIR/mongo/unittest/unittest",
+        'query_ce_heuristic',
         'query_ce_histogram',
         'query_ce_sampling',
         'query_stats',

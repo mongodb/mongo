@@ -79,7 +79,8 @@ public:
                     PrefixId& prefixId,
                     bool requireRID,
                     Metadata metadata,
-                    std::unique_ptr<CEInterface> ceDerivation,
+                    std::unique_ptr<CEInterface> explorationCE,
+                    std::unique_ptr<CEInterface> substitutionCE,
                     std::unique_ptr<CostingInterface> costDerivation,
                     PathToIntervalFn pathToInterval,
                     ConstFoldFn constFold,
@@ -169,9 +170,18 @@ private:
     std::unique_ptr<LogicalPropsInterface> _logicalPropsDerivation;
 
     /**
-     * Cardinality estimation implementation.
+     * Cardinality estimation implementation to be used during the exploraton phase..
      */
-    std::unique_ptr<CEInterface> _ceDerivation;
+    std::unique_ptr<CEInterface> _explorationCE;
+
+    /**
+     * Cardinality estimation implementation to be used during the substitution phase.
+     *
+     * The substitution phase typically doesn't care about CE, because it doesn't generate/compare
+     * alternatives. Since some CE implementations are expensive (sampling), we let the caller pass
+     * a different one for this phase.
+     */
+    std::unique_ptr<CEInterface> _substitutionCE;
 
     /**
      * Cost derivation implementation.

@@ -32,23 +32,23 @@
 #include "mongo/db/query/ce/collection_statistics_impl.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 
-namespace mongo::optimizer::cascades {
+namespace mongo::ce {
 
 class CEHistogramTransportImpl;
 
-class CEHistogramTransport : public CEInterface {
+class CEHistogramTransport : public optimizer::cascades::CEInterface {
 public:
-    CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats,
-                         std::unique_ptr<CEInterface> fallbackCE);
+    CEHistogramTransport(std::shared_ptr<CollectionStatistics> stats,
+                         std::unique_ptr<optimizer::cascades::CEInterface> fallbackCE);
     ~CEHistogramTransport();
 
-    CEType deriveCE(const Metadata& metadata,
-                    const Memo& memo,
-                    const properties::LogicalProps& logicalProps,
-                    ABT::reference_type logicalNodeRef) const final;
+    optimizer::CEType deriveCE(const optimizer::Metadata& metadata,
+                               const optimizer::cascades::Memo& memo,
+                               const optimizer::properties::LogicalProps& logicalProps,
+                               optimizer::ABT::reference_type logicalNodeRef) const final;
 
 private:
     std::unique_ptr<CEHistogramTransportImpl> _impl;
 };
 
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::ce

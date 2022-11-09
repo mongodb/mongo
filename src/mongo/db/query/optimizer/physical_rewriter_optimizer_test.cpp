@@ -28,8 +28,6 @@
  */
 
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
-#include "mongo/db/query/optimizer/cascades/ce_hinted.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
@@ -40,6 +38,8 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::optimizer {
+using PartialSchemaSelHints = ce::PartialSchemaSelHints;
+
 namespace {
 
 // Default selectivity of predicates used by HintedCE to force certain plans.
@@ -1938,7 +1938,7 @@ TEST(PhysRewriter, FilterReorder) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
-        std::make_unique<HintedCE>(std::move(hints)),
+        makeHintedCE(std::move(hints)),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -2033,7 +2033,7 @@ TEST(PhysRewriter, CoveredScan) {
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
-        std::make_unique<HintedCE>(std::move(hints)),
+        makeHintedCE(std::move(hints)),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -2349,7 +2349,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
                {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)},
                 {"index2",
                  makeIndexDefinition("b", CollationOp::Descending, false /*isMultiKey*/)}})}}},
-        std::make_unique<HintedCE>(std::move(hints)),
+        makeHintedCE(std::move(hints)),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     {
@@ -2833,7 +2833,7 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
                  IndexDefinition{{{makeNonMultikeyIndexPath("b"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("d"), CollationOp::Ascending}},
                                  false /*isMultiKey*/}}})}}},
-        std::make_unique<HintedCE>(std::move(hints)),
+        makeHintedCE(std::move(hints)),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4013,7 +4013,7 @@ TEST(PhysRewriter, PathObj) {
                            makeCompositeIndexDefinition(
                                {{"a", CollationOp::Ascending, false /*isMultiKey*/},
                                 {"b", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
-        std::make_unique<HintedCE>(std::move(hints)),
+        makeHintedCE(std::move(hints)),
         DebugInfo{true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
         {} /*hints*/);
 
@@ -4416,7 +4416,7 @@ TEST(PhysRewriter, IndexPartitioning) {
                ConstEval::constFold,
                {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("b"))})}},
          5 /*numberOfPartitions*/},
-        std::make_unique<HintedCE>(std::move(hints)),
+        makeHintedCE(std::move(hints)),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4539,7 +4539,7 @@ TEST(PhysRewriter, IndexPartitioning1) {
                ConstEval::constFold,
                {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("c"))})}},
          5 /*numberOfPartitions*/},
-        std::make_unique<HintedCE>(std::move(hints)),
+        makeHintedCE(std::move(hints)),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -5836,7 +5836,7 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
                  makeCompositeIndexDefinition({{"b", CollationOp::Ascending, false /*isMultiKey*/},
                                                {"a", CollationOp::Ascending, false /*isMultiKey*/}},
                                               false /*isMultiKey*/)}})}}},
-        std::make_unique<HintedCE>(std::move(hints)),
+        makeHintedCE(std::move(hints)),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -5924,7 +5924,7 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
                {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)},
                 {"index2",
                  makeIndexDefinition("b", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
-        std::make_unique<HintedCE>(std::move(hints)),
+        makeHintedCE(std::move(hints)),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;

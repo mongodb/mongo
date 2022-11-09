@@ -81,6 +81,7 @@ optimizer::CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> node
                                  false /*requireRID*/,
                                  _metadata,
                                  getCETransport(),
+                                 makeHeuristicCE(),
                                  makeCosting(),
                                  defaultConvertPathToInterval,
                                  ConstEval::constFold,

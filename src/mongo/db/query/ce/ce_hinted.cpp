@@ -27,17 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/optimizer/cascades/ce_hinted.h"
-#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
+#include "mongo/db/query/ce/ce_hinted.h"
+#include "mongo/db/query/ce/ce_heuristic.h"
 
-namespace mongo::optimizer::cascades {
+namespace mongo::ce {
+namespace cascades = optimizer::cascades;
+namespace properties = optimizer::properties;
 
-using namespace properties;
+using ABT = optimizer::ABT;
+using CEType = optimizer::CEType;
+using LogicalProps = properties::LogicalProps;
+using Memo = cascades::Memo;
+using Metadata = optimizer::Metadata;
 
 class CEHintedTransport {
 public:
     CEType transport(const ABT& n,
-                     const SargableNode& node,
+                     const optimizer::SargableNode& node,
                      CEType childResult,
                      CEType /*bindsResult*/,
                      CEType /*refsResult*/) {
@@ -57,7 +63,7 @@ public:
 
     template <typename T, typename... Ts>
     CEType transport(const ABT& n, const T& /*node*/, Ts&&...) {
-        if (canBeLogicalNode<T>()) {
+        if (optimizer::canBeLogicalNode<T>()) {
             return _heuristicCE.deriveCE(_metadata, _memo, _logicalProps, n.ref());
         }
         return 0.0;
@@ -69,7 +75,7 @@ public:
                          const LogicalProps& logicalProps,
                          const ABT::reference_type logicalNodeRef) {
         CEHintedTransport instance(metadata, memo, logicalProps, hints);
-        return algebra::transport<true>(logicalNodeRef, instance);
+        return optimizer::algebra::transport<true>(logicalNodeRef, instance);
     }
 
 private:
@@ -99,4 +105,4 @@ CEType HintedCE::deriveCE(const Metadata& metadata,
     return CEHintedTransport::derive(metadata, memo, _hints, logicalProps, logicalNodeRef);
 }
 
-}  // namespace mongo::optimizer::cascades
+}  // namespace mongo::ce
