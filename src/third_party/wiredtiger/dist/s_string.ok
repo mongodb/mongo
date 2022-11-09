@@ -1109,6 +1109,7 @@ llvm
 loadtext
 loc
 localTime
+localid
 localkey
 localtime
 localvalue
