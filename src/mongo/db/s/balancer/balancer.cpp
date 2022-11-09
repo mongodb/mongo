@@ -1151,7 +1151,12 @@ BalancerCollectionStatusResponse Balancer::getBalancerStatusForNs(OperationConte
         uasserted(ErrorCodes::NamespaceNotSharded, "Collection unsharded or undefined");
     }
 
-    const auto maxChunkSizeMB = getMaxChunkSizeMB(opCtx, coll);
+
+    const auto maxChunkSizeBytes = getMaxChunkSizeBytes(opCtx, coll);
+    double maxChunkSizeMB = (double)maxChunkSizeBytes / (1024 * 1024);
+    // Keep only 2 decimal digits to return a readable value
+    maxChunkSizeMB = std::ceil(maxChunkSizeMB * 100.0) / 100.0;
+
     BalancerCollectionStatusResponse response(maxChunkSizeMB, true /*balancerCompliant*/);
     auto setViolationOnResponse = [&response](const StringData& reason,
                                               const boost::optional<BSONObj>& details =
