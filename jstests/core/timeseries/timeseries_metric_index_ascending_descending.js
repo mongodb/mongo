@@ -64,8 +64,10 @@ TimeseriesTest.run((insert) => {
         const bucketsColl = db.getCollection("system.buckets." + collName);
 
         // Tests hint() using the index name.
-        assert.eq(4, bucketsColl.find().hint(indexName).toArray().length);
-        assert.eq(4, coll.find().hint(indexName).toArray().length);
+        assert.eq(4,
+                  bucketsColl.find().hint(indexName).toArray().length,
+                  tojson(bucketsColl.getIndexes()));
+        assert.eq(4, coll.find().hint(indexName).toArray().length, tojson(coll.getIndexes()));
 
         // Tests that hint() cannot be used when the index is hidden.
         assert.commandWorked(coll.hideIndex(indexName));
@@ -162,8 +164,8 @@ TimeseriesTest.run((insert) => {
         (FeatureFlagUtil.isEnabled(db, "TimeseriesScalabilityImprovements") ? 1 : 0);
 
     userIndexes = coll.getIndexes();
-    assert.eq(numExtraIndexes, userIndexes.length);
+    assert.eq(numExtraIndexes, userIndexes.length, tojson(userIndexes));
     bucketIndexes = bucketsColl.getIndexes();
-    assert.eq(13 + numExtraIndexes, bucketIndexes.length);
+    assert.eq(13 + numExtraIndexes, bucketIndexes.length, tojson(bucketIndexes));
 });
 }());
