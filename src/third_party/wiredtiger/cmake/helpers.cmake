@@ -604,6 +604,8 @@ function(parse_filelist_source filelist output_var)
         set(arch_host "ZSERIES_HOST")
     elseif(WT_RISCV64)
         set(arch_host "RISCV64_HOST")
+    elseif(WT_LOONGARCH64)
+        set(arch_host "LOONGARCH64_HOST")
     endif()
     # Determine platform host for our filelist parse.
     if(WT_POSIX)

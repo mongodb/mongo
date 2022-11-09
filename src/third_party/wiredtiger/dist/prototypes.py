@@ -83,6 +83,8 @@ def prototypes_extern():
                 continue;
         if fnmatch.fnmatch(name, '*/checksum/arm64/*'):
             continue
+        if fnmatch.fnmatch(name, '*/checksum/loongarch64/*'):
+            continue
         if fnmatch.fnmatch(name, '*/checksum/power8/*'):
             continue
         if fnmatch.fnmatch(name, '*/checksum/riscv64/*'):

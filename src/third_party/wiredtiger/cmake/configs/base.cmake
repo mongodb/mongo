@@ -66,6 +66,7 @@ config_choice(
         "ppc64le;WT_PPC64;"
         "s390x;WT_S390X;"
         "riscv64;WT_RISCV64;"
+        "loongarch64;WT_LOONGARCH64;"
 )
 
 config_choice(
