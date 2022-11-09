@@ -198,5 +198,5 @@ The bounds API supports these cursor types:
 - Table cursor
 - Datastore cursor
 - Dump cursor
-
+- Index cursor
 */

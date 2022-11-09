@@ -261,6 +261,10 @@
     CURSOR_API_CALL(cur, s, n, bt);             \
     JOINABLE_CURSOR_CALL_CHECK(cur)
 
+#define JOINABLE_CURSOR_API_CALL_CONF(cur, s, n, config, cfg, bt) \
+    CURSOR_API_CALL_CONF(cur, s, n, config, cfg, bt);             \
+    JOINABLE_CURSOR_CALL_CHECK(cur)
+
 #define JOINABLE_CURSOR_API_CALL_PREPARE_ALLOWED(cur, s, n, bt) \
     CURSOR_API_CALL_PREPARE_ALLOWED(cur, s, n, bt);             \
     JOINABLE_CURSOR_CALL_CHECK(cur)

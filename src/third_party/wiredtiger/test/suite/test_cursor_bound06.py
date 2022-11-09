@@ -62,7 +62,8 @@ class test_cursor_bound06(bound_base):
     ]
 
     config = [
-        ('no-evict', dict(evict=False))
+        ('no-evict', dict(evict=False)),
+        ('evict', dict(evict=True))
     ]
     scenarios = make_scenarios(types, key_formats, value_formats, inclusive, config)
 

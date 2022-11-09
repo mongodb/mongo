@@ -203,6 +203,13 @@ __curindex_reset(WT_CURSOR *cursor)
         WT_TRET((*cp)->reset(*cp));
     }
 
+    /*
+     * The bounded cursor API clears bounds on external calls to cursor->reset. We determine this by
+     * guarding the call to cursor bound reset with the API_USER_ENTRY macro. Doing so prevents
+     * internal API calls from resetting cursor bounds unintentionally, e.g. cursor->remove.
+     */
+    if (API_USER_ENTRY(session))
+        __wt_cursor_bound_reset(cindex->child);
 err:
     API_END_RET(session, ret);
 }
@@ -348,6 +355,40 @@ err:
 }
 
 /*
+ * __increment_bound_array --
+ *     Increment the given buffer by one bit, return true if we incremented the buffer or not. If
+ *     all of the values inside the buffer are UINT8_MAX value we do not increment the buffer.
+ */
+static inline bool
+__increment_bound_array(WT_ITEM *user_item)
+{
+    size_t usz, i;
+    uint8_t *userp;
+
+    usz = user_item->size;
+    userp = (uint8_t *)user_item->data;
+    /*
+     * First loop through all max values on the buffer from the end. This is to find the appropriate
+     * position to increment add one to the byte.
+     */
+    for (i = usz - 1; i > 0 && userp[i] == UINT8_MAX; --i)
+        ;
+
+    /*
+     * If all of the buffer are max values, we don't need to do increment the buffer as the key
+     * format is a fixed length format. Ideally we double check that the table format has a fixed
+     * length string.
+     */
+    if (i == 0 && userp[i] == UINT8_MAX)
+        return (false);
+
+    userp[i++] += 1;
+    for (; i < usz; ++i)
+        userp[i] = 0;
+    return (true);
+}
+
+/*
  * __curindex_bound --
  *     WT_CURSOR->bound method for the index cursor type.
  *
@@ -355,19 +396,78 @@ err:
 static int
 __curindex_bound(WT_CURSOR *cursor, const char *config)
 {
+    WT_CONFIG_ITEM cval;
     WT_CURSOR *child;
+    WT_CURSOR_BOUNDS_STATE saved_bounds;
     WT_CURSOR_INDEX *cindex;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
+    bool inclusive;
 
-    cindex = (WT_CURSOR_INDEX *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, bound, NULL);
-
-    /* Grab the primary cursor and call bound function. */
     cindex = (WT_CURSOR_INDEX *)cursor;
     child = cindex->child;
+    WT_CLEAR(saved_bounds);
+    inclusive = false;
+
+    JOINABLE_CURSOR_API_CALL_CONF(cursor, session, bound, config, cfg, NULL);
+
+    /* Save the current state of the bounds in case we fail to apply the new state. */
+    WT_ERR(__wt_cursor_bounds_save(session, child, &saved_bounds));
+
+    WT_ERR(__wt_config_gets(session, cfg, "action", &cval));
+
+    /* When setting bounds, we need to check that the key is set. */
+    if (WT_STRING_MATCH("set", cval.str, cval.len)) {
+        WT_ERR(__cursor_checkkey(cursor));
+
+        /* Point the public cursor to the key in the child. */
+        __wt_cursor_set_raw_key(child, &cursor->key);
+
+        WT_ERR(__wt_config_gets(session, cfg, "inclusive", &cval));
+        inclusive = cval.val != 0;
+
+        /* Check if we have set the lower bound or upper bound. */
+        WT_ERR(__wt_config_gets(session, cfg, "bound", &cval));
+    }
+
     WT_ERR(child->bound(child, config));
+
+    /*
+     * Index tables internally combines the user chosen columns with the key format of the table to
+     * maintain uniqueness between each key. However user's are not aware of the combining the key
+     * format and cannot set bounds based on the combined index format. Therefore WiredTiger needs
+     * to internally fix this by incrementing one bit to the array in two cases:
+     *  1. If the set bound is lower and it is not inclusive.
+     *  2. If the set bound is upper and it is inclusive.
+     */
+    if (WT_STRING_MATCH("lower", cval.str, cval.len) && !inclusive) {
+        /*
+         * In the case that we can't increment the lower bound, it means we have reached the max
+         * possible key for the lower bound. This is a very tricky case since there isn't a trivial
+         * way to set the lower bound to a key exclusively not show the max possible key. This is
+         * due to how index key formats are combined with the main table's key format. In this edge
+         * case we expect no entries to be returned, thus we return it back to the user with an
+         * error instead.
+         */
+        if (!__increment_bound_array(&child->lower_bound)) {
+            WT_ERR(__wt_cursor_bounds_restore(session, child, &saved_bounds));
+            WT_ERR_MSG(session, EINVAL,
+              "Cannot set index cursors with the max possible key as the lower bound");
+        }
+    }
+
+    if (WT_STRING_MATCH("upper", cval.str, cval.len) && inclusive) {
+        /*
+         * In the case that we can't increment the upper bound, it means we have reached the max
+         * possible key for the upper bound. In that case we can just clear upper bound.
+         */
+        if (!__increment_bound_array(&child->upper_bound))
+            WT_ERR(child->bound(child, "action=clear,bound=upper"));
+    }
 err:
+
+    __wt_scr_free(session, &saved_bounds.lower_bound);
+    __wt_scr_free(session, &saved_bounds.upper_bound);
     API_END_RET(session, ret);
 }
 

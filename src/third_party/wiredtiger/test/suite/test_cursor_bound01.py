@@ -40,8 +40,7 @@ class test_cursor_bound01(bound_base):
         ('table', dict(uri='table:', use_index = False, use_colgroup = False)),
         ('lsm', dict(uri='lsm:', use_index = False, use_colgroup = False)),
         ('colgroup', dict(uri='table:', use_index = False, use_colgroup = False)),
-        #FIXME: Turn on once index cursor bound implementation is done.
-        #('index', dict(uri='table:', use_index = True)), 
+        ('index', dict(uri='table:', use_index = True, use_colgroup = False)), 
     ]
 
     format_values = [
@@ -94,13 +93,24 @@ class test_cursor_bound01(bound_base):
             '/Invalid argument/')
 
         # Check that bound configuration works properly.
-        cursor.set_key(self.gen_key(1))
-        cursor.bound("action=set,bound=lower")
-        cursor.set_key(self.gen_key(10))
-        cursor.bound("action=set,bound=upper")
+        if (self.use_index):
+            cursor.set_key(self.gen_val(1))
+            cursor.bound("bound=lower")
+            cursor.set_key(self.gen_val(10))
+            cursor.bound("bound=upper")
+        else:
+            cursor.set_key(self.gen_key(1))
+            cursor.bound("bound=lower")
+            cursor.set_key(self.gen_key(10))
+            cursor.bound("bound=upper")
 
         # Check that clear works properly.
         cursor.bound("action=clear")
+
+        # Index cursors work slightly differently to other cursors, we can early exit here as the
+        # below edge cases don't apply for index cursors.
+        if (self.use_index):
+            return
 
         # Check that largest key doesn't work with bounded cursors.
         cursor.set_key(self.gen_key(1))

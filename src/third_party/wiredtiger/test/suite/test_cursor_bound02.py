@@ -68,7 +68,7 @@ class test_cursor_bound02(bound_base):
         uri = self.uri + self.file_name
         create_params = 'value_format={},key_format={}'.format(self.value_format, self.key_format)
         if self.use_colgroup:
-            create_params += self.gen_colgroup_create_param()
+            create_params += self.gen_create_param()
         self.session.create(uri, create_params)
 
         # Add in column groups.
@@ -141,7 +141,7 @@ class test_cursor_bound02(bound_base):
         uri = self.uri + self.file_name
         create_params = 'value_format={},key_format={}'.format(self.value_format, self.key_format)
         if self.use_colgroup:
-            create_params += self.gen_colgroup_create_param()
+            create_params += self.gen_create_param()
         self.session.create(uri, create_params)
         # Add in column groups.
         if self.use_colgroup:
@@ -194,7 +194,7 @@ class test_cursor_bound02(bound_base):
         uri = self.uri + self.file_name
         create_params = 'value_format={},key_format={}'.format(self.value_format, self.key_format)
         if self.use_colgroup:
-            create_params += self.gen_colgroup_create_param()
+            create_params += self.gen_create_param()
         self.session.create(uri, create_params)
         # Add in column groups.
         if self.use_colgroup:
