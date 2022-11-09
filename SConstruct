@@ -2877,7 +2877,7 @@ if env.TargetOSIs('posix'):
     env.Append(
         CCFLAGS=[
             "-fasynchronous-unwind-tables",
-            "-ggdb" if not env.TargetOSIs('emscripten') else "-g",
+            "-g2" if not env.TargetOSIs('emscripten') else "-g",
             "-Wall",
             "-Wsign-compare",
             "-Wno-unknown-pragmas",
@@ -4336,12 +4336,14 @@ def doConfigure(myenv):
         if link_model.startswith("dynamic"):
             myenv.AddToLINKFLAGSIfSupported('-Wl,--gdb-index')
 
-        if link_model != 'dynamic':
+        if myenv.AddToCCFLAGSIfSupported('-gdwarf64'):
+            myenv.AppendUnique(LINKFLAGS=['-gdwarf64'])
+        elif link_model != 'dynamic':
             # This will create an extra section where debug types can be referred from,
             # reducing other section sizes. This helps most with big static links as there
             # will be lots of duplicate debug type info.
-            myenv.AddToCCFLAGSIfSupported('-fdebug-types-section')
-            myenv.AddToLINKFLAGSIfSupported('-fdebug-types-section')
+            if myenv.AddToCCFLAGSIfSupported('-fdebug-types-section'):
+                myenv.AppendUnique(LINKFLAGS=['-fdebug-types-section'])
 
         # Our build is already parallel.
         myenv.AddToLINKFLAGSIfSupported('-Wl,--no-threads')
