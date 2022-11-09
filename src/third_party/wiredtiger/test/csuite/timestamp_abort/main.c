@@ -82,7 +82,6 @@ static const char *const uri_shadow = "shadow";
 static const char *const ckpt_file = "checkpoint_done";
 
 static bool columns, stress, use_ts;
-static uint64_t global_ts = 1;
 
 static TEST_OPTS *opts, _opts;
 
@@ -116,6 +115,16 @@ static TEST_OPTS *opts, _opts;
 
 #define SHARED_PARSE_OPTIONS "b:CmP:h:p"
 
+/*
+ * We reserve timestamps for each thread for the entire run. The timestamp for the i-th key that a
+ * thread writes is given by the macro below. In a given iteration for each thread, there are three
+ * timestamps available, though we don't always use the third. The first is used to timestamp the
+ * transaction at the beginning. The second is used to timestamp after an insert is done. Then, we
+ * sometimes want the durable timestamp ahead of the commit timestamp, so we reserve the last
+ * timestamp for that use.
+ */
+#define RESERVED_TIMESTAMPS_FOR_ITERATION(threadnum, iter) (((iter)*nth + (threadnum)) * 3 + 1)
+
 typedef struct {
     uint64_t absent_key; /* Last absent key */
     uint64_t exist_key;  /* First existing key after miss */
@@ -128,6 +137,8 @@ typedef struct {
     WT_CONNECTION *conn;
     uint64_t start;
     uint32_t info;
+    WT_RAND_STATE data_rnd;
+    WT_RAND_STATE extra_rnd;
 } THREAD_DATA;
 
 static uint32_t nth;                      /* Number of threads. */
@@ -255,7 +266,6 @@ static WT_THREAD_RET
 thread_ts_run(void *arg)
 {
     WT_CONNECTION *conn;
-    WT_RAND_STATE rnd;
     WT_SESSION *session;
     THREAD_DATA *td;
     wt_timestamp_t last_ts, ts;
@@ -268,7 +278,6 @@ thread_ts_run(void *arg)
     conn = td->conn;
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
 
     __wt_seconds((WT_SESSION_IMPL *)session, &last_reconfig);
     /* Update the oldest/stable timestamps every 1 millisecond. */
@@ -281,7 +290,7 @@ thread_ts_run(void *arg)
         last_ts = ts;
 
         /* Let the oldest timestamp lag 25% of the time. */
-        rand_op = __wt_random(&rnd) % 4;
+        rand_op = __wt_random(&td->extra_rnd) % 4;
         if (rand_op == 1)
             testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%" PRIx64, ts));
         else
@@ -300,7 +309,7 @@ thread_ts_run(void *arg)
              * Set and reset the checkpoint retention setting on a regular basis. We want to test
              * racing with the internal log removal thread while we're here.
              */
-            dbg = __wt_random(&rnd) % 2;
+            dbg = __wt_random(&td->extra_rnd) % 2;
             if (dbg == 0)
                 testutil_check(
                   __wt_snprintf(tscfg, sizeof(tscfg), "debug_mode=(checkpoint_retention=0)"));
@@ -322,7 +331,6 @@ static WT_THREAD_RET
 thread_ckpt_run(void *arg)
 {
     FILE *fp;
-    WT_RAND_STATE rnd;
     WT_SESSION *session;
     THREAD_DATA *td;
     uint64_t stable;
@@ -330,8 +338,6 @@ thread_ckpt_run(void *arg)
     int i;
     bool first_ckpt;
     char ts_string[WT_TS_HEX_STRING_SIZE];
-
-    __wt_random_init(&rnd);
 
     td = (THREAD_DATA *)arg;
     /*
@@ -341,7 +347,7 @@ thread_ckpt_run(void *arg)
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
     first_ckpt = true;
     for (i = 1;; ++i) {
-        sleep_time = __wt_random(&rnd) % MAX_CKPT_INVL;
+        sleep_time = __wt_random(&td->extra_rnd) % MAX_CKPT_INVL;
         sleep(sleep_time);
         /*
          * Since this is the default, send in this string even if running without timestamps.
@@ -377,7 +383,6 @@ thread_run(void *arg)
     WT_CURSOR *cur_coll, *cur_local, *cur_oplog, *cur_shadow;
     WT_DECL_RET;
     WT_ITEM data;
-    WT_RAND_STATE rnd;
     WT_SESSION *prepared_session, *session;
     THREAD_DATA *td;
     uint64_t i, active_ts;
@@ -385,7 +390,6 @@ thread_run(void *arg)
     char kname[64], tscfg[64], uri[128];
     bool durable_ahead_commit, use_prep;
 
-    __wt_random_init(&rnd);
     memset(cbuf, 0, sizeof(cbuf));
     memset(lbuf, 0, sizeof(lbuf));
     memset(obuf, 0, sizeof(obuf));
@@ -458,8 +462,11 @@ thread_run(void *arg)
             testutil_check(prepared_session->begin_transaction(prepared_session, NULL));
 
         if (use_ts) {
-            /* Allocate two timestamps. */
-            active_ts = __wt_atomic_fetch_addv64(&global_ts, 2);
+            /*
+             * Set the active timestamp to the first of the three timestamps we reserve for use this
+             * iteration. Use the first reserved timestamp.
+             */
+            active_ts = RESERVED_TIMESTAMPS_FOR_ITERATION(td->info, i);
             testutil_check(
               __wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts));
             /*
@@ -491,7 +498,7 @@ thread_run(void *arg)
           "LOCAL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->info, active_ts, i));
         testutil_check(__wt_snprintf(obuf, sizeof(obuf),
           "OPLOG: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->info, active_ts, i));
-        data.size = __wt_random(&rnd) % MAX_VAL;
+        data.size = __wt_random(&td->data_rnd) % MAX_VAL;
         data.data = cbuf;
         cur_coll->set_value(cur_coll, &data);
         if ((ret = cur_coll->insert(cur_coll)) == WT_ROLLBACK)
@@ -501,7 +508,7 @@ thread_run(void *arg)
         if (use_ts) {
             /*
              * Change the timestamp in the middle of the transaction so that we simulate a
-             * secondary.
+             * secondary. This uses our second reserved timestamp.
              */
             ++active_ts;
             testutil_check(
@@ -510,7 +517,7 @@ thread_run(void *arg)
         }
         if ((ret = cur_shadow->insert(cur_shadow)) == WT_ROLLBACK)
             goto rollback;
-        data.size = __wt_random(&rnd) % MAX_VAL;
+        data.size = __wt_random(&td->data_rnd) % MAX_VAL;
         data.data = obuf;
         cur_oplog->set_value(cur_oplog, &data);
         if ((ret = cur_oplog->insert(cur_oplog)) == WT_ROLLBACK)
@@ -533,10 +540,7 @@ thread_run(void *arg)
                 durable_ahead_commit = i % PREPARE_DURABLE_AHEAD_COMMIT == 0;
                 testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
                   "commit_timestamp=%" PRIx64 ",durable_timestamp=%" PRIx64, active_ts,
-                  durable_ahead_commit ? active_ts + 4 : active_ts));
-                /* Ensure the global timestamp is not behind the all durable timestamp. */
-                if (durable_ahead_commit)
-                    __wt_atomic_addv64(&global_ts, 4);
+                  durable_ahead_commit ? active_ts + 1 : active_ts));
             } else
                 testutil_check(
                   __wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts));
@@ -549,14 +553,17 @@ thread_run(void *arg)
          * timestamp transaction, not before, because of the possibility of rollback in the
          * transaction. The local table must stay in sync with the other tables.
          */
-        data.size = __wt_random(&rnd) % MAX_VAL;
+        data.size = __wt_random(&td->data_rnd) % MAX_VAL;
         data.data = lbuf;
         cur_local->set_value(cur_local, &data);
         testutil_check(cur_local->insert(cur_local));
 
-        /* Save the timestamps and key separately for checking later. */
+        /*
+         * Save the timestamps and key separately for checking later. Optionally use our third
+         * reserved timestamp.
+         */
         if (fprintf(fp, "%" PRIu64 " %" PRIu64 " %" PRIu64 "\n", active_ts,
-              durable_ahead_commit ? active_ts + 4 : active_ts, i) < 0)
+              durable_ahead_commit ? active_ts + 1 : active_ts, i) < 0)
             testutil_die(EIO, "fprintf");
 
         if (0) {
@@ -571,6 +578,20 @@ rollback:
             WT_PUBLISH(active_timestamps[td->info], active_ts);
     }
     /* NOTREACHED */
+}
+
+/*
+ * init_thread_data --
+ *     Initialize the thread data struct.
+ */
+static void
+init_thread_data(THREAD_DATA *td, WT_CONNECTION *conn, uint64_t start, uint32_t info)
+{
+    td->conn = conn;
+    td->start = start;
+    td->info = info;
+    testutil_random_from_random(&td->data_rnd, &opts->data_rnd);
+    testutil_random_from_random(&td->extra_rnd, &opts->extra_rnd);
 }
 
 static void run_workload(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
@@ -653,22 +674,18 @@ run_workload(void)
 
     /* The checkpoint, timestamp and worker threads are added at the end. */
     ckpt_id = nth;
-    td[ckpt_id].conn = conn;
-    td[ckpt_id].info = nth;
+    init_thread_data(&td[ckpt_id], conn, 0, nth);
     printf("Create checkpoint thread\n");
     testutil_check(__wt_thread_create(NULL, &thr[ckpt_id], thread_ckpt_run, &td[ckpt_id]));
     ts_id = nth + 1;
     if (use_ts) {
-        td[ts_id].conn = conn;
-        td[ts_id].info = nth;
+        init_thread_data(&td[ts_id], conn, 0, nth);
         printf("Create timestamp thread\n");
         testutil_check(__wt_thread_create(NULL, &thr[ts_id], thread_ts_run, &td[ts_id]));
     }
     printf("Create %" PRIu32 " writer threads\n", nth);
     for (i = 0; i < nth; ++i) {
-        td[i].conn = conn;
-        td[i].start = WT_BILLION * (uint64_t)i;
-        td[i].info = i;
+        init_thread_data(&td[i], conn, WT_BILLION * (uint64_t)i, i);
         testutil_check(__wt_thread_create(NULL, &thr[i], thread_run, &td[i]));
     }
     /*
@@ -744,12 +761,11 @@ main(int argc, char *argv[])
     REPORT c_rep[MAX_TH], l_rep[MAX_TH], o_rep[MAX_TH];
     WT_CONNECTION *conn;
     WT_CURSOR *cur_coll, *cur_local, *cur_oplog, *cur_shadow;
-    WT_RAND_STATE rnd;
     WT_SESSION *session;
     pid_t pid;
     uint64_t absent_coll, absent_local, absent_oplog, absent_shadow, count, key, last_key;
     uint64_t commit_fp, durable_fp, stable_val;
-    uint32_t i, timeout;
+    uint32_t i, rand_value, timeout;
     int ch, status, ret;
     char buf[512], fname[64], kname[64], statname[1024];
     char ts_string[WT_TS_HEX_STRING_SIZE];
@@ -810,6 +826,9 @@ main(int argc, char *argv[])
     if (argc != 0)
         usage();
 
+    /*
+     * Among other things, this initializes the random number generators in the option structure.
+     */
     testutil_parse_end_opt(opts);
 
     testutil_work_dir_from_path(home, sizeof(home), opts->home);
@@ -825,14 +844,24 @@ main(int argc, char *argv[])
     if (!verify_only) {
         testutil_make_work_dir(home);
 
-        __wt_random_init_seed(NULL, &rnd);
         if (rand_time) {
-            timeout = __wt_random(&rnd) % MAX_TIME;
+            timeout = __wt_random(&opts->extra_rnd) % MAX_TIME;
             if (timeout < MIN_TIME)
                 timeout = MIN_TIME;
         }
+
+        /*
+         * We unconditionally grab a random value to be used for the thread count to keep the RNG in
+         * sync for all runs. If we are run first without having a thread count or random seed
+         * argument, then when we rerun (with the thread count and random seed that was output),
+         * we'll have the same results.
+         *
+         * We use the data random generator because the number of threads affects the data for this
+         * test.
+         */
+        rand_value = __wt_random(&opts->data_rnd);
         if (rand_th) {
-            nth = __wt_random(&rnd) % MAX_TH;
+            nth = rand_value % MAX_TH;
             if (nth < MIN_TH)
                 nth = MIN_TH;
         }
@@ -843,9 +872,11 @@ main(int argc, char *argv[])
           opts->compat ? "true" : "false", opts->inmem ? "true" : "false",
           stress ? "true" : "false", use_ts ? "true" : "false");
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
-        printf("CONFIG: %s%s%s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
-          opts->compat ? " -C" : "", columns ? " -c" : "", opts->inmem ? " -m" : "",
-          stress ? " -s" : "", !use_ts ? " -z" : "", opts->home, nth, timeout);
+        printf("CONFIG: %s%s%s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 " " TESTUTIL_SEED_FORMAT
+               "\n",
+          progname, opts->compat ? " -C" : "", columns ? " -c" : "", opts->inmem ? " -m" : "",
+          stress ? " -s" : "", !use_ts ? " -z" : "", opts->home, nth, timeout, opts->data_seed,
+          opts->extra_seed);
         /*
          * Fork a child to insert as many items. We will then randomly kill the child, run recovery
          * and make sure all items we wrote exist after recovery runs.

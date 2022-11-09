@@ -407,6 +407,9 @@ int testutil_parse_single_opt(TEST_OPTS *, int);
 int testutil_parse_opts(int, char *const *, TEST_OPTS *);
 void testutil_print_command_line(int argc, char *const *argv);
 void testutil_progress(TEST_OPTS *, const char *);
+void testutil_random_init(WT_RAND_STATE *, uint64_t *, uint32_t);
+void testutil_random_from_random(WT_RAND_STATE *, WT_RAND_STATE *);
+void testutil_random_from_seed(WT_RAND_STATE *, uint64_t);
 #ifndef _WIN32
 void testutil_sleep_wait(uint32_t, pid_t);
 #endif
