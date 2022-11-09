@@ -6,6 +6,7 @@ selector:
   # Currently, the test suite is only used for verify the override implemented by inject_security_token.js.
   - jstests/core/basic8.js
   - jstests/core/count.js
+  - jstests/core/rename_collection_different_dbs.js
   - jstests/core/all.js
   - jstests/core/timeseries/timeseries_internal_bucket_geo_within.js
   - jstests/core/timeseries/bucket_granularity.js
