@@ -92,12 +92,12 @@ public:
     }
 
     const ForwardableOperationMetadata& getForwardableOpMetadata() const {
-        invariant(metadata().getForwardableOpMetadata());
-        return metadata().getForwardableOpMetadata().get();
+        invariant(_forwardableOpMetadata);
+        return _forwardableOpMetadata.get();
     }
 
     const boost::optional<mongo::DatabaseVersion>& getDatabaseVersion() const& {
-        return metadata().getDatabaseVersion();
+        return _databaseVersion;
     }
 
 protected:
@@ -141,6 +141,9 @@ protected:
     const ShardingDDLCoordinatorId _coordId;
 
     const bool _recoveredFromDisk;
+    const boost::optional<mongo::ForwardableOperationMetadata> _forwardableOpMetadata;
+    const boost::optional<mongo::DatabaseVersion> _databaseVersion;
+
     bool _firstExecution{
         true};  // True only when executing the coordinator for the first time (meaning it's not a
                 // retry after a retryable error nor a recovered instance from a previous primary)

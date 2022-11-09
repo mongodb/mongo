@@ -83,6 +83,9 @@ ShardingDDLCoordinator::ShardingDDLCoordinator(ShardingDDLCoordinatorService* se
     : _service(service),
       _coordId(extractShardingDDLCoordinatorMetadata(coorDoc).getId()),
       _recoveredFromDisk(extractShardingDDLCoordinatorMetadata(coorDoc).getRecoveredFromDisk()),
+      _forwardableOpMetadata(
+          extractShardingDDLCoordinatorMetadata(coorDoc).getForwardableOpMetadata()),
+      _databaseVersion(extractShardingDDLCoordinatorMetadata(coorDoc).getDatabaseVersion()),
       _firstExecution(!_recoveredFromDisk) {}
 
 ShardingDDLCoordinator::~ShardingDDLCoordinator() {
