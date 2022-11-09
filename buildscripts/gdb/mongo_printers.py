@@ -1063,6 +1063,7 @@ def register_abt_printers(pp):
                                "EvaluationNode",
                                "SargableNode",
                                "RIDIntersectNode",
+                               "RIDUnionNode",
                                "BinaryJoinNode",
                                "HashJoinNode",
                                "MergeJoinNode",

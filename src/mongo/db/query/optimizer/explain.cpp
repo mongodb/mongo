@@ -1334,6 +1334,27 @@ public:
     }
 
     ExplainPrinter transport(const ABT& n,
+                             const RIDUnionNode& node,
+                             ExplainPrinter leftChildResult,
+                             ExplainPrinter rightChildResult) {
+        ExplainPrinter printer("RIDUnion");
+        maybePrintProps(printer, node);
+        printer.separator(" [")
+            .fieldName("scanProjectionName", ExplainVersion::V3)
+            .print(node.getScanProjectionName());
+
+        printer.separator("]");
+        nodeCEPropsPrint(printer, n, node);
+        printer.setChildCount(2)
+            .maybeReverse()
+            .fieldName("leftChild", ExplainVersion::V3)
+            .print(leftChildResult)
+            .fieldName("rightChild", ExplainVersion::V3)
+            .print(rightChildResult);
+        return printer;
+    }
+
+    ExplainPrinter transport(const ABT& n,
                              const BinaryJoinNode& node,
                              ExplainPrinter leftChildResult,
                              ExplainPrinter rightChildResult,

@@ -227,8 +227,20 @@ public:
         // noop.
     }
 
+    void prepare(const ABT& n, const RIDUnionNode& node, const VariableEnvironment& /*env*/) {
+        // noop.
+    }
+
     GroupIdType transport(const ABT& n,
                           const RIDIntersectNode& node,
+                          const VariableEnvironment& env,
+                          GroupIdType leftChild,
+                          GroupIdType rightChild) {
+        return addNodes(n, node, env, leftChild, rightChild);
+    }
+
+    GroupIdType transport(const ABT& n,
+                          const RIDUnionNode& node,
                           const VariableEnvironment& env,
                           GroupIdType leftChild,
                           GroupIdType rightChild) {

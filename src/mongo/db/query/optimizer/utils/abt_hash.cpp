@@ -206,6 +206,12 @@ public:
                                   rightChildResult);
     }
 
+    size_t transport(const RIDUnionNode& node, size_t leftChildResult, size_t rightChildResult) {
+        return computeHashSeq<47>(ProjectionName::Hasher()(node.getScanProjectionName()),
+                                  leftChildResult,
+                                  rightChildResult);
+    }
+
     size_t transport(const BinaryJoinNode& node,
                      size_t leftChildResult,
                      size_t rightChildResult,

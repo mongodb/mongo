@@ -81,6 +81,7 @@ class FilterNode;
 class EvaluationNode;
 class SargableNode;
 class RIDIntersectNode;
+class RIDUnionNode;
 class BinaryJoinNode;
 class HashJoinNode;
 class MergeJoinNode;

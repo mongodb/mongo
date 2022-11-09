@@ -317,6 +317,38 @@ const ProjectionName& RIDIntersectNode::getScanProjectionName() const {
     return _scanProjectionName;
 }
 
+RIDUnionNode::RIDUnionNode(ProjectionName scanProjectionName, ABT leftChild, ABT rightChild)
+    : Base(std::move(leftChild), std::move(rightChild)),
+      _scanProjectionName(std::move(scanProjectionName)) {
+    assertNodeSort(getLeftChild());
+    assertNodeSort(getRightChild());
+}
+
+const ABT& RIDUnionNode::getLeftChild() const {
+    return get<0>();
+}
+
+ABT& RIDUnionNode::getLeftChild() {
+    return get<0>();
+}
+
+const ABT& RIDUnionNode::getRightChild() const {
+    return get<1>();
+}
+
+ABT& RIDUnionNode::getRightChild() {
+    return get<1>();
+}
+
+bool RIDUnionNode::operator==(const RIDUnionNode& other) const {
+    return _scanProjectionName == other._scanProjectionName &&
+        getLeftChild() == other.getLeftChild() && getRightChild() == other.getRightChild();
+}
+
+const ProjectionName& RIDUnionNode::getScanProjectionName() const {
+    return _scanProjectionName;
+}
+
 static ProjectionNameVector createSargableBindings(const PartialSchemaRequirements& reqMap) {
     ProjectionNameVector result;
     for (const auto& entry : reqMap) {

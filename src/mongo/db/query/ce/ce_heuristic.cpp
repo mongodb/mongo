@@ -479,6 +479,14 @@ public:
         uasserted(6624038, "Should not be necessary to derive CE for RIDIntersectNode");
     }
 
+    CEType transport(const RIDUnionNode& node,
+                     CEType /*leftChildResult*/,
+                     CEType /*rightChildResult*/) {
+        // CE for the group should already be derived via the underlying Filter or Evaluation
+        // logical nodes.
+        uasserted(7016301, "Should not be necessary to derive CE for RIDUnionNode");
+    }
+
     CEType transport(const BinaryJoinNode& node,
                      CEType leftChildResult,
                      CEType rightChildResult,

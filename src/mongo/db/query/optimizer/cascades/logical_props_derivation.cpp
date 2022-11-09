@@ -249,6 +249,14 @@ public:
         uasserted(6624042, "Should not be necessary to derive properties for RIDIntersectNode");
     }
 
+    LogicalProps transport(const RIDUnionNode& node,
+                           LogicalProps /*leftChildResult*/,
+                           LogicalProps /*rightChildResult*/) {
+        // Properties for the group should already be derived via the underlying Filter or
+        // Evaluation logical nodes.
+        uasserted(7016302, "Should not be necessary to derive properties for RIDUnionNode");
+    }
+
     LogicalProps transport(const BinaryJoinNode& node,
                            LogicalProps leftChildResult,
                            LogicalProps rightChildResult,

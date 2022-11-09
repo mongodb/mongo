@@ -853,5 +853,44 @@ TEST(IntervalNormalize, Basic) {
         ExplainGenerator::explainIntervalExpr(intervalExpr));
 }
 
+TEST(Optimizer, ExplainRIDUnion) {
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
+            make<Variable>("root")),
+        make<ScanNode>("root", "c1"));
+
+    ABT unionNode = make<RIDUnionNode>("root", filterNode, make<ScanNode>("root", "c1"));
+
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"root"}},
+                                  std::move(unionNode));
+
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "RIDUnion [root]\n"
+        "|   Scan [c1]\n"
+        "|       BindBlock:\n"
+        "|           [root]\n"
+        "|               Source []\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "Scan [c1]\n"
+        "    BindBlock:\n"
+        "        [root]\n"
+        "            Source []\n",
+        rootNode);
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

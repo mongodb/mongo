@@ -466,10 +466,10 @@ struct Collector {
         return result;
     }
 
-    CollectedInfo transport(const ABT& n,
-                            const RIDIntersectNode& node,
-                            CollectedInfo leftChildResult,
-                            CollectedInfo rightChildResult) {
+    template <class T>
+    CollectedInfo handleRIDNodeReferences(const T& node,
+                                          CollectedInfo leftChildResult,
+                                          CollectedInfo rightChildResult) {
         CollectedInfo result{};
 
         // This is a special case where both children of 'node' have a definition for the scan
@@ -478,11 +478,28 @@ struct Collector {
         rightChildResult.defs.erase(node.getScanProjectionName());
 
         result.merge(std::move(leftChildResult));
-        result.merge(std::move(rightChildResult));
+        result.merge<false /*resolveFreeVarsWithOther*/>(std::move(rightChildResult));
 
         result.nodeDefs[&node] = result.defs;
 
         return result;
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const RIDIntersectNode& node,
+                            CollectedInfo leftChildResult,
+                            CollectedInfo rightChildResult) {
+        return handleRIDNodeReferences(
+            node, std::move(leftChildResult), std::move(rightChildResult));
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const RIDUnionNode& node,
+                            CollectedInfo leftChildResult,
+                            CollectedInfo rightChildResult) {
+        // TODO SERVER-69026 should determine how the reference tracker for RIDUnionNode will work.
+        return handleRIDNodeReferences(
+            node, std::move(leftChildResult), std::move(rightChildResult));
     }
 
     CollectedInfo transport(const ABT& n,

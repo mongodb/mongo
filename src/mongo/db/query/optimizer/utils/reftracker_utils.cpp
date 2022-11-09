@@ -101,6 +101,12 @@ public:
         return {};
     }
 
+    ProjectionNameSet walk(const RIDUnionNode& /*node*/,
+                           const ABT& /*leftChild*/,
+                           const ABT& /*rightChild*/) {
+        return {};
+    }
+
     ProjectionNameSet walk(const BinaryJoinNode& /*node*/,
                            const ABT& /*leftChild*/,
                            const ABT& /*rightChild*/,

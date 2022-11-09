@@ -405,6 +405,30 @@ private:
 };
 
 /**
+ * RID union node.
+ * This is a logical node representing index-index unioning. Used for index OR-ing.
+ */
+class RIDUnionNode final : public Operator<2>, public ExclusivelyLogicalNode {
+    using Base = Operator<2>;
+
+public:
+    RIDUnionNode(ProjectionName scanProjectionName, ABT leftChild, ABT rightChild);
+
+    bool operator==(const RIDUnionNode& other) const;
+
+    const ABT& getLeftChild() const;
+    ABT& getLeftChild();
+
+    const ABT& getRightChild() const;
+    ABT& getRightChild();
+
+    const ProjectionName& getScanProjectionName() const;
+
+private:
+    const ProjectionName _scanProjectionName;
+};
+
+/**
  * Sargable node.
  * This is a logical node which represents special kinds of (simple) evaluations and filters which
  * are amenable to being used in indexing or covered scans.

@@ -911,6 +911,12 @@ public:
         }
     }
 
+    void operator()(const ABT& /*n*/, const RIDUnionNode& node) {
+        // TODO SERVER-69026 should implement this.
+        tasserted(7016300, "RIDUnionNode not implemented yet.");
+        return;
+    }
+
     void operator()(const ABT& n, const BinaryJoinNode& node) {
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // We cannot satisfy limit-skip requirements.
