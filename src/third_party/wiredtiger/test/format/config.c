@@ -275,12 +275,6 @@ config_table(TABLE *table, void *arg)
             config_single(table, "btree.value_min=20", false);
     }
 
-#ifndef WT_STANDALONE_BUILD
-    /* Turn off truncate for non-standalone build if timestamp is enabled. */
-    if (GV(TRANSACTION_TIMESTAMPS) || config_explicit(NULL, "transaction.timestamps"))
-        config_off(table, "ops.truncate");
-#endif
-
     /*
      * Key/value minimum/maximum are related, correct unless specified by the configuration. Key
      * sizes are a row-store consideration: column-store doesn't store keys, a constant of 8 will

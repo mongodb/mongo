@@ -41,7 +41,7 @@
 
 from __future__ import print_function
 
-import wthooks, random, wiredtiger
+import os, sys, wthooks, random, wiredtiger
 from wttest import WiredTigerTestCase
 
 # Print to /dev/tty for debugging, since anything extraneous to stdout/stderr will
@@ -103,10 +103,6 @@ class RollbackHookCreator(wthooks.WiredTigerHookCreator):
               format(failrate))
         self.mod = int(1 / failrate)
         self.rand = random.Random()
-        self.platform_api = wthooks.DefaultPlatformAPI()
-
-    def get_platform_api(self):
-        return self.platform_api
 
     def do_retry(self):
         return self.rand.randint(1, 1000000) % self.mod == 0
