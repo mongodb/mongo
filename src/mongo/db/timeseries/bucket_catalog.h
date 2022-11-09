@@ -59,6 +59,8 @@ protected:
 
     using ShouldClearFn = std::function<bool(const NamespaceString&)>;
 
+    class BucketStateManager;
+
     struct BucketHandle {
         const OID id;
         const StripeNumber stripe;
@@ -153,7 +155,7 @@ public:
         ClosedBucket() = default;
         ~ClosedBucket();
         ClosedBucket(
-            BucketCatalog*, const OID&, const std::string&, boost::optional<uint32_t>, bool);
+            BucketStateManager*, const OID&, const std::string&, boost::optional<uint32_t>, bool);
         ClosedBucket(ClosedBucket&&);
         ClosedBucket& operator=(ClosedBucket&&);
         ClosedBucket(const ClosedBucket&) = delete;
@@ -165,7 +167,7 @@ public:
         bool eligibleForReopening = false;
 
     private:
-        BucketCatalog* _bucketCatalog = nullptr;
+        BucketStateManager* _bucketStateManager = nullptr;
     };
     using ClosedBuckets = std::vector<ClosedBucket>;
 
@@ -391,10 +393,22 @@ public:
     void abort(std::shared_ptr<WriteBatch> batch, const Status& status);
 
     /**
-     * Marks any bucket with the specified OID as cleared and prevents any future inserts from
-     * landing in that bucket.
+     * Notifies the catalog of a direct write (that is, a write not initiated by the BucketCatalog)
+     * that will be performed on the bucket document with the specified ID. If there is already an
+     * internally-prepared operation on that bucket, this method will throw a
+     * 'WriteConflictException'. This should be followed by a call to 'directWriteFinish' after the
+     * write has been committed, rolled back, or otherwise finished.
      */
-    void clear(const OID& oid);
+    void directWriteStart(const OID& oid);
+
+    /**
+     * Notifies the catalog that a pending direct write to the bucket document with the specified ID
+     * has finished or been abandoned, and normal operations on the bucket can resume. After this
+     * point any in-memory representation of the on-disk bucket data from before the direct write
+     * should have been cleared from the catalog, and it may be safely reopened from the on-disk
+     * state.
+     */
+    void directWriteFinish(const OID& oid);
 
     /**
      * Clears any bucket whose namespace satisfies the predicate.
@@ -432,20 +446,39 @@ public:
     long long memoryUsage() const;
 
 protected:
-    enum class BucketState {
-        // Bucket can be inserted into, and does not have an outstanding prepared commit.
-        kNormal,
-        // Bucket can be inserted into, and has a prepared commit outstanding.
-        kPrepared,
-        // Bucket can no longer be inserted into, does not have an outstanding prepared commit.
-        kCleared,
-        // Bucket can no longer be inserted into, but still has an outstanding prepared commit. Any
-        // writer other than the one who prepared the commit should receive a
-        // WriteConflictException.
-        kPreparedAndCleared,
-        // Bucket can no longer be inserted into, and is effectively closed, but has an outstanding
-        // compression operation pending, so it is also not eligible for reopening.
-        kPendingCompression,
+    enum class BucketStateFlag : std::uint8_t {
+        // Bucket has a prepared batch outstanding.
+        kPrepared = 0b00000001,
+        // In-memory representation of the bucket may be out of sync with on-disk data. Bucket
+        // should not be inserted into.
+        kCleared = 0b00000010,
+        // Bucket is effectively closed, but has an outstanding compression operation pending, so it
+        // is also not eligible for reopening.
+        kPendingCompression = 0b00000100,
+        // Bucket is effectively closed, but has an outstanding direct write pending, so it is also
+        // not eligible for reopening.
+        kPendingDirectWrite = 0b00001000,
+        // Bucket state is stored in the catalog for synchronization purposes only, but the actual
+        // bucket isn't stored in the catalog, nor is it archived.
+        kUntracked = 0b00010000,
+    };
+
+    class BucketState {
+    public:
+        BucketState& setFlag(BucketStateFlag);
+        BucketState& unsetFlag(BucketStateFlag);
+        BucketState& reset();
+
+        bool isSet(BucketStateFlag) const;
+        bool isPrepared() const;
+        bool conflictsWithReopening() const;
+        bool conflictsWithInsertion() const;
+
+        bool operator==(const BucketState&) const;
+        std::string toString() const;
+
+    private:
+        std::underlying_type<BucketStateFlag>::type _state = 0;
     };
 
     struct BucketMetadata {
@@ -591,18 +624,15 @@ protected:
      */
     class BucketStateManager {
     public:
+        using StateChangeFn = std::function<boost::optional<BucketState>(
+            boost::optional<BucketState>, std::uint64_t)>;
+
         explicit BucketStateManager(Mutex* m);
 
         uint64_t getEra();
         uint64_t getEraAndIncrementCount();
         void decrementCountForEra(uint64_t value);
         uint64_t getCountForEra(uint64_t value);
-
-        /**
-         * Marks a single bucket cleared. Returns the resulting state of the bucket i.e. kCleared
-         * or kPreparedAndCleared, or boost::none if the bucket isn't tracked in the catalog.
-         */
-        boost::optional<BucketState> clearSingleBucket(const OID& oid);
 
         /**
          * Asynchronously clears all buckets belonging to namespaces satisfying the 'shouldClear'
@@ -627,32 +657,27 @@ protected:
         boost::optional<BucketState> getBucketState(const OID& oid) const;
 
         /**
-         * Initializes state for the given bucket to kNormal.
+         * Checks whether the bucket has been cleared before changing the bucket state as requested.
+         * If the bucket has been cleared, it will set the kCleared flag instead and ignore the
+         * requested 'change'. For more details about how the 'change' is processed, see the other
+         * variant of this function that takes an 'OID' parameter.
          */
-        bool initializeBucketState(const OID& id, boost::optional<std::uint64_t> targetEra);
+        boost::optional<BucketState> changeBucketState(Bucket* bucket, const StateChangeFn& change);
 
         /**
-         * Remove state for the given bucket from the catalog.
-         */
-        void eraseBucketState(const OID& id);
-
-        /**
-         * Checks whether the bucket has been cleared before changing the bucket state to the target
-         * state. If the bucket has been cleared, it will set the state to kCleared instead and
-         * ignore the target state. The return value, if set, is the final state of the bucket with
-         * the given id.
-         */
-        boost::optional<BucketState> setBucketState(Bucket* bucket, BucketState target);
-
-        /**
-         * Changes the bucket state, taking into account the current state, the specified target
-         * state, and allowed state transitions. The return value, if set, is the final state of the
-         * bucket with the given id; if no such bucket exists, the return value will not be set.
+         * Changes the bucket state, taking into account the current state, the requested 'change',
+         * and allowed state transitions. The return value, if set, is the final state of the bucket
+         * with the given ID.
          *
-         * Ex. For a bucket with state kPrepared, and a target of kCleared, the return will be
-         * kPreparedAndCleared.
+         * If no state is currently tracked for 'id', then the optional input state to 'change' will
+         * be 'none'. To initialize the state, 'change' may return a valid `BucketState', and it
+         * will be added to the set of tracked states.
+         *
+         * Similarly, if 'change' returns 'none', the value will be removed from the registry. To
+         * perform a noop (i.e. if upon inspecting the input, the change would be invalid), 'change'
+         * may simply return its input state unchanged.
          */
-        boost::optional<BucketState> setBucketState(const OID& id, BucketState target);
+        boost::optional<BucketState> changeBucketState(const OID& id, const StateChangeFn& change);
 
         /**
          * Appends statistics for observability.
@@ -662,16 +687,23 @@ protected:
     protected:
         void _decrementEraCountHelper(uint64_t era);
         void _incrementEraCountHelper(uint64_t era);
-        boost::optional<BucketState> _setBucketStateHelper(WithLock withLock,
-                                                           const OID& id,
-                                                           BucketState target);
+        boost::optional<BucketState> _changeBucketStateHelper(WithLock withLock,
+                                                              const OID& id,
+                                                              const StateChangeFn& change);
 
         /**
          * Returns whether the Bucket has been marked as cleared by checking against the
          * clearRegistry. Advances Bucket's era up to current global era if the bucket has not been
          * cleared.
          */
-        bool _hasBeenCleared(WithLock catalogLock, Bucket* bucket);
+        bool _isMemberOfClearedSet(WithLock catalogLock, Bucket* bucket);
+
+        /**
+         * A helper function to set the kCleared flag for the given bucket. Results in a noop if the
+         * bucket state isn't currently tracked.
+         */
+        boost::optional<BucketState> _markIndividualBucketCleared(WithLock catalogLock,
+                                                                  const OID& bucketId);
 
         /**
          * Removes clear operations from the clear registry that no longer need to be tracked.
@@ -884,10 +916,10 @@ protected:
     StripeNumber _getStripeNumber(const BucketKey& key) const;
 
     /**
-     * Mode enum to control whether the bucket retrieval methods below will return buckets that are
-     * in kCleared or kPreparedAndCleared state.
+     * Mode enum to control whether the bucket retrieval methods below will return buckets that have
+     * a state that conflicts with insertion.
      */
-    enum class ReturnClearedBuckets { kYes, kNo };
+    enum class IgnoreBucketState { kYes, kNo };
 
     /**
      * Retrieve a bucket for read-only use.
@@ -895,23 +927,20 @@ protected:
     const Bucket* _findBucket(const Stripe& stripe,
                               WithLock stripeLock,
                               const OID& id,
-                              ReturnClearedBuckets mode = ReturnClearedBuckets::kNo);
+                              IgnoreBucketState mode = IgnoreBucketState::kNo);
 
     /**
      * Retrieve a bucket for write use.
      */
-    Bucket* _useBucket(Stripe* stripe,
-                       WithLock stripeLock,
-                       const OID& id,
-                       ReturnClearedBuckets mode);
+    Bucket* _useBucket(Stripe* stripe, WithLock stripeLock, const OID& id, IgnoreBucketState mode);
 
     /**
-     * Retrieve a bucket for write use, setting the state in the process.
+     * Retrieve a bucket for write use, updating the state in the process.
      */
-    Bucket* _useBucketInState(Stripe* stripe,
-                              WithLock stripeLock,
-                              const OID& id,
-                              BucketState targetState);
+    Bucket* _useBucketAndChangeState(Stripe* stripe,
+                                     WithLock stripeLock,
+                                     const OID& id,
+                                     const BucketStateManager::StateChangeFn& change);
 
     /**
      * Mode enum to control whether the bucket retrieval methods below will create new buckets if no
@@ -1006,7 +1035,10 @@ protected:
      * Archives the given bucket, minimizing the memory footprint but retaining the necessary
      * information required to efficiently identify it as a candidate for future insertions.
      */
-    void _archiveBucket(Stripe* stripe, WithLock stripeLock, Bucket* bucket);
+    void _archiveBucket(Stripe* stripe,
+                        WithLock stripeLock,
+                        Bucket* bucket,
+                        ClosedBuckets* closedBuckets);
 
     /**
      * Identifies a previously archived bucket that may be able to accomodate the measurement

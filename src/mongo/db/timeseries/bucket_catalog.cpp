@@ -59,7 +59,11 @@ namespace mongo {
 namespace {
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
+MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningBucket);
 MONGO_FAIL_POINT_DEFINE(alwaysUseSameBucketCatalogStripe);
+MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationAfterStart);
+MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeFinish);
+
 
 uint8_t numDigits(uint32_t num) {
     uint8_t numDigits = 0;
@@ -284,6 +288,87 @@ void BucketCatalog::ExecutionStatsController::incNumDuplicateBucketsReopened(lon
     _globalStats->numDuplicateBucketsReopened.fetchAndAddRelaxed(increment);
 }
 
+BucketCatalog::BucketState& BucketCatalog::BucketState::setFlag(BucketStateFlag flag) {
+    _state |= static_cast<decltype(_state)>(flag);
+    return *this;
+}
+
+BucketCatalog::BucketState& BucketCatalog::BucketState::unsetFlag(BucketStateFlag flag) {
+    _state &= ~static_cast<decltype(_state)>(flag);
+    return *this;
+}
+
+BucketCatalog::BucketState& BucketCatalog::BucketState::reset() {
+    _state = 0;
+    return *this;
+}
+
+bool BucketCatalog::BucketState::isSet(BucketStateFlag flag) const {
+    return _state & static_cast<decltype(_state)>(flag);
+}
+
+
+bool BucketCatalog::BucketState::isPrepared() const {
+    constexpr decltype(_state) mask = static_cast<decltype(_state)>(BucketStateFlag::kPrepared);
+    return _state & mask;
+}
+
+bool BucketCatalog::BucketState::conflictsWithReopening() const {
+    constexpr decltype(_state) mask =
+        static_cast<decltype(_state)>(BucketStateFlag::kPendingCompression) |
+        static_cast<decltype(_state)>(BucketStateFlag::kPendingDirectWrite);
+    return _state & mask;
+}
+
+bool BucketCatalog::BucketState::conflictsWithInsertion() const {
+    constexpr decltype(_state) mask = static_cast<decltype(_state)>(BucketStateFlag::kCleared) |
+        static_cast<decltype(_state)>(BucketStateFlag::kPendingCompression) |
+        static_cast<decltype(_state)>(BucketStateFlag::kPendingDirectWrite);
+    return _state & mask;
+}
+
+bool BucketCatalog::BucketState::operator==(const BucketState& other) const {
+    return _state == other._state;
+}
+
+std::string BucketCatalog::BucketState::toString() const {
+    str::stream str;
+    str << "[";
+
+    bool first = true;
+    auto output = [&first, &str](std::string name) {
+        if (first) {
+            first = false;
+        } else {
+            str << ", ";
+        }
+        str << name;
+    };
+
+    if (isSet(BucketStateFlag::kPrepared)) {
+        output("prepared");
+    }
+
+    if (isSet(BucketStateFlag::kCleared)) {
+        output("cleared");
+    }
+
+    if (isSet(BucketStateFlag::kPendingCompression)) {
+        output("pendingCompression");
+    }
+
+    if (isSet(BucketStateFlag::kPendingDirectWrite)) {
+        output("pendingDirectWrite");
+    }
+
+    if (isSet(BucketStateFlag::kUntracked)) {
+        output("untracked");
+    }
+
+    str << "]";
+    return str;
+}
+
 BucketCatalog::BucketStateManager::BucketStateManager(Mutex* m) : _mutex(m), _era(0) {}
 
 uint64_t BucketCatalog::BucketStateManager::getEra() {
@@ -310,13 +395,6 @@ uint64_t BucketCatalog::BucketStateManager::getCountForEra(uint64_t value) {
     } else {
         return it->second;
     }
-}
-
-boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::clearSingleBucket(
-    const OID& oid) {
-    stdx::lock_guard catalogLock{*_mutex};
-    ++_era;
-    return _setBucketStateHelper(catalogLock, oid, BucketState::kCleared);
 }
 
 void BucketCatalog::BucketStateManager::clearSetOfBuckets(ShouldClearFn&& shouldClear) {
@@ -348,7 +426,8 @@ void BucketCatalog::BucketStateManager::_incrementEraCountHelper(uint64_t era) {
     }
 }
 
-bool BucketCatalog::BucketStateManager::_hasBeenCleared(WithLock catalogLock, Bucket* bucket) {
+bool BucketCatalog::BucketStateManager::_isMemberOfClearedSet(WithLock catalogLock,
+                                                              Bucket* bucket) {
     for (auto it = _clearRegistry.lower_bound(bucket->getEra() + 1); it != _clearRegistry.end();
          ++it) {
         if (it->second(bucket->_ns)) {
@@ -364,34 +443,26 @@ bool BucketCatalog::BucketStateManager::_hasBeenCleared(WithLock catalogLock, Bu
     return false;
 }
 
-bool BucketCatalog::BucketStateManager::initializeBucketState(
-    const OID& id, boost::optional<std::uint64_t> targetEra) {
-    stdx::lock_guard catalogLock{*_mutex};
-    if (targetEra.has_value() && targetEra.value() < _era) {
-        return false;
-    }
-
-    auto it = _bucketStates.find(id);
-    if (it != _bucketStates.end() && it->second == BucketState::kPendingCompression) {
-        return false;
-    }
-
-    _bucketStates[id] = BucketState::kNormal;
-    return true;
-}
-
-void BucketCatalog::BucketStateManager::eraseBucketState(const OID& id) {
-    stdx::lock_guard catalogLock{*_mutex};
-    _bucketStates.erase(id);
+boost::optional<BucketCatalog::BucketState>
+BucketCatalog::BucketStateManager::_markIndividualBucketCleared(WithLock catalogLock,
+                                                                const OID& bucketId) {
+    return _changeBucketStateHelper(
+        catalogLock,
+        bucketId,
+        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+            if (!input.has_value()) {
+                return boost::none;
+            }
+            return input.value().setFlag(BucketStateFlag::kCleared);
+        });
 }
 
 boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::getBucketState(
     Bucket* bucket) {
     stdx::lock_guard catalogLock{*_mutex};
-    // If the bucket has been cleared, we will set the bucket state accordingly to reflect that
-    // (kPreparedAndCleared or kCleared).
-    if (_hasBeenCleared(catalogLock, bucket)) {
-        return _setBucketStateHelper(catalogLock, bucket->id(), BucketState::kCleared);
+    // If the bucket has been cleared, we will set the bucket state accordingly to reflect that.
+    if (_isMemberOfClearedSet(catalogLock, bucket)) {
+        return _markIndividualBucketCleared(catalogLock, bucket->id());
     }
     auto it = _bucketStates.find(bucket->id());
     return it != _bucketStates.end() ? boost::make_optional(it->second) : boost::none;
@@ -404,20 +475,20 @@ boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::g
     return it != _bucketStates.end() ? boost::make_optional(it->second) : boost::none;
 }
 
-boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::setBucketState(
-    Bucket* bucket, BucketState target) {
+boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::changeBucketState(
+    Bucket* bucket, const StateChangeFn& change) {
     stdx::lock_guard catalogLock{*_mutex};
-    if (_hasBeenCleared(catalogLock, bucket)) {
-        return _setBucketStateHelper(catalogLock, bucket->id(), BucketState::kCleared);
+    if (_isMemberOfClearedSet(catalogLock, bucket)) {
+        return _markIndividualBucketCleared(catalogLock, bucket->id());
     }
 
-    return _setBucketStateHelper(catalogLock, bucket->id(), target);
+    return _changeBucketStateHelper(catalogLock, bucket->id(), change);
 }
 
-boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::setBucketState(
-    const OID& id, BucketState target) {
+boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::changeBucketState(
+    const OID& id, const StateChangeFn& change) {
     stdx::lock_guard catalogLock{*_mutex};
-    return _setBucketStateHelper(catalogLock, id, target);
+    return _changeBucketStateHelper(catalogLock, id, change);
 }
 
 void BucketCatalog::BucketStateManager::appendStats(BSONObjBuilder* base) const {
@@ -432,49 +503,52 @@ void BucketCatalog::BucketStateManager::appendStats(BSONObjBuilder* base) const 
 }
 
 boost::optional<BucketCatalog::BucketState>
-BucketCatalog::BucketStateManager::_setBucketStateHelper(WithLock catalogLock,
-                                                         const OID& id,
-                                                         BucketState target) {
+BucketCatalog::BucketStateManager::_changeBucketStateHelper(WithLock catalogLock,
+                                                            const OID& id,
+                                                            const StateChangeFn& change) {
     auto it = _bucketStates.find(id);
-    if (it == _bucketStates.end()) {
+    const boost::optional<BucketState> initial =
+        (it == _bucketStates.end()) ? boost::none : boost::make_optional(it->second);
+    const boost::optional<BucketState> target = change(initial, _era);
+
+    // If we are initiating or finishing a direct write, we need to advance the era. This allows us
+    // to synchronize with reopening attempts that do not directly observe a state with the
+    // kPendingDirectWrite flag set, but which nevertheless may be trying to reopen a stale bucket.
+    if ((target.has_value() && target.value().isSet(BucketStateFlag::kPendingDirectWrite) &&
+         (!initial.has_value() || !initial.value().isSet(BucketStateFlag::kPendingDirectWrite))) ||
+        (initial.has_value() && initial.value().isSet(BucketStateFlag::kPendingDirectWrite) &&
+         (!target.has_value() || !target.value().isSet(BucketStateFlag::kPendingDirectWrite)))) {
+        ++_era;
+    }
+
+    // If initial and target are not both set, then we are either initializing or erasing the state.
+    if (!target.has_value()) {
+        if (initial.has_value()) {
+            _bucketStates.erase(it);
+        }
         return boost::none;
+    } else if (!initial.has_value()) {
+        _bucketStates.emplace(id, target.value());
+        return target;
     }
 
-    auto& [_, state] = *it;
-    switch (target) {
-        case BucketState::kNormal: {
-            if (state == BucketState::kPrepared) {
-                state = BucketState::kNormal;
-            } else if (state == BucketState::kPreparedAndCleared) {
-                state = BucketState::kCleared;
-            }
-            break;
-        }
-        case BucketState::kPrepared: {
-            if (state == BucketState::kNormal) {
-                state = BucketState::kPrepared;
-            }
-            break;
-        }
-        case BucketState::kCleared: {
-            if (state == BucketState::kNormal) {
-                state = BucketState::kCleared;
-            } else if (state == BucketState::kPrepared) {
-                state = BucketState::kPreparedAndCleared;
-            }
-            break;
-        }
-        case BucketState::kPendingCompression: {
-            invariant(state == BucketState::kNormal || state == BucketState::kCleared);
-            state = BucketState::kPendingCompression;
-            break;
-        }
-        case BucketState::kPreparedAndCleared: {
-            invariant(target != BucketState::kPreparedAndCleared);
-        }
+    // At this point we can now assume that both initial and target are set.
+
+    // We cannot prepare a bucket that isn't eligible for insertions. We expect to attempt this when
+    // we try to prepare a batch on a bucket that's been recently cleared.
+    if (!initial.value().isPrepared() && target.value().isPrepared() &&
+        initial.value().conflictsWithInsertion()) {
+        return initial;
     }
 
-    return state;
+    // We cannot transition from a prepared state to pending compression, as that would indicate a
+    // programmer error.
+    invariant(!initial.value().isPrepared() ||
+              !target.value().isSet(BucketStateFlag::kPendingCompression));
+
+    it->second = target.value();
+
+    return target;
 }
 
 void BucketCatalog::BucketStateManager::_cleanClearRegistry() {
@@ -624,26 +698,41 @@ std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::Bucket::_activeBatch(
 }
 
 BucketCatalog::ClosedBucket::~ClosedBucket() {
-    if (_bucketCatalog) {
-        _bucketCatalog->_compressionDone(bucketId);
+    if (_bucketStateManager) {
+        _bucketStateManager->changeBucketState(
+            bucketId,
+            [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+                return boost::none;
+            });
     }
 }
 
-BucketCatalog::ClosedBucket::ClosedBucket(
-    BucketCatalog* bc, const OID& id, const std::string& tf, boost::optional<uint32_t> nm, bool efr)
+BucketCatalog::ClosedBucket::ClosedBucket(BucketStateManager* bsm,
+                                          const OID& id,
+                                          const std::string& tf,
+                                          boost::optional<uint32_t> nm,
+                                          bool efr)
     : bucketId{id},
       timeField{tf},
       numMeasurements{nm},
       eligibleForReopening{efr},
-      _bucketCatalog{bc} {}
+      _bucketStateManager{bsm} {
+    invariant(_bucketStateManager);
+    _bucketStateManager->changeBucketState(
+        bucketId,
+        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+            invariant(input.has_value());
+            return input.value().setFlag(BucketStateFlag::kPendingCompression);
+        });
+}
 
 BucketCatalog::ClosedBucket::ClosedBucket(ClosedBucket&& other)
     : bucketId{std::move(other.bucketId)},
       timeField{std::move(other.timeField)},
       numMeasurements{other.numMeasurements},
       eligibleForReopening{other.eligibleForReopening},
-      _bucketCatalog{other._bucketCatalog} {
-    other._bucketCatalog = nullptr;
+      _bucketStateManager{other._bucketStateManager} {
+    other._bucketStateManager = nullptr;
 }
 
 BucketCatalog::ClosedBucket& BucketCatalog::ClosedBucket::operator=(ClosedBucket&& other) {
@@ -652,8 +741,8 @@ BucketCatalog::ClosedBucket& BucketCatalog::ClosedBucket::operator=(ClosedBucket
         timeField = std::move(other.timeField);
         numMeasurements = other.numMeasurements;
         eligibleForReopening = other.eligibleForReopening;
-        _bucketCatalog = other._bucketCatalog;
-        other._bucketCatalog = nullptr;
+        _bucketStateManager = other._bucketStateManager;
+        other._bucketStateManager = nullptr;
     }
     return *this;
 }
@@ -886,8 +975,14 @@ Status BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
     _waitToCommitBatch(&stripe, batch);
 
     stdx::lock_guard stripeLock{stripe.mutex};
-    Bucket* bucket =
-        _useBucketInState(&stripe, stripeLock, batch->bucket().id, BucketState::kPrepared);
+    Bucket* bucket = _useBucketAndChangeState(
+        &stripe,
+        stripeLock,
+        batch->bucket().id,
+        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+            invariant(input.has_value());
+            return input.value().setFlag(BucketStateFlag::kPrepared);
+        });
 
     if (batch->finished()) {
         // Someone may have aborted it while we were waiting. Since we have the prepared batch, we
@@ -919,8 +1014,14 @@ boost::optional<BucketCatalog::ClosedBucket> BucketCatalog::finish(
     auto& stripe = _stripes[batch->bucket().stripe];
     stdx::lock_guard stripeLock{stripe.mutex};
 
-    Bucket* bucket =
-        _useBucketInState(&stripe, stripeLock, batch->bucket().id, BucketState::kNormal);
+    Bucket* bucket = _useBucketAndChangeState(
+        &stripe,
+        stripeLock,
+        batch->bucket().id,
+        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+            invariant(input.has_value());
+            return input.value().unsetFlag(BucketStateFlag::kPrepared);
+        });
     if (bucket) {
         bucket->_preparedBatch.reset();
     }
@@ -958,7 +1059,7 @@ boost::optional<BucketCatalog::ClosedBucket> BucketCatalog::finish(
             case RolloverAction::kSoftClose: {
                 const bool eligibleForReopening =
                     bucket->_rolloverAction == RolloverAction::kSoftClose;
-                closedBucket = boost::in_place(this,
+                closedBucket = boost::in_place(&_bucketStateManager,
                                                bucket->id(),
                                                bucket->getTimeField().toString(),
                                                bucket->numMeasurements(),
@@ -989,12 +1090,45 @@ void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch, const Status& statu
     _abort(&stripe, stripeLock, batch, status);
 }
 
-void BucketCatalog::clear(const OID& oid) {
-    auto result = _bucketStateManager.clearSingleBucket(oid);
-    if (result && *result == BucketState::kPreparedAndCleared) {
+void BucketCatalog::directWriteStart(const OID& oid) {
+    auto result = _bucketStateManager.changeBucketState(
+        oid, [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+            if (input.has_value()) {
+                return input.value().setFlag(BucketStateFlag::kPendingDirectWrite);
+            }
+            // The underlying bucket isn't tracked by the catalog, but we need to insert a state
+            // here so that we can conflict reopening this bucket until we've completed our write
+            // and the reader has refetched.
+            return BucketState{}
+                .setFlag(BucketStateFlag::kPendingDirectWrite)
+                .setFlag(BucketStateFlag::kUntracked);
+        });
+    if (result && result.value().isPrepared()) {
         hangTimeseriesDirectModificationBeforeWriteConflict.pauseWhileSet();
         throwWriteConflictException("Prepared bucket can no longer be inserted into.");
     }
+    hangTimeseriesDirectModificationAfterStart.pauseWhileSet();
+}
+
+void BucketCatalog::directWriteFinish(const OID& oid) {
+    hangTimeseriesDirectModificationBeforeFinish.pauseWhileSet();
+    (void)_bucketStateManager.changeBucketState(
+        oid, [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+            if (!input.has_value()) {
+                // We may have had multiple direct writes to this document in the same storage
+                // transaction. If so, a previous call to directWriteFinish may have cleaned up the
+                // state.
+                return boost::none;
+            }
+            if (input.value().isSet(BucketStateFlag::kUntracked)) {
+                // The underlying bucket is not tracked by the catalog, so we can clean up the
+                // state.
+                return boost::none;
+            }
+            return input.value()
+                .unsetFlag(BucketStateFlag::kPendingDirectWrite)
+                .setFlag(BucketStateFlag::kCleared);
+        });
 }
 
 void BucketCatalog::clear(ShouldClearFn&& shouldClear) {
@@ -1178,15 +1312,15 @@ BucketCatalog::StripeNumber BucketCatalog::_getStripeNumber(const BucketKey& key
 const BucketCatalog::Bucket* BucketCatalog::_findBucket(const Stripe& stripe,
                                                         WithLock,
                                                         const OID& id,
-                                                        ReturnClearedBuckets mode) {
+                                                        IgnoreBucketState mode) {
     auto it = stripe.allBuckets.find(id);
     if (it != stripe.allBuckets.end()) {
-        if (mode == ReturnClearedBuckets::kYes) {
+        if (mode == IgnoreBucketState::kYes) {
             return it->second.get();
         }
 
-        if (auto state = _bucketStateManager.getBucketState(it->second.get()); state &&
-            (state != BucketState::kCleared && state != BucketState::kPreparedAndCleared)) {
+        if (auto state = _bucketStateManager.getBucketState(it->second.get());
+            state && !state.value().conflictsWithInsertion()) {
             return it->second.get();
         }
     }
@@ -1196,18 +1330,19 @@ const BucketCatalog::Bucket* BucketCatalog::_findBucket(const Stripe& stripe,
 BucketCatalog::Bucket* BucketCatalog::_useBucket(Stripe* stripe,
                                                  WithLock stripeLock,
                                                  const OID& id,
-                                                 ReturnClearedBuckets mode) {
+                                                 IgnoreBucketState mode) {
     return const_cast<Bucket*>(_findBucket(*stripe, stripeLock, id, mode));
 }
 
-BucketCatalog::Bucket* BucketCatalog::_useBucketInState(Stripe* stripe,
-                                                        WithLock stripeLock,
-                                                        const OID& id,
-                                                        BucketState targetState) {
+BucketCatalog::Bucket* BucketCatalog::_useBucketAndChangeState(
+    Stripe* stripe,
+    WithLock stripeLock,
+    const OID& id,
+    const BucketStateManager::StateChangeFn& change) {
     auto it = stripe->allBuckets.find(id);
     if (it != stripe->allBuckets.end()) {
-        if (auto state = _bucketStateManager.setBucketState(it->second.get(), targetState);
-            state && state != BucketState::kCleared && state != BucketState::kPreparedAndCleared) {
+        if (auto state = _bucketStateManager.changeBucketState(it->second.get(), change);
+            state && !state.value().conflictsWithInsertion()) {
             return it->second.get();
         }
     }
@@ -1228,7 +1363,7 @@ BucketCatalog::Bucket* BucketCatalog::_useBucket(Stripe* stripe,
     Bucket* bucket = it->second;
 
     if (auto state = _bucketStateManager.getBucketState(bucket);
-        state && (state == BucketState::kNormal || state == BucketState::kPrepared)) {
+        state && !state.value().conflictsWithInsertion()) {
         _markBucketNotIdle(stripe, stripeLock, bucket);
         return bucket;
     }
@@ -1389,8 +1524,22 @@ BucketCatalog::Bucket* BucketCatalog::_reopenBucket(Stripe* stripe,
         }
     }
 
+    hangTimeseriesInsertBeforeReopeningBucket.pauseWhileSet();
+
     // We may need to initialize the bucket's state.
-    bool initialized = _bucketStateManager.initializeBucketState(bucket->id(), targetEra);
+    bool initialized = false;
+    auto state = _bucketStateManager.changeBucketState(
+        bucket->id(),
+        [targetEra, &initialized](boost::optional<BucketState> input,
+                                  std::uint64_t currentEra) -> boost::optional<BucketState> {
+            if (targetEra < currentEra ||
+                (input.has_value() && input.value().conflictsWithReopening())) {
+                initialized = false;
+                return input;
+            }
+            initialized = true;
+            return BucketState{};
+        });
     if (!initialized) {
         return nullptr;
     }
@@ -1413,7 +1562,7 @@ BucketCatalog::Bucket* BucketCatalog::_reopenBucket(Stripe* stripe,
         if (it->second->allCommitted()) {
             auto* closedBucket = it->second;
             constexpr bool eligibleForReopening = true;
-            closedBuckets->emplace_back(ClosedBucket{this,
+            closedBuckets->emplace_back(ClosedBucket{&_bucketStateManager,
                                                      closedBucket->id(),
                                                      closedBucket->getTimeField().toString(),
                                                      closedBucket->numMeasurements(),
@@ -1588,7 +1737,7 @@ void BucketCatalog::_waitToCommitBatch(Stripe* stripe, const std::shared_ptr<Wri
         {
             stdx::lock_guard stripeLock{stripe->mutex};
             Bucket* bucket =
-                _useBucket(stripe, stripeLock, batch->bucket().id, ReturnClearedBuckets::kNo);
+                _useBucket(stripe, stripeLock, batch->bucket().id, IgnoreBucketState::kNo);
             if (!bucket || batch->finished()) {
                 return;
             }
@@ -1630,13 +1779,22 @@ void BucketCatalog::_removeBucket(Stripe* stripe,
     // we can remove the state from the catalog altogether.
     switch (mode) {
         case RemovalMode::kClose: {
-            auto state =
-                _bucketStateManager.setBucketState(bucket->id(), BucketState::kPendingCompression);
-            invariant(state == BucketState::kPendingCompression);
+            auto state = _bucketStateManager.getBucketState(bucket->id());
+            invariant(state.has_value());
+            invariant(state.value().isSet(BucketStateFlag::kPendingCompression));
             break;
         }
         case RemovalMode::kAbort:
-            _bucketStateManager.eraseBucketState(bucket->id());
+            _bucketStateManager.changeBucketState(
+                bucket->id(),
+                [](boost::optional<BucketState> input,
+                   std::uint64_t) -> boost::optional<BucketState> {
+                    invariant(input.has_value());
+                    if (input->conflictsWithReopening()) {
+                        return input.value().setFlag(BucketStateFlag::kUntracked);
+                    }
+                    return boost::none;
+                });
             break;
         case RemovalMode::kArchive:
             // No state change
@@ -1647,7 +1805,10 @@ void BucketCatalog::_removeBucket(Stripe* stripe,
     stripe->allBuckets.erase(allIt);
 }
 
-void BucketCatalog::_archiveBucket(Stripe* stripe, WithLock stripeLock, Bucket* bucket) {
+void BucketCatalog::_archiveBucket(Stripe* stripe,
+                                   WithLock stripeLock,
+                                   Bucket* bucket,
+                                   ClosedBuckets* closedBuckets) {
     bool archived = false;
     auto& archivedSet = stripe->archivedBuckets[bucket->keyHash()];
     auto it = archivedSet.find(bucket->getTime());
@@ -1661,11 +1822,25 @@ void BucketCatalog::_archiveBucket(Stripe* stripe, WithLock stripeLock, Bucket* 
         archived = true;
     }
 
-    // If we have an archived bucket, we still want to account for it in numberOfOpenBuckets so we
-    // will increase it here since removeBucket decrements the count.
-    _numberOfActiveBuckets.fetchAndAdd(1);
-    _removeBucket(
-        stripe, stripeLock, bucket, archived ? RemovalMode::kArchive : RemovalMode::kClose);
+    RemovalMode mode = RemovalMode::kArchive;
+    if (archived) {
+        // If we have an archived bucket, we still want to account for it in numberOfActiveBuckets
+        // so we will increase it here since removeBucket decrements the count.
+        _numberOfActiveBuckets.fetchAndAdd(1);
+    } else {
+        // We had a meta hash collision, and already have a bucket archived with the same meta hash
+        // and timestamp as this bucket. Since it's somewhat arbitrary which bucket we keep, we'll
+        // keep the one that's already archived and just plain close this one.
+        mode = RemovalMode::kClose;
+        constexpr bool eligibleForReopening = true;
+        closedBuckets->emplace_back(ClosedBucket{&_bucketStateManager,
+                                                 bucket->id(),
+                                                 bucket->getTimeField().toString(),
+                                                 bucket->numMeasurements(),
+                                                 eligibleForReopening});
+    }
+
+    _removeBucket(stripe, stripeLock, bucket, mode);
 }
 
 boost::optional<OID> BucketCatalog::_findArchivedCandidate(Stripe* stripe,
@@ -1693,11 +1868,20 @@ boost::optional<OID> BucketCatalog::_findArchivedCandidate(Stripe* stripe,
     // can't use this bucket.
     if (info.time - candidateTime < Seconds(*info.options.getBucketMaxSpanSeconds())) {
         auto state = _bucketStateManager.getBucketState(candidateBucket.bucketId);
-        if (state && state == BucketState::kNormal) {
+        if (state && !state.value().conflictsWithReopening()) {
             return candidateBucket.bucketId;
         } else {
             if (state) {
-                _bucketStateManager.eraseBucketState(candidateBucket.bucketId);
+                _bucketStateManager.changeBucketState(
+                    candidateBucket.bucketId,
+                    [](boost::optional<BucketState> input,
+                       std::uint64_t) -> boost::optional<BucketState> {
+                        if (!input.has_value()) {
+                            return boost::none;
+                        }
+                        invariant(input.value().conflictsWithReopening());
+                        return input.value().setFlag(BucketStateFlag::kUntracked);
+                    });
             }
             long long memory =
                 _marginalMemoryUsageForArchivedBucket(candidateBucket, archivedSet.size() == 1);
@@ -1737,7 +1921,7 @@ void BucketCatalog::_abort(Stripe* stripe,
                            std::shared_ptr<WriteBatch> batch,
                            const Status& status) {
     // Before we access the bucket, make sure it's still there.
-    Bucket* bucket = _useBucket(stripe, stripeLock, batch->bucket().id, ReturnClearedBuckets::kYes);
+    Bucket* bucket = _useBucket(stripe, stripeLock, batch->bucket().id, IgnoreBucketState::kYes);
     if (!bucket) {
         // Special case, bucket has already been cleared, and we need only abort this batch.
         batch->_abort(status);
@@ -1780,7 +1964,10 @@ void BucketCatalog::_abort(Stripe* stripe,
 }
 
 void BucketCatalog::_compressionDone(const OID& id) {
-    _bucketStateManager.eraseBucketState(id);
+    _bucketStateManager.changeBucketState(
+        id, [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+            return boost::none;
+        });
 }
 
 void BucketCatalog::_markBucketIdle(Stripe* stripe, WithLock stripeLock, Bucket* bucket) {
@@ -1816,13 +2003,15 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
         Bucket* bucket = stripe->idleBuckets.back();
 
         auto state = _bucketStateManager.getBucketState(bucket);
-        if (canArchive && state && BucketState::kCleared != state) {
-            // Can archive a bucket if it hasn't been cleared. Note: an idle bucket cannot be
-            // kPreparedAndCleared.
-            _archiveBucket(stripe, stripeLock, bucket);
+        if (canArchive && state && !state.value().conflictsWithInsertion()) {
+            // Can archive a bucket if it's still eligible for insertions.
+            _archiveBucket(stripe, stripeLock, bucket, closedBuckets);
             stats.incNumBucketsArchivedDueToMemoryThreshold();
+        } else if (state && state.value().isSet(BucketStateFlag::kCleared)) {
+            // Bucket was cleared and just needs to be removed from catalog.
+            _removeBucket(stripe, stripeLock, bucket, RemovalMode::kAbort);
         } else {
-            closedBuckets->emplace_back(ClosedBucket{this,
+            closedBuckets->emplace_back(ClosedBucket{&_bucketStateManager,
                                                      bucket->id(),
                                                      bucket->getTimeField().toString(),
                                                      bucket->numMeasurements(),
@@ -1842,11 +2031,13 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
         invariant(!archivedSet.empty());
 
         auto& [timestamp, bucket] = *archivedSet.begin();
-        closedBuckets->emplace_back(ClosedBucket{
-            this, bucket.bucketId, bucket.timeField, boost::none, eligibleForReopening});
+        closedBuckets->emplace_back(ClosedBucket{&_bucketStateManager,
+                                                 bucket.bucketId,
+                                                 bucket.timeField,
+                                                 boost::none,
+                                                 eligibleForReopening});
 
         long long memory = _marginalMemoryUsageForArchivedBucket(bucket, archivedSet.size() == 1);
-        _bucketStateManager.setBucketState(bucket.bucketId, BucketState::kPendingCompression);
         if (archivedSet.size() == 1) {
             // If this is the only entry, erase the whole map so we don't leave it empty.
             stripe->archivedBuckets.erase(stripe->archivedBuckets.begin());
@@ -1876,8 +2067,13 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     Bucket* bucket = it->second.get();
     stripe->openBuckets[info.key] = bucket;
 
-    bool initialized = _bucketStateManager.initializeBucketState(bucketId, boost::none);
-    invariant(initialized);
+    auto state = _bucketStateManager.changeBucketState(
+        bucketId,
+        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+            invariant(!input.has_value());
+            return BucketState{};
+        });
+    invariant(state == BucketState{});
     _numberOfActiveBuckets.fetchAndAdd(1);
 
     if (info.openedDuetoMetadata) {
@@ -1989,7 +2185,7 @@ BucketCatalog::Bucket* BucketCatalog::_rollover(Stripe* stripe,
         // The bucket does not contain any measurements that are yet to be committed, so we can take
         // action now.
         const bool eligibleForReopening = action == RolloverAction::kSoftClose;
-        info.closedBuckets->emplace_back(ClosedBucket{this,
+        info.closedBuckets->emplace_back(ClosedBucket{&_bucketStateManager,
                                                       bucket->id(),
                                                       bucket->getTimeField().toString(),
                                                       bucket->numMeasurements(),

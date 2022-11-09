@@ -71,7 +71,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
-#include "mongo/db/timeseries/deleted_buckets.h"
+#include "mongo/db/timeseries/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
@@ -938,8 +938,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             opCtx, args.updateArgs->updatedDoc["_id"], args.updateArgs->updatedDoc);
     } else if (args.coll->ns().isTimeseriesBucketsCollection()) {
         if (args.updateArgs->source != OperationSource::kTimeseriesInsert) {
-            auto& bucketCatalog = BucketCatalog::get(opCtx);
-            bucketCatalog.clear(args.updateArgs->updatedDoc["_id"].OID());
+            OID bucketId = args.updateArgs->updatedDoc["_id"].OID();
+            timeseries::handleDirectWrite(opCtx, bucketId);
         }
     }
 }
@@ -958,14 +958,8 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
     shardObserveAboutToDelete(opCtx, coll->ns(), doc);
 
     if (coll->ns().isTimeseriesBucketsCollection()) {
-        if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            auto& deletedBuckets = timeseries::DeletedBuckets::get(opCtx);
-            deletedBuckets.emplace(doc["_id"].OID());
-        } else {
-            auto& bucketCatalog = BucketCatalog::get(opCtx);
-            bucketCatalog.clear(doc["_id"].OID());
-        }
+        OID bucketId = doc["_id"].OID();
+        timeseries::handleDirectWrite(opCtx, bucketId);
     }
 }
 
@@ -1115,13 +1109,6 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     } else if (nss == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
             opCtx, documentKey.getId().firstElement(), boost::none);
-    } else if (nss.isTimeseriesBucketsCollection() &&
-               feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                   serverGlobalParams.featureCompatibility)) {
-        auto& bucketCatalog = BucketCatalog::get(opCtx);
-        auto& deletedBuckets = timeseries::DeletedBuckets::get(opCtx);
-        deletedBuckets.for_each_once(
-            [&bucketCatalog](const OID& oid) { bucketCatalog.clear(oid); });
     }
 }
 

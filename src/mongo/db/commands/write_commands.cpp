@@ -97,6 +97,7 @@ MONGO_FAIL_POINT_DEFINE(hangWriteBeforeWaitingForMigrationDecision);
 MONGO_FAIL_POINT_DEFINE(hangInsertBeforeWrite);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeCommit);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeWrite);
+MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningQuery);
 MONGO_FAIL_POINT_DEFINE(failUnorderedTimeseriesInsert);
 
 void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
@@ -1154,6 +1155,7 @@ public:
                                 if (auto* bucketId = stdx::get_if<OID>(&insertResult.candidate)) {
                                     // Look up archived bucket by _id.
                                     DBDirectClient client{opCtx};
+                                    hangTimeseriesInsertBeforeReopeningQuery.pauseWhileSet();
                                     suitableBucket =
                                         client.findOne(bucketsColl->ns(), BSON("_id" << *bucketId));
                                     bucketFindResult.fetchedBucket = true;
@@ -1170,6 +1172,7 @@ public:
                                             opCtx,
                                             bucketsColl->getIndexCatalog(),
                                             timeSeriesOptions)) {
+                                        hangTimeseriesInsertBeforeReopeningQuery.pauseWhileSet();
                                         // Run a query to find a suitable bucket to reopen.
                                         suitableBucket = client.findOne(bucketsColl->ns(), *filter);
                                         bucketFindResult.queriedBucket = true;

@@ -28,8 +28,11 @@
  */
 
 #include "mongo/db/timeseries/bucket_catalog_helpers.h"
+
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
@@ -39,6 +42,7 @@
 namespace mongo::timeseries {
 
 namespace {
+
 void normalizeArray(BSONArrayBuilder* builder, const BSONObj& obj);
 void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj);
 
@@ -237,6 +241,25 @@ BSONObj findDocFromOID(OperationContext* opCtx, const Collection* coll, const OI
     auto foundDoc = coll->findDoc(opCtx, rid, &bucketObj);
 
     return (foundDoc) ? bucketObj.value() : BSONObj();
+}
+
+void handleDirectWrite(OperationContext* opCtx, const OID& bucketId) {
+    // First notify the BucketCatalog that we intend to start a direct write, so we can conflict
+    // with any already-prepared operation, and also block bucket reopening if it's enabled.
+    auto& bucketCatalog = BucketCatalog::get(opCtx);
+    bucketCatalog.directWriteStart(bucketId);
+
+    // Then register callbacks so we can let the BucketCatalog know that we are done with our
+    // direct write after the actual write takes place (or is abandoned), and allow reopening.
+    opCtx->recoveryUnit()->onCommit(
+        [svcCtx = opCtx->getServiceContext(), bucketId](boost::optional<Timestamp>) {
+            auto& bucketCatalog = BucketCatalog::get(svcCtx);
+            bucketCatalog.directWriteFinish(bucketId);
+        });
+    opCtx->recoveryUnit()->onRollback([svcCtx = opCtx->getServiceContext(), bucketId]() {
+        auto& bucketCatalog = BucketCatalog::get(svcCtx);
+        bucketCatalog.directWriteFinish(bucketId);
+    });
 }
 
 }  // namespace mongo::timeseries

@@ -730,7 +730,7 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
     ASSERT_EQ(batch->measurements().size(), 1);
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements(), 0);
 
-    ASSERT_THROWS(_bucketCatalog->clear(batch->bucket().id), WriteConflictException);
+    ASSERT_THROWS(_bucketCatalog->directWriteStart(batch->bucket().id), WriteConflictException);
 
     _bucketCatalog->abort(batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(batch->finished());
@@ -766,7 +766,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     ASSERT_EQ(batch1->bucket().id, batch2->bucket().id);
 
     // Now clear the bucket. Since there's a prepared batch it should conflict.
-    ASSERT_THROWS(_bucketCatalog->clear(batch1->bucket().id), WriteConflictException);
+    ASSERT_THROWS(_bucketCatalog->directWriteStart(batch1->bucket().id), WriteConflictException);
 
     // Now try to prepare the second batch. Ensure it aborts the batch.
     ASSERT(batch2->claimCommitRights());
@@ -775,7 +775,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     ASSERT_EQ(batch2->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 
     // Make sure we didn't clear the bucket state when we aborted the second batch.
-    ASSERT_THROWS(_bucketCatalog->clear(batch1->bucket().id), WriteConflictException);
+    ASSERT_THROWS(_bucketCatalog->directWriteStart(batch1->bucket().id), WriteConflictException);
 
     // Make sure a subsequent insert, which opens a new bucket, doesn't corrupt the old bucket
     // state and prevent us from finishing the first batch.
@@ -1698,7 +1698,9 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
 
     // If we advance the catalog era, then we shouldn't use a bucket that was fetched during a
     // previous era.
-    _bucketCatalog->clear(OID());
+    const auto fakeId = OID();
+    _bucketCatalog->directWriteStart(fakeId);
+    _bucketCatalog->directWriteFinish(fakeId);
 
     BucketCatalog::BucketFindResult findResult;
     findResult.bucketToReopen =
