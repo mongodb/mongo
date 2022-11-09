@@ -3190,10 +3190,9 @@ tasks:
         vars:
           <<: *configure_flags_with_builtins
           CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
-      # FIXME-WT-9767
-      # - func: "format test script"
-      #   vars:
-      #     format_test_script_args: -a -t 30
+      - func: "format test script"
+        vars:
+          format_test_script_args: -a -t 30
 
   - name: many-collection-test
     commands:
