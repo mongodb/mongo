@@ -726,8 +726,9 @@ bool UpdateStage::wasReshardingKeyUpdated(const ShardingWriteRouter& shardingWri
                                           const BSONObj& newObj,
                                           const Snapshotted<BSONObj>& oldObj) {
     const auto& collDesc = shardingWriteRouter.getCollDesc();
+    invariant(collDesc);
 
-    auto reshardingKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
+    auto reshardingKeyPattern = collDesc->getReshardingKeyIfShouldForwardOps();
     if (!reshardingKeyPattern)
         return false;
 
@@ -737,8 +738,8 @@ bool UpdateStage::wasReshardingKeyUpdated(const ShardingWriteRouter& shardingWri
     if (newShardKey.binaryEqual(oldShardKey))
         return false;
 
-    FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
-    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
+    FieldRefSet shardKeyPaths(collDesc->getKeyPatternFields());
+    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(*collDesc, shardKeyPaths);
 
     auto oldRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(oldObj.value());
     auto newRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(newObj);
@@ -757,10 +758,19 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj
     ShardingWriteRouter shardingWriteRouter(
         opCtx(), collection()->ns(), Grid::get(opCtx())->catalogCache());
 
+    auto* const css = shardingWriteRouter.getCss();
+
+    // css can be null when this is a config server.
+    if (css == nullptr) {
+        return false;
+    }
+
+    const auto collDesc = css->getCollectionDescription(opCtx());
+
     // Calling mutablebson::Document::getObject() renders a full copy of the updated document. This
     // can be expensive for larger documents, so we skip calling it when the collection isn't even
     // sharded.
-    if (!shardingWriteRouter.getCollDesc().isSharded()) {
+    if (!collDesc.isSharded()) {
         return false;
     }
 
@@ -778,7 +788,9 @@ bool UpdateStage::wasExistingShardKeyUpdated(const ShardingWriteRouter& sharding
                                              const BSONObj& newObj,
                                              const Snapshotted<BSONObj>& oldObj) {
     const auto& collDesc = shardingWriteRouter.getCollDesc();
-    const auto& shardKeyPattern = collDesc.getShardKeyPattern();
+    invariant(collDesc);
+
+    const auto& shardKeyPattern = collDesc->getShardKeyPattern();
 
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldObj.value());
     auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);
@@ -790,12 +802,12 @@ bool UpdateStage::wasExistingShardKeyUpdated(const ShardingWriteRouter& sharding
         return false;
     }
 
-    FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
+    FieldRefSet shardKeyPaths(collDesc->getKeyPatternFields());
 
     // Assert that the updated doc has no arrays or array descendants for the shard key fields.
     _assertPathsNotArray(_doc, shardKeyPaths);
 
-    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
+    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(*collDesc, shardKeyPaths);
 
     // At this point we already asserted that the complete shardKey have been specified in the
     // query, this implies that mongos is not doing a broadcast update and that it attached a

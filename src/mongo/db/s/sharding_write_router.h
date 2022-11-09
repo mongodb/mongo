@@ -41,18 +41,18 @@ public:
                         CatalogCache* catalogCache);
 
     CollectionShardingState* getCss() const {
-        return &(*_scopedCss);
+        return _scopedCss ? &(**_scopedCss) : nullptr;
     }
 
-    const auto& getCollDesc() const {
+    const boost::optional<ScopedCollectionDescription>& getCollDesc() const {
         return _collDesc;
     }
 
     boost::optional<ShardId> getReshardingDestinedRecipient(const BSONObj& fullDocument) const;
 
 private:
-    CollectionShardingState::ScopedCollectionShardingState _scopedCss;
-    ScopedCollectionDescription _collDesc;
+    boost::optional<CollectionShardingState::ScopedCollectionShardingState> _scopedCss;
+    boost::optional<ScopedCollectionDescription> _collDesc;
 
     boost::optional<ScopedCollectionFilter> _ownershipFilter;
 
