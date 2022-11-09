@@ -53,7 +53,7 @@ public:
         OperationContext* opCtx) = 0;
 
     virtual boost::optional<MigrateInfo> popNextMigration(
-        OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) = 0;
+        OperationContext* opCtx, stdx::unordered_set<ShardId>* availableShards) = 0;
 
     virtual void applyActionResult(OperationContext* opCtx,
                                    const DefragmentationAction& action,
@@ -86,7 +86,7 @@ public:
     virtual BSONObj reportProgressOn(const UUID& uuid) override;
 
     MigrateInfoVector selectChunksToMove(OperationContext* opCtx,
-                                         stdx::unordered_set<ShardId>* usedShards) override;
+                                         stdx::unordered_set<ShardId>* availableShards) override;
 
     StringData getName() const override;
 

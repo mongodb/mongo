@@ -248,7 +248,7 @@ public:
     }
 
     boost::optional<MigrateInfo> popNextMigration(
-        OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) override {
+        OperationContext* opCtx, stdx::unordered_set<ShardId>* availableShards) override {
         return boost::none;
     }
 
@@ -425,9 +425,9 @@ public:
     }
 
     boost::optional<MigrateInfo> popNextMigration(
-        OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) override {
+        OperationContext* opCtx, stdx::unordered_set<ShardId>* availableShards) override {
         for (const auto& shardId : _shardProcessingOrder) {
-            if (usedShards->count(shardId) != 0) {
+            if (availableShards->count(shardId) == 0) {
                 // the shard is already busy in a migration
                 continue;
             }
@@ -435,7 +435,7 @@ public:
             ChunkRangeInfoIterator nextSmallChunk;
             std::list<ChunkRangeInfoIterator> candidateSiblings;
             if (!_findNextSmallChunkInShard(
-                    shardId, *usedShards, &nextSmallChunk, &candidateSiblings)) {
+                    shardId, *availableShards, &nextSmallChunk, &candidateSiblings)) {
                 // there isn't a chunk in this shard that can currently be moved and merged with one
                 // of its siblings.
                 continue;
@@ -458,8 +458,8 @@ public:
             // ... then build up the migration request, marking the needed resources as busy.
             nextSmallChunk->busyInOperation = true;
             targetSibling->busyInOperation = true;
-            usedShards->insert(nextSmallChunk->shard);
-            usedShards->insert(targetSibling->shard);
+            availableShards->erase(nextSmallChunk->shard);
+            availableShards->erase(targetSibling->shard);
             auto smallChunkVersion = getShardVersion(opCtx, nextSmallChunk->shard, _nss);
             _outstandingMigrations.emplace_back(nextSmallChunk, targetSibling);
             return _outstandingMigrations.back().asMigrateInfo(
@@ -885,7 +885,7 @@ private:
     // Returns true on success (storing the related info in nextSmallChunk + smallChunkSiblings),
     // false otherwise.
     bool _findNextSmallChunkInShard(const ShardId& shard,
-                                    const stdx::unordered_set<ShardId>& usedShards,
+                                    const stdx::unordered_set<ShardId>& availableShards,
                                     ChunkRangeInfoIterator* nextSmallChunk,
                                     std::list<ChunkRangeInfoIterator>* smallChunkSiblings) {
         auto matchingShardInfo = _smallChunksByShard.find(shard);
@@ -911,7 +911,7 @@ private:
             size_t siblingsDiscardedDueToRangeDeletion = 0;
 
             for (const auto& sibling : candidateSiblings) {
-                if (sibling->busyInOperation || usedShards.count(sibling->shard)) {
+                if (sibling->busyInOperation || !availableShards.count(sibling->shard)) {
                     continue;
                 }
                 if ((*candidateIt)->shardsToAvoid.count(sibling->shard)) {
@@ -1080,7 +1080,7 @@ public:
     }
 
     boost::optional<MigrateInfo> popNextMigration(
-        OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) override {
+        OperationContext* opCtx, stdx::unordered_set<ShardId>* availableShards) override {
         return boost::none;
     }
 
@@ -1265,7 +1265,7 @@ public:
     }
 
     boost::optional<MigrateInfo> popNextMigration(
-        OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) override {
+        OperationContext* opCtx, stdx::unordered_set<ShardId>* availableShards) override {
         return boost::none;
     }
 
@@ -1443,7 +1443,8 @@ BSONObj BalancerDefragmentationPolicyImpl::reportProgressOn(const UUID& uuid) {
 }
 
 MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
-    OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) {
+    OperationContext* opCtx, stdx::unordered_set<ShardId>* availableShards) {
+
     MigrateInfoVector chunksToMove;
     {
         stdx::lock_guard<Latch> lk(_stateMutex);
@@ -1470,6 +1471,10 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
             for (auto it = collectionUUIDs.begin(); it != collectionUUIDs.end();) {
                 const auto& collUUID = *it;
 
+                if (availableShards->size() == 0) {
+                    return chunksToMove;
+                }
+
                 try {
                     auto defragStateIt = _defragmentationStates.find(collUUID);
                     if (defragStateIt == _defragmentationStates.end()) {
@@ -1484,7 +1489,7 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
                         continue;
                     }
                     auto actionableMigration =
-                        collDefragmentationPhase->popNextMigration(opCtx, usedShards);
+                        collDefragmentationPhase->popNextMigration(opCtx, availableShards);
                     if (!actionableMigration.has_value()) {
                         it = popCollectionUUID(it);
                         continue;
@@ -1505,7 +1510,7 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
         }
     }
 
-    if (chunksToMove.empty() && usedShards->empty()) {
+    if (chunksToMove.empty()) {
         // If the policy cannot produce new migrations even in absence of temporary constraints, it
         // is possible that some streaming actions must be processed first. Notify an update of the
         // internal state to make it happen.

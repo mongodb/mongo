@@ -404,15 +404,11 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 }
 
 StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMove(
-    OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) {
-    auto shardStatsStatus = _clusterStats->getStats(opCtx);
-    if (!shardStatsStatus.isOK()) {
-        return shardStatsStatus.getStatus();
-    }
+    OperationContext* opCtx,
+    const std::vector<ClusterStatistics::ShardStatistics>& shardStats,
+    stdx::unordered_set<ShardId>* availableShards) {
 
-    const auto& shardStats = shardStatsStatus.getValue();
-
-    if (shardStats.size() < 2) {
+    if (availableShards->size() < 2) {
         return MigrateInfoVector{};
     }
 
@@ -429,6 +425,11 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 
     std::vector<CollectionType> collBatch;
     for (auto collIt = collections.begin(); collIt != collections.end();) {
+
+        if (availableShards->size() < 2) {
+            break;
+        }
+
         const auto& coll = *(collIt++);
         if (!coll.getAllowBalance() || !coll.getAllowMigrations() || !coll.getPermitMigrations() ||
             coll.getDefragmentCollection()) {
@@ -457,6 +458,11 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         }
 
         for (const auto& collFromBatch : collBatch) {
+
+            if (availableShards->size() < 2) {
+                break;
+            }
+
             const auto& nss = collFromBatch.getNss();
 
             boost::optional<CollectionDataSizeInfoForBalancing> optDataSizeInfo;
@@ -465,7 +471,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
             }
 
             auto candidatesStatus = _getMigrateCandidatesForCollection(
-                opCtx, nss, shardStats, optDataSizeInfo, usedShards);
+                opCtx, nss, shardStats, optDataSizeInfo, availableShards);
             if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
                 // Namespace got dropped before we managed to get to it, so just skip it
                 continue;
@@ -502,7 +508,14 @@ StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicyImpl::selectChunk
     // doesn't.
     Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
 
-    stdx::unordered_set<ShardId> usedShards;
+    stdx::unordered_set<ShardId> availableShards;
+    std::transform(shardStats.begin(),
+                   shardStats.end(),
+                   std::inserter(availableShards, availableShards.end()),
+                   [](const ClusterStatistics::ShardStatistics& shardStatistics) -> ShardId {
+                       return shardStatistics.shardId;
+                   });
+
 
     boost::optional<CollectionDataSizeInfoForBalancing> optCollDataSizeInfo;
     if (feature_flags::gBalanceAccordingToDataSize.isEnabled(
@@ -511,7 +524,7 @@ StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicyImpl::selectChunk
     }
 
     auto candidatesStatus = _getMigrateCandidatesForCollection(
-        opCtx, nss, shardStats, optCollDataSizeInfo, &usedShards);
+        opCtx, nss, shardStats, optCollDataSizeInfo, &availableShards);
     if (!candidatesStatus.isOK()) {
         return candidatesStatus.getStatus();
     }
@@ -635,7 +648,7 @@ BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
     const NamespaceString& nss,
     const ShardStatisticsVector& shardStats,
     const boost::optional<CollectionDataSizeInfoForBalancing>& collDataSizeInfo,
-    stdx::unordered_set<ShardId>* usedShards) {
+    stdx::unordered_set<ShardId>* availableShards) {
     auto routingInfoStatus =
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);
     if (!routingInfoStatus.isOK()) {
@@ -692,7 +705,7 @@ BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
         shardStats,
         distribution,
         collDataSizeInfo,
-        usedShards,
+        availableShards,
         Grid::get(opCtx)->getBalancerConfiguration()->attemptToBalanceJumboChunks());
 }
 

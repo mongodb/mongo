@@ -109,13 +109,22 @@ std::pair<ShardStatisticsVector, ShardToChunksMap> generateCluster(
     return std::make_pair(std::move(shardStats), std::move(chunkMap));
 }
 
+stdx::unordered_set<ShardId> getAllShardIds(const ShardStatisticsVector& shardStats) {
+    stdx::unordered_set<ShardId> shards;
+    std::transform(shardStats.begin(),
+                   shardStats.end(),
+                   std::inserter(shards, shards.end()),
+                   [](const ShardStatistics& shardStatistics) { return shardStatistics.shardId; });
+    return shards;
+}
+
 MigrateInfosWithReason balanceChunks(const ShardStatisticsVector& shardStats,
                                      const DistributionStatus& distribution,
                                      bool shouldAggressivelyBalance,
                                      bool forceJumbo) {
-    stdx::unordered_set<ShardId> usedShards;
+    auto availableShards = getAllShardIds(shardStats);
     return BalancerPolicy::balance(
-        shardStats, distribution, boost::none /* collDataSizeInfo */, &usedShards, forceJumbo);
+        shardStats, distribution, boost::none /* collDataSizeInfo */, &availableShards, forceJumbo);
 }
 
 TEST(BalancerPolicy, Basic) {
@@ -263,12 +272,13 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNe
          {ShardStatistics(kShardId3, 0, false, emptyZoneSet, emptyShardVersion), 0}});
 
     // Here kShardId0 would have been selected as a donor
-    stdx::unordered_set<ShardId> usedShards{kShardId0};
+    auto availableShards = getAllShardIds(cluster.first);
+    availableShards.erase(kShardId0);
     const auto [migrations, reason] =
         BalancerPolicy::balance(cluster.first,
                                 DistributionStatus(kNamespace, cluster.second),
                                 boost::none /* collDataSizeInfo */,
-                                &usedShards,
+                                &availableShards,
                                 false);
     ASSERT_EQ(1U, migrations.size());
 
@@ -287,12 +297,13 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNo
          {ShardStatistics(kShardId3, 0, false, emptyZoneSet, emptyShardVersion), 0}});
 
     // Here kShardId0 would have been selected as a donor
-    stdx::unordered_set<ShardId> usedShards{kShardId0};
+    auto availableShards = getAllShardIds(cluster.first);
+    availableShards.erase(kShardId0);
     const auto [migrations, reason] =
         BalancerPolicy::balance(cluster.first,
                                 DistributionStatus(kNamespace, cluster.second),
                                 boost::none /* collDataSizeInfo */,
-                                &usedShards,
+                                &availableShards,
                                 false);
     ASSERT_EQ(0U, migrations.size());
 }
@@ -305,12 +316,13 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseDestinationShards) {
          {ShardStatistics(kShardId3, 1, false, emptyZoneSet, emptyShardVersion), 1}});
 
     // Here kShardId2 would have been selected as a recipient
-    stdx::unordered_set<ShardId> usedShards{kShardId2};
+    auto availableShards = getAllShardIds(cluster.first);
+    availableShards.erase(kShardId2);
     const auto [migrations, reason] =
         BalancerPolicy::balance(cluster.first,
                                 DistributionStatus(kNamespace, cluster.second),
                                 boost::none /* collDataSizeInfo */,
-                                &usedShards,
+                                &availableShards,
                                 false);
     ASSERT_EQ(1U, migrations.size());
 
@@ -631,9 +643,10 @@ TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleZonesSkipZoneWithShardI
     ASSERT_OK(distribution.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 3), "b")));
     ASSERT_OK(distribution.addRangeToZone(ZoneRange(BSON("x" << 3), BSON("x" << 5), "c")));
 
-    stdx::unordered_set<ShardId> usedShards{kShardId1};
+    auto availableShards = getAllShardIds(cluster.first);
+    availableShards.erase(kShardId1);
     const auto [migrations, reason] = BalancerPolicy::balance(
-        cluster.first, distribution, boost::none /* collDataSizeInfo */, &usedShards, false);
+        cluster.first, distribution, boost::none /* collDataSizeInfo */, &availableShards, false);
     ASSERT_EQ(1U, migrations.size());
 
     ASSERT_EQ(kShardId0, migrations[0].from);
