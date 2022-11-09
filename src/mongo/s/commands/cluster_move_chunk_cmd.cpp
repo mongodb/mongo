@@ -152,6 +152,11 @@ public:
                         str::stream() << "no shard key found in chunk query " << *find,
                         !shardKey.isEmpty());
 
+                if (find && chunkManager.getShardKeyPattern().isHashedPattern()) {
+                    LOGV2_WARNING(7065400,
+                                  "bounds should be used instead of query for hashed shard keys");
+                }
+
                 chunk.emplace(chunkManager.findIntersectingChunkWithSimpleCollation(shardKey));
             } else {
 
