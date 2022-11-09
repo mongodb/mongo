@@ -319,7 +319,7 @@ ReorderDependencies computeDependencies(ABT::reference_type aboveNodeRef,
         env.hasDefinitions(belowChild) ? env.getDefinitions(belowChild) : DefinitionsMap{};
 
     ReorderDependencies dependencies;
-    for (const std::string& varName : aboveNodeVarNames) {
+    for (const ProjectionName& varName : aboveNodeVarNames) {
         auto it = belowNodeDefs.find(varName);
         // Variable is exclusively defined in the below node.
         const bool refersToNode = it != belowNodeDefs.cend() && it->second.definedBy == belowNode;
@@ -696,7 +696,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
     for (auto it = conversion->_reqMap.cbegin(); it != conversion->_reqMap.cend();) {
         uassert(6624111,
                 "Filter partial schema requirement must contain a variable name.",
-                !it->first._projectionName.empty());
+                it->first._projectionName);
         uassert(6624112,
                 "Filter partial schema requirement cannot bind.",
                 !it->second.getBoundProjectionName());
@@ -844,12 +844,12 @@ struct SubstituteConvert<EvaluationNode> {
                     ABT result = evalNode.getChild();
                     ABT keepPath = make<PathIdentity>();
 
-                    std::set<std::string> orderedSet;
-                    for (const std::string& fieldName : pathKeepPtr->getNames()) {
+                    FieldNameOrderedSet orderedSet;
+                    for (const FieldNameType& fieldName : pathKeepPtr->getNames()) {
                         orderedSet.insert(fieldName);
                     }
-                    for (const std::string& fieldName : orderedSet) {
-                        ProjectionName projName = ctx.getPrefixId().getNextId("fieldProj");
+                    for (const FieldNameType& fieldName : orderedSet) {
+                        ProjectionName projName{ctx.getPrefixId().getNextId("fieldProj")};
                         result = make<EvaluationNode>(
                             projName,
                             make<EvalPath>(make<PathGet>(fieldName, make<PathIdentity>()),
@@ -892,7 +892,7 @@ struct SubstituteConvert<EvaluationNode> {
 
             uassert(6624114,
                     "Eval partial schema requirement must contain a variable name.",
-                    !key._projectionName.empty());
+                    key._projectionName);
             uassert(6624115,
                     "Eval partial schema requirement cannot have a range",
                     isIntervalReqFullyOpenDNF(req.getIntervals()));
@@ -960,7 +960,7 @@ static SplitRequirementsResult splitRequirements(
     const bool disableYieldingTolerantPlans,
     const std::vector<bool>& isFullyOpen,
     const std::vector<bool>& mayReturnNull,
-    const boost::optional<opt::unordered_set<FieldNameType>>& indexFieldPrefixMapForScanDef,
+    const boost::optional<FieldNameSet>& indexFieldPrefixMapForScanDef,
     const PartialSchemaRequirements& reqMap) {
     SplitRequirementsResult result;
     auto& leftReqs = result._leftReqs;
@@ -1071,7 +1071,7 @@ struct ExploreConvert<SargableNode> {
         }
 
         const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
-        if (collectVariableReferences(node) != VariableNameSetType{scanProjectionName}) {
+        if (collectVariableReferences(node) != ProjectionNameSet{scanProjectionName}) {
             // Rewrite not applicable if we refer projections other than the scan projection.
             return;
         }
@@ -1079,7 +1079,7 @@ struct ExploreConvert<SargableNode> {
         const bool isIndex = target == IndexReqTarget::Index;
 
         const auto& indexFieldPrefixMap = ctx.getIndexFieldPrefixMap();
-        boost::optional<opt::unordered_set<FieldNameType>> indexFieldPrefixMapForScanDef;
+        boost::optional<FieldNameSet> indexFieldPrefixMapForScanDef;
         if (auto it = indexFieldPrefixMap.find(scanDefName);
             it != indexFieldPrefixMap.cend() && !isIndex) {
             indexFieldPrefixMapForScanDef = it->second;

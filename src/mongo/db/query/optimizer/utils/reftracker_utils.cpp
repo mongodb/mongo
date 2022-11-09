@@ -41,142 +41,140 @@ namespace mongo::optimizer {
 class NodeVariableTracker {
 public:
     template <typename T, typename... Ts>
-    VariableNameSetType walk(const T&, Ts&&...) {
+    ProjectionNameSet walk(const T&, Ts&&...) {
         static_assert(!std::is_base_of_v<Node, T>, "Nodes must implement variable tracking");
 
         // Default case: no variables.
         return {};
     }
 
-    VariableNameSetType walk(const ScanNode& /*node*/, const ABT& /*binds*/) {
+    ProjectionNameSet walk(const ScanNode& /*node*/, const ABT& /*binds*/) {
         return {};
     }
 
-    VariableNameSetType walk(const ValueScanNode& /*node*/, const ABT& /*binds*/) {
+    ProjectionNameSet walk(const ValueScanNode& /*node*/, const ABT& /*binds*/) {
         return {};
     }
 
-    VariableNameSetType walk(const PhysicalScanNode& /*node*/, const ABT& /*binds*/) {
+    ProjectionNameSet walk(const PhysicalScanNode& /*node*/, const ABT& /*binds*/) {
         return {};
     }
 
-    VariableNameSetType walk(const CoScanNode& /*node*/) {
+    ProjectionNameSet walk(const CoScanNode& /*node*/) {
         return {};
     }
 
-    VariableNameSetType walk(const IndexScanNode& /*node*/, const ABT& /*binds*/) {
+    ProjectionNameSet walk(const IndexScanNode& /*node*/, const ABT& /*binds*/) {
         return {};
     }
 
-    VariableNameSetType walk(const SeekNode& /*node*/, const ABT& /*binds*/, const ABT& refs) {
+    ProjectionNameSet walk(const SeekNode& /*node*/, const ABT& /*binds*/, const ABT& refs) {
         return extractFromABT(refs);
     }
 
-    VariableNameSetType walk(const MemoLogicalDelegatorNode& /*node*/) {
+    ProjectionNameSet walk(const MemoLogicalDelegatorNode& /*node*/) {
         return {};
     }
 
-    VariableNameSetType walk(const MemoPhysicalDelegatorNode& /*node*/) {
+    ProjectionNameSet walk(const MemoPhysicalDelegatorNode& /*node*/) {
         return {};
     }
 
-    VariableNameSetType walk(const FilterNode& /*node*/, const ABT& /*child*/, const ABT& expr) {
+    ProjectionNameSet walk(const FilterNode& /*node*/, const ABT& /*child*/, const ABT& expr) {
         return extractFromABT(expr);
     }
 
-    VariableNameSetType walk(const EvaluationNode& /*node*/,
-                             const ABT& /*child*/,
-                             const ABT& expr) {
+    ProjectionNameSet walk(const EvaluationNode& /*node*/, const ABT& /*child*/, const ABT& expr) {
         return extractFromABT(expr);
     }
 
-    VariableNameSetType walk(const SargableNode& /*node*/,
-                             const ABT& /*child*/,
-                             const ABT& /*binds*/,
-                             const ABT& refs) {
+    ProjectionNameSet walk(const SargableNode& /*node*/,
+                           const ABT& /*child*/,
+                           const ABT& /*binds*/,
+                           const ABT& refs) {
         return extractFromABT(refs);
     }
 
-    VariableNameSetType walk(const RIDIntersectNode& /*node*/,
-                             const ABT& /*leftChild*/,
-                             const ABT& /*rightChild*/) {
+    ProjectionNameSet walk(const RIDIntersectNode& /*node*/,
+                           const ABT& /*leftChild*/,
+                           const ABT& /*rightChild*/) {
         return {};
     }
 
-    VariableNameSetType walk(const BinaryJoinNode& /*node*/,
-                             const ABT& /*leftChild*/,
-                             const ABT& /*rightChild*/,
-                             const ABT& expr) {
+    ProjectionNameSet walk(const BinaryJoinNode& /*node*/,
+                           const ABT& /*leftChild*/,
+                           const ABT& /*rightChild*/,
+                           const ABT& expr) {
         return extractFromABT(expr);
     }
 
-    VariableNameSetType walk(const HashJoinNode& /*node*/,
-                             const ABT& /*leftChild*/,
-                             const ABT& /*rightChild*/,
-                             const ABT& refs) {
+    ProjectionNameSet walk(const HashJoinNode& /*node*/,
+                           const ABT& /*leftChild*/,
+                           const ABT& /*rightChild*/,
+                           const ABT& refs) {
         return extractFromABT(refs);
     }
 
-    VariableNameSetType walk(const MergeJoinNode& /*node*/,
-                             const ABT& /*leftChild*/,
-                             const ABT& /*rightChild*/,
-                             const ABT& refs) {
+    ProjectionNameSet walk(const MergeJoinNode& /*node*/,
+                           const ABT& /*leftChild*/,
+                           const ABT& /*rightChild*/,
+                           const ABT& refs) {
         return extractFromABT(refs);
     }
 
-    VariableNameSetType walk(const UnionNode& /*node*/,
-                             const ABTVector& /*children*/,
-                             const ABT& /*binder*/,
-                             const ABT& refs) {
+    ProjectionNameSet walk(const UnionNode& /*node*/,
+                           const ABTVector& /*children*/,
+                           const ABT& /*binder*/,
+                           const ABT& refs) {
         return extractFromABT(refs);
     }
 
-    VariableNameSetType walk(const GroupByNode& /*node*/,
-                             const ABT& /*child*/,
-                             const ABT& /*aggBinder*/,
-                             const ABT& aggRefs,
-                             const ABT& /*groupbyBinder*/,
-                             const ABT& groupbyRefs) {
-        VariableNameSetType result;
+    ProjectionNameSet walk(const GroupByNode& /*node*/,
+                           const ABT& /*child*/,
+                           const ABT& /*aggBinder*/,
+                           const ABT& aggRefs,
+                           const ABT& /*groupbyBinder*/,
+                           const ABT& groupbyRefs) {
+        ProjectionNameSet result;
         extractFromABT(result, aggRefs);
         extractFromABT(result, groupbyRefs);
         return result;
     }
 
-    VariableNameSetType walk(const UnwindNode& /*node*/,
-                             const ABT& /*child*/,
-                             const ABT& /*binds*/,
-                             const ABT& refs) {
+    ProjectionNameSet walk(const UnwindNode& /*node*/,
+                           const ABT& /*child*/,
+                           const ABT& /*binds*/,
+                           const ABT& refs) {
         return extractFromABT(refs);
     }
 
-    VariableNameSetType walk(const UniqueNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
+    ProjectionNameSet walk(const UniqueNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
         return extractFromABT(refs);
     }
 
-    VariableNameSetType walk(const CollationNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
+    ProjectionNameSet walk(const CollationNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
         return extractFromABT(refs);
     }
 
-    VariableNameSetType walk(const LimitSkipNode& /*node*/, const ABT& /*child*/) {
+    ProjectionNameSet walk(const LimitSkipNode& /*node*/, const ABT& /*child*/) {
         return {};
     }
 
-    VariableNameSetType walk(const ExchangeNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
+    ProjectionNameSet walk(const ExchangeNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
         return extractFromABT(refs);
     }
 
-    VariableNameSetType walk(const RootNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
+    ProjectionNameSet walk(const RootNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
         return extractFromABT(refs);
     }
 
-    static VariableNameSetType collect(const ABT& n) {
+    static ProjectionNameSet collect(const ABT& n) {
         NodeVariableTracker tracker;
         return algebra::walk<false>(n, tracker);
     }
 
 private:
-    void extractFromABT(VariableNameSetType& vars, const ABT& v) {
+    void extractFromABT(ProjectionNameSet& vars, const ABT& v) {
         const auto& result = VariableEnvironment::getVariables(v);
         for (const Variable& var : result._variables) {
             if (result._definedVars.count(var.name()) == 0) {
@@ -186,14 +184,14 @@ private:
         }
     }
 
-    VariableNameSetType extractFromABT(const ABT& v) {
-        VariableNameSetType result;
+    ProjectionNameSet extractFromABT(const ABT& v) {
+        ProjectionNameSet result;
         extractFromABT(result, v);
         return result;
     }
 };
 
-VariableNameSetType collectVariableReferences(const ABT& n) {
+ProjectionNameSet collectVariableReferences(const ABT& n) {
     return NodeVariableTracker::collect(n);
 }
 

@@ -418,7 +418,7 @@ public:
     void visit(const SizeMatchExpression* expr) override {
         assertSupportedPathExpression(expr);
 
-        const std::string lambdaProjName = _ctx.getNextId("lambda_sizeMatch");
+        const ProjectionName lambdaProjName{_ctx.getNextId("lambda_sizeMatch")};
         ABT result = make<PathLambda>(make<LambdaAbstraction>(
             lambdaProjName,
             make<BinaryOp>(
@@ -447,7 +447,7 @@ public:
     void visit(const TypeMatchExpression* expr) override {
         assertSupportedPathExpression(expr);
 
-        const std::string lambdaProjName = _ctx.getNextId("lambda_typeMatch");
+        const ProjectionName lambdaProjName{_ctx.getNextId("lambda_typeMatch")};
         ABT result = make<PathLambda>(make<LambdaAbstraction>(
             lambdaProjName,
             make<FunctionCall>("typeMatch",
@@ -656,10 +656,12 @@ private:
 
 ABT generateMatchExpression(const MatchExpression* expr,
                             const bool allowAggExpressions,
-                            const std::string& rootProjection,
-                            const std::string& uniqueIdPrefix) {
-    ExpressionAlgebrizerContext ctx(
-        false /*assertExprSort*/, true /*assertPathSort*/, rootProjection, uniqueIdPrefix);
+                            const ProjectionName& rootProjection,
+                            boost::optional<ProjectionName> uniqueIdPrefix) {
+    ExpressionAlgebrizerContext ctx(false /*assertExprSort*/,
+                                    true /*assertPathSort*/,
+                                    rootProjection,
+                                    std::move(uniqueIdPrefix));
     ABTMatchExpressionPreVisitor preVisitor(ctx);
     ABTMatchExpressionVisitor postVisitor(ctx, allowAggExpressions);
     MatchExpressionWalker walker(&preVisitor, nullptr /*inVisitor*/, &postVisitor);

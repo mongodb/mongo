@@ -49,7 +49,7 @@ void EvalPathLowering::transport(ABT& n, const PathConstant&, ABT& c) {
 }
 
 void EvalPathLowering::transport(ABT& n, const PathIdentity&) {
-    const std::string& name = _prefixId.getNextId("x");
+    const ProjectionName name{_prefixId.getNextId("x")};
 
     n = make<LambdaAbstraction>(name, make<Variable>(name));
     _changed = true;
@@ -62,7 +62,7 @@ void EvalPathLowering::transport(ABT& n, const PathLambda&, ABT& lam) {
 
 void EvalPathLowering::transport(ABT& n, const PathDefault&, ABT& c) {
     // if (exists(x), x, c)
-    const std::string& name = _prefixId.getNextId("valDefault");
+    const ProjectionName name{_prefixId.getNextId("valDefault")};
 
     n = make<LambdaAbstraction>(
         name,
@@ -77,26 +77,26 @@ void EvalPathLowering::transport(ABT& n, const PathCompare&, ABT& c) {
 }
 
 void EvalPathLowering::transport(ABT& n, const PathGet& p, ABT& inner) {
-    const std::string& name = _prefixId.getNextId("inputGet");
+    const ProjectionName name{_prefixId.getNextId("inputGet")};
 
     n = make<LambdaAbstraction>(
         name,
         make<LambdaApplication>(
             std::exchange(inner, make<Blackhole>()),
             make<FunctionCall>("getField",
-                               makeSeq(make<Variable>(name), Constant::str(p.name())))));
+                               makeSeq(make<Variable>(name), Constant::str(p.name().value())))));
     _changed = true;
 }
 
 void EvalPathLowering::transport(ABT& n, const PathDrop& drop) {
     // if (isObject(x), dropFields(x,...) , x)
     // Alternatively, we can implement a special builtin function that does the comparison and drop.
-    const std::string& name = _prefixId.getNextId("valDrop");
+    const ProjectionName name{_prefixId.getNextId("valDrop")};
 
     std::vector<ABT> params;
     params.emplace_back(make<Variable>(name));
     for (const auto& fieldName : drop.getNames()) {
-        params.emplace_back(Constant::str(fieldName));
+        params.emplace_back(Constant::str(fieldName.value()));
     }
 
     n = make<LambdaAbstraction>(
@@ -110,12 +110,12 @@ void EvalPathLowering::transport(ABT& n, const PathDrop& drop) {
 void EvalPathLowering::transport(ABT& n, const PathKeep& keep) {
     // if (isObject(x), keepFields(x,...) , x)
     // Alternatively, we can implement a special builtin function that does the comparison and drop.
-    const std::string& name = _prefixId.getNextId("valKeep");
+    const ProjectionName name{_prefixId.getNextId("valKeep")};
 
     std::vector<ABT> params;
     params.emplace_back(make<Variable>(name));
     for (const auto& fieldName : keep.getNames()) {
-        params.emplace_back(Constant::str(fieldName));
+        params.emplace_back(Constant::str(fieldName.value()));
     }
 
     n = make<LambdaAbstraction>(
@@ -128,7 +128,7 @@ void EvalPathLowering::transport(ABT& n, const PathKeep& keep) {
 
 void EvalPathLowering::transport(ABT& n, const PathObj&) {
     // if (isObject(x), x, Nothing)
-    const std::string& name = _prefixId.getNextId("valObj");
+    const ProjectionName name{_prefixId.getNextId("valObj")};
 
     n = make<LambdaAbstraction>(
         name,
@@ -140,7 +140,7 @@ void EvalPathLowering::transport(ABT& n, const PathObj&) {
 
 void EvalPathLowering::transport(ABT& n, const PathArr&) {
     // if (isArray(x), x, Nothing)
-    const std::string& name = _prefixId.getNextId("valArr");
+    const ProjectionName name{_prefixId.getNextId("valArr")};
 
     n = make<LambdaAbstraction>(
         name,
@@ -158,7 +158,7 @@ void EvalPathLowering::transport(ABT& n, const PathTraverse& p, ABT& inner) {
             "Currently we allow only multi-level traversal under EvalPath",
             p.getMaxDepth() == PathTraverse::kUnlimited);
 
-    const std::string& name = _prefixId.getNextId("valTraverse");
+    const ProjectionName name{_prefixId.getNextId("valTraverse")};
 
     n = make<LambdaAbstraction>(name,
                                 make<FunctionCall>("traverseP",
@@ -169,8 +169,8 @@ void EvalPathLowering::transport(ABT& n, const PathTraverse& p, ABT& inner) {
 }
 
 void EvalPathLowering::transport(ABT& n, const PathField& p, ABT& inner) {
-    const std::string& name = _prefixId.getNextId("inputField");
-    const std::string& val = _prefixId.getNextId("valField");
+    const ProjectionName name{_prefixId.getNextId("inputField")};
+    const ProjectionName val{_prefixId.getNextId("valField")};
 
     n = make<LambdaAbstraction>(
         name,
@@ -179,22 +179,22 @@ void EvalPathLowering::transport(ABT& n, const PathField& p, ABT& inner) {
             make<LambdaApplication>(
                 std::exchange(inner, make<Blackhole>()),
                 make<FunctionCall>("getField",
-                                   makeSeq(make<Variable>(name), Constant::str(p.name())))),
-            make<If>(
-                make<BinaryOp>(Operations::Or,
-                               make<FunctionCall>("exists", makeSeq(make<Variable>(val))),
-                               make<FunctionCall>("isObject", makeSeq(make<Variable>(name)))),
-                make<FunctionCall>(
-                    "setField",
-                    makeSeq(make<Variable>(name), Constant::str(p.name()), make<Variable>(val))),
-                make<Variable>(name))));
+                                   makeSeq(make<Variable>(name), Constant::str(p.name().value())))),
+            make<If>(make<BinaryOp>(Operations::Or,
+                                    make<FunctionCall>("exists", makeSeq(make<Variable>(val))),
+                                    make<FunctionCall>("isObject", makeSeq(make<Variable>(name)))),
+                     make<FunctionCall>("setField",
+                                        makeSeq(make<Variable>(name),
+                                                Constant::str(p.name().value()),
+                                                make<Variable>(val))),
+                     make<Variable>(name))));
 
     _changed = true;
 }
 
 void EvalPathLowering::transport(ABT& n, const PathComposeM&, ABT& p1, ABT& p2) {
     // p1 * p2 -> (p2 (p1 input))
-    const std::string& name = _prefixId.getNextId("inputComposeM");
+    const ProjectionName name{_prefixId.getNextId("inputComposeM")};
 
     n = make<LambdaAbstraction>(
         name,
@@ -251,7 +251,7 @@ void EvalFilterLowering::transport(ABT& n, const PathLambda&, ABT& lam) {
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathDefault&, ABT& c) {
-    const std::string& name = _prefixId.getNextId("valDefault");
+    const ProjectionName name{_prefixId.getNextId("valDefault")};
 
     n = make<LambdaAbstraction>(
         name,
@@ -263,7 +263,7 @@ void EvalFilterLowering::transport(ABT& n, const PathDefault&, ABT& c) {
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathCompare& cmp, ABT& c) {
-    const std::string& name = _prefixId.getNextId("valCmp");
+    const ProjectionName name{_prefixId.getNextId("valCmp")};
 
     if (cmp.op() == Operations::Eq) {
         n = make<LambdaAbstraction>(
@@ -289,16 +289,16 @@ void EvalFilterLowering::transport(ABT& n, const PathCompare& cmp, ABT& c) {
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathGet& p, ABT& inner) {
-    const std::string& name = _prefixId.getNextId("inputGet");
+    const ProjectionName name{_prefixId.getNextId("inputGet")};
 
     int idx;
-    bool isNumber = NumberParser{}(p.name(), &idx).isOK();
+    bool isNumber = NumberParser{}(p.name().value(), &idx).isOK();
     n = make<LambdaAbstraction>(
         name,
         make<LambdaApplication>(
             std::exchange(inner, make<Blackhole>()),
             make<FunctionCall>(isNumber ? "getFieldOrElement" : "getField",
-                               makeSeq(make<Variable>(name), Constant::str(p.name())))));
+                               makeSeq(make<Variable>(name), Constant::str(p.name().value())))));
     _changed = true;
 }
 
@@ -311,14 +311,14 @@ void EvalFilterLowering::transport(ABT& n, const PathKeep& keep) {
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathObj&) {
-    const std::string& name = _prefixId.getNextId("valObj");
+    const ProjectionName name{_prefixId.getNextId("valObj")};
     n = make<LambdaAbstraction>(name,
                                 make<FunctionCall>("isObject", makeSeq(make<Variable>(name))));
     _changed = true;
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathArr&) {
-    const std::string& name = _prefixId.getNextId("valArr");
+    const ProjectionName name{_prefixId.getNextId("valArr")};
     n = make<LambdaAbstraction>(name, make<FunctionCall>("isArray", makeSeq(make<Variable>(name))));
     _changed = true;
 }
@@ -327,7 +327,7 @@ void EvalFilterLowering::prepare(ABT& n, const PathTraverse& t) {
     int idx;
     // This is a bad hack that detect if a child is number path element
     if (auto child = t.getPath().cast<PathGet>();
-        child && NumberParser{}(child->name(), &idx).isOK()) {
+        child && NumberParser{}(child->name().value(), &idx).isOK()) {
         _traverseStack.emplace_back(n.ref());
     }
 }
@@ -339,7 +339,7 @@ void EvalFilterLowering::transport(ABT& n, const PathTraverse& p, ABT& inner) {
             "Currently we allow only single-level traversal under EvalFilter",
             p.getMaxDepth() == PathTraverse::kSingleLevel);
 
-    const std::string& name = _prefixId.getNextId("valTraverse");
+    const ProjectionName name{_prefixId.getNextId("valTraverse")};
 
     ABT numberPath = Constant::boolean(false);
     if (!_traverseStack.empty() && _traverseStack.back() == n.ref()) {
@@ -360,7 +360,7 @@ void EvalFilterLowering::transport(ABT& n, const PathField& p, ABT& inner) {
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathComposeM&, ABT& p1, ABT& p2) {
-    const std::string& name = _prefixId.getNextId("inputComposeM");
+    const ProjectionName name{_prefixId.getNextId("inputComposeM")};
 
     n = make<LambdaAbstraction>(
         name,
@@ -376,7 +376,7 @@ void EvalFilterLowering::transport(ABT& n, const PathComposeM&, ABT& p1, ABT& p2
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathComposeA&, ABT& p1, ABT& p2) {
-    const std::string& name = _prefixId.getNextId("inputComposeA");
+    const ProjectionName name{_prefixId.getNextId("inputComposeA")};
 
     n = make<LambdaAbstraction>(
         name,

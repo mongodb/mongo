@@ -80,12 +80,14 @@ private:
 };
 
 struct PartialSchemaKey {
+    PartialSchemaKey(ABT path);
     PartialSchemaKey(ProjectionName projectionName, ABT path);
+    PartialSchemaKey(boost::optional<ProjectionName> projectionName, ABT path);
 
     bool operator==(const PartialSchemaKey& other) const;
 
     // Referred, or input projection name.
-    ProjectionName _projectionName;
+    boost::optional<ProjectionName> _projectionName;
 
     // (Partially determined) path.
     ABT _path;

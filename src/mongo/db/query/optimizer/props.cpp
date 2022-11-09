@@ -358,7 +358,7 @@ size_t DistributionHash::operator()(
     size_t result = 0;
     updateHash(result, std::hash<DistributionType>()(distributionAndProjections._type));
     for (const ProjectionName& projectionName : distributionAndProjections._projectionNames) {
-        updateHash(result, std::hash<ProjectionName>()(projectionName));
+        updateHash(result, ProjectionName::Hasher()(projectionName));
     }
     return result;
 }

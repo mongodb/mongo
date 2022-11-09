@@ -314,10 +314,10 @@ void PathFusion::tryFuseComposition(ABT& n, ABT& input) {
     // TODO: handle Drop elements.
 
     // Latest value per field.
-    opt::unordered_map<FieldNameType, ABT> fieldMap;
+    opt::unordered_map<FieldNameType, ABT, FieldNameType::Hasher> fieldMap;
     // Used to preserve the relative order in which fields are set on the result.
     FieldPathType orderedFieldNames;
-    boost::optional<std::set<FieldNameType>> toKeep;
+    boost::optional<FieldNameOrderedSet> toKeep;
 
     Type inputType = Type::any;
     if (auto constPtr = input.cast<Constant>(); constPtr != nullptr && constPtr->isObject()) {

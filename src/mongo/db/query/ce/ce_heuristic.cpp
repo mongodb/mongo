@@ -260,7 +260,7 @@ public:
         // Each item represents a field in a dotted path.
         // Collected while traversing a path expression.
         // Used for deciding whether a conjunction of comparisons is an interval or not.
-        std::vector<std::string> path;
+        FieldPathType path;
         // When handling a PathComposeM, we need to access its child comparisons which might be
         // hidden under path expressions.
         const PathCompare* compare;

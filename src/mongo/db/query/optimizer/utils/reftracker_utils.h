@@ -37,7 +37,6 @@ namespace mongo::optimizer {
 /**
  * Used to extract variable references from a node.
  */
-using VariableNameSetType = opt::unordered_set<std::string>;
-VariableNameSetType collectVariableReferences(const ABT& n);
+ProjectionNameSet collectVariableReferences(const ABT& n);
 
 }  // namespace mongo::optimizer

@@ -51,7 +51,7 @@ public:
 
     static ABT createFromCopy(sbe::value::TypeTags tag, sbe::value::Value val);
 
-    static ABT str(std::string str);
+    static ABT str(StringData str);
 
     static ABT int32(int32_t valueInt32);
     static ABT int64(int64_t valueInt64);
@@ -129,12 +129,10 @@ private:
  * elsewhere.
  */
 class Variable final : public Operator<0>, public ExpressionSyntaxSort {
-    std::string _name;
+    ProjectionName _name;
 
 public:
-    Variable(std::string inName) : _name(std::move(inName)) {
-        tassert(6684503, "Empty variable name", !_name.empty());
-    }
+    Variable(ProjectionName inName) : _name(std::move(inName)) {}
 
     bool operator==(const Variable& other) const {
         return _name == other._name;
@@ -244,10 +242,10 @@ public:
 class Let final : public Operator<2>, public ExpressionSyntaxSort {
     using Base = Operator<2>;
 
-    std::string _varName;
+    ProjectionName _varName;
 
 public:
-    Let(std::string var, ABT inBind, ABT inExpr)
+    Let(ProjectionName var, ABT inBind, ABT inExpr)
         : Base(std::move(inBind), std::move(inExpr)), _varName(std::move(var)) {
         assertExprSort(bind());
         assertExprSort(in());
@@ -278,10 +276,10 @@ public:
 class LambdaAbstraction final : public Operator<1>, public ExpressionSyntaxSort {
     using Base = Operator<1>;
 
-    std::string _varName;
+    ProjectionName _varName;
 
 public:
-    LambdaAbstraction(std::string var, ABT inBody)
+    LambdaAbstraction(ProjectionName var, ABT inBody)
         : Base(std::move(inBody)), _varName(std::move(var)) {
         assertExprSort(getBody());
     }

@@ -36,7 +36,7 @@
 namespace mongo::optimizer {
 
 ABT generateAggExpression(const Expression* expr,
-                          const std::string& rootProjection,
-                          const std::string& uniqueIdPrefix);
+                          const ProjectionName& rootProjection,
+                          boost::optional<ProjectionName> uniqueIdPrefix);
 
 }  // namespace mongo::optimizer

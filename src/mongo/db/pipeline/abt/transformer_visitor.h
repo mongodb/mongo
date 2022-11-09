@@ -76,7 +76,7 @@ private:
      * Handles renamed fields and computed projections.
      */
     void processComputedPaths(const projection_executor::InclusionNode& node,
-                              const std::string& rootProjection,
+                              const ProjectionName& rootProjection,
                               bool isAddingFields);
 
     void visitInclusionNode(const projection_executor::InclusionNode& node, bool isAddingFields);

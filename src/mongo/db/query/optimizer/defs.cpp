@@ -33,9 +33,9 @@
 
 namespace mongo::optimizer {
 
-static opt::unordered_map<ProjectionName, size_t> createMapFromVector(
+static opt::unordered_map<ProjectionName, size_t, ProjectionName::Hasher> createMapFromVector(
     const ProjectionNameVector& v) {
-    opt::unordered_map<ProjectionName, size_t> result;
+    opt::unordered_map<ProjectionName, size_t, ProjectionName::Hasher> result;
     for (size_t i = 0; i < v.size(); i++) {
         result.emplace(v.at(i), i);
     }
@@ -95,7 +95,7 @@ bool ProjectionNameOrderPreservingSet::erase(const ProjectionName& projectionNam
     }
 
     _map.erase(projectionName);
-    _vector.resize(_vector.size() - 1);
+    _vector.pop_back();
 
     return true;
 }

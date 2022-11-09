@@ -730,12 +730,13 @@ TEST(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
     ASSERT_MATCH_CE_NODE(t, "{mixed: {$elemMatch: {}}}", 88.0, isSargable);
 
     // Take into account both empty and non-empty arrays.
-    auto makePathArrABT = [&](const std::string& path) {
-        const auto scanProjection = "scan_0";
+    auto makePathArrABT = [&](const FieldNameType& fieldName) {
+        const ProjectionName scanProjection{"scan_0"};
         auto scanNode = make<ScanNode>(scanProjection, collName);
-        auto filterNode = make<FilterNode>(
-            make<EvalFilter>(make<PathGet>(path, make<PathArr>()), make<Variable>(scanProjection)),
-            std::move(scanNode));
+        auto filterNode =
+            make<FilterNode>(make<EvalFilter>(make<PathGet>(std::move(fieldName), make<PathArr>()),
+                                              make<Variable>(scanProjection)),
+                             std::move(scanNode));
         return make<RootNode>(
             properties::ProjectionRequirement{ProjectionNameVector{scanProjection}},
             std::move(filterNode));

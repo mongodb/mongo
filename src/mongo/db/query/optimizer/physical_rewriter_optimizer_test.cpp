@@ -1529,7 +1529,7 @@ TEST(PhysRewriter, FilterIndexingStress) {
         os << "field" << index;
 
         result = make<FilterNode>(
-            make<EvalFilter>(make<PathGet>(os.str(),
+            make<EvalFilter>(make<PathGet>(FieldNameType{os.str()},
                                            make<PathTraverse>(make<PathCompare>(Operations::Eq,
                                                                                 Constant::int64(0)),
                                                               PathTraverse::kSingleLevel)),
@@ -1916,12 +1916,12 @@ TEST(PhysRewriter, FilterReorder) {
         ProjectionName projName = prefixId.getNextId("field");
         hints.emplace(
             PartialSchemaKey{"root",
-                             make<PathGet>(projName,
+                             make<PathGet>(FieldNameType{projName.value()},
                                            make<PathTraverse>(make<PathIdentity>(),
                                                               PathTraverse::kSingleLevel))},
             kDefaultSelectivity * (kFilterCount - i));
         result = make<FilterNode>(
-            make<EvalFilter>(make<PathGet>(std::move(projName),
+            make<EvalFilter>(make<PathGet>(FieldNameType{projName.value()},
                                            make<PathTraverse>(make<PathCompare>(Operations::Eq,
                                                                                 Constant::int64(i)),
                                                               PathTraverse::kSingleLevel)),

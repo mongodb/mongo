@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <set>
 #include <sstream>
 #include <string>
@@ -36,20 +37,36 @@
 
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/utils/printable_enum.h"
+#include "mongo/db/query/optimizer/utils/strong_string_alias.h"
 
 
 namespace mongo::optimizer {
 
-using FieldNameType = std::string;
+/**
+ * Representation of a field name. Can be empty.
+ */
+struct FieldNameAliasTag {
+    static constexpr bool kAllowEmpty = true;
+};
+using FieldNameType = StrongStringAlias<FieldNameAliasTag>;
+
 using FieldPathType = std::vector<FieldNameType>;
+using FieldNameOrderedSet = std::set<FieldNameType>;
+using FieldNameSet = opt::unordered_set<FieldNameType, FieldNameType::Hasher>;
 
-using CollectionNameType = std::string;
+/**
+ * Representation of a variable name. Cannot be empty.
+ */
+struct ProjectionNameAliasTag {
+    static constexpr bool kAllowEmpty = false;
+};
+using ProjectionName = StrongStringAlias<ProjectionNameAliasTag>;
 
-using ProjectionName = std::string;
-using ProjectionNameSet = opt::unordered_set<ProjectionName>;
+using ProjectionNameSet = opt::unordered_set<ProjectionName, ProjectionName::Hasher>;
 using ProjectionNameOrderedSet = std::set<ProjectionName>;
 using ProjectionNameVector = std::vector<ProjectionName>;
-using ProjectionRenames = opt::unordered_map<ProjectionName, ProjectionName>;
+using ProjectionRenames =
+    opt::unordered_map<ProjectionName, ProjectionName, ProjectionName::Hasher>;
 
 // Map from scanDefName to rid projection name.
 using RIDProjectionsMap = opt::unordered_map<std::string, ProjectionName>;
@@ -73,7 +90,7 @@ public:
     const ProjectionNameVector& getVector() const;
 
 private:
-    opt::unordered_map<ProjectionName, size_t> _map;
+    opt::unordered_map<ProjectionName, size_t, ProjectionName::Hasher> _map;
     ProjectionNameVector _vector;
 };
 
@@ -101,9 +118,9 @@ MAKE_PRINTABLE_ENUM_STRING_ARRAY(DistributionTypeEnum, DistributionType, DISTRIB
 // In case of covering scan, index, or fetch, specify names of bound projections for each field.
 // Also optionally specify if applicable the rid and record (root) projections.
 struct FieldProjectionMap {
-    ProjectionName _ridProjection;
-    ProjectionName _rootProjection;
-    opt::unordered_map<FieldNameType, ProjectionName> _fieldProjections;
+    boost::optional<ProjectionName> _ridProjection;
+    boost::optional<ProjectionName> _rootProjection;
+    opt::unordered_map<FieldNameType, ProjectionName, FieldNameType::Hasher> _fieldProjections;
 
     bool operator==(const FieldProjectionMap& other) const;
 };

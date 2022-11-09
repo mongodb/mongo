@@ -81,14 +81,17 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
 }
 
 static std::string generateFreeVarsAssertMsg(const VariableEnvironment& env) {
-    std::string result;
+    str::stream os;
+    bool first = true;
     for (const auto& name : env.freeVariableNames()) {
-        if (!result.empty()) {
-            result += ", ";
+        if (first) {
+            first = false;
+        } else {
+            os << ", ";
         }
-        result += name;
+        os << name;
     }
-    return result;
+    return os;
 }
 
 template <OptPhase phase, class C>

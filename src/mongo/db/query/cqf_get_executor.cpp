@@ -220,7 +220,7 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
             ABT exprABT = generateMatchExpression(expr.get(),
                                                   false /*allowAggExpression*/,
                                                   "<root>" /*rootProjection*/,
-                                                  "" /*uniquePrefix*/);
+                                                  boost::none /*uniquePrefix*/);
             exprABT = make<EvalFilter>(std::move(exprABT), make<Variable>(scanProjName));
 
             // TODO SERVER-70315: simplify partial filter expression.

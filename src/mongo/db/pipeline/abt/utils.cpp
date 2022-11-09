@@ -73,8 +73,8 @@ ABT translateFieldPath(const FieldPath& fieldPath,
     const size_t fieldPathLength = fieldPath.getPathLength();
     bool isLastElement = true;
     for (size_t i = fieldPathLength; i-- > skipFromStart;) {
-        result =
-            fieldNameFn(fieldPath.getFieldName(i).toString(), isLastElement, std::move(result));
+        result = fieldNameFn(
+            FieldNameType{fieldPath.getFieldName(i).toString()}, isLastElement, std::move(result));
         isLastElement = false;
     }
 
@@ -108,7 +108,7 @@ ABT translateFieldRef(const FieldRef& fieldRef, ABT initial) {
                 result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
             }
         }
-        result = make<PathGet>(fieldRef[i].toString(), std::move(result));
+        result = make<PathGet>(FieldNameType{fieldRef[i].toString()}, std::move(result));
     }
 
     return result;

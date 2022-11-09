@@ -124,6 +124,12 @@ public:
         return *this;
     }
 
+    template <class TagType>
+    ExplainPrinterImpl& print(const StrongStringAlias<TagType>& t) {
+        print(t.value().empty() ? "<empty>" : t.value());
+        return *this;
+    }
+
     /**
      * Here and below: "other" printer(s) may be siphoned out.
      */
@@ -414,8 +420,13 @@ public:
     }
 
     ExplainPrinterImpl& print(const std::string& s) {
-        auto [tag, val] = sbe::value::makeNewString(s);
-        addValue(tag, val);
+        printStringInternal(s);
+        return *this;
+    }
+
+    template <class TagType>
+    ExplainPrinterImpl& print(const StrongStringAlias<TagType>& s) {
+        printStringInternal(s.value().toString());
         return *this;
     }
 
@@ -458,12 +469,26 @@ public:
         return *this;
     }
 
+    template <size_t N>
+    ExplainPrinterImpl& fieldName(const char (&name)[N],
+                                  const ExplainVersion minVersion = ExplainVersion::V1,
+                                  const ExplainVersion maxVersion = ExplainVersion::Vmax) {
+        fieldNameInternal(name, minVersion, maxVersion);
+        return *this;
+    }
+
     ExplainPrinterImpl& fieldName(const std::string& name,
                                   const ExplainVersion minVersion = ExplainVersion::V1,
                                   const ExplainVersion maxVersion = ExplainVersion::Vmax) {
-        if (minVersion <= version && maxVersion >= version) {
-            _nextFieldName = name;
-        }
+        fieldNameInternal(name, minVersion, maxVersion);
+        return *this;
+    }
+
+    template <class TagType>
+    ExplainPrinterImpl& fieldName(const StrongStringAlias<TagType>& name,
+                                  const ExplainVersion minVersion = ExplainVersion::V1,
+                                  const ExplainVersion maxVersion = ExplainVersion::Vmax) {
+        fieldNameInternal(name.value().toString(), minVersion, maxVersion);
         return *this;
     }
 
@@ -473,6 +498,21 @@ public:
     }
 
 private:
+    ExplainPrinterImpl& printStringInternal(const std::string& s) {
+        auto [tag, val] = sbe::value::makeNewString(s);
+        addValue(tag, val);
+        return *this;
+    }
+
+    ExplainPrinterImpl& fieldNameInternal(const std::string& name,
+                                          const ExplainVersion minVersion,
+                                          const ExplainVersion maxVersion) {
+        if (minVersion <= version && maxVersion >= version) {
+            _nextFieldName = name;
+        }
+        return *this;
+    }
+
     ExplainPrinterImpl& print(ExplainPrinterImpl& other, const bool append) {
         auto [tag, val] = other.moveValue();
         addValue(tag, val, append);
@@ -674,7 +714,7 @@ public:
     ExplainPrinter transport(const ABT& /*n*/,
                              const ExpressionBinder& binders,
                              std::vector<ExplainPrinter> inResults) {
-        std::map<std::string, ExplainPrinter> ordered;
+        std::map<ProjectionName, ExplainPrinter> ordered;
         for (size_t idx = 0; idx < inResults.size(); ++idx) {
             ordered.emplace(binders.names()[idx], std::move(inResults[idx]));
         }
@@ -699,11 +739,11 @@ public:
 
     static void printFieldProjectionMap(ExplainPrinter& printer, const FieldProjectionMap& map) {
         std::map<FieldNameType, ProjectionName> ordered;
-        if (!map._ridProjection.empty()) {
-            ordered["<rid>"] = map._ridProjection;
+        if (const auto& projName = map._ridProjection) {
+            ordered.emplace("<rid>", *projName);
         }
-        if (!map._rootProjection.empty()) {
-            ordered["<root>"] = map._rootProjection;
+        if (const auto& projName = map._rootProjection) {
+            ordered.emplace("<root>", *projName);
         }
         for (const auto& entry : map._fieldProjections) {
             ordered.insert(entry);
@@ -1085,7 +1125,9 @@ public:
         for (const auto& [key, req] : reqMap) {
             ExplainPrinter local;
 
-            local.fieldName("refProjection").print(key._projectionName).separator(", ");
+            if (const auto& projName = key._projectionName) {
+                local.fieldName("refProjection").print(*projName).separator(", ");
+            }
             ExplainPrinter pathPrinter = generate(key._path);
             local.fieldName("path").separator("'").printSingleLevel(pathPrinter).separator("', ");
 
@@ -1113,7 +1155,9 @@ public:
         for (const auto& [key, req, entryIndex] : residualReqs) {
             ExplainPrinter local;
 
-            local.fieldName("refProjection").print(key._projectionName).separator(", ");
+            if (const auto& projName = key._projectionName) {
+                local.fieldName("refProjection").print(*projName).separator(", ");
+            }
             ExplainPrinter pathPrinter = generate(key._path);
             local.fieldName("path").separator("'").printSingleLevel(pathPrinter).separator("', ");
 
@@ -1733,10 +1777,10 @@ public:
                     ExplainPrinter pathPrinter = gen.generate(key._path);
 
                     ExplainPrinter local;
-                    local.fieldName("refProjection")
-                        .print(key._projectionName)
-                        .separator(", ")
-                        .fieldName("path")
+                    if (const auto& projName = key._projectionName) {
+                        local.fieldName("refProjection").print(*projName).separator(", ");
+                    }
+                    local.fieldName("path")
                         .separator("'")
                         .printSingleLevel(pathPrinter)
                         .separator("', ")
@@ -2172,10 +2216,10 @@ public:
         return printer;
     }
 
-    static void printPathProjections(ExplainPrinter& printer, const std::set<std::string>& names) {
+    static void printPathProjections(ExplainPrinter& printer, const FieldNameOrderedSet& names) {
         if constexpr (version < ExplainVersion::V3) {
             bool first = true;
-            for (const std::string& s : names) {
+            for (const FieldNameType& s : names) {
                 if (first) {
                     first = false;
                 } else {
@@ -2185,7 +2229,7 @@ public:
             }
         } else if constexpr (version == ExplainVersion::V3) {
             std::vector<ExplainPrinter> printers;
-            for (const std::string& s : names) {
+            for (const FieldNameType& s : names) {
                 ExplainPrinter local;
                 local.print(s);
                 printers.push_back(std::move(local));
@@ -2263,7 +2307,7 @@ public:
         ExplainPrinter printer("PathGet");
         printer.separator(" [")
             .fieldName("path", ExplainVersion::V3)
-            .print(path.name().empty() ? "<empty>" : path.name())
+            .print(path.name())
             .separator("]")
             .setChildCount(1)
             .fieldName("input", ExplainVersion::V3)

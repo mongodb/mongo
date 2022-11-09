@@ -39,7 +39,7 @@ namespace mongo::optimizer {
 std::pair<sbe::value::TypeTags, sbe::value::Value> convertFrom(Value val);
 
 using ABTFieldNameFn =
-    std::function<ABT(const std::string& fieldName, const bool isLastElement, ABT input)>;
+    std::function<ABT(FieldNameType fieldName, const bool isLastElement, ABT input)>;
 
 /**
  * Translates an aggregation FieldPath by invoking the `fieldNameFn` for each path component.

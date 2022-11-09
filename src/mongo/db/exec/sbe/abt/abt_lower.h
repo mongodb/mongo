@@ -36,7 +36,7 @@
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer {
-using SlotVarMap = stdx::unordered_map<std::string, sbe::value::SlotId>;
+using SlotVarMap = stdx::unordered_map<ProjectionName, sbe::value::SlotId, ProjectionName::Hasher>;
 
 class SBEExpressionLowering {
 public:

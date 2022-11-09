@@ -190,7 +190,7 @@ public:
         const ProjectionNameSet& availableProjections =
             getPropertyConst<ProjectionAvailability>(_logicalProps).getProjections();
 
-        ProjectionName ridProjName;
+        boost::optional<ProjectionName> ridProjName;
         if (hasProperty<IndexingAvailability>(_logicalProps)) {
             const auto& scanDefName =
                 getPropertyConst<IndexingAvailability>(_logicalProps).getScanDefName();

@@ -136,7 +136,7 @@ private:
 
     // Contains the set of top-level index fields for a given scanDef. For example "a.b" is encoded
     // as "a". This is used to constrain the possible splits of a sargable node.
-    opt::unordered_map<std::string, opt::unordered_set<FieldNameType>> _indexFieldPrefixMap;
+    opt::unordered_map<std::string, FieldNameSet> _indexFieldPrefixMap;
 
     // Track number of times a SargableNode at a given position in the memo has been split.
     opt::unordered_map<MemoLogicalNodeId, size_t, NodeIdHash> _sargableSplitCountMap;

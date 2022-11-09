@@ -39,7 +39,7 @@ namespace mongo::optimizer {
  */
 ABT generateMatchExpression(const MatchExpression* expr,
                             bool allowAggExpressions,
-                            const std::string& rootProjection,
-                            const std::string& uniqueIdPrefix);
+                            const ProjectionName& rootProjection,
+                            boost::optional<ProjectionName> uniqueIdPrefix);
 
 }  // namespace mongo::optimizer

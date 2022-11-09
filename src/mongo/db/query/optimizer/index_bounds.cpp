@@ -105,7 +105,13 @@ void IntervalRequirement::reverse() {
     std::swap(_lowBound, _highBound);
 }
 
+PartialSchemaKey::PartialSchemaKey(ABT path) : PartialSchemaKey(boost::none, std::move(path)) {}
+
 PartialSchemaKey::PartialSchemaKey(ProjectionName projectionName, ABT path)
+    : PartialSchemaKey(boost::optional<ProjectionName>{std::move(projectionName)},
+                       std::move(path)) {}
+
+PartialSchemaKey::PartialSchemaKey(boost::optional<ProjectionName> projectionName, ABT path)
     : _projectionName(std::move(projectionName)), _path(std::move(path)) {
     assertPathSort(_path);
 }
@@ -131,8 +137,6 @@ PartialSchemaRequirement::PartialSchemaRequirement(
     tassert(6624154,
             "Cannot have perf only requirement which also binds",
             !_isPerfOnly || !_boundProjectionName);
-    tassert(
-        6624155, "Empty projection name", !_boundProjectionName || !_boundProjectionName->empty());
 }
 
 bool PartialSchemaRequirement::operator==(const PartialSchemaRequirement& other) const {
@@ -162,10 +166,20 @@ bool IndexPath3WComparator::operator()(const ABT& path1, const ABT& path2) const
 
 bool PartialSchemaKeyLessComparator::operator()(const PartialSchemaKey& k1,
                                                 const PartialSchemaKey& k2) const {
-    const int projCmp = k1._projectionName.compare(k2._projectionName);
-    if (projCmp != 0) {
-        return projCmp < 0;
+    if (const auto& p1 = k1._projectionName) {
+        if (const auto& p2 = k2._projectionName) {
+            const int projCmp = p1->compare(*p2);
+            if (projCmp != 0) {
+                return projCmp < 0;
+            }
+            // Fallthrough to comparison below.
+        } else {
+            return false;
+        }
+    } else if (k2._projectionName) {
+        return false;
     }
+
     return compareExprAndPaths(k1._path, k2._path) < 0;
 }
 

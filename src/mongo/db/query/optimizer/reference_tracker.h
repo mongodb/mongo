@@ -53,7 +53,7 @@ struct Definition {
 };
 
 struct CollectedInfo;
-using DefinitionsMap = opt::unordered_map<ProjectionName, Definition>;
+using DefinitionsMap = opt::unordered_map<ProjectionName, Definition, ProjectionName::Hasher>;
 
 struct VariableCollectorResult {
     // The Variables referenced by the subtree.
@@ -62,7 +62,7 @@ struct VariableCollectorResult {
     // variable resolution. Tracking these separately allows us to easily check, for example, which
     // variables are referenced in but not defined by the subtree (i.e. variables which should be
     // defined elsewhere in the ABT).
-    opt::unordered_set<std::string> _definedVars;
+    ProjectionNameSet _definedVars;
 };
 
 /**
@@ -119,12 +119,12 @@ public:
 
     bool hasFreeVariables() const;
 
-    opt::unordered_set<std::string> freeVariableNames() const;
+    ProjectionNameSet freeVariableNames() const;
 
     /**
      * Returns the number of places in the ABT where there is a free Variable with name 'variable'.
      */
-    size_t freeOccurences(const std::string& variable) const;
+    size_t freeOccurences(const ProjectionName& variable) const;
 
     /**
      * Returns whether 'var' is guaranteed to be the last access to the projection to which it

@@ -41,8 +41,8 @@ class ExpressionAlgebrizerContext {
 public:
     ExpressionAlgebrizerContext(bool assertExprSort,
                                 bool assertPathSort,
-                                const std::string& rootProjection,
-                                const std::string& uniqueIdPrefix);
+                                const ProjectionName& rootProjection,
+                                boost::optional<ProjectionName> uniqueIdPrefix);
 
     /**
      * Push an ABT onto the stack. Optionally perform a check on the type of the ABT based on
@@ -64,15 +64,15 @@ public:
      */
     void ensureArity(size_t arity);
 
-    const std::string& getRootProjection() const;
+    const ProjectionName& getRootProjection() const;
     const ABT& getRootProjVar() const;
 
-    const std::string& getUniqueIdPrefix() const;
+    const boost::optional<ProjectionName>& getUniqueIdPrefix() const;
 
     /**
-     * Returns a unique string for a new projection name. It will be prefixed by 'uniqueIdPrefix'.
+     * Returns a unique projection. It will be prefixed by 'uniqueIdPrefix'.
      */
-    std::string getNextId(const std::string& key);
+    ProjectionName getNextId(const std::string& prefix);
 
     void enterElemMatch(const MatchExpression::MatchType matchType) {
         _elemMatchStack.push_back(matchType);
@@ -112,11 +112,11 @@ private:
     const bool _assertPathSort;
 
     // The name of the input projection on which the top-level expression will be evaluated.
-    const std::string _rootProjection;
+    const ProjectionName _rootProjection;
     const ABT _rootProjVar;
 
     // Used to vend out unique strings for projection names.
-    const std::string _uniqueIdPrefix;
+    const boost::optional<ProjectionName> _uniqueIdPrefix;
     PrefixId _prefixId;
 
     // Used to track the parts of the expression tree that have so far been translated to ABT.

@@ -256,11 +256,11 @@ public:
         ABT path = translateFieldPath(
             fieldPath,
             make<PathIdentity>(),
-            [](const std::string& fieldName, const bool isLastElement, ABT input) {
+            [](FieldNameType fieldName, const bool isLastElement, ABT input) {
                 if (!isLastElement) {
                     input = make<PathTraverse>(std::move(input), PathTraverse::kUnlimited);
                 }
-                return make<PathGet>(fieldName, std::move(input));
+                return make<PathGet>(std::move(fieldName), std::move(input));
             },
             1ul);
 
@@ -272,7 +272,7 @@ public:
         uassert(6624427,
                 "Filter variable must be user-defined.",
                 Variables::isUserDefinedVariable(varId));
-        const std::string& varName = generateVariableName(varId);
+        const ProjectionName varName{generateVariableName(varId)};
 
         _ctx.ensureArity(2);
         ABT filter = _ctx.pop();
@@ -856,10 +856,13 @@ private:
         _ctx.push(std::move(current));
     }
 
-    std::string generateVariableName(const Variables::Id varId) {
-        std::ostringstream os;
-        os << _ctx.getUniqueIdPrefix() << "_var_" << varId;
-        return os.str();
+    ProjectionName generateVariableName(const Variables::Id varId) {
+        str::stream os;
+        if (const auto& projName = _ctx.getUniqueIdPrefix()) {
+            os << *projName << "_";
+        }
+        os << "var_" << varId;
+        return ProjectionName{os};
     }
 
     void unsupportedExpression(const char* op) const {
@@ -884,10 +887,12 @@ private:
 };
 
 ABT generateAggExpression(const Expression* expr,
-                          const std::string& rootProjection,
-                          const std::string& uniqueIdPrefix) {
-    ExpressionAlgebrizerContext ctx(
-        true /*assertExprSort*/, false /*assertPathSort*/, rootProjection, uniqueIdPrefix);
+                          const ProjectionName& rootProjection,
+                          boost::optional<ProjectionName> uniqueIdPrefix) {
+    ExpressionAlgebrizerContext ctx(true /*assertExprSort*/,
+                                    false /*assertPathSort*/,
+                                    rootProjection,
+                                    std::move(uniqueIdPrefix));
     ABTAggExpressionVisitor visitor(ctx);
 
     AggExpressionWalker walker(&visitor);

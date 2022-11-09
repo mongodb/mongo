@@ -172,12 +172,12 @@ public:
         const auto& requiredProjections =
             getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
 
-        ProjectionName ridProjName;
+        boost::optional<ProjectionName> ridProjName;
         bool needsRID = false;
         if (hasProperty<IndexingAvailability>(_logicalProps)) {
             ridProjName = _ridProjections.at(
                 getPropertyConst<IndexingAvailability>(_logicalProps).getScanDefName());
-            needsRID = requiredProjections.find(ridProjName).second;
+            needsRID = requiredProjections.find(*ridProjName).second;
         }
         if (needsRID && !node.getHasRID()) {
             // We cannot provide RID.
@@ -201,7 +201,7 @@ public:
             }
             if (needsRID) {
                 physNode = make<EvaluationNode>(
-                    std::move(ridProjName), Constant::nothing(), std::move(physNode));
+                    std::move(*ridProjName), Constant::nothing(), std::move(physNode));
                 nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
             }
         } else {
@@ -210,7 +210,7 @@ public:
             physNode = make<LimitSkipNode>(LimitSkipRequirement{1, 0}, std::move(physNode));
             nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
 
-            const ProjectionName valueScanProj = _prefixId.getNextId("valueScan");
+            const ProjectionName valueScanProj{_prefixId.getNextId("valueScan")};
             physNode =
                 make<EvaluationNode>(valueScanProj, node.getValueArray(), std::move(physNode));
             nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
@@ -245,7 +245,7 @@ public:
             if (needsRID) {
                 // Obtain row id from first element of the array.
                 physNode = make<EvaluationNode>(
-                    std::move(ridProjName), getElementFn(0), std::move(physNode));
+                    std::move(*ridProjName), getElementFn(0), std::move(physNode));
                 nodeCEMap.emplace(physNode.cast<Node>(), node.getArraySize());
             }
         }
@@ -269,7 +269,7 @@ public:
             return;
         }
 
-        VariableNameSetType references = collectVariableReferences(n);
+        ProjectionNameSet references = collectVariableReferences(n);
         if (checkIntroducesScanProjectionUnderIndexOnly(references)) {
             // Reject if under indexing requirements and now we introduce dependence on scan
             // projection.
@@ -349,7 +349,7 @@ public:
         // requirement.
         PhysProps newProps = _physProps;
 
-        VariableNameSetType references = collectVariableReferences(n);
+        ProjectionNameSet references = collectVariableReferences(n);
         if (checkIntroducesScanProjectionUnderIndexOnly(references)) {
             // Reject if under indexing requirements and now we introduce dependence on scan
             // projection.
@@ -572,8 +572,9 @@ public:
                     !areCompoundIntervalsEqualities(*singularInterval) && indexDef.isMultiKey() &&
                     requirements.getDedupRID();
 
-                indexProjectionMap._ridProjection =
-                    (needsRID || needsUniqueStage) ? ridProjName : "";
+                if (needsRID || needsUniqueStage) {
+                    indexProjectionMap._ridProjection = ridProjName;
+                }
                 if (singularInterval) {
                     physNode =
                         make<IndexScanNode>(std::move(indexProjectionMap),
@@ -943,7 +944,7 @@ public:
                 getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
 
             // Add expression references to requirements.
-            VariableNameSetType references = collectVariableReferences(n);
+            ProjectionNameSet references = collectVariableReferences(n);
             for (const auto& varName : references) {
                 reqProjections.emplace_back(varName);
             }
@@ -978,7 +979,7 @@ public:
 
             // Split collation between inner and outer side.
             const CollationSplitResult& collationSplit = splitCollationSpec(
-                "" /*ridProjName*/, collationSpec, leftProjections, rightProjections);
+                boost::none /*ridProjName*/, collationSpec, leftProjections, rightProjections);
             if (!collationSplit._validSplit) {
                 return;
             }
@@ -1102,7 +1103,7 @@ public:
         // Iterate over the aggregation expressions and only add those required.
         ABTVector aggregationProjections;
         ProjectionNameVector aggregationProjectionNames;
-        VariableNameSetType projectionsToAdd;
+        ProjectionNameSet projectionsToAdd;
         for (const ProjectionName& groupByProjName : groupByProjections) {
             projectionsToAdd.insert(groupByProjName);
         }
@@ -1310,7 +1311,7 @@ private:
                 const bool needsCollation =
                     candidateIndexEntry._fieldsToCollate.count(indexField) > 0;
 
-                auto it = fieldProjections.find(encodeIndexKeyName(indexField));
+                auto it = fieldProjections.find(FieldNameType{encodeIndexKeyName(indexField)});
                 if (it == fieldProjections.cend()) {
                     // No bound projection for this index field.
                     if (needsCollation) {
@@ -1369,7 +1370,7 @@ private:
      * Check if we are under index-only requirements and expression introduces dependency on scan
      * projection.
      */
-    bool checkIntroducesScanProjectionUnderIndexOnly(const VariableNameSetType& references) {
+    bool checkIntroducesScanProjectionUnderIndexOnly(const ProjectionNameSet& references) {
         return hasProperty<IndexingAvailability>(_logicalProps) &&
             getPropertyConst<IndexingRequirement>(_physProps).getIndexReqTarget() ==
             IndexReqTarget::Index &&

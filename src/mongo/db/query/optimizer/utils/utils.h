@@ -44,11 +44,13 @@ inline void updateHashUnordered(size_t& result, const size_t hash) {
     result ^= hash;
 }
 
-template <class T, class T1 = std::conditional_t<std::is_arithmetic_v<T>, const T, const T&>>
+template <class T,
+          class Hasher = std::hash<T>,
+          class T1 = std::conditional_t<std::is_arithmetic_v<T>, const T, const T&>>
 inline size_t computeVectorHash(const std::vector<T>& v) {
     size_t result = 17;
     for (T1 e : v) {
-        updateHash(result, std::hash<T>()(e));
+        updateHash(result, Hasher()(e));
     }
     return result;
 }
@@ -89,21 +91,21 @@ inline void maybeComposePaths(ABTVector& paths) {
     while (paths.size() > 1) {
         const size_t half = paths.size() / 2;
         for (size_t i = 0; i < half; i++) {
-            maybeComposePath<Element>(paths.at(i), std::move(paths.at(paths.size() - i - 1)));
+            maybeComposePath<Element>(paths.at(i), std::move(paths.back()));
+            paths.pop_back();
         }
-        paths.resize(paths.size() - half, make<Blackhole>());
     }
 }
 
 /**
- * Used to vend out fresh ids for projection names.
+ * Used to vend out fresh projection names.
  */
 class PrefixId {
 public:
-    std::string getNextId(const std::string& key);
+    ProjectionName getNextId(const StringData& prefix);
 
 private:
-    opt::unordered_map<std::string, int> _idCounterPerKey;
+    opt::unordered_map<std::string, uint64_t> _idCounterPerPrefix;
 };
 
 ProjectionNameOrderedSet convertToOrderedSet(ProjectionNameSet unordered);
@@ -136,7 +138,7 @@ struct CollationSplitResult {
  * Split a collation requirement between an outer (left) and inner (right) side. The outer side must
  * be a prefix in the collation spec, and the right side a suffix.
  */
-CollationSplitResult splitCollationSpec(const ProjectionName& ridProjName,
+CollationSplitResult splitCollationSpec(const boost::optional<ProjectionName>& ridProjName,
                                         const ProjectionCollationSpec& collationSpec,
                                         const ProjectionNameSet& leftProjections,
                                         const ProjectionNameSet& rightProjections);

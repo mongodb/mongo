@@ -81,7 +81,7 @@ TEST(CEDataflowTest, EstimateTrivialNodes) {
 
 TEST(CEDataflowTest, EstimateUnionNode) {
     auto makeUnionBranch = [](const std::string& collName) {
-        auto scanVar = "scan_" + collName;
+        ProjectionName scanVar{"scan_" + collName};
         auto scanNode = make<ScanNode>(scanVar, collName);
         auto evalPath =
             make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>(scanVar));

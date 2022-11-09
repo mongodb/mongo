@@ -70,7 +70,7 @@ ScanDefinition createScanDef(ScanDefOptions options,
     // Simplify partial filter requirements using the non-multikey paths.
     for (auto& [indexDefName, indexDef] : indexDefs) {
         [[maybe_unused]] const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
-            "" /*scanProjName*/, multikeynessTrie, indexDef.getPartialReqMap(), constFold);
+            "<root>", multikeynessTrie, indexDef.getPartialReqMap(), constFold);
         // If "hasEmptyInterval" is set, we have a partial filter index with an unsatisfiable
         // condition, which is thus guaranteed to never contain any documents.
     }

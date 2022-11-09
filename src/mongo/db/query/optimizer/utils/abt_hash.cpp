@@ -37,7 +37,7 @@ namespace mongo::optimizer {
 static size_t computeCollationHash(const properties::CollationRequirement& prop) {
     size_t collationHash = 17;
     for (const auto& entry : prop.getCollationSpec()) {
-        updateHash(collationHash, std::hash<ProjectionName>()(entry.first));
+        updateHash(collationHash, ProjectionName::Hasher()(entry.first));
         updateHash(collationHash, std::hash<CollationOp>()(entry.second));
     }
     return collationHash;
@@ -53,7 +53,7 @@ static size_t computeLimitSkipHash(const properties::LimitSkipRequirement& prop)
 static size_t computePropertyProjectionsHash(const ProjectionNameVector& projections) {
     size_t resultHash = 17;
     for (const ProjectionName& projection : projections) {
-        updateHashUnordered(resultHash, std::hash<ProjectionName>()(projection));
+        updateHashUnordered(resultHash, ProjectionName::Hasher()(projection));
     }
     return resultHash;
 }
@@ -123,9 +123,14 @@ static size_t computePartialSchemaReqHash(const PartialSchemaRequirements& reqMa
 
     IntervalHasher<IntervalReqExpr> intervalHasher;
     for (const auto& [key, req] : reqMap) {
-        updateHash(result, std::hash<ProjectionName>()(key._projectionName));
+        if (const auto& projName = key._projectionName) {
+            updateHash(result, ProjectionName::Hasher()(*projName));
+        }
         updateHash(result, ABTHashGenerator::generate(key._path));
-        updateHash(result, std::hash<ProjectionName>()(req.getBoundProjectionName().value_or("")));
+
+        if (const auto& projName = req.getBoundProjectionName()) {
+            updateHash(result, ProjectionName::Hasher()(*projName));
+        }
         updateHash(result, intervalHasher.compute(req.getIntervals()));
         updateHash(result, std::hash<bool>()(req.getIsPerfOnly()));
     }
@@ -152,7 +157,9 @@ public:
     }
 
     size_t transport(const ExpressionBinder& binders, std::vector<size_t> inResults) {
-        return computeHashSeq<2>(computeVectorHash(binders.names()), computeVectorHash(inResults));
+        return computeHashSeq<2>(
+            computeVectorHash<ProjectionName, ProjectionName::Hasher>(binders.names()),
+            computeVectorHash(inResults));
     }
 
     size_t transport(const ScanNode& node, size_t bindResult) {
@@ -194,7 +201,7 @@ public:
                      size_t leftChildResult,
                      size_t rightChildResult) {
         // Specifically always including children.
-        return computeHashSeq<45>(std::hash<ProjectionName>()(node.getScanProjectionName()),
+        return computeHashSeq<45>(ProjectionName::Hasher()(node.getScanProjectionName()),
                                   leftChildResult,
                                   rightChildResult);
     }
@@ -267,7 +274,7 @@ public:
     }
 
     size_t transport(const Variable& expr) {
-        return computeHashSeq<18>(std::hash<std::string>()(expr.name()));
+        return computeHashSeq<18>(ProjectionName::Hasher()(expr.name()));
     }
 
     size_t transport(const UnaryOp& expr, size_t inResult) {
@@ -283,11 +290,11 @@ public:
     }
 
     size_t transport(const Let& expr, size_t bindResult, size_t exprResult) {
-        return computeHashSeq<22>(std::hash<std::string>()(expr.varName()), bindResult, exprResult);
+        return computeHashSeq<22>(ProjectionName::Hasher()(expr.varName()), bindResult, exprResult);
     }
 
     size_t transport(const LambdaAbstraction& expr, size_t inResult) {
-        return computeHashSeq<23>(std::hash<std::string>()(expr.varName()), inResult);
+        return computeHashSeq<23>(ProjectionName::Hasher()(expr.varName()), inResult);
     }
 
     size_t transport(const LambdaApplication& expr, size_t lambdaResult, size_t argumentResult) {
@@ -336,16 +343,16 @@ public:
 
     size_t transport(const PathDrop& path) {
         size_t namesHash = 17;
-        for (const std::string& name : path.getNames()) {
-            updateHash(namesHash, std::hash<std::string>()(name));
+        for (const FieldNameType& name : path.getNames()) {
+            updateHash(namesHash, FieldNameType::Hasher()(name));
         }
         return computeHashSeq<34>(namesHash);
     }
 
     size_t transport(const PathKeep& path) {
         size_t namesHash = 17;
-        for (const std::string& name : path.getNames()) {
-            updateHash(namesHash, std::hash<std::string>()(name));
+        for (const FieldNameType& name : path.getNames()) {
+            updateHash(namesHash, FieldNameType::Hasher()(name));
         }
         return computeHashSeq<35>(namesHash);
     }
@@ -363,11 +370,11 @@ public:
     }
 
     size_t transport(const PathField& path, size_t inResult) {
-        return computeHashSeq<39>(std::hash<std::string>()(path.name()), inResult);
+        return computeHashSeq<39>(FieldNameType::Hasher()(path.name()), inResult);
     }
 
     size_t transport(const PathGet& path, size_t inResult) {
-        return computeHashSeq<40>(std::hash<std::string>()(path.name()), inResult);
+        return computeHashSeq<40>(FieldNameType::Hasher()(path.name()), inResult);
     }
 
     size_t transport(const PathComposeM& path, size_t leftResult, size_t rightResult) {

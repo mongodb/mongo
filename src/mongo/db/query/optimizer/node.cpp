@@ -79,11 +79,11 @@ static ProjectionNameVector extractProjectionNamesForScan(
     const FieldProjectionMap& fieldProjectionMap) {
     ProjectionNameVector result;
 
-    if (!fieldProjectionMap._ridProjection.empty()) {
-        result.push_back(fieldProjectionMap._ridProjection);
+    if (const auto& projName = fieldProjectionMap._ridProjection) {
+        result.push_back(*projName);
     }
-    if (!fieldProjectionMap._rootProjection.empty()) {
-        result.push_back(fieldProjectionMap._rootProjection);
+    if (const auto& projName = fieldProjectionMap._rootProjection) {
+        result.push_back(*projName);
     }
     for (const auto& entry : fieldProjectionMap._fieldProjections) {
         result.push_back(entry.second);
@@ -278,7 +278,6 @@ EvaluationNode::EvaluationNode(ProjectionName projectionName, ProjectionType pro
     : Base(std::move(child),
            make<ExpressionBinder>(std::move(projectionName), std::move(projection))) {
     assertNodeSort(getChild());
-    tassert(6684504, "Empty projection name", !getProjectionName().empty());
 }
 
 bool EvaluationNode::operator==(const EvaluationNode& other) const {
@@ -331,7 +330,7 @@ static ProjectionNameVector createSargableBindings(const PartialSchemaRequiremen
 static ProjectionNameVector createSargableReferences(const PartialSchemaRequirements& reqMap) {
     ProjectionNameOrderPreservingSet result;
     for (const auto& entry : reqMap) {
-        result.emplace_back(entry.first._projectionName);
+        result.emplace_back(*entry.first._projectionName);
     }
     return result.getVector();
 }
@@ -378,7 +377,7 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
     for (const auto& [key, req] : _reqMap) {
         tassert(6624088,
                 "SargableNode cannot reference an internally bound projection",
-                boundsProjectionNameSet.count(key._projectionName) == 0);
+                boundsProjectionNameSet.count(*key._projectionName) == 0);
     }
 }
 

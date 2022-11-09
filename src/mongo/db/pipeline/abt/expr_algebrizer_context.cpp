@@ -31,15 +31,16 @@
 
 namespace mongo::optimizer {
 
-ExpressionAlgebrizerContext::ExpressionAlgebrizerContext(const bool assertExprSort,
-                                                         const bool assertPathSort,
-                                                         const std::string& rootProjection,
-                                                         const std::string& uniqueIdPrefix)
+ExpressionAlgebrizerContext::ExpressionAlgebrizerContext(
+    const bool assertExprSort,
+    const bool assertPathSort,
+    const ProjectionName& rootProjection,
+    boost::optional<ProjectionName> uniqueIdPrefix)
     : _assertExprSort(assertExprSort),
       _assertPathSort(assertPathSort),
       _rootProjection(rootProjection),
       _rootProjVar(make<Variable>(_rootProjection)),
-      _uniqueIdPrefix(uniqueIdPrefix),
+      _uniqueIdPrefix(std::move(uniqueIdPrefix)),
       _prefixId() {}
 
 void ExpressionAlgebrizerContext::push(ABT node) {
@@ -64,7 +65,7 @@ void ExpressionAlgebrizerContext::ensureArity(const size_t arity) {
     uassert(6624429, "Arity violation", _stack.size() >= arity);
 }
 
-const std::string& ExpressionAlgebrizerContext::getRootProjection() const {
+const ProjectionName& ExpressionAlgebrizerContext::getRootProjection() const {
     return _rootProjection;
 }
 
@@ -72,12 +73,15 @@ const ABT& ExpressionAlgebrizerContext::getRootProjVar() const {
     return _rootProjVar;
 }
 
-const std::string& ExpressionAlgebrizerContext::getUniqueIdPrefix() const {
+const boost::optional<ProjectionName>& ExpressionAlgebrizerContext::getUniqueIdPrefix() const {
     return _uniqueIdPrefix;
 }
 
-std::string ExpressionAlgebrizerContext::getNextId(const std::string& key) {
-    return getUniqueIdPrefix() + "_" + _prefixId.getNextId(key);
+ProjectionName ExpressionAlgebrizerContext::getNextId(const std::string& prefix) {
+    if (const auto& projName = _uniqueIdPrefix) {
+        return _prefixId.getNextId(str::stream() << *projName << "_" << prefix);
+    }
+    return _prefixId.getNextId(prefix);
 }
 
 }  // namespace mongo::optimizer

@@ -56,7 +56,11 @@ int compareContainers(const T& n1, const T& n2, const Fn& fn) {
     return 0;
 }
 
-int compareStrings(const std::string& v1, const std::string& v2) {
+/**
+ * Used to compare strings and strong string aliases.
+ */
+template <class T>
+int compareStrings(const T& v1, const T& v2) {
     return v1.compare(v2);
 }
 
@@ -220,11 +224,11 @@ private:
     }
 
     int compare(const PathDrop& node, const PathDrop& other) {
-        return compareContainers(node.getNames(), other.getNames(), compareStrings);
+        return compareContainers(node.getNames(), other.getNames(), compareStrings<FieldNameType>);
     }
 
     int compare(const PathKeep& node, const PathKeep& other) {
-        return compareContainers(node.getNames(), other.getNames(), compareStrings);
+        return compareContainers(node.getNames(), other.getNames(), compareStrings<FieldNameType>);
     }
 
     int compare(const PathObj& node, const PathObj& other) {
@@ -277,7 +281,8 @@ private:
     }
 
     int compare(const ExpressionBinder& node, const ExpressionBinder& other) {
-        const int cmp = compareContainers(node.names(), other.names(), compareStrings);
+        const int cmp =
+            compareContainers(node.names(), other.names(), compareStrings<ProjectionName>);
         if (cmp != 0) {
             return cmp;
         }

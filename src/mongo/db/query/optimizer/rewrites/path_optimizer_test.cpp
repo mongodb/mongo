@@ -410,7 +410,7 @@ TEST(Path, Fuse5) {
 
     auto project = make<EvaluationNode>(
         "x",
-        make<EvalPath>(make<PathKeep>(PathKeep::NameSet{"a", "b", "c"}), make<Variable>("root")),
+        make<EvalPath>(make<PathKeep>(FieldNameOrderedSet{"a", "b", "c"}), make<Variable>("root")),
         std::move(scanNode));
 
     // Get "a" Traverse Compare= 2
@@ -494,11 +494,11 @@ TEST(Path, Fuse6) {
 
     auto project = make<EvaluationNode>(
         "x",
-        make<EvalPath>(
-            make<PathComposeM>(make<PathComposeM>(make<PathObj>(),
-                                                  make<PathKeep>(PathKeep::NameSet{"a", "b", "c"})),
-                               make<PathField>("a", make<PathConstant>(Constant::emptyObject()))),
-            make<Variable>("root")),
+        make<EvalPath>(make<PathComposeM>(
+                           make<PathComposeM>(make<PathObj>(),
+                                              make<PathKeep>(FieldNameOrderedSet{"a", "b", "c"})),
+                           make<PathField>("a", make<PathConstant>(Constant::emptyObject()))),
+                       make<Variable>("root")),
         std::move(scanNode));
 
     auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"x"}},
@@ -576,7 +576,7 @@ TEST(Path, Fuse7) {
         "py",
         make<EvalPath>(
             make<PathComposeM>(
-                make<PathComposeM>(make<PathKeep>(PathKeep::NameSet{"a"}),
+                make<PathComposeM>(make<PathKeep>(FieldNameOrderedSet{"a"}),
                                    make<PathField>("a", make<PathConstant>(make<Variable>("px")))),
                 make<PathDefault>(Constant::emptyObject())),
             make<Variable>("root")),
@@ -873,9 +873,9 @@ TEST(Path, ProjElim2) {
 
 TEST(Path, ProjElim3) {
     auto node = make<ScanNode>("root", "test");
-    std::string var = "root";
+    ProjectionName var{"root"};
     for (int i = 0; i < 100; ++i) {
-        std::string newVar = "p" + std::to_string(i);
+        ProjectionName newVar{"p" + std::to_string(i)};
         node = make<EvaluationNode>(
             newVar,
             // make<FunctionCall>("anyFunctionWillDo", makeSeq(make<Variable>(var))),

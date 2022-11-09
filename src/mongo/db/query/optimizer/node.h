@@ -844,11 +844,6 @@ public:
 
 private:
     properties::DistributionRequirement _distribution;
-
-    /**
-     * Defined for hash and range-based partitioning.
-     */
-    const ProjectionName _projectionName;
 };
 
 /**

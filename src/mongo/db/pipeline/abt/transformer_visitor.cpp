@@ -58,7 +58,7 @@ void ABTTransformerVisitor::visit(const GroupFromFirstDocumentTransformation* tr
 
 void ABTTransformerVisitor::visit(const ReplaceRootTransformation* transformer) {
     auto entry = _ctx.getNode();
-    const std::string& projName = _ctx.getNextId("newRoot");
+    const ProjectionName projName{_ctx.getNextId("newRoot")};
     ABT expr =
         generateAggExpression(transformer->getExpression().get(), entry._rootProjection, projName);
 
@@ -112,7 +112,7 @@ void ABTTransformerVisitor::processProjectedPaths(const projection_executor::Inc
  * Handles renamed fields and computed projections.
  */
 void ABTTransformerVisitor::processComputedPaths(const projection_executor::InclusionNode& node,
-                                                 const std::string& rootProjection,
+                                                 const ProjectionName& rootProjection,
                                                  const bool isAddingFields) {
     OrderedPathSet computedPaths;
     StringMap<std::string> renamedPaths;
@@ -123,15 +123,15 @@ void ABTTransformerVisitor::processComputedPaths(const projection_executor::Incl
         ABT path = translateFieldPath(
             FieldPath(renamedPathEntry.second),
             make<PathIdentity>(),
-            [](const std::string& fieldName, const bool isLastElement, ABT input) {
+            [](FieldNameType fieldName, const bool isLastElement, ABT input) {
                 return make<PathGet>(
-                    fieldName,
+                    std::move(fieldName),
                     isLastElement ? std::move(input)
                                   : make<PathTraverse>(std::move(input), PathTraverse::kUnlimited));
             });
 
         auto entry = _ctx.getNode();
-        const std::string& renamedProjName = _ctx.getNextId("projRenamedPath");
+        const ProjectionName renamedProjName{_ctx.getNextId("projRenamedPath")};
         _ctx.setNode<EvaluationNode>(
             entry._rootProjection,
             renamedProjName,
@@ -158,7 +158,7 @@ void ABTTransformerVisitor::processComputedPaths(const projection_executor::Incl
         const FieldPath computedPath(computedPathStr);
 
         auto entry = _ctx.getNode();
-        const std::string& getProjName = _ctx.getNextId("projGetPath");
+        const ProjectionName getProjName{_ctx.getNextId("projGetPath")};
         ABT getExpr = generateAggExpression(
             node.getExpressionForPath(computedPath).get(), rootProjection, getProjName);
 
@@ -184,7 +184,7 @@ void ABTTransformerVisitor::processComputedPaths(const projection_executor::Incl
 void ABTTransformerVisitor::visitInclusionNode(const projection_executor::InclusionNode& node,
                                                const bool isAddingFields) {
     auto entry = _ctx.getNode();
-    const std::string rootProjection = entry._rootProjection;
+    const ProjectionName rootProjection{entry._rootProjection};
 
     processProjectedPaths(node);
     processComputedPaths(node, rootProjection, isAddingFields);

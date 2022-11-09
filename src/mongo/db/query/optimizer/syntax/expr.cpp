@@ -57,7 +57,7 @@ ABT Constant::createFromCopy(const sbe::value::TypeTags tag, const sbe::value::V
     return make<Constant>(copy.first, copy.second);
 }
 
-ABT Constant::str(std::string str) {
+ABT Constant::str(StringData str) {
     // Views are non-owning so we have to make a copy.
     auto [tag, val] = makeNewString(str);
     return make<Constant>(tag, val);

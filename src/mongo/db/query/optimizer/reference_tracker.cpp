@@ -35,7 +35,9 @@
 namespace mongo::optimizer {
 
 struct CollectedInfo {
-    using VarRefsMap = opt::unordered_map<std::string, opt::unordered_map<const Variable*, bool>>;
+    using VarRefsMap = opt::unordered_map<ProjectionName,
+                                          opt::unordered_map<const Variable*, bool>,
+                                          ProjectionName::Hasher>;
 
     /**
      * All resolved variables so far, regardless of visibility in the ABT.
@@ -52,7 +54,10 @@ struct CollectedInfo {
      * ABT. Maps from projection name to all Variable instances referencing that name. Variables
      * move from 'freeVars' to 'useMap' when they are resolved.
      */
-    opt::unordered_map<std::string, std::vector<std::reference_wrapper<const Variable>>> freeVars;
+    opt::unordered_map<ProjectionName,
+                       std::vector<std::reference_wrapper<const Variable>>,
+                       ProjectionName::Hasher>
+        freeVars;
 
     /**
      * Maps from a node to the definitions (projections) available for use in its ancestor nodes.
@@ -172,7 +177,7 @@ struct CollectedInfo {
      * Records collected last variable references for a specific variable. Should only be called
      * when the variable is guaranteed not to be referenced again in the ABT.
      */
-    void finalizeLastRefs(const std::string& name) {
+    void finalizeLastRefs(const ProjectionName& name) {
         if (auto it = varLastRefs.find(name); it != varLastRefs.end()) {
             for (auto& [var, isLastRef] : it->second) {
                 if (isLastRef) {
@@ -742,15 +747,15 @@ bool VariableEnvironment::hasFreeVariables() const {
     return !_info->freeVars.empty();
 }
 
-opt::unordered_set<std::string> VariableEnvironment::freeVariableNames() const {
-    opt::unordered_set<std::string> freeVarNames;
+ProjectionNameSet VariableEnvironment::freeVariableNames() const {
+    ProjectionNameSet freeVarNames;
     for (auto&& [name, vars] : _info->freeVars) {
         freeVarNames.insert(name);
     }
     return freeVarNames;
 }
 
-size_t VariableEnvironment::freeOccurences(const std::string& variable) const {
+size_t VariableEnvironment::freeOccurences(const ProjectionName& variable) const {
     auto it = _info->freeVars.find(variable);
     if (it == _info->freeVars.end()) {
         return 0;

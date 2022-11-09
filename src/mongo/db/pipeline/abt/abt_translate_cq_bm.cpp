@@ -59,7 +59,7 @@ public:
 
         Metadata metadata{{}};
         PrefixId prefixId;
-        std::string scanProjName = prefixId.getNextId("scan");
+        ProjectionName scanProjName{prefixId.getNextId("scan")};
 
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(matchSpec);

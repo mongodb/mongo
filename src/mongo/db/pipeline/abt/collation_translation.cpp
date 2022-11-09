@@ -45,7 +45,8 @@ void generateCollationNode(AlgebrizerContext& ctx, const SortPattern& sortPatter
         const FieldPath& fieldPath = part.fieldPath.value();
         ABT sortPath = make<PathIdentity>();
         for (size_t j = 0; j < fieldPath.getPathLength(); j++) {
-            sortPath = make<PathGet>(fieldPath.getFieldName(j).toString(), std::move(sortPath));
+            sortPath = make<PathGet>(FieldNameType{fieldPath.getFieldName(j).toString()},
+                                     std::move(sortPath));
         }
 
         ctx.setNode<EvaluationNode>(

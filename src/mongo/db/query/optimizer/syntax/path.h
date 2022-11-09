@@ -169,20 +169,18 @@ public:
  */
 class PathDrop final : public Operator<0>, public PathSyntaxSort {
 public:
-    using NameSet = std::set<std::string>;
-
-    PathDrop(NameSet inNames) : _names(std::move(inNames)) {}
+    PathDrop(FieldNameOrderedSet inNames) : _names(std::move(inNames)) {}
 
     bool operator==(const PathDrop& other) const {
         return _names == other._names;
     }
 
-    const NameSet& getNames() const {
+    const auto& getNames() const {
         return _names;
     }
 
 private:
-    const NameSet _names;
+    const FieldNameOrderedSet _names;
 };
 
 /**
@@ -193,20 +191,18 @@ private:
  */
 class PathKeep final : public Operator<0>, public PathSyntaxSort {
 public:
-    using NameSet = std::set<std::string>;
-
-    PathKeep(NameSet inNames) : _names(std::move(inNames)) {}
+    PathKeep(FieldNameOrderedSet inNames) : _names(std::move(inNames)) {}
 
     bool operator==(const PathKeep other) const {
         return _names == other._names;
     }
 
-    const NameSet& getNames() const {
+    const auto& getNames() const {
         return _names;
     }
 
 private:
-    const NameSet _names;
+    const FieldNameOrderedSet _names;
 };
 
 /**
@@ -290,10 +286,11 @@ private:
  */
 class PathField final : public Operator<1>, public PathSyntaxSort {
     using Base = Operator<1>;
-    std::string _name;
+    FieldNameType _name;
 
 public:
-    PathField(std::string inName, ABT inPath) : Base(std::move(inPath)), _name(std::move(inName)) {
+    PathField(FieldNameType inName, ABT inPath)
+        : Base(std::move(inPath)), _name(std::move(inName)) {
         assertPathSort(getPath());
     }
 
@@ -323,10 +320,10 @@ public:
  */
 class PathGet final : public Operator<1>, public PathSyntaxSort {
     using Base = Operator<1>;
-    std::string _name;
+    FieldNameType _name;
 
 public:
-    PathGet(std::string inName, ABT inPath) : Base(std::move(inPath)), _name(std::move(inName)) {
+    PathGet(FieldNameType inName, ABT inPath) : Base(std::move(inPath)), _name(std::move(inName)) {
         assertPathSort(getPath());
     }
 

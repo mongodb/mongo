@@ -849,18 +849,18 @@ void SBENodeLowering::generateSlots(const FieldProjectionMap& fieldProjectionMap
                                     boost::optional<sbe::value::SlotId>& rootSlot,
                                     std::vector<std::string>& fields,
                                     sbe::value::SlotVector& vars) {
-    if (!fieldProjectionMap._ridProjection.empty()) {
+    if (const auto& projName = fieldProjectionMap._ridProjection) {
         ridSlot = _slotIdGenerator.generate();
-        _slotMap.emplace(fieldProjectionMap._ridProjection, ridSlot.value());
+        _slotMap.emplace(*projName, ridSlot.value());
     }
-    if (!fieldProjectionMap._rootProjection.empty()) {
+    if (const auto& projName = fieldProjectionMap._rootProjection) {
         rootSlot = _slotIdGenerator.generate();
-        _slotMap.emplace(fieldProjectionMap._rootProjection, rootSlot.value());
+        _slotMap.emplace(*projName, rootSlot.value());
     }
     for (const auto& [fieldName, projectionName] : fieldProjectionMap._fieldProjections) {
         vars.push_back(_slotIdGenerator.generate());
         _slotMap.emplace(projectionName, vars.back());
-        fields.push_back(fieldName);
+        fields.push_back(fieldName.value().toString());
     }
 }
 

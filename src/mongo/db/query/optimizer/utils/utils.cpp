@@ -60,10 +60,10 @@ bool isSimplePath(const ABT& node) {
     return false;
 }
 
-std::string PrefixId::getNextId(const std::string& key) {
+ProjectionName PrefixId::getNextId(const StringData& prefix) {
     std::ostringstream os;
-    os << key << "_" << _idCounterPerKey[key]++;
-    return os.str();
+    os << prefix << "_" << _idCounterPerPrefix[prefix.toString()]++;
+    return ProjectionName{os.str()};
 }
 
 ProjectionNameOrderedSet convertToOrderedSet(ProjectionNameSet unordered) {
@@ -144,7 +144,7 @@ bool areCompoundIntervalsEqualities(const CompoundIntervalRequirement& intervals
     return true;
 }
 
-CollationSplitResult splitCollationSpec(const ProjectionName& ridProjName,
+CollationSplitResult splitCollationSpec(const boost::optional<ProjectionName>& ridProjName,
                                         const ProjectionCollationSpec& collationSpec,
                                         const ProjectionNameSet& leftProjections,
                                         const ProjectionNameSet& rightProjections) {
@@ -220,7 +220,7 @@ public:
             PartialSchemaRequirements newMap;
 
             for (auto& [key, req] : pathResult->_reqMap) {
-                if (!key._projectionName.empty()) {
+                if (key._projectionName) {
                     return {};
                 }
                 newMap.emplace(PartialSchemaKey{boundVarName, key._path}, std::move(req));
@@ -433,7 +433,7 @@ public:
             auto intervalExpr = IntervalReqExpr::makeSingularDNF(IntervalRequirement{
                 {true /*inclusive*/, Constant::null()}, {true /*inclusive*/, Constant::null()}});
             return {{PartialSchemaRequirements{
-                {PartialSchemaKey{"" /*projectionName*/, make<PathIdentity>()},
+                {PartialSchemaKey{make<PathIdentity>()},
                  PartialSchemaRequirement{boost::none /*boundProjectionName*/,
                                           std::move(intervalExpr),
                                           false /*isPerfOnly*/}}}}};
@@ -456,7 +456,7 @@ public:
         PartialSchemaRequirements newMap;
 
         for (auto& entry : inputResult->_reqMap) {
-            if (!entry.first._projectionName.empty()) {
+            if (entry.first._projectionName) {
                 return {};
             }
 
@@ -467,7 +467,7 @@ public:
             std::swap(appendedPath.cast<T>()->getPath(), path);
             std::swap(path, appendedPath);
 
-            newMap.emplace(PartialSchemaKey{"", std::move(path)}, std::move(entry.second));
+            newMap.emplace(PartialSchemaKey{std::move(path)}, std::move(entry.second));
         }
 
         inputResult->_reqMap = std::move(newMap);
@@ -533,7 +533,7 @@ public:
         }
 
         return {{PartialSchemaRequirements{
-            {PartialSchemaKey{"" /*projectionName*/, make<PathIdentity>()},
+            {PartialSchemaKey{make<PathIdentity>()},
              PartialSchemaRequirement{boost::none /*boundProjectionName*/,
                                       std::move(*unionedInterval),
                                       false /*isPerfOnly*/}}}}};
@@ -583,14 +583,14 @@ public:
         auto intervalExpr = IntervalReqExpr::makeSingularDNF(IntervalRequirement{
             {lowBoundInclusive, std::move(lowBound)}, {highBoundInclusive, std::move(highBound)}});
         return {{PartialSchemaRequirements{
-            {PartialSchemaKey{"" /*projectionName*/, make<PathIdentity>()},
+            {PartialSchemaKey{make<PathIdentity>()},
              PartialSchemaRequirement{boost::none /*boundProjectionName*/,
                                       std::move(intervalExpr),
                                       false /*isPerfOnly*/}}}}};
     }
 
     ResultType transport(const ABT& n, const PathIdentity& pathIdentity) {
-        return {{PartialSchemaRequirements{{{"" /*projectionName*/, n},
+        return {{PartialSchemaRequirements{{{n},
                                             {boost::none /*boundProjectionName*/,
                                              IntervalReqExpr::makeSingularDNF(),
                                              false /*isPerfOnly*/}}}}};
@@ -615,7 +615,7 @@ public:
             // If we have a path converter, attempt to convert directly into bounds.
             if (auto conversion = _pathToInterval(n); conversion) {
                 return {{PartialSchemaRequirements{
-                    {PartialSchemaKey{"" /*projectionName*/, make<PathIdentity>()},
+                    {PartialSchemaKey{make<PathIdentity>()},
                      PartialSchemaRequirement{boost::none /*boundProjectionName*/,
                                               std::move(*conversion),
                                               false /*isPerfOnly*/}}}}};
@@ -1147,7 +1147,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                 if (!req.getIsPerfOnly()) {
                     // Only regular requirements are added to residual predicates.
                     const ProjectionName& tempProjName = getExistingOrTempProjForFieldName(
-                        prefixId, encodeIndexKeyName(indexField), fieldProjMap);
+                        prefixId, FieldNameType{encodeIndexKeyName(indexField)}, fieldProjMap);
                     entry._residualRequirements.emplace_back(
                         PartialSchemaKey{tempProjName, std::move(*fusedPath._suffix)},
                         req,
@@ -1408,7 +1408,7 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
 
     if (const auto& boundProjName = req.getBoundProjectionName()) {
         node = make<EvaluationNode>(*boundProjName,
-                                    make<EvalPath>(key._path, make<Variable>(key._projectionName)),
+                                    make<EvalPath>(key._path, make<Variable>(*key._projectionName)),
                                     std::move(node));
         visitor(node);
 
@@ -1425,9 +1425,9 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
         path = key._path;
         appender.append(path);
 
-        node =
-            make<FilterNode>(make<EvalFilter>(std::move(path), make<Variable>(key._projectionName)),
-                             std::move(node));
+        node = make<FilterNode>(
+            make<EvalFilter>(std::move(path), make<Variable>(*key._projectionName)),
+            std::move(node));
         visitor(node);
     }
 }
@@ -1522,7 +1522,7 @@ void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& r
             }
         }
 
-        residualTempProjections.insert(key._projectionName);
+        residualTempProjections.insert(*key._projectionName);
         it++;
     }
 
@@ -1769,7 +1769,7 @@ public:
         _estimateStack.push_back(childSel);
 
         FieldProjectionMap childMap = _fpmStack.back();
-        if (childMap._ridProjection.empty()) {
+        if (!childMap._ridProjection) {
             childMap._ridProjection = _ridProjName;
         }
         if (childCount > 1) {
@@ -1799,7 +1799,7 @@ public:
         }
 
         ProjectionNameVector unionProjectionNames;
-        unionProjectionNames.push_back(innerMap._ridProjection);
+        unionProjectionNames.push_back(*innerMap._ridProjection);
         for (const auto& [fieldName, projectionName] : innerMap._fieldProjections) {
             unionProjectionNames.push_back(projectionName);
         }
@@ -1815,7 +1815,7 @@ public:
                 make<FunctionCall>("$first", makeSeq(make<Variable>(projectionName))));
         }
 
-        ProjectionName sideSetProjectionName;
+        boost::optional<ProjectionName> sideSetProjectionName;
         if constexpr (isIntersect) {
             const ProjectionName sideIdProjectionName = _prefixId.getNextId("sideId");
             unionProjectionNames.push_back(sideIdProjectionName);
@@ -1831,13 +1831,13 @@ public:
 
             aggExpressions.emplace_back(
                 make<FunctionCall>("$addToSet", makeSeq(make<Variable>(sideIdProjectionName))));
-            aggProjectionNames.push_back(sideSetProjectionName);
+            aggProjectionNames.push_back(*sideSetProjectionName);
         }
 
         ABT result = make<UnionNode>(std::move(unionProjectionNames), std::move(inputs));
         _nodeCEMap.emplace(result.cast<Node>(), ce);
 
-        result = make<GroupByNode>(ProjectionNameVector{innerMap._ridProjection},
+        result = make<GroupByNode>(ProjectionNameVector{*innerMap._ridProjection},
                                    std::move(aggProjectionNames),
                                    std::move(aggExpressions),
                                    std::move(result));
@@ -1848,7 +1848,7 @@ public:
                 make<EvalFilter>(
                     make<PathCompare>(Operations::Eq, Constant::int64(inputSize)),
                     make<FunctionCall>("getArraySize",
-                                       makeSeq(make<Variable>(sideSetProjectionName)))),
+                                       makeSeq(make<Variable>(*sideSetProjectionName)))),
                 std::move(result));
             _nodeCEMap.emplace(result.cast<Node>(), ce);
         }

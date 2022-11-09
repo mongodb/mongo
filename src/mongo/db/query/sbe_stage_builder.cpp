@@ -859,7 +859,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    const std::string rootStr = "rowStoreRoot";
+    const optimizer::ProjectionName rootStr = "rowStoreRoot";
     optimizer::FieldMapBuilder builder(rootStr, true);
 
     // When building its output document (in 'recordSlot'), the 'ColumnStoreStage' should not try to

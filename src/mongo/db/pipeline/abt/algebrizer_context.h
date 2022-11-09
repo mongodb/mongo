@@ -70,8 +70,8 @@ public:
         return _node;
     }
 
-    std::string getNextId(const std::string& key) {
-        return _prefixId.getNextId(key);
+    ProjectionName getNextId(const std::string& prefix) {
+        return _prefixId.getNextId(prefix);
     }
 
     PrefixId& getPrefixId() {

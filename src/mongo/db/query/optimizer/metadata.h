@@ -88,7 +88,7 @@ struct MultikeynessTrie {
     void merge(const MultikeynessTrie& other);
     void add(const ABT& path);
 
-    opt::unordered_map<std::string, MultikeynessTrie> children;
+    opt::unordered_map<FieldNameType, MultikeynessTrie, FieldNameType::Hasher> children;
     // An empty trie doesn't know whether anything is multikey.
     // 'true' means "not sure" while 'false' means "definitely no arrays".
     bool isMultiKey = true;

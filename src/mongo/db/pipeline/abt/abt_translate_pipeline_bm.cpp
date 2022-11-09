@@ -65,7 +65,7 @@ public:
 
         Metadata metadata{{}};
         PrefixId prefixId;
-        std::string scanProjName = prefixId.getNextId("scan");
+        ProjectionName scanProjName{prefixId.getNextId("scan")};
 
         std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =
             Pipeline::parse(pipeline, expCtx);
