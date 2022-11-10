@@ -487,6 +487,8 @@ public:
     Decimal128 squareRoot(std::uint32_t* signalingFlags,
                           RoundingMode roundMode = kRoundTiesToEven) const;
 
+    Decimal128 scale(int n, RoundingMode roundMode = kRoundTiesToEven) const;
+
     /**
      * This function quantizes the current decimal given a quantum reference
      */

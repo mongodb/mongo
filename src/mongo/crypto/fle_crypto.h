@@ -1141,7 +1141,8 @@ struct OSTType_Double {
 
 OSTType_Double getTypeInfoDouble(double value,
                                  boost::optional<double> min,
-                                 boost::optional<double> max);
+                                 boost::optional<double> max,
+                                 boost::optional<uint32_t> precision);
 /**
  * Describe the encoding of an BSON Decimal (i.e. IEEE 754 Decimal128)
  *
@@ -1159,9 +1160,13 @@ struct OSTType_Decimal128 {
     boost::multiprecision::uint128_t max;
 };
 
+boost::multiprecision::uint128_t toInt128FromDecimal128(Decimal128 dec);
+
 OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
                                          boost::optional<Decimal128> min,
-                                         boost::optional<Decimal128> max);
+                                         boost::optional<Decimal128> max,
+                                         boost::optional<uint32_t> precision);
+
 
 struct FLEFindEdgeTokenSet {
     EDCDerivedFromDataToken edc;
@@ -1216,11 +1221,14 @@ std::unique_ptr<Edges> getEdgesInt64(int64_t value,
 std::unique_ptr<Edges> getEdgesDouble(double value,
                                       boost::optional<double> min,
                                       boost::optional<double> max,
+                                      boost::optional<uint32_t> precision,
                                       int sparsity);
 
 std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
                                           boost::optional<Decimal128> min,
                                           boost::optional<Decimal128> max,
+                                          boost::optional<uint32_t> precision,
+
                                           int sparsity);
 /**
  * Mincover calculator
@@ -1248,6 +1256,7 @@ std::vector<std::string> minCoverDouble(double lowerBound,
                                         bool includeUpperBound,
                                         boost::optional<double> min,
                                         boost::optional<double> max,
+                                        boost::optional<uint32_t> precision,
                                         int sparsity);
 
 std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
@@ -1256,6 +1265,8 @@ std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
                                             bool includeUpperBound,
                                             boost::optional<Decimal128> min,
                                             boost::optional<Decimal128> max,
+                                            boost::optional<uint32_t> precision,
+
                                             int sparsity);
 /**
  * Utility functions manipulating buffers.

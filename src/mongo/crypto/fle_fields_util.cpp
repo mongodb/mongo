@@ -156,5 +156,5 @@ void validateIDLFLE2RangeFindSpec(const FLE2RangeFindSpec* placeholder) {
     auto lb = edgesInfo.getLowerBound().getElement();
     auto ub = edgesInfo.getUpperBound().getElement();
     validateQueryBounds(min.type(), lb, ub);
-}  // namespace mongo
+}
 }  // namespace mongo

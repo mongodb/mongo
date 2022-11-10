@@ -37,6 +37,7 @@
 #include <iomanip>
 #include <iterator>
 #include <limits>
+#include <math.h>
 #include <memory>
 #include <stack>
 #include <string>
@@ -83,10 +84,10 @@
 // Optional defines to help with debugging
 //
 // Appends unencrypted fields to the state collections to aid in debugging
-//#define FLE2_DEBUG_STATE_COLLECTIONS
+// #define FLE2_DEBUG_STATE_COLLECTIONS
 
 // Verbose std::cout to troubleshoot the EmuBinary algorithm
-//#define DEBUG_ENUM_BINARY 1
+// #define DEBUG_ENUM_BINARY 1
 
 #ifdef FLE2_DEBUG_STATE_COLLECTIONS
 static_assert(kDebugBuild == 1, "Only use in debug builds");
@@ -140,6 +141,7 @@ constexpr size_t kHmacKeyOffset = 64;
 
 constexpr boost::multiprecision::uint128_t k1(1);
 constexpr boost::multiprecision::int128_t k10(10);
+constexpr boost::multiprecision::uint128_t k10ui(10);
 
 #ifdef FLE2_DEBUG_STATE_COLLECTIONS
 constexpr auto kDebugId = "_debug_id";
@@ -747,19 +749,12 @@ std::unique_ptr<Edges> getEdges(FLE2RangeInsertSpec spec, int sparsity) {
             uassert(6775508,
                     "max bound must be double",
                     !maxBound.has_value() || maxBound->type() == BSONType::NumberDouble);
-            // TODO - SERVER-69667 remove
-            uassert(7006610,
-                    "unexpected min bound",
-                    !minBound.has_value() ||
-                        minBound->numberDouble() == std::numeric_limits<double>::min());
-            uassert(7006611,
-                    "unexpected max bound",
-                    !maxBound.has_value() ||
-                        maxBound->numberDouble() == std::numeric_limits<double>::max());
-            return getEdgesDouble(element.Double(),
-                                  minBound.map([](BSONElement m) { return m.Double(); }),
-                                  maxBound.map([](BSONElement m) { return m.Double(); }),
-                                  sparsity);
+            return getEdgesDouble(
+                element.Double(),
+                minBound.map([](BSONElement m) { return m.Double(); }),
+                maxBound.map([](BSONElement m) { return m.Double(); }),
+                spec.getPrecision().map([](std::int32_t m) { return static_cast<uint32_t>(m); }),
+                sparsity);
 
         case BSONType::NumberDecimal:
             uassert(6775509,
@@ -768,19 +763,12 @@ std::unique_ptr<Edges> getEdges(FLE2RangeInsertSpec spec, int sparsity) {
             uassert(6775510,
                     "max bound must be decimal",
                     !maxBound.has_value() || maxBound->type() == BSONType::NumberDecimal);
-            // TODO - SERVER-69667 remove
-            uassert(7006612,
-                    "unexpected min bound",
-                    !minBound.has_value() ||
-                        minBound->numberDecimal() == Decimal128::kLargestNegative);
-            uassert(7006613,
-                    "unexpected max bound",
-                    !maxBound.has_value() ||
-                        maxBound->numberDecimal() == Decimal128::kLargestPositive);
-            return getEdgesDecimal128(element.numberDecimal(),
-                                      minBound.map([](BSONElement m) { return m.numberDecimal(); }),
-                                      maxBound.map([](BSONElement m) { return m.numberDecimal(); }),
-                                      sparsity);
+            return getEdgesDecimal128(
+                element.numberDecimal(),
+                minBound.map([](BSONElement m) { return m.numberDecimal(); }),
+                maxBound.map([](BSONElement m) { return m.numberDecimal(); }),
+                spec.getPrecision().map([](std::int32_t m) { return static_cast<uint32_t>(m); }),
+                sparsity);
 
         default:
             uassert(6775500, "must use supported FLE2 range type", false);
@@ -1512,6 +1500,14 @@ boost::multiprecision::int128_t exp10(int x) {
     return pow(k10, x);
 }
 
+boost::multiprecision::uint128_t exp10ui128(int x) {
+    return pow(k10ui, x);
+}
+
+double exp10Double(int x) {
+    return pow(10, x);
+}
+
 }  // namespace
 
 std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t sparsity) {
@@ -1573,8 +1569,11 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
                                   includeLowerBound,
                                   upperBound.numberDouble(),
                                   includeUpperBound,
-                                  indexMin.Double(),
-                                  indexMax.Double(),
+                                  indexMin.numberDouble(),
+                                  indexMax.numberDouble(),
+                                  edgesInfo.getPrecision().map(
+                                      [](std::int32_t m) { return static_cast<uint32_t>(m); }),
+
                                   sparsity);
         case NumberDecimal:
             return minCoverDecimal128(lowerBound.numberDecimal(),
@@ -1583,6 +1582,9 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
                                       includeUpperBound,
                                       indexMin.numberDecimal(),
                                       indexMax.numberDecimal(),
+                                      edgesInfo.getPrecision().map(
+                                          [](std::int32_t m) { return static_cast<uint32_t>(m); }),
+
                                       sparsity);
         default:
             // IDL validates that no other type is permitted.
@@ -3501,9 +3503,10 @@ OSTType_Int64 getTypeInfo64(int64_t value,
 
 OSTType_Double getTypeInfoDouble(double value,
                                  boost::optional<double> min,
-                                 boost::optional<double> max) {
+                                 boost::optional<double> max,
+                                 boost::optional<uint32_t> precision) {
     uassert(6775007,
-            "Must specify both a lower and upper bound or no bounds.",
+            "Must specify both a lower bound and upper bound or no bounds.",
             min.has_value() == max.has_value());
 
     uassert(6775008,
@@ -3523,6 +3526,70 @@ OSTType_Double getTypeInfoDouble(double value,
     // Map negative 0 to zero so sign bit is 0.
     if (std::signbit(value) && value == 0) {
         value = 0;
+    }
+
+    // When we use precision mode, we try to represent as a double value that fits in [-2^63, 2^63]
+    // (i.e. is a valid int64)
+    //
+    // This check determines if we can represent the precision truncated value as a 64-bit integer
+    // I.e. Is ((ub - lb) * 10^precision) < 64 bits.
+    //
+    // It is important we determine whether a range and its precision fit without looking that value
+    // because the encoding for precision truncated doubles is incompatible with the encoding for
+    // doubles without precision.
+    //
+    bool use_precision_mode = false;
+    uint32_t bits_range;
+    if (precision.has_value()) {
+
+        // Subnormal representations can support up to 5x10^-324 as a number
+        uassert(6966801,
+                "Precision must be between 0 and 324 inclusive",
+                precision.get() >= 0 && precision.get() <= 324);
+
+        uassert(6966803,
+                "Must specify both a lower bound, upper bound and precision",
+                min.has_value() == max.has_value() && max.has_value() == precision.has_value());
+
+        double range = max.get() - min.get();
+
+        // We can overflow if max = max double and min = min double so make sure we have finite
+        // number after we do subtraction
+        if (std::isfinite(range)) {
+
+            // This creates a range which is wider then we permit by our min/max bounds check with
+            // the +1 but it is as the algorithm is written in the paper.
+            double rangeAndPrecision = (range + 1) * exp10Double(precision.get());
+
+            if (std::isfinite(rangeAndPrecision)) {
+
+                double bits_range_double = log2(rangeAndPrecision);
+                bits_range = ceil(bits_range_double);
+
+                if (bits_range < 64) {
+                    use_precision_mode = true;
+                }
+            }
+        }
+    }
+
+    if (use_precision_mode) {
+
+        // Take a number of xxxx.ppppp and truncate it xxxx.ppp if precision = 3. We do not change
+        // the digits before the decimal place.
+        double v_prime = trunc(value * exp10Double(precision.get())) / exp10Double(precision.get());
+        int64_t v_prime2 = (v_prime - min.get()) * exp10Double(precision.get());
+
+        invariant(v_prime2 < std::numeric_limits<int64_t>::max() && v_prime2 >= 0);
+
+        uint64_t ret = static_cast<uint64_t>(v_prime2);
+
+        // Adjust maximum value to be the max bit range. This will be used by getEdges/minCover to
+        // trim bits.
+        uint64_t max_value = (1ULL << bits_range) - 1;
+        invariant(ret <= max_value);
+
+        return {ret, 0, max_value};
     }
 
     // When we translate the double into "bits", the sign bit means that the negative numbers
@@ -3552,12 +3619,45 @@ OSTType_Double getTypeInfoDouble(double value,
     return {uv, 0, std::numeric_limits<uint64_t>::max()};
 }
 
+boost::multiprecision::uint128_t toInt128FromDecimal128(Decimal128 dec) {
+    // This algorithm only works because it assumes we are dealing with Decimal128 numbers that are
+    // valid uint128 numbers. This means the Decimal128 has to be an integer or else the result is
+    // undefined.
+    invariant(dec.isFinite());
+    invariant(!dec.isNegative());
+
+    // If after rounding, the number has changed, we have a fraction, not an integer.
+    invariant(dec.round() == dec);
+
+    boost::multiprecision::uint128_t ret(dec.getCoefficientHigh());
+
+    ret <<= 64;
+    ret |= dec.getCoefficientLow();
+
+    auto exponent = static_cast<int32_t>(dec.getBiasedExponent()) - Decimal128::kExponentBias;
+
+    auto e1 = exp10ui128(labs(exponent));
+    if (exponent < 0) {
+        ret /= e1;
+    } else {
+        ret *= e1;
+    }
+
+    // Round-trip our new Int128 back to Decimal128 and make sure it is equal to the original
+    // Decimal128 or else.
+    Decimal128 roundTrip(ret.str());
+    invariant(roundTrip == dec);
+
+    return ret;
+}
+
 // For full algorithm see SERVER-68542
 OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
                                          boost::optional<Decimal128> min,
-                                         boost::optional<Decimal128> max) {
+                                         boost::optional<Decimal128> max,
+                                         boost::optional<uint32_t> precision) {
     uassert(6854201,
-            "Must specify both a lower and upper bound or no bounds.",
+            "Must specify both a lower bound and upper bound or no bounds.",
             min.has_value() == max.has_value());
 
     uassert(6854202,
@@ -3573,6 +3673,95 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
                 "Value must be greater than or equal to the minimum value and less than or equal "
                 "to the maximum value",
                 value >= min.value() && value <= max.value());
+    }
+
+    // When we use precision mode, we try to represent as a decimal128 value that fits in [-2^127,
+    // 2^127] (i.e. is a valid int128)
+    //
+    // This check determines if we can represent the precision truncated value as a 128-bit integer
+    // I.e. Is ((ub - lb) * 10^precision) < 128 bits.
+    //
+    // It is important we determine whether a range and its precision fit without looking that value
+    // because the encoding for precision truncated decimal128 is incompatible with normal
+    // decimal128 values.
+    bool use_precision_mode = false;
+    int bits_range = 0;
+    if (precision.has_value()) {
+        uassert(6966804,
+                "Must specify both a lower bound, upper bound and precision",
+                min.has_value() == max.has_value() && max.has_value() == precision.has_value());
+
+        uassert(6966802,
+                "Precision must be between 0 and 6182 inclusive",
+                precision.get() >= 0 && precision.get() <= 6142);
+
+
+        Decimal128 bounds = max.get().subtract(min.get()).add(Decimal128(1));
+
+        if (bounds.isFinite()) {
+            Decimal128 bits_range_dec = bounds.scale(precision.get()).logarithm(Decimal128(2));
+
+            if (bits_range_dec.isFinite() && bits_range_dec < Decimal128(128)) {
+                // kRoundTowardPositive is the same as C99 ceil()
+
+                bits_range = bits_range_dec.toIntExact(Decimal128::kRoundTowardPositive);
+
+                if (bits_range < 128) {
+                    use_precision_mode = true;
+                }
+            }
+        }
+    }
+
+    if (use_precision_mode) {
+        // Example value: 31.4159
+        // Example Precision = 2
+
+        // Shift the number up
+        // Returns: 3141.9
+        Decimal128 valueScaled = value.scale(precision.get());
+
+        // Round the number down
+        // Returns 3141.0
+        Decimal128 valueTruncated = valueScaled.round(Decimal128::kRoundTowardZero);
+
+        // Shift the number down
+        // Returns: 31.41
+        Decimal128 v_prime = valueTruncated.scale(-static_cast<int32_t>(precision.get()));
+
+        // Adjust the number by the lower bound
+        // Make it an integer by scaling the number
+        //
+        // Returns 3141.0
+        Decimal128 v_prime2 = v_prime.subtract(min.get()).scale(precision.get());
+
+        invariant(v_prime2.logarithm(Decimal128(2)).isLess(Decimal128(128)));
+
+        // Now we need to get the Decimal128 out as a 128-bit integer
+        // But Decimal128 does not support conversion to Int128.
+        //
+        // If we think the Decimal128 fits in the range, based on the maximum value, we try to
+        // convert to int64 directly.
+        if (bits_range < 64) {
+
+            // Try conversion to int64, it may fail but since it is easy we try this first.
+            //
+            uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+
+            std::int64_t vPrimeInt264 = v_prime2.toLongExact(&signalingFlags);
+
+            if (signalingFlags == Decimal128::SignalingFlag::kNoFlag) {
+                std::uint64_t vPrimeUInt264 = static_cast<uint64_t>(vPrimeInt264);
+                return {vPrimeUInt264, 0, (1ULL << bits_range) - 1};
+            }
+        }
+
+        boost::multiprecision::uint128_t u_ret = toInt128FromDecimal128(v_prime2);
+
+        boost::multiprecision::uint128_t max_dec =
+            (boost::multiprecision::uint128_t(1) << bits_range) - 1;
+
+        return {u_ret, 0, max_dec};
     }
 
     bool isNegative = value.isNegative();
@@ -3743,16 +3932,18 @@ std::unique_ptr<Edges> getEdgesInt64(int64_t value,
 std::unique_ptr<Edges> getEdgesDouble(double value,
                                       boost::optional<double> min,
                                       boost::optional<double> max,
+                                      boost::optional<uint32_t> precision,
                                       int sparsity) {
-    auto aost = getTypeInfoDouble(value, min, max);
+    auto aost = getTypeInfoDouble(value, min, max, precision);
     return getEdgesT(aost.value, aost.min, aost.max, sparsity);
 }
 
 std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
                                           boost::optional<Decimal128> min,
                                           boost::optional<Decimal128> max,
+                                          boost::optional<uint32_t> precision,
                                           int sparsity) {
-    auto aost = getTypeInfoDecimal128(value, min, max);
+    auto aost = getTypeInfoDecimal128(value, min, max, precision);
     return getEdgesT(aost.value, aost.min, aost.max, sparsity);
 }
 
@@ -3919,9 +4110,10 @@ std::vector<std::string> minCoverDouble(double lowerBound,
                                         bool includeUpperBound,
                                         boost::optional<double> min,
                                         boost::optional<double> max,
+                                        boost::optional<uint32_t> precision,
                                         int sparsity) {
-    auto a = getTypeInfoDouble(lowerBound, min, max);
-    auto b = getTypeInfoDouble(upperBound, min, max);
+    auto a = getTypeInfoDouble(lowerBound, min, max, precision);
+    auto b = getTypeInfoDouble(upperBound, min, max, precision);
     dassert(a.min == b.min);
     dassert(a.max == b.max);
     adjustBounds(a, includeLowerBound, b, includeUpperBound);
@@ -3936,9 +4128,10 @@ std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
                                             bool includeUpperBound,
                                             boost::optional<Decimal128> min,
                                             boost::optional<Decimal128> max,
+                                            boost::optional<uint32_t> precision,
                                             int sparsity) {
-    auto a = getTypeInfoDecimal128(lowerBound, min, max);
-    auto b = getTypeInfoDecimal128(upperBound, min, max);
+    auto a = getTypeInfoDecimal128(lowerBound, min, max, precision);
+    auto b = getTypeInfoDecimal128(upperBound, min, max, precision);
     dassert(a.min == b.min);
     dassert(a.max == b.max);
     adjustBounds(a, includeLowerBound, b, includeUpperBound);

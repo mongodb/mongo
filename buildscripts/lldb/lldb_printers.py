@@ -21,6 +21,7 @@ try:
     import collections
     from bson import json_util
     from bson.codec_options import CodecOptions
+    from bson import Decimal128
 except ImportError:
     print("Warning: Could not load bson library for Python {}.".format(sys.version))
     print("Check with the pip command if pymongo 3.x is installed.")
@@ -36,6 +37,8 @@ def __lldb_init_module(debugger, *_args):
     debugger.HandleCommand("type summary add mongo::StatusWith -F lldb_printers.StatusWithPrinter")
     debugger.HandleCommand("type summary add mongo::StringData -F lldb_printers.StringDataPrinter")
     debugger.HandleCommand("type summary add mongo::UUID -F lldb_printers.UUIDPrinter")
+    debugger.HandleCommand("type summary add mongo::Decimal128 -F lldb_printers.Decimal128Printer")
+
     debugger.HandleCommand(
         "type summary add --summary-string '${var.m_pathname}' 'boost::filesystem::path'")
     debugger.HandleCommand(
@@ -109,6 +112,14 @@ def UUIDPrinter(valobj, *_args):  # pylint: disable=invalid-name
     raw_bytes = [x.GetValueAsUnsigned() for x in char_array]
     uuid_hex_bytes = [hex(b)[2:].zfill(2) for b in raw_bytes]
     return str(uuid.UUID("".join(uuid_hex_bytes)))
+
+
+def Decimal128Printer(valobj, *_args):  # pylint: disable=invalid-name
+    """Print the Decimal128's string value."""
+    value = valobj.GetChildMemberWithName("_value")
+    low64 = value.GetChildMemberWithName("low64").GetValueAsUnsigned()
+    high64 = value.GetChildMemberWithName("high64").GetValueAsUnsigned()
+    return Decimal128((high64, low64))
 
 
 class UniquePtrPrinter:

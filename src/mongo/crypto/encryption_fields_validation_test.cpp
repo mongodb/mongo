@@ -27,34 +27,48 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/document_value/value.h"
+#include "mongo/crypto/encryption_fields_validation.h"
+
 #include "mongo/platform/decimal128.h"
-
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-class EncryptedField;
-class EncryptedFieldConfig;
 
-/*
- * Value: Value to attempt to coerce to field's type.
- * BSONType: Type of the field being queryed against.
- * StringData: A string parameter to support more informative error messages (currently expected
- * to only be either "bounds" (min and max parameters) or "literal", with "literal" being the
- * default)
- *
- * First, checks that the Value's type is supported on a range index. Then, the Value is
- * coerced if applicable:
- * - Int32 value and Int64 field --> coerce value to Int64
- * - Double value Decimal 128 field --> coerce value to Decimal 128
- */
-Value coerceValueToRangeIndexTypes(Value val, BSONType fieldType);
 
-void validateEncryptedField(const EncryptedField* field);
-void validateEncryptedFieldConfig(const EncryptedFieldConfig* config);
+TEST(FLEValidationUtils, ValidateDoublePrecisionRange) {
 
-bool validateDoublePrecisionRange(double d, uint32_t precision);
-bool validateDecimal128PrecisionRange(Decimal128& dec, uint32_t precision);
+
+    ASSERT(validateDoublePrecisionRange(3.000, 0));
+    ASSERT(validateDoublePrecisionRange(3.000, 1));
+    ASSERT(validateDoublePrecisionRange(3.000, 2));
+
+    ASSERT_FALSE(validateDoublePrecisionRange(3.100, 0));
+    ASSERT(validateDoublePrecisionRange(3.100, 1));
+    ASSERT(validateDoublePrecisionRange(3.100, 2));
+
+    ASSERT(validateDoublePrecisionRange(1.000, 3));
+
+    ASSERT_FALSE(validateDoublePrecisionRange(3.140, 1));
+}
+
+bool validateDecimal128PrecisionRangeTest(std::string s, uint32_t precision) {
+    Decimal128 dec(s);
+    return validateDecimal128PrecisionRange(dec, precision);
+}
+
+TEST(FLEValidationUtils, ValidateDecimalPrecisionRange) {
+
+    ASSERT(validateDecimal128PrecisionRangeTest("3.000", 0));
+    ASSERT(validateDecimal128PrecisionRangeTest("3.000", 1));
+    ASSERT(validateDecimal128PrecisionRangeTest("3.000", 2));
+
+    ASSERT_FALSE(validateDecimal128PrecisionRangeTest("3.100", 0));
+    ASSERT(validateDecimal128PrecisionRangeTest("3.100", 1));
+    ASSERT(validateDecimal128PrecisionRangeTest("3.100", 2));
+
+    ASSERT_FALSE(validateDecimal128PrecisionRangeTest("3.140", 1));
+}
+
 }  // namespace mongo

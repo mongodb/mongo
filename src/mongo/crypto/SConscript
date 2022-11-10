@@ -132,6 +132,7 @@ env.CppUnitTest(
     source=[
         'aead_encryption_test.cpp',
         'encryption_fields_util_test.cpp',
+        'encryption_fields_validation_test.cpp',
         'fle_crypto_test.cpp',
         'fle_crypto_test_vectors.cpp',
         'mechanism_scram_test.cpp',

@@ -32,6 +32,7 @@
 #include "mongo/crypto/fle_crypto.h"
 
 #include <algorithm>
+#include <boost/algorithm/string/replace.hpp>
 #include <cstdint>
 #include <iostream>
 #include <limits>
@@ -2354,9 +2355,9 @@ TEST(RangeTest, Int64_Errors) {
     ASSERT_THROWS_CODE(getTypeInfo64(4, LLONG_MIN, LLONG_MIN), AssertionException, 6775005);
 }
 
-
 TEST(RangeTest, Double_Bounds) {
-#define ASSERT_EIB(x, z) ASSERT_EQ(getTypeInfoDouble((x), -1E100, 1E100).value, (z));
+#define ASSERT_EIB(x, z) \
+    ASSERT_EQ(getTypeInfoDouble((x), boost::none, boost::none, boost::none).value, (z));
 
     // Larger numbers map to larger uint64
     ASSERT_EIB(-1111, 4570770991734587392ULL);
@@ -2403,24 +2404,99 @@ TEST(RangeTest, Double_Bounds) {
 #undef ASSERT_EIB
 }
 
+TEST(RangeTest, Double_Bounds_Precision) {
+#define ASSERT_EIBP(x, y, z) ASSERT_EQ(getTypeInfoDouble((x), -100000, 100000, y).value, (z));
+
+    ASSERT_EIBP(3.141592653589, 1, 1000031);
+    ASSERT_EIBP(3.141592653589, 2, 10000314);
+    ASSERT_EIBP(3.141592653589, 3, 100003141);
+    ASSERT_EIBP(3.141592653589, 4, 1000031415);
+    ASSERT_EIBP(3.141592653589, 5, 10000314159);
+    ASSERT_EIBP(3.141592653589, 6, 100003141592);
+    ASSERT_EIBP(3.141592653589, 7, 1000031415926);
+#undef ASSERT_EIBP
+
+
+#define ASSERT_EIBB(v, ub, lb, prc, z)                   \
+    {                                                    \
+        auto _ost = getTypeInfoDouble((v), lb, ub, prc); \
+        ASSERT_NE(_ost.max, 18446744073709551615ULL);    \
+        ASSERT_EQ(_ost.value, z);                        \
+    }
+#define ASSERT_EIBB_OVERFLOW(v, ub, lb, prc, z)          \
+    {                                                    \
+        auto _ost = getTypeInfoDouble((v), lb, ub, prc); \
+        ASSERT_EQ(_ost.max, 18446744073709551615ULL);    \
+        ASSERT_EQ(_ost.value, z);                        \
+    }
+
+    ASSERT_EIBB(0, 1, -1, 3, 1000);
+    ASSERT_EIBB(0, 1, -1E5, 3, 100000000);
+
+    ASSERT_EIBB(-1E-33, 1, -1E5, 3, 100000000);
+
+    ASSERT_EIBB_OVERFLOW(0,
+                         std::numeric_limits<double>::max(),
+                         std::numeric_limits<double>::lowest(),
+                         3,
+                         9223372036854775808ULL);
+
+    ASSERT_EIBB(3.141592653589, 5, 0, 0, 3);
+    ASSERT_EIBB(3.141592653589, 5, 0, 1, 31);
+
+    ASSERT_EIBB(3.141592653589, 5, 0, 2, 314);
+
+    ASSERT_EIBB(3.141592653589, 5, 0, 3, 3141);
+    ASSERT_EIBB(3.141592653589, 5, 0, 16, 31415926535890000);
+
+
+    ASSERT_EIBB(-5, -1, -10, 3, 5000);
+
+
+    ASSERT_EIBB_OVERFLOW(1E100,
+                         std::numeric_limits<double>::max(),
+                         std::numeric_limits<double>::lowest(),
+                         3,
+                         15326393489903895421ULL);
+
+    ASSERT_EIBB(1E9, 1E10, 0, 3, 1000000000000);
+    ASSERT_EIBB(1E9, 1E10, 0, 0, 1000000000);
+
+
+    ASSERT_EIBB(-5, 10, -10, 0, 5);
+    ASSERT_EIBB(-5, 10, -10, 2, 500);
+
+    ASSERT_EIBB_OVERFLOW(1E-30, 10E-30, 1E-30, 35, 13381399884061196960ULL);
+
+#undef ASSERT_EIBB
+#undef ASSERT_EIBB_OVERFLOW
+}
+
+TEST(RangeTest, Double_Bounds_Precision_Errors) {
+
+    ASSERT_THROWS_CODE(
+        getTypeInfoDouble(1, boost::none, boost::none, 1), AssertionException, 6966803);
+
+    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 1, 2, -1), AssertionException, 6966801);
+    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 1, 2, 325), AssertionException, 6966801);
+}
 
 TEST(RangeTest, Double_Errors) {
-    ASSERT_THROWS_CODE(getTypeInfoDouble(1, boost::none, 2), AssertionException, 6775007);
-    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 0, boost::none), AssertionException, 6775007);
-    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 2, 1), AssertionException, 6775009);
+    ASSERT_THROWS_CODE(getTypeInfoDouble(1, boost::none, 2, 5), AssertionException, 6775007);
+    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 0, boost::none, 5), AssertionException, 6775007);
+    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 2, 1, 5), AssertionException, 6775009);
+
+    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 2, 3, 5), AssertionException, 6775010);
+    ASSERT_THROWS_CODE(getTypeInfoDouble(4, 2, 3, 5), AssertionException, 6775010);
 
 
-    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 2, 3), AssertionException, 6775010);
-    ASSERT_THROWS_CODE(getTypeInfoDouble(4, 2, 3), AssertionException, 6775010);
-
-
-    ASSERT_THROWS_CODE(getTypeInfoDouble(std::numeric_limits<double>::infinity(), 1, 2),
+    ASSERT_THROWS_CODE(getTypeInfoDouble(std::numeric_limits<double>::infinity(), 1, 2, 5),
                        AssertionException,
                        6775008);
-    ASSERT_THROWS_CODE(getTypeInfoDouble(std::numeric_limits<double>::quiet_NaN(), 1, 2),
+    ASSERT_THROWS_CODE(getTypeInfoDouble(std::numeric_limits<double>::quiet_NaN(), 1, 2, 5),
                        AssertionException,
                        6775008);
-    ASSERT_THROWS_CODE(getTypeInfoDouble(std::numeric_limits<double>::signaling_NaN(), 1, 2),
+    ASSERT_THROWS_CODE(getTypeInfoDouble(std::numeric_limits<double>::signaling_NaN(), 1, 2, 5),
                        AssertionException,
                        6775008);
 }
@@ -2431,24 +2507,25 @@ TEST(EdgeCalcTest, SparsityConstraints) {
     ASSERT_THROWS_CODE(getEdgesInt32(1, 0, 8, -1), AssertionException, 6775101);
     ASSERT_THROWS_CODE(getEdgesInt64(1, 0, 8, 0), AssertionException, 6775101);
     ASSERT_THROWS_CODE(getEdgesInt64(1, 0, 8, -1), AssertionException, 6775101);
-    ASSERT_THROWS_CODE(getEdgesDouble(1.0, 0.0, 8.0, 0), AssertionException, 6775101);
-    ASSERT_THROWS_CODE(getEdgesDouble(1.0, 0.0, 8.0, -1), AssertionException, 6775101);
+    ASSERT_THROWS_CODE(getEdgesDouble(1.0, 0.0, 8.0, 5, 0), AssertionException, 6775101);
+    ASSERT_THROWS_CODE(getEdgesDouble(1.0, 0.0, 8.0, 5, -1), AssertionException, 6775101);
 }
 
 TEST(MinCoverCalcTest, MinCoverConstraints) {
     ASSERT(minCoverInt32(2, true, 1, true, 0, 7, 1).empty());
     ASSERT(minCoverInt64(2, true, 1, true, 0, 7, 1).empty());
-    ASSERT(minCoverDouble(2, true, 1, 0, true, 7, 1).empty());
+    ASSERT(minCoverDouble(2, true, 1, true, 0, 7, boost::none, 1).empty());
     ASSERT(minCoverDecimal128(
-               Decimal128(2), true, Decimal128(1), true, Decimal128(0), Decimal128(7), 1)
+               Decimal128(2), true, Decimal128(1), true, Decimal128(0), Decimal128(7), 5, 1)
                .empty());
 }
 
-TEST(RangeTest, Decimal1238_Bounds) {
-#define ASSERT_EIB(x, z)                                                                 \
-    ASSERT_EQ(boost::multiprecision::to_string(                                          \
-                  getTypeInfoDecimal128(Decimal128(x), boost::none, boost::none).value), \
-              (z));
+TEST(RangeTest, Decimal128_Bounds) {
+#define ASSERT_EIB(x, z)                                                                        \
+    ASSERT_EQ(                                                                                  \
+        boost::multiprecision::to_string(                                                       \
+            getTypeInfoDecimal128(Decimal128(x), boost::none, boost::none, boost::none).value), \
+        (z));
 
     // Larger numbers map tw larger uint64
     ASSERT_EIB(-1234567890E7, "108549948892579231731687303715884111887");
@@ -2531,42 +2608,200 @@ TEST(RangeTest, Decimal1238_Bounds) {
 #undef ASSERT_EIB
 }
 
-TEST(RangeTest, Decimal1238_Errors) {
-    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), boost::none, Decimal128(2)),
+
+TEST(RangeTest, Decimal128_Bounds_Precision) {
+
+#define ASSERT_EIBP(x, y, z)                                                                    \
+    ASSERT_EQ(                                                                                  \
+        getTypeInfoDecimal128(Decimal128(x), Decimal128(-100000), Decimal128(100000), y).value, \
+        (z));
+
+    ASSERT_EIBP("3.141592653589E-1", 10, 1000003141592653);
+    ASSERT_EIBP("31.41592653589E-2", 10, 1000003141592653);
+    ASSERT_EIBP("314.1592653589E-3", 10, 1000003141592653);
+    ASSERT_EIBP("3141.592653589E-4", 10, 1000003141592653);
+    ASSERT_EIBP("31415.92653589E-5", 10, 1000003141592653);
+    ASSERT_EIBP("314159.2653589E-6", 10, 1000003141592653);
+    ASSERT_EIBP("3141592.653589E-7", 10, 1000003141592653);
+    ASSERT_EIBP("31415926.53589E-8", 10, 1000003141592653);
+
+#undef ASSERT_EIBP
+
+#define ASSERT_EIBPL(x, y, z)                                                                   \
+    ASSERT_EQ(                                                                                  \
+        getTypeInfoDecimal128(Decimal128(x), Decimal128(-100000), Decimal128("1E22"), y).value, \
+        boost::multiprecision::uint128_t(z));
+
+    ASSERT_EIBPL("3.1415926535897932384626433832795E20", 5, "31415926535897942384626433");
+    ASSERT_EIBPL("3.1415926535897932384626433832795E20", 6, "314159265358979423846264338");
+
+    ASSERT_EIBPL("3.1415926535897932384626433832795E20", 7, "3141592653589794238462643383");
+
+    ASSERT_EIBPL("3.1415926535897932384626433832795E20", 8, "31415926535897942384626433832");
+
+#undef ASSERT_EIBP
+
+#define ASSERT_EIBP(x, y, z)                                                                    \
+    ASSERT_EQ(                                                                                  \
+        getTypeInfoDecimal128(Decimal128(x), Decimal128(-100000), Decimal128(100000), y).value, \
+        (z));
+
+    ASSERT_EIBP(3.141592653589, 1, 1000031);
+    ASSERT_EIBP(3.141592653589, 2, 10000314);
+    ASSERT_EIBP(3.141592653589, 3, 100003141);
+    ASSERT_EIBP(3.141592653589, 4, 1000031415);
+    ASSERT_EIBP(3.141592653589, 5, 10000314159);
+    ASSERT_EIBP(3.141592653589, 6, 100003141592);
+    ASSERT_EIBP(3.141592653589, 7, 1000031415926);
+#undef ASSERT_EIBP
+
+
+#define ASSERT_EIBB(v, ub, lb, prc, z)                                                         \
+    {                                                                                          \
+        auto _ost = getTypeInfoDecimal128(Decimal128(v), Decimal128(lb), Decimal128(ub), prc); \
+        ASSERT_NE(_ost.max.str(), "340282366920938463463374607431768211455");                  \
+        ASSERT_EQ(_ost.value, z);                                                              \
+    }
+
+#define ASSERT_EIBB_OVERFLOW(v, ub, lb, prc, z)                                                \
+    {                                                                                          \
+        auto _ost = getTypeInfoDecimal128(Decimal128(v), Decimal128(lb), Decimal128(ub), prc); \
+        ASSERT_EQ(_ost.max.str(), "340282366920938463463374607431768211455");                  \
+        ASSERT_EQ(_ost.value, z);                                                              \
+    }
+
+    ASSERT_EIBB(0, 1, -1, 3, 1000);
+    ASSERT_EIBB(0, 1, -1E5, 3, 100000000);
+
+    ASSERT_EIBB(-1E-33, 1, -1E5, 3, 100000000);
+
+    ASSERT_EIBB_OVERFLOW(
+        0,
+        Decimal128::kLargestPositive,
+        Decimal128::kLargestNegative,
+        3,
+        boost::multiprecision::uint128_t("170141183460469231731687303715884105728"));
+    ASSERT_EIBB_OVERFLOW(
+        0,
+        std::numeric_limits<double>::max(),
+        std::numeric_limits<double>::lowest(),
+        3,
+        boost::multiprecision::uint128_t("170141183460469231731687303715884105728"));
+
+    ASSERT_EIBB(3.141592653589, 5, 0, 0, 3);
+    ASSERT_EIBB(3.141592653589, 5, 0, 1, 31);
+
+    ASSERT_EIBB(3.141592653589, 5, 0, 2, 314);
+
+    ASSERT_EIBB(3.141592653589, 5, 0, 3, 3141);
+    ASSERT_EIBB(3.141592653589, 5, 0, 16, 31415926535890000);
+
+
+    ASSERT_EIBB(-5, -1, -10, 3, 5000);
+
+
+    ASSERT_EIBB_OVERFLOW(
+        1E100,
+        std::numeric_limits<double>::max(),
+        std::numeric_limits<double>::lowest(),
+        3,
+        boost::multiprecision::uint128_t("232572183460469231731687303715884099485"));
+
+    ASSERT_EIBB(1E9, 1E10, 0, 3, 1000000000000);
+    ASSERT_EIBB(1E9, 1E10, 0, 0, 1000000000);
+
+
+    ASSERT_EIBB(-5, 10, -10, 0, 5);
+    ASSERT_EIBB(-5, 10, -10, 2, 500);
+
+
+    ASSERT_EIBB(5E-30, 10E-30, 1E-30, 35, boost::multiprecision::uint128_t("400000"));
+
+#undef ASSERT_EIBB
+#undef ASSERT_EIBB_OVERFLOW
+}
+
+TEST(RangeTest, Decimal128_Errors) {
+    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), boost::none, Decimal128(2), 5),
                        AssertionException,
                        6854201);
-    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), Decimal128(0), boost::none),
+    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), Decimal128(0), boost::none, 5),
                        AssertionException,
                        6854201);
-    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), Decimal128(2), Decimal128(1)),
+    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), Decimal128(2), Decimal128(1), 5),
                        AssertionException,
                        6854203);
 
 
-    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), Decimal128(2), Decimal128(3)),
+    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), Decimal128(2), Decimal128(3), 5),
                        AssertionException,
                        6854204);
-    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(4), Decimal128(2), Decimal128(3)),
+    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(4), Decimal128(2), Decimal128(3), 5),
                        AssertionException,
                        6854204);
 
 
     ASSERT_THROWS_CODE(
-        getTypeInfoDecimal128(Decimal128::kPositiveInfinity, boost::none, boost::none),
+        getTypeInfoDecimal128(Decimal128::kPositiveInfinity, boost::none, boost::none, boost::none),
         AssertionException,
         6854202);
     ASSERT_THROWS_CODE(
-        getTypeInfoDecimal128(Decimal128::kNegativeInfinity, boost::none, boost::none),
+        getTypeInfoDecimal128(Decimal128::kNegativeInfinity, boost::none, boost::none, boost::none),
         AssertionException,
         6854202);
 
-    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128::kPositiveNaN, boost::none, boost::none),
-                       AssertionException,
-                       6854202);
+    ASSERT_THROWS_CODE(
+        getTypeInfoDecimal128(Decimal128::kPositiveNaN, boost::none, boost::none, boost::none),
+        AssertionException,
+        6854202);
 
-    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128::kNegativeNaN, boost::none, boost::none),
+    ASSERT_THROWS_CODE(
+        getTypeInfoDecimal128(Decimal128::kNegativeNaN, boost::none, boost::none, boost::none),
+        AssertionException,
+        6854202);
+}
+
+
+TEST(RangeTest, Decimal128_Bounds_Precision_Errors) {
+
+    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), boost::none, boost::none, 1),
                        AssertionException,
-                       6854202);
+                       6966804);
+
+    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), Decimal128(1), Decimal128(2), -1),
+                       AssertionException,
+                       6966802);
+
+    ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), Decimal128(1), Decimal128(2), 6143),
+                       AssertionException,
+                       6966802);
+}
+
+void roundTripDecimal128_Int128(std::string dec_str) {
+    Decimal128 dec(dec_str);
+
+    auto ret = toInt128FromDecimal128(dec);
+
+    Decimal128 roundTrip(ret.str());
+    ASSERT(roundTrip == dec);
+}
+
+TEST(RangeTest, Decimal128_to_Int128) {
+    roundTripDecimal128_Int128("0");
+    roundTripDecimal128_Int128("123");
+    roundTripDecimal128_Int128("40000000");
+    roundTripDecimal128_Int128("40000000.00");
+    roundTripDecimal128_Int128("40000000.00000");
+    roundTripDecimal128_Int128("40000000.000000000000");
+
+    roundTripDecimal128_Int128("40000.000E5");
+    roundTripDecimal128_Int128("40000000E10");
+    roundTripDecimal128_Int128("40000.000E10");
+    roundTripDecimal128_Int128("40000000E20");
+    roundTripDecimal128_Int128("40000.000E20");
+    roundTripDecimal128_Int128("40000000E30");
+    roundTripDecimal128_Int128("40000.000E30");
+    roundTripDecimal128_Int128("4E37");
 }
 
 // Tests to make sure that the getMinCover() interface properly calculates the mincover when given a
@@ -2594,6 +2829,44 @@ void assertMinCoverResult(A lb,
     edgesInfo.setUbIncluded(ubIncluded);
     edgesInfo.setIndexMin(elems[2]);
     edgesInfo.setIndexMax(elems[3]);
+
+    FLE2RangeFindSpec spec;
+    spec.setEdgesInfo(edgesInfo);
+
+    spec.setFirstOperator(Fle2RangeOperator::kGt);
+    spec.setPayloadId(1234);
+
+    auto result = getMinCover(spec, sparsity);
+    ASSERT_EQ(result.size(), expected.size());
+    for (size_t i = 0; i < result.size(); i++) {
+        ASSERT_EQ(result[i], expected[i]) << spec.toBSON();
+    }
+}
+
+template <typename A, typename B, typename C, typename D>
+void assertMinCoverResultPrecision(A lb,
+                                   bool lbIncluded,
+                                   B ub,
+                                   bool ubIncluded,
+                                   C min,
+                                   D max,
+                                   int sparsity,
+                                   int precision,
+                                   std::initializer_list<std::string> expectedList) {
+    std::vector<std::string> expected{expectedList};
+    std::vector<BSONElement> elems;
+    auto vals = BSON_ARRAY(lb << ub << min << max);
+    vals.elems(elems);
+
+    FLE2RangeFindSpecEdgesInfo edgesInfo;
+
+    edgesInfo.setLowerBound(elems[0]);
+    edgesInfo.setLbIncluded(lbIncluded);
+    edgesInfo.setUpperBound(elems[1]);
+    edgesInfo.setUbIncluded(ubIncluded);
+    edgesInfo.setIndexMin(elems[2]);
+    edgesInfo.setIndexMax(elems[3]);
+    edgesInfo.setPrecision(precision);
 
     FLE2RangeFindSpec spec;
     spec.setEdgesInfo(edgesInfo);
@@ -3466,35 +3739,41 @@ TEST(MinCoverInterfaceTest, Decimal_Basic) {
 }
 
 TEST(MinCoverInterfaceTest, InfiniteRangeBounds) {
-    assertMinCoverResult(7,
+    assertMinCoverResult(7.0,
                          true,
                          std::numeric_limits<double>::infinity(),
                          true,
-                         0,
-                         32,
-                         1,
-                         {"000111", "001", "01", "100000"});
-    assertMinCoverResult(0,
-                         true,
-                         8,
-                         true,
-                         0,
-                         32,
+                         0.0,
+                         32.0,
                          1,
                          {
-                             "000",
-                             "001000",
+                             "11000000000111",
+                             "11000000001",
+                             "1100000001000000000000000000000000000000000000000000000000000000",
+                         });
+    assertMinCoverResult(0.0,
+                         true,
+                         8.0,
+                         true,
+                         0.0,
+                         32.0,
+                         1,
+                         {
+                             "10",
+                             "11000000000",
+                             "1100000000100000000000000000000000000000000000000000000000000000",
                          });
     assertMinCoverResult(-std::numeric_limits<double>::infinity(),
                          true,
-                         8,
+                         8.0,
                          true,
-                         0,
-                         32,
+                         0.0,
+                         32.0,
                          1,
                          {
-                             "000",
-                             "001000",
+                             "10",
+                             "11000000000",
+                             "1100000000100000000000000000000000000000000000000000000000000000",
                          });
 }
 
@@ -3511,6 +3790,31 @@ TEST(MinCoverInteraceTest, InvalidBounds) {
         assertMinCoverResult(1, false, 1, false, 0, 1, 1, {}), AssertionException, 6901316);
     ASSERT_THROWS_CODE(
         assertMinCoverResult(0, true, 0, false, 0, 7, 1, {}), AssertionException, 6901317);
+}
+
+// Test point queries and that trimming bitstrings is correct in precision mode
+TEST(MinCoverInteraceTest, Precision_Equal) {
+    assertMinCoverResultPrecision(3.14159, true, 3.14159, true, 0.0, 10.0, 1, 2, {"00100111010"});
+    assertMinCoverResultPrecision(Decimal128(3.14159),
+                                  true,
+                                  Decimal128(3.14159),
+                                  true,
+                                  Decimal128(0.0),
+                                  Decimal128(10.0),
+                                  1,
+                                  2,
+                                  {"00100111010"});
+
+    assertMinCoverResultPrecision(3.1, true, 3.1, true, 0.0, 12.0, 1, 1, {"00011111"});
+    assertMinCoverResultPrecision(Decimal128(3.1),
+                                  true,
+                                  Decimal128(3.1),
+                                  true,
+                                  Decimal128(0.0),
+                                  Decimal128(12.0),
+                                  1,
+                                  1,
+                                  {"00011111"});
 }
 
 DEATH_TEST_REGEX(MinCoverInterfaceTest, Error_MinMaxTypeMismatch, "Tripwire assertion.*6901300") {

@@ -138,6 +138,14 @@ TEST(EdgeCalcTest, Int64_TestVectors) {
     }
 }
 
+std::unique_ptr<Edges> getEdgesDoubleForTest(double value,
+                                             boost::optional<double> min,
+                                             boost::optional<double> max,
+                                             int sparsity) {
+    // The non-precision test vectors set min/max which is not allowed
+    return getEdgesDouble(value, boost::none, boost::none, boost::none, sparsity);
+}
+
 TEST(EdgeCalcTest, Double_TestVectors) {
     std::vector<EdgeCalcTestVector<double>> testVectors = {
 #include "test_vectors/edges_double.cstruct"
@@ -145,6 +153,16 @@ TEST(EdgeCalcTest, Double_TestVectors) {
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate());
     }
+}
+
+
+std::unique_ptr<Edges> getEdgesDecimal128ForTest(Decimal128 value,
+                                                 boost::optional<Decimal128> min,
+                                                 boost::optional<Decimal128> max,
+                                                 int sparsity) {
+
+    // The non-precision test vectors set min/max which is not allowed
+    return getEdgesDecimal128(value, boost::none, boost::none, boost::none, sparsity);
 }
 
 
@@ -213,24 +231,118 @@ TEST(MinCoverCalcTest, Int64_TestVectors) {
     }
 }
 
+std::vector<std::string> minCoverDoubleForTest(double lowerBound,
+                                               bool includeLowerBound,
+                                               double upperBound,
+                                               bool includeUpperBound,
+                                               boost::optional<double> min,
+                                               boost::optional<double> max,
+                                               int sparsity) {
+    // The non-precision test vectors set min/max which is not allowed
+    return minCoverDouble(lowerBound,
+                          includeLowerBound,
+                          upperBound,
+                          includeUpperBound,
+                          boost::none,
+                          boost::none,
+                          boost::none,
+                          sparsity);
+}
+
 TEST(MinCoverCalcTest, Double_TestVectors) {
     MinCoverTestVector<double> testVectors[] = {
 #include "test_vectors/mincover_double.cstruct"
     };
     for (const auto& testVector : testVectors) {
-        ASSERT_TRUE(testVector.validate(minCoverDouble));
+        ASSERT_TRUE(testVector.validate(minCoverDoubleForTest));
     }
 }
+
+std::vector<std::string> minCoverDecimal128ForTest(Decimal128 lowerBound,
+                                                   bool includeLowerBound,
+                                                   Decimal128 upperBound,
+                                                   bool includeUpperBound,
+                                                   boost::optional<Decimal128> min,
+                                                   boost::optional<Decimal128> max,
+                                                   int sparsity) {
+
+    // The non-precision test vectors set min/max which is not allowed
+    return minCoverDecimal128(lowerBound,
+                              includeLowerBound,
+                              upperBound,
+                              includeUpperBound,
+                              boost::none,
+                              boost::none,
+                              boost::none,
+                              sparsity);
+}
+
 
 TEST(MinCoverCalcTest, Decimal128_TestVectors) {
     MinCoverTestVector<Decimal128> testVectors[] = {
 #include "test_vectors/mincover_decimal128.cstruct"
     };
     for (const auto& testVector : testVectors) {
-        ASSERT_TRUE(testVector.validate(minCoverDecimal128));
+        ASSERT_TRUE(testVector.validate(minCoverDecimal128ForTest));
     }
 }
 
 #pragma clang optimize on
 
+
+template <typename T>
+struct MinCoverTestVectorPrecision {
+    T rangeMin, rangeMax;
+    T min, max;
+    int sparsity;
+    uint32_t precision;
+    std::string expect;
+
+    bool validate(
+        std::function<std::vector<std::string>(
+            T, bool, T, bool, boost::optional<T>, boost::optional<T>, uint32_t, int)> algo) const {
+        auto result = algo(rangeMin, true, rangeMax, true, min, max, precision, sparsity);
+
+        std::stringstream ss(expect);
+        std::vector<std::string> vexpect;
+        std::string item;
+        while (std::getline(ss, item, '\n') && !item.empty()) {
+            vexpect.push_back(std::move(item));
+        }
+
+        if (std::equal(result.begin(), result.end(), vexpect.begin())) {
+            return true;
+        }
+
+        LOGV2_ERROR(6966809,
+                    "MinCover algorithm produced unexpected result",
+                    "rangeMin"_attr = rangeMin,
+                    "rangeMax"_attr = rangeMax,
+                    "min"_attr = min,
+                    "max"_attr = max,
+                    "sparsity"_attr = sparsity,
+                    "precision"_attr = precision,
+                    "expect"_attr = expect,
+                    "got"_attr = result);
+        return false;
+    }
+};
+
+TEST(MinCoverCalcPrecisionTest, Double_TestVectors) {
+    MinCoverTestVectorPrecision<double> testVectors[] = {
+#include "test_vectors/mincover_double_precision.cstruct"
+    };
+    for (const auto& testVector : testVectors) {
+        ASSERT_TRUE(testVector.validate(minCoverDouble));
+    }
+}
+
+TEST(MinCoverCalcPrecisionTest, Decimal128_TestVectors) {
+    MinCoverTestVectorPrecision<Decimal128> testVectors[] = {
+#include "test_vectors/mincover_decimal128_precision.cstruct"
+    };
+    for (const auto& testVector : testVectors) {
+        ASSERT_TRUE(testVector.validate(minCoverDecimal128));
+    }
+}
 }  // namespace mongo
