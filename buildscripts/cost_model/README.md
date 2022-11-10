@@ -18,3 +18,29 @@ More specifically, to collect data for calibration we only need to run "execute_
 This phase should be the same as calibration in other experiments.
 
 Please note that this type of experiment may not work with some certain ABT nodes. For example, for PhyscialScan Node, all the data collected may come with the same "n_processed" - the collection cardinality, which does not make any sense for calibration.
+
+## Python virtual environment
+
+The following assumes you are using python from the MongoDB toolchain.
+
+```
+/opt/mongodbtoolchain/v4/bin/python3
+```
+
+### Getting started
+
+```sh
+(mongo-python3) deactivate  # only if you have another python env activated
+sh> /opt/mongodbtoolchain/v4/bin/python3 -m venv cm  # create new env
+sh> source cm/bin/activate  # activate new env
+(cm) python -m pip install -r requirements.txt  # install required packages           
+(cm) python start.py  # run the calibrator
+(cm) deactivate  # back to bash
+sh> 
+```
+
+### Install new packages
+
+```sh
+(cm) python -m pip install <package_name>     # install <package_name>
+(cm) python -m pip freeze > requirements.txt  # do not forget to update requirements.txt
