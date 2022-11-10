@@ -45,6 +45,28 @@ const isIgnorableError = function ignorableError(codeName) {
  */
 const validateCollectionsBackgroundThread = function validateCollectionsBackground(
     host, isIgnorableErrorFunc) {
+    // Some tests explicitly mess with schema validation. We will skip running background validation
+    // on those collections.
+    const skippedCollections = new Set([
+        "collectionWithValidator",
+        "jstests_schema_encrypt",
+        "json_schema_additional_items",
+        "schema_allowed_properties",
+        "jstests_schema_bsontype",
+        "jstests_schema_dependencies",
+        "jstests_schema_encrypt",
+        "json_schema_items",
+        "jstests_json_schema",
+        "jstests_json_schema_logical",
+        "json_schema_min_max_items",
+        "jstests_schema_min_max_properties",
+        "schema_pattern_properties",
+        "jstests_schema_required",
+        "json_schema_unique_items",
+        "json_schema_test_corpus",
+        "jstests_json_schema_ignore_unsupported",
+    ]);
+
     // Calls 'func' with the print() function overridden to be a no-op.
     const quietly = (func) => {
         const printOriginal = print;
@@ -106,6 +128,9 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
         });
 
         for (let collectionName of collectionNames) {
+            if (dbName == "bypass_document_validation" || skippedCollections.has(collectionName)) {
+                continue;
+            }
             let res = conn.getDB(dbName).getCollection(collectionName).runCommand({
                 "validate": collectionName,
                 background: true,

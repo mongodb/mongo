@@ -113,7 +113,8 @@ function runTest(badViewDefinition) {
     }
 
     assert.commandWorked(
-        viewsDB.runCommand({collMod: "collection", validator: {x: {$type: "string"}}}),
+        viewsDB.runCommand(
+            {collMod: "collection", validator: {x: {$type: "string"}}, validationAction: "warn"}),
         makeErrorMessage("collMod"));
 
     const renameCommand = {
