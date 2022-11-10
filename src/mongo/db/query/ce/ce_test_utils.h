@@ -86,10 +86,7 @@ const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
     (str::stream() << "{" << field << ": {$elemMatch: " << predicate << "}}")
 
 // This macro verifies the cardinality of a pipeline or an input ABT.
-#define ASSERT_CE(ce, pipeline, expectedCE)                                                   \
-    _ASSERT_CE(                                                                               \
-        ce.getCE(pipeline, [](const ABT& n) -> bool { return n.is<optimizer::RootNode>(); }), \
-        (expectedCE))
+#define ASSERT_CE(ce, pipeline, expectedCE) _ASSERT_CE(ce.getCE(pipeline), (expectedCE))
 
 // This macro does the same as above but also sets the collection cardinality.
 #define ASSERT_CE_CARD(ce, pipeline, expectedCE, collCard) \
@@ -97,10 +94,8 @@ const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
     ASSERT_CE(ce, pipeline, expectedCE)
 
 // This macro verifies the cardinality of a pipeline with a single $match predicate.
-#define ASSERT_MATCH_CE(ce, predicate, expectedCE)                                              \
-    _ASSERT_CE(ce.getMatchCE(predicate,                                                         \
-                             [](const ABT& n) -> bool { return n.is<optimizer::RootNode>(); }), \
-               (expectedCE))
+#define ASSERT_MATCH_CE(ce, predicate, expectedCE) \
+    _ASSERT_CE(ce.getMatchCE(predicate), (expectedCE))
 
 #define ASSERT_MATCH_CE_NODE(ce, queryPredicate, expectedCE, nodePredicate) \
     _ASSERT_CE(ce.getMatchCE(queryPredicate, nodePredicate), (expectedCE))
@@ -114,6 +109,32 @@ const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
 #define ASSERT_EQ_ELEMMATCH_CE(tester, expectedCE, elemMatchExpectedCE, field, predicate) \
     ASSERT_MATCH_CE(tester, _PREDICATE(field, predicate), expectedCE);                    \
     ASSERT_MATCH_CE(tester, _ELEMMATCH_PREDICATE(field, predicate), elemMatchExpectedCE)
+
+#define ASSERT_EQ_ELEMMATCH_CE_NODE(tester, expectedCE, elemMatchExpectedCE, field, predicate, n) \
+    ASSERT_MATCH_CE_NODE(tester, _PREDICATE(field, predicate), expectedCE, n);                    \
+    ASSERT_MATCH_CE_NODE(tester, _ELEMMATCH_PREDICATE(field, predicate), elemMatchExpectedCE, n)
+
+// Some commonly used functions for picking nodes in the memo for testing estimation.
+template <size_t NumReq>
+bool isSargableNode(const ABT& n) {
+    if constexpr (NumReq == 0) {
+        return n.is<optimizer::SargableNode>();
+    }
+
+    // Sometimes SargableNodes get split and placed into different memo groups, but we are looking
+    // for a SargableNode with a specific number of predicates. For tests, we only care about
+    // verifying the cardinality of that one.
+    if (auto* sargable = n.cast<optimizer::SargableNode>()) {
+        return sargable->getReqMap().size() == NumReq;
+    }
+    return false;
+}
+const auto isSargable = isSargableNode<0>;
+const auto isSargable1 = isSargableNode<1>;
+const auto isSargable2 = isSargableNode<2>;
+const auto isSargable3 = isSargableNode<3>;
+const auto isSargable4 = isSargableNode<4>;
+const auto isRoot = [](const ABT& n) -> bool { return n.is<optimizer::RootNode>(); };
 
 /**
  * A test utility class for helping verify the cardinality of CE transports on a given $match
@@ -135,21 +156,22 @@ public:
      * 'nodePredicate' identifies the node in the memo we want to estimate.
      */
     CEType getMatchCE(const std::string& matchPredicate,
-                      std::function<bool(const ABT&)> nodePredicate) const;
+                      std::function<bool(const ABT&)> nodePredicate = isRoot) const;
 
     /**
      * Returns the estimated cardinality of a given 'pipeline'.
      *
      * 'nodePredicate' identifies the node in the memo we want to estimate.
      */
-    CEType getCE(const std::string& pipeline, std::function<bool(const ABT&)> nodePredicate) const;
+    CEType getCE(const std::string& pipeline,
+                 std::function<bool(const ABT&)> nodePredicate = isRoot) const;
 
     /**
      * Returns the estimated cardinality of a given 'abt'.
      *
      * 'nodePredicate' identifies the node in the memo we want to estimate.
      */
-    CEType getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) const;
+    CEType getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate = isRoot) const;
 
     /**
      * Updates the cardinality of the collection '_collName'.

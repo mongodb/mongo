@@ -207,6 +207,13 @@ public:
                                                             childResult,
                                                             conjunctReq.includeScalar);
 
+                        // We may still not have been able to estimate the interval using
+                        // histograms, for instance if the interval bounds were non-Constant. In
+                        // this case, we should fallback to heuristics.
+                        if (cardinality < 0) {
+                            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
+                        }
+
                         // We have to convert the cardinality to a selectivity. The histogram
                         // returns the cardinality for the entire collection; however, fewer records
                         // may be expected at the SargableNode.

@@ -106,4 +106,12 @@ void sortValueVector(std::vector<SBEValue>& sortVector);
 */
 double valueToDouble(value::TypeTags tag, value::Value val);
 
+/**
+ * Returns true for types that can be estimated via histograms, and false for types that need type
+ * counters. Any other type results in a uassert.
+ *
+ * NOTE: This should be kept in sync with 'valueToDouble' above.
+ */
+bool canEstimateTypeViaHistogram(value::TypeTags tag);
+
 }  // namespace mongo::ce

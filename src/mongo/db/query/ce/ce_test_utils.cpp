@@ -143,7 +143,7 @@ optimizer::CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> node
         }
 
         if (nodePredicate(node)) {
-            // We want to return the cardinality for the entire ABT.
+            // We want to return the cardinality for the memo group matching the 'nodePredicate'.
             outCard = memoCE;
         }
     }

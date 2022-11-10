@@ -64,12 +64,6 @@ protected:
     }
 };
 
-namespace {
-bool isRootNodeFn(const ABT& node) {
-    return node.is<optimizer::RootNode>();
-}
-}  // namespace
-
 TEST(CEHeuristicTest, CEWithoutOptimizationGtLtNum) {
     std::string query = "{a0 : {$gt : 14, $lt : 21}}";
     HeuristicCETester ht(collName, kNoOptPhaseSet);
@@ -211,8 +205,8 @@ TEST(CEHeuristicTest, CEWithoutOptimizationTraverseSelectivityDoesNotAccumulate)
         "{'b0.b1.b3': {$gt: 10}}"
         "]}";
     HeuristicCETester ht(collName, kNoOptPhaseSet);
-    auto ce1 = ht.getMatchCE(query, isRootNodeFn);
-    auto ce2 = ht.getMatchCE(queryWithLongPaths, isRootNodeFn);
+    auto ce1 = ht.getMatchCE(query);
+    auto ce2 = ht.getMatchCE(queryWithLongPaths);
     ASSERT_APPROX_EQUAL(ce1, ce2, kMaxCEError);
 }
 
@@ -654,8 +648,8 @@ TEST(CEHeuristicTest, CEWithoutOptimizationEquivalentConjunctions) {
 
     HeuristicCETester ht(collName, kNoOptPhaseSet);
     ht.setCollCard(kCollCard);
-    auto ce1 = ht.getCE(rootNode1, isRootNodeFn);
-    auto ce2 = ht.getCE(rootNode2, isRootNodeFn);
+    auto ce1 = ht.getCE(rootNode1);
+    auto ce2 = ht.getCE(rootNode2);
     ASSERT_APPROX_EQUAL(ce1, ce2, kMaxCEError);
 }
 
@@ -755,7 +749,7 @@ TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathComplex) {
         "{$and: [{a0: {$gt:40}}, {a0: {$lt: 99}}, {a0: {$gt: 42}}, {a0: {$lt: 88}}, {a0: {$lt: "
         "81}}, {a0: {$lt: 77}}]}"
         "]}";
-    auto ce1 = ht.getMatchCE(query1, isRootNodeFn);
+    auto ce1 = ht.getMatchCE(query1);
     // The conjuncts are in inverse selectivity order.
     std::string query2 =
         "{$or: ["
@@ -767,7 +761,7 @@ TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathComplex) {
         "{$and: [{a0: {$gt: 9}}, {a0: {$lt: 12}}, {a0: {$gt: 42}}]},"
         "{$and: [{a0: {$gt: 9}}, {a0: {$lt: 12}}]}"
         "]}";
-    auto ce2 = ht.getMatchCE(query2, isRootNodeFn);
+    auto ce2 = ht.getMatchCE(query2);
     ASSERT_APPROX_EQUAL(ce1, ce2, kMaxCEError);
 }
 

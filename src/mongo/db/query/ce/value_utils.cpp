@@ -126,7 +126,6 @@ bool sameTypeBracket(value::TypeTags tag1, value::TypeTags tag2) {
 }
 
 int32_t compareValues(value::TypeTags tag1,
-
                       value::Value val1,
                       value::TypeTags tag2,
                       value::Value val2) {
@@ -175,5 +174,35 @@ double valueToDouble(value::TypeTags tag, value::Value val) {
     return result;
 }
 
+bool canEstimateTypeViaHistogram(value::TypeTags tag) {
+    if (sbe::value::isNumber(tag) || value::isString(tag)) {
+        return true;
+    }
+
+    switch (tag) {
+        // Other types that we can/do build histograms on:
+        // - Date/time types.
+        case value::TypeTags::Date:
+        case value::TypeTags::Timestamp:
+        // - ObjectId.
+        case value::TypeTags::ObjectId:
+            return true;
+
+        // Types that can only be estimated via the type-counters.
+        case value::TypeTags::Object:
+        case value::TypeTags::Array:
+        case value::TypeTags::Null:
+        case value::TypeTags::Boolean:
+            return false;
+
+        // Trying to estimate any other types should result in an error.
+        default:
+            uasserted(7051100,
+                      str::stream()
+                          << "Type " << tag << " is not supported by histogram estimation.");
+    }
+
+    MONGO_UNREACHABLE;
+}
 
 }  // namespace mongo::ce

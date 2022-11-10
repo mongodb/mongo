@@ -35,6 +35,8 @@
 
 namespace mongo::ce {
 
+constexpr double kInvalidEstimate = -1.0;
+
 enum class EstimationType { kEqual, kLess, kLessOrEqual, kGreater, kGreaterOrEqual };
 enum class EstimationAlgo { HistogramV1, HistogramV2, HistogramV3 };
 
