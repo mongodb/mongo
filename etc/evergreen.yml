@@ -192,8 +192,6 @@ variables:
     - ubuntu2004-package
   - name: selinux_rhel7_enterprise
   - name: .publish
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 
@@ -1123,12 +1121,8 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: push
-    distros:
-    - rhel70-small
   - name: .crypt
   - name: .publish_crypt
-    distros:
-    - rhel70-small
 
 ###########################################
 #          Embedded SDK buildvariants     #
