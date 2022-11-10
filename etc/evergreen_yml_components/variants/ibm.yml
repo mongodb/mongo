@@ -61,11 +61,7 @@ buildvariants:
   - name: .crypt
   - name: test_packages
   - name: .publish_crypt
-    distros:
-    - rhel70-small
   - name: .publish
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *enterprise-rhel-81-ppc64le-template
@@ -142,11 +138,7 @@ buildvariants:
   - name: .crypt
   - name: test_packages
   - name: .publish_crypt
-    distros:
-    - rhel70-small
   - name: .publish
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-83-s390x
@@ -207,9 +199,5 @@ buildvariants:
   - name: .crypt
   - name: test_packages
   - name: .publish_crypt
-    distros:
-    - rhel80-small
   - name: .publish
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping

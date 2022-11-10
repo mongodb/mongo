@@ -177,11 +177,7 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-    distros:
-    - amazon2-small
   - name: .publish_test
-    distros:
-    - amazon2-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-amazon2
@@ -248,11 +244,7 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-    distros:
-    - amazon2-small
   - name: .publish_test
-    distros:
-    - amazon2-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon2-arm64
@@ -306,11 +298,7 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-    distros:
-    - rhel80-small
   - name: .publish_test
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-amazon2-arm64
@@ -429,8 +417,6 @@ buildvariants:
     distros:
     - amazon2-arm64-large
   - name: .publish_crypt
-    distros:
-    - amazon2-arm64-large
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
@@ -443,11 +429,7 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-    distros:
-    - rhel80-small
   - name: .publish_test
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon2022-arm64
@@ -497,11 +479,7 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-large
   - name: .publish
-    distros:
-    - rhel80-small
   - name: .publish_test
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-amazon2022-arm64
@@ -630,11 +608,7 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-large
   - name: .publish
-    distros:
-    - rhel80-small
   - name: .publish_test
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian10
@@ -692,11 +666,7 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-    distros:
-    - debian10-small
   - name: .publish_test
-    distros:
-    - debian10-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-debian10-64
@@ -762,11 +732,7 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-    distros:
-    - debian10-small
   - name: .publish_test
-    distros:
-    - debian10-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian11
@@ -824,11 +790,7 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .publish
-    distros:
-    - debian11-small
   - name: .publish_test
-    distros:
-    - debian11-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-debian11-64
@@ -892,11 +854,7 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .publish
-    distros:
-    - debian11-small
   - name: .publish_test
-    distros:
-    - debian11-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel70
@@ -952,11 +910,7 @@ buildvariants:
     - ubuntu2004-package
   - name: selinux_rhel7_org
   - name: .publish
-    distros:
-    - rhel70-small
   - name: .publish_test
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
   # This variant compiles on RHEL 7.0 and runs tests on RHEL 7.6
@@ -1057,11 +1011,7 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-    distros:
-    - rhel80-small
   - name: .publish_test
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-80-64-bit
@@ -1239,11 +1189,7 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-    distros:
-    - rhel80-small
   - name: .publish_test
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-82-arm64
@@ -1312,11 +1258,7 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-    distros:
-    - rhel80-small
   - name: .publish_test
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel90
@@ -1368,11 +1310,7 @@ buildvariants:
     - ubuntu2204-large
   - name: selinux_rhel9_org
   - name: .publish
-    distros:
-    - rhel90-small
   - name: .publish_test
-    distros:
-    - rhel90-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-90-64-bit
@@ -1449,11 +1387,7 @@ buildvariants:
     - ubuntu2204-large
   - name: selinux_rhel9_enterprise
   - name: .publish
-    distros:
-    - rhel90-small
   - name: .publish_test
-    distros:
-    - rhel90-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: suse12
@@ -1511,11 +1445,7 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-    distros:
-    - suse12-small
   - name: .publish_test
-    distros:
-    - suse12-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-suse12-64
@@ -1572,11 +1502,7 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-    distros:
-    - suse12-small
   - name: .publish_test
-    distros:
-    - suse12-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-suse15-64
@@ -1628,11 +1554,7 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
-    distros:
-    - suse15-small
   - name: .publish_test
-    distros:
-    - suse15-small
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -1689,11 +1611,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - suse15-small
   - name: .publish_test
-    distros:
-    - suse15-small
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -1760,11 +1678,7 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-    distros:
-    - ubuntu1804-small
   - name: .publish_test
-    distros:
-    - ubuntu1804-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu1804-64
@@ -1847,11 +1761,7 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-    distros:
-    - ubuntu1804-small
   - name: .publish_test
-    distros:
-    - ubuntu1804-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu1804-arm64
@@ -1914,17 +1824,11 @@ buildvariants:
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
-    distros:
-    - ubuntu1804-test
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-    distros:
-    - ubuntu1804-test
   - name: .publish_test
-    distros:
-    - ubuntu1804-test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu1804-arm64
@@ -1965,11 +1869,7 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-    distros:
-    - ubuntu1804-test
   - name: .publish_test
-    distros:
-    - ubuntu1804-test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2204
@@ -2025,11 +1925,7 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .publish
-    distros:
-    - ubuntu2204-small
   - name: .publish_test
-    distros:
-    - ubuntu2204-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2004
@@ -2085,11 +1981,7 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-    distros:
-    - ubuntu2004-small
   - name: .publish_test
-    distros:
-    - ubuntu2004-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu2004-64
@@ -2155,11 +2047,7 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-    distros:
-    - ubuntu2004-small
   - name: .publish_test
-    distros:
-    - ubuntu2004-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu2204-64
@@ -2229,11 +2117,7 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .publish
-    distros:
-    - ubuntu2204-small
   - name: .publish_test
-    distros:
-    - ubuntu2204-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu2004-arm64
@@ -2296,11 +2180,7 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-    distros:
-    - ubuntu2004-test
   - name: .publish_test
-    distros:
-    - ubuntu2004-test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2004-arm64
@@ -2339,11 +2219,7 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-    distros:
-    - ubuntu2004-test
   - name: .publish_test
-    distros:
-    - ubuntu2004-test
   - name: generate_buildid_to_debug_symbols_mapping
 
 
@@ -2403,11 +2279,7 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-large
   - name: .publish
-    distros:
-    - ubuntu2204-small
   - name: .publish_test
-    distros:
-    - ubuntu2204-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2204-arm64
@@ -2442,11 +2314,7 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-large
   - name: .publish
-    distros:
-    - ubuntu2204-small
   - name: .publish_test
-    distros:
-    - ubuntu2204-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: windows
@@ -2511,8 +2379,6 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: push
-    distros:
-    - rhel70-small
 
 - name: enterprise-windows
   display_name: "Enterprise Windows"
@@ -2573,8 +2439,6 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: .publish_crypt
-    distros:
-    - rhel70-small
   - name: disk_wiredtiger
   - name: .jscore .common !.auth !.feature_flag_guarded
   - name: json_schema
@@ -2593,8 +2457,6 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: push
-    distros:
-    - rhel70-small
 
   ###########################################
   #           macOS buildvariants           #
@@ -2652,8 +2514,6 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: push
-    distros:
-    - rhel70-small
 
 - name: macos-arm64
   display_name: macOS arm64
@@ -2708,8 +2568,6 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: push
-    distros:
-    - rhel70-small
 
 - name: enterprise-macos
   display_name: Enterprise macOS
@@ -2753,12 +2611,8 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: push
-    distros:
-    - rhel70-small
   - name: .crypt
   - name: .publish_crypt
-    distros:
-    - rhel70-small
 
 - name: enterprise-macos-arm64
   display_name: Enterprise macOS arm64
@@ -2801,9 +2655,5 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: push
-    distros:
-    - rhel70-small
   - name: .crypt
   - name: .publish_crypt
-    distros:
-    - rhel70-small
