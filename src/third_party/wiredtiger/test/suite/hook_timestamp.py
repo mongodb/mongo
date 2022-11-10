@@ -45,12 +45,11 @@
 # current transaction.
 #
 # To run, for example, the cursor tests with these hooks enabled:
-#     ../test/suite/run.py --hooks timestamp cursor
+#     ../test/suite/run.py --hook timestamp cursor
 #
 from __future__ import print_function
 
-import os, sys, unittest, wthooks, wttimestamp
-from wttest import WiredTigerTestCase
+import sys, unittest, wthooks, wttimestamp
 
 # These are the hook functions that are run when particular APIs are called.
 
