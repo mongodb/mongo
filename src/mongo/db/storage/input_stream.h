@@ -52,6 +52,9 @@ namespace mongo {
 template <typename InputT>
 class InputStream : public InputT {
 public:
+    /**
+     * Constructs an InputStream object wrapped around a low-level class (e.g. NamedPipeInput).
+     */
     template <typename... ArgT>
     InputStream(ArgT&&... args) : InputT(std::forward<ArgT>(args)...) {
         using namespace fmt::literals;

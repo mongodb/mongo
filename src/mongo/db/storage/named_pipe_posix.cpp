@@ -37,6 +37,7 @@
 
 #include "mongo/db/storage/io_error_message.h"
 #include "mongo/logv2/log.h"
+#include "mongo/stdx/thread.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -90,7 +91,15 @@ NamedPipeInput::~NamedPipeInput() {
 }
 
 void NamedPipeInput::doOpen() {
-    _ifs.open(_pipeAbsolutePath.c_str(), std::ios::binary | std::ios::in);
+    // Retry open every 1 ms for up to 1 sec in case writer has not created the pipe yet.
+    int retries = 0;
+    do {
+        _ifs.open(_pipeAbsolutePath.c_str(), std::ios::binary | std::ios::in);
+        if (!_ifs.is_open()) {
+            stdx::this_thread::sleep_for(stdx::chrono::milliseconds(1));
+            ++retries;
+        }
+    } while (!_ifs.is_open() && retries <= 1000);
 }
 
 int NamedPipeInput::doRead(char* data, int size) {
