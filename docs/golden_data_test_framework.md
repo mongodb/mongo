@@ -164,27 +164,43 @@ just run the Golden Data tests when not using buildscripts/golden_test.py.
 2. Set GOLDEN_TEST_CONFIG_PATH environment variable to config file location, so that is available 
 when running tests and when running buildscripts/golden_test.py tool.
 
-**Example (linux/macOS):**
+### Automatic Setup
 
-Create ~/.golden_test_config.yml, as one of the variants below, depending on personal preference.
-For full documentation of config file format see 
-[Appendix - Config file reference](#appendix---config-file-reference)
+Use buildscripts/golden_test.py builtin setup to initialize default config for your current platform.
 
-a. A config that uses a unique subfolder folder for each test run.
-   * Allows diffing each test run separately. 
-   * Works with multiple source repos.
-```yaml
-outputRootPattern: /var/tmp/test_output/out-%%%%-%%%%-%%%%-%%%%
-diffCmd: diff -ruN --unidirectional-new-file --color=always "{{expected}}" "{{actual}}"
+**Instructions for Linux**
+
+Run buildscripts/golden_test.py setup utility
+```bash
+buildscripts/golden_test.py setup
 ```
 
-b. A config that uses the same folder for each test run.
-   * Allows to execute multiple independent test run and then diff them together. 
-   * Requires running "buildscripts/golden_test.py list" to remove output files from previous runs.
-   * May not work as well with multiple source repos.
+**Instructions for Windows**
+
+Run buildscripts/golden_test.py setup utility.
+You may be asked for a password, when not running in "Run as administrator" shell.
+```cmd
+c:\python\Python37\python.exe buildscripts/golden_test.py setup
+```
+
+### Manual Setup (Default config)
+
+This is the same config as that would be setup by the [Automatic Setup](#automatic-setup)
+
+This config uses a unique subfolder folder for each test run. (default)
+   * Allows diffing each test run separately. 
+   * Works with multiple source repos.
+
+**Instructions for Linux/macOS:**
+
+This config uses a unique subfolder folder for each test run. (default)
+   * Allows diffing each test run separately. 
+   * Works with multiple source repos.
+
+Create ~/.golden_test_config.yml with following contents:
 ```yaml
-outputRootPattern: /var/tmp/test_output
-diffCmd: diff -ruN --unidirectional-new-file --color=always "{{expected}}" "{{actual}}"
+outputRootPattern: /var/tmp/test_output/out-%%%%-%%%%-%%%%-%%%%
+diffCmd: git diff --no-index "{{expected}}" "{{actual}}"
 ```
 
 Update .bashrc, .zshrc
@@ -193,6 +209,18 @@ export GOLDEN_TEST_CONFIG_PATH=~/.golden_test_config.yml
 ```
 alternatively modify /etc/environment or other configuration if needed by Debugger/IDE etc.
 
+**Instructions for Windows:**
+
+Create %LocalAppData%\.golden_test_config.yml with the following contents:
+```yaml
+outputRootPattern: 'C:\Users\Administrator\AppData\Local\Temp\test_output\out-%%%%-%%%%-%%%%-%%%%'
+diffCmd: 'git diff --no-index "{{expected}}" "{{actual}}"'
+```
+
+Add GOLDEN_TEST_CONFIG_PATH=~/.golden_test_config.yml environment variable:
+```cmd
+runas /profile /user:administrator "setx GOLDEN_TEST_CONFIG_PATH %LocalAppData%\.golden_test_config.yml"
+```
 
 ## Usage
 
@@ -283,8 +311,8 @@ diffCmd:
         actual output folder paths respectively.
         This property is not used to decide whether the test passes or fails; it is only used to
         display differences once we've decided that a test failed.
-    examples: 
-         diff -ruN --unidirectional-new-file --color=always "{{expected}}" "{{actual}}"
+    examples:
          git diff --no-index "{{expected}}" "{{actual}}"
+         diff -ruN --unidirectional-new-file --color=always "{{expected}}" "{{actual}}"
 ```
 
