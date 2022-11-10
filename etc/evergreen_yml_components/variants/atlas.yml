@@ -75,6 +75,4 @@ buildvariants:
     - ubuntu2004-package
   - name: selinux_rhel7_enterprise
   - name: .publish
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping

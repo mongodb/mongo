@@ -50,11 +50,7 @@ buildvariants:
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
-    distros:
-    - rhel70-small
   - name: .publish
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-72-s390x
@@ -106,11 +102,7 @@ buildvariants:
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
-    distros:
-    - rhel70-small
   - name: .publish
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-83-s390x
@@ -162,9 +154,5 @@ buildvariants:
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
-    distros:
-    - rhel80-small
   - name: .publish
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
