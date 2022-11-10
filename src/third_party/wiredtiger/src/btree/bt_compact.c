@@ -119,6 +119,9 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
         addr->ta.newest_stop_ts = unpack.ta.newest_stop_ts;
         addr->ta.newest_stop_txn = unpack.ta.newest_stop_txn;
         switch (unpack.raw) {
+        case WT_CELL_ADDR_DEL:
+            addr->type = WT_ADDR_LEAF_NO;
+            break;
         case WT_CELL_ADDR_INT:
             addr->type = WT_ADDR_INT;
             break;

@@ -249,6 +249,10 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home, WT_REF **from_ref
         WT_ERR(__wt_memdup(session, unpack.data, unpack.size, &addr->addr));
         addr->size = (uint8_t)unpack.size;
         switch (unpack.raw) {
+        case WT_CELL_ADDR_DEL:
+            /* Could only have been fast-truncated if there were no overflow items. */
+            addr->type = WT_ADDR_LEAF_NO;
+            break;
         case WT_CELL_ADDR_INT:
             addr->type = WT_ADDR_INT;
             break;
