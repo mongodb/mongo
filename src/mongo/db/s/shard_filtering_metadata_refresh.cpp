@@ -149,6 +149,40 @@ Status refreshDbMetadata(OperationContext* opCtx,
     const auto swDbMetadata =
         Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName);
 
+    // Before setting the database metadata, exit early if the database version received by the
+    // config server is not newer than the cached one. This is a best-effort optimization to reduce
+    // the number of possible threads convoying on the exclusive lock below.
+    if (swDbMetadata.isOK()) {
+        Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+        auto* dss = DatabaseShardingState::get(opCtx, dbName);
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+
+        if (const auto cachedDbVersion = dss->getDbVersion(opCtx, dssLock)) {
+            const auto refreshedDbVersion = swDbMetadata.getValue().databaseVersion();
+
+            // Do not reorder these two statements! If the comparison is done through epochs, the
+            // construction order matters: we are pessimistically assuming that the refreshed
+            // version is newer when they have different UUIDs.
+            const ComparableDatabaseVersion comparableCachedDbVersion =
+                ComparableDatabaseVersion::makeComparableDatabaseVersion(cachedDbVersion);
+            const ComparableDatabaseVersion comparableRefreshedDbVersion =
+                ComparableDatabaseVersion::makeComparableDatabaseVersion(refreshedDbVersion);
+
+            if (comparableRefreshedDbVersion < comparableCachedDbVersion ||
+                (comparableRefreshedDbVersion == comparableCachedDbVersion &&
+                 refreshedDbVersion.getTimestamp() == cachedDbVersion->getTimestamp())) {
+                LOGV2_DEBUG(7079300,
+                            2,
+                            "Skip setting cached database metadata as there are no updates",
+                            "db"_attr = dbName,
+                            "cachedDbVersion"_attr = *cachedDbVersion,
+                            "refreshedDbVersion"_attr = refreshedDbVersion);
+
+                return Status::OK();
+            }
+        }
+    }
+
     Lock::DBLock dbLock(opCtx, dbName, MODE_X);
     auto* dss = DatabaseShardingState::get(opCtx, dbName);
     auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
