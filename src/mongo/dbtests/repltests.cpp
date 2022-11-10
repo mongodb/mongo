@@ -42,7 +42,9 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/transport_layer_asio.h"
 
@@ -98,7 +100,6 @@ public:
           _defaultReplSettings(
               ReplicationCoordinator::get(_opCtx.getServiceContext())->getSettings()) {
         auto* const sc = _opCtx.getServiceContext();
-
         transport::TransportLayerASIO::Options opts;
         opts.mode = transport::TransportLayerASIO::Options::kEgress;
         sc->setTransportLayer(std::make_unique<transport::TransportLayerASIO>(opts, nullptr));
@@ -332,6 +333,15 @@ protected:
         b.appendElements(fromjson(json));
         return b.obj();
     }
+
+private:
+    // Disable batched deletes. We use batched writes for the delete in the Remove() case which
+    // tries to group two deletes in one applyOps. It is illegal to batch writes outside a WUOW,
+    // so we disable batching for this test.
+    // TODO SERVER-69316: When featureFlagBatchMultiDeletes is removed, we want the Remove() test
+    // to issue two different applyOps deletes, or wrap the applyOps in a WUOW.
+    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagBatchMultiDeletes",
+                                                                false};
 };
 
 

@@ -666,7 +666,7 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
     ASSERT(!pipeline->getNext());
 }
 
-TEST_F(ReshardingAggTest, VerifyPipelineAtomicApplyOps) {
+TEST_F(ReshardingAggTest, VerifyPipelineApplyOps) {
     const auto oplogBSON = fromjson(R"({
         "op": "c",
         "ns": "test.$cmd",
@@ -704,7 +704,6 @@ TEST_F(ReshardingAggTest, VerifyPipelineAtomicApplyOps) {
 
     auto pipeline = createPipeline({Document(oplogBSON)});
 
-    // We don't need to support atomic applyOps in the resharding pipeline; we filter them out.
     ASSERT(!pipeline->getNext());
 }
 

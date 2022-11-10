@@ -45,14 +45,6 @@ structs:
                 type: array<object>
                 description: "The operations to apply"
 
-            allowAtomic:
-                cpp_name: allowAtomic
-                type: bool
-                default: true
-                description: "If 'allowAtomic' is true, applyOps() determines if all the given
-                              operations can be processed inside one WriteUnitOfWork. Set this flag
-                              to false to disable this 'atomic' mode."
-
             alwaysUpsert:
                 cpp_name: alwaysUpsert
                 type: bool

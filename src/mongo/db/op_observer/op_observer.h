@@ -441,8 +441,8 @@ public:
 
     /**
      * The write operations between onBatchedWriteStart() and onBatchedWriteCommit()
-     * are gathered in a single applyOps oplog entry, similar to atomic applyOps and
-     * multi-doc transactions, and written to the oplog.
+     * are gathered in a single applyOps oplog entry, similar to multi-doc transactions, and written
+     * to the oplog.
      */
     virtual void onBatchedWriteCommit(OperationContext* opCtx) = 0;
 

@@ -204,8 +204,7 @@ assert.eq(0, t.find().count(), "Non-zero amount of documents in collection to st
 
 /**
  * Test function for running CRUD operations on non-existent namespaces using various
- * combinations of invalid namespaces (collection/database), allowAtomic and alwaysUpsert,
- * and nesting.
+ * combinations of invalid namespaces (collection/database), alwaysUpsert, and nesting.
  *
  * Leave 'expectedErrorCode' undefined if this command is expected to run successfully.
  */
@@ -216,20 +215,14 @@ function testCrudOperationOnNonExistentNamespace(optype, o, o2, expectedErrorCod
         const op = {op: optype, ns: coll.getFullName(), o: o, o2: o2};
         [false, true].forEach(nested => {
             const opToRun = nested ? {op: 'c', ns: 'test.$cmd', o: {applyOps: [op]}, o2: {}} : op;
-            [false, true].forEach(allowAtomic => {
-                [false, true].forEach(alwaysUpsert => {
-                    const cmd = {
-                        applyOps: [opToRun],
-                        allowAtomic: allowAtomic,
-                        alwaysUpsert: alwaysUpsert
-                    };
-                    jsTestLog('Testing applyOps on non-existent namespace: ' + tojson(cmd));
-                    if (expectedErrorCode === ErrorCodes.OK) {
-                        assert.commandWorked(db.adminCommand(cmd));
-                    } else {
-                        assert.commandFailedWithCode(db.adminCommand(cmd), expectedErrorCode);
-                    }
-                });
+            [false, true].forEach(alwaysUpsert => {
+                const cmd = {applyOps: [opToRun], alwaysUpsert: alwaysUpsert};
+                jsTestLog('Testing applyOps on non-existent namespace: ' + tojson(cmd));
+                if (expectedErrorCode === ErrorCodes.OK) {
+                    assert.commandWorked(db.adminCommand(cmd));
+                } else {
+                    assert.commandFailedWithCode(db.adminCommand(cmd), expectedErrorCode);
+                }
             });
         });
     });
@@ -304,14 +297,13 @@ assert.commandFailedWithCode(db.runCommand({
     preCondition: []
 }),
                              6711600);
-// Expect the same error code when 'allowAtomic' is false, or with operations that include commands.
+// Expect the same error code with operations that include commands.
 assert.commandFailedWithCode(db.runCommand({
     applyOps: [
         {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 20}}}},
         {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 21}}}}
     ],
-    preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}],
-    allowAtomic: false
+    preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
 }),
                              6711600);
 // The use of preCondition is also incompatible with operations that include commands.

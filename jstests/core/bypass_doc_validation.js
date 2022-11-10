@@ -2,6 +2,8 @@
 //   does_not_support_stepdowns,
 //   does_not_support_transactions,
 //   requires_fastcount,
+//   # 6.2 removes support for atomic applyOps
+//   requires_fcv_62,
 //   requires_non_retryable_commands,
 //   uses_map_reduce_with_temp_collections,
 //   # Tenant migrations don't support applyOps.
@@ -54,8 +56,9 @@ function runBypassDocumentValidationTest(validator) {
     // Test applyOps with a simple insert if not on mongos.
     if (!isMongos) {
         const op = [{op: 'i', ns: coll.getFullName(), o: {_id: 9}}];
-        assertDocumentValidationFailure(
-            myDb.runCommand({applyOps: op, bypassDocumentValidation: false}), coll);
+        const res = myDb.runCommand({applyOps: op, bypassDocumentValidation: false});
+        assert.commandFailedWithCode(res, ErrorCodes.UnknownError, tojson(res));
+        assertDocumentValidationFailureCheckLogs(myDb);
         assert.eq(0, coll.count({_id: 9}));
         assert.commandWorked(myDb.runCommand({applyOps: op, bypassDocumentValidation: true}));
         assert.eq(1, coll.count({_id: 9}));

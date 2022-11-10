@@ -1,8 +1,8 @@
 /**
  * Tests that point-in-time pre- and post-images are retrieved for update/replace/delete operations
- * performed in a transaction and non-atomic "applyOps" command.
+ * performed in a transaction and "applyOps" command.
  * @tags: [
- * requires_fcv_60,
+ * requires_fcv_62,
  * uses_transactions,
  * ]
  */
@@ -130,14 +130,13 @@ assertChangeEventsReturned(changeStreamCursor, [
 
 // "applyOps" command can only be issued on a replica set.
 if (!FixtureHelpers.isMongos(testDB)) {
-    jsTestLog("Testing non-atomic 'applyOps' command.");
+    jsTestLog("Testing 'applyOps' command.");
     assert.commandWorked(coll.insert([{_id: 5, a: 1}, {_id: 6, a: 1}]));
     assert.commandWorked(testDB.runCommand({
         applyOps: [
             {op: "u", ns: coll.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {a: 2}}}},
             {op: "d", ns: coll.getFullName(), o: {_id: 6}}
-        ],
-        allowAtomic: false,
+        ]
     }));
     assertChangeEventsReturned(changeStreamCursor, [
         {_id: 5, operationType: "insert", postImage: {_id: 5, a: 1}},

@@ -2,6 +2,8 @@
  * @tags: [
  *   requires_non_retryable_commands,
  *   requires_fastcount,
+ *   # 6.2 removes support for atomic applyOps
+ *   requires_fcv_62,
  *   # applyOps is not supported on mongos
  *   assumes_against_mongod_not_mongos,
  *   # applyOps uses the oplog that require replication support
@@ -50,5 +52,7 @@ var a = assert.commandFailedWithCode(db.adminCommand({
     ]
 }),
                                      ErrorCodes.DuplicateKey);
-assert.eq(prevCount, t.find().count(), "Invalid insert worked");
+// We do not applyOps atomically, so the first op is applied and the second is not. The total number
+// is now 2.
+assert.eq(2, t.find().count(), "Expected 2 documents after applyOps");
 })();

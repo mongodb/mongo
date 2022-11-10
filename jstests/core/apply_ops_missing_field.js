@@ -26,10 +26,8 @@
 const coll = db.getCollection(jsTestName());
 coll.drop();
 
-// Run applyOps as MongoMirror does, with a dummy command to make it non-atomic. MongoMirror does
-// not use allowAtomic: false.
+// Run applyOps.
 function applyOps(ops) {
-    ops.push({op: "c", ns: "admin.$cmd", o: {applyOps: [{op: "n", ns: "", o: {"msg": "noop"}}]}});
     let command = {applyOps: ops, writeConcern: {w: "majority"}};
     assert.commandWorked(db.adminCommand(command));
 }

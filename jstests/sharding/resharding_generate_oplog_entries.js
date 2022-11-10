@@ -82,7 +82,7 @@ simulateResharding();
 let primary = st.shard0;
 
 (() => {
-    jsTestLog("Inserting docs in atomic applyOps");
+    jsTestLog("Inserting docs in applyOps");
 
     assert.commandWorked(primary.getDB(dbName).runCommand({
         applyOps:

@@ -4,6 +4,8 @@
  * @tags: [
  *   requires_non_retryable_commands,
  *   requires_fastcount,
+ *   # 6.2 removes support for atomic applyOps
+ *   requires_fcv_62,
  *   # applyOps is not supported on mongos
  *   assumes_against_mongod_not_mongos,
  *   # applyOps uses the oplog that require replication support
@@ -68,8 +70,7 @@ res = db.runCommand({
     alwaysUpsert: false
 });
 
-// Because the CRUD apply-ops are atomic, all results are false, even the first one.
-assert.eq(false, res.results[0], "upsert = false, existing doc update failed");
+assert.eq(true, res.results[0], "upsert = true, existing doc expected to succeed, but it failed");
 assert.eq(false, res.results[1], "upsert = false, nonexisting doc upserted");
 assert.eq(2, t.find().count(), "2 docs expected after upsert failure");
 

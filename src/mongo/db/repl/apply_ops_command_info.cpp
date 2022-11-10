@@ -88,10 +88,6 @@ bool ApplyOpsCommandInfo::areOpsCrudOnly() const {
     return _areOpsCrudOnly;
 }
 
-bool ApplyOpsCommandInfo::isAtomic() const {
-    return getAllowAtomic() && areOpsCrudOnly();
-}
-
 ApplyOpsCommandInfo::ApplyOpsCommandInfo(const BSONObj& applyOpCmd)
     : _areOpsCrudOnly(_parseAreOpsCrudOnly(applyOpCmd)) {
     boost::optional<TenantId> tid;

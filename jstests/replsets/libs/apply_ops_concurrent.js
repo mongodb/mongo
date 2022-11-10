@@ -1,9 +1,9 @@
 /**
- * This test ensures that multiple non-atomic applyOps commands can run concurrently.
+ * This test ensures that multiple applyOps commands can run concurrently.
  * Prior to SERVER-29802, applyOps would acquire the global lock regardless of the
  * atomicity of the operations (as a whole) being applied.
  *
- * Every instance of ApplyOpsConcurrentNonAtomicTest is configured with an "options" document
+ * Every instance of ApplyOpsConcurrentTest is configured with an "options" document
  * with the following format:
  * {
  *     ns1: <string>,
@@ -19,13 +19,13 @@
  *     Fully qualified namespace of second set of CRUD operations. This may be the same namespace as
  *     ns1. As with ns1, only insert operations will be used.
  */
-var ApplyOpsConcurrentNonAtomicTest = function(options) {
+var ApplyOpsConcurrentTest = function(options) {
     'use strict';
 
     load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
-    if (!(this instanceof ApplyOpsConcurrentNonAtomicTest)) {
-        return new ApplyOpsConcurrentNonAtomicTest(options);
+    if (!(this instanceof ApplyOpsConcurrentTest)) {
+        return new ApplyOpsConcurrentTest(options);
     }
 
     // Capture the 'this' reference
@@ -37,7 +37,7 @@ var ApplyOpsConcurrentNonAtomicTest = function(options) {
      * Logs message using test name as prefix.
      */
     function testLog(message) {
-        jsTestLog('ApplyOpsConcurrentNonAtomicTest: ' + message);
+        jsTestLog('ApplyOpsConcurrentTest: ' + message);
     }
 
     /**
@@ -55,13 +55,13 @@ var ApplyOpsConcurrentNonAtomicTest = function(options) {
     }
 
     /**
-     * Runs applyOps in non-atomic mode to insert 'numOps' documents into collection 'coll'.
+     * Runs applyOps to insert 'numOps' documents into collection 'coll'.
      */
-    function applyOpsInsertNonAtomic(coll, numOps, id) {
+    function applyOpsInsert(coll, numOps, id) {
         'use strict';
         const ops = generateInsertOps(coll, numOps, id);
         const mydb = coll.getDB();
-        assert.commandWorked(mydb.runCommand({applyOps: ops, allowAtomic: false}),
+        assert.commandWorked(mydb.runCommand({applyOps: ops}),
                              'failed to insert documents into ' + coll.getFullName());
     }
 
@@ -94,7 +94,7 @@ var ApplyOpsConcurrentNonAtomicTest = function(options) {
         const id = options.id;
 
         testLog('Starting to apply ' + numOps + ' operations in collection ' + coll.getFullName());
-        applyOpsInsertNonAtomic(coll, numOps, id);
+        applyOpsInsert(coll, numOps, id);
         testLog('Successfully applied ' + numOps + ' operations in collection ' +
                 coll.getFullName());
     }
@@ -110,13 +110,13 @@ var ApplyOpsConcurrentNonAtomicTest = function(options) {
             id: id,
         };
         const functionName = 'insertFunction_' + coll.getFullName().replace(/\./g, '_');
-        const s =                                                                     //
-            '\n\n' +                                                                  //
-            'const testLog = ' + testLog + ';\n\n' +                                  //
-            'const generateInsertOps = ' + generateInsertOps + ';\n\n' +              //
-            'const applyOpsInsertNonAtomic = ' + applyOpsInsertNonAtomic + ';\n\n' +  //
-            'const ' + functionName + ' = ' + insertFunction + ';\n\n' +              //
-            functionName + '(' + tojson(options) + ');';                              //
+        const s =                                                         //
+            '\n\n' +                                                      //
+            'const testLog = ' + testLog + ';\n\n' +                      //
+            'const generateInsertOps = ' + generateInsertOps + ';\n\n' +  //
+            'const applyOpsInsert = ' + applyOpsInsert + ';\n\n' +        //
+            'const ' + functionName + ' = ' + insertFunction + ';\n\n' +  //
+            functionName + '(' + tojson(options) + ');';                  //
         return s;
     }
 

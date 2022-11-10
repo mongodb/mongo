@@ -1251,8 +1251,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 "oplogApplicationMode"_attr = OplogApplication::modeToString(mode));
 
     // Choose opCounters based on running on standalone/primary or secondary by checking
-    // whether writes are replicated. Atomic applyOps command is an exception, which runs
-    // on primary/standalone but disables write replication.
+    // whether writes are replicated.
     const bool shouldUseGlobalOpCounters =
         mode == repl::OplogApplication::Mode::kApplyOpsCmd || opCtx->writesAreReplicated();
     OpCounters* opCounters = shouldUseGlobalOpCounters ? &globalOpCounters : &replOpCounters;
@@ -1320,14 +1319,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
         if (opCtx->writesAreReplicated()) {
             // We do not assign timestamps on replicated writes since they will get their oplog
             // timestamp once they are logged. The operation may contain a timestamp if it is part
-            // of a non-atomic applyOps command, but we ignore it so that we don't violate oplog
-            // ordering.
+            // of a applyOps command, but we ignore it so that we don't violate oplog ordering.
             return false;
         } else if (haveWrappingWriteUnitOfWork) {
             // We do not assign timestamps to non-replicated writes that have a wrapping
-            // WriteUnitOfWork, as they will get the timestamp on that WUOW. Use cases include: (1)
-            // Atomic applyOps (used by sharding). (2) Secondary oplog application of prepared
-            // transactions.
+            // WriteUnitOfWork, as they will get the timestamp on that WUOW. Use cases include:
+            // Secondary oplog application of prepared transactions.
             return false;
         } else {
             switch (replMode) {
@@ -1531,8 +1528,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     const StringData ns = op.getNss().ns();
                     writeConflictRetry(opCtx, "applyOps_upsert", ns, [&] {
                         WriteUnitOfWork wuow(opCtx);
-                        // If this is an atomic applyOps (i.e: `haveWrappingWriteUnitOfWork` is
-                        // true), do not timestamp the write.
+                        // If `haveWrappingWriteUnitOfWork` is true, do not timestamp the write.
                         if (assignOperationTimestamp && timestamp != Timestamp::min()) {
                             uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
                         }

@@ -73,7 +73,7 @@ void TenantOplogBatcher::_pushEntry(OperationContext* opCtx,
         }
         // All applyOps entries are expanded and the expansions put in the batch expansion array.
         // The original applyOps is kept in the batch ops array.
-        // This applies to both multi-document transactions and atomic applyOps.
+        // This applies to multi-document transactions.
         auto expansionsIndex = batch->expansions.size();
         auto& curExpansion = batch->expansions.emplace_back();
         auto lastOpInTransactionBson = op.getEntry().toBSON();

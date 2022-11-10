@@ -169,8 +169,7 @@ BSONObj makeApplyOpsWithInsertOperation(const NamespaceString& nss,
     return BSON("applyOps" << BSON_ARRAY(insertOp));
 }
 
-TEST_F(ApplyOpsTest,
-       AtomicApplyOpsInsertIntoNonexistentCollectionReturnsNamespaceNotFoundInResult) {
+TEST_F(ApplyOpsTest, ApplyOpsInsertIntoNonexistentCollectionReturnsNamespaceNotFoundInResult) {
     auto opCtx = cc().makeOperationContext();
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
     NamespaceString nss("test.t");
@@ -184,7 +183,7 @@ TEST_F(ApplyOpsTest,
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
 }
 
-TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWithOtherUuid) {
+TEST_F(ApplyOpsTest, ApplyOpsInsertWithUuidIntoCollectionWithOtherUuid) {
     auto opCtx = cc().makeOperationContext();
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
     NamespaceString nss("test.t");
@@ -197,16 +196,13 @@ TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWithOtherUuid) {
     ASSERT_NOT_EQUALS(applyOpsUuid, *collectionOptions.uuid);
     ASSERT_OK(_storage->createCollection(opCtx.get(), nss, collectionOptions));
 
-    // The applyOps returns a NamespaceNotFound error because of the failed UUID lookup
+    // The applyOps returns an Unknown error because of the failed UUID lookup
     // even though a collection exists with the same namespace as the insert operation.
     auto documentToInsert = BSON("_id" << 0);
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, applyOpsUuid, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+    ASSERT_EQUALS(ErrorCodes::UnknownError,
                   applyOps(opCtx.get(), DatabaseName("test"), cmdObj, mode, &resultBuilder));
-    auto result = resultBuilder.obj();
-    auto status = getStatusFromApplyOpsResult(result);
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
 }
 
 TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {

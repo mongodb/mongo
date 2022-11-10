@@ -117,8 +117,8 @@ bool isUnpreparedCommit(const OplogEntry& entry) {
  * CRUD operations, which can be safely batched with other CRUD operations. All other command oplog
  * entries, including unprepared applyOps/commitTransaction for transactions that contain commands,
  * must be processed in their own batch.
- * Note that 'unprepared applyOps' could mean a partial transaction oplog entry, an implicit commit
- * applyOps oplog entry, or an atomic applyOps oplog entry outside of a transaction.
+ * Note that 'unprepared applyOps' could mean a partial transaction oplog entry, or an implicit
+ * commit applyOps oplog entry.
  *
  * Command operations inside large transactions do not need to be processed individually as long as
  * the final oplog entry in the transaction is processed individually, since the operations are not

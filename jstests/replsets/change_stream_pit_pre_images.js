@@ -5,7 +5,8 @@
  * The test relies on a correct change stream pre-image recording on a node in the primary role.
  *
  * @tags: [
- * requires_fcv_60,
+ * # 6.2 removes support for atomic applyOps
+ * requires_fcv_62,
  * # The test waits for the Checkpointer, but this process runs only for on-disk storage engines.
  * requires_persistence,
  * ]
@@ -110,7 +111,7 @@ for (const [collectionName, collectionOptions] of [
         assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
     }
 
-    function issueNonAtomicApplyOpsCommand(testDB) {
+    function issueApplyOpsCommand(testDB) {
         assert.commandWorked(coll.deleteMany({$and: [{_id: {$gte: 9}}, {_id: {$lte: 10}}]}));
         assert.commandWorked(coll.insert([{_id: 9, a: 1}, {_id: 10, a: 1}]));
         assert.commandWorked(testDB.runCommand({
@@ -118,7 +119,6 @@ for (const [collectionName, collectionOptions] of [
                 {op: "u", ns: coll.getFullName(), o2: {_id: 9}, o: {$v: 2, diff: {u: {a: 2}}}},
                 {op: "d", ns: coll.getFullName(), o: {_id: 10}}
             ],
-            allowAtomic: false,
         }));
     }
 
@@ -156,7 +156,7 @@ for (const [collectionName, collectionOptions] of [
         replTest.awaitReplication();
         assertPreImagesCollectionOnPrimaryMatchesSecondary();
 
-        issueNonAtomicApplyOpsCommand(testDB);
+        issueApplyOpsCommand(testDB);
 
         // Verify that related change stream pre-images were replicated to the secondary.
         replTest.awaitReplication();
@@ -194,7 +194,7 @@ for (const [collectionName, collectionOptions] of [
         assert.commandWorked(coll.deleteOne({_id: 3}, {writeConcern: {w: 2}}));
 
         issueRetryableFindAndModifyCommands(testDB);
-        issueNonAtomicApplyOpsCommand(testDB);
+        issueApplyOpsCommand(testDB);
         issueWriteCommandsInTransaction(testDB);
 
         // Resume the initial sync process.
@@ -238,7 +238,7 @@ for (const [collectionName, collectionOptions] of [
         assert.commandWorked(coll.deleteOne({_id: 4}, {writeConcern: {w: 2}}));
 
         issueRetryableFindAndModifyCommands(testDB);
-        issueNonAtomicApplyOpsCommand(testDB);
+        issueApplyOpsCommand(testDB);
         issueWriteCommandsInTransaction(testDB);
 
         // Do an unclean shutdown of the primary node, and then restart.

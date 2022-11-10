@@ -46,7 +46,8 @@ function assertApplyOpsWorks(testdbs, ops) {
             ops.shift();
 
         // These errors are expected when replaying operations and should be ignored.
-        if (res.code == ErrorCodes.NamespaceNotFound || res.code == ErrorCodes.DuplicateKey) {
+        if (res.code == ErrorCodes.NamespaceNotFound || res.code == ErrorCodes.DuplicateKey ||
+            res.code == ErrorCodes.UnknownError) {
             ops.shift();
             continue;
         }

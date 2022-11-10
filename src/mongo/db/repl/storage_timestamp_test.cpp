@@ -441,32 +441,14 @@ public:
         return durableCatalog->getMetaData(_opCtx, catalogId);
     }
 
-    StatusWith<BSONObj> doAtomicApplyOps(const DatabaseName& dbName,
-                                         const std::list<BSONObj>& applyOpsList) {
+    StatusWith<BSONObj> doApplyOps(const DatabaseName& dbName,
+                                   const std::list<BSONObj>& applyOpsList) {
         OneOffRead oor(_opCtx, Timestamp::min());
 
         BSONObjBuilder result;
         Status status = applyOps(_opCtx,
                                  dbName,
                                  BSON("applyOps" << applyOpsList),
-                                 repl::OplogApplication::Mode::kApplyOpsCmd,
-                                 &result);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        return {result.obj()};
-    }
-
-    // Creates a dummy command operation to persuade `applyOps` to be non-atomic.
-    StatusWith<BSONObj> doNonAtomicApplyOps(const DatabaseName& dbName,
-                                            const std::list<BSONObj>& applyOpsList) {
-        OneOffRead oor(_opCtx, Timestamp::min());
-
-        BSONObjBuilder result;
-        Status status = applyOps(_opCtx,
-                                 dbName,
-                                 BSON("applyOps" << applyOpsList << "allowAtomic" << false),
                                  repl::OplogApplication::Mode::kApplyOpsCmd,
                                  &result);
         if (!status.isOK()) {
@@ -956,14 +938,14 @@ TEST_F(StorageTimestampTest, SecondaryDeleteTimes) {
     // Delete all documents one at a time.
     const LogicalTime startDeleteTime = _clock->tickClusterTime(docsToInsert);
     for (std::int32_t num = 0; num < docsToInsert; ++num) {
-        ASSERT_OK(doNonAtomicApplyOps(
-                      nss.dbName(),
-                      {BSON("ts" << startDeleteTime.addTicks(num).asTimestamp() << "t" << 0LL << "v"
-                                 << 2 << "op"
-                                 << "d"
-                                 << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
-                                 << "wall" << Date_t() << "o" << BSON("_id" << num))})
-                      .getStatus());
+        ASSERT_OK(
+            doApplyOps(nss.dbName(),
+                       {BSON("ts" << startDeleteTime.addTicks(num).asTimestamp() << "t" << 0LL
+                                  << "v" << 2 << "op"
+                                  << "d"
+                                  << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
+                                  << "wall" << Date_t() << "o" << BSON("_id" << num))})
+                .getStatus());
     }
 
     for (std::int32_t num = 0; num <= docsToInsert; ++num) {
@@ -1028,15 +1010,14 @@ TEST_F(StorageTimestampTest, SecondaryUpdateTimes) {
 
     const LogicalTime firstUpdateTime = _clock->tickClusterTime(updates.size());
     for (std::size_t idx = 0; idx < updates.size(); ++idx) {
-        ASSERT_OK(
-            doNonAtomicApplyOps(
-                nss.dbName(),
-                {BSON("ts" << firstUpdateTime.addTicks(idx).asTimestamp() << "t" << 0LL << "v" << 2
-                           << "op"
-                           << "u"
-                           << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid() << "wall"
-                           << Date_t() << "o2" << BSON("_id" << 0) << "o" << updates[idx].first)})
-                .getStatus());
+        ASSERT_OK(doApplyOps(nss.dbName(),
+                             {BSON("ts" << firstUpdateTime.addTicks(idx).asTimestamp() << "t" << 0LL
+                                        << "v" << 2 << "op"
+                                        << "u"
+                                        << "ns" << nss.ns() << "ui"
+                                        << autoColl.getCollection()->uuid() << "wall" << Date_t()
+                                        << "o2" << BSON("_id" << 0) << "o" << updates[idx].first)})
+                      .getStatus());
     }
 
     for (std::size_t idx = 0; idx < updates.size(); ++idx) {
@@ -1066,16 +1047,16 @@ TEST_F(StorageTimestampTest, SecondaryInsertToUpsert) {
     // on the same collection with `{_id: 0}`. It's expected for this second insert to be
     // turned into an upsert. The goal document does not contain `field: 0`.
     BSONObjBuilder resultBuilder;
-    auto result = unittest::assertGet(doNonAtomicApplyOps(
-        nss.dbName(),
-        {BSON("ts" << insertTime.asTimestamp() << "t" << 1LL << "op"
-                   << "i"
-                   << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid() << "wall"
-                   << Date_t() << "o" << BSON("_id" << 0 << "field" << 0)),
-         BSON("ts" << insertTime.addTicks(1).asTimestamp() << "t" << 1LL << "op"
-                   << "i"
-                   << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid() << "wall"
-                   << Date_t() << "o" << BSON("_id" << 0))}));
+    auto result = unittest::assertGet(
+        doApplyOps(nss.dbName(),
+                   {BSON("ts" << insertTime.asTimestamp() << "t" << 1LL << "op"
+                              << "i"
+                              << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
+                              << "wall" << Date_t() << "o" << BSON("_id" << 0 << "field" << 0)),
+                    BSON("ts" << insertTime.addTicks(1).asTimestamp() << "t" << 1LL << "op"
+                              << "i"
+                              << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
+                              << "wall" << Date_t() << "o" << BSON("_id" << 0))}));
 
     ASSERT_EQ(2, result.getIntField("applied"));
     ASSERT(result["results"].Array()[0].Bool());
@@ -1100,99 +1081,6 @@ TEST_F(StorageTimestampTest, SecondaryInsertToUpsert) {
         << "Doc: " << doc.toString() << " Expected: {_id: 0}";
 }
 
-TEST_F(StorageTimestampTest, SecondaryAtomicApplyOps) {
-    // Create a new collection.
-    NamespaceString nss("unittests.insertToUpsert");
-    create(nss);
-
-    Lock::GlobalWrite lk{_opCtx};  // avoid global lock upgrade during applyOps.
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-
-    // Reserve a timestamp before the inserts should happen.
-    const LogicalTime preInsertTimestamp = _clock->tickClusterTime(1);
-    auto swResult =
-        doAtomicApplyOps(nss.dbName(),
-                         {BSON("op"
-                               << "i"
-                               << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
-                               << "o" << BSON("_id" << 0)),
-                          BSON("op"
-                               << "i"
-                               << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
-                               << "o" << BSON("_id" << 1))});
-    ASSERT_OK(swResult);
-
-    ASSERT_EQ(2, swResult.getValue().getIntField("applied"));
-    ASSERT(swResult.getValue()["results"].Array()[0].Bool());
-    ASSERT(swResult.getValue()["results"].Array()[1].Bool());
-
-    // Reading at `preInsertTimestamp` should not find anything.
-    auto recoveryUnit = _opCtx->recoveryUnit();
-    recoveryUnit->abandonSnapshot();
-    recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                         preInsertTimestamp.asTimestamp());
-    ASSERT_EQ(0, itCount(autoColl.getCollection()))
-        << "Should not observe a write at `preInsertTimestamp`. TS: "
-        << preInsertTimestamp.asTimestamp();
-
-    // Reading at `preInsertTimestamp + 1` should observe both inserts.
-    recoveryUnit = _opCtx->recoveryUnit();
-    recoveryUnit->abandonSnapshot();
-    recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                         preInsertTimestamp.addTicks(1).asTimestamp());
-    ASSERT_EQ(2, itCount(autoColl.getCollection()))
-        << "Should observe both writes at `preInsertTimestamp + 1`. TS: "
-        << preInsertTimestamp.addTicks(1).asTimestamp();
-}
-
-// This should have the same result as `SecondaryInsertToUpsert` except it gets there a different
-// way. Doing an atomic `applyOps` should result in a WriteConflictException because the same
-// transaction is trying to write modify the same document twice. The `applyOps` command should
-// catch that failure and retry in non-atomic mode, preserving the timestamps supplied by the
-// user.
-TEST_F(StorageTimestampTest, SecondaryAtomicApplyOpsWCEToNonAtomic) {
-    // Create a new collectiont.
-    NamespaceString nss("unitteTsts.insertToUpsert");
-    create(nss);
-
-    Lock::GlobalWrite lk{_opCtx};  // avoid global lock upgrade during applyOps.
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-
-    const LogicalTime preInsertTimestamp = _clock->tickClusterTime(1);
-    auto swResult =
-        doAtomicApplyOps(nss.dbName(),
-                         {BSON("op"
-                               << "i"
-                               << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
-                               << "o" << BSON("_id" << 0 << "field" << 0)),
-                          BSON("op"
-                               << "i"
-                               << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
-                               << "o" << BSON("_id" << 0))});
-    ASSERT_OK(swResult);
-
-    ASSERT_EQ(2, swResult.getValue().getIntField("applied"));
-    ASSERT(swResult.getValue()["results"].Array()[0].Bool());
-    ASSERT(swResult.getValue()["results"].Array()[1].Bool());
-
-    // Reading at `insertTime` should not see any documents.
-    auto recoveryUnit = _opCtx->recoveryUnit();
-    recoveryUnit->abandonSnapshot();
-    recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                         preInsertTimestamp.asTimestamp());
-    ASSERT_EQ(0, itCount(autoColl.getCollection()))
-        << "Should not find any documents at `preInsertTimestamp`. TS: "
-        << preInsertTimestamp.asTimestamp();
-
-    // Reading at `preInsertTimestamp + 1` should show the final state of the document.
-    recoveryUnit->abandonSnapshot();
-    recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                         preInsertTimestamp.addTicks(1).asTimestamp());
-    auto doc = findOne(autoColl.getCollection());
-    ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, BSON("_id" << 0)))
-        << "Doc: " << doc.toString() << " Expected: {_id: 0}";
-}
-
 TEST_F(StorageTimestampTest, SecondaryCreateCollection) {
     // In order for applyOps to assign timestamps, we must be in non-replicated mode.
     repl::UnreplicatedWritesBlock uwb(_opCtx);
@@ -1203,14 +1091,14 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollection) {
     { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
 
     BSONObjBuilder resultBuilder;
-    auto swResult = doNonAtomicApplyOps(
-        nss.dbName(),
-        {
-            BSON("ts" << _presentTs << "t" << 1LL << "op"
-                      << "c"
-                      << "ui" << UUID::gen() << "ns" << nss.getCommandNS().ns() << "wall"
-                      << Date_t() << "o" << BSON("create" << nss.coll())),
-        });
+    auto swResult =
+        doApplyOps(nss.dbName(),
+                   {
+                       BSON("ts" << _presentTs << "t" << 1LL << "op"
+                                 << "c"
+                                 << "ui" << UUID::gen() << "ns" << nss.getCommandNS().ns() << "wall"
+                                 << Date_t() << "o" << BSON("create" << nss.coll())),
+                   });
     ASSERT_OK(swResult);
 
     { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
@@ -1238,18 +1126,18 @@ TEST_F(StorageTimestampTest, SecondaryCreateTwoCollections) {
     const Timestamp dummyTs = dummyLt.asTimestamp();
 
     BSONObjBuilder resultBuilder;
-    auto swResult = doNonAtomicApplyOps(
-        DatabaseName(dbName),
-        {
-            BSON("ts" << _presentTs << "t" << 1LL << "op"
-                      << "c"
-                      << "ui" << UUID::gen() << "ns" << nss1.getCommandNS().ns() << "wall"
-                      << Date_t() << "o" << BSON("create" << nss1.coll())),
-            BSON("ts" << _futureTs << "t" << 1LL << "op"
-                      << "c"
-                      << "ui" << UUID::gen() << "ns" << nss2.getCommandNS().ns() << "wall"
-                      << Date_t() << "o" << BSON("create" << nss2.coll())),
-        });
+    auto swResult =
+        doApplyOps(DatabaseName(dbName),
+                   {
+                       BSON("ts" << _presentTs << "t" << 1LL << "op"
+                                 << "c"
+                                 << "ui" << UUID::gen() << "ns" << nss1.getCommandNS().ns()
+                                 << "wall" << Date_t() << "o" << BSON("create" << nss1.coll())),
+                       BSON("ts" << _futureTs << "t" << 1LL << "op"
+                                 << "c"
+                                 << "ui" << UUID::gen() << "ns" << nss2.getCommandNS().ns()
+                                 << "wall" << Date_t() << "o" << BSON("create" << nss2.coll())),
+                   });
     ASSERT_OK(swResult);
 
     { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss1).getCollection()); }
@@ -1295,7 +1183,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
         { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection()); }
 
         BSONObjBuilder resultBuilder;
-        auto swResult = doNonAtomicApplyOps(
+        auto swResult = doApplyOps(
             DatabaseName(dbName),
             {
                 BSON("ts" << _presentTs << "t" << 1LL << "op"
@@ -1352,14 +1240,14 @@ TEST_F(StorageTimestampTest, PrimaryCreateCollectionInApplyOps) {
     { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
 
     BSONObjBuilder resultBuilder;
-    auto swResult = doNonAtomicApplyOps(
-        nss.dbName(),
-        {
-            BSON("ts" << _presentTs << "t" << 1LL << "op"
-                      << "c"
-                      << "ui" << UUID::gen() << "ns" << nss.getCommandNS().ns() << "wall"
-                      << Date_t() << "o" << BSON("create" << nss.coll())),
-        });
+    auto swResult =
+        doApplyOps(nss.dbName(),
+                   {
+                       BSON("ts" << _presentTs << "t" << 1LL << "op"
+                                 << "c"
+                                 << "ui" << UUID::gen() << "ns" << nss.getCommandNS().ns() << "wall"
+                                 << Date_t() << "o" << BSON("create" << nss.coll())),
+                   });
     ASSERT_OK(swResult);
 
     { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }

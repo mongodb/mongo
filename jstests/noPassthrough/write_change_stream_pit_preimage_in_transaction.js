@@ -1,6 +1,6 @@
 /**
  * Tests that pre-images are written to the pre-images collection on updates and deletes in
- * transactions and for non-atomic "applyOps" command.
+ * transactions and for "applyOps" command.
  * @tags: [
  *  requires_fcv_60,
  *  requires_replication,
@@ -200,7 +200,7 @@ function getCollections(db) {
     assert.commandWorked(coll.deleteMany({}));
     assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 2, a: 1}]));
 
-    // Verify that pre-images are written correctly for the non-atomic "applyOps" command.
+    // Verify that pre-images are written correctly for the "applyOps" command.
     assertPreImagesWrittenForOps(testDB, function() {
         assert.commandWorked(testDB.runCommand({
             applyOps: [
@@ -208,22 +208,6 @@ function getCollections(db) {
                 {op: "d", ns: coll.getFullName(), o: {_id: 2}}
             ],
             allowAtomic: false,
-        }));
-    }, [{_id: 1, a: 1}, {_id: 2, a: 1}]);
-})();
-
-(function testPreImageWritingForAtomicApplyOpsCommandAutoConvertedToNonAtomic() {
-    assert.commandWorked(coll.deleteMany({}));
-    assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 2, a: 1}]));
-
-    // Verify that pre-images are written correctly for the atomic "applyOps" command, which is
-    // automatically converted to a non-atomic one.
-    assertPreImagesWrittenForOps(testDB, function() {
-        assert.commandWorked(testDB.runCommand({
-            applyOps: [
-                {op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$v: 2, diff: {u: {a: 2}}}},
-                {op: "d", ns: coll.getFullName(), o: {_id: 2}}
-            ],
         }));
     }, [{_id: 1, a: 1}, {_id: 2, a: 1}]);
 })();
