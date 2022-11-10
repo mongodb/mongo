@@ -28,8 +28,6 @@ function isError(res) {
     return !res.hasOwnProperty('ok') || !res['ok'];
 }
 
-Random.setRandomSeed();
-
 const dbName = "test-SERVER-57469";
 const collName = "test-SERVER-57469-coll";
 
@@ -41,11 +39,9 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.name);
 
 // Insert some data.
-function initDb(numSamples) {
+function initDb(numSamples, splitPoint) {
     coll.drop();
 
-    // Use ranged sharding with 90% of the value range on the second shard.
-    const splitPoint = Math.max(1, numSamples / 10);
     st.shardColl(
         coll,
         {_id: 1},              // shard key
@@ -61,7 +57,9 @@ function initDb(numSamples) {
 }
 
 let nDocs = 1000;
-initDb(nDocs);
+// Use ranged sharding with 90% of the value range on the second shard.
+let splitPoint = Math.max(1, nDocs / 10);
+initDb(nDocs, splitPoint);
 
 /**
  * @param {Object} cmdRes coll.runCommand() result
@@ -101,18 +99,18 @@ function runBigBatchQuery(timeoutMs) {
 let fullQueryTimeoutMS = runtimeMillis(() => assert.eq("full", runBigBatchQuery(9999999)));
 print("ran in " + fullQueryTimeoutMS + " ms");
 const targetTimeoutMS =
-    50;  // We want the query to run for at least this long, to allow for timeout.
+    1000;  // We want the query to run for at least this long, to allow for timeout.
 if (fullQueryTimeoutMS < targetTimeoutMS) {
     // Assume linear scaling of runtime with the number of docs.
     nDocs *= Math.ceil(targetTimeoutMS / fullQueryTimeoutMS);
     // Limit size to prevent long runtime due to bad first sample.
-    nDocs = Math.min(nDocs, 100000);
+    nDocs = Math.min(nDocs, 1000000);
     if (nDocs % 2 == 1) {  // make sure it's even so the math for half size is easier
         nDocs += 1;
     }
+    splitPoint = Math.max(1, nDocs / 10);
     print("adjusting size to " + nDocs);
-    fullQueryTimeoutMS = 100;
-    initDb(nDocs);
+    initDb(nDocs, splitPoint);
 
     // Re-time the full query after resizing, with unlimited time allowed.
     fullQueryTimeoutMS = runtimeMillis(() => assert.eq("full", runBigBatchQuery(9999999)));
@@ -126,40 +124,32 @@ if (fullQueryTimeoutMS < targetTimeoutMS) {
  *     never seen.
  */
 function searchForAndAssertPartialResults(initialTimeoutMS, queryFunc) {
-    // Try this test twice because it's very sensitive to timing and resource contention.
-    for (let i = 1; i <= 2; i++) {
-        let timeoutMS = initialTimeoutMS;
-        const attempts = 20;
-        for (let j = 1; j <= attempts; j++) {
-            print("try query with maxTimeMS: " + timeoutMS);
-            let res = queryFunc(timeoutMS);
-            if (res == "partial") {
-                // Got partial results!
-                return timeoutMS;
-            } else if (res == "full") {
-                // Timeout was so long that we got complete results.  Make it shorter and try again
-                if (timeoutMS > 1) {  // 1 ms is the min timeout allowed.
-                    timeoutMS = Math.floor(0.8 * timeoutMS);
-                }
-            } else {
-                assert.eq("error", res);
-                // Timeout was so short that we go no results.  Increase maxTimeMS and try again
-                timeoutMS = Math.ceil(1.1 * timeoutMS);
-                // Don't let the timeout explode upward without bound.
-                if (timeoutMS > 100 * initialTimeoutMS) {
-                    break;
-                }
+    let timeoutMS = initialTimeoutMS;
+    const attempts = 1000;
+    for (let j = 1; j <= attempts; j++) {
+        print("try query with maxTimeMS: " + timeoutMS);
+        // The longer we are searching, the more fine-grained our changes to the timeout become.
+        const changeFactor = 0.2 - ((0.2 * j) / attempts);
+        let res = queryFunc(timeoutMS);
+        if (res == "partial") {
+            // Got partial results!
+            return timeoutMS;
+        } else if (res == "full") {
+            // Timeout was so long that we got complete results.  Make it shorter and try again
+            if (timeoutMS > 1) {  // 1 ms is the min timeout allowed.
+                timeoutMS = Math.floor((1 - changeFactor) * timeoutMS);
+            }
+        } else {
+            assert.eq("error", res);
+            // Timeout was so short that we got no results.  Increase maxTimeMS and try again
+            timeoutMS = Math.ceil((1 + changeFactor) * timeoutMS);
+            // Don't let the timeout explode upward without bound.
+            if (timeoutMS > 100 * initialTimeoutMS) {
+                break;
             }
         }
-        // Pause for one minute then try once again.  We don't expect to ever reach this except
-        // in rare cases when the test infrastructure is behaving inconsistently.  We are trying
-        // the test again after a long delay instead of failing the test.
-        sleep(60 * 1000);
     }
     // Failed to ever see partial results :-(
-    if (fullQueryTimeoutMS < 10) {
-        lsTest.log("!!!: This error is likely due to the nDocs constant being set too small.");
-    }
     assert(false, "Did not find partial results after max number of attempts");
 }
 
@@ -167,26 +157,28 @@ function searchForAndAssertPartialResults(initialTimeoutMS, queryFunc) {
 // This first case will try to get all the results in one big batch.
 // Start with half of the full runtime of the query.
 
-// fetch one big batch of results
+// Fetch one big batch of results.
 searchForAndAssertPartialResults(Math.round(fullQueryTimeoutMS), runBigBatchQuery);
 
-// Try to get partial results in a getMore, while fetching the second half of data.
+// Try to get partial results in a getMore.
 searchForAndAssertPartialResults(Math.round(0.5 * fullQueryTimeoutMS), function(timeout) {
-    // Find a small first batch.
-    const smallBatchSize = 1;
+    // Find the first batch.
+    // First batch size must be chosen carefully.  We want it to be small enough that we don't get
+    // all the docs from the small shard in the first batch.  We want it to be large enough that
+    // the repeated getMores on the remotes for the remaining data does not overwhelm the exec time.
+    const firstBatchSize = Math.round(splitPoint / 2);  // Half the size of the small shard.
     let findRes = coll.runCommand(
-        {find: collName, allowPartialResults: true, batchSize: smallBatchSize, maxTimeMS: timeout});
-    if (isError(findRes)) {
-        // We don't expect this first small-batch find to timeout, but it can if we're unlucky.
-        assert.eq(ErrorCodes.MaxTimeMSExpired, findRes.code);  // timeout
-        return "error";
+        {find: collName, allowPartialResults: true, batchSize: firstBatchSize, maxTimeMS: timeout});
+    // We don't expect this first batch find to timeout, but it can if we're unlucky.
+    const findResStatus = interpretCommandResult(findRes, firstBatchSize);
+    if (findResStatus == "error" || findResStatus == "partial") {
+        return findResStatus;
     }
-    // Partial results can be either size zero or smallBatchSize.
-    assert.lte(findRes.cursor.firstBatch.length, smallBatchSize);
-    assert.eq(undefined, findRes.cursor.partialResultsReturned);
 
     // Try to get partial results with a getMore.
-    const secondBatchSize = nDocs - smallBatchSize;
+    // TODO SERVER-71248: Note that the getMore below uses the original firstBatchSize, not
+    // secondBatchSize in the getMores sent to the shards.
+    const secondBatchSize = nDocs - firstBatchSize;
     return interpretCommandResult(
         coll.runCommand(
             {getMore: findRes.cursor.id, collection: collName, batchSize: secondBatchSize}),

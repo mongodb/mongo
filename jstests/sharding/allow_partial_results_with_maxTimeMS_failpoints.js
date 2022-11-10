@@ -38,11 +38,10 @@ const collName = "test-SERVER-57469-coll";
 
 const coll = st.s0.getDB(dbName)[collName];
 
-function initDb(numSamples) {
+function initDb(numSamples, splitPoint) {
     coll.drop();
 
     // Use ranged sharding with 50% of the data on the second shard.
-    const splitPoint = Math.max(1, numSamples / 2);
     st.shardColl(
         coll,
         {_id: 1},              // shard key
@@ -59,11 +58,17 @@ function initDb(numSamples) {
 
 // Insert some data.
 const size = 1000;
-initDb(size);
+const splitPoint = Math.max(1, size / 2);
+initDb(size, splitPoint);
+
+// We will sometimes use $where expressions to inject delays in processing documents on some shards.
+// Maps from shard to a snippet of JS code.  This is modified by FindWhereSleepController
+let whereExpressions = {};
 
 function runQueryWithTimeout(doAllowPartialResults, timeout) {
     return coll.runCommand({
         find: collName,
+        filter: {$where: Object.values(whereExpressions).join("") + "return 1;"},
         allowPartialResults: doAllowPartialResults,
         batchSize: size,
         maxTimeMS: timeout
@@ -98,6 +103,7 @@ function getMoreMongosTimeout(allowPartialResults) {
     // Get the first batch.
     const res = assert.commandWorked(coll.runCommand({
         find: collName,
+        filter: {$where: Object.values(whereExpressions).join("") + "return 1;"},
         allowPartialResults: allowPartialResults,
         batchSize: batchSizeForGetMore,
         maxTimeMS: ampleTimeMS
@@ -124,6 +130,7 @@ function getMoreMongosTimeout(allowPartialResults) {
         print(numReturned + " docs returned so far");
         assert.neq(numReturned, size, "Got full results even through mongos had MaxTimeMSExpired.");
         if (res2.cursor.partialResultsReturned) {
+            assert(allowPartialResults);
             assert.lt(numReturned, size);
             break;
         }
@@ -189,6 +196,27 @@ class MultiFailureController {
     }
 }
 
+class FindWhereSleepController {
+    constructor(shard) {
+        this.shard = shard;
+    }
+
+    enable() {
+        // Add a $where expression to find command that sleeps when processing a document on the
+        // shard of interest.
+        let slowDocId = (this.shard == st.shard0) ? 0 : splitPoint;
+        // Offset the slowDocId by batchSizeForGetMore so that when testing getMore, we quickly
+        // return enough documents to serve the first batch without timing out.
+        slowDocId += batchSizeForGetMore;
+        const sleepTimeMS = 2 * ampleTimeMS;
+        whereExpressions[this.shard] = `if (this._id == ${slowDocId}) {sleep(${sleepTimeMS})};`;
+    }
+
+    disable() {
+        delete whereExpressions[this.shard];
+    }
+}
+
 const shard0Failpoint = new MaxTimeMSFailpointFailureController(st.shard0);
 const shard1Failpoint = new MaxTimeMSFailpointFailureController(st.shard1);
 const allShardsFailpoint = new MultiFailureController([shard0Failpoint, shard1Failpoint]);
@@ -198,14 +226,18 @@ const shard1NetworkFailure = new NetworkFailureController(st.rs1);
 const allshardsNetworkFailure =
     new MultiFailureController([shard0NetworkFailure, shard1NetworkFailure]);
 
+const shard0SleepFailure = new FindWhereSleepController(st.shard0);
+const shard1SleepFailure = new FindWhereSleepController(st.shard1);
+const allShardsSleepFailure = new MultiFailureController([shard0SleepFailure, shard1SleepFailure]);
+
 const allshardsMixedFailures = new MultiFailureController([shard0NetworkFailure, shard1Failpoint]);
 
-// With 'allowPartialResults: true', if a shard times out on getMore then return partial results.
-function partialResultsTrueGetMoreTimeout(failureController) {
+function getMoreShardTimeout(allowPartialResults, failureController) {
     // Get the first batch.
     const res = assert.commandWorked(coll.runCommand({
         find: collName,
-        allowPartialResults: true,
+        filter: {$where: Object.values(whereExpressions).join("") + "return 1;"},
+        allowPartialResults: allowPartialResults,
         batchSize: batchSizeForGetMore,
         maxTimeMS: ampleTimeMS
     }));
@@ -217,23 +249,55 @@ function partialResultsTrueGetMoreTimeout(failureController) {
     print(numReturned + " docs returned in the first batch");
     while (true) {
         // Run getmores repeatedly until we exhaust the cache on mongos.
-        // Eventually we should get partial results because a shard is down.
-        const res2 = assert.commandWorked(coll.runCommand(
-            {getMore: res.cursor.id, collection: collName, batchSize: batchSizeForGetMore}));
+        // Eventually we should get partial results or an error because a shard is down.
+        const res2 = coll.runCommand(
+            {getMore: res.cursor.id, collection: collName, batchSize: batchSizeForGetMore});
+        if (allowPartialResults) {
+            assert.commandWorked(res2);
+        } else {
+            if (isError(res2)) {
+                assert.commandFailedWithCode(
+                    res2, ErrorCodes.MaxTimeMSExpired, "failure should be due to MaxTimeMSExpired");
+                break;
+            }
+        }
         numReturned += res2.cursor.nextBatch.length;
         print(numReturned + " docs returned so far");
         assert.neq(numReturned, size, "Entire collection seemed to be cached by the first find!");
         if (res2.cursor.partialResultsReturned) {
-            assert.lt(numReturned, size);
-            break;
+            if (allowPartialResults) {
+                assert.lt(numReturned, size);
+                break;
+            } else {
+                assert(false, "Partial results should not have been allowed.");
+            }
         }
     }
     failureController.disable();
 }
-partialResultsTrueGetMoreTimeout(shard0Failpoint);
-partialResultsTrueGetMoreTimeout(shard1Failpoint);
-partialResultsTrueGetMoreTimeout(shard0NetworkFailure);
-partialResultsTrueGetMoreTimeout(shard1NetworkFailure);
+// getMore timeout with allowPartialResults=true.
+getMoreShardTimeout(true, shard0Failpoint);
+getMoreShardTimeout(true, shard1Failpoint);
+getMoreShardTimeout(true, shard0NetworkFailure);
+getMoreShardTimeout(true, shard1NetworkFailure);
+// The FindWhereSleepFailureController must be set before the first "find" because that's when the
+// $where clause is set.
+shard0SleepFailure.enable();
+getMoreShardTimeout(true, shard0SleepFailure);
+shard1SleepFailure.enable();
+getMoreShardTimeout(true, shard1SleepFailure);
+
+// getMore timeout with allowPartialResults=false.
+getMoreShardTimeout(false, shard0Failpoint);
+getMoreShardTimeout(false, shard1Failpoint);
+getMoreShardTimeout(false, shard0NetworkFailure);
+getMoreShardTimeout(false, shard1NetworkFailure);
+// The FindWhereSleepFailureController must be set before the first "find" because that's when the
+// $where clause is set.
+shard0SleepFailure.enable();
+getMoreShardTimeout(false, shard0SleepFailure);
+shard1SleepFailure.enable();
+getMoreShardTimeout(false, shard1SleepFailure);
 
 // With 'allowPartialResults: true', if a shard times out on the first batch then return
 // partial results.
@@ -249,6 +313,8 @@ partialResultsTrueFirstBatch(shard0Failpoint);
 partialResultsTrueFirstBatch(shard1Failpoint);
 partialResultsTrueFirstBatch(shard0NetworkFailure);
 partialResultsTrueFirstBatch(shard1NetworkFailure);
+partialResultsTrueFirstBatch(shard0SleepFailure);
+partialResultsTrueFirstBatch(shard1SleepFailure);
 
 // With 'allowPartialResults: false', if one shard times out then return a timeout error.
 function partialResultsFalseOneFailure(failureController) {
@@ -260,6 +326,8 @@ partialResultsFalseOneFailure(shard0Failpoint);
 partialResultsFalseOneFailure(shard1Failpoint);
 partialResultsFalseOneFailure(shard0NetworkFailure);
 partialResultsFalseOneFailure(shard1NetworkFailure);
+partialResultsFalseOneFailure(shard0SleepFailure);
+partialResultsFalseOneFailure(shard1SleepFailure);
 
 // With 'allowPartialResults: false', if both shards time out then return a timeout error.
 function allowPartialResultsFalseAllFailed(failureController) {
@@ -270,6 +338,7 @@ function allowPartialResultsFalseAllFailed(failureController) {
 allowPartialResultsFalseAllFailed(allShardsFailpoint);
 allowPartialResultsFalseAllFailed(allshardsNetworkFailure);
 allowPartialResultsFalseAllFailed(allshardsMixedFailures);
+allowPartialResultsFalseAllFailed(allShardsSleepFailure);
 
 // With 'allowPartialResults: true', if both shards time out then return empty "partial" results.
 function allowPartialResultsTrueAllFailed(failureController) {
@@ -283,6 +352,7 @@ function allowPartialResultsTrueAllFailed(failureController) {
 allowPartialResultsTrueAllFailed(allShardsFailpoint);
 allowPartialResultsTrueAllFailed(allshardsNetworkFailure);
 allowPartialResultsTrueAllFailed(allshardsMixedFailures);
+allowPartialResultsTrueAllFailed(allShardsSleepFailure);
 
 st.stop();
 }());
