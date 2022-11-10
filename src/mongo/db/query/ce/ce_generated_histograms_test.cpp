@@ -131,7 +131,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
     // Queries over the low string bound.
     // Actual cardinality {$eq: ''} = 0.
     expectedCard = estimateCardEq(arrHist, tagLowStr, valLowStr, true);
-    ASSERT_APPROX_EQUAL(0.01, expectedCard, 0.001);
+    ASSERT_APPROX_EQUAL(2.727, expectedCard, 0.001);
 
     // Actual cardinality {$gt: ''} = 485.
     expectedCard = estimateCardRange(arrHist,
@@ -270,7 +270,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
 
     // Actual cardinality {$eq: ''} = 0.
     expectedCard = estimateCardEq(arrHist, tagLowStr, valLowStr, true /* includeScalar */);
-    ASSERT_APPROX_EQUAL(0.02, expectedCard, 0.001);
+    ASSERT_APPROX_EQUAL(6.69, expectedCard, 0.001);
 
     // Actual cardinality {$eq: 'DD2'} = 2.
     auto [tagStr, valStr] = value::makeNewString("DD2"_sd);

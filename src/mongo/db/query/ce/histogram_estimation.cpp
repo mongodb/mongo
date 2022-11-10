@@ -121,22 +121,19 @@ EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
         }
     }
 
-    // If the value is minimal for its type, return minimal valid cardinality.
-    auto&& [minConstant, inclusive] = getMinMaxBoundForType(true /*isMin*/, tag);
-    auto [minTag, minVal] = getConstTypeVal(*minConstant);
-    if (compareValues(minTag, minVal, tag, val) == 0) {
-        if (type == EstimationType::kEqual) {
-            return {kMinCard, 1.0};
-        } else {
-            return {resultCard, resultNDV};
-        }
-    }
-
     // Estimate for equality frequency inside of the bucket.
     const double innerEqFreq = (bucket._ndv == 0.0) ? 0.0 : bucket._rangeFreq / bucket._ndv;
 
     if (type == EstimationType::kEqual) {
         return {innerEqFreq, 1.0};
+    }
+
+    // If the value is minimal for its type, and the operation is $lt or $lte return cardinality up
+    // to the previous bucket.
+    auto&& [minConstant, inclusive] = getMinMaxBoundForType(true /*isMin*/, tag);
+    auto [minTag, minVal] = getConstTypeVal(*minConstant);
+    if (compareValues(minTag, minVal, tag, val) == 0) {
+        return {resultCard, resultNDV};
     }
 
     // For $lt and $lte operations use linear interpolation to take a fraction of the bucket

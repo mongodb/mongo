@@ -161,6 +161,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'ce_test_utils',
+        'query_stats_test_utils',
     ],
 )
 
