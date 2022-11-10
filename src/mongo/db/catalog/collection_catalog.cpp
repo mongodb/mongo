@@ -777,8 +777,6 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
     // Try to find a catalog entry matching 'readTimestamp'.
     auto catalogEntry = _fetchPITCatalogEntry(opCtx, nss, readTimestamp);
     if (!catalogEntry) {
-        // TODO SERVER-70150: no entry found, mapping might be incorrect due to speculative inserts
-        // after startup. Scan durable catalog to confirm.
         return CollectionPtr();
     }
 
@@ -817,18 +815,36 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
     if (result == CatalogIdLookup::NamespaceExistence::kNotExists) {
         return boost::none;
     }
+
+    auto writeCatalogIdAfterScan = [&](const boost::optional<DurableCatalogEntry>& catalogEntry) {
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            catalog._insertCatalogIdForNSSAfterScan(
+                nss,
+                catalogEntry ? boost::make_optional(catalogEntry->catalogId) : boost::none,
+                *readTimestamp);
+        });
+    };
+
     if (result == CatalogIdLookup::NamespaceExistence::kUnknown) {
-        // TODO SERVER-70150: scan durable catalog when we don't have accurate catalogId mapping for
-        // this timestamp
-        return boost::none;
+        // We shouldn't receive kUnknown when we don't have a timestamp since no timestamp means
+        // we're operating on the latest.
+        invariant(readTimestamp);
+
+        // Scan durable catalog when we don't have accurate catalogId mapping for this timestamp.
+        auto catalogEntry = DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nss);
+        writeCatalogIdAfterScan(catalogEntry);
+        return catalogEntry;
     }
 
     auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
-    // TODO SERVER-70150: confirm that the entry contains the namespace we expect
-    if (!catalogEntry) {
-        // TODO SERVER-70150: no entry found, mapping might be incorrect due to speculative inserts
-        // after startup. Scan durable catalog to confirm.
-        return boost::none;
+    // TODO SERVER-71208 remove readTimestamp check and add invariant to make sure this scan isn't
+    // reached when there is no timestamp
+    if (readTimestamp && (!catalogEntry || nss != catalogEntry->metadata->nss)) {
+        // If no entry is found or the entry contains a different namespace, the mapping might be
+        // incorrect since it is incomplete after startup; scans durable catalog to confirm.
+        auto catalogEntry = DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nss);
+        writeCatalogIdAfterScan(catalogEntry);
+        return catalogEntry;
     }
     return catalogEntry;
 }
