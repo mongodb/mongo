@@ -1016,8 +1016,10 @@ TEST(MetaFields, MetaFieldsIncludedInDocumentApproximateSize) {
     const size_t bigMetadataDocSize = doc2.getApproximateSize();
     ASSERT_GT(bigMetadataDocSize, smallMetadataDocSize);
 
-    // Do a sanity check on the amount of space taken by metadata in document 2.
-    ASSERT_LT(doc2.getMetadataApproximateSize(), 300U);
+    // Do a sanity check on the amount of space taken by metadata in document 2. Note that the size
+    // of certain data types may vary on different build variants, so we cannot assert on the exact
+    // size.
+    ASSERT_LT(doc2.getMetadataApproximateSize(), 400U);
 
     Document emptyDoc;
     ASSERT_LT(emptyDoc.getMetadataApproximateSize(), 100U);
