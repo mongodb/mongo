@@ -55,13 +55,13 @@ env.Library(
     target='op_observer_impl',
     source=[
         'op_observer_impl.cpp',
+        'batched_write_context.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/batched_write_context',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
@@ -133,7 +133,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/batched_write_context',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',

@@ -1043,17 +1043,6 @@ env.Library(
 )
 
 env.Library(
-    target="batched_write_context",
-    source=[
-        "batched_write_context.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/transaction/transaction_operations",
-    ],
-)
-
-env.Library(
     target="service_entry_point_common",
     source=[
         "service_entry_point_common.cpp",

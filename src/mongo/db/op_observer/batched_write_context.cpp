@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/batched_write_context.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
