@@ -479,6 +479,10 @@ public:
         logicAnd,
         logicOr,
 
+        // Nothing-handling operation. This is short-circuiting like logicOr,
+        // but it checks Nothing / non-Nothing instead of false / true.
+        fillEmpty,
+
         // Math operations.
         add,
         sub,

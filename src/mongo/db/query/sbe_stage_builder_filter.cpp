@@ -626,8 +626,9 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
     // If the traverse stage's input was Nothing, or if the traverse stage's inner branch wasn't
     // executed at all (because the input was an empty array), then 'traverseOutputSlot' will
     // contain Nothing. In this case we haven't found matching element, so convert Nothing to false.
-    auto resultExpr =
-        makeFunction("fillEmpty", makeVariable(traverseOutputSlot), stateHelper.makeState(false));
+    auto resultExpr = makeBinaryOp(sbe::EPrimBinary::fillEmpty,
+                                   makeVariable(traverseOutputSlot),
+                                   stateHelper.makeState(false));
 
     if (!needsArrayCheck) {
         return {std::move(resultExpr), std::move(outputStage)};
@@ -993,7 +994,7 @@ EvalExprStagePair elemMatchMakePredicate(MatchExpressionVisitorContext* context,
     // doesn't match anything. One  example of when this happens is when innerBranch->getNext()
     // returns EOF every time it is called by TraverseStage. In these cases $elemMatch should return
     // false instead of Nothing.
-    auto projectExpr = makeFunction("fillEmpty",
+    auto projectExpr = makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                                     sbe::makeE<sbe::EVariable>(traverseSlot),
                                     context->stateHelper.makeState(false));
 

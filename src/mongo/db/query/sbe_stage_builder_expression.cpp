@@ -1067,8 +1067,8 @@ public:
         auto nothingFallbackCmp =
             makeBinaryOp(comparisonOperator, generateExists(lhsRef), generateExists(rhsRef));
 
-        auto cmpWithFallback =
-            makeFunction("fillEmpty", std::move(cmp), std::move(nothingFallbackCmp));
+        auto cmpWithFallback = makeBinaryOp(
+            sbe::EPrimBinary::fillEmpty, std::move(cmp), std::move(nothingFallbackCmp));
 
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(operands), std::move(cmpWithFallback)));
@@ -2185,7 +2185,7 @@ public:
         // If input array is null or missing, 'in' stage of traverse will return EOF. In this case
         // traverse sets output slot (filteredArraySlot) to Nothing. We replace it with Null to
         // match $filter expression behaviour.
-        auto result = makeFunction("fillEmpty",
+        auto result = makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                                    makeVariable(filteredArraySlot),
                                    makeConstant(sbe::value::TypeTags::Null, 0));
 
@@ -2475,7 +2475,8 @@ public:
                                      makeConstant(sbe::value::TypeTags::NumberInt64,
                                                   sbe::value::bitcastFrom<int64_t>(getBSONTypeMask(
                                                       sbe::value::TypeTags::NumberDouble)))))),
-                makeFunction("fillEmpty", std::move(numericConvert32), rhsVar.clone())},
+                makeBinaryOp(
+                    sbe::EPrimBinary::fillEmpty, std::move(numericConvert32), rhsVar.clone())},
             rhsVar.clone());
 
         auto modExpr = buildMultiBranchConditional(

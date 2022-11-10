@@ -110,7 +110,7 @@ result = run({
         "nodeType": "Root",
         "child": {
             "nodeType": "Filter",
-            "filter": {"nodeType": "FunctionCall"},
+            "filter": {"nodeType": "BinaryOp"},
             "child": {
                 "nodeType": "BinaryJoin",
                 "leftChild":
@@ -138,7 +138,7 @@ result = run({
             },
             "rightChild": {
                 "nodeType": "Filter",
-                "filter": {"nodeType": "FunctionCall"},
+                "filter": {"nodeType": "BinaryOp"},
                 "child": {"nodeType": "LimitSkip", "child": {"nodeType": "Seek"}}
             }
         }
@@ -155,7 +155,7 @@ result = run({
         "nodeType": "Root",
         "child": {
             "nodeType": "Filter",
-            "filter": {"nodeType": "FunctionCall"},
+            "filter": {"nodeType": "BinaryOp"},
             "child": {
                 "nodeType": "BinaryJoin",
                 "leftChild": {
@@ -181,14 +181,14 @@ result = run({
         "nodeType": "Root",
         "child": {
             "nodeType": "Filter",
-            "filter": {"nodeType": "FunctionCall"},
+            "filter": {"nodeType": "BinaryOp"},
             "child": {
                 "nodeType": "BinaryJoin",
                 "leftChild": {
                     "nodeType": "Unique",
                     "child": {
                         "nodeType": "Filter",
-                        "filter": {"nodeType": "FunctionCall"},
+                        "filter": {"nodeType": "BinaryOp"},
                         "child": {
                             "nodeType": "IndexScan",
                             "indexDefName": "c_1",
@@ -198,7 +198,7 @@ result = run({
                 },
                 "rightChild": {
                     "nodeType": "Filter",
-                    "filter": {"nodeType": "FunctionCall"},
+                    "filter": {"nodeType": "BinaryOp"},
                     "child": {"nodeType": "LimitSkip", "child": {"nodeType": "Seek"}}
                 }
             }

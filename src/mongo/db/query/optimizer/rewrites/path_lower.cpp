@@ -365,10 +365,10 @@ void EvalFilterLowering::transport(ABT& n, const PathComposeM&, ABT& p1, ABT& p2
     n = make<LambdaAbstraction>(
         name,
         make<If>(
-            make<FunctionCall>("fillEmpty",
-                               makeSeq(make<LambdaApplication>(std::exchange(p1, make<Blackhole>()),
-                                                               make<Variable>(name)),
-                                       Constant::boolean(false))),
+            make<BinaryOp>(
+                Operations::FillEmpty,
+                make<LambdaApplication>(std::exchange(p1, make<Blackhole>()), make<Variable>(name)),
+                Constant::boolean(false)),
             make<LambdaApplication>(std::exchange(p2, make<Blackhole>()), make<Variable>(name)),
             Constant::boolean(false)));
 
@@ -381,10 +381,10 @@ void EvalFilterLowering::transport(ABT& n, const PathComposeA&, ABT& p1, ABT& p2
     n = make<LambdaAbstraction>(
         name,
         make<If>(
-            make<FunctionCall>("fillEmpty",
-                               makeSeq(make<LambdaApplication>(std::exchange(p1, make<Blackhole>()),
-                                                               make<Variable>(name)),
-                                       Constant::boolean(false))),
+            make<BinaryOp>(
+                Operations::FillEmpty,
+                make<LambdaApplication>(std::exchange(p1, make<Blackhole>()), make<Variable>(name)),
+                Constant::boolean(false)),
             Constant::boolean(true),
             make<LambdaApplication>(std::exchange(p2, make<Blackhole>()), make<Variable>(name))));
 
@@ -400,7 +400,7 @@ void EvalFilterLowering::transport(ABT& n, const EvalFilter&, ABT& path, ABT& in
                                 std::exchange(input, make<Blackhole>()));
 
     // Wrap EvalFilter in fillEmpty to coerce it to a boolean.
-    n = make<FunctionCall>("fillEmpty", makeSeq(std::move(n), Constant::boolean(false)));
+    n = make<BinaryOp>(Operations::FillEmpty, std::move(n), Constant::boolean(false));
 
     _changed = true;
 }

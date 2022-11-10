@@ -125,6 +125,8 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
                 return sbe::EPrimBinary::add;
             case Operations::Sub:
                 return sbe::EPrimBinary::sub;
+            case Operations::FillEmpty:
+                return sbe::EPrimBinary::fillEmpty;
             case Operations::And:
                 return sbe::EPrimBinary::logicAnd;
             case Operations::Or:

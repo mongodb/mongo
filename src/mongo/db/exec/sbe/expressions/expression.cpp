@@ -228,6 +228,58 @@ vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
         });
 
         return code;
+    } else if (_op == EPrimBinary::fillEmpty) {
+        // Special cases: rhs is trivial to evaluate -> avoid a jump
+        auto lhs = _nodes[0]->compileDirect(ctx);
+        auto rhs = _nodes[1]->compileDirect(ctx);
+
+        if (EConstant* rhsConst = _nodes[1]->as<EConstant>()) {
+            auto [tag, val] = rhsConst->getConstant();
+            if (tag == value::TypeTags::Null) {
+                code.append(std::move(lhs));
+                code.appendFillEmpty(vm::Instruction::Null);
+                return code;
+            }
+            if (tag == value::TypeTags::Boolean) {
+                code.append(std::move(lhs));
+                code.appendFillEmpty(value::bitcastTo<bool>(val) ? vm::Instruction::True
+                                                                 : vm::Instruction::False);
+                return code;
+            }
+        }
+
+        // For now:
+        //   lhs
+        //   if peek() is nothing then goto nothingCase
+        // existsCase:
+        //   goto done
+        // nothingCase:
+        //   pop   // drop lhs
+        //   rhs
+        // done:
+
+        // TODO if we had a jmpNotNothing (exactly like jmpNothing but with the condition reversed)
+        // we could avoid jumping over a jump here:
+        //   lhs
+        //   if peek() is not nothing then goto done
+        //   pop   // drop lhs
+        //   rhs
+        // done:
+
+
+        vm::CodeFragment nothingCase;
+        nothingCase.appendPop();
+        nothingCase.append(std::move(rhs));
+
+        vm::CodeFragment existsCase;
+        existsCase.appendJump(nothingCase.instrs().size());
+
+        code.append(std::move(lhs));
+        code.appendJumpNothing(existsCase.instrs().size());
+        code.append(std::move(existsCase));
+        code.append(std::move(nothingCase));
+
+        return code;
     }
 
 
@@ -301,6 +353,10 @@ std::vector<DebugPrinter::Block> EPrimBinary::debugPrint() const {
             break;
         case EPrimBinary::logicOr:
             ret.emplace_back("||");
+            break;
+        case EPrimBinary::fillEmpty:
+            // Sometimes called the "Elvis operator"...
+            ret.emplace_back("?:");
             break;
         case EPrimBinary::add:
             ret.emplace_back("+");
@@ -675,28 +731,6 @@ vm::CodeFragment generateGetField(CompileCtx& ctx, const EExpression::Vector& no
     return code;
 }
 
-vm::CodeFragment generateFillEmpty(CompileCtx& ctx, const EExpression::Vector& nodes, bool) {
-
-    if (nodes[1]->as<EConstant>()) {
-        vm::CodeFragment code;
-        auto [tag, val] = nodes[1]->as<EConstant>()->getConstant();
-        if (tag == value::TypeTags::Null) {
-            code.append(nodes[0]->compileDirect(ctx));
-            code.appendFillEmpty(vm::Instruction::Null);
-
-            return code;
-        }
-        if (tag == value::TypeTags::Boolean) {
-            code.append(nodes[0]->compileDirect(ctx));
-            code.appendFillEmpty(value::bitcastTo<bool>(val) ? vm::Instruction::True
-                                                             : vm::Instruction::False);
-
-            return code;
-        }
-    }
-    return generatorLegacy<&vm::CodeFragment::appendFillEmpty>(ctx, nodes, false);
-}
-
 vm::CodeFragment generateTraverseP(CompileCtx& ctx, const EExpression::Vector& nodes, bool) {
     if (nodes[1]->as<ELocalLambda>() && nodes[2]->as<EConstant>()) {
         auto [tag, val] = nodes[2]->as<EConstant>()->getConstant();
@@ -823,7 +857,6 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
      InstrFn{2, generator<2, &vm::CodeFragment::appendCollComparisonKey>, false}},
     {"getFieldOrElement",
      InstrFn{2, generator<2, &vm::CodeFragment::appendGetFieldOrElement>, false}},
-    {"fillEmpty", InstrFn{2, generateFillEmpty, false}},
     {"traverseP", InstrFn{3, generateTraverseP, false}},
     {"traverseF", InstrFn{3, generateTraverseF, false}},
     {"traverseCsiCellValues", InstrFn{2, generateTraverseCellValues, false}},

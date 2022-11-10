@@ -350,13 +350,12 @@ public:
 
         auto localProjName = _ctx.getNextId("local");
         entry = _ctx.getNode();
-        _ctx.setNode<EvaluationNode>(
-            entry._rootProjection,
-            localProjName,
-            make<FunctionCall>(
-                "fillEmpty",
-                makeSeq(make<Variable>(std::move(localPathProjName)), Constant::null())),
-            std::move(entry._node));
+        _ctx.setNode<EvaluationNode>(entry._rootProjection,
+                                     localProjName,
+                                     make<BinaryOp>(Operations::FillEmpty,
+                                                    make<Variable>(std::move(localPathProjName)),
+                                                    Constant::null()),
+                                     std::move(entry._node));
 
         const auto& foreignPath = source->getForeignField();
         ABT foreignSimplePath = translateFieldPath(

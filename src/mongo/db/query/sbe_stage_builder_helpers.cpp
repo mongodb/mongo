@@ -114,7 +114,7 @@ std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression>
     return makeIsMember(std::move(input), std::move(arr), std::move(collatorVar));
 }
 std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpression& expr) {
-    return makeFunction("fillEmpty",
+    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                         makeFunction("typeMatch",
                                      expr.clone(),
                                      makeConstant(sbe::value::TypeTags::NumberInt64,
@@ -238,7 +238,7 @@ std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long 
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
-    return makeFunction("fillEmpty"_sd,
+    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                         std::move(e),
                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
                                                    sbe::value::bitcastFrom<bool>(false)));
@@ -259,13 +259,14 @@ std::unique_ptr<sbe::EExpression> makeMoveVariable(sbe::FrameId frameId,
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
-    return makeFunction(
-        "fillEmpty"_sd, std::move(e), sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
+    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
+                        std::move(e),
+                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
 }
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyUndefined(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
-    return makeFunction("fillEmpty"_sd,
+    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                         std::move(e),
                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::bsonUndefined, 0));
 }

@@ -156,6 +156,9 @@ inline bool operator!=(const ABT& left, const ABT& right) {
     /* unary operations */      \
     F(Neg)                      \
                                 \
+    /* Nothing-handling */      \
+    F(FillEmpty)                \
+                                \
     /* logical operations */    \
     F(And)                      \
     F(Or)                       \

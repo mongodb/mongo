@@ -565,7 +565,7 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildForei
         if (i > 0) {
             // Ignoring the nulls produced by missing field in array.
             filter =
-                sbe::makeE<sbe::EIf>(makeFunction("fillEmpty"_sd,
+                sbe::makeE<sbe::EIf>(makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                                                   makeFunction("isObject"_sd, lambdaArg->clone()),
                                                   makeConstant(TypeTags::Boolean, true)),
                                      std::move(filter),
@@ -786,7 +786,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
         makeProjectStage(makeLimitCoScanTree(nodeId, 1),
                          nodeId,
                          arrayBranchOutput,
-                         makeFunction("fillEmpty",
+                         makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                                       makeFunction("getElement",
                                                    makeVariable(singleLocalValueSlot),
                                                    makeConstant(TypeTags::NumberInt32, 0)),
@@ -1017,8 +1017,10 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildHashJoi
     // Add a projection that makes so that empty array is returned if no foreign row were matched.
     auto innerResultSlot = slotIdGenerator.generate();
     auto [emptyArrayTag, emptyArrayVal] = makeNewArray();
-    std::unique_ptr<EExpression> innerResultProjection = makeFunction(
-        "fillEmpty"_sd, makeVariable(lookupAggSlot), makeConstant(emptyArrayTag, emptyArrayVal));
+    std::unique_ptr<EExpression> innerResultProjection =
+        makeBinaryOp(sbe::EPrimBinary::fillEmpty,
+                     makeVariable(lookupAggSlot),
+                     makeConstant(emptyArrayTag, emptyArrayVal));
 
     std::unique_ptr<sbe::PlanStage> resultStage =
         makeProjectStage(std::move(hl), nodeId, innerResultSlot, std::move(innerResultProjection));
