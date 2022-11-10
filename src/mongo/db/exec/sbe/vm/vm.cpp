@@ -181,6 +181,8 @@ void ByteCode::allocStack(size_t size) noexcept {
 
 std::string CodeFragment::toString() const {
     std::ostringstream ss;
+    vm::CodeFragmentPrinter printer(vm::CodeFragmentPrinter::PrintFormat::Debug);
+    printer.print(ss, *this);
     return ss.str();
 }
 template <typename... Ts>
