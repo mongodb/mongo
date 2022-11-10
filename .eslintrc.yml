@@ -2,6 +2,10 @@ env:
   es6: true
   mongo: true
 
+parserOptions:
+  ecmaVersion: 6
+  sourceType: "module"
+
 rules:
   # Rules are documented at http://eslint.org/docs/rules/
   no-cond-assign: 2

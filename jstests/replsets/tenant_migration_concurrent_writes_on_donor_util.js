@@ -214,11 +214,6 @@ TenantMigrationConcurrentWriteUtil.kTestIndex = {
     expireAfterSeconds: TenantMigrationConcurrentWriteUtil.kExpireAfterSeconds
 };
 
-function collectionExists(db, collName) {
-    const res = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
-    return res.cursor.firstBatch.length == 1;
-}
-
 function insertTestDoc(primaryDB, collName) {
     assert.commandWorked(primaryDB.runCommand(
         {insert: collName, documents: [TenantMigrationConcurrentWriteUtil.kTestDoc]}));

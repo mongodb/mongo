@@ -30,8 +30,8 @@
 #pragma once
 
 #include <jsapi.h>
+#include <jsfriendapi.h>
 #include <vm/PosixNSPR.h>
-
 
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/scripting/mozjs/bindata.h"
@@ -53,6 +53,7 @@
 #include "mongo/scripting/mozjs/jsthread.h"
 #include "mongo/scripting/mozjs/maxkey.h"
 #include "mongo/scripting/mozjs/minkey.h"
+#include "mongo/scripting/mozjs/module_loader.h"
 #include "mongo/scripting/mozjs/mongo.h"
 #include "mongo/scripting/mozjs/mongohelpers.h"
 #include "mongo/scripting/mozjs/nativefunction.h"
@@ -320,6 +321,7 @@ public:
         return _globalProto;
     }
 
+    static const char* const kInteractiveShellName;
     static const char* const kExecResult;
     static const char* const kInvokeResult;
 
@@ -368,6 +370,8 @@ public:
     };
 
     void setStatus(Status status);
+
+    ModuleLoader* getModuleLoader() const;
 
 private:
     template <typename ImplScopeFunction>
@@ -436,6 +440,8 @@ private:
     bool _hasOutOfMemoryException;
 
     bool _inReportError;
+
+    std::unique_ptr<ModuleLoader> _moduleLoader;
 
     WrapType<BinDataInfo> _binDataProto;
     WrapType<BSONInfo> _bsonProto;

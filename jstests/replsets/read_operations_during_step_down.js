@@ -28,8 +28,7 @@ TestData.dbName = dbName;
 TestData.collName = collName;
 
 jsTestLog("1. Do a document write");
-assert.commandWorked(
-        primaryColl.insert({_id: 0}, {"writeConcern": {"w": "majority"}}));
+assert.commandWorked(primaryColl.insert({_id: 0}, {"writeConcern": {"w": "majority"}}));
 rst.awaitReplication();
 
 // Open a cursor on primary.

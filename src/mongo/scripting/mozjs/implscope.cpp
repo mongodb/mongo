@@ -39,12 +39,16 @@
 #include <js/CompilationAndEvaluation.h>
 #include <js/ContextOptions.h>
 #include <js/Initialization.h>
+#include <js/Modules.h>
 #include <js/Object.h>
 #include <js/SourceText.h>
 #include <js/TypeDecls.h>
+#include <js/friend/ErrorMessages.h>
 #include <jsapi.h>
 #include <jscustomallocator.h>
 #include <jsfriendapi.h>
+
+#include <boost/filesystem.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/config.h"
@@ -77,6 +81,7 @@ extern const JSFile assert;
 
 namespace mozjs {
 
+const char* const MozJSImplScope::kInteractiveShellName = "(shell)";
 const char* const MozJSImplScope::kExecResult = "__lastres__";
 const char* const MozJSImplScope::kInvokeResult = "__returnValue";
 
@@ -462,6 +467,12 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _timestampProto(_context),
       _uriProto(_context) {
 
+    _moduleLoader = std::make_unique<ModuleLoader>();
+    uassert(ErrorCodes::JSInterpreterFailure, "Failed to create ModuleLoader", _moduleLoader);
+    uassert(ErrorCodes::JSInterpreterFailure,
+            "Failed to initialize ModuleLoader",
+            _moduleLoader->init(_context, boost::filesystem::current_path()));
+
     try {
         kCurrentScope = this;
 
@@ -792,6 +803,35 @@ int MozJSImplScope::invoke(ScriptingFunction func,
     });
 }
 
+bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success) {
+    if (name == MozJSImplScope::kInteractiveShellName) {
+        return false;
+    }
+
+    if (success) {
+        return false;
+    }
+
+    JS::RootedValue ex(cx);
+    if (!JS_GetPendingException(cx, &ex)) {
+        return false;
+    }
+
+    JS::RootedObject obj(cx, ex.toObjectOrNull());
+    const JSClass* syntaxError = js::ProtoKeyToClass(JSProto_SyntaxError);
+    if (!JS_InstanceOf(cx, obj, syntaxError, nullptr)) {
+        return false;
+    }
+
+    JSErrorReport* report = JS_ErrorFromException(cx, obj);
+    if (!report) {
+        return false;
+    }
+
+    return report->errorNumber == JSMSG_IMPORT_DECL_AT_TOP_LEVEL ||
+        report->errorNumber == JSMSG_EXPORT_DECL_AT_TOP_LEVEL;
+}
+
 bool MozJSImplScope::exec(StringData code,
                           const std::string& name,
                           bool printResult,
@@ -804,19 +844,24 @@ bool MozJSImplScope::exec(StringData code,
         co.setFileAndLine(name.c_str(), 1);
 
         JS::SourceText<mozilla::Utf8Unit> srcBuf;
-        JSScript* scriptPtr;
-
         bool success =
             srcBuf.init(_context, code.rawData(), code.size(), JS::SourceOwnership::Borrowed);
-        if (_checkErrorState(success, reportError, assertOnError))
+        if (_checkErrorState(success, reportError, assertOnError)) {
             return false;
+        }
 
-        scriptPtr = JS::Compile(_context, co, srcBuf);
+        JSScript* scriptPtr = JS::Compile(_context, co, srcBuf);
         success = scriptPtr != nullptr;
-        if (_checkErrorState(success, reportError, assertOnError))
-            return false;
 
-        JS::RootedScript script(_context, scriptPtr);
+        JSObject* modulePtr = nullptr;
+        if (shouldTryExecAsModule(_context, name, success)) {
+            modulePtr = _moduleLoader->loadRootModuleFromSource(_context, name, code);
+            success = modulePtr != nullptr;
+        }
+
+        if (_checkErrorState(success, reportError, assertOnError)) {
+            return false;
+        }
 
         if (timeoutMs) {
             _engine->getDeadlineMonitor().startDeadline(this, timeoutMs);
@@ -828,10 +873,27 @@ bool MozJSImplScope::exec(StringData code,
         {
             ScopeGuard guard([&] { _engine->getDeadlineMonitor().stopDeadline(this); });
 
-            success = JS_ExecuteScript(_context, script, &out);
+            if (scriptPtr) {
+                JS::RootedScript script(_context, scriptPtr);
+                success = JS_ExecuteScript(_context, script, &out);
+            } else {
+                JS::Rooted<JS::Value> returnValue(_context);
+                JS::RootedObject module(_context, modulePtr);
 
-            if (_checkErrorState(success, reportError, assertOnError))
+                success = JS::ModuleInstantiate(_context, module);
+                if (success) {
+                    success = JS::ModuleEvaluate(_context, module, &returnValue);
+                    if (success) {
+                        JS::RootedObject evaluationPromise(_context, &returnValue.toObject());
+                        success = JS::ThrowOnModuleEvaluationFailure(_context, evaluationPromise);
+                    }
+                }
+            }
+
+            if (_checkErrorState(success, reportError, assertOnError)) {
                 return false;
+            }
+
             // Run all of the async JS functions
             js::RunJobs(_context);
         }
@@ -1076,6 +1138,10 @@ std::string MozJSImplScope::buildStackString() {
     } else {
         return {};
     }
+}
+
+ModuleLoader* MozJSImplScope::getModuleLoader() const {
+    return _moduleLoader.get();
 }
 
 }  // namespace mozjs

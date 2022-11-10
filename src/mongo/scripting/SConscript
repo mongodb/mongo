@@ -92,6 +92,7 @@ if jsEngine:
             'mozjs/jsthread.cpp',
             'mozjs/maxkey.cpp',
             'mozjs/minkey.cpp',
+            'mozjs/module_loader.cpp',
             'mozjs/mongo.cpp',
             'mozjs/mongohelpers.cpp',
             'mozjs/mongohelpers_js.cpp',
@@ -121,6 +122,15 @@ if jsEngine:
             '$BUILD_DIR/mongo/client/clientdriver_network',
             '$BUILD_DIR/mongo/db/service_context',
             '$BUILD_DIR/third_party/mozjs/mozjs',
+        ],
+    )
+
+    scriptingEnv.CppUnitTest(
+        target='scripting_mozjs_test',
+        source=['mozjs/module_loader_test.cpp'],
+        LIBDEPS=[
+            'bson_template_evaluator',
+            'scripting',
         ],
     )
 else:
