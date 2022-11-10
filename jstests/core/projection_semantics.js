@@ -2,8 +2,6 @@
  * Tests the behavior of projection for dotted paths, including edge cases where the path only
  * sometimes exists.
  *
- * TODO SERVER-63947 these tags shouldn't be necessary if we remove the explicit columnstore index
- * mention.
  * @tags: [
  *   uses_column_store_index,
  *   # We could potentially need to resume an index build in the event of a stepdown, which is not
@@ -16,8 +14,11 @@
 "use strict";
 
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
-const columnstoreEnabled = checkSBEEnabled(
-    db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true /* checkAllNodes */);
+
+if (!checkSBEEnabled(db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"])) {
+    jsTestLog("Skipping test since columnstore Indexes are not enabled");
+    return;
+}
 
 const coll = db.projection_semantics;
 coll.drop();
@@ -26,8 +27,7 @@ let globalIdCounter = 0;
 
 // Tests that when 'projection' is applied to 'input', we get 'expectedOutput'.
 // Tests that this remains true if indexes are added, or if we use aggregation instead of find.
-function testInputOutput(
-    {input, projection, expectedOutput, interestingIndexes = [], excludeColumnStore = false}) {
+function testInputOutput({input, projection, expectedOutput, interestingIndexes = []}) {
     if (!input.hasOwnProperty("_id")) {
         input = Object.merge({_id: ++globalIdCounter}, input);
     }
@@ -37,21 +37,15 @@ function testInputOutput(
         expectedOutput,
         () =>
             tojson(coll.find({_id: input._id}, projection).limit(1).hint({$natural: 1}).explain()));
+
     for (let indexSpec of interestingIndexes) {
         assert.commandWorkedOrFailedWithCode(coll.createIndex(indexSpec),
                                              ErrorCodes.IndexAlreadyExists);
-        assert.docEq(coll.find({_id: input._id}, projection).hint(indexSpec).toArray()[0],
-                     expectedOutput);
-    }
-    if (columnstoreEnabled && !excludeColumnStore) {
-        const columnStore = {"$**": "columnstore"};
-        assert.commandWorkedOrFailedWithCode(coll.createIndex(columnStore),
-                                             ErrorCodes.IndexAlreadyExists);
-        assert.docEq(coll.find({_id: input._id}, projection).hint(columnStore).toArray()[0],
-                     expectedOutput,
-                     () => tojson(coll.find({_id: input._id}, projection)
-                                      .hint(columnStore)
-                                      .explain("executionStats")));
+        assert.docEq(
+            coll.find({_id: input._id}, projection).hint(indexSpec).toArray()[0],
+            expectedOutput,
+            () => tojson(
+                coll.find({_id: input._id}, projection).hint(indexSpec).explain("executionStats")));
     }
 
     assert.docEq(
@@ -67,7 +61,7 @@ function testInputOutput(
         input: input,
         projection: {a: 1},
         expectedOutput: output,
-        interestingIndexes: [{_id: 1, a: 1}, {a: 1, _id: 1}]
+        interestingIndexes: [{_id: 1, a: 1}, {a: 1, _id: 1}, {"$**": "columnstore"}]
     });
 
     // Test some basic "normal" cases.
@@ -80,18 +74,19 @@ function testInputOutput(
 
     // Test including "a" when "a" is missing/not present.
     // TODO SERVER-23229 this will return different results if there is a covering index, so here
-    // but not elsewhere we don't use any "interestingIndexes".
+    // but not elsewhere we don't use any "interestingIndexes." Column store indexes are excepted
+    // since their unique storage format means they are unimpacted by SERVER-23229.
     testInputOutput({
         input: {_id: ++globalIdCounter, b: "other", x: "extra"},
         projection: {a: 1},
         expectedOutput: {_id: globalIdCounter},
-        interestingIndexes: []
+        interestingIndexes: [{"$**": "columnstore"}]
     });
     testInputOutput({
         input: {_id: ++globalIdCounter},
         projection: {a: 1},
         expectedOutput: {_id: globalIdCounter},
-        interestingIndexes: []
+        interestingIndexes: [{"$**": "columnstore"}]
     });
 
     // Test a range of interesting values for "a". We expect everything to be preserved unmodified.
@@ -99,7 +94,7 @@ function testInputOutput(
         input: input,
         projection: {a: 1},
         expectedOutput: input,
-        interestingIndexes: [{_id: 1, a: 1}, {a: 1, _id: 1}]
+        interestingIndexes: [{_id: 1, a: 1}, {a: 1, _id: 1}, {"$**": "columnstore"}]
     });
     testIdentityInclusionA({_id: ++globalIdCounter, a: null});
     testIdentityInclusionA({_id: ++globalIdCounter, a: undefined});
@@ -124,7 +119,7 @@ function testInputOutput(
         // Can't use {a: "hashed"} here because it doesn't support array values.
         // Could use {a: "$**"}, but it can't be hinted without a query predicate so we'll leave
         // that coverage for elsewhere rather than add complexity to get a valid query predicate.
-        interestingIndexes: [{a: 1}, {a: -1}]
+        interestingIndexes: [{a: 1}, {a: -1}, {"$**": "columnstore"}]
     });
 
     // The "basics" again.
@@ -135,18 +130,19 @@ function testInputOutput(
 
     // Missing 'a' value again.
     // TODO SERVER-23229 this will return different results if there is a covering index, so here
-    // but not elsewhere we don't use any "interestingIndexes".
+    // but not elsewhere we don't use any "interestingIndexes". Column store indexes are excepted
+    // since their unique storage format means they are unimpacted by SERVER-23229.
     testInputOutput({
         input: {_id: ++globalIdCounter, b: "other", x: "extra"},
         projection: {a: 1, _id: 0},
         expectedOutput: {},
-        interestingIndexes: []
+        interestingIndexes: [{"$**": "columnstore"}]
     });
     testInputOutput({
         input: {_id: ++globalIdCounter},
         projection: {a: 1, _id: 0},
         expectedOutput: {},
-        interestingIndexes: []
+        interestingIndexes: [{"$**": "columnstore"}]
     });
 
     // Just a couple of the cases above to confirm the same behavior just without the _id.
@@ -165,7 +161,7 @@ function testInputOutput(
         input: input,
         projection: {'a.b': 1},
         expectedOutput: output,
-        interestingIndexes: [{_id: 1, 'a.b': 1}, {'a.b': 1, _id: 1}]
+        interestingIndexes: [{_id: 1, 'a.b': 1}, {'a.b': 1, _id: 1}, {"$**": "columnstore"}]
     });
 
     // Test some basic "normal" cases.
@@ -196,8 +192,15 @@ function testInputOutput(
     // Interestingly, this bug disappears if the index is multikey ('a' or 'a.b' are arrays), since
     // we will need to add a fetch to reconstruct the array anyway and will figure out the correct
     // answer in the process.
-    const testADotBNoIndexes = (input, output) => testInputOutput(
-        {input: input, projection: {'a.b': 1}, expectedOutput: output, interestingIndexes: []});
+    //
+    // Column store indexes are excepted since their unique storage format means they are unimpacted
+    // by SERVER-23229.
+    const testADotBNoIndexes = (input, output) => testInputOutput({
+        input: input,
+        projection: {'a.b': 1},
+        expectedOutput: output,
+        interestingIndexes: [{"$**": "columnstore"}]
+    });
 
     testADotBNoIndexes({_id: ++globalIdCounter, b: "other", x: "extra"}, {_id: globalIdCounter});
     testADotBNoIndexes({_id: ++globalIdCounter}, {_id: globalIdCounter});
@@ -208,7 +211,7 @@ function testInputOutput(
         input: input,
         projection: {'a.b': 1, _id: 0},
         expectedOutput: output,
-        interestingIndexes: [{'a.b': 1}, {'a.b': -1}]
+        interestingIndexes: [{'a.b': 1}, {'a.b': -1}, {"$**": "columnstore"}]
     });
 
     // The "basics" again - no _id this time.
@@ -266,8 +269,14 @@ function testInputOutput(
         input: input,
         projection: {'a.b': 1, 'a.c': 1, _id: 0},
         expectedOutput: output,
-        interestingIndexes:
-            [{a: 1}, {'a.b': 1}, {'a.c': 1}, {'a.b': 1, 'a.c': 1}, {'a.b': 1, 'a.c': -1}]
+        interestingIndexes: [
+            {a: 1},
+            {'a.b': 1},
+            {'a.c': 1},
+            {'a.b': 1, 'a.c': 1},
+            {'a.b': 1, 'a.c': -1},
+            {"$**": "columnstore"}
+        ]
     });
     testIncludeOnlyADotBAndADotC(
         {_id: ++globalIdCounter, a: {b: "scalar", c: "scalar", d: "extra"}},
@@ -288,12 +297,13 @@ function testInputOutput(
     // Non-array cases where one or both of the paths don't exist.
     //
     // TODO SERVER-23229: This will return different results if there is a covering index, so here
-    // but not elsewhere we don't use any "interestingIndexes" in test cases.
+    // but not elsewhere we don't use any "interestingIndexes" in test cases. Column store indexes
+    // are excepted since their unique storage format means they are unimpacted by SERVER-23229.
     const testIncludeADotBAndCNoIndexes = (input, output) => testInputOutput({
         input: input,
         projection: {'a.b': 1, 'a.c': 1, _id: 0},
         expectedOutput: output,
-        interestingIndexes: []
+        interestingIndexes: [{"$**": "columnstore"}]
     });
 
     testIncludeADotBAndCNoIndexes({_id: ++globalIdCounter, a: {b: "scalar", d: "extra"}},
@@ -310,7 +320,7 @@ function testInputOutput(
         input: input,
         projection: {'a.b.c': 1, _id: 0},
         expectedOutput: output,
-        interestingIndexes: [{'a.b.c': 1}, {'a.b.c': -1}]
+        interestingIndexes: [{'a.b.c': 1}, {'a.b.c': -1}, {"$**": "columnstore"}]
     });
 
     // Test some basic "normal" cases.
@@ -370,11 +380,14 @@ function testInputOutput(
     // Interestingly, this bug disappears if the index is multikey ('a.b.c' or any parent is an
     // array), since we will need to add a fetch to reconstruct the array anyway and will figure out
     // the correct answer in the process.
+    //
+    // Column store indexes are excepted since their unique storage format means they are unimpacted
+    // by SERVER-23229.
     const testADotBDotCNoIndexes = (input, output) => testInputOutput({
         input: input,
         projection: {'a.b.c': 1, _id: 0},
         expectedOutput: output,
-        interestingIndexes: []
+        interestingIndexes: [{"$**": "columnstore"}]
     });
 
     testADotBDotCNoIndexes({}, {});
@@ -390,7 +403,7 @@ function testInputOutput(
         input: input,
         projection: {'a.b.c': 1, _id: 0},
         expectedOutput: output,
-        interestingIndexes: [{'a.b.c': 1}, {'a.b.c': -1}]
+        interestingIndexes: [{'a.b.c': 1}, {'a.b.c': -1}, {"$**": "columnstore"}]
     });
 
     // More cases where 'a.b.c' doesn't exist - but with arrays this time.
@@ -628,21 +641,18 @@ function testInputOutput(
     testInputOutput({
         input: {_id: ++globalIdCounter},
         projection: {_id: 1},
-        expectedOutput: {_id: globalIdCounter}
+        expectedOutput: {_id: globalIdCounter},
+        interestingIndexes: [{_id: 1}, {"$**": "columnstore"}]
     });
     testInputOutput({
         input: {_id: ++globalIdCounter},
         projection: {_id: 0},
         expectedOutput: {},
-        // Column store indexes do not support exclusion projections.
-        excludeColumnStore: true,
     });
     testInputOutput({
         input: {_id: ++globalIdCounter, a: 1, b: 1},
         projection: {_id: 0},
         expectedOutput: {a: 1, b: 1},
-        // Column store indexes do not support exclusion projections.
-        excludeColumnStore: true,
     });
 
     // Test that you can specify nested paths with dots or as sub-objects and it'll mean the
@@ -651,21 +661,21 @@ function testInputOutput(
         input: {measurements: {temperature: 20, pressure: 0.7, humidity: 0.4, time: new Date()}},
         projection: {'measurements.temperature': 1, 'measurements.pressure': 1, _id: 0},
         expectedOutput: {measurements: {temperature: 20, pressure: 0.7}},
-        interestingIndexes: [{'measurements.temperature': 1, 'measurements.pressure': 1}]
+        interestingIndexes:
+            [{'measurements.temperature': 1, 'measurements.pressure': 1}, {"$**": "columnstore"}]
     });
     testInputOutput({
         input: {measurements: {temperature: 20, pressure: 0.7, humidity: 0.4, time: new Date()}},
         projection: {measurements: {temperature: 1, pressure: 1}, _id: 0},
         expectedOutput: {measurements: {temperature: 20, pressure: 0.7}},
-        interestingIndexes: [{'measurements.temperature': 1, 'measurements.pressure': 1}]
+        interestingIndexes:
+            [{'measurements.temperature': 1, 'measurements.pressure': 1}, {"$**": "columnstore"}]
     });
     // Now with an exclusion projection.
     testInputOutput({
         input: {measurements: {temperature: 20, pressure: 0.7, humidity: 0.4, time: new Date()}},
         projection: {measurements: {humidity: 0, time: 0}, _id: 0},
         expectedOutput: {measurements: {temperature: 20, pressure: 0.7}},
-        // Column store indexes do not support exclusion projections.
-        excludeColumnStore: true,
     });
 }());
 }());
