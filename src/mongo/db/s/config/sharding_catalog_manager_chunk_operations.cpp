@@ -35,7 +35,6 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/distinct_command_gen.h"
@@ -52,11 +51,13 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point.h"
@@ -1242,7 +1243,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
     }
 
     _commitChunkMigrationInTransaction(
-        opCtx, nss, newMigratedChunk, newSplitChunks, newControlChunk);
+        opCtx, nss, newMigratedChunk, newSplitChunks, newControlChunk, fromShard);
 
     ShardAndCollectionVersion response;
     if (!newControlChunk) {
@@ -2013,86 +2014,194 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
     const NamespaceString& nss,
     std::shared_ptr<const ChunkType> migratedChunk,
     std::shared_ptr<const std::vector<ChunkType>> splitChunks,
-    std::shared_ptr<ChunkType> controlChunk) {
+    std::shared_ptr<ChunkType> controlChunk,
+    const ShardId& donorShardId) {
 
+    const auto includePlacementData = feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
+        serverGlobalParams.featureCompatibility);
 
-    auto updateFn = [nss, migratedChunk, splitChunks, controlChunk](
-                        const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-        write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
-        std::vector<write_ops::UpdateOpEntry> updateEntries;
+    // Verify the placement info for collectionUUID needs to be updated because the donor is losing
+    // its last chunk for the namespace.
+    const auto donorToBeRemoved = includePlacementData && !controlChunk && splitChunks->empty();
 
-        if (controlChunk)
-            updateEntries.reserve(splitChunks->size() + 1);  // + migrateChunk
-        else
-            updateEntries.reserve(splitChunks->size() + 2);  // + migrateChunk + controlChunk
-
-
-        updateEntries.emplace_back([&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setUpsert(false);
-
-            auto chunkID = MONGO_unlikely(migrateCommitInvalidChunkQuery.shouldFail())
-                ? OID::gen()
-                : migratedChunk->getName();
-
-            entry.setQ(BSON(ChunkType::name() << chunkID));
-
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                migratedChunk->toConfigBSON()));
-
-            return entry;
-        }());
-
-        if (controlChunk) {
-            updateEntries.emplace_back([&] {
-                write_ops::UpdateOpEntry entry;
-                entry.setUpsert(false);
-
-                auto chunkID = MONGO_unlikely(migrateCommitInvalidChunkQuery.shouldFail())
-                    ? OID::gen()
-                    : controlChunk->getName();
-
-                entry.setQ(BSON(ChunkType::name() << chunkID));
-
-                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                    controlChunk->toConfigBSON()));
-
-                return entry;
-            }());
+    // Verify the placement info for collectionUUID needs to be updated because the recipient is
+    // acquiring its first chunk for the namespace.
+    const auto recipientToBeAdded = [&] {
+        if (!includePlacementData) {
+            return false;
         }
 
+        const auto chunkQuery =
+            BSON(ChunkType::collectionUUID << migratedChunk->getCollectionUUID() << ChunkType::shard
+                                           << migratedChunk->getShard());
+        auto findResponse = uassertStatusOK(
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                repl::ReadConcernLevel::kLocalReadConcern,
+                ChunkType::ConfigNS,
+                chunkQuery,
+                BSONObj(),
+                1 /* limit */));
+        return findResponse.docs.empty();
+    }();
 
+    const auto configChunksUpdateRequest = [&migratedChunk, &splitChunks, &controlChunk] {
+        write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
+        std::vector<write_ops::UpdateOpEntry> updateEntries;
+        updateEntries.reserve(1 + splitChunks->size() + (controlChunk ? 1 : 0));
+
+        auto buildUpdateOpEntry = [](const ChunkType& chunk,
+                                     bool isUpsert) -> write_ops::UpdateOpEntry {
+            write_ops::UpdateOpEntry entry;
+
+            entry.setUpsert(isUpsert);
+            auto chunkID = MONGO_unlikely(migrateCommitInvalidChunkQuery.shouldFail())
+                ? OID::gen()
+                : chunk.getName();
+
+            entry.setQ(BSON(ChunkType::name() << chunkID));
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(chunk.toConfigBSON()));
+            return entry;
+        };
+
+        updateEntries.emplace_back(buildUpdateOpEntry(*migratedChunk, false));
         for (const auto& splitChunk : *splitChunks) {
-            updateEntries.emplace_back([&] {
-                write_ops::UpdateOpEntry entry;
-                entry.setUpsert(true);
-                auto chunkID = MONGO_unlikely(migrateCommitInvalidChunkQuery.shouldFail())
-                    ? OID::gen()
-                    : splitChunk.getName();
-                entry.setQ(BSON(ChunkType::name() << chunkID));
+            updateEntries.emplace_back(buildUpdateOpEntry(splitChunk, true));
+        }
 
-                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                    splitChunk.toConfigBSON()));
-
-                return entry;
-            }());
+        if (controlChunk) {
+            updateEntries.emplace_back(buildUpdateOpEntry(*controlChunk, false));
         }
 
         updateOp.setUpdates(updateEntries);
+        return updateOp;
+    }();
 
-        // Capture expected chunk to update for asserting update succeeded.
-        int nChunksToUpdate = controlChunk ? 2 + splitChunks->size() : 1 + splitChunks->size();
+    auto transactionChain = [nss,
+                             donorShardId,
+                             recipientShardId = migratedChunk->getShard(),
+                             migrationCommitTime =
+                                 migratedChunk->getHistory().front().getValidAfter(),
+                             configChunksUpdateRequest = std::move(configChunksUpdateRequest),
+                             donorToBeRemoved,
+                             recipientToBeAdded](const txn_api::TransactionClient& txnClient,
+                                                 ExecutorPtr txnExec) -> SemiFuture<void> {
+        const long long nChunksToUpdate = configChunksUpdateRequest.getUpdates().size();
 
-        return txnClient.runCRUDOp(updateOp, {})
+        auto updateConfigChunksFuture =
+            txnClient.runCRUDOp(configChunksUpdateRequest, {})
+                .thenRunOn(txnExec)
+                .then([nChunksToUpdate](const BatchedCommandResponse& updateResponse) {
+                    uassertStatusOK(updateResponse.toStatus());
+                    uassert(ErrorCodes::UpdateOperationFailed,
+                            str::stream()
+                                << "Commit chunk migration in transaction failed: N chunks updated "
+                                << updateResponse.getN() << " expected " << nChunksToUpdate,
+                            updateResponse.getN() == nChunksToUpdate);
+                });
+
+        if (!(donorToBeRemoved || recipientToBeAdded)) {
+            // End the transaction here.
+            return std::move(updateConfigChunksFuture).semi();
+        }
+
+        // Add the needed transaction statements to also upsert the new placement information.
+        return std::move(updateConfigChunksFuture)
             .thenRunOn(txnExec)
-            .then([nChunksToUpdate](auto updateResponse) {
-                uassertStatusOK(updateResponse.toStatus());
-                uassert(ErrorCodes::UpdateOperationFailed,
-                        str::stream()
-                            << "commit chunk migration in transaction failed: N chunks updated "
-                            << updateResponse.getN() << " expected " << nChunksToUpdate,
-                        updateResponse.getN() == nChunksToUpdate);
-                LOGV2_DEBUG(6583601, 1, "commit chunk migration in transaction finished");
+            .then([&txnClient, &nss, &migrationCommitTime] {
+                // Retrieve the previous placement entry - it will be used as a base for the next
+                // update.
+                FindCommandRequest placementInfoQuery{
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace};
+                placementInfoQuery.setFilter(BSON(NamespacePlacementType::kNssFieldName
+                                                  << nss.toString()
+                                                  << NamespacePlacementType::kTimestampFieldName
+                                                  << BSON("$lte" << migrationCommitTime)));
+                placementInfoQuery.setSort(BSON(NamespacePlacementType::kTimestampFieldName << -1));
+                placementInfoQuery.setLimit(1);
+                return txnClient.exhaustiveFind(placementInfoQuery);
+            })
+            .thenRunOn(txnExec)
+            .then([&nss,
+                   &recipientShardId,
+                   &migrationCommitTime,
+                   &donorShardId,
+                   &txnClient,
+                   &donorToBeRemoved,
+                   &recipientToBeAdded](const std::vector<BSONObj>& queryResponse) {
+                /*
+                 * TODO SERVER-70687 replace the block below with a
+                 * tassert(queryResponse.size() == 1)
+                 */
+                if (queryResponse.size() != 1) {
+                    // If the collection has been created under a legacy FCV, no previous placement
+                    // info will be available. Skip this statement.
+                    LOGV2_WARNING(6892801,
+                                  "Unable to create a new placement entry for the namespace to "
+                                  "match a chunk migration",
+                                  "namespace"_attr = nss);
+
+                    BatchedCommandResponse noOpResponse;
+                    noOpResponse.setStatus(Status::OK());
+                    noOpResponse.setN(0);
+
+                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
+                }
+
+                tassert(6892800,
+                        str::stream() << "Unable to retrieve historical placement data for "
+                                      << nss.toString(),
+                        queryResponse.size() == 1);
+
+                // Leverage the most recent placement info to build the new version.
+                auto placementInfo = NamespacePlacementType::parse(
+                    IDLParserContext("CommitMoveChunk"), queryResponse.front());
+                placementInfo.setTimestamp(migrationCommitTime);
+
+                const auto& originalShardList = placementInfo.getShards();
+                std::vector<ShardId> updatedShardList;
+                updatedShardList.reserve(originalShardList.size() + 1);
+                if (recipientToBeAdded) {
+                    updatedShardList.push_back(recipientShardId);
+                }
+
+                std::copy_if(std::make_move_iterator(originalShardList.begin()),
+                             std::make_move_iterator(originalShardList.end()),
+                             std::back_inserter(updatedShardList),
+                             [&](const ShardId& shardId) {
+                                 if (donorToBeRemoved && shardId == donorShardId) {
+                                     return false;
+                                 }
+                                 if (recipientToBeAdded && shardId == recipientShardId) {
+                                     // Ensure that the added recipient will only appear once.
+                                     return false;
+                                 }
+                                 return true;
+                             });
+                placementInfo.setShards(std::move(updatedShardList));
+
+                // Persist the latest placement info (the update statement is needed to keep a
+                // single history record for concurrent migrations that get committed at the same
+                // "validAfter" time).
+                write_ops::UpdateCommandRequest upsertRequest(
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace);
+                write_ops::UpdateOpEntry upsertEntry;
+                upsertEntry.setQ(BSON(NamespacePlacementType::kNssFieldName
+                                      << nss.toString()
+                                      << NamespacePlacementType::kTimestampFieldName
+                                      << migrationCommitTime));
+                upsertEntry.setU(
+                    write_ops::UpdateModification::parseFromClassicUpdate(placementInfo.toBSON()));
+                upsertEntry.setMulti(false);
+                upsertEntry.setUpsert(true);
+                upsertRequest.setUpdates({std::move(upsertEntry)});
+
+                return txnClient.runCRUDOp(upsertRequest, {});
+            })
+            .thenRunOn(txnExec)
+            .then([](const BatchedCommandResponse& insertPlacementEntryResponse) {
+                uassertStatusOK(insertPlacementEntryResponse.toStatus());
             })
             .semi();
     };
@@ -2100,6 +2209,6 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
     txn_api::SyncTransactionWithRetries txn(
         opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(), nullptr);
 
-    txn.run(opCtx, updateFn);
+    txn.run(opCtx, transactionChain);
 }
 }  // namespace mongo

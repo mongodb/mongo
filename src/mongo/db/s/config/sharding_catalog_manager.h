@@ -687,7 +687,8 @@ private:
         const NamespaceString& nss,
         std::shared_ptr<const ChunkType> migratedChunk,
         std::shared_ptr<const std::vector<ChunkType>> splitChunks,
-        std::shared_ptr<ChunkType> controlChunk);
+        std::shared_ptr<ChunkType> controlChunk,
+        const ShardId& donorShardId);
     /**
      * Use the internal transaction API to remove a shard.
      */
