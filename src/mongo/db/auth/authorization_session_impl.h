@@ -76,7 +76,9 @@ public:
 
     void startContractTracking() override;
 
-    Status addAndAuthorizeUser(OperationContext* opCtx, const UserName& userName) override;
+    Status addAndAuthorizeUser(OperationContext* opCtx,
+                               const UserName& userName,
+                               boost::optional<Date_t> expirationTime) override;
 
     User* lookupUser(const UserName& name) override;
 
@@ -158,6 +160,8 @@ public:
 
     bool mayBypassWriteBlockingMode() const override;
 
+    bool isExpired() const override;
+
 protected:
     friend class AuthorizationSessionImplTestHelper;
 
@@ -170,7 +174,6 @@ protected:
     // This function is called whenever the user state changes to keep the internal state up to
     // date.
     void _updateInternalAuthorizationState();
-
 
     // The User who has been authenticated on this connection.
     boost::optional<UserHandle> _authenticatedUser;
@@ -221,5 +224,14 @@ private:
     AuthorizationContract _contract;
 
     bool _mayBypassWriteBlockingMode;
+
+    // The expiration time for this session, expressed as a Unix timestamp. After this time passes,
+    // the session will be expired and requests will fail until the expiration time is refreshed.
+    // If boost::none, then the session never expires (default behavior).
+    boost::optional<Date_t> _expirationTime;
+
+    // If the session is expired, this represents the UserName that was formerly authenticated on
+    // this connection.
+    boost::optional<UserName> _expiredUserName;
 };
 }  // namespace mongo

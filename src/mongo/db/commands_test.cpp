@@ -29,15 +29,24 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/crypto/mechanism_scram.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session_for_test.h"
+#include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands_test_example_gen.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
@@ -307,8 +316,8 @@ public:
     mutable std::int32_t iCapture = 0;
 };
 
-template <typename Fn>
-class MyCommand final : public TypedCommand<MyCommand<Fn>> {
+template <typename Fn, typename AuthFn>
+class MyCommand final : public TypedCommand<MyCommand<Fn, AuthFn>> {
 public:
     class Invocation final : public TypedCommand<MyCommand>::InvocationBase {
     public:
@@ -326,7 +335,9 @@ public:
         bool supportsWriteConcern() const override {
             return false;
         }
-        void doCheckAuthorization(OperationContext* opCtx) const override {}
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            return _command()->_authFn();
+        }
 
         const MyCommand* _command() const {
             return static_cast<const MyCommand*>(Base::definition());
@@ -335,7 +346,10 @@ public:
 
     using Request = commands_test_example::ExampleVoid;
 
-    MyCommand(StringData name, Fn fn) : TypedCommand<MyCommand<Fn>>(name), _fn{std::move(fn)} {}
+    MyCommand(StringData name, Fn fn, AuthFn authFn)
+        : TypedCommand<MyCommand<Fn, AuthFn>>(name),
+          _fn{std::move(fn)},
+          _authFn{std::move(authFn)} {}
 
 private:
     Command::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -347,30 +361,90 @@ private:
     }
 
     Fn _fn;
+    AuthFn _authFn;
 };
 
-template <typename Fn>
-using CmdT = MyCommand<typename std::decay<Fn>::type>;
+template <typename Fn, typename AuthFn>
+using CmdT = MyCommand<typename std::decay<Fn>::type, typename std::decay<AuthFn>::type>;
 
 auto throwFn = [] { uasserted(ErrorCodes::UnknownError, "some error"); };
+auto authSuccessFn = [] { return; };
+auto authFailFn = [] { uasserted(ErrorCodes::Unauthorized, "Not authorized"); };
 
 ExampleIncrementCommand exampleIncrementCommand;
 ExampleMinimalCommand exampleMinimalCommand;
 ExampleVoidCommand exampleVoidCommand;
-CmdT<decltype(throwFn)> throwStatusCommand("throwsStatus", throwFn);
+CmdT<decltype(throwFn), decltype(authSuccessFn)> throwStatusCommand("throwsStatus",
+                                                                    throwFn,
+                                                                    authSuccessFn);
+CmdT<decltype(throwFn), decltype(authFailFn)> unauthorizedCommand("unauthorizedCmd",
+                                                                  throwFn,
+                                                                  authFailFn);
 
-class TypedCommandTest : public ServiceContextTest {
+class TypedCommandTest : public ServiceContextMongoDTest {
+public:
+    void setUp() {
+        ServiceContextMongoDTest::setUp();
+
+        // Set up the auth subsystem to authorize the command.
+        auto localManagerState = std::make_unique<AuthzManagerExternalStateMock>();
+        _managerState = localManagerState.get();
+        _managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+        auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
+            getServiceContext(), std::move(localManagerState));
+        _authzManager = uniqueAuthzManager.get();
+        AuthorizationManager::set(getServiceContext(), std::move(uniqueAuthzManager));
+        _authzManager->setAuthEnabled(true);
+
+        _session = _transportLayer.createSession();
+        _client = getServiceContext()->makeClient("testClient", _session);
+        RestrictionEnvironment::set(
+            _session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
+        _authzSession = AuthorizationSession::get(_client.get());
+
+        // Insert a user document that will represent the user used for running the commands.
+        auto credentials =
+            BSON("SCRAM-SHA-1" << scram::Secrets<SHA1Block>::generateCredentials(
+                                      "a", saslGlobalParams.scramSHA1IterationCount.load())
+                               << "SCRAM-SHA-256"
+                               << scram::Secrets<SHA256Block>::generateCredentials(
+                                      "a", saslGlobalParams.scramSHA256IterationCount.load()));
+
+        BSONObj userDoc = BSON("_id"_sd
+                               << "test.varun"_sd
+                               << "user"_sd
+                               << "varun"
+                               << "db"_sd
+                               << "test"
+                               << "credentials"_sd << credentials << "roles"_sd
+                               << BSON_ARRAY(BSON("role"_sd
+                                                  << "readWrite"_sd
+                                                  << "db"_sd
+                                                  << "test"_sd)));
+
+        auto opCtx = _client->makeOperationContext();
+        ASSERT_OK(_managerState->insertPrivilegeDocument(opCtx.get(), userDoc, {}));
+    }
+
 protected:
+    TypedCommandTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+
+    ClockSourceMock* clockSource() {
+        return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
+    }
+
     template <typename T>
     void runIncr(T& command, std::function<void(int, const BSONObj&)> postAssert) {
         const NamespaceString ns("testdb.coll");
+
         for (std::int32_t i : {123, 12345, 0, -456}) {
             const OpMsgRequest request = [&] {
                 typename T::Request incr(ns);
                 incr.setI(i);
                 return incr.serialize(BSON("$db" << ns.db()));
             }();
-            auto opCtx = makeOperationContext();
+
+            auto opCtx = _client->makeOperationContext();
             auto invocation = command.parse(opCtx.get(), request);
 
             ASSERT_EQ(invocation->ns(), ns);
@@ -378,6 +452,7 @@ protected:
             const BSONObj reply = [&] {
                 rpc::OpMsgReplyBuilder replyBuilder;
                 try {
+                    invocation->checkAuthorization(opCtx.get(), request);
                     invocation->run(opCtx.get(), &replyBuilder);
                     auto bob = replyBuilder.getBodyBuilder();
                     CommandHelpers::extractOrAppendOk(bob);
@@ -391,9 +466,23 @@ protected:
             postAssert(i, reply);
         }
     }
+
+protected:
+    AuthorizationManager* _authzManager;
+    AuthzManagerExternalStateMock* _managerState;
+    transport::TransportLayerMock _transportLayer;
+    transport::SessionHandle _session;
+    ServiceContext::UniqueClient _client;
+    AuthorizationSession* _authzSession;
 };
 
 TEST_F(TypedCommandTest, runTyped) {
+    {
+        auto opCtx = _client->makeOperationContext();
+        ASSERT_OK(_authzSession->addAndAuthorizeUser(opCtx.get(), {"varun", "test"}, boost::none));
+        _authzSession->startRequest(opCtx.get());
+    }
+
     runIncr(exampleIncrementCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(reply["iPlusOne"].Int(), i + 1);
@@ -401,6 +490,12 @@ TEST_F(TypedCommandTest, runTyped) {
 }
 
 TEST_F(TypedCommandTest, runMinimal) {
+    {
+        auto opCtx = _client->makeOperationContext();
+        ASSERT_OK(_authzSession->addAndAuthorizeUser(opCtx.get(), {"varun", "test"}, boost::none));
+        _authzSession->startRequest(opCtx.get());
+    }
+
     runIncr(exampleMinimalCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(reply["iPlusOne"].Int(), i + 1);
@@ -408,6 +503,12 @@ TEST_F(TypedCommandTest, runMinimal) {
 }
 
 TEST_F(TypedCommandTest, runVoid) {
+    {
+        auto opCtx = _client->makeOperationContext();
+        ASSERT_OK(_authzSession->addAndAuthorizeUser(opCtx.get(), {"varun", "test"}, boost::none));
+        _authzSession->startRequest(opCtx.get());
+    }
+
     runIncr(exampleVoidCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(exampleVoidCommand.iCapture, i + 1);
@@ -415,6 +516,12 @@ TEST_F(TypedCommandTest, runVoid) {
 }
 
 TEST_F(TypedCommandTest, runThrowStatus) {
+    {
+        auto opCtx = _client->makeOperationContext();
+        ASSERT_OK(_authzSession->addAndAuthorizeUser(opCtx.get(), {"varun", "test"}, boost::none));
+        _authzSession->startRequest(opCtx.get());
+    }
+
     runIncr(throwStatusCommand, [](int i, const BSONObj& reply) {
         Status status = Status::OK();
         try {
@@ -426,6 +533,67 @@ TEST_F(TypedCommandTest, runThrowStatus) {
         ASSERT_EQ(reply["errmsg"].String(), status.reason());
         ASSERT_EQ(reply["code"].Int(), status.code());
         ASSERT_EQ(reply["codeName"].String(), ErrorCodes::errorString(status.code()));
+    });
+}
+
+TEST_F(TypedCommandTest, runThrowDoCheckAuthorization) {
+    {
+        auto opCtx = _client->makeOperationContext();
+        ASSERT_OK(_authzSession->addAndAuthorizeUser(opCtx.get(), {"varun", "test"}, boost::none));
+        _authzSession->startRequest(opCtx.get());
+    }
+
+    runIncr(unauthorizedCommand, [](int i, const BSONObj& reply) {
+        Status status = Status::OK();
+        try {
+            (void)authFailFn();
+        } catch (const DBException& e) {
+            status = e.toStatus();
+        }
+        ASSERT_EQ(reply["ok"].Double(), 0.0);
+        ASSERT_EQ(reply["code"].Int(), status.code());
+        ASSERT_EQ(reply["codeName"].String(), ErrorCodes::errorString(status.code()));
+    });
+}
+
+TEST_F(TypedCommandTest, runThrowNoUserAuthenticated) {
+    {
+        // Don't authenticate any users.
+        auto opCtx = _client->makeOperationContext();
+        _authzSession->startRequest(opCtx.get());
+    }
+
+    runIncr(exampleIncrementCommand, [](int i, const BSONObj& reply) {
+        ASSERT_EQ(reply["ok"].Double(), 0.0);
+        ASSERT_EQ(reply["errmsg"].String(),
+                  str::stream() << "Command exampleIncrement requires authentication");
+        ASSERT_EQ(reply["code"].Int(), ErrorCodes::Unauthorized);
+        ASSERT_EQ(reply["codeName"].String(), ErrorCodes::errorString(ErrorCodes::Unauthorized));
+    });
+}
+
+TEST_F(TypedCommandTest, runThrowAuthzSessionExpired) {
+    {
+        // Load user into the authorization session and then expire it.
+        auto opCtx = _client->makeOperationContext();
+        auto expirationTime = clockSource()->now() + Hours{1};
+        ASSERT_OK(
+            _authzSession->addAndAuthorizeUser(opCtx.get(), {"varun", "test"}, expirationTime));
+
+        // Fast-forward time before starting a new request.
+        clockSource()->advance(Hours(2));
+        _authzSession->startRequest(opCtx.get());
+    }
+
+    runIncr(exampleIncrementCommand, [](int i, const BSONObj& reply) {
+        ASSERT_EQ(reply["ok"].Double(), 0.0);
+        ASSERT_EQ(
+            reply["errmsg"].String(),
+            str::stream() << "Command exampleIncrement requires reauthentication since the current "
+                             "authorization session has expired. Please re-auth.");
+        ASSERT_EQ(reply["code"].Int(), ErrorCodes::ReauthenticationRequired);
+        ASSERT_EQ(reply["codeName"].String(),
+                  ErrorCodes::errorString(ErrorCodes::ReauthenticationRequired));
     });
 }
 

@@ -43,7 +43,8 @@ SecurityTokenAuthenticationGuard::SecurityTokenAuthenticationGuard(
     if (token.hasAuthenticatedUser()) {
         const auto& userName = token.authenticatedUser();
         auto* client = opCtx->getClient();
-        uassertStatusOK(AuthorizationSession::get(client)->addAndAuthorizeUser(opCtx, userName));
+        uassertStatusOK(
+            AuthorizationSession::get(client)->addAndAuthorizeUser(opCtx, userName, boost::none));
         _client = client;
 
         LOGV2_DEBUG(5838100,

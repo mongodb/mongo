@@ -206,8 +206,9 @@ SaslReply doSaslStep(OperationContext* opCtx,
 
     if (mechanism.isSuccess()) {
         UserName userName(mechanism.getPrincipalName(), mechanism.getAuthenticationDatabase());
-        uassertStatusOK(
-            AuthorizationSession::get(opCtx->getClient())->addAndAuthorizeUser(opCtx, userName));
+        auto expirationTime = mechanism.getExpirationTime();
+        uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
+                            ->addAndAuthorizeUser(opCtx, userName, expirationTime));
 
         if (!serverGlobalParams.quiet.load()) {
             auto attrs = makeLogAttributes();

@@ -147,6 +147,15 @@ public:
     }
 
     /**
+     * Returns the expiration time, if applicable, of the user's authentication for the given
+     * mechanism. The default of boost::none indicates that the user will be authenticated
+     * indefinitely on the session.
+     */
+    virtual boost::optional<Date_t> getExpirationTime() const {
+        return boost::none;
+    }
+
+    /**
      * Appends mechanism specific info in BSON form. The schema of this BSON will vary by mechanism
      * implementation, thus this info is entirely diagnostic/for records.
      */

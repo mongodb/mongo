@@ -144,7 +144,9 @@ public:
      * Adds the User identified by "UserName" to the authorization session, acquiring privileges
      * for it in the process.
      */
-    virtual Status addAndAuthorizeUser(OperationContext* opCtx, const UserName& userName) = 0;
+    virtual Status addAndAuthorizeUser(OperationContext* opCtx,
+                                       const UserName& userName,
+                                       boost::optional<Date_t> expirationTime) = 0;
 
     // Returns the authenticated user with the given name.  Returns NULL
     // if no such user is found.
@@ -182,7 +184,8 @@ public:
     // How the active session is authenticated.
     enum class AuthenticationMode {
         kNone,           // Not authenticated.
-        kConnection,     // For the duration of the connection, or until logged out.
+        kConnection,     // For the duration of the connection, or until logged out or
+                         // expiration.
         kSecurityToken,  // By operation scoped security token.
     };
     virtual AuthenticationMode getAuthenticationMode() const = 0;
@@ -305,6 +308,10 @@ public:
     // Returns true if any user has the privilege to bypass write blocking mode for the cluster
     // resource.
     virtual bool mayBypassWriteBlockingMode() const = 0;
+
+    // Returns true if the authorization session is expired. When this returns true,
+    // isAuthenticated() is also expected to return false.
+    virtual bool isExpired() const = 0;
 
 protected:
     virtual std::tuple<boost::optional<UserName>*, std::vector<RoleName>*> _getImpersonations() = 0;

@@ -84,11 +84,18 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
     auto client = opCtx->getClient();
     if (client->isInDirectClient())
         return true;
+
     uassert(ErrorCodes::Unauthorized,
             str::stream() << command->getName() << " may only be run against the admin database.",
             !command->adminOnly() || request.getDatabase() == NamespaceString::kAdminDb);
 
     auto authzSession = AuthorizationSession::get(client);
+    uassert(ErrorCodes::ReauthenticationRequired,
+            fmt::format("Command {} requires reauthentication since the current authorization "
+                        "session has expired. Please re-auth.",
+                        command->getName()),
+            !command->requiresAuth() || !authzSession->isExpired());
+
     if (!authzSession->getAuthorizationManager().isAuthEnabled()) {
         // Running without auth, so everything should be allowed except remotely invoked
         // commands that have the 'localHostOnlyIfNoAuth' restriction.
@@ -99,13 +106,16 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
                     client->getIsLocalHostConnection());
         return true;  // Blanket authorization: don't need to check anything else.
     }
+
     if (authzSession->isUsingLocalhostBypass())
         return false;  // Still can't decide on auth because of the localhost bypass.
+
     uassert(ErrorCodes::Unauthorized,
-            str::stream() << "command " << command->getName() << " requires authentication",
+            str::stream() << "Command " << command->getName() << " requires authentication",
             !command->requiresAuth() || authzSession->isAuthenticated() ||
                 (request.validatedTenancyScope &&
                  request.validatedTenancyScope->hasAuthenticatedUser()));
+
     return false;
 }
 

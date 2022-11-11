@@ -93,7 +93,7 @@ function doQueryOn(p) {
                                  r = p.getDB("test").foo.findOne();
                              }, [], "find did not throw, returned: " + tojson(r)).toString();
     printjson(error);
-    assert.gt(error.indexOf("command find requires authentication"), -1, "error was non-auth");
+    assert.gt(error.indexOf("Command find requires authentication"), -1, "error was non-auth");
 }
 
 doQueryOn(secondary);

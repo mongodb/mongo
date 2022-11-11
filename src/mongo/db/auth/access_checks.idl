@@ -52,6 +52,6 @@ enums:
             kIsCoauthorizedWith : "is_coauthorized_with"
             kIsCoauthorizedWithClient : "is_coauthorized_with_client"
             kIsImpersonating : "is_impersonating"
+            kIsUsingLocalhostBypass : "is_using_localhost_bypass" # Called in common code in commands.cpp dispatch
             kLookupUser :  "lookup_user"
             kShouldIgnoreAuthChecks :  "should_ignore_auth_checks"
-            kIsUsingLocalhostBypass : "is_using_localhost_bypass" # Called in common code in commands.cpp dispatch

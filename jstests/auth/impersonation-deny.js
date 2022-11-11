@@ -18,7 +18,7 @@ function testMongod(mongod, systemuserpwd = undefined) {
 
     // Localhost authbypass is disabled, and we haven't logged in,
     // so normal auth-required commands should fail.
-    assertUnauthorized({usersInfo: 1}, 'command usersInfo requires authentication');
+    assertUnauthorized({usersInfo: 1}, 'Command usersInfo requires authentication');
 
     // Hello command requires no auth, so it works fine.
     assert.commandWorked(admin.runCommand({hello: 1}));

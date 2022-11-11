@@ -198,7 +198,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
         uassert(ErrorCodes::BadValue,
                 kX509AuthenticationDisabledMessage,
                 !isX509AuthDisabled(opCtx->getServiceContext()));
-        uassertStatusOK(authorizationSession->addAndAuthorizeUser(opCtx, user));
+        uassertStatusOK(authorizationSession->addAndAuthorizeUser(opCtx, user, boost::none));
     };
 
     if (sslConfiguration->isClusterMember(clientName)) {

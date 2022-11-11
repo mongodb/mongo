@@ -512,6 +512,7 @@ error_codes:
 
     - {code: 390, name: InvalidSignature}
 
+    - {code: 391, name: ReauthenticationRequired}
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
