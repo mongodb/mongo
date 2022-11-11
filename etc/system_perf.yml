@@ -2286,7 +2286,7 @@ buildvariants:
       # - name: linkbench2
 
   - name: atlas-M60-real
-    display_name: M60-Atlas ReplSet
+    display_name: M60-Atlas ReplSet AWS
     cron: "0 0 * * 0,4" # 00:00 on Sunday, Thursday
     modules: *modules
     expansions:
@@ -2300,7 +2300,7 @@ buildvariants:
       storageEngine: wiredTiger
       run_server_on_arm: true
     run_on:
-      - "rhel70-perf-M60-like"
+      - "rhel70-perf-atlas-large"
     depends_on:
       - name: compile
         variant: compile-amazon2
@@ -2335,7 +2335,7 @@ buildvariants:
       project_dir: *project_dir
       storageEngine: wiredTiger
     run_on:
-      - "rhel70-perf-M60-like"
+      - "rhel70-perf-atlas-large"
     depends_on:
       - name: compile
         variant: compile-amazon2
