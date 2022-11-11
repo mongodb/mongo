@@ -50,6 +50,10 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
+    bool shouldAffectCommandCounter() const final {
+        return false;
+    }
+
     bool supportsRetryableWrite() const final {
         return true;
     }

@@ -67,13 +67,17 @@ let runTest = (operationToRunFn, expectedOpIncreases) => {
 
 setUp();
 
+// TODO (SERVER-71289): Remove mongos version check in catalog_cache_refresh_counters.js.
+const isLatestMongos = jsTestOptions().mongosBinVersion !== "last-lts" &&
+    jsTestOptions().mongosBinVersion !== "last-continuous";
+
 /**
  * Verify that insert operations get logged when blocked by a refresh.
  */
 runTest(() => assert.commandWorked(mongos1Coll.insert({x: 250})), [
-    {opType: 'countAllOperations', increase: 2},
+    {opType: 'countAllOperations', increase: isLatestMongos ? 1 : 2},
     {opType: 'countInserts', increase: 1},
-    {opType: 'countCommands', increase: 1}
+    {opType: 'countCommands', increase: isLatestMongos ? 0 : 1}
 ]);
 
 /**
@@ -86,18 +90,18 @@ runTest(() => mongos1Coll.findOne({x: 250}),
  * Verify that updates get logged when blocked by a refresh.
  */
 runTest(() => assert.commandWorked(mongos1Coll.update({x: 250}, {$set: {a: 1}})), [
-    {opType: 'countAllOperations', increase: 2},
+    {opType: 'countAllOperations', increase: isLatestMongos ? 1 : 2},
     {opType: 'countUpdates', increase: 1},
-    {opType: 'countCommands', increase: 1}
+    {opType: 'countCommands', increase: isLatestMongos ? 0 : 1}
 ]);
 
 /**
  * Verify that deletes get logged when blocked by a refresh.
  */
 runTest(() => assert.commandWorked(mongos1Coll.remove({x: 250})), [
-    {opType: 'countAllOperations', increase: 2},
+    {opType: 'countAllOperations', increase: isLatestMongos ? 1 : 2},
     {opType: 'countDeletes', increase: 1},
-    {opType: 'countCommands', increase: 1}
+    {opType: 'countCommands', increase: isLatestMongos ? 0 : 1}
 ]);
 
 /**
