@@ -229,12 +229,17 @@ public:
                                     BSONObjBuilder* builder) const = 0;
 
     /**
-     * Appends storage statistics for collection "nss" to "builder"
+     * Appends storage statistics for collection "nss" to "builder".
+     *
+     * By passing a BSONObj as the parameter 'filterObj' in this function, the caller can request
+     * specific stats to be appended to parameter 'builder'. By passing 'boost::none' to
+     * 'filterObj', the caller is requesting to append all possible storage stats.
      */
     virtual Status appendStorageStats(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const StorageStatsSpec& spec,
-                                      BSONObjBuilder* builder) const = 0;
+                                      BSONObjBuilder* builder,
+                                      const boost::optional<BSONObj>& filterObj) const = 0;
 
     /**
      * Appends the record count for collection "nss" to "builder".
@@ -242,6 +247,7 @@ public:
     virtual Status appendRecordCount(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      BSONObjBuilder* builder) const = 0;
+
     /**
      * Appends the exec stats for the collection 'nss' to 'builder'.
      */

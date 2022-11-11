@@ -120,7 +120,8 @@ public:
     Status appendStorageStats(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const StorageStatsSpec& spec,
-                              BSONObjBuilder* builder) const final {
+                              BSONObjBuilder* builder,
+                              const boost::optional<BSONObj>& filterObj) const final {
         MONGO_UNREACHABLE;
     }
 

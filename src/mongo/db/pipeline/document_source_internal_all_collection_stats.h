@@ -125,5 +125,10 @@ private:
     // A $match stage can be absorbed in order to avoid unnecessarily computing the stats for
     // collections that do not match that predicate.
     boost::intrusive_ptr<DocumentSourceMatch> _absorbedMatch;
+
+    // If a $project stage exists after $_internalAllCollectionStats, we will peek the BSONObj
+    // associated with the $project. This BSONObj will be used to avoid calculating
+    // unnecessary fields.
+    boost::optional<BSONObj> _projectFilter;
 };
 }  // namespace mongo

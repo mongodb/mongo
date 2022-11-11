@@ -74,7 +74,8 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
 BSONObj DocumentSourceCollStats::makeStatsForNs(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
-    const DocumentSourceCollStatsSpec& spec) {
+    const DocumentSourceCollStatsSpec& spec,
+    const boost::optional<BSONObj>& filterObj) {
     BSONObjBuilder builder;
 
     builder.append("ns", nss.ns());
@@ -96,9 +97,10 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
     if (auto storageStats = spec.getStorageStats()) {
         // If the storageStats field exists, it must have been validated as an object when parsing.
         BSONObjBuilder storageBuilder(builder.subobjStart("storageStats"));
-        uassertStatusOKWithContext(expCtx->mongoProcessInterface->appendStorageStats(
-                                       expCtx->opCtx, nss, *storageStats, &storageBuilder),
-                                   "Unable to retrieve storageStats in $collStats stage");
+        uassertStatusOKWithContext(
+            expCtx->mongoProcessInterface->appendStorageStats(
+                expCtx->opCtx, nss, *storageStats, &storageBuilder, filterObj),
+            "Unable to retrieve storageStats in $collStats stage");
         storageBuilder.doneFast();
     }
 

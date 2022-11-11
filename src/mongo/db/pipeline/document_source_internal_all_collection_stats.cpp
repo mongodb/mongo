@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/document_source_internal_all_collection_stats.h"
+#include "mongo/db/pipeline/document_source_project.h"
 
 namespace mongo {
 
@@ -63,7 +64,7 @@ DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNex
 
         try {
             return {Document{DocumentSourceCollStats::makeStatsForNs(
-                pExpCtx, nss, _internalAllCollectionStatsSpec.getStats().get())}};
+                pExpCtx, nss, _internalAllCollectionStatsSpec.getStats().get(), _projectFilter)}};
         } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
             // We don't want to retrieve data for views, only for collections.
             continue;
@@ -79,6 +80,14 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalAllCollectionStats::do
 
     if (std::next(itr) == container->end()) {
         return container->end();
+    }
+
+    // Attempt to internalize any predicates of a $project stage in order to calculate only
+    // necessary fields.
+    if (auto nextProject =
+            dynamic_cast<DocumentSourceSingleDocumentTransformation*>((*std::next(itr)).get())) {
+        _projectFilter =
+            nextProject->getTransformer().serializeTransformation(boost::none).toBson();
     }
 
     // Attempt to internalize any predicates of a $match upon the "ns" field.

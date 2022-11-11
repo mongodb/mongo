@@ -349,11 +349,13 @@ void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,
     Top::get(opCtx->getServiceContext()).appendLatencyStats(nss, includeHistograms, builder);
 }
 
-Status CommonMongodProcessInterface::appendStorageStats(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        const StorageStatsSpec& spec,
-                                                        BSONObjBuilder* builder) const {
-    return appendCollectionStorageStats(opCtx, nss, spec, builder);
+Status CommonMongodProcessInterface::appendStorageStats(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const StorageStatsSpec& spec,
+    BSONObjBuilder* builder,
+    const boost::optional<BSONObj>& filterObj) const {
+    return appendCollectionStorageStats(opCtx, nss, spec, builder, filterObj);
 }
 
 Status CommonMongodProcessInterface::appendRecordCount(OperationContext* opCtx,

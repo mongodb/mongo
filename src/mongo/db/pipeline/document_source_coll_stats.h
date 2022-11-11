@@ -87,7 +87,8 @@ public:
 
     static BSONObj makeStatsForNs(const boost::intrusive_ptr<ExpressionContext>&,
                                   const NamespaceString&,
-                                  const DocumentSourceCollStatsSpec&);
+                                  const DocumentSourceCollStatsSpec&,
+                                  const boost::optional<BSONObj>& filterObj = boost::none);
 
     DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                             DocumentSourceCollStatsSpec spec)
