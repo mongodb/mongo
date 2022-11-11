@@ -10,6 +10,18 @@
 # in alphabetical order.
 
 overrides:
+  enterprise-amazon2-arm64:
+  - task: config_fuzzer_replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
+
+  enterprise-amazon2022-arm64:
+  - task: config_fuzzer_replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
+
+  enterprise-rhel-70-64-bit:
+  - task: config_fuzzer_replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
+
   enterprise-macos:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
