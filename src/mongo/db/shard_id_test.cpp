@@ -88,8 +88,8 @@ TEST(ShardId, Compare) {
     ShardId sa1(a1);
     ShardId sb(b);
     ASSERT_EQUALS(sa.compare(sa1), a.compare(a1));
-    ASSERT_EQUALS(sb.compare(sa1), b.compare(a1));
-    ASSERT_EQUALS(sa.compare(sb), a.compare(b));
+    ASSERT_EQUALS(sb.compare(sa1) > 0, b.compare(a1) > 0);
+    ASSERT_EQUALS(sa.compare(sb) < 0, a.compare(b) < 0);
 }
 
 TEST(ShardId, Equals) {
