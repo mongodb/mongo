@@ -220,9 +220,9 @@ Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObj
     // Special object
     std::string firstField;
     firstField.reserve(FIELD_RESERVE_SIZE);
-    Status ret = field(&firstField);
-    if (ret != Status::OK()) {
-        return ret;
+    Status fieldParseResult = field(&firstField);
+    if (fieldParseResult != Status::OK()) {
+        return fieldParseResult;
     }
 
     if (firstField == "$oid") {
@@ -365,18 +365,18 @@ Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObj
             return valueRet;
         }
         while (readToken(COMMA)) {
-            std::string fieldName;
-            fieldName.reserve(FIELD_RESERVE_SIZE);
-            Status fieldRet = field(&fieldName);
+            std::string nextFieldName;
+            nextFieldName.reserve(FIELD_RESERVE_SIZE);
+            Status fieldRet = field(&nextFieldName);
             if (fieldRet != Status::OK()) {
                 return fieldRet;
             }
             if (!readToken(COLON)) {
                 return parseError("Expecting ':'");
             }
-            Status valueRet = value(fieldName, *objBuilder);
-            if (valueRet != Status::OK()) {
-                return valueRet;
+            Status nextFieldValueRet = value(nextFieldName, *objBuilder);
+            if (nextFieldValueRet != Status::OK()) {
+                return nextFieldValueRet;
             }
         }
     }
@@ -529,13 +529,13 @@ Status JParse::dateObject(StringData fieldName, BSONObjBuilder& builder) {
         }
         date = dateRet.getValue();
     } else if (readToken(LBRACE)) {
-        std::string fieldName;
-        fieldName.reserve(FIELD_RESERVE_SIZE);
-        Status ret = field(&fieldName);
+        std::string nextFieldName;
+        nextFieldName.reserve(FIELD_RESERVE_SIZE);
+        Status ret = field(&nextFieldName);
         if (ret != Status::OK()) {
             return ret;
         }
-        if (fieldName != "$numberLong") {
+        if (nextFieldName != "$numberLong") {
             return parseError("Expected field name: $numberLong for $date value object");
         }
         if (!readToken(COLON)) {

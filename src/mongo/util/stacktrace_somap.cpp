@@ -102,7 +102,6 @@ void processNoteSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
 #ifdef NT_GNU_BUILD_ID
     const char* const notesBegin = reinterpret_cast<const char*>(info.dlpi_addr) + phdr.p_vaddr;
     const char* const notesEnd = notesBegin + phdr.p_memsz;
-    ElfW(Nhdr) noteHeader;
     // Returns the size in bytes of an ELF note entry with the given header.
     auto roundUpToElfWordAlignment = [](size_t offset) -> size_t {
         static const size_t elfWordSizeBytes = sizeof(ElfW(Word));
@@ -112,6 +111,7 @@ void processNoteSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
         return sizeof(noteHeader) + roundUpToElfWordAlignment(noteHeader.n_namesz) +
             roundUpToElfWordAlignment(noteHeader.n_descsz);
     };
+    ElfW(Nhdr) noteHeader;
     for (const char* notesCurr = notesBegin; (notesCurr + sizeof(noteHeader)) < notesEnd;
          notesCurr += getNoteSizeBytes(noteHeader)) {
         memcpy(&noteHeader, notesCurr, sizeof(noteHeader));

@@ -306,10 +306,10 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
         };
     };
 
-    auto dateFn = [&](Date_t date) {
-        return jsobj([&, date](CommaTracker& tracker) {
-            field(tracker, "$date", quote([&, date] {
-                      write(StringData{DateStringBuffer{}.iso8601(date, local)});
+    auto dateFn = [&](Date_t dateToPrint) {
+        return jsobj([&, dateToPrint](CommaTracker& tracker) {
+            field(tracker, "$date", quote([&, dateToPrint] {
+                      write(StringData{DateStringBuffer{}.iso8601(dateToPrint, local)});
                   }));
         });
     };

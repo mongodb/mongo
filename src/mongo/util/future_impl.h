@@ -1200,8 +1200,8 @@ public:
                       "func passed to tap must return void");
 
         return tapImpl(std::forward<Func>(func),
-                       [](Func && func, const T& val) noexcept { call(func, val); },
-                       [](Func && func, const Status& status) noexcept {});
+                       [](Func && successFunc, const T& val) noexcept { call(successFunc, val); },
+                       [](Func && failFunc, const Status& status) noexcept {});
     }
 
     TEMPLATE(typename Policy, typename Func)
@@ -1210,8 +1210,9 @@ public:
         static_assert(std::is_void<decltype(call(func, std::declval<const Status&>()))>::value,
                       "func passed to tapError must return void");
 
-        return tapImpl(std::forward<Func>(func), [](Func && func, const T& val) noexcept {}, [
-        ](Func && func, const Status& status) noexcept { call(func, status); });
+        return tapImpl(
+            std::forward<Func>(func), [](Func && successFunc, const T& val) noexcept {}, [
+            ](Func && failFunc, const Status& status) noexcept { call(failFunc, status); });
     }
 
     TEMPLATE(typename Policy, typename Func)
@@ -1224,8 +1225,10 @@ public:
         using Wrapper = StatusOrStatusWith<T>;
         return tapImpl(
             std::forward<Func>(func),
-            [](Func && func, const T& val) noexcept { call(func, Wrapper(val)); },
-            [](Func && func, const Status& status) noexcept { call(func, Wrapper(status)); });
+            [](Func && successFunc, const T& val) noexcept { call(successFunc, Wrapper(val)); },
+            [](Func && failFunc, const Status& status) noexcept {
+                call(failFunc, Wrapper(status));
+            });
     }
 
     FutureImpl<void> ignoreValue() && noexcept;

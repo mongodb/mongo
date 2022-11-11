@@ -766,7 +766,7 @@ BSONElement BSONColumn::Iterator::DecodingState::_loadDelta(BSONColumn& column,
     }
 
     // Write value depending on type
-    auto elem = [&]() -> ElementStorage::Element {
+    auto elemFn = [&]() -> ElementStorage::Element {
         switch (_lastType) {
             case String:
             case Code: {
@@ -809,7 +809,7 @@ BSONElement BSONColumn::Iterator::DecodingState::_loadDelta(BSONColumn& column,
         }
     }();
 
-    _lastValue = elem.element();
+    _lastValue = elemFn.element();
     return _lastValue;
 }
 
