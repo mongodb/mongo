@@ -49,7 +49,8 @@ namespace analyze_shard_key {
  *   on this sampler.
  *
  * Currently, query sampling is only supported on a sharded cluster. So a sampler must be a mongos
- * and the coordinator must be the config server's primary mongod.
+ * or a shardsvr mongod (acting as a router), and the coordinator must be the config server's
+ * primary mongod.
  */
 class QueryAnalysisSampler final {
     QueryAnalysisSampler(const QueryAnalysisSampler&) = delete;
@@ -203,6 +204,8 @@ public:
     }
 
 private:
+    long long _getTotalQueriesCount() const;
+
     void _refreshQueryStats();
 
     void _refreshConfigurations(OperationContext* opCtx);

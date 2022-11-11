@@ -62,9 +62,10 @@ QueryAnalysisSampler& QueryAnalysisSampler::get(OperationContext* opCtx) {
 }
 
 QueryAnalysisSampler& QueryAnalysisSampler::get(ServiceContext* serviceContext) {
-    invariant(analyze_shard_key::isFeatureFlagEnabled(),
+    invariant(analyze_shard_key::isFeatureFlagEnabledIgnoreFCV(),
               "Only support analyzing queries when the feature flag is enabled");
-    invariant(isMongos(), "Only support analyzing queries on a sharded cluster");
+    invariant(isMongos() || serverGlobalParams.clusterRole == ClusterRole::ShardServer,
+              "Only support analyzing queries on a sharded cluster");
     return getQueryAnalysisSampler(serviceContext);
 }
 
@@ -122,15 +123,23 @@ void QueryAnalysisSampler::QueryStats::refreshTotalCount(long long newTotalCount
     _lastTotalCount = newTotalCount;
 }
 
+long long QueryAnalysisSampler::_getTotalQueriesCount() const {
+    if (isMongos()) {
+        return globalOpCounters.getQuery()->load() + globalOpCounters.getInsert()->load() +
+            globalOpCounters.getUpdate()->load() + globalOpCounters.getDelete()->load() +
+            globalOpCounters.getCommand()->load();
+    } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        return globalOpCounters.getNestedAggregate()->load();
+    }
+    MONGO_UNREACHABLE;
+}
+
 void QueryAnalysisSampler::_refreshQueryStats() {
     if (MONGO_unlikely(disableQueryAnalysisSampler.shouldFail())) {
         return;
     }
 
-    long long newTotalCount = globalOpCounters.getQuery()->load() +
-        globalOpCounters.getInsert()->load() + globalOpCounters.getUpdate()->load() +
-        globalOpCounters.getDelete()->load() + globalOpCounters.getCommand()->load();
-
+    long long newTotalCount = _getTotalQueriesCount();
     stdx::lock_guard<Latch> lk(_mutex);
     _queryStats.refreshTotalCount(newTotalCount);
 }

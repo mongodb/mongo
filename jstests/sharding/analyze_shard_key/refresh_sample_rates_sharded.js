@@ -7,13 +7,20 @@
 (function() {
 "use strict";
 
-// Prevent all mongoses from running _refreshQueryAnalyzerConfiguration commands by themselves in
-// the background.
+// Prevent all mongoses and shardsvr mongods from running _refreshQueryAnalyzerConfiguration
+// commands by themselves in the background.
 const setParameterOpts = {
-    setParameter: {"failpoint.disableQueryAnalysisSampler": tojson({mode: "alwaysOn"})}
+    "failpoint.disableQueryAnalysisSampler": tojson({mode: "alwaysOn"})
 };
-const st = new ShardingTest(
-    {mongos: {s0: setParameterOpts, s1: setParameterOpts, s2: setParameterOpts}, shards: 1});
+const st = new ShardingTest({
+    mongos: {
+        s0: {setParameter: setParameterOpts},
+        s1: {setParameter: setParameterOpts},
+        s2: {setParameter: setParameterOpts}
+    },
+    shards: 1,
+    rs: {nodes: 1, setParameter: setParameterOpts}
+});
 
 const dbName = "testDb";
 const db = st.s0.getDB(dbName);
@@ -131,18 +138,14 @@ const collUuid1 = getCollectionUuid(collName1);
             {ns: ns1, collectionUuid: collUuid1, sampleRate: expectedRatio0 * sampleRate1},
         ]);
 
-        // Query distribution after: [4.5, 0, 1] (no change). Verify that refreshing returns correct
-        // weighted sample rates (i.e. zero).
+        // Query distribution after: [4.5, 0, 1] (no change). Verify that refreshing doesn't
+        // return any sample rates since the weight for this mongos is 0.
         res1 = assert.commandWorked(configRSPrimary.adminCommand({
             _refreshQueryAnalyzerConfiguration: 1,
             name: st.s1.host,
             numQueriesExecutedPerSecond: 0
         }));
-        expectedRatio1 = 0;
-        assert.sameMembers(res1.configurations, [
-            {ns: ns0, collectionUuid: collUuid0, sampleRate: expectedRatio1 * sampleRate0},
-            {ns: ns1, collectionUuid: collUuid1, sampleRate: expectedRatio1 * sampleRate1},
-        ]);
+        assert.eq(res1.configurations.length, 0);
 
         assert.commandWorked(st.s0.adminCommand({configureQueryAnalyzer: ns1, mode: "off"}));
 

@@ -721,16 +721,8 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsMultipleSamplersBasic) 
     // Query distribution after: [1.5, 0].
     configurations1 =
         coordinator->getNewConfigurationsForSampler(operationContext(), mongosName1, 0);
-    expectedRatio1 = 0;
-    ASSERT_EQ(configurations1.size(), 2U);
-    assertContainsConfiguration(configurations1,
-                                analyzerDoc0.getNs(),
-                                analyzerDoc0.getCollectionUuid(),
-                                expectedRatio1 * analyzerDoc0.getSampleRate().get());
-    assertContainsConfiguration(configurations1,
-                                analyzerDoc1.getNs(),
-                                analyzerDoc1.getCollectionUuid(),
-                                expectedRatio1 * analyzerDoc1.getSampleRate().get());
+    // The weight for this mongos is 0 so no configurations should be returned.
+    ASSERT(configurations1.empty());
 
     // Query distribution after: [0, 0].
     configurations0 =

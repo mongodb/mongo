@@ -198,6 +198,7 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query_analysis_sampler.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/future.h"
@@ -1321,6 +1322,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         lsc->joinOnShutDown();
     }
 
+    if (analyze_shard_key::supportsSamplingQueriesIgnoreFCV()) {
+        LOGV2(7114100, "Shutting down the QueryAnalysisSampler");
+        analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
+    }
     if (analyze_shard_key::supportsPersistingSampledQueriesIgnoreFCV()) {
         LOGV2(7047303, "Shutting down the QueryAnalysisWriter");
         analyze_shard_key::QueryAnalysisWriter::get(serviceContext).onShutdown();

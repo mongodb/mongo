@@ -77,6 +77,10 @@ public:
         _checkWrap(&OpCounters::_queryDeprecated, 1);
     }
 
+    void gotNestedAggregate() {
+        _checkWrap(&OpCounters::_nestedAggregate, 1);
+    }
+
     BSONObj getObj() const;
 
     // These opcounters record operations that would fail if we were fully enforcing our consistency
@@ -116,6 +120,9 @@ public:
     const AtomicWord<long long>* getCommand() const {
         return &*_command;
     }
+    const AtomicWord<long long>* getNestedAggregate() const {
+        return &*_nestedAggregate;
+    }
     const AtomicWord<long long>* getInsertOnExistingDoc() const {
         return &*_insertOnExistingDoc;
     }
@@ -150,6 +157,7 @@ private:
     CacheExclusive<AtomicWord<long long>> _delete;
     CacheExclusive<AtomicWord<long long>> _getmore;
     CacheExclusive<AtomicWord<long long>> _command;
+    CacheExclusive<AtomicWord<long long>> _nestedAggregate;
 
     CacheExclusive<AtomicWord<long long>> _insertOnExistingDoc;
     CacheExclusive<AtomicWord<long long>> _updateOnMissingDoc;

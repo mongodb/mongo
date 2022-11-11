@@ -49,6 +49,7 @@ void OpCounters::_reset() {
     _delete->store(0);
     _getmore->store(0);
     _command->store(0);
+    _nestedAggregate->store(0);
 
     _queryDeprecated->store(0);
 

@@ -59,7 +59,13 @@ bool supportsPersistingSampledQueriesIgnoreFCV() {
 }
 
 bool supportsSamplingQueries() {
-    return isFeatureFlagEnabled() && isMongos();
+    return isFeatureFlagEnabled() &&
+        (isMongos() || serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+}
+
+bool supportsSamplingQueriesIgnoreFCV() {
+    return isFeatureFlagEnabledIgnoreFCV() &&
+        (isMongos() || serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 }
 
 }  // namespace analyze_shard_key
