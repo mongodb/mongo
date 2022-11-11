@@ -163,16 +163,6 @@ BSONObj ShardServerProcessInterface::preparePipelineAndExplain(
     return sharded_agg_helpers::targetShardsForExplain(ownedPipeline);
 }
 
-std::unique_ptr<ShardFilterer> ShardServerProcessInterface::getShardFilterer(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-    auto collectionFilter =
-        CollectionShardingState::assertCollectionLockedAndAcquire(expCtx->opCtx, expCtx->ns)
-            ->getOwnershipFilter(
-                expCtx->opCtx,
-                CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
-    return std::make_unique<ShardFiltererImpl>(std::move(collectionFilter));
-}
-
 void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
     const NamespaceString& sourceNs,

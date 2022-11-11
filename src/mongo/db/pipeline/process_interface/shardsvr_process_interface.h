@@ -96,9 +96,6 @@ public:
     BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline,
                                       ExplainOptions::Verbosity verbosity) final;
 
-    std::unique_ptr<ShardFilterer> getShardFilterer(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override final;
-
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final;
 
     std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,

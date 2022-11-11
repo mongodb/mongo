@@ -339,12 +339,6 @@ public:
         Pipeline* pipeline) = 0;
 
     /**
-     * Produces a ShardFilterer. May return null.
-     */
-    virtual std::unique_ptr<ShardFilterer> getShardFilterer(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;
-
-    /**
      * Returns a vector of owned BSONObjs, each of which contains details of an in-progress
      * operation or, optionally, an idle connection. If userMode is kIncludeAllUsers, report
      * operations for all authenticated users; otherwise, report only the current user's operations.

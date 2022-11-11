@@ -91,16 +91,6 @@ public:
         const Document& documentKey,
         boost::optional<BSONObj> readConcern);
 
-    std::unique_ptr<ShardFilterer> getShardFilterer(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
-        // Try to emulate the behavior mongos and mongod would each follow.
-        if (expCtx->inMongos) {
-            return nullptr;
-        } else {
-            return std::make_unique<StubShardFilterer>();
-        }
-    }
-
 private:
     std::deque<DocumentSource::GetNextResult> _mockResults;
 };

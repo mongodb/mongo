@@ -176,11 +176,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<ShardFilterer> getShardFilterer(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
-        return nullptr;
-    }
-
     std::string getShardName(OperationContext* opCtx) const final {
         MONGO_UNREACHABLE;
     }
