@@ -48,6 +48,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -288,6 +289,27 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
             }
 
             cmrIndex->idx = indexes[0];
+        }
+
+        if (cmdIndex.getHidden()) {
+            // Checks if it is possible to drop the shard key, so it could be possible to hide it
+            if (auto catalogClient = Grid::get(opCtx)->catalogClient()) {
+                try {
+                    auto shardedColl = catalogClient->getCollection(opCtx, nss);
+
+                    if (isLastNonHiddenShardKeyIndex(opCtx,
+                                                     coll,
+                                                     coll->getIndexCatalog(),
+                                                     indexName.toString(),
+                                                     shardedColl.getKeyPattern().toBSON())) {
+                        return {ErrorCodes::InvalidOptions,
+                                "Cannot hide the only compatible index for this collection's shard "
+                                "key"};
+                    }
+                } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                    // The collection is unsharded or doesn't exist.
+                }
+            }
         }
 
         if (cmdIndex.getExpireAfterSeconds()) {
