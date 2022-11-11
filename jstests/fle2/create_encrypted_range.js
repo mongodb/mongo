@@ -2,7 +2,7 @@
 
 /**
  * @tags: [
- * featureFlagFLE2Range,
+ * requires_fcv_62,
  * assumes_unsharded_collection
  * ]
  */
