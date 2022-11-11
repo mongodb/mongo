@@ -43,8 +43,13 @@ class Status;
  * { _id: "minOpTimeRecovery",
  *   minOpTime: { ts: Timestamp 1443820968000|1, t: 11 },
  *   minOptimeUpdaters: 1 }
+ *
+ * This class is flagged as deprecated because the persist/recovery of the config
+ * time on `[start|end]MetadataOp` is managed via vector clock starting from v6.2.
+ *
+ * TODO (SERVER-60110): Remove once 7.0 becomes last LTS.
  */
-class ShardingStateRecovery {
+class ShardingStateRecovery_DEPRECATED {
 public:
     /**
      * Marks the beginning of a sharding metadata operation which requires recovery of the config

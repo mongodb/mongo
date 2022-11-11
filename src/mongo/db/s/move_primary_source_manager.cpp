@@ -40,6 +40,7 @@
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/type_shard_database.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
@@ -156,10 +157,14 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
     ScopeGuard scopedGuard([&] { cleanupOnError(opCtx); });
 
     // Mark the shard as running a critical operation that requires recovery on crash.
-    auto startMetadataOpStatus = ShardingStateRecovery::startMetadataOp(opCtx);
+    // TODO (SERVER-60110): Remove once 7.0 becomes last LTS.
+    auto startMetadataOpStatus = ShardingStateRecovery_DEPRECATED::startMetadataOp(opCtx);
     if (!startMetadataOpStatus.isOK()) {
         return startMetadataOpStatus;
     }
+
+    // Checkpoint the vector clock to ensure causality in the event of a crash or shutdown.
+    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
     {
         // The critical section must be entered with the database X lock in order to ensure there
@@ -517,7 +522,11 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
     if (_state == kCriticalSection || _state == kCloneCompleted) {
         // Clear the 'minOpTime recovery' document so that the next time a node from this shard
         // becomes a primary, it won't have to recover the config server optime.
-        ShardingStateRecovery::endMetadataOp(opCtx);
+        // TODO (SERVER-60110): Remove once 7.0 becomes last LTS.
+        ShardingStateRecovery_DEPRECATED::endMetadataOp(opCtx);
+
+        // Checkpoint the vector clock to ensure causality in the event of a crash or shutdown.
+        VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
     }
 
     // If we're in the kCloneCompleted state, then we need to do the last step of cleaning up

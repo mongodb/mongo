@@ -933,7 +933,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
     } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (ShardingState::get(opCtx)->enabled()) {
-            Status status = ShardingStateRecovery::recover(opCtx);
+            Status status = ShardingStateRecovery_DEPRECATED::recover(opCtx);
             VectorClockMutable::get(opCtx)->recoverDirect(opCtx);
 
             // If the node is shutting down or it lost quorum just as it was becoming primary, don't

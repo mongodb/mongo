@@ -189,7 +189,7 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
 
 }  // namespace
 
-Status ShardingStateRecovery::startMetadataOp(OperationContext* opCtx) {
+Status ShardingStateRecovery_DEPRECATED::startMetadataOp(OperationContext* opCtx) {
     Status upsertStatus =
         modifyRecoveryDocument(opCtx, RecoveryDocument::Increment, kMajorityWriteConcern);
 
@@ -204,7 +204,7 @@ Status ShardingStateRecovery::startMetadataOp(OperationContext* opCtx) {
     return upsertStatus;
 }
 
-void ShardingStateRecovery::endMetadataOp(OperationContext* opCtx) {
+void ShardingStateRecovery_DEPRECATED::endMetadataOp(OperationContext* opCtx) {
     Status status =
         modifyRecoveryDocument(opCtx, RecoveryDocument::Decrement, WriteConcernOptions());
     if (!status.isOK()) {
@@ -215,7 +215,7 @@ void ShardingStateRecovery::endMetadataOp(OperationContext* opCtx) {
     }
 }
 
-Status ShardingStateRecovery::recover(OperationContext* opCtx) {
+Status ShardingStateRecovery_DEPRECATED::recover(OperationContext* opCtx) {
     ShardingState* const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->enabled());
 

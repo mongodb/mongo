@@ -50,6 +50,7 @@
 #include "mongo/db/s/type_shard_collection.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog_cache_loader.h"
@@ -350,9 +351,14 @@ void MigrationSourceManager::enterCriticalSection() {
     // Mark the shard as running critical operation, which requires recovery on crash.
     //
     // NOTE: The 'migrateChunkToNewShard' oplog message written by the above call to
-    // 'notifyChangeStreamsOnRecipientFirstChunk' depends on this majority write to carry its
-    // local write to majority committed.
-    uassertStatusOKWithContext(ShardingStateRecovery::startMetadataOp(_opCtx), "Start metadata op");
+    // 'notifyChangeStreamsOnRecipientFirstChunk' depends on this majority write to carry its local
+    // write to majority committed.
+    // TODO (SERVER-60110): Remove once 7.0 becomes last LTS.
+    uassertStatusOKWithContext(ShardingStateRecovery_DEPRECATED::startMetadataOp(_opCtx),
+                               "Start metadata op");
+
+    // Checkpoint the vector clock to ensure causality in the event of a crash or shutdown.
+    VectorClockMutable::get(_opCtx)->waitForDurableConfigTime().get(_opCtx);
 
     LOGV2_DEBUG_OPTIONS(4817402,
                         2,
@@ -722,7 +728,12 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
 
                 // Clear the 'minOpTime recovery' document so that the next time a node from this
                 // shard becomes a primary, it won't have to recover the config server optime.
-                ShardingStateRecovery::endMetadataOp(newOpCtx);
+                // TODO (SERVER-60110): Remove once 7.0 becomes last LTS.
+                ShardingStateRecovery_DEPRECATED::endMetadataOp(newOpCtx);
+
+                // Checkpoint the vector clock to ensure causality in the event of a crash or
+                // shutdown.
+                VectorClockMutable::get(newOpCtx)->waitForDurableConfigTime().get(newOpCtx);
             }
             if (completeMigration) {
                 // This can be called on an exception path after the OperationContext has been

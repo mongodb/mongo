@@ -725,7 +725,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
             if (!replCoord->isReplEnabled()) {
                 if (ShardingState::get(startupOpCtx.get())->enabled()) {
-                    uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
+                    uassertStatusOK(ShardingStateRecovery_DEPRECATED::recover(startupOpCtx.get()));
                 }
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
