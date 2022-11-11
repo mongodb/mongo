@@ -2001,10 +2001,41 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
     std::shared_ptr<ReplIndexBuildState> replState,
     Timestamp startTimestamp,
     const IndexBuildOptions& indexBuildOptions) {
-    const NamespaceStringOrUUID nssOrUuid{replState->dbName, replState->collectionUUID};
+    auto [dbLock, collLock, rstl] = [&] {
+        while (true) {
+            Lock::DBLock dbLock{opCtx, replState->dbName, MODE_IX};
 
-    AutoGetCollection coll(opCtx, nssOrUuid, MODE_X);
-    CollectionWriter collection(opCtx, coll);
+            // Unlock the RSTL to avoid deadlocks with prepared transactions and replication state
+            // transitions. See SERVER-71191.
+            unlockRSTL(opCtx);
+
+            CollectionNamespaceOrUUIDLock collLock{
+                opCtx, {replState->dbName, replState->collectionUUID}, MODE_X};
+            repl::ReplicationStateTransitionLockGuard rstl{
+                opCtx, MODE_IX, repl::ReplicationStateTransitionLockGuard::EnqueueOnly{}};
+
+            try {
+                // Since this thread is not killable by state transitions, this deadline is
+                // effectively the longest period of time we can block a state transition. State
+                // transitions are infrequent, but need to happen quickly. It should be okay to set
+                // this to a low value because the RSTL is rarely contended and, if this does time
+                // out, we will retry and reacquire the RSTL again without a deadline.
+                rstl.waitForLockUntil(Date_t::now() + Milliseconds{10});
+            } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+                // We weren't able to re-acquire the RSTL within the timeout, which means there is
+                // an active state transition. Release our locks and try again from the beginning.
+                LOGV2(7119100,
+                      "Unable to acquire RSTL for index build setup within deadline, releasing "
+                      "locks and trying again",
+                      "buildUUID"_attr = replState->buildUUID);
+                continue;
+            }
+
+            return std::make_tuple(std::move(dbLock), std::move(collLock), std::move(rstl));
+        }
+    }();
+
+    CollectionWriter collection(opCtx, replState->collectionUUID);
 
     const auto& nss = collection.get()->ns();
 
