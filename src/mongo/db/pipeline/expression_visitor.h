@@ -66,7 +66,6 @@ class ExpressionDayOfMonth;
 class ExpressionDayOfWeek;
 class ExpressionDayOfYear;
 class ExpressionDivide;
-class ExpressionBetween;
 class ExpressionExp;
 class ExpressionFieldPath;
 class ExpressionFilter;
@@ -234,7 +233,6 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDateToString>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDateTrunc>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDivide>) = 0;
-    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBetween>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionExp>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionFieldPath>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionFilter>) = 0;
@@ -416,7 +414,6 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionDateToString*) override {}
     void visit(const ExpressionDateTrunc*) override {}
     void visit(const ExpressionDivide*) override {}
-    void visit(const ExpressionBetween*) override {}
     void visit(const ExpressionExp*) override {}
     void visit(const ExpressionFieldPath*) override {}
     void visit(const ExpressionFilter*) override {}

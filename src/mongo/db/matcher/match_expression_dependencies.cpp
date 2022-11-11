@@ -327,10 +327,6 @@ public:
 
     void visit(const WhereNoOpMatchExpression* expr) override {}
 
-    void visit(const BetweenMatchExpression* expr) override {
-        visitPathExpression(expr);
-    }
-
 private:
     void visitPathExpression(const PathMatchExpression* expr) {
         if (_ignoreDependencies) {

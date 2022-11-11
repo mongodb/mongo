@@ -1804,36 +1804,6 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
         case PathAcceptingKeyword::GEO_NEAR:
             return {Status(ErrorCodes::BadValue,
                            str::stream() << "near must be first in: " << context)};
-
-        case PathAcceptingKeyword::BETWEEN: {
-            if (e.type() == BSONType::BinData) {
-                uassert(ErrorCodes::BadValue,
-                        "$between needs an encrypted binData",
-                        e.binDataType() == BinDataType::Encrypt);
-                return std::make_unique<BetweenMatchExpression>(
-                    name,
-                    e,
-                    doc_validation_error::createAnnotation(expCtx,
-                                                           e.fieldNameStringData().toString(),
-                                                           BSON((name ? *name : "") << e.wrap())));
-            } else if (e.type() == BSONType::Array) {
-                auto betweenArray = e.embeddedObject();
-                auto iter = BSONObjIterator(betweenArray);
-                if (!iter.more()) {
-                    return Status(ErrorCodes::FailedToParse, "$between needs an array of size 2");
-                }
-                auto first = iter.next();
-                if (!iter.more()) {
-                    return Status(ErrorCodes::FailedToParse, "$between needs an array of size 2");
-                }
-                auto second = iter.next();
-                if (iter.more()) {
-                    return Status(ErrorCodes::FailedToParse, "$between needs an array of size 2");
-                }
-                return parseBetweenWithArray(name, e, expCtx, allowedFeatures, first, second);
-            }
-            return {Status(ErrorCodes::BadValue, "$between needs an array or binData ")};
-        }
         case PathAcceptingKeyword::INTERNAL_EXPR_EQ: {
             if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
                 return {Status(ErrorCodes::BadValue,
@@ -2230,7 +2200,6 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
             {"bitsAnyClear", PathAcceptingKeyword::BITS_ANY_CLEAR},
             {"bitsAnySet", PathAcceptingKeyword::BITS_ANY_SET},
             {"elemMatch", PathAcceptingKeyword::ELEM_MATCH},
-            {"between", PathAcceptingKeyword::BETWEEN},
             {"eq", PathAcceptingKeyword::EQUALITY},
             {"exists", PathAcceptingKeyword::EXISTS},
             {"geoIntersects", PathAcceptingKeyword::GEO_INTERSECTS},

@@ -90,7 +90,6 @@ public:
     void visit(BitsAllSetMatchExpression* expr) final;
     void visit(BitsAnyClearMatchExpression* expr) final;
     void visit(BitsAnySetMatchExpression* expr) final;
-    void visit(BetweenMatchExpression* expr) final {}
     void visit(ElemMatchObjectMatchExpression* matchExpr) final {}
     void visit(ElemMatchValueMatchExpression* matchExpr) final {}
     void visit(EqualityMatchExpression* expr) final;

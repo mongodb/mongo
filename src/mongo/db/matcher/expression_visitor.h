@@ -55,7 +55,6 @@ class InternalExprGTMatchExpression;
 class InternalExprGTEMatchExpression;
 class InternalExprLTMatchExpression;
 class InternalExprLTEMatchExpression;
-class BetweenMatchExpression;
 class InternalSchemaAllElemMatchFromIndexMatchExpression;
 class InternalSchemaAllowedPropertiesMatchExpression;
 class InternalSchemaBinDataEncryptedTypeExpression;
@@ -163,7 +162,6 @@ public:
     virtual void visit(MaybeConstPtr<TypeMatchExpression> expr) = 0;
     virtual void visit(MaybeConstPtr<WhereMatchExpression> expr) = 0;
     virtual void visit(MaybeConstPtr<WhereNoOpMatchExpression> expr) = 0;
-    virtual void visit(MaybeConstPtr<BetweenMatchExpression> expr) = 0;
 };
 
 using MatchExpressionMutableVisitor = MatchExpressionVisitor<false>;
@@ -249,7 +247,6 @@ struct SelectiveMatchExpressionVisitorBase : public MatchExpressionVisitor<IsCon
     void visit(MaybeConstPtr<TypeMatchExpression> expr) override {}
     void visit(MaybeConstPtr<WhereMatchExpression> expr) override {}
     void visit(MaybeConstPtr<WhereNoOpMatchExpression> expr) override {}
-    void visit(MaybeConstPtr<BetweenMatchExpression> expr) override {}
 };
 
 }  // namespace mongo

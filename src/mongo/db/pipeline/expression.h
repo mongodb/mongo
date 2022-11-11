@@ -4301,28 +4301,4 @@ public:
     }
 };
 
-class ExpressionBetween : public ExpressionFixedArity<ExpressionBetween, 2> {
-public:
-    static constexpr const char* const opName = "$between";
-    explicit ExpressionBetween(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionBetween, 2>(expCtx) {}
-
-    ExpressionBetween(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionBetween, 2>(expCtx, std::move(children)) {}
-
-    Value evaluate(const Document& root, Variables* variables) const final;
-
-    const char* getOpName() const final {
-        return opName;
-    }
-
-    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
-        return visitor->visit(this);
-    }
-
-    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
-        return visitor->visit(this);
-    }
-};
-
 }  // namespace mongo

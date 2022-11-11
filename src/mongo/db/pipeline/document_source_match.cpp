@@ -267,7 +267,6 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             }
 
             // These are never allowed
-            case PathAcceptingKeyword::BETWEEN:
             case PathAcceptingKeyword::EXISTS:
             case PathAcceptingKeyword::GEO_INTERSECTS:
             case PathAcceptingKeyword::GEO_NEAR:

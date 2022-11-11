@@ -475,10 +475,6 @@ public:
         unsupportedExpression(expr);
     }
 
-    void visit(const BetweenMatchExpression* expr) override {
-        unsupportedExpression(expr);
-    }
-
 private:
     void generateBoolConstant(const bool value) {
         _ctx.push<PathConstant>(Constant::boolean(value));

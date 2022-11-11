@@ -34,7 +34,7 @@
 
 namespace mongo::fle {
 /**
- * Rewrite for the encrypted range index, which expects a $between expression.
+ * Rewrite for the encrypted range index, which expects a comparison operator expression.
  */
 class RangePredicate : public EncryptedPredicate {
 public:

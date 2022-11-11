@@ -86,7 +86,6 @@ public:
         BITS_ALL_CLEAR,
         BITS_ANY_SET,
         BITS_ANY_CLEAR,
-        BETWEEN,
 
         // Negations.
         NOT,

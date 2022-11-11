@@ -7999,13 +7999,6 @@ Value ExpressionTsIncrement::evaluate(const Document& root, Variables* variables
 
 REGISTER_STABLE_EXPRESSION(tsIncrement, ExpressionTsIncrement::parse);
 
-/* ------------------------- ExpressionBetween ----------------------------- */
-
-Value ExpressionBetween::evaluate(const Document& root, Variables* variables) const {
-    tasserted(6882800, "$between does not have a runtime implementation.");
-}
-
-REGISTER_STABLE_EXPRESSION(between, ExpressionBetween::parse);
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())

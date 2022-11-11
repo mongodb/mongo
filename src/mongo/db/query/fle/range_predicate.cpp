@@ -42,18 +42,10 @@
 
 namespace mongo::fle {
 
-REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(BETWEEN,
-                                                     RangePredicate,
-                                                     gFeatureFlagFLE2Range);
-
 REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(GT, RangePredicate, gFeatureFlagFLE2Range);
 REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(GTE, RangePredicate, gFeatureFlagFLE2Range);
 REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(LT, RangePredicate, gFeatureFlagFLE2Range);
 REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(LTE, RangePredicate, gFeatureFlagFLE2Range);
-
-REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionBetween,
-                                                   RangePredicate,
-                                                   gFeatureFlagFLE2Range);
 
 REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionCompare,
                                                    RangePredicate,
@@ -65,32 +57,27 @@ namespace {
 // predicate, then return null to the caller so that the rewrite can return null.
 std::pair<boost::intrusive_ptr<Expression>, Value> validateRangeOp(Expression* expr) {
     auto children = [&]() {
-        if (auto betweenExpr = dynamic_cast<ExpressionBetween*>(expr)) {
-            return betweenExpr->getChildren();
-        } else {
-            auto cmpExpr = dynamic_cast<ExpressionCompare*>(expr);
-            tassert(6720901,
-                    "Range rewrite should only be called with $between or comparison operator.",
-                    cmpExpr);
-            switch (cmpExpr->getOp()) {
-                case ExpressionCompare::GT:
-                case ExpressionCompare::GTE:
-                case ExpressionCompare::LT:
-                case ExpressionCompare::LTE:
-                    return cmpExpr->getChildren();
+        auto cmpExpr = dynamic_cast<ExpressionCompare*>(expr);
+        tassert(
+            6720901, "Range rewrite should only be called with a comparison operator.", cmpExpr);
+        switch (cmpExpr->getOp()) {
+            case ExpressionCompare::GT:
+            case ExpressionCompare::GTE:
+            case ExpressionCompare::LT:
+            case ExpressionCompare::LTE:
+                return cmpExpr->getChildren();
 
-                case ExpressionCompare::EQ:
-                case ExpressionCompare::NE:
-                case ExpressionCompare::CMP:
-                    return std::vector<boost::intrusive_ptr<Expression>>();
-            }
+            case ExpressionCompare::EQ:
+            case ExpressionCompare::NE:
+            case ExpressionCompare::CMP:
+                return std::vector<boost::intrusive_ptr<Expression>>();
         }
         return std::vector<boost::intrusive_ptr<Expression>>();
     }();
     if (children.empty()) {
         return {nullptr, Value()};
     }
-    // Both ExpressionBetween and ExpressionCompare have a fixed arity of 2.
+    // ExpressionCompare has a fixed arity of 2.
     auto fieldpath = dynamic_cast<ExpressionFieldPath*>(children[0].get());
     uassert(6720903, "first argument should be a fieldpath", fieldpath);
     auto secondArg = dynamic_cast<ExpressionConstant*>(children[1].get());
@@ -157,17 +144,7 @@ std::unique_ptr<MatchExpression> RangePredicate::rewriteToTagDisjunction(
         }
         return makeTagDisjunction(toBSONArray(generateTags(payload)));
     }
-
-    tassert(6720900,
-            "Range rewrite should only be called with $between operator.",
-            expr->matchType() == MatchExpression::BETWEEN);
-    auto betExpr = static_cast<BetweenMatchExpression*>(expr);
-    auto payload = betExpr->rhs();
-
-    if (!isPayload(payload)) {
-        return nullptr;
-    }
-    return makeTagDisjunction(toBSONArray(generateTags(payload)));
+    MONGO_UNREACHABLE_TASSERT(6720900);
 }
 
 std::unique_ptr<Expression> RangePredicate::rewriteToTagDisjunction(Expression* expr) const {
@@ -189,20 +166,24 @@ std::unique_ptr<Expression> RangePredicate::rewriteToTagDisjunction(Expression* 
 
 std::unique_ptr<MatchExpression> RangePredicate::rewriteToRuntimeComparison(
     MatchExpression* expr) const {
-    BSONElement ffp;
-    if (auto compExpr = dynamic_cast<ComparisonMatchExpression*>(expr)) {
-        auto payload = compExpr->getData();
-        if (!isPayload(payload)) {
+    auto compExpr = dynamic_cast<ComparisonMatchExpression*>(expr);
+    tassert(7121400, "Reange rewrite can only operate on comparison match expression", compExpr);
+    switch (compExpr->matchType()) {
+        case MatchExpression::GT:
+        case MatchExpression::LT:
+        case MatchExpression::GTE:
+        case MatchExpression::LTE:
+            break;
+        default:
             return nullptr;
-        }
-        // If this is a stub expression, replace expression with $alwaysTrue.
-        if (isStub(payload)) {
-            return std::make_unique<AlwaysTrueMatchExpression>();
-        }
-        ffp = payload;
-    } else {
-        auto between = static_cast<BetweenMatchExpression*>(expr);
-        ffp = between->rhs();
+    }
+    auto ffp = compExpr->getData();
+    if (!isPayload(ffp)) {
+        return nullptr;
+    }
+    // If this is a stub expression, replace expression with $alwaysTrue.
+    if (isStub(ffp)) {
+        return std::make_unique<AlwaysTrueMatchExpression>();
     }
 
     if (!isPayload(ffp)) {
