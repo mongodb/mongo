@@ -63,8 +63,7 @@ public:
      */
     ReplicationStateTransitionLockGuard(OperationContext* opCtx, LockMode mode, EnqueueOnly);
 
-    ReplicationStateTransitionLockGuard(ReplicationStateTransitionLockGuard&&) = delete;
-    ReplicationStateTransitionLockGuard& operator=(ReplicationStateTransitionLockGuard&&) = delete;
+    ReplicationStateTransitionLockGuard(ReplicationStateTransitionLockGuard&&);
 
     ~ReplicationStateTransitionLockGuard();
 
