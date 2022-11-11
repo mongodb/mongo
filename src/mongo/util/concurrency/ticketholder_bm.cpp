@@ -47,6 +47,17 @@ static int kThreadMax = 1024;
 static int kLowPriorityAdmissionBypassThreshold = 100;
 static TicketHolder::WaitMode waitMode = TicketHolder::WaitMode::kUninterruptible;
 
+// For a given benchmark, specifies the AdmissionContext::Priority of ticket admissions
+enum class AdmissionsPriority {
+    // All admissions must be AdmissionContext::Priority::kNormal.
+    kNormal,
+    // Admissions may vary between AdmissionContext::Priority::kNormal and
+    // AdmissionContext::Priority::kLow.
+    kNormalAndLow,
+    // All admissions must be AdmissionContext::Priority::kLow.
+    kLow,
+};
+
 template <typename TicketHolderImpl>
 class TicketHolderFixture {
 public:
@@ -76,10 +87,9 @@ static Mutex isReadyMutex;
 static stdx::condition_variable isReadyCv;
 static bool isReady = false;
 
-template <class TicketHolderImpl>
+template <class TicketHolderImpl, AdmissionsPriority admissionsPriority>
 void BM_acquireAndRelease(benchmark::State& state) {
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> readTicketHolder;
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> writeTicketHolder;
+    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> ticketHolder;
     static ServiceContext::UniqueServiceContext serviceContext;
     {
         stdx::unique_lock lk(isReadyMutex);
@@ -87,9 +97,7 @@ void BM_acquireAndRelease(benchmark::State& state) {
             serviceContext = ServiceContext::make();
             serviceContext->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
             serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-            readTicketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
-                state.threads, serviceContext.get());
-            writeTicketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
+            ticketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
                 state.threads, serviceContext.get());
             isReady = true;
             isReadyCv.notify_all();
@@ -98,14 +106,25 @@ void BM_acquireAndRelease(benchmark::State& state) {
         }
     }
     double acquired = 0;
-    auto mode = (state.thread_index % 2) == 0 ? MODE_IS : MODE_IX;
-    auto priority = (state.thread_index % 2) == 0 ? AdmissionContext::Priority::kLow
-                                                  : AdmissionContext::Priority::kNormal;
-    TicketHolderFixture<TicketHolderImpl>* fixture;
-    fixture = (mode == MODE_IS ? readTicketHolder : writeTicketHolder).get();
+
+    AdmissionContext::Priority priority = [&] {
+        switch (admissionsPriority) {
+            case AdmissionsPriority::kNormal:
+                return AdmissionContext::Priority::kNormal;
+            case AdmissionsPriority::kLow:
+                return AdmissionContext::Priority::kLow;
+            case AdmissionsPriority::kNormalAndLow: {
+                return (state.thread_index % 2) == 0 ? AdmissionContext::Priority::kNormal
+                                                     : AdmissionContext::Priority::kLow;
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }();
+
+    TicketHolderFixture<TicketHolderImpl>* fixture = ticketHolder.get();
     for (auto _ : state) {
         AdmissionContext admCtx;
-        admCtx.setLockMode(mode);
         admCtx.setPriority(priority);
         auto opCtx = fixture->opCtxs[state.thread_index].get();
         {
@@ -120,22 +139,44 @@ void BM_acquireAndRelease(benchmark::State& state) {
     state.counters["AcquiredPerThread"] =
         benchmark::Counter(acquired, benchmark::Counter::kAvgThreadsRate);
     if (state.thread_index == 0) {
-        readTicketHolder.reset();
-        writeTicketHolder.reset();
+        ticketHolder.reset();
         serviceContext.reset();
         isReady = false;
     }
 }
 
-BENCHMARK_TEMPLATE(BM_acquireAndRelease, SemaphoreTicketHolder)
+// The 'AdmissionsPriority' has no effect on SemaphoreTicketHolder performance because the
+// SemaphoreTicketHolder treaats all operations the same, regardless of their specified priority.
+// However, the benchmarks between the SemaphoreTicketHolder and the PriorityTicketHolder are only
+// comparable when all admissions are of normal priority.
+BENCHMARK_TEMPLATE(BM_acquireAndRelease, SemaphoreTicketHolder, AdmissionsPriority::kNormal)
     ->Threads(kThreadMin)
     ->Threads(kTickets)
     ->Threads(kThreadMax);
 
-BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder)
+BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriority::kNormal)
     ->Threads(kThreadMin)
     ->Threads(kTickets)
     ->Threads(kThreadMax);
+
+// Low priority operations are expected to take longer to acquire a ticket because they are forced
+// to take a slower path than normal priority operations.
+BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriority::kLow)
+    ->Threads(kThreadMin)
+    ->Threads(kTickets)
+    ->Threads(kThreadMax);
+
+// This benchmark is intended for comparisons between different iterations of the
+// PriorityTicketHolder over time.
+//
+// Since it is known low priority operations will be less performant than normal priority
+// operations, the aggregate performance over operations will be lower, and cannot be accurately
+// compared to TicketHolderImpl benchmarks with only normal priority operations.
+BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriority::kNormalAndLow)
+    ->Threads(kThreadMin)
+    ->Threads(kTickets)
+    ->Threads(kThreadMax);
+
 
 }  // namespace
 }  // namespace mongo
