@@ -134,26 +134,4 @@ if (checkCascadesOptimizerEnabled(db)) {
         {filter: {a: {$gte: MaxKey()}}, expected: [docs[31]]},
         {filter: {a: {$gt: MaxKey()}}, expected: []});
 }
-
-const hasTestCommandsEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, enableTestCommands: 1}))
-        .enableTestCommands;
-try {
-    // Disable pipeline optimization because it is unclear if pipeline optimization is masking
-    // some bugs in ABT translation
-    if (hasTestCommandsEnabled) {
-        jsTestLog('Disabling pipeline optimization for type bracket queries');
-        assert.commandWorked(db.adminCommand(
-            {'configureFailPoint': 'disablePipelineOptimization', 'mode': 'alwaysOn'}));
-    }
-
-    for (const testData of tests) {
-        runTest(testData.filter, testData.expected);
-    }
-} finally {
-    if (hasTestCommandsEnabled) {
-        assert.commandWorked(
-            db.adminCommand({'configureFailPoint': 'disablePipelineOptimization', 'mode': 'off'}));
-    }
-}
 }());
