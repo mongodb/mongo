@@ -501,6 +501,7 @@ buildvariants:
       archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
     compile_flags: >-
+      --allocator=system
       --dbg=on
       --gcov
       --opt=off
@@ -553,6 +554,7 @@ buildvariants:
       archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
     compile_flags: >-
+      --allocator=system
       --dbg=on
       --gcov
       --opt=debug
@@ -597,6 +599,7 @@ buildvariants:
       archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
     compile_flags: >-
+      --allocator=system
       --dbg=on
       --gcov
       --opt=off
@@ -638,6 +641,7 @@ buildvariants:
       archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
     compile_flags: >-
+      --allocator=system
       --dbg=on
       --gcov
       --opt=debug
