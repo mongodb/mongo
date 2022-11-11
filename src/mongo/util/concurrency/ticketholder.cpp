@@ -382,66 +382,16 @@ PriorityTicketHolder::PriorityTicketHolder(int numTickets,
                                            int lowPriorityBypassThreshold,
                                            ServiceContext* serviceContext)
     : TicketHolderWithQueueingStats(numTickets, serviceContext),
-      _queues{Queue(this, QueueType::kLowPriority),
-              Queue(this, QueueType::kNormalPriority),
-              Queue(this, QueueType::kImmediatePriority)},
       _lowPriorityBypassThreshold(lowPriorityBypassThreshold),
       _serviceContext(serviceContext) {
     _ticketsAvailable.store(numTickets);
     _enqueuedElements.store(0);
 }
 
-PriorityTicketHolder::~PriorityTicketHolder() {}
-
-int PriorityTicketHolder::available() const {
-    return _ticketsAvailable.load();
-}
-
-int PriorityTicketHolder::queued() const {
-    return _enqueuedElements.loadRelaxed();
-}
-
 void PriorityTicketHolder::updateLowPriorityAdmissionBypassThreshold(
     const int& newBypassThreshold) {
-    UniqueLockGuard uniqueQueueLock(_queueMutex);
+    ticket_queues::UniqueLockGuard uniqueQueueLock(_queueMutex);
     _lowPriorityBypassThreshold = newBypassThreshold;
-}
-
-std::int64_t PriorityTicketHolder::expedited() const {
-    return _expeditedLowPriorityAdmissions.loadRelaxed();
-}
-
-std::int64_t PriorityTicketHolder::bypassed() const {
-    return _lowPriorityBypassCount.loadRelaxed();
-}
-
-void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
-    // Tickets acquired with priority kImmediate are not generated from the pool of available
-    // tickets, and thus should never be returned to the pool of available tickets.
-    invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
-
-    // The idea behind the release mechanism consists of a consistent view of queued elements
-    // waiting for a ticket and many threads releasing tickets simultaneously. The releasers will
-    // proceed to attempt to dequeue an element by seeing if there are threads not woken and waking
-    // one, having increased the number of woken threads for accuracy. Once the thread gets woken it
-    // will then decrease the number of woken threads (as it has been woken) and then attempt to
-    // acquire a ticket. The two possible states are either one or more releasers releasing or a
-    // thread waking up due to the RW mutex.
-    //
-    // Under this lock the queues cannot be modified in terms of someone attempting to enqueue on
-    // them, only waking threads is allowed.
-    SharedLockGuard sharedQueueLock(_queueMutex);
-    _ticketsAvailable.addAndFetch(1);
-    _dequeueWaitingThread(sharedQueueLock);
-}
-
-bool PriorityTicketHolder::_tryAcquireTicket() {
-    auto remaining = _ticketsAvailable.subtractAndFetch(1);
-    if (remaining < 0) {
-        _ticketsAvailable.addAndFetch(1);
-        return false;
-    }
-    return true;
 }
 
 boost::optional<Ticket> PriorityTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
@@ -464,36 +414,45 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationC
                                                                       WaitMode waitMode) {
     invariant(admCtx);
 
-    auto queueType = _queueType(admCtx);
+    auto queueType = _getQueueType(admCtx);
     auto& queue = _getQueue(queueType);
 
-    bool assigned;
-    {
-        UniqueLockGuard uniqueQueueLock(_queueMutex);
+    bool interruptible = waitMode == WaitMode::kInterruptible;
 
-        _enqueuedElements.addAndFetch(1);
-        ON_BLOCK_EXIT([&] { _enqueuedElements.subtractAndFetch(1); });
+    _enqueuedElements.addAndFetch(1);
+    ON_BLOCK_EXIT([&] { _enqueuedElements.subtractAndFetch(1); });
 
-        assigned = queue.enqueue(opCtx, uniqueQueueLock, until, waitMode);
-    }
-
-    if (assigned) {
-        return Ticket{this, admCtx};
-    } else {
-        return boost::none;
-    }
+    ticket_queues::UniqueLockGuard uniqueQueueLock(_queueMutex);
+    do {
+        while (_ticketsAvailable.load() <= 0 ||
+               _hasToWaitForHigherPriority(uniqueQueueLock, queueType)) {
+            bool hasTimedOut = !queue.enqueue(uniqueQueueLock, opCtx, until, interruptible);
+            if (hasTimedOut) {
+                return boost::none;
+            }
+        }
+    } while (!_tryAcquireTicket());
+    return Ticket{this, admCtx};
 }
 
-bool PriorityTicketHolder::_hasToWaitForHigherPriority(const UniqueLockGuard& lk, QueueType queue) {
-    switch (queue) {
-        case QueueType::kLowPriority: {
-            const auto& normalQueue = _getQueue(QueueType::kNormalPriority);
-            auto pending = normalQueue.getThreadsPendingToWake();
-            return pending != 0 && pending >= _ticketsAvailable.load();
-        }
-        default:
-            return false;
-    }
+void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
+    // Tickets acquired with priority kImmediate are not generated from the pool of available
+    // tickets, and thus should never be returned to the pool of available tickets.
+    invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
+
+    // The idea behind the release mechanism consists of a consistent view of queued elements
+    // waiting for a ticket and many threads releasing tickets simultaneously. The releasers will
+    // proceed to attempt to dequeue an element by seeing if there are threads not woken and waking
+    // one, having increased the number of woken threads for accuracy. Once the thread gets woken it
+    // will then decrease the number of woken threads (as it has been woken) and then attempt to
+    // acquire a ticket. The two possible states are either one or more releasers releasing or a
+    // thread waking up due to the RW mutex.
+    //
+    // Under this lock the queues cannot be modified in terms of someone attempting to enqueue on
+    // them, only waking threads is allowed.
+    ticket_queues::SharedLockGuard sharedQueueLock(_queueMutex);
+    _ticketsAvailable.addAndFetch(1);
+    _dequeueWaitingThread(sharedQueueLock);
 }
 
 void PriorityTicketHolder::_resize(int newSize, int oldSize) noexcept {
@@ -504,7 +463,7 @@ void PriorityTicketHolder::_resize(int newSize, int oldSize) noexcept {
     if (difference > 0) {
         // As we're adding tickets the waiting threads need to be notified that there are new
         // tickets available.
-        SharedLockGuard sharedQueueLock(_queueMutex);
+        ticket_queues::SharedLockGuard sharedQueueLock(_queueMutex);
         for (int i = 0; i < difference; i++) {
             _dequeueWaitingThread(sharedQueueLock);
         }
@@ -514,70 +473,56 @@ void PriorityTicketHolder::_resize(int newSize, int oldSize) noexcept {
     // have to wait until the current ticket holders release their tickets.
 }
 
-bool PriorityTicketHolder::Queue::attemptToDequeue(const SharedLockGuard& sharedQueueLock) {
-    auto threadsToBeWoken = _threadsToBeWoken.load();
-    while (threadsToBeWoken < _queuedThreads) {
-        auto canDequeue = _threadsToBeWoken.compareAndSwap(&threadsToBeWoken, threadsToBeWoken + 1);
-        if (canDequeue) {
-            _cv.notify_one();
-            return true;
-        }
-    }
-    return false;
+TicketHolderWithQueueingStats::QueueStats& PriorityTicketHolder::_getQueueStatsToUse(
+    const AdmissionContext* admCtx) noexcept {
+    auto queueType = _getQueueType(admCtx);
+    return _stats[_enumToInt(queueType)];
 }
 
-void PriorityTicketHolder::Queue::_signalThreadWoken(const UniqueLockGuard& uniqueQueueLock) {
-    auto currentThreadsToBeWoken = _threadsToBeWoken.load();
-    while (currentThreadsToBeWoken > 0) {
-        if (_threadsToBeWoken.compareAndSwap(&currentThreadsToBeWoken,
-                                             currentThreadsToBeWoken - 1)) {
-            return;
-        }
+void PriorityTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
+    {
+        BSONObjBuilder bbb(b.subobjStart("lowPriority"));
+        const auto& lowPriorityTicketStats = _stats[_enumToInt(QueueType::kLowPriority)];
+        appendCommonQueueImplStats(bbb, lowPriorityTicketStats);
+        bbb.append("expedited", expedited());
+        bbb.append("bypassed", bypassed());
+        bbb.done();
+    }
+    {
+        BSONObjBuilder bbb(b.subobjStart("normalPriority"));
+        const auto& normalPriorityTicketStats = _stats[_enumToInt(QueueType::kNormalPriority)];
+        appendCommonQueueImplStats(bbb, normalPriorityTicketStats);
+        bbb.done();
+    }
+    {
+        BSONObjBuilder bbb(b.subobjStart("immediatePriority"));
+        // Since 'kImmediate' priority operations will never queue, omit queueing statistics that
+        // will always be 0.
+        const auto& immediateTicketStats = _stats[_enumToInt(QueueType::kImmediatePriority)];
+
+        auto finished = immediateTicketStats.totalFinishedProcessing.loadRelaxed();
+        auto started = immediateTicketStats.totalStartedProcessing.loadRelaxed();
+        bbb.append("startedProcessing", started);
+        bbb.append("processing", std::max(static_cast<int>(started - finished), 0));
+        bbb.append("finishedProcessing", finished);
+        bbb.append("totalTimeProcessingMicros",
+                   immediateTicketStats.totalTimeProcessingMicros.loadRelaxed());
+        bbb.append("newAdmissions", immediateTicketStats.totalNewAdmissions.loadRelaxed());
+        bbb.done();
     }
 }
 
-bool PriorityTicketHolder::Queue::enqueue(OperationContext* opCtx,
-                                          UniqueLockGuard& uniqueQueueLock,
-                                          const Date_t& until,
-                                          WaitMode waitMode) {
-    _queuedThreads++;
-    // Before exiting we remove ourselves from the count of queued threads, we are still holding the
-    // lock here so this is safe.
-    ON_BLOCK_EXIT([&] { _queuedThreads--; });
-
-    // TODO SERVER-69179: Replace the custom version of waiting on a condition variable with what
-    // comes out of SERVER-69178.
-    auto clockSource = opCtx->getServiceContext()->getPreciseClockSource();
-    auto baton = waitMode == WaitMode::kInterruptible ? opCtx->getBaton().get() : nullptr;
-
-    // We need to determine the actual deadline to use.
-    auto deadline = waitMode == WaitMode::kInterruptible ? std::min(until, opCtx->getDeadline())
-                                                         : Date_t::max();
-
-    do {
-        // We normally would use the opCtx->waitForConditionOrInterruptUntil method for doing this
-        // check. The problem is that we must call a method that signals that the thread has been
-        // woken after the condition variable wait, not before which is where the predicate would
-        // go.
-        while (_holder->_ticketsAvailable.load() <= 0 ||
-               _holder->_hasToWaitForHigherPriority(uniqueQueueLock, _queueType)) {
-            // This method must be called after getting woken in all cases, so we use a ScopeGuard
-            // to handle exceptions as well as early returns.
-            ON_BLOCK_EXIT([&] { _signalThreadWoken(uniqueQueueLock); });
-            auto waitResult =
-                clockSource->waitForConditionUntil(_cv, uniqueQueueLock, deadline, baton);
-            // We check if the operation has been interrupted (timeout, killed, etc.) here.
-            if (waitMode == WaitMode::kInterruptible) {
-                opCtx->checkForInterrupt();
-            }
-            if (waitResult == stdx::cv_status::timeout)
-                return false;
-        }
-    } while (!_holder->_tryAcquireTicket());
+bool PriorityTicketHolder::_tryAcquireTicket() {
+    auto remaining = _ticketsAvailable.subtractAndFetch(1);
+    if (remaining < 0) {
+        _ticketsAvailable.addAndFetch(1);
+        return false;
+    }
     return true;
 }
 
-void PriorityTicketHolder::_dequeueWaitingThread(const SharedLockGuard& sharedQueueLock) {
+void PriorityTicketHolder::_dequeueWaitingThread(
+    const ticket_queues::SharedLockGuard& sharedQueueLock) {
     // There are only 2 possible queues to dequeue from - the low priority and normal priority
     // queues. There will never be anything to dequeue from the immediate priority queue, given
     // immediate priority operations will never wait for ticket admission.
@@ -618,65 +563,17 @@ void PriorityTicketHolder::_dequeueWaitingThread(const SharedLockGuard& sharedQu
     }
 }
 
-void PriorityTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
-    {
-        BSONObjBuilder bbb(b.subobjStart("lowPriority"));
-        const auto& lowPriorityTicketStats = _getQueue(QueueType::kLowPriority).getStatsToUse();
-        appendCommonQueueImplStats(bbb, lowPriorityTicketStats);
-        bbb.append("expedited", expedited());
-        bbb.append("bypassCount", bypassed());
-        bbb.done();
-    }
-    {
-        BSONObjBuilder bbb(b.subobjStart("normalPriority"));
-        const auto& normalPriorityTicketStats =
-            _getQueue(QueueType::kNormalPriority).getStatsToUse();
-        appendCommonQueueImplStats(bbb, normalPriorityTicketStats);
-        bbb.done();
-    }
-    {
-        BSONObjBuilder bbb(b.subobjStart("immediatePriority"));
-        // Since 'kImmediate' priority operations will never queue, omit queueing statistics that
-        // will always be 0.
-        const auto& immediateTicketStats = _getQueue(QueueType::kImmediatePriority).getStatsToUse();
-
-        auto finished = immediateTicketStats.totalFinishedProcessing.loadRelaxed();
-        auto started = immediateTicketStats.totalStartedProcessing.loadRelaxed();
-        bbb.append("startedProcessing", started);
-        bbb.append("processing", std::max(static_cast<int>(started - finished), 0));
-        bbb.append("finishedProcessing", finished);
-        bbb.append("totalTimeProcessingMicros",
-                   immediateTicketStats.totalTimeProcessingMicros.loadRelaxed());
-        bbb.append("newAdmissions", immediateTicketStats.totalNewAdmissions.loadRelaxed());
-        bbb.done();
-    }
-}
-
-PriorityTicketHolder::QueueType PriorityTicketHolder::_queueType(const AdmissionContext* admCtx) {
-    auto priority = admCtx->getPriority();
-    switch (priority) {
-        case AdmissionContext::Priority::kLow:
-            return QueueType::kLowPriority;
-        case AdmissionContext::Priority::kNormal:
-            return QueueType::kNormalPriority;
-        case AdmissionContext::Priority::kImmediate:
-            return QueueType::kImmediatePriority;
+bool PriorityTicketHolder::_hasToWaitForHigherPriority(const ticket_queues::UniqueLockGuard& lk,
+                                                       QueueType queue) {
+    switch (queue) {
+        case QueueType::kLowPriority: {
+            const auto& normalQueue = _getQueue(QueueType::kNormalPriority);
+            auto pending = normalQueue.getThreadsPendingToWake();
+            return pending != 0 && pending >= _ticketsAvailable.load();
+        }
         default:
-            MONGO_UNREACHABLE;
+            return false;
     }
 }
 
-PriorityTicketHolder::Queue& PriorityTicketHolder::_getQueue(QueueType queueType) {
-    return _queues[static_cast<unsigned int>(queueType)];
-}
-
-const PriorityTicketHolder::Queue& PriorityTicketHolder::_getQueue(QueueType queueType) const {
-    return _queues[static_cast<unsigned int>(queueType)];
-}
-
-TicketHolderWithQueueingStats::QueueStats& PriorityTicketHolder::_getQueueStatsToUse(
-    const AdmissionContext* admCtx) noexcept {
-    auto queueType = _queueType(admCtx);
-    return _getQueue(queueType).getStatsToUse();
-}
 }  // namespace mongo
