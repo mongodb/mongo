@@ -74,10 +74,10 @@ public:
      */
     std::unique_ptr<TelemetryStore> resetTelemetryStore() {
         Lock::ExclusiveLock writeLock{&_instanceLock, _instanceMutex};
-        auto oldStore = std::move(_telemetryStore);
-        _telemetryStore = std::make_unique<TelemetryStore>(_telemetryStore->size(),
-                                                           _telemetryStore->numPartitions());
-        return oldStore;
+        auto newStore = std::make_unique<TelemetryStore>(_telemetryStore->size(),
+                                                         _telemetryStore->numPartitions());
+        std::swap(_telemetryStore, newStore);
+        return newStore;  // which is now the old store.
     }
 
 private:

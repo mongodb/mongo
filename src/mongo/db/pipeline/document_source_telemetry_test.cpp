@@ -115,11 +115,5 @@ TEST_F(DocumentSourceTelemetryTest, ShouldSerializeOmittedOptionalArguments) {
     ASSERT_DOCUMENT_EQ(telemetryOp->serialize().getDocument(), expected);
 }
 
-TEST_F(DocumentSourceTelemetryTest, GetNextNotImplemented) {
-    auto telemetryOp = DocumentSourceTelemetry::createFromBson(
-        fromjson("{$telemetry: {}}").firstElement(), getExpCtx());
-    ASSERT_THROWS_CODE(telemetryOp->getNext(), AssertionException, ErrorCodes::NotImplemented);
-}
-
 }  // namespace
 }  // namespace mongo

@@ -31,6 +31,8 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/telemetry.h"
+#include "mongo/util/producer_consumer_queue.h"
 
 namespace mongo {
 
@@ -107,13 +109,88 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
+    /**
+     * A wrapper around the producer/consumer queue which allows waiting for it to be empty.
+     */
+    class QueueWrapper {
+
+    public:
+        void push(Document doc) {
+            _queue.push(std::move(doc));
+        }
+
+        boost::optional<Document> pop() {
+            try {
+                // First, wait for the queue be non-empty. We do this before locking the queue's
+                // mutation mutex.
+                _queue.waitForNonEmpty(Interruptible::notInterruptible());
+
+                // Now, pop() will succeed. Obtain the lock before popping.
+                stdx::unique_lock lk{_mutex};
+                Document d = _queue.pop();
+                // Notify the cv since we've popped.
+                _waitForEmpty.notify_one();
+                return d;
+            } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
+                _waitForEmpty.notify_one();
+                return {};
+            }
+        }
+
+        void closeProducerEnd() {
+            _queue.closeProducerEnd();
+        }
+
+        /**
+         * Wait for the queue to be empty.
+         */
+        void waitForEmpty() {
+            stdx::unique_lock lk{_mutex};
+            _waitForEmpty.wait(lk, [&] {
+                try {
+                    return !_queue.tryPop();
+                } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
+                    return true;
+                }
+            });
+        }
+
+    private:
+        /**
+         * Underlying queue implementation.
+         */
+        SingleProducerSingleConsumerQueue<Document> _queue;
+
+        /**
+         * Mutex to synchronize pop() and waitForEmpty().
+         */
+        mongo::Mutex _mutex;
+
+        /**
+         * Condition variable used to wait for the queue to be empty.
+         */
+        stdx::condition_variable _waitForEmpty;
+    };
+
     DocumentSourceTelemetry(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             bool clearEntries)
         : DocumentSource(kStageName, expCtx), _clearEntries(clearEntries) {}
 
     GetNextResult doGetNext() final;
 
+    void buildTelemetryStoreIterator();
+
     const bool _clearEntries;
+
+    bool _initialized = false;
+
+    /**
+     * Instance of TelemetryStore which will be deleted when the document source is deleted. This
+     * non-null only when _clearEntries is true.
+     */
+    boost::optional<std::unique_ptr<TelemetryStore>> _telemetryStore;
+
+    QueueWrapper _queue;
 };
 
 }  // namespace mongo

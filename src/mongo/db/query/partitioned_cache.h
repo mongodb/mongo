@@ -54,6 +54,7 @@ private:
 
 public:
     using Lru = LRUKeyValue<KeyType, ValueType, BudgetEstimator, KeyHasher, Eq>;
+    using Partition = typename Partitioned<Lru, Partitioner>::OnePartition;
 
     /**
      * Initialize plan cache with the total cache size in bytes and number of partitions.
@@ -73,9 +74,7 @@ public:
         partition->add(key, std::move(value));
     }
 
-    void put(const KeyType& key,
-             ValueType value,
-             typename Partitioned<Lru, Partitioner>::OnePartition& partition) {
+    void put(const KeyType& key, ValueType value, Partition& partition) {
         partition->add(key, std::move(value));
     }
 
@@ -93,8 +92,7 @@ public:
      * Lookup an entry and also return a lock over the partition. The lock is returned whether
      * or not the entry is found.
      */
-    std::pair<StatusWith<ValueType*>, typename Partitioned<Lru, Partitioner>::OnePartition>
-    getWithPartitionLock(const KeyType& key) const {
+    std::pair<StatusWith<ValueType*>, Partition> getWithPartitionLock(const KeyType& key) const {
         auto partition = _partitionedCache->lockOnePartition(key);
         auto entry = partition->get(key);
         if (!entry.isOK()) {
@@ -169,6 +167,17 @@ public:
             for (auto&& [key, entry] : *lockedPartition) {
                 op(key, entry);
             }
+        }
+    }
+
+    /**
+     * Allow iterating over partitions. The provided function is called for each partition. The
+     * argument to the function is another function which can delay acquiring the implicitly locked
+     * partition until it's needed.
+     */
+    void forEachPartition(const std::function<void(const std::function<Partition()>&)>& op) const {
+        for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
+            op([&]() { return _partitionedCache->lockOnePartitionById(partitionId); });
         }
     }
 

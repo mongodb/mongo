@@ -29,6 +29,9 @@
 
 #include "mongo/db/pipeline/document_source_telemetry.h"
 
+#include "mongo/bson/timestamp.h"
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 namespace {
 const StringData kClearEntriesFieldName = "clearEntries"_sd;
@@ -107,9 +110,57 @@ Value DocumentSourceTelemetry::serialize(boost::optional<ExplainOptions::Verbosi
     return Value{Document{{kStageName, Document{{kClearEntriesFieldName, Value(_clearEntries)}}}}};
 }
 
+void DocumentSourceTelemetry::buildTelemetryStoreIterator() {
+    TelemetryStore* telemetryStore = [&]() {
+        if (_clearEntries) {
+            // Save the telemetry store to a member variable to be destroyed with the document
+            // source.
+            _telemetryStore = resetTelemetryStore(getContext()->opCtx->getServiceContext());
+            return &**_telemetryStore;
+        } else {
+            return getTelemetryStoreForRead(getContext()->opCtx->getServiceContext()).first;
+        }
+    }();
+
+    // Here we start a new thread which runs until the document source finishes iterating the
+    // telemetry store.
+    stdx::thread producer([&, telemetryStore] {
+        telemetryStore->forEachPartition(
+            [&](const std::function<TelemetryStore::Partition()>& getPartition) {
+                // Block here waiting for the queue to be empty. Locking the partition will block
+                // telemetry writers. We want to delay lock acquisition as long as possible.
+                _queue.waitForEmpty();
+
+                // Now get the locked partition.
+                auto partition = getPartition();
+
+                // Capture the time at which reading the partition begins to indicate to the caller
+                // when the snapshot began.
+                const auto partitionReadTime =
+                    Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
+                for (auto&& [key, metrics] : *partition) {
+                    Document d{
+                        {{"key", key}, {"metrics", metrics.toBSON()}, {"asOf", partitionReadTime}}};
+                    _queue.push(std::move(d));
+                }
+            });
+        _queue.closeProducerEnd();
+    });
+    producer.detach();
+}
+
 DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
-    uasserted(ErrorCodes::NotImplemented, "DocumentSourceTelemetry::doGetNext()");
-    return DocumentSource::GetNextResult::makeEOF();
+    if (!_initialized) {
+        buildTelemetryStoreIterator();
+        _initialized = true;
+    }
+
+    auto maybeResult = _queue.pop();
+    if (maybeResult) {
+        return {std::move(*maybeResult)};
+    } else {
+        return DocumentSource::GetNextResult::makeEOF();
+    }
 }
 
 }  // namespace mongo
