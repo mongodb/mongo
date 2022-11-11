@@ -39,4 +39,8 @@ assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 res = coll.explain("executionStats").aggregate([{$match: {'a.b': {$lte: 2}}}]);
 assert.eq(2, res.executionStats.nReturned);
 assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
+
+res = coll.explain("executionStats").aggregate([{$match: {$and: [{'a.b': 2}]}}]);
+assert.eq(1, res.executionStats.nReturned);
+assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 }());

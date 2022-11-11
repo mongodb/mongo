@@ -61,7 +61,7 @@ ABT translateCanonicalQueryToABT(const Metadata& metadata,
         // in the short term. Remove this workaround and complete projection translation via
         // projeciton_ast_visitor instead.
         try {
-            translateProjection(ctx, proj);
+            translateProjection(ctx, *proj);
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::InternalErrorNotSupported) {
                 translateProjection(ctx, scanProjName, canonicalQuery.getExpCtx(), proj);

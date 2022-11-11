@@ -33,25 +33,6 @@
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer {
-
-template <bool isConjunction, typename... Args>
-ABT generateConjunctionOrDisjunction(Args&... args) {
-    ABTVector elements;
-    (elements.emplace_back(args), ...);
-
-    if (elements.size() == 0) {
-        return Constant::boolean(isConjunction);
-    }
-
-    ABT result = std::move(elements.at(0));
-    for (size_t i = 1; i < elements.size(); i++) {
-        result = make<BinaryOp>(isConjunction ? Operations::And : Operations::Or,
-                                std::move(elements.at(i)),
-                                std::move(result));
-    }
-    return result;
-}
-
 std::pair<sbe::value::TypeTags, sbe::value::Value> convertFrom(const Value val) {
     // TODO: Either make this conversion unnecessary by changing the value representation in
     // ExpressionConstant, or provide a nicer way to convert directly from Document/Value to

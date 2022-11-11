@@ -485,7 +485,7 @@ public:
                         "DocumentSource",
                         source->hasProjectionAST());
                 try {
-                    translateProjection(_ctx, source->getProjectionAST());
+                    translateProjection(_ctx, *source->getProjectionAST());
                     return;
                 } catch (const DBException& ex) {
                     if (ex.code() != ErrorCodes::InternalErrorNotSupported) {

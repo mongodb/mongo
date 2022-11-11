@@ -126,19 +126,18 @@ private:
     }
 };
 
-void translateProjection(AlgebrizerContext& ctx, const projection_ast::Projection* proj) {
+void translateProjection(AlgebrizerContext& ctx, const projection_ast::Projection& proj) {
     projection_ast::PathTrackingVisitorContext context{};
-    const bool isInclusion = proj->type() == projection_ast::ProjectType::kInclusion;
+    const bool isInclusion = proj.type() == projection_ast::ProjectType::kInclusion;
     const ProjectionName& rootProjName = ctx.getNode()._rootProjection;
 
     ProjectionPreVisitor astVisitor{&context, isInclusion, rootProjName, ctx.getScanProjName()};
     projection_ast::PathTrackingWalker walker{&context, {&astVisitor}, {}};
-    tree_walker::walk<true, projection_ast::ASTNode>(proj->root(), &walker);
+    tree_walker::walk<true, projection_ast::ASTNode>(proj.root(), &walker);
 
     auto result = astVisitor.generateABT();
-    if (!result) {
-        return;
-    }
+    tassert(7021702, "Failed to generate ABT for projection", result);
+
     auto entry = ctx.getNode();
     const ProjectionName projName = ctx.getNextId("combinedProjection");
     ctx.setNode<EvaluationNode>(projName, projName, std::move(*result), std::move(entry._node));

@@ -491,9 +491,8 @@ private:
         // Returns true if at least one sub-objects matches the condition.
 
         const size_t childCount = expr->numChildren();
-        if (childCount == 0) {
-            _ctx.push(Constant::boolean(true));
-        }
+        tassert(
+            7021700, "ArrayMatchingMatchExpression must have at least one child", childCount > 0);
 
         _ctx.ensureArity(childCount);
         ABT result = _ctx.pop();
@@ -579,7 +578,9 @@ private:
             }
 
             default:
-                break;
+                tasserted(7021701,
+                          str::stream() << "Cannot generate comparison for operation: "
+                                        << OperationsEnum::toString[static_cast<int>(op)]);
         }
 
         if (shouldGeneratePath(expr)) {

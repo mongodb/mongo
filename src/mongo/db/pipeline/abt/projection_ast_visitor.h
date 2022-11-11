@@ -37,6 +37,6 @@ namespace mongo::optimizer {
 /**
  * Populate's ctx's root node with an EvaluationNode encoding the projection.
  */
-void translateProjection(AlgebrizerContext& ctx, const projection_ast::Projection* proj);
+void translateProjection(AlgebrizerContext& ctx, const projection_ast::Projection& proj);
 
 }  // namespace mongo::optimizer
