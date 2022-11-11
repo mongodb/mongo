@@ -142,6 +142,9 @@ private:
 
         mutable Mutex _mutex = MONGO_MAKE_LATCH("ReadyRangeDeletionsProcessor");
 
+        enum State { kRunning, kStopped };
+        State _state{kRunning};
+
         /*
          * Condition variable notified when:
          * - The component has been initialized (the operation context has been instantiated)
@@ -158,9 +161,6 @@ private:
 
         /* Thread consuming the range deletions queue */
         stdx::thread _thread;
-
-        enum State { kRunning, kStopped };
-        State _state{kRunning};
     };
 
     // Keeping track of per-collection registered range deletion tasks
