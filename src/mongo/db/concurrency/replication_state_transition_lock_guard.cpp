@@ -50,6 +50,12 @@ ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(Operati
     _enqueueLock();
 }
 
+ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(
+    ReplicationStateTransitionLockGuard&& other)
+    : _opCtx(other._opCtx), _mode(other._mode), _result(other._result) {
+    other._result = LockResult::LOCK_INVALID;
+}
+
 ReplicationStateTransitionLockGuard::~ReplicationStateTransitionLockGuard() {
     _unlock();
 }
@@ -81,6 +87,10 @@ void ReplicationStateTransitionLockGuard::_enqueueLock() {
 }
 
 void ReplicationStateTransitionLockGuard::_unlock() {
+    if (_result == LockResult::LOCK_INVALID) {
+        return;
+    }
+
     // If ReplicationStateTransitionLockGuard is called in a WriteUnitOfWork, we won't accept
     // any exceptions to be thrown between _enqueueLock and waitForLockUntil because that would
     // delay cleaning up any failed RSTL lock attempt state from lock manager.
