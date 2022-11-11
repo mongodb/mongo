@@ -331,9 +331,7 @@ buildvariants:
     has_packages: true
     multiversion_platform: amazon2
     multiversion_edition: enterprise
-    multiversion_architecture: arm64
-    multiversion_architecture_42_or_later: aarch64
-    multiversion_skip_install_for_40: "true"
+    multiversion_architecture: aarch64
     packager_script: packager_enterprise.py
     packager_arch: aarch64
     packager_distro: amazon2
@@ -502,9 +500,7 @@ buildvariants:
     has_packages: true
     multiversion_platform: amazon2022
     multiversion_edition: enterprise
-    multiversion_architecture: arm64
-    multiversion_architecture_42_or_later: aarch64
-    multiversion_skip_install_for_40: "true"
+    multiversion_architecture: aarch64
     packager_script: packager_enterprise.py
     packager_arch: aarch64
     packager_distro: amazon2022
@@ -626,10 +622,8 @@ buildvariants:
       MONGO_DISTMOD=debian10
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: linux_x86_64
-    multiversion_edition: base
-    multiversion_platform_42_or_later: debian10
-    multiversion_edition_42_or_later: targeted
+    multiversion_platform: debian10
+    multiversion_edition: targeted
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -695,10 +689,8 @@ buildvariants:
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
-    multiversion_platform: linux_x86_64
-    multiversion_edition: base
-    multiversion_platform_42_or_later: debian10
-    multiversion_edition_42_or_later: enterprise
+    multiversion_edition: enterprise
+    multiversion_platform: debian10
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -750,10 +742,8 @@ buildvariants:
       MONGO_DISTMOD=debian11
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: linux_x86_64
-    multiversion_edition: base
-    multiversion_platform_42_or_later: debian11
-    multiversion_edition_42_or_later: targeted
+    multiversion_platform: debian11
+    multiversion_edition: targeted
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -817,10 +807,8 @@ buildvariants:
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
-    multiversion_platform: linux_x86_64
-    multiversion_edition: base
-    multiversion_platform_42_or_later: debian11
-    multiversion_edition_42_or_later: enterprise
+    multiversion_platform: debian11
+    multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -1575,10 +1563,8 @@ buildvariants:
       MONGO_DISTMOD=suse15
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: linux_x86_64
-    multiversion_edition: base
-    multiversion_platform_42_or_later: suse15
-    multiversion_edition_42_or_later: targeted
+    multiversion_platform: suse15
+    multiversion_edition: targeted
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -1797,8 +1783,7 @@ buildvariants:
     packager_distro: ubuntu1804
     repo_edition: enterprise
     multiversion_platform: ubuntu1804
-    multiversion_architecture: arm64
-    multiversion_architecture_42_or_later: aarch64
+    multiversion_architecture: aarch64
     multiversion_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-ubuntu1804-arm64
@@ -1855,8 +1840,7 @@ buildvariants:
     packager_distro: ubuntu1804
     repo_edition: org
     multiversion_platform: ubuntu1804
-    multiversion_architecture: arm64
-    multiversion_architecture_42_or_later: aarch64
+    multiversion_architecture: aarch64
     multiversion_edition: targeted
     scons_cache_scope: shared
     compile_variant: ubuntu1804-arm64
@@ -2149,8 +2133,7 @@ buildvariants:
     packager_distro: ubuntu2004
     repo_edition: enterprise
     multiversion_platform: ubuntu2004
-    multiversion_architecture: arm64
-    multiversion_architecture_42_or_later: aarch64
+    multiversion_architecture: aarch64
     multiversion_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-ubuntu2004-arm64
@@ -2205,8 +2188,7 @@ buildvariants:
     packager_distro: ubuntu2004
     repo_edition: org
     multiversion_platform: ubuntu2004
-    multiversion_architecture: arm64
-    multiversion_architecture_42_or_later: aarch64
+    multiversion_architecture: aarch64
     multiversion_edition: targeted
     scons_cache_scope: shared
     compile_variant: ubuntu2004-arm64
@@ -2245,8 +2227,7 @@ buildvariants:
     packager_distro: ubuntu2204
     repo_edition: enterprise
     multiversion_platform: ubuntu2204
-    multiversion_architecture: arm64
-    multiversion_architecture_42_or_later: aarch64
+    multiversion_architecture: aarch64
     multiversion_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-ubuntu2204-arm64
@@ -2300,8 +2281,7 @@ buildvariants:
     packager_distro: ubuntu2204
     repo_edition: org
     multiversion_platform: ubuntu2204
-    multiversion_architecture: arm64
-    multiversion_architecture_42_or_later: aarch64
+    multiversion_architecture: aarch64
     multiversion_edition: targeted
     scons_cache_scope: shared
     compile_variant: ubuntu2204-arm64

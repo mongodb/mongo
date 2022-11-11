@@ -31,7 +31,6 @@ const defaultOptions = {
 // This lists all supported releases and needs to be kept up to date as versions are added and
 // dropped.
 const versions = [
-    {binVersion: '4.0', featureCompatibilityVersion: '4.0', testCollection: 'four_zero'},
     {binVersion: '4.2', featureCompatibilityVersion: '4.2', testCollection: 'four_two'},
     {binVersion: '4.4', featureCompatibilityVersion: '4.4', testCollection: 'four_four'},
     {binVersion: '5.0', featureCompatibilityVersion: '5.0', testCollection: 'five_zero'},
