@@ -35,6 +35,7 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
@@ -102,8 +103,8 @@ public:
     void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
         // Checks the field name before the element, if inside array.
         checkArrIndex(ptr);
-        // Increments the pointer to the actual element.
-        ptr += offsetToValue;
+        // Increments the pointer to the actual element value.
+        BSONElementValue bsonElemVal(ptr + offsetToValue);
         switch (type) {
             case BSONType::Undefined:
             case BSONType::DBRef:
@@ -118,14 +119,12 @@ public:
                 addIndexLevel(false /* isArr */);
                 break;
             case BSONType::RegEx: {
-                // Skips regular expression cstring.
-                const char* options = ptr + strlen(ptr) + 1;
-                _checkRegexOptions(options);
+                _checkRegexOptions(bsonElemVal);
                 break;
             }
             case BSONType::BinData: {
-                uint8_t subtype =
-                    ConstDataView(ptr + sizeof(uint32_t)).read<LittleEndian<uint8_t>>();
+                auto binData = bsonElemVal.BinData();
+                auto subtype = binData.type;
                 switch (subtype) {
                     case BinDataType::ByteArrayDeprecated:
                     case BinDataType::bdtUUID:
@@ -134,28 +133,28 @@ public:
                             fmt::format("Use of deprecated BSON binary data subtype {}", subtype));
                         break;
                     case BinDataType::newUUID: {
-                        constexpr uint32_t UUIDLength = 16;
-                        uint32_t l = ConstDataView(ptr).read<LittleEndian<uint32_t>>();
-                        uassert(
-                            ErrorCodes::NonConformantBSON,
-                            fmt::format("BSON UUID length should be {} bytes. Found {} instead.",
-                                        UUIDLength,
-                                        l),
-                            l == UUIDLength);
+                        constexpr int32_t UUIDLength = 16;
+                        auto l = binData.length;
+                        uassert(ErrorCodes::NonConformantBSON,
+                                fmt::format(
+                                    "BSON UUID length should be 16 bytes. Found {} instead.", l),
+                                l == UUIDLength);
                         break;
                     }
                     case BinDataType::MD5Type: {
-                        constexpr uint32_t md5Length = 16;
-                        auto md5Size = ConstDataView(ptr).read<LittleEndian<uint32_t>>();
+                        constexpr int32_t md5Length = 16;
+                        auto l = binData.length;
                         uassert(NonConformantBSON,
-                                fmt::format("MD5 must be 16 bytes, got {} instead.", md5Size),
-                                md5Size == md5Length);
+                                fmt::format("MD5 must be 16 bytes, got {} instead.", l),
+                                l == md5Length);
                         break;
                     }
                     case BinDataType::Encrypt: {
-                        _checkEncryptedBSONValue(ptr);
+                        _checkEncryptedBSONValue(binData);
                         break;
                     }
+                    default:
+                        break;
                 }
                 break;
             }
@@ -202,9 +201,10 @@ private:
         ++indexCount.back().counter;
     }
 
-    void _checkRegexOptions(const char* options) {
+    void _checkRegexOptions(const BSONElementValue& regex) {
         // Checks that the options are in ascending alphabetical order and that they're all valid.
         std::string validRegexOptions("ilmsux");
+        auto options = regex.RegexFlags();
         for (const auto& option : std::string(options)) {
             uassert(
                 NonConformantBSON,
@@ -219,20 +219,20 @@ private:
         }
     }
 
-    void _checkEncryptedBSONValue(const char* ptr) {
+    void _checkEncryptedBSONValue(const BSONBinData& binData) {
         constexpr uint32_t UUIDLength = 16;
-        constexpr uint32_t minLength = sizeof(uint8_t) + UUIDLength + sizeof(uint8_t);
+        constexpr int32_t minLength = sizeof(uint8_t) + UUIDLength + sizeof(uint8_t);
 
-        auto len = ConstDataView(ptr).read<LittleEndian<uint32_t>>();
+        auto len = binData.length;
         // Make sure we can read the subtype byte of the Encrypted BSON Value.
         uassert(ErrorCodes::NonConformantBSON,
                 fmt::format("Invalid Encrypted BSON Value length {}", len),
                 len);
 
         // Skip the size bytes and BinData subtype byte to the actual encrypted data.
-        ptr += sizeof(uint32_t) + sizeof(uint8_t);
+        auto data = static_cast<const char*>(binData.data);
         auto encryptedBinDataType = static_cast<EncryptedBinDataType>(
-            (uint8_t)ConstDataView(ptr).read<LittleEndian<uint8_t>>());
+            (uint8_t)ConstDataView(data).read<LittleEndian<uint8_t>>());
         // Only subtype 1, 2, 6, 7, and 9 can exist in MongoDB collections.
         switch (encryptedBinDataType) {
             case EncryptedBinDataType::kDeterministic:
@@ -249,7 +249,7 @@ private:
                         fmt::format("Invalid Encrypted BSON Value length {}", len),
                         len >= minLength);
                 auto originalBsonType =
-                    static_cast<BSONType>((int8_t)ConstDataView(ptr + sizeof(uint8_t) + UUIDLength)
+                    static_cast<BSONType>((int8_t)ConstDataView(data + sizeof(uint8_t) + UUIDLength)
                                               .read<LittleEndian<uint8_t>>());
                 uassert(ErrorCodes::NonConformantBSON,
                         fmt::format(
@@ -275,20 +275,21 @@ protected:
 class FullValidator : private ExtendedValidator {
 public:
     void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
-        registerFieldName(ptr + 1);
+        registerFieldName(ptr + 1 /* fieldName */, offsetToValue - 1 /* length */);
         ExtendedValidator::checkNonConformantElem(ptr, offsetToValue, type);
+        // Increments the pointer to the actual element value.
+        BSONElementValue bsonElemVal(ptr + offsetToValue);
         switch (type) {
             case BSONType::Array: {
-                objFrames.push_back({std::vector<std::string>(), false});
+                objFrames.push_back({std::vector<StringData>(), false});
                 break;
             }
             case BSONType::Object: {
-                objFrames.push_back({std::vector<std::string>(), true});
+                objFrames.push_back({std::vector<StringData>(), true});
                 break;
             };
             case BSONType::BinData: {
-                uint8_t subtype = ConstDataView(ptr + offsetToValue + sizeof(uint32_t))
-                                      .read<LittleEndian<uint8_t>>();
+                auto subtype = bsonElemVal.BinData().type;
                 switch (subtype) {
                     case BinDataType::Column: {
                         // Check for exceptions when decompressing.
@@ -299,13 +300,16 @@ public:
                             uasserted(NonConformantBSON,
                                       "Exception ocurred while decompressing a BSON column.");
                         }
+                        break;
                     }
+                    default:
+                        break;
                 }
                 break;
             }
             case BSONType::String: {
                 // Increment pointer to actual value and then four more to skip size.
-                checkUTF8Char(ptr + offsetToValue + 4);
+                checkUTF8Char(bsonElemVal.String());
             }
         }
     }
@@ -334,21 +338,22 @@ public:
 
 private:
     // A given frame is an object if and only if frame.second == true.
-    std::vector<std::pair<std::vector<std::string>, bool>> objFrames = {
-        {std::vector<std::string>(), true}};
+    std::vector<std::pair<std::vector<StringData>, bool>> objFrames = {
+        {std::vector<StringData>(), true}};
 
-    void registerFieldName(const char* ptr) {
+    void registerFieldName(const char* ptr, uint32_t length) {
         // Check the field name is UTF-8 encoded.
-        checkUTF8Char(ptr);
+        StringData fieldName(ptr, length);
+        checkUTF8Char(fieldName);
         if (objFrames.back().second) {
-            objFrames.back().first.emplace_back(ptr);
+            objFrames.back().first.emplace_back(fieldName);
         };
     }
 
-    void checkUTF8Char(const char* ptr) {
+    void checkUTF8Char(StringData str) {
         uassert(NonConformantBSON,
                 "Found string that doesn't follow UTF-8 encoding.",
-                str::validUTF8(ptr));
+                str::validUTF8(str));
     }
 };
 
