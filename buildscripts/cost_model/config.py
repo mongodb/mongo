@@ -73,9 +73,8 @@ class DataGeneratorConfig:
     """Data Generator configuration."""
 
     enabled: bool
-    collection_cardinalities: list[int]
-    collection_name_with_card: bool
     collection_templates: list[CollectionTemplate]
+    collection_name_with_card: bool
     write_mode: WriteMode
     batch_size: int
 
@@ -87,6 +86,7 @@ class CollectionTemplate:
     name: str
     fields: Sequence[FieldTemplate]
     compound_indexes: Sequence[Sequence[str]]
+    cardinalities: Sequence[int]
 
 
 @dataclass

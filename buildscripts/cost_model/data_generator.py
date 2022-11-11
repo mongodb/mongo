@@ -110,7 +110,7 @@ class DataGenerator:
                 FieldInfo(name=ft.name, type=ft.data_type, distribution=ft.distribution,
                           indexed=ft.indexed) for ft in coll_template.fields
             ]
-            for doc_count in self.config.collection_cardinalities:
+            for doc_count in coll_template.cardinalities:
                 name = f'{coll_template.name}'
                 if self.config.collection_name_with_card is True:
                     name = f'{coll_template.name}_{doc_count}'

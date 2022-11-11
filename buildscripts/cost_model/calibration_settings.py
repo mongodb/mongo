@@ -33,6 +33,9 @@ from random_generator import RangeGenerator, DataType, RandomDistribution, Array
 
 __all__ = ['main_config', 'distributions']
 
+# A string value to fill up collections and not used in queries.
+HIDDEN_STRING_VALUE = '__hidden_string_value'
+
 # Data distributions settings.
 distributions = {}
 
@@ -103,69 +106,60 @@ distributions['array_small'] = ArrayRandomDistribution(lengths_distr, distributi
 
 # Database settings
 database = config.DatabaseConfig(connection_string='mongodb://localhost',
-                                 database_name='abt_calibration_small', dump_path='~/data/dump',
+                                 database_name='abt_calibration', dump_path='~/data/dump',
                                  restore_from_dump=config.RestoreMode.NEVER, dump_on_exit=False)
 
-# Collection template seetings
 
-# templates for small queries.
-c_int_05_small = config.CollectionTemplate(
-    name="c_int_05", fields=[
-        config.FieldTemplate(name="in1", data_type=config.DataType.INTEGER,
-                             distribution=distributions["int_choice"], indexed=True),
-        config.FieldTemplate(name="mixed1", data_type=config.DataType.STRING,
-                             distribution=distributions["string_mixed"], indexed=False),
-        config.FieldTemplate(name="uniform1", data_type=config.DataType.STRING,
-                             distribution=distributions["string_uniform"], indexed=False),
-        config.FieldTemplate(name="in2", data_type=config.DataType.INTEGER,
-                             distribution=distributions["int_choice"], indexed=True),
-        config.FieldTemplate(name="mixed2", data_type=config.DataType.STRING,
-                             distribution=distributions["string_mixed"], indexed=False),
-    ], compound_indexes=[])
+# Collection template settings
+def create_index_scan_collection_template(name: str, cardinality: int) -> config.CollectionTemplate:
+    values = [
+        'iqtbr5b5is', 'vt5s3tf8o6', 'b0rgm58qsn', '9m59if353m', 'biw2l9ok17', 'b9ct0ue14d',
+        'oxj0vxjsti', 'f3k8w9vb49', 'ec7v82k6nk', 'f49ufwaqx7'
+    ]
 
-c_str_02_small = config.CollectionTemplate(
-    name="c_str_02", fields=[
-        config.FieldTemplate(name="choice1", data_type=config.DataType.STRING,
-                             distribution=distributions['string_choice_small'], indexed=True),
-        config.FieldTemplate(name="choice2", data_type=config.DataType.STRING,
-                             distribution=distributions['string_choice_small'], indexed=False)
-    ], compound_indexes=[])
+    start_weight = 10
+    step_weight = 25
+    finish_weight = start_weight + len(values) * step_weight
+    weights = list(range(start_weight, finish_weight, step_weight))
+    fill_up_weight = cardinality - sum(weights)
+    if fill_up_weight > 0:
+        values.append(HIDDEN_STRING_VALUE)
+        weights.append(fill_up_weight)
 
-c_arr_01_small = config.CollectionTemplate(
-    name="c_arr_01", fields=[
-        config.FieldTemplate(name="as", data_type=config.DataType.INTEGER,
-                             distribution=distributions["array_small"], indexed=False),
-        config.FieldTemplate(name="in1", data_type=config.DataType.INTEGER,
-                             distribution=distributions["int_choice"], indexed=True),
-    ], compound_indexes=[])
+    distr = RandomDistribution.choice(values, weights)
 
-c_str_01 = config.CollectionTemplate(
-    name="c_str_01", fields=[
-        config.FieldTemplate(name="choice1", data_type=config.DataType.STRING,
-                             distribution=distributions['string_choice'], indexed=True)
-    ], compound_indexes=[])
+    return config.CollectionTemplate(
+        name=name, fields=[
+            config.FieldTemplate(name="choice", data_type=config.DataType.STRING,
+                                 distribution=distr, indexed=True),
+            config.FieldTemplate(name="mixed1", data_type=config.DataType.STRING,
+                                 distribution=distributions["string_mixed"], indexed=False),
+            config.FieldTemplate(name="uniform1", data_type=config.DataType.STRING,
+                                 distribution=distributions["string_uniform"], indexed=False),
+            config.FieldTemplate(name="choice2", data_type=config.DataType.STRING,
+                                 distribution=distributions["string_choice"], indexed=False),
+            config.FieldTemplate(name="mixed2", data_type=config.DataType.STRING,
+                                 distribution=distributions["string_mixed"], indexed=False),
+        ], compound_indexes=[], cardinalities=[cardinality])
 
-c_str_02 = config.CollectionTemplate(
-    name="c_str_02", fields=[
-        config.FieldTemplate(name="choice1", data_type=config.DataType.STRING,
-                             distribution=distributions['string_choice'], indexed=True),
-        config.FieldTemplate(name="choice2", data_type=config.DataType.STRING,
-                             distribution=distributions['string_choice'], indexed=False)
-    ], compound_indexes=[])
 
-c_str_05 = config.CollectionTemplate(
-    name="c_str_05", fields=[
-        config.FieldTemplate(name="choice1", data_type=config.DataType.STRING,
-                             distribution=distributions["string_choice"], indexed=True),
-        config.FieldTemplate(name="mixed1", data_type=config.DataType.STRING,
-                             distribution=distributions["string_mixed"], indexed=True),
-        config.FieldTemplate(name="uniform1", data_type=config.DataType.STRING,
-                             distribution=distributions["string_uniform"], indexed=True),
-        config.FieldTemplate(name="choice2", data_type=config.DataType.STRING,
-                             distribution=distributions["string_choice"], indexed=True),
-        config.FieldTemplate(name="mixed2", data_type=config.DataType.STRING,
-                             distribution=distributions["string_mixed"], indexed=True),
-    ], compound_indexes=[["choice1", "mixed1"]])
+def create_physical_scan_collection_template(name: str) -> config.CollectionTemplate:
+    return config.CollectionTemplate(
+        name=name, fields=[
+            config.FieldTemplate(name="choice1", data_type=config.DataType.STRING,
+                                 distribution=distributions["string_choice"], indexed=False),
+            config.FieldTemplate(name="mixed1", data_type=config.DataType.STRING,
+                                 distribution=distributions["string_mixed"], indexed=False),
+            config.FieldTemplate(name="uniform1", data_type=config.DataType.STRING,
+                                 distribution=distributions["string_uniform"], indexed=False),
+            config.FieldTemplate(name="choice", data_type=config.DataType.STRING,
+                                 distribution=distributions["string_choice"], indexed=False),
+            config.FieldTemplate(name="mixed2", data_type=config.DataType.STRING,
+                                 distribution=distributions["string_mixed"], indexed=False),
+        ], compound_indexes=[], cardinalities=[1000, 5000, 10000, 50000])
+
+
+collection_caridinalities = list(range(10000, 50001, 5000))
 
 c_int_05 = config.CollectionTemplate(
     name="c_int_05", fields=[
@@ -179,48 +173,45 @@ c_int_05 = config.CollectionTemplate(
                              distribution=distributions["int_normal"], indexed=True),
         config.FieldTemplate(name="mixed2", data_type=config.DataType.STRING,
                              distribution=distributions["string_mixed"], indexed=False),
-    ], compound_indexes=[])
+    ], compound_indexes=[], cardinalities=collection_caridinalities)
 
 c_arr_01 = config.CollectionTemplate(
     name="c_arr_01", fields=[
         config.FieldTemplate(name="as", data_type=config.DataType.INTEGER,
                              distribution=distributions["array_small"], indexed=False)
-    ], compound_indexes=[])
+    ], compound_indexes=[], cardinalities=collection_caridinalities)
+
+index_scan = create_index_scan_collection_template('index_scan', 1000000)
+
+physical_scan = create_physical_scan_collection_template('physical_scan')
 
 # Data Generator settings
 data_generator = config.DataGeneratorConfig(
-    enabled=True, collection_cardinalities=list(range(10000, 50001,
-                                                      2500)), collection_name_with_card=True,
-    batch_size=10000, collection_templates=[c_str_01, c_str_05, c_int_05,
-                                            c_arr_01], write_mode=config.WriteMode.REPLACE)
-"""Data generation settings for Calibration with queries that return smaller number of documents.
-# First round of data population generates a small set of documents that will be queried.
-
-data_generator = config.DataGeneratorConfig(
-    enabled=True, collection_cardinalities=[small_query_cardinality], collection_name_with_card=False, batch_size=10000,
-    collection_templates=[c_str_02_small, c_int_05_small, c_arr_01_small], write_mode=config.WriteMode.APPEND)
-
-# Second round of data population which generates 100,000 documents to the collection in order to
-# make sure the collection is big enough for queries.
-
-data_generator = config.DataGeneratorConfig(
-    enabled=True, collection_cardinalities=[100000], collection_name_with_card=False, batch_size=10000,
-    collection_templates=[c_str_02, c_int_05, c_arr_01], write_mode=config.WriteMode.APPEND)
-
-# Please note that the 'WriteMode' should be 'APPEND' type and the collection name should remain
-# unchanged. This can be controlled by setting "collection_name_with_card=False".
-"""
+    enabled=True, batch_size=10000,
+    collection_templates=[index_scan, physical_scan, c_int_05,
+                          c_arr_01], write_mode=config.WriteMode, collection_name_with_card=True)
 
 # Workload Execution settings
 workload_execution = config.WorkloadExecutionConfig(
-    enabled=True, output_collection_name='calibrationDataSmall', write_mode=config.WriteMode.APPEND,
+    enabled=True, output_collection_name='calibrationData', write_mode=config.WriteMode.REPLACE,
     warmup_runs=3, runs=10)
 
+
+def make_filter_by_note(note_value: any):
+    def impl(df):
+        return df[df.note == note_value]
+
+    return impl
+
+
 abt_nodes = [
-    config.AbtNodeCalibrationConfig(type='PhysicalScan'),
-    config.AbtNodeCalibrationConfig(type='IndexScan'),
+    config.AbtNodeCalibrationConfig(type='PhysicalScan',
+                                    filter_function=make_filter_by_note('PhysicalScan')),
+    config.AbtNodeCalibrationConfig(type='IndexScan',
+                                    filter_function=make_filter_by_note('IndexScan')),
     config.AbtNodeCalibrationConfig(type='Seek'),
-    config.AbtNodeCalibrationConfig(type='Filter'),
+    config.AbtNodeCalibrationConfig(type='Filter',
+                                    filter_function=make_filter_by_note('PhysicalScan')),
     config.AbtNodeCalibrationConfig(type='Evaluation'),
     config.AbtNodeCalibrationConfig(type='BinaryJoin'),
     config.AbtNodeCalibrationConfig(type='HashJoin'),
@@ -230,6 +221,7 @@ abt_nodes = [
     config.AbtNodeCalibrationConfig(type='GroupBy'),
     config.AbtNodeCalibrationConfig(type='Unwind'),
 ]
+
 # Calibrator settings
 abt_calibrator = config.AbtCalibratorConfig(
     enabled=True, test_size=0.2, input_collection_name=workload_execution.output_collection_name,

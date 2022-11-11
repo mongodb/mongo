@@ -75,4 +75,4 @@ def calibrate_node(abt_df: pd.DataFrame, config: AbtCalibratorConfig,
         model = nnls.fit(X, y)
         return (model.coef_, model.predict)
 
-    return estimate(fit, X, y, config.test_size, config.trace)
+    return estimate(fit, X.to_numpy(), y.to_numpy(), config.test_size, config.trace)

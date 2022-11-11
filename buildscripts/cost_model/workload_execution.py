@@ -46,6 +46,7 @@ class Query:
     pipeline: Pipeline
     keys_length_in_bytes: int = 0
     number_of_fields: int = 0
+    note: any = None
 
 
 @dataclass
@@ -54,6 +55,7 @@ class QueryParameters:
 
     keys_length_in_bytes: int
     average_document_size_in_bytes: float
+    note: any
     number_of_fields: int = 0
 
     def to_json(self) -> str:
@@ -114,7 +116,7 @@ class WorkloadExecution:
         avg_doc_size = await self.database.get_average_document_size(coll_info.name)
         parameters = QueryParameters(keys_length_in_bytes=query.keys_length_in_bytes,
                                      number_of_fields=query.number_of_fields,
-                                     average_document_size_in_bytes=avg_doc_size)
+                                     average_document_size_in_bytes=avg_doc_size, note=query.note)
         for _ in range(self.config.runs):
             explain = await self.database.explain(coll_info.name, query.pipeline)
             if explain['ok'] == 1:
