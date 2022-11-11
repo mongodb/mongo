@@ -12,3 +12,6 @@
 # released create the transactions collection index and is only meant to be enabled adhoc, so only
 # its targeted tests should enable it.
 - featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
+# Disable the new logic for the resilient movePrimary for non-dedicated tests until the logic is
+# mature enough to be enabled for all tests.
+- featureFlagResilientMovePrimary

@@ -36,6 +36,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -118,15 +119,24 @@ public:
         ON_BLOCK_EXIT(
             [opCtx, dbNss] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db()); });
 
-        auto coordinatorDoc = MovePrimaryCoordinatorDocument();
-        coordinatorDoc.setShardingDDLCoordinatorMetadata(
-            {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
-        coordinatorDoc.setToShardId(toShard.toString());
+        if (!feature_flags::gResilientMovePrimary.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            auto coordinatorDoc = MovePrimaryCoordinatorDocument();
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
+            coordinatorDoc.setToShardId(toShard.toString());
 
-        auto service = ShardingDDLCoordinatorService::getService(opCtx);
-        auto movePrimaryCoordinator = checked_pointer_cast<MovePrimaryCoordinator>(
-            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
-        movePrimaryCoordinator->getCompletionFuture().get(opCtx);
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto movePrimaryCoordinator = checked_pointer_cast<MovePrimaryCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            movePrimaryCoordinator->getCompletionFuture().get(opCtx);
+
+            return true;
+        }
+
+        // TODO (SERVER-71200): Resilient DDL Coordinator
+        MONGO_UNREACHABLE;
+
         return true;
     }
 } movePrimaryCmd;
