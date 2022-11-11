@@ -27,43 +27,41 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/query/cost_model/cost_model_on_update.h"
 
-#include <shared_mutex>
-
-#include "mongo/db/query/cost_model/cost_model_gen.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/client.h"
+#include "mongo/db/query/cost_model/cost_model_manager.h"
+#include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo::cost_model {
 
-/**
- * This class is main access point to Cost Model Coefficients, it rerieves them and applies
- * overrides.
- */
-class CostModelManager {
-public:
-    CostModelManager();
+namespace {
+BSONObj getCostModelCoefficientsOverride() {
+    if (internalCostModelCoefficients.empty()) {
+        return BSONObj();
+    }
 
-    /**
-     * Returns the current cost model coefficients. They may not be the default ones as the
-     * coefficients can be changed at runtime. See the IDL definition of 'CostModelCoefficients' for
-     * the names of the fields.
-     */
-    CostModelCoefficients getCoefficients() const;
+    return fromjson(internalCostModelCoefficients);
+}
+}  // namespace
 
-    /**
-     * This update function will be called when the cost model coefficients are changed at runtime.
-     */
-    void updateCostModelCoefficients(const BSONObj& overrides);
+Status updateCostCoefficients() {
+    if (auto client = Client::getCurrent()) {
+        auto serviceCtx = client->getServiceContext();
+        tassert(7049000, "ServiceContext must be non null", serviceCtx);
 
-    /**
-     * Returns the default version of Cost Model Coefficients no matter whether there are
-     * user-defined coefficients or not.
-     */
-    static CostModelCoefficients getDefaultCoefficients();
+        const auto overrides = getCostModelCoefficientsOverride();
+        auto updater = onCoefficientsChangeUpdater(serviceCtx).get();
+        updater->updateCoefficients(serviceCtx, overrides);
+    } else {
+        tasserted(7049001, "Client must be non null");
+    }
 
-private:
-    CostModelCoefficients _coefficients;
-    mutable std::shared_mutex _mutex;  // NOLINT
-};
+    return Status::OK();
+}
+
+const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnCoefficientsChangeUpdater>>
+    onCoefficientsChangeUpdater =
+        ServiceContext::declareDecoration<std::unique_ptr<OnCoefficientsChangeUpdater>>();
 }  // namespace mongo::cost_model

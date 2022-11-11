@@ -29,41 +29,42 @@
 
 #pragma once
 
-#include <shared_mutex>
+#include <string>
 
-#include "mongo/db/query/cost_model/cost_model_gen.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo::cost_model {
 
+Status updateCostCoefficients();
+
 /**
- * This class is main access point to Cost Model Coefficients, it rerieves them and applies
- * overrides.
+ * On-update hook to update the cost coefficients in 'CostModelManager' when cost coefficients are
+ * updated.
  */
-class CostModelManager {
-public:
-    CostModelManager();
-
-    /**
-     * Returns the current cost model coefficients. They may not be the default ones as the
-     * coefficients can be changed at runtime. See the IDL definition of 'CostModelCoefficients' for
-     * the names of the fields.
-     */
-    CostModelCoefficients getCoefficients() const;
-
-    /**
-     * This update function will be called when the cost model coefficients are changed at runtime.
-     */
-    void updateCostModelCoefficients(const BSONObj& overrides);
-
-    /**
-     * Returns the default version of Cost Model Coefficients no matter whether there are
-     * user-defined coefficients or not.
-     */
-    static CostModelCoefficients getDefaultCoefficients();
-
-private:
-    CostModelCoefficients _coefficients;
-    mutable std::shared_mutex _mutex;  // NOLINT
+constexpr inline auto updateCostCoefficientsOnUpdate = [](auto&&) {
+    auto status = updateCostCoefficients();
+    if (status != Status::OK()) {
+        return status;
+    }
+    return plan_cache_util::clearSbeCacheOnParameterChangeHelper();
 };
+
+class OnCoefficientsChangeUpdater {
+public:
+    virtual ~OnCoefficientsChangeUpdater() = default;
+
+    /**
+     * This function should update the cost coefficients stored in 'CostModelManager'.
+     */
+    virtual void updateCoefficients(ServiceContext* serviceCtx, const BSONObj& overrides) = 0;
+};
+
+/**
+ * Decorated accessor to the 'OnCoefficientsChangeUpdater' stored in 'ServiceContext'.
+ */
+extern const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnCoefficientsChangeUpdater>>
+    onCoefficientsChangeUpdater;
 }  // namespace mongo::cost_model

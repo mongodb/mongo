@@ -249,7 +249,7 @@ std::unique_ptr<CEInterface> makeHintedCE(ce::PartialSchemaSelHints hints) {
 
 std::unique_ptr<CostingInterface> makeCosting() {
     return std::make_unique<cost_model::CostEstimator>(
-        cost_model::CostModelManager().getDefaultCoefficients());
+        cost_model::CostModelManager::getDefaultCoefficients());
 }
 
 OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,

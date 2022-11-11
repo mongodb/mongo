@@ -43,6 +43,7 @@
 #include "mongo/db/query/cost_model/cost_estimator.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/cost_model/cost_model_manager.h"
+#include "mongo/db/query/cost_model/on_coefficients_change_updater_impl.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
@@ -66,19 +67,6 @@ namespace mongo {
 using namespace optimizer;
 using cost_model::CostEstimator;
 using cost_model::CostModelManager;
-
-namespace {
-const auto costModelManager = ServiceContext::declareDecoration<CostModelManager>();
-
-BSONObj getCostModelCoefficientsOverride() {
-    if (internalCostModelCoefficients.empty()) {
-        return BSONObj();
-    }
-
-    return fromjson(internalCostModelCoefficients);
-}
-}  // namespace
-
 
 static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpecsOptimizer(
     boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -724,8 +712,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
                                 << internalQueryCardinalityEstimatorMode);
     }
 
-    auto costModel = costModelManager(opCtx->getServiceContext())
-                         .getCoefficients(getCostModelCoefficientsOverride());
+    auto costModel = cost_model::costModelManager(opCtx->getServiceContext()).getCoefficients();
 
     OptPhaseManager phaseManager = createPhaseManager(mode,
                                                       costModel,

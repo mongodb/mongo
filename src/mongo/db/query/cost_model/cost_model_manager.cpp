@@ -29,9 +29,10 @@
 
 #include "mongo/db/query/cost_model/cost_model_manager.h"
 
+#include "mongo/db/query/cost_model/cost_model_on_update.h"
+
 namespace mongo::cost_model {
 namespace {
-
 /**
  * Populate given cost model coefficients object with default values.
  */
@@ -87,17 +88,29 @@ void initializeCoefficients(CostModelCoefficients& coefficients) {
 }  // namespace
 
 CostModelManager::CostModelManager() {
-    CostModelCoefficients coefficients;
-    initializeCoefficients(coefficients);
-    _coefficients = coefficients.toBSON();
+    initializeCoefficients(_coefficients);
 }
 
-CostModelCoefficients CostModelManager::getDefaultCoefficients() const {
-    return CostModelCoefficients::parse(IDLParserContext{"CostModelCoefficients"}, _coefficients);
+CostModelCoefficients CostModelManager::getCoefficients() const {
+    std::shared_lock rLock(_mutex);  // NOLINT
+
+    return _coefficients;
 }
 
-CostModelCoefficients CostModelManager::getCoefficients(const BSONObj& overrides) const {
-    return CostModelCoefficients::parse(IDLParserContext{"CostModelCoefficients"},
-                                        _coefficients.addFields(overrides));
+CostModelCoefficients CostModelManager::getDefaultCoefficients() {
+    CostModelCoefficients defaultCoefs;
+
+    initializeCoefficients(defaultCoefs);
+
+    return defaultCoefs;
+}
+
+void CostModelManager::updateCostModelCoefficients(const BSONObj& overrides) {
+    auto coefsObj = _coefficients.toBSON();
+    auto newCoefs = CostModelCoefficients::parse(IDLParserContext{"CostModelCoefficients"},
+                                                 coefsObj.addFields(overrides));
+
+    stdx::unique_lock wLock(_mutex);
+    _coefficients = std::move(newCoefs);
 }
 }  // namespace mongo::cost_model

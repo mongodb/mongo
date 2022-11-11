@@ -27,43 +27,21 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <shared_mutex>
-
-#include "mongo/db/query/cost_model/cost_model_gen.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/db/query/cost_model/on_coefficients_change_updater_impl.h"
 
 namespace mongo::cost_model {
 
-/**
- * This class is main access point to Cost Model Coefficients, it rerieves them and applies
- * overrides.
- */
-class CostModelManager {
-public:
-    CostModelManager();
+const Decorable<ServiceContext>::Decoration<CostModelManager> costModelManager =
+    ServiceContext::declareDecoration<CostModelManager>();
 
-    /**
-     * Returns the current cost model coefficients. They may not be the default ones as the
-     * coefficients can be changed at runtime. See the IDL definition of 'CostModelCoefficients' for
-     * the names of the fields.
-     */
-    CostModelCoefficients getCoefficients() const;
+void OnCoefficientsChangeUpdaterImpl::updateCoefficients(ServiceContext* serviceCtx,
+                                                         const BSONObj& overrides) {
+    costModelManager(serviceCtx).updateCostModelCoefficients(overrides);
+}
 
-    /**
-     * This update function will be called when the cost model coefficients are changed at runtime.
-     */
-    void updateCostModelCoefficients(const BSONObj& overrides);
-
-    /**
-     * Returns the default version of Cost Model Coefficients no matter whether there are
-     * user-defined coefficients or not.
-     */
-    static CostModelCoefficients getDefaultCoefficients();
-
-private:
-    CostModelCoefficients _coefficients;
-    mutable std::shared_mutex _mutex;  // NOLINT
-};
+ServiceContext::ConstructorActionRegisterer costModelUpdaterRegisterer{
+    "costModelUpdaterRegisterer", [](ServiceContext* serviceCtx) {
+        onCoefficientsChangeUpdater(serviceCtx) =
+            std::make_unique<OnCoefficientsChangeUpdaterImpl>();
+    }};
 }  // namespace mongo::cost_model
