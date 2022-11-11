@@ -45,7 +45,9 @@ BoundRequirement BoundRequirement::makePlusInf() {
 }
 
 BoundRequirement::BoundRequirement(bool inclusive, ABT bound)
-    : _inclusive(inclusive), _bound(std::move(bound)) {}
+    : _inclusive(inclusive), _bound(std::move(bound)) {
+    assertExprSort(_bound);
+}
 
 bool BoundRequirement::operator==(const BoundRequirement& other) const {
     return _inclusive == other._inclusive && _bound == other._bound;

@@ -35,6 +35,7 @@
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
+#include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
@@ -339,18 +340,13 @@ TEST(IntervalIntersection, MultiFieldIntersection) {
 }
 
 TEST(IntervalIntersection, VariableIntervals) {
+    using namespace unit_test_abt_literals;
+
     const auto constFold = ConstEval::constFold;
 
     {
-        auto interval =
-            IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
-                IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::NodeVector{
-                    IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
-                        BoundRequirement(true /*inclusive*/, make<Variable>("v1")),
-                        BoundRequirement::makePlusInf()}),
-                    IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
-                        BoundRequirement(false /*inclusive*/, make<Variable>("v2")),
-                        BoundRequirement::makePlusInf()})})});
+        auto interval = _disj(
+            _conj(_interval(_incl("v1"_var), _plusInf()), _interval(_excl("v2"_var), _plusInf())));
 
         auto result = intersectDNFIntervals(interval, constFold);
         ASSERT_TRUE(result);
@@ -377,15 +373,8 @@ TEST(IntervalIntersection, VariableIntervals) {
     }
 
     {
-        auto interval =
-            IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
-                IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::NodeVector{
-                    IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
-                        BoundRequirement(true /*inclusive*/, make<Variable>("v1")),
-                        BoundRequirement(true /*inclusive*/, make<Variable>("v3"))}),
-                    IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
-                        BoundRequirement(true /*inclusive*/, make<Variable>("v2")),
-                        BoundRequirement(true /*inclusive*/, make<Variable>("v4"))})})});
+        auto interval = _disj(_conj(_interval(_incl("v1"_var), _incl("v3"_var)),
+                                    _interval(_incl("v2"_var), _incl("v4"_var))));
 
         auto result = intersectDNFIntervals(interval, constFold);
         ASSERT_TRUE(result);
@@ -407,15 +396,8 @@ TEST(IntervalIntersection, VariableIntervals) {
     }
 
     {
-        auto interval =
-            IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
-                IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::NodeVector{
-                    IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
-                        BoundRequirement(false /*inclusive*/, make<Variable>("v1")),
-                        BoundRequirement(true /*inclusive*/, make<Variable>("v3"))}),
-                    IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
-                        BoundRequirement(true /*inclusive*/, make<Variable>("v2")),
-                        BoundRequirement(true /*inclusive*/, make<Variable>("v4"))})})});
+        auto interval = _disj(_conj(_interval(_excl("v1"_var), _incl("v3"_var)),
+                                    _interval(_incl("v2"_var), _incl("v4"_var))));
 
         auto result = intersectDNFIntervals(interval, constFold);
         ASSERT_TRUE(result);
@@ -444,15 +426,8 @@ TEST(IntervalIntersection, VariableIntervals) {
     }
 
     {
-        auto interval =
-            IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
-                IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::NodeVector{
-                    IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
-                        BoundRequirement(false /*inclusive*/, make<Variable>("v1")),
-                        BoundRequirement(true /*inclusive*/, make<Variable>("v3"))}),
-                    IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
-                        BoundRequirement(true /*inclusive*/, make<Variable>("v2")),
-                        BoundRequirement(false /*inclusive*/, make<Variable>("v4"))})})});
+        auto interval = _disj(_conj(_interval(_excl("v1"_var), _incl("v3"_var)),
+                                    _interval(_incl("v2"_var), _excl("v4"_var))));
 
         auto result = intersectDNFIntervals(interval, constFold);
         ASSERT_TRUE(result);

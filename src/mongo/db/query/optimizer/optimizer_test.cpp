@@ -33,6 +33,7 @@
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
+#include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/unittest/unittest.h"
@@ -67,6 +68,120 @@ TEST(Optimizer, AutoUpdateExplain) {
     ASSERT_EXPLAIN_V2_AUTO(         // NOLINT (test auto-update)
         "Variable [short name]\n",  // NOLINT (test auto-update)
         tree1);
+}
+
+TEST(Optimizer, ABTLiterals) {
+    using namespace unit_test_abt_literals;
+
+    // Demonstrate shorthand tree initialization using the ABT string literal constructors.
+
+    // Construct inline.
+    auto scanNode = _scan("root", "c1");
+    auto projectionANode = _eval("pa", _evalp(_get("a", _id()), "root"_var), std::move(scanNode));
+    auto filterANode =
+        _filter(_evalf(_cmp("Gt", "0"_cint64), "pa"_var), std::move(projectionANode));
+    auto projectionBNode =
+        _eval("pb", _evalp(_get("b", _id()), "root"_var), std::move(filterANode));
+    auto filterBNode =
+        _filter(_evalf(_cmp("Gt", "1"_cint64), "pb"_var), std::move(projectionBNode));
+    auto groupByNode = _gb(_varnames("pa"), _varnames("pc"), {"pb"_var}, std::move(filterBNode));
+    auto rootNode = _root("pc")(std::move(groupByNode));
+
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       pc\n"
+        "|   RefBlock: \n"
+        "|       Variable [pc]\n"
+        "GroupBy []\n"
+        "|   |   groupings: \n"
+        "|   |       RefBlock: \n"
+        "|   |           Variable [pa]\n"
+        "|   aggregations: \n"
+        "|       [pc]\n"
+        "|           Variable [pb]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [pb]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [1]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [pb]\n"
+        "|           EvalPath []\n"
+        "|           |   Variable [root]\n"
+        "|           PathGet [b]\n"
+        "|           PathIdentity []\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [pa]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [0]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [pa]\n"
+        "|           EvalPath []\n"
+        "|           |   Variable [root]\n"
+        "|           PathGet [a]\n"
+        "|           PathIdentity []\n"
+        "Scan [c1]\n"
+        "    BindBlock:\n"
+        "        [root]\n"
+        "            Source []\n",
+        rootNode);
+
+    // Construct using a builder. Note we construct the tree in a top-to-bottom fashion.
+    auto rootNode1 = NodeBuilder{}
+                         .root("pc")
+                         .gb(_varnames("pa"), _varnames("pc"), {"pb"_var})
+                         .filter(_evalf(_cmp("Gt", "1"_cint64), "pb"_var))
+                         .eval("pb", _evalp(_get("b", _id()), "root"_var))
+                         .filter(_evalf(_cmp("Gt", "0"_cint64), "pa"_var))
+                         .eval("pa", _evalp(_get("a", _id()), "root"_var))
+                         .finish(_scan("root", "c1"));
+
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       pc\n"
+        "|   RefBlock: \n"
+        "|       Variable [pc]\n"
+        "GroupBy []\n"
+        "|   |   groupings: \n"
+        "|   |       RefBlock: \n"
+        "|   |           Variable [pa]\n"
+        "|   aggregations: \n"
+        "|       [pc]\n"
+        "|           Variable [pb]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [pb]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [1]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [pb]\n"
+        "|           EvalPath []\n"
+        "|           |   Variable [root]\n"
+        "|           PathGet [b]\n"
+        "|           PathIdentity []\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [pa]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [0]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [pa]\n"
+        "|           EvalPath []\n"
+        "|           |   Variable [root]\n"
+        "|           PathGet [a]\n"
+        "|           PathIdentity []\n"
+        "Scan [c1]\n"
+        "    BindBlock:\n"
+        "        [root]\n"
+        "            Source []\n",
+        rootNode1);
 }
 
 Constant* constEval(ABT& tree) {
