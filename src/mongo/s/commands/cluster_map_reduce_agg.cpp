@@ -169,6 +169,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto cm = uassertStatusOK(
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, parsedMr.getNamespace()));
     auto expCtx = makeExpressionContext(opCtx, parsedMr, cm, verbosity);
+    const bool eligibleForSampling = !expCtx->explain;
 
     const auto pipelineBuilder = [&]() {
         return map_reduce_common::translateFromMR(parsedMr, expCtx);
@@ -208,6 +209,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                                                                            verbosity,
                                                                            std::move(serialized),
                                                                            privileges,
+                                                                           eligibleForSampling,
                                                                            &tempResults));
                 break;
             }
@@ -235,8 +237,9 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                     namespaces,
                     privileges,
                     &tempResults,
-                    false,    // hasChangeStream
-                    false));  // startsWithDocuments
+                    false /* hasChangeStream */,
+                    false /* startsWithDocuments */,
+                    eligibleForSampling));
                 break;
             }
 

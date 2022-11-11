@@ -97,12 +97,16 @@ struct AggregationTargeter {
     boost::optional<ChunkManager> cm;
 };
 
+/**
+ * Runs a pipeline on the primary shard. See 'runPipelineOnSpecificShardOnly' for more details.
+ */
 Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  const ClusterAggregate::Namespaces& namespaces,
                                  const ChunkManager& cm,
                                  boost::optional<ExplainOptions::Verbosity> explain,
                                  Document serializedCommand,
                                  const PrivilegeVector& privileges,
+                                 bool eligibleForSampling,
                                  BSONObjBuilder* out);
 
 /**
@@ -117,7 +121,9 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
 
 /**
  * Dispatches the pipeline in 'targeter' to the shards that are involved, and merges the results if
- * necessary on either mongos or a randomly designated shard.
+ * necessary on either mongos or a randomly designated shard. If 'eligibleForSampling' is true,
+ * attaches a unique sample id to the request for one of the targeted shards if the collection has
+ * query sampling enabled and the rate-limited sampler successfully generates a sample id for it.
  */
 Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                 AggregationTargeter targeter,
@@ -127,12 +133,16 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                 const PrivilegeVector& privileges,
                                 BSONObjBuilder* result,
                                 bool hasChangeStream,
-                                bool startsWithDocuments);
+                                bool startsWithDocuments,
+                                bool eligibleForSampling);
 
 /**
- * Similar to runPipelineOnPrimaryShard but allows $changeStreams. Intended for use by per shard
- * $changeStream cursors. Note: if forPerShardCursor is true shard versions will not be added to the
- * request sent to mongod.
+ * Runs a pipeline on a specific shard. Used for running a pipeline on the primary shard (i.e. by
+ * 'runPipelineOnPrimaryShard') and on a specifc shard  (i.e. by per shard $changeStream cursors).
+ * If 'forPerShardCursor' is true shard versions will not be added to the request sent to mongod.
+ * If 'eligibleForSampling' is true, attaches a unique sample id to the request for that shard if
+ * the collection has query sampling enabled and the rate-limited sampler successfully generates a
+ * sample id for it.
  */
 Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const ClusterAggregate::Namespaces& namespaces,
@@ -142,6 +152,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                       const PrivilegeVector& privileges,
                                       ShardId shardId,
                                       bool forPerShardCursor,
+                                      bool eligibleForSampling,
                                       BSONObjBuilder* out);
 
 }  // namespace cluster_aggregation_planner

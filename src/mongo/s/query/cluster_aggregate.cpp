@@ -64,6 +64,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_registry.h"
@@ -454,6 +455,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kPassthrough: {
                 // A pipeline with $changeStream should never be allowed to passthrough.
                 invariant(!hasChangeStream);
+                const bool eligibleForSampling = !request.getExplain();
                 return cluster_aggregation_planner::runPipelineOnPrimaryShard(
                     expCtx,
                     namespaces,
@@ -461,6 +463,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     request.getExplain(),
                     aggregation_request_helper::serializeToCommandDoc(request),
                     privileges,
+                    eligibleForSampling,
                     result);
             }
 
@@ -486,6 +489,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             }
 
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kAnyShard: {
+                const bool eligibleForSampling = !request.getExplain();
                 return cluster_aggregation_planner::dispatchPipelineAndMerge(
                     opCtx,
                     std::move(targeter),
@@ -496,7 +500,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     privileges,
                     result,
                     hasChangeStream,
-                    startsWithDocuments);
+                    startsWithDocuments,
+                    eligibleForSampling);
             }
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
                 kSpecificShardOnly: {
@@ -519,6 +524,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 uassert(6273803,
                         "$_passthroughToShard not supported for queries against config replica set",
                         shardId != ShardId::kConfigServerId);
+                // This is an aggregation pipeline started internally, so it is not eligible for
+                // sampling.
+                const bool eligibleForSampling = false;
 
                 return cluster_aggregation_planner::runPipelineOnSpecificShardOnly(
                     expCtx,
@@ -528,7 +536,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     aggregation_request_helper::serializeToCommandDoc(request),
                     privileges,
                     shardId,
-                    true,
+                    true /* forPerShardCursor */,
+                    eligibleForSampling,
                     result);
             }
 

@@ -56,6 +56,7 @@
 #include "mongo/s/query/router_stage_remove_metadata_fields.h"
 #include "mongo/s/query/router_stage_skip.h"
 #include "mongo/s/query/store_possible_cursor.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/transaction_router.h"
 
@@ -631,6 +632,7 @@ Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& 
                                  boost::optional<ExplainOptions::Verbosity> explain,
                                  Document serializedCommand,
                                  const PrivilegeVector& privileges,
+                                 bool eligibleForSampling,
                                  BSONObjBuilder* out) {
     return runPipelineOnSpecificShardOnly(expCtx,
                                           namespaces,
@@ -639,7 +641,8 @@ Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& 
                                           serializedCommand,
                                           privileges,
                                           cm.dbPrimary(),
-                                          false,
+                                          false /* forPerShardCursor */,
+                                          eligibleForSampling,
                                           out);
 }
 
@@ -680,11 +683,16 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                 const PrivilegeVector& privileges,
                                 BSONObjBuilder* result,
                                 bool hasChangeStream,
-                                bool startsWithDocuments) {
+                                bool startsWithDocuments,
+                                bool eligibleForSampling) {
     auto expCtx = targeter.pipeline->getContext();
     // If not, split the pipeline as necessary and dispatch to the relevant shards.
-    auto shardDispatchResults = sharded_agg_helpers::dispatchShardPipeline(
-        serializedCommand, hasChangeStream, startsWithDocuments, std::move(targeter.pipeline));
+    auto shardDispatchResults =
+        sharded_agg_helpers::dispatchShardPipeline(serializedCommand,
+                                                   hasChangeStream,
+                                                   startsWithDocuments,
+                                                   eligibleForSampling,
+                                                   std::move(targeter.pipeline));
 
     // If the operation is an explain, then we verify that it succeeded on all targeted
     // shards, write the results to the output builder, and return immediately.
@@ -794,6 +802,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                       const PrivilegeVector& privileges,
                                       ShardId shardId,
                                       bool forPerShardCursor,
+                                      bool eligibleForSampling,
                                       BSONObjBuilder* out) {
     auto opCtx = expCtx->opCtx;
 
@@ -824,6 +833,13 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
         // Unless this is a per shard cursor, we need to send shard version info.
         tassert(6377400, "Missing shard versioning information", dbVersion.has_value());
         cmdObj = appendDbVersionIfPresent(std::move(cmdObj), *dbVersion);
+    }
+
+    if (eligibleForSampling) {
+        if (auto sampleId =
+                analyze_shard_key::tryGenerateSampleId(opCtx, namespaces.executionNss)) {
+            cmdObj = analyze_shard_key::appendSampleId(std::move(cmdObj), std::move(*sampleId));
+        }
     }
 
     MultiStatementTransactionRequestsSender ars(

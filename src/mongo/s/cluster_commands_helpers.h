@@ -166,8 +166,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
  * Utility for dispatching versioned commands on a namespace, deciding which shards to
  * target by applying the passed-in query and collation to the local routing table cache.
  *
- * If the command is eligible for sampling, attaches a unique sample id to one of requests if the
- * collection has query sampling enabled and the rate-limited sampler successfully generates a
+ * If the command is eligible for sampling, attaches a unique sample id to one of the requests if
+ * the collection has query sampling enabled and the rate-limited sampler successfully generates a
  * sample id for it.
  *
  * Does not retry on StaleConfigException.

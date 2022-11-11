@@ -54,12 +54,14 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/collection_uuid_mismatch.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/query/cluster_query_knobs_gen.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/establish_cursors.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/router.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
@@ -178,14 +180,16 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
     return cmdForShards.freeze().toBson();
 }
 
-std::vector<RemoteCursor> establishShardCursors(OperationContext* opCtx,
-                                                std::shared_ptr<executor::TaskExecutor> executor,
-                                                const NamespaceString& nss,
-                                                bool mustRunOnAll,
-                                                boost::optional<ChunkManager>& cm,
-                                                const std::set<ShardId>& shardIds,
-                                                const BSONObj& cmdObj,
-                                                const ReadPreferenceSetting& readPref) {
+std::vector<RemoteCursor> establishShardCursors(
+    OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    const NamespaceString& nss,
+    bool mustRunOnAll,
+    boost::optional<ChunkManager>& cm,
+    const std::set<ShardId>& shardIds,
+    const BSONObj& cmdObj,
+    const boost::optional<analyze_shard_key::TargetedSampleId>& sampleId,
+    const ReadPreferenceSetting& readPref) {
     LOGV2_DEBUG(20904,
                 1,
                 "Dispatching command {cmdObj} to establish cursors on shards",
@@ -210,16 +214,28 @@ std::vector<RemoteCursor> establishShardCursors(OperationContext* opCtx,
             auto versionedCmdObj = appendShardVersion(
                 cmdObj,
                 ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
+
+            if (sampleId && sampleId->isFor(shardId)) {
+                versionedCmdObj =
+                    analyze_shard_key::appendSampleId(versionedCmdObj, sampleId->getId());
+            }
+
             requests.emplace_back(shardId, std::move(versionedCmdObj));
         }
     } else {
         // The collection is unsharded. Target only the primary shard for the database.
         // Don't append shard version info when contacting the config servers.
-        const auto cmdObjWithShardVersion = cm->dbPrimary() != ShardId::kConfigServerId
+        auto versionedCmdObj = cm->dbPrimary() != ShardId::kConfigServerId
             ? appendShardVersion(cmdObj, ShardVersion::UNSHARDED())
             : cmdObj;
-        requests.emplace_back(cm->dbPrimary(),
-                              appendDbVersionIfPresent(cmdObjWithShardVersion, cm->dbVersion()));
+        versionedCmdObj = appendDbVersionIfPresent(versionedCmdObj, cm->dbVersion());
+
+        if (sampleId) {
+            invariant(sampleId->isFor(cm->dbPrimary()));
+            versionedCmdObj = analyze_shard_key::appendSampleId(versionedCmdObj, sampleId->getId());
+        }
+
+        requests.emplace_back(cm->dbPrimary(), std::move(versionedCmdObj));
     }
 
     if (MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
@@ -770,6 +786,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
         dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
                               hasChangeStream,
                               startsWithDocuments,
+                              !aggRequest.getExplain() /* eligibleForSampling */,
                               std::move(pipeline),
                               shardTargetingPolicy,
                               std::move(readConcern));
@@ -1008,6 +1025,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     Document serializedCommand,
     bool hasChangeStream,
     bool startsWithDocuments,
+    bool eligibleForSampling,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
@@ -1104,6 +1122,9 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                                            expCtx->getCollatorBSON(),
                                                            std::move(readConcern),
                                                            boost::none));
+    const auto targetedSampleId = eligibleForSampling
+        ? analyze_shard_key::tryGenerateTargetedSampleId(opCtx, expCtx->ns, shardIds)
+        : boost::none;
 
     // A $changeStream pipeline must run on all shards, and will also open an extra cursor on the
     // config server in order to monitor for new shards. To guarantee that we do not miss any
@@ -1166,6 +1187,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                             executionNsRoutingInfo,
                                             shardIds,
                                             targetedCommand,
+                                            targetedSampleId,
                                             ReadPreferenceSetting::get(opCtx));
 
         } catch (const StaleConfigException& e) {
@@ -1473,6 +1495,7 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
         dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
                               hasChangeStream,
                               startsWithDocuments,
+                              false /* eligibleForSampling */,
                               std::move(pipeline));
     BSONObjBuilder explainBuilder;
     auto appendStatus =

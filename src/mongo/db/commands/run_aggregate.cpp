@@ -945,15 +945,6 @@ Status runAggregate(OperationContext* opCtx,
             }
         }
 
-        if (analyze_shard_key::supportsPersistingSampledQueries() && request.getSampleId()) {
-            analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                .addAggregateQuery(*request.getSampleId(),
-                                   expCtx->ns,
-                                   pipeline->getInitialQuery(),
-                                   expCtx->getCollatorBSON())
-                .getAsync([](auto) {});
-        }
-
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.
         if (shouldDoFLERewrite(request)) {
@@ -967,6 +958,15 @@ Status runAggregate(OperationContext* opCtx,
 
         constexpr bool alreadyOptimized = true;
         pipeline->validateCommon(alreadyOptimized);
+
+        if (analyze_shard_key::supportsPersistingSampledQueries() && request.getSampleId()) {
+            analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                .addAggregateQuery(*request.getSampleId(),
+                                   expCtx->ns,
+                                   pipeline->getInitialQuery(),
+                                   expCtx->getCollatorBSON())
+                .getAsync([](auto) {});
+        }
 
         if (isEligibleForBonsai(request, *pipeline, opCtx, collections.getMainCollection())) {
             uassert(6624344,

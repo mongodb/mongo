@@ -119,12 +119,16 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
 /**
  * Targets shards for the pipeline and returns a struct with the remote cursors or results, and
  * the pipeline that will need to be executed to merge the results from the remotes. If a stale
- * shard version is encountered, refreshes the routing table and tries again.
+ * shard version is encountered, refreshes the routing table and tries again. If the command is
+ * eligible for sampling, attaches a unique sample id to the request for one of the targeted shards
+ * if the collection has query sampling enabled and the rate-limited sampler successfully generates
+ * a sample id for it.
  */
 DispatchShardPipelineResults dispatchShardPipeline(
     Document serializedCommand,
     bool hasChangeStream,
     bool startsWithDocuments,
+    bool eligibleForSampling,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none);

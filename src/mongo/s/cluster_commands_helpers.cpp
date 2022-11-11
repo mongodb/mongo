@@ -132,8 +132,8 @@ namespace {
  *
  * If a shard is included in shardsToSkip, it will be excluded from the list returned to the
  * caller.
- * If the command is eligible for sampling, attaches a unique sample id to one of requests if the
- * collection has query sampling enabled and the rate-limited sampler successfully generates a
+ * If the command is eligible for sampling, attaches a unique sample id to one of the requests if
+ * the collection has query sampling enabled and the rate-limited sampler successfully generates a
  * sample id for it.
  */
 std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShards(

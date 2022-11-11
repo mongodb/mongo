@@ -67,10 +67,18 @@ var QuerySamplingUtil = (function() {
         const coll = conn.getCollection(kSampledQueriesNs);
 
         let actualSampledQueryDocs;
+        let tries = 0;
         assert.soon(() => {
+            tries++;
             actualSampledQueryDocs = coll.find({ns}).toArray();
+
+            if (tries % 100 == 0) {
+                jsTest.log("Waiting for sampled query documents " +
+                           tojson({actualSampledQueryDocs, expectedSampledQueryDocs}));
+            }
+
             return actualSampledQueryDocs.length >= expectedSampledQueryDocs.length;
-        }, "timed out waiting for sampled query documents");
+        }, "timed out waiting for sampled query documents " + tojson(expectedSampledQueryDocs));
         assert.eq(actualSampledQueryDocs.length,
                   expectedSampledQueryDocs.length,
                   {actualSampledQueryDocs, expectedSampledQueryDocs});
@@ -99,10 +107,11 @@ var QuerySamplingUtil = (function() {
     function assertSoonSampledQueryDocumentsAcrossShards(
         st, ns, collectionUuid, cmdNames, expectedSampledQueryDocs) {
         let actualSampledQueryDocs, actualCount;
+        let tries = 0;
         assert.soon(() => {
             actualSampledQueryDocs = {};
             actualCount = 0;
-
+            tries++;
             st._rs.forEach((rs) => {
                 const docs = rs.test.getPrimary()
                                  .getCollection(kSampledQueriesNs)
@@ -111,6 +120,12 @@ var QuerySamplingUtil = (function() {
                 actualSampledQueryDocs[[rs.test.name]] = docs;
                 actualCount += docs.length;
             });
+
+            if (tries % 100 == 0) {
+                jsTest.log("Waiting for sampled query documents " +
+                           tojson({actualSampledQueryDocs, expectedSampledQueryDocs}));
+            }
+
             return actualCount >= expectedSampledQueryDocs.length;
         }, "timed out waiting for sampled query documents " + tojson(expectedSampledQueryDocs));
         assert.eq(actualCount,

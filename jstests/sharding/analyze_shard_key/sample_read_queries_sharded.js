@@ -22,7 +22,7 @@ const ns = dbName + "." + collName;
 const mongosDB = st.s.getDB(dbName);
 const mongosColl = mongosDB.getCollection(collName);
 
-// Make the collection have two chunks:
+// Make the collection have three chunks:
 // shard0: [MinKey, 0]
 // shard1: [0, 1000]
 // shard1: [1000, MaxKey]
@@ -43,7 +43,7 @@ const expectedSampledQueryDocs = [];
 
 // Make each read below have a unique filter and use that to look up the corresponding
 // config.sampledQueries document later.
-function runCmd(makeCmdObjFunc, filter, shardNames, explain) {
+function runCmd(makeCmdObjFunc, filter, shardNames, explain, expectFilterCaptured = true) {
     const collation = QuerySamplingUtil.generateRandomCollation();
     const originalCmdObj = makeCmdObjFunc(filter, collation);
     const cmdName = Object.keys(originalCmdObj)[0];
@@ -51,8 +51,13 @@ function runCmd(makeCmdObjFunc, filter, shardNames, explain) {
     assert.commandWorked(mongosDB.runCommand(explain ? {explain: originalCmdObj} : originalCmdObj));
     // 'explain' queries should not get sampled.
     if (!explain) {
-        expectedSampledQueryDocs.push(
-            {filter: {"cmd.filter": filter}, cmdName, cmdObj: {filter, collation}, shardNames});
+        const expectedFilter = expectFilterCaptured ? filter : {};
+        expectedSampledQueryDocs.push({
+            filter: {"cmd.filter": expectedFilter},
+            cmdName,
+            cmdObj: {filter: expectedFilter, collation},
+            shardNames
+        });
     }
 }
 
@@ -138,7 +143,116 @@ function runCmd(makeCmdObjFunc, filter, shardNames, explain) {
     runCmd(makeCmdObjFunc, filter3, shardNames3, true /* explain */);
 }
 
-const cmdNames = ["find", "count", "distinct"];
+{
+    // Run aggregate commands with filter in the first stage ($match).
+    const makeCmdObjFunc = (filter, collation) => {
+        return {aggregate: collName, pipeline: [{$match: filter}], collation, cursor: {}};
+    };
+
+    const filter0 = {x: 13};
+    const shardNames0 = [st.rs1.name];
+    runCmd(makeCmdObjFunc, filter0, shardNames0, false /* explain */);
+
+    const filter1 = {x: {$gte: 14}};
+    const shardNames1 = [st.rs1.name, st.rs2.name];
+    runCmd(makeCmdObjFunc, filter1, shardNames1, false /* explain */);
+
+    const filter2 = {x: 15};
+    const shardNames2 = [];
+    runCmd(makeCmdObjFunc, filter2, shardNames2, true /* explain */);
+
+    const filter3 = {x: {$gte: 16}};
+    const shardNames3 = [];
+    runCmd(makeCmdObjFunc, filter3, shardNames3, true /* explain */);
+}
+
+{
+    // Run aggregate commands with filter in the first stage ($geoNear).
+    const makeCmdObjFunc = (filter, collation) => {
+        const geoNearStage = {
+            $geoNear: {near: {type: "Point", coordinates: [1, 1]}, distanceField: "dist"}
+        };
+        if (filter !== null) {
+            geoNearStage.$geoNear.query = filter;
+        }
+        return {aggregate: collName, pipeline: [geoNearStage], collation, cursor: {}};
+    };
+
+    assert.commandWorked(mongosColl.createIndex({x: "2dsphere"}));
+
+    const filter0 = {x: 17};
+    const shardNames0 = [st.rs1.name];
+    runCmd(makeCmdObjFunc, filter0, shardNames0, false /* explain */);
+
+    const filter1 = {x: {$gte: 18}};
+    const shardNames1 = [st.rs1.name, st.rs2.name];
+    runCmd(makeCmdObjFunc, filter1, shardNames1, false /* explain */);
+
+    const filter2 = {x: 19};
+    const shardNames2 = [];
+    runCmd(makeCmdObjFunc, filter2, shardNames2, true /* explain */);
+
+    const filter3 = {x: {$gte: 20}};
+    const shardNames3 = [];
+    runCmd(makeCmdObjFunc, filter3, shardNames3, true /* explain */);
+}
+
+{
+    // Run aggregate commands with filter in a non-first but moveable stage ($match).
+    const makeCmdObjFunc = (filter, collation) => {
+        return {
+            aggregate: collName,
+            pipeline: [{$sort: {x: -1}}, {$match: filter}],
+            collation,
+            cursor: {}
+        };
+    };
+
+    const filter0 = {x: 21};
+    const shardNames0 = [st.rs1.name];
+    runCmd(makeCmdObjFunc, filter0, shardNames0, false /* explain */);
+
+    const filter1 = {x: {$gte: 22}};
+    const shardNames1 = [st.rs1.name, st.rs2.name];
+    runCmd(makeCmdObjFunc, filter1, shardNames1, false /* explain */);
+
+    const filter2 = {x: 23};
+    const shardNames2 = [];
+    runCmd(makeCmdObjFunc, filter2, shardNames2, true /* explain */);
+
+    const filter3 = {x: {$gte: 24}};
+    const shardNames3 = [];
+    runCmd(makeCmdObjFunc, filter3, shardNames3, true /* explain */);
+}
+
+{
+    // Run aggregate commands with filter in a non-first and non-moveable stage ($match).
+    const makeCmdObjFunc = (filter, collation) => {
+        return {
+            aggregate: collName,
+            pipeline: [{$_internalInhibitOptimization: {}}, {$match: filter}],
+            collation,
+            cursor: {}
+        };
+    };
+
+    // The filter can't be moved up so the commands below don't have an initial filter.
+    const expectFilterCaptured = false;
+
+    const filter0 = {x: 25};
+    const shardNames0 = [st.rs0.name, st.rs1.name, st.rs2.name];
+    runCmd(makeCmdObjFunc, filter0, shardNames0, false /* explain */, expectFilterCaptured);
+
+    const filter1 = {x: 26};
+    const shardNames1 = [];
+    runCmd(makeCmdObjFunc, filter1, shardNames1, true /* explain */, expectFilterCaptured);
+
+    const filter2 = {x: {$gte: 27}};
+    const shardNames2 = [];
+    runCmd(makeCmdObjFunc, filter2, shardNames2, true /* explain */, expectFilterCaptured);
+}
+
+const cmdNames = ["find", "count", "distinct", "aggregate"];
 QuerySamplingUtil.assertSoonSampledQueryDocumentsAcrossShards(
     st, ns, collectionUuid, cmdNames, expectedSampledQueryDocs);
 
