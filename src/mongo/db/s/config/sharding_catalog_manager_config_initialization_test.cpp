@@ -42,7 +42,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -59,54 +58,9 @@ using unittest::assertGet;
 
 using ConfigInitializationTest = ConfigServerTestFixture;
 
-TEST_F(ConfigInitializationTest, UpgradeNotNeeded) {
-    VersionType version;
-    version.setClusterId(OID::gen());
-    version.setCurrentVersion(CURRENT_CONFIG_VERSION);
-    version.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
-    ASSERT_OK(
-        insertToConfigCollection(operationContext(), VersionType::ConfigNS, version.toBSON()));
-
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->initializeConfigDatabaseIfNeeded(operationContext()));
-
-    auto versionDoc =
-        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
-
-    VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
-
-    ASSERT_EQUALS(version.getClusterId(), foundVersion.getClusterId());
-    ASSERT_EQUALS(version.getCurrentVersion(), foundVersion.getCurrentVersion());
-    ASSERT_EQUALS(version.getMinCompatibleVersion(), foundVersion.getMinCompatibleVersion());
-}
-
-TEST_F(ConfigInitializationTest, InitIncompatibleVersion) {
-    VersionType version;
-    version.setClusterId(OID::gen());
-    version.setCurrentVersion(MIN_COMPATIBLE_CONFIG_VERSION - 1);
-    version.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION - 2);
-    ASSERT_OK(
-        insertToConfigCollection(operationContext(), VersionType::ConfigNS, version.toBSON()));
-
-    ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion,
-              ShardingCatalogManager::get(operationContext())
-                  ->initializeConfigDatabaseIfNeeded(operationContext()));
-
-    auto versionDoc =
-        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
-
-    VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
-
-    ASSERT_EQUALS(version.getClusterId(), foundVersion.getClusterId());
-    ASSERT_EQUALS(version.getCurrentVersion(), foundVersion.getCurrentVersion());
-    ASSERT_EQUALS(version.getMinCompatibleVersion(), foundVersion.getMinCompatibleVersion());
-}
-
 TEST_F(ConfigInitializationTest, InitClusterMultipleVersionDocs) {
     VersionType version;
     version.setClusterId(OID::gen());
-    version.setCurrentVersion(MIN_COMPATIBLE_CONFIG_VERSION - 2);
-    version.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION - 3);
     ASSERT_OK(
         insertToConfigCollection(operationContext(), VersionType::ConfigNS, version.toBSON()));
 
@@ -123,9 +77,7 @@ TEST_F(ConfigInitializationTest, InitClusterMultipleVersionDocs) {
 TEST_F(ConfigInitializationTest, InitInvalidConfigVersionDoc) {
     BSONObj versionDoc(fromjson(R"({
                     _id: 1,
-                    minCompatibleVersion: "should be numeric",
-                    currentVersion: 7,
-                    clusterId: ObjectId("55919cc6dbe86ce7ac056427")
+                    clusterId: "should be an ID"
                 })"));
     ASSERT_OK(insertToConfigCollection(operationContext(), VersionType::ConfigNS, versionDoc));
 
@@ -149,21 +101,6 @@ TEST_F(ConfigInitializationTest, InitNoVersionDocEmptyConfig) {
     VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
 
     ASSERT_TRUE(foundVersion.getClusterId().isSet());
-    ASSERT_EQUALS(CURRENT_CONFIG_VERSION, foundVersion.getCurrentVersion());
-    ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, foundVersion.getMinCompatibleVersion());
-}
-
-TEST_F(ConfigInitializationTest, InitVersionTooHigh) {
-    VersionType version;
-    version.setClusterId(OID::gen());
-    version.setCurrentVersion(10000);
-    version.setMinCompatibleVersion(10000);
-    ASSERT_OK(
-        insertToConfigCollection(operationContext(), VersionType::ConfigNS, version.toBSON()));
-
-    ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion,
-              ShardingCatalogManager::get(operationContext())
-                  ->initializeConfigDatabaseIfNeeded(operationContext()));
 }
 
 TEST_F(ConfigInitializationTest, OnlyRunsOnce) {
@@ -176,8 +113,6 @@ TEST_F(ConfigInitializationTest, OnlyRunsOnce) {
     VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
 
     ASSERT_TRUE(foundVersion.getClusterId().isSet());
-    ASSERT_EQUALS(CURRENT_CONFIG_VERSION, foundVersion.getCurrentVersion());
-    ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, foundVersion.getMinCompatibleVersion());
 
     ASSERT_EQUALS(ErrorCodes::AlreadyInitialized,
                   ShardingCatalogManager::get(operationContext())
@@ -194,8 +129,6 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
     VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
 
     ASSERT_TRUE(foundVersion.getClusterId().isSet());
-    ASSERT_EQUALS(CURRENT_CONFIG_VERSION, foundVersion.getCurrentVersion());
-    ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, foundVersion.getMinCompatibleVersion());
 
     // Now remove the version document and re-run initializeConfigDatabaseIfNeeded().
     {
@@ -240,8 +173,6 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
 
     ASSERT_TRUE(newFoundVersion.getClusterId().isSet());
     ASSERT_NOT_EQUALS(newFoundVersion.getClusterId(), foundVersion.getClusterId());
-    ASSERT_EQUALS(CURRENT_CONFIG_VERSION, newFoundVersion.getCurrentVersion());
-    ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, newFoundVersion.getMinCompatibleVersion());
 }
 
 TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {

@@ -156,7 +156,6 @@ env.Library(
     source=[
         'analyze_shard_key_cmd.idl',
         'cannot_implicitly_create_collection_info.cpp',
-        'catalog/mongo_version_range.cpp',
         'catalog/type_changelog.cpp',
         'catalog/type_chunk_base.idl',
         'catalog/type_chunk.cpp',

@@ -16,9 +16,6 @@ load('./jstests/multiVersion/libs/multi_cluster.js');
 // command is nondeterministic, skip the consistency check for this test.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-const kMinVersion = 5;
-const kCurrentVerion = 6;
-
 var testCRUDAndAgg = function(db) {
     assert.commandWorked(db.foo.insert({x: 1}));
     assert.commandWorked(db.foo.insert({x: -1}));
@@ -52,11 +49,8 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
 
     // check that config.version document gets initialized properly
     var version = st.s.getCollection('config.version').findOne();
-    assert.eq(version.minCompatibleVersion, kMinVersion);
-    assert.eq(version.currentVersion, kCurrentVerion);
     var clusterID = version.clusterId;
     assert.neq(null, clusterID);
-    assert.eq(version.excluding, undefined);
 
     // Setup sharded collection
     assert.commandWorked(st.s.adminCommand({enableSharding: 'sharded'}));
@@ -114,10 +108,7 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
 
     // Check that version document is unmodified.
     version = st.s.getCollection('config.version').findOne();
-    assert.eq(version.minCompatibleVersion, kMinVersion);
-    assert.eq(version.currentVersion, kCurrentVerion);
     assert.eq(clusterID, version.clusterId);
-    assert.eq(version.excluding, undefined);
 
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Downgrade back
@@ -163,10 +154,7 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
 
     // Check that version document is unmodified.
     version = st.s.getCollection('config.version').findOne();
-    assert.eq(version.minCompatibleVersion, kMinVersion);
-    assert.eq(version.currentVersion, kCurrentVerion);
     assert.eq(clusterID, version.clusterId);
-    assert.eq(version.excluding, undefined);
 
     st.stop();
 }

@@ -84,6 +84,7 @@
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
@@ -493,10 +494,78 @@ private:
                           const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             _createGlobalIndexesIndexes(opCtx, requestedVersion);
+            _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion);
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             _createGlobalIndexesIndexes(opCtx, requestedVersion);
         } else {
             return;
+        }
+    }
+
+    // TODO SERVER-68889 remove once 7.0 becomes last LTS
+    void _cleanupConfigVersionOnUpgrade(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (feature_flags::gStopUsingConfigVersion.isEnabledOnVersion(requestedVersion)) {
+            LOGV2(6888800, "Removing deprecated fields from config.version collection");
+            static const std::vector<StringData> deprecatedFields{
+                "excluding"_sd,
+                "upgradeId"_sd,
+                "upgradeState"_sd,
+                StringData{VersionType::currentVersion.name()},
+                StringData{VersionType::minCompatibleVersion.name()},
+            };
+
+            const auto updateObj = [&] {
+                BSONObjBuilder updateBuilder;
+                BSONObjBuilder unsetBuilder(updateBuilder.subobjStart("$unset"));
+                for (const auto deprecatedField : deprecatedFields) {
+                    unsetBuilder.append(deprecatedField.toString(), true);
+                }
+                unsetBuilder.doneFast();
+                return updateBuilder.obj();
+            }();
+
+            DBDirectClient client(opCtx);
+            write_ops::UpdateCommandRequest update(VersionType::ConfigNS);
+            update.setUpdates({[&]() {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ({});
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
+                entry.setMulti(true);
+                entry.setUpsert(false);
+                return entry;
+            }()});
+            client.update(update);
+        }
+    }
+
+    // TODO SERVER-68889 remove once 7.0 becomes last LTS
+    void _updateConfigVersionOnDowngrade(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (!feature_flags::gStopUsingConfigVersion.isEnabledOnVersion(requestedVersion)) {
+            LOGV2(6888801, "Restoring removed fields in config.version collection");
+            const auto updateObj = [&] {
+                BSONObjBuilder updateBuilder;
+                BSONObjBuilder unsetBuilder(updateBuilder.subobjStart("$set"));
+                unsetBuilder.append(VersionType::minCompatibleVersion.name(),
+                                    VersionType::MIN_COMPATIBLE_CONFIG_VERSION);
+                unsetBuilder.append(VersionType::currentVersion.name(),
+                                    VersionType::CURRENT_CONFIG_VERSION);
+                unsetBuilder.doneFast();
+                return updateBuilder.obj();
+            }();
+
+            DBDirectClient client(opCtx);
+            write_ops::UpdateCommandRequest update(VersionType::ConfigNS);
+            update.setUpdates({[&]() {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ({});
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
+                entry.setMulti(true);
+                entry.setUpsert(false);
+                return entry;
+            }()});
+            client.update(update);
         }
     }
 
@@ -758,6 +827,7 @@ private:
             // run on a consistent version from start to finish. This will ensure that it will
             // be able to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
+            _updateConfigVersionOnDowngrade(opCtx, requestedVersion);
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             // If we are downgrading to a version that doesn't support implicit translation of
             // Timeseries collection in sharding DDL Coordinators we need to drain all ongoing

@@ -87,6 +87,12 @@ feature_flags:
     description: "Feature flag for enabling concurrency within a chunk migration"
     cpp_varname: feature_flags::gConcurrencyInChunkMigration
     default: false
+  featureFlagStopUsingConfigVersion:
+  # TODO SERVER-68889 remove once 7.0 becomes last LTS
+    description: "Stop using deprecated config version fields to check metadata compatibility between different version"
+    cpp_varname: feature_flags::gStopUsingConfigVersion
+    default: true
+    version: 6.2
   featureFlagResilientMovePrimary:
     description: "Enable the resilient coordinator for the movePrimary command in order to improve
                   the tolerance in case of a failure on donor and recipient nodes"

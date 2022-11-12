@@ -46,7 +46,6 @@
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -370,47 +369,21 @@ Status ShardingCatalogManager::_initConfigVersion(OperationContext* opCtx) {
 
     auto versionStatus =
         catalogClient->getConfigVersion(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
-    if (!versionStatus.isOK()) {
+    if (versionStatus.isOK() || versionStatus != ErrorCodes::NoMatchingDocument) {
         return versionStatus.getStatus();
     }
 
-    const auto& versionInfo = versionStatus.getValue();
-    if (versionInfo.getMinCompatibleVersion() > CURRENT_CONFIG_VERSION) {
-        return {ErrorCodes::IncompatibleShardingConfigVersion,
-                str::stream() << "current version v" << CURRENT_CONFIG_VERSION
-                              << " is older than the cluster min compatible v"
-                              << versionInfo.getMinCompatibleVersion()};
+    VersionType newVersion;
+    newVersion.setClusterId(OID::gen());
+
+    if (!feature_flags::gStopUsingConfigVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        newVersion.setCurrentVersion(VersionType::CURRENT_CONFIG_VERSION);
+        newVersion.setMinCompatibleVersion(VersionType::MIN_COMPATIBLE_CONFIG_VERSION);
     }
-
-    if (versionInfo.getCurrentVersion() == UpgradeHistory_EmptyVersion) {
-        VersionType newVersion;
-        newVersion.setClusterId(OID::gen());
-        newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
-        newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
-
-        BSONObj versionObj(newVersion.toBSON());
-        auto insertStatus = catalogClient->insertConfigDocument(
-            opCtx, VersionType::ConfigNS, versionObj, kNoWaitWriteConcern);
-
-        return insertStatus;
-    }
-
-    if (versionInfo.getCurrentVersion() == UpgradeHistory_UnreportedVersion) {
-        return {ErrorCodes::IncompatibleShardingConfigVersion,
-                "Assuming config data is old since the version document cannot be found in the "
-                "config server and it contains databases besides 'local' and 'admin'. "
-                "Please upgrade if this is the case. Otherwise, make sure that the config "
-                "server is clean."};
-    }
-
-    if (versionInfo.getCurrentVersion() < CURRENT_CONFIG_VERSION) {
-        return {ErrorCodes::IncompatibleShardingConfigVersion,
-                str::stream() << "need to upgrade current cluster version to v"
-                              << CURRENT_CONFIG_VERSION << "; currently at v"
-                              << versionInfo.getCurrentVersion()};
-    }
-
-    return Status::OK();
+    auto insertStatus = catalogClient->insertConfigDocument(
+        opCtx, VersionType::ConfigNS, newVersion.toBSON(), kNoWaitWriteConcern);
+    return insertStatus;
 }
 
 Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {

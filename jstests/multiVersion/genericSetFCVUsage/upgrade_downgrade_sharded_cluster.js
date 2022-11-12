@@ -14,6 +14,7 @@
 'use strict';
 
 load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster
+load("jstests/libs/feature_flag_util.js");
 
 const dbName = jsTestName();
 
@@ -44,6 +45,35 @@ function getNodeName(node) {
     return info.setName + '_' + (info.secondary ? 'secondary' : 'primary');
 }
 
+function checkConfigVersionDoc() {
+    // TODO: SERVER-68889 remove this function once 7.0 becomes last LTS
+    const versionDoc = st.s.getCollection('config.version').findOne();
+
+    if (FeatureFlagUtil.isEnabled(st.s, "StopUsingConfigVersion")) {
+        // Check that the version doc doesn't contain any of the deprecatedFields
+        const deprecatedFields = [
+            "excluding",
+            "upgradeId",
+            "upgradeState",
+            "currentVersion",
+            "minCompatibleVersion",
+        ];
+
+        deprecatedFields.forEach(deprecatedField => {
+            assert(!versionDoc.hasOwnProperty(deprecatedField),
+                   `Found deprecated field '${deprecatedField}' in version document ${
+                       tojson(versionDoc)}`);
+        });
+    } else {
+        assert.eq(versionDoc.minCompatibleVersion,
+                  5,
+                  "Version doc does not contain expected value for minCompatibleVersion field");
+        assert.eq(versionDoc.currentVersion,
+                  6,
+                  "Version doc does not contain expected value for currentVersion field");
+    }
+}
+
 function checkConfigAndShardsFCV(expectedFCV) {
     const configPrimary = st.configRS.getPrimary();
 
@@ -66,21 +96,25 @@ function checkConfigAndShardsFCV(expectedFCV) {
 
 function checkClusterBeforeUpgrade(fcv) {
     checkConfigAndShardsFCV(fcv);
+    checkConfigVersionDoc();
 }
 
 function checkClusterAfterBinaryUpgrade() {
-    // To implement in the future, if necessary.
+    checkConfigVersionDoc();
 }
 
 function checkClusterAfterFCVUpgrade(fcv) {
     checkConfigAndShardsFCV(fcv);
+    checkConfigVersionDoc();
 }
 
 function checkClusterAfterFCVDowngrade() {
+    checkConfigVersionDoc();
 }
 
 function checkClusterAfterBinaryDowngrade(fcv) {
     checkConfigAndShardsFCV(fcv);
+    checkConfigVersionDoc();
 }
 
 for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {

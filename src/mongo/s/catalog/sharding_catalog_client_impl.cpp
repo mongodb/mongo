@@ -56,7 +56,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -859,11 +858,8 @@ StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
     }
 
     if (queryResults.empty()) {
-        VersionType versionInfo;
-        versionInfo.setMinCompatibleVersion(UpgradeHistory_EmptyVersion);
-        versionInfo.setCurrentVersion(UpgradeHistory_EmptyVersion);
-        versionInfo.setClusterId(OID{});
-        return versionInfo;
+        return {ErrorCodes::NoMatchingDocument,
+                str::stream() << "No documents found in " << VersionType::ConfigNS.ns()};
     }
 
     BSONObj versionDoc = queryResults.front();

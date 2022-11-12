@@ -39,7 +39,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
@@ -87,8 +86,6 @@ public:
 
             if (result.isOK()) {
                 VersionType version;
-                version.setCurrentVersion(CURRENT_CONFIG_VERSION);
-                version.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
                 version.setClusterId(result.getValue());
 
                 return StatusWith<std::vector<BSONObj>>{{version.toBSON()}};
@@ -123,6 +120,21 @@ TEST_F(ClusterIdentityTest, BasicLoadSuccess) {
     ASSERT_OK(
         ClusterIdentityLoader::get(operationContext())
             ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern));
+}
+
+TEST_F(ClusterIdentityTest, NoConfigVersionDocument) {
+    // If no version document is found on config server loadClusterId will return a newly generated
+    // clusterId
+    auto future = launchAsync([&] {
+        ASSERT_OK(
+            ClusterIdentityLoader::get(operationContext())
+                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern));
+    });
+
+    expectConfigVersionLoad(
+        Status(ErrorCodes::NoMatchingDocument, "No config version document found"));
+
+    future.default_timed_get();
 }
 
 TEST_F(ClusterIdentityTest, MultipleThreadsLoadingSuccess) {
