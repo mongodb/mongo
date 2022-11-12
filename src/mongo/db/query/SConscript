@@ -357,6 +357,17 @@ env.Library(
 )
 
 env.Library(
+    target='rate_limiting',
+    source=[
+        'rate_limiting.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/clock_sources',
+    ],
+)
+
+env.Library(
     target='telemetry',
     source=[
         'telemetry.cpp',
@@ -423,6 +434,7 @@ env.CppUnitTest(
         "query_request_test.cpp",
         "query_settings_test.cpp",
         "query_solution_test.cpp",
+        "rate_limiting_test.cpp",
         "sbe_and_hash_test.cpp",
         "sbe_and_sorted_test.cpp",
         "sbe_stage_builder_accumulator_test.cpp",
@@ -459,6 +471,7 @@ env.CppUnitTest(
         "query_planner_test_fixture",
         "query_request",
         "query_test_service_context",
+        "rate_limiting",
     ],
 )
 
