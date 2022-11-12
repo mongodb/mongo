@@ -77,13 +77,6 @@ TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfNotRunWithAggregateOne) {
                        ErrorCodes::InvalidNamespace);
 }
 
-TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseClearEntriesIfNotBoolean) {
-    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
-                           fromjson("{$telemetry: {clearEntries: 1}}").firstElement(), getExpCtx()),
-                       AssertionException,
-                       ErrorCodes::TypeMismatch);
-}
-
 TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfUnrecognisedParameterSpecified) {
     ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
                            fromjson("{$telemetry: {foo: true}}").firstElement(), getExpCtx()),
@@ -91,27 +84,11 @@ TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfUnrecognisedParameterSpec
                        ErrorCodes::FailedToParse);
 }
 
-TEST_F(DocumentSourceTelemetryTest, ShouldParseAndSerializeNonDefaultOptionalArguments) {
-    auto obj = fromjson("{$telemetry: {clearEntries: true}}");
-    auto doc = DocumentSourceTelemetry::createFromBson(obj.firstElement(), getExpCtx());
-    auto telemetryOp = static_cast<DocumentSourceTelemetry*>(doc.get());
-    auto expected = Document{{"$telemetry", Document{{"clearEntries", true}}}};
-    ASSERT_DOCUMENT_EQ(telemetryOp->serialize().getDocument(), expected);
-}
-
-TEST_F(DocumentSourceTelemetryTest, ShouldParseAndSerializeDefaultOptionalArguments) {
-    auto obj = fromjson("{$telemetry: {clearEntries: false}}");
-    auto doc = DocumentSourceTelemetry::createFromBson(obj.firstElement(), getExpCtx());
-    auto telemetryOp = static_cast<DocumentSourceTelemetry*>(doc.get());
-    auto expected = Document{{"$telemetry", Document{{"clearEntries", false}}}};
-    ASSERT_DOCUMENT_EQ(telemetryOp->serialize().getDocument(), expected);
-}
-
-TEST_F(DocumentSourceTelemetryTest, ShouldSerializeOmittedOptionalArguments) {
+TEST_F(DocumentSourceTelemetryTest, ParseAndSerialize) {
     auto obj = fromjson("{$telemetry: {}}");
     auto doc = DocumentSourceTelemetry::createFromBson(obj.firstElement(), getExpCtx());
     auto telemetryOp = static_cast<DocumentSourceTelemetry*>(doc.get());
-    auto expected = Document{{"$telemetry", Document{{"clearEntries", false}}}};
+    auto expected = Document{{"$telemetry", Document{}}};
     ASSERT_DOCUMENT_EQ(telemetryOp->serialize().getDocument(), expected);
 }
 

@@ -33,9 +33,6 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-namespace {
-const StringData kClearEntriesFieldName = "clearEntries"_sd;
-}  // namespace
 
 REGISTER_DOCUMENT_SOURCE(telemetry,
                          DocumentSourceTelemetry::LiteParsed::parse,
@@ -49,26 +46,12 @@ std::unique_ptr<DocumentSourceTelemetry::LiteParsed> DocumentSourceTelemetry::Li
                           << " value must be an object. Found: " << typeName(spec.type()),
             spec.type() == BSONType::Object);
 
-    auto clearEntries = false;
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << kStageName
+                          << " parameters object must be empty. Found: " << typeName(spec.type()),
+            spec.embeddedObject().isEmpty());
 
-    for (auto&& elem : spec.embeddedObject()) {
-        const auto fieldName = elem.fieldNameStringData();
-        if (fieldName == "clearEntries"_sd) {
-            uassert(
-                ErrorCodes::TypeMismatch,
-                str::stream() << "The 'clearEntries' parameter of the $telemetry stage must be a "
-                                 "boolean. Instead found: "
-                              << typeName(elem.type()),
-                elem.type() == BSONType::Bool);
-            clearEntries = elem.boolean();
-        } else {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream()
-                          << "Unrecognized option '" << fieldName << "' in $telemetry stage.");
-        }
-    }
-
-    return std::make_unique<DocumentSourceTelemetry::LiteParsed>(spec.fieldName(), clearEntries);
+    return std::make_unique<DocumentSourceTelemetry::LiteParsed>(spec.fieldName());
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceTelemetry::createFromBson(
@@ -78,48 +61,27 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceTelemetry::createFromBson(
                           << " value must be an object. Found: " << typeName(spec.type()),
             spec.type() == BSONType::Object);
 
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << kStageName
+                          << " parameters object must be empty. Found: " << typeName(spec.type()),
+            spec.embeddedObject().isEmpty());
+
     const NamespaceString& nss = pExpCtx->ns;
 
     uassert(ErrorCodes::InvalidNamespace,
             "$telemetry must be run against the 'admin' database with {aggregate: 1}",
             nss.db() == NamespaceString::kAdminDb && nss.isCollectionlessAggregateNS());
 
-    auto clearEntries = false;
-
-    for (auto&& elem : spec.embeddedObject()) {
-        const auto fieldName = elem.fieldNameStringData();
-        if (fieldName == "clearEntries"_sd) {
-            uassert(
-                ErrorCodes::TypeMismatch,
-                str::stream() << "The 'clearEntries' parameter of the $telemetry stage must be a "
-                                 "boolean. Instead found: "
-                              << typeName(elem.type()),
-                elem.type() == BSONType::Bool);
-            clearEntries = elem.boolean();
-        } else {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream()
-                          << "Unrecognized option '" << fieldName << "' in $telemetry stage.");
-        }
-    }
-
-    return new DocumentSourceTelemetry(pExpCtx, clearEntries);
+    return new DocumentSourceTelemetry(pExpCtx);
 }
 
 Value DocumentSourceTelemetry::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value{Document{{kStageName, Document{{kClearEntriesFieldName, Value(_clearEntries)}}}}};
+    return Value{Document{{kStageName, Document{}}}};
 }
 
 void DocumentSourceTelemetry::buildTelemetryStoreIterator() {
     TelemetryStore* telemetryStore = [&]() {
-        if (_clearEntries) {
-            // Save the telemetry store to a member variable to be destroyed with the document
-            // source.
-            _telemetryStore = resetTelemetryStore(getContext()->opCtx->getServiceContext());
-            return &**_telemetryStore;
-        } else {
-            return getTelemetryStoreForRead(getContext()->opCtx->getServiceContext()).first;
-        }
+        return getTelemetryStoreForRead(getContext()->opCtx->getServiceContext()).first;
     }();
 
     // Here we start a new thread which runs until the document source finishes iterating the

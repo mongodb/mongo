@@ -964,11 +964,11 @@ server_parameters:
       cache. This will accept values in either of the following formats:
       1. <number>% indicates a percentage of the physical memory available to the process. E.g.: 15%.
       2. <number>(MB|GB), indicates the amount of memory in MB or GB. E.g.: 1.5GB, 100MB.
-      The default value is 5%, which means 5% of the physical memory available to the process."
+      The default value is 1%, which means 1% of the physical memory available to the process."
     set_at: [ startup, runtime ]
     cpp_varname: "queryTelemetryStoreSize"
     cpp_vartype: synchronized_value<std::string>
-    default: "5%"
+    default: "1%"
     on_update: telemetry_util::onTelemetryStoreSizeUpdate
     validator:
       callback: telemetry_util::validateTelemetryStoreSize

@@ -45,8 +45,8 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, bool clearEntries)
-            : LiteParsedDocumentSource(std::move(parseTimeName)), _clearEntries(clearEntries) {}
+        LiteParsed(std::string parseTimeName)
+            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             return stdx::unordered_set<NamespaceString>();
@@ -69,9 +69,6 @@ public:
         void assertSupportsMultiDocumentTransaction() const {
             transactionNotSupported(kStageName);
         }
-
-    private:
-        const bool _clearEntries;
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
@@ -172,15 +169,12 @@ private:
         stdx::condition_variable _waitForEmpty;
     };
 
-    DocumentSourceTelemetry(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                            bool clearEntries)
-        : DocumentSource(kStageName, expCtx), _clearEntries(clearEntries) {}
+    DocumentSourceTelemetry(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSource(kStageName, expCtx) {}
 
     GetNextResult doGetNext() final;
 
     void buildTelemetryStoreIterator();
-
-    const bool _clearEntries;
 
     bool _initialized = false;
 
