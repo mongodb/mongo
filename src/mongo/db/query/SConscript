@@ -90,6 +90,17 @@ env.Library(
 )
 
 env.Library(
+    target='memory_util',
+    source=[
+        'util/memory_util.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/pcre_wrapper',
+        '$BUILD_DIR/mongo/util/processinfo',
+    ],
+)
+
+env.Library(
     target="query_plan_cache",
     source=[
         "classic_plan_cache.cpp",
@@ -98,10 +109,8 @@ env.Library(
         "sbe_plan_cache.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",
-        '$BUILD_DIR/mongo/util/memory_util',
-        "canonical_query",
+        "$BUILD_DIR/mongo/base", "$BUILD_DIR/mongo/db/exec/sbe/query_sbe", "canonical_query",
+        "memory_util"
     ],
 )
 
@@ -262,13 +271,13 @@ env.Library(
         'query_feature_flags.idl',
         'query_knobs.idl',
         'sbe_plan_cache_on_parameter_change.cpp',
+        'telemetry_util.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/query/telemetry',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/memory_util',
         '$BUILD_DIR/mongo/util/pcre_wrapper',
+        'memory_util',
     ],
 )
 
@@ -354,9 +363,10 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        '$BUILD_DIR/mongo/util/memory_util',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/util/processinfo',
+        'memory_util',
+        'query_knobs',
     ],
 )
 
@@ -386,6 +396,7 @@ env.CppUnitTest(
         "killcursors_request_test.cpp",
         "lru_key_value_test.cpp",
         'map_reduce_output_format_test.cpp',
+        "util/memory_util_test.cpp",
         "parsed_distinct_test.cpp",
         "plan_cache_indexability_test.cpp",
         "plan_cache_key_info_test.cpp",

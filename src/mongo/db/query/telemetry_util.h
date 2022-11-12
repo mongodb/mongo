@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,44 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/util/memory_util.h"
+#pragma once
 
-#include "mongo/util/pcre.h"
+#include "mongo/base/status.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/query/partitioned_cache.h"
+#include "mongo/db/query/util/memory_util.h"
 
-namespace mongo::memory_util {
 
-StatusWith<MemoryUnits> parseUnitString(const std::string& strUnit) {
-    if (strUnit.empty()) {
-        return Status(ErrorCodes::Error{6007010}, "Unit value cannot be empty");
-    }
+namespace mongo::telemetry_util {
 
-    if (strUnit[0] == '%') {
-        return MemoryUnits::kPercent;
-    } else if (strUnit[0] == 'M' || strUnit[0] == 'm') {
-        return MemoryUnits::kMB;
-    } else if (strUnit[0] == 'G' || strUnit[0] == 'g') {
-        return MemoryUnits::kGB;
-    }
+Status onTelemetryStoreSizeUpdate(const std::string& str);
 
-    return Status(ErrorCodes::Error{6007011}, "Incorrect unit value");
-}
 
-StatusWith<MemorySize> MemorySize::parse(const std::string& str) {
-    // Looks for a floating point number with followed by a unit suffix (MB, GB, %).
-    static auto& re = *new pcre::Regex(R"re((?i)^\s*(\d+\.?\d*)\s*(MB|GB|%)\s*$)re");
-    auto m = re.matchView(str);
-    if (!m) {
-        return {ErrorCodes::Error{6007012}, "Unable to parse memory size string"};
-    }
-    double size = std::stod(std::string{m[1]});
-    std::string strUnit{m[2]};
+Status validateTelemetryStoreSize(const std::string& str, const boost::optional<TenantId>&);
 
-    auto statusWithUnit = parseUnitString(strUnit);
-    if (!statusWithUnit.isOK()) {
-        return statusWithUnit.getStatus();
-    }
+/**
+ *  An interface used to modify the telemetry store when query setParameters are modified. This is
+ *  done via an interface decorating the 'ServiceContext' in order to avoid a link-time dependency
+ *  of the query knobs library on the telemetry code.
+ */
+class OnParamChangeUpdater {
+public:
+    virtual ~OnParamChangeUpdater() = default;
 
-    return MemorySize{size, statusWithUnit.getValue()};
-}
+    /**
+     * Resizes the telemetry store decorating 'serviceCtx' to the new size given by 'memSize'. If
+     * the new size is smaller than the old, cache entries are evicted in order to ensure the
+     * cache fits within the new size bound.
+     */
+    virtual void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) = 0;
+};
 
-}  // namespace mongo::memory_util
+/**
+ * Decorated accessor to the 'OnParamChangeUpdater' stored in 'ServiceContext'.
+ */
+extern const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater>>
+    telemetryStoreOnParamChangeUpdater;
+}  // namespace mongo::telemetry_util

@@ -32,8 +32,8 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
-#include "mongo/util/memory_util.h"
 
 namespace mongo::plan_cache_util {
 

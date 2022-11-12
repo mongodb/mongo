@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/util/memory_util.h"
+#include "mongo/db/query/util/memory_util.h"
 
 #include "mongo/unittest/unittest.h"
 

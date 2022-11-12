@@ -32,7 +32,7 @@ global:
     - "mongo/db/query/cost_model/cost_model_on_update.h"
     - "mongo/db/query/ce_mode_parameter.h"
     - "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
-    - "mongo/db/query/telemetry.h"
+    - "mongo/db/query/telemetry_util.h"
     - "mongo/platform/atomic_proxy.h"
     - "mongo/platform/atomic_word.h"
 
@@ -966,12 +966,12 @@ server_parameters:
       2. <number>(MB|GB), indicates the amount of memory in MB or GB. E.g.: 1.5GB, 100MB.
       The default value is 5%, which means 5% of the physical memory available to the process."
     set_at: [ startup, runtime ]
-    cpp_varname: "queryTelemetryCacheSize"
+    cpp_varname: "queryTelemetryStoreSize"
     cpp_vartype: synchronized_value<std::string>
     default: "5%"
-    on_update: telemetry_util::onTelemetryCacheSizeUpdate
+    on_update: telemetry_util::onTelemetryStoreSizeUpdate
     validator:
-      callback: telemetry_util::validateTelemetryCacheSize
+      callback: telemetry_util::validateTelemetryStoreSize
 
 
 # Note for adding additional query knobs:

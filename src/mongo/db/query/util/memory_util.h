@@ -31,6 +31,7 @@
 
 #include <string>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 
 namespace mongo::memory_util {
@@ -44,8 +45,6 @@ enum class MemoryUnits {
     kGB,
 };
 
-StatusWith<MemoryUnits> parseUnitString(const std::string& strUnit);
-
 /**
  * Represents parsed memory size parameter.
  */
@@ -55,5 +54,13 @@ struct MemorySize {
     const double size;
     const MemoryUnits units;
 };
+
+StatusWith<MemoryUnits> parseUnitString(const std::string& strUnit);
+size_t convertToSizeInBytes(const MemorySize& memSize);
+size_t capMemorySize(size_t requestedSizeBytes,
+                     size_t maximumSizeGB,
+                     double percentTotalSystemMemory);
+size_t getRequestedMemSizeInBytes(const MemorySize& memSize);
+
 
 }  // namespace mongo::memory_util

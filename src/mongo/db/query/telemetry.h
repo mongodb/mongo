@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/query/partitioned_cache.h"
+#include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
@@ -135,17 +136,4 @@ std::pair<TelemetryStore*, Lock::ResourceLock> getTelemetryStoreForRead(ServiceC
 
 std::unique_ptr<TelemetryStore> resetTelemetryStore(ServiceContext* serviceCtx);
 
-namespace telemetry_util {
-
-/**
- * Callback called on a change of telemetryCacheSize parameter.
- */
-Status onTelemetryCacheSizeUpdate(const std::string& str);
-
-/**
- * Callback called on validation of telemetryCacheSize parameter.
- */
-Status validateTelemetryCacheSize(const std::string& str, const boost::optional<TenantId>&);
-
-}  // namespace telemetry_util
 }  // namespace mongo

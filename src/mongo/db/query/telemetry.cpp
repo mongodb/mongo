@@ -33,8 +33,11 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/util/memory_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/processinfo.h"
+#include <cstddef>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -94,17 +97,48 @@ private:
 const auto telemetryStoreDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<TelemetryStoreManager>>();
 
+class TelemetryOnParamChangeUpdaterImpl final : public telemetry_util::OnParamChangeUpdater {
+public:
+    void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
+        auto newSizeBytes = memory_util::getRequestedMemSizeInBytes(memSize);
+        auto cappedSize = memory_util::capMemorySize(
+            newSizeBytes /*requestedSize*/, 1 /*maximumSizeGB*/, 25 /*percentTotalSystemMemory*/);
+
+        /* If capped size is less than requested size, the telemetry store has been capped at its
+         * upper limit*/
+        if (cappedSize < newSizeBytes) {
+            LOGV2_DEBUG(7106503,
+                        1,
+                        "The telemetry store size has been capped",
+                        "cappedSize"_attr = cappedSize);
+        }
+        auto& telemetryStoreManager = telemetryStoreDecoration(serviceCtx);
+        auto&& [telemetryStore, resourceLock] = telemetryStoreManager->getTelemetryStore();
+        telemetryStore->reset(cappedSize);
+    }
+};
+
+
 ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
     "TelemetryStoreManagerRegisterer", [](ServiceContext* serviceCtx) {
-        // TODO SERVER-71065 update telemetry cache size
-        (void)internalQueryDisableExclusionProjectionFastPath;
-        (void)queryTelemetrySamplingRate;
-        (void)queryTelemetryCacheSize;
-
-        auto size = 100000;  // getPlanCacheSizeInBytes(queryTelemetryCacheSize.get());
+        telemetry_util::telemetryStoreOnParamChangeUpdater(serviceCtx) =
+            std::make_unique<TelemetryOnParamChangeUpdaterImpl>();
+        auto status = memory_util::MemorySize::parse(queryTelemetryStoreSize.get());
+        uassertStatusOK(status);
+        auto size = memory_util::getRequestedMemSizeInBytes(status.getValue());
+        auto cappedStoreSize = memory_util::capMemorySize(
+            size /*requestedSizeBytes*/, 1 /*maximumSizeGB*/, 25 /*percentTotalSystemMemory*/);
+        /* If capped size is less than requested size, the telemetry store has been capped at its
+         * upper limit*/
+        if (cappedStoreSize < size) {
+            LOGV2_DEBUG(7106502,
+                        1,
+                        "The telemetry store size has been capped",
+                        "cappedSize"_attr = cappedStoreSize);
+        }
         auto&& globalTelemetryStoreManager = telemetryStoreDecoration(serviceCtx);
-        globalTelemetryStoreManager =
-            std::make_unique<TelemetryStoreManager>(serviceCtx, size, ProcessInfo::getNumCores());
+        globalTelemetryStoreManager = std::make_unique<TelemetryStoreManager>(
+            serviceCtx, cappedStoreSize, ProcessInfo::getNumCores());
     }};
 
 }  // namespace
@@ -118,22 +152,4 @@ std::unique_ptr<TelemetryStore> resetTelemetryStore(ServiceContext* serviceCtx) 
     return telemetryStoreDecoration(serviceCtx)->resetTelemetryStore();
 }
 
-namespace telemetry_util {
-
-Status onTelemetryCacheSizeUpdate(const std::string& str) {
-    auto newSize = memory_util::MemorySize::parse(str);
-    if (!newSize.isOK()) {
-        return newSize.getStatus();
-    }
-
-    // TODO SERVER-71065 update telemetry cache size
-
-    return Status::OK();
-}
-
-Status validateTelemetryCacheSize(const std::string& str, const boost::optional<TenantId>&) {
-    return memory_util::MemorySize::parse(str).getStatus();
-}
-
-}  // namespace telemetry_util
 }  // namespace mongo
