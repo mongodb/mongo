@@ -58,17 +58,16 @@ namespace mongo {
 using std::vector;
 using ResolveRoleOption = AuthzManagerExternalStateLocal::ResolveRoleOption;
 
-Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationContext* opCtx,
-                                                                     int* outVersion) {
-    BSONObj versionDoc;
+Status AuthzManagerExternalStateLocal::hasValidStoredAuthorizationVersion(
+    OperationContext* opCtx, BSONObj* foundVersionDoc) {
     Status status = findOne(opCtx,
                             AuthorizationManager::versionCollectionNamespace,
                             AuthorizationManager::versionDocumentQuery,
-                            &versionDoc);
+                            foundVersionDoc);
     if (status.isOK()) {
-        BSONElement versionElement = versionDoc[AuthorizationManager::schemaVersionFieldName];
+        BSONElement versionElement =
+            (*foundVersionDoc)[AuthorizationManager::schemaVersionFieldName];
         if (versionElement.isNumber()) {
-            *outVersion = versionElement.numberInt();
             return Status::OK();
         } else if (versionElement.eoo()) {
             return Status(ErrorCodes::NoSuchKey,
@@ -83,12 +82,24 @@ Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationCo
                               << ") for " << AuthorizationManager::schemaVersionFieldName
                               << " field in version document");
         }
-    } else if (status == ErrorCodes::NoMatchingDocument) {
-        *outVersion = AuthorizationManager::schemaVersion28SCRAM;
-        return Status::OK();
     } else {
         return status;
     }
+}
+
+Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationContext* opCtx,
+                                                                     int* outVersion) {
+    BSONObj foundVersionDoc;
+    auto status = hasValidStoredAuthorizationVersion(opCtx, &foundVersionDoc);
+    if (status.isOK()) {
+        *outVersion = foundVersionDoc.getIntField(AuthorizationManager::schemaVersionFieldName);
+        return status;
+    } else if (status == ErrorCodes::NoMatchingDocument) {
+        *outVersion = AuthorizationManager::schemaVersion28SCRAM;
+        return Status::OK();
+    }
+
+    return status;
 }
 
 namespace {
@@ -239,16 +250,23 @@ void handleAuthLocalGetUserFailPoint(const std::vector<RoleName>& directRoles) {
 }
 }  // namespace
 
-// We ignore tenant-specific collections here, since hasAnyPrivilegeDocuments
-// only impacts localhost auth bypass which by definition will be a local user.
+Status AuthzManagerExternalStateLocal::hasAnyUserDocuments(
+    OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
+    BSONObj userBSONObj;
+    return findOne(opCtx,
+                   NamespaceString(tenantId, AuthorizationManager::usersCollectionNamespace.ns()),
+                   BSONObj(),
+                   &userBSONObj);
+}
+
+// If tenantId is none, we're checking whether to enable localhost auth bypass which by definition
+// will be a local user.
 bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
     if (_hasAnyPrivilegeDocuments.load()) {
         return true;
     }
 
-    BSONObj userBSONObj;
-    Status statusFindUsers =
-        findOne(opCtx, AuthorizationManager::usersCollectionNamespace, BSONObj(), &userBSONObj);
+    Status statusFindUsers = hasAnyUserDocuments(opCtx, boost::none);
 
     // If we were unable to complete the query,
     // it's best to assume that there _are_ privilege documents.
@@ -256,6 +274,8 @@ bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* 
         _hasAnyPrivilegeDocuments.store(true);
         return true;
     }
+
+    BSONObj userBSONObj;
     Status statusFindRoles =
         findOne(opCtx, AuthorizationManager::rolesCollectionNamespace, BSONObj(), &userBSONObj);
     if (statusFindRoles != ErrorCodes::NoMatchingDocument) {

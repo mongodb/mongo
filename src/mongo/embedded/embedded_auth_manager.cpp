@@ -66,11 +66,19 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
+    Status hasValidAuthSchemaVersionDocumentForInitialSync(OperationContext* opCtx) override {
+        UASSERT_NOT_IMPLEMENTED;
+    }
+
     bool hasAnyPrivilegeDocuments(OperationContext*) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
     Status getUserDescription(OperationContext*, const UserName&, BSONObj*) override {
+        UASSERT_NOT_IMPLEMENTED;
+    }
+
+    bool hasUser(OperationContext* opCtx, const boost::optional<TenantId>& tenantId) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

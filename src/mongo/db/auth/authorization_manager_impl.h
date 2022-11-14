@@ -67,11 +67,15 @@ public:
 
     OID getCacheGeneration() override;
 
+    Status hasValidAuthSchemaVersionDocumentForInitialSync(OperationContext* opCtx) override;
+
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) override;
 
     Status getUserDescription(OperationContext* opCtx,
                               const UserName& userName,
                               BSONObj* result) override;
+
+    bool hasUser(OperationContext* opCtx, const boost::optional<TenantId>& tenantId) override;
 
     Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) override;
 

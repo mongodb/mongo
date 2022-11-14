@@ -54,6 +54,8 @@ class AuthzManagerExternalStateLocal : public AuthzManagerExternalState {
 public:
     virtual ~AuthzManagerExternalStateLocal() = default;
 
+    Status hasValidStoredAuthorizationVersion(OperationContext* opCtx,
+                                              BSONObj* foundVersionDoc) override;
     Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) override;
     StatusWith<User> getUserObject(OperationContext* opCtx, const UserRequest& userReq) override;
     Status getUserDescription(OperationContext* opCtx,
@@ -78,6 +80,9 @@ public:
                                     AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,
                                     std::vector<BSONObj>* result) override;
+
+    Status hasAnyUserDocuments(OperationContext* opCtx,
+                               const boost::optional<TenantId>& tenantId) final;
 
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final;
 

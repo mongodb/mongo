@@ -449,6 +449,39 @@ Status AuthorizationManagerImpl::getUserDescription(OperationContext* opCtx,
     return _externalState->getUserDescription(opCtx, UserRequest(userName, boost::none), result);
 }
 
+Status AuthorizationManagerImpl::hasValidAuthSchemaVersionDocumentForInitialSync(
+    OperationContext* opCtx) {
+    BSONObj foundDoc;
+    auto status = _externalState->hasValidStoredAuthorizationVersion(opCtx, &foundDoc);
+
+    if (status == ErrorCodes::NoSuchKey || status == ErrorCodes::TypeMismatch) {
+        std::string msg = str::stream()
+            << "During initial sync, found malformed auth schema version document: "
+            << status.toString() << "; document: " << foundDoc;
+        return Status(ErrorCodes::AuthSchemaIncompatible, msg);
+    }
+
+    if (status.isOK()) {
+        auto version = foundDoc.getIntField(AuthorizationManager::schemaVersionFieldName);
+        if ((version != AuthorizationManager::schemaVersion26Final) &&
+            (version != AuthorizationManager::schemaVersion28SCRAM)) {
+            std::string msg = str::stream()
+                << "During initial sync, found auth schema version " << version
+                << ", but this version of MongoDB only supports schema versions "
+                << AuthorizationManager::schemaVersion26Final << " and "
+                << AuthorizationManager::schemaVersion28SCRAM;
+            return {ErrorCodes::AuthSchemaIncompatible, msg};
+        }
+    }
+
+    return status;
+}
+
+bool AuthorizationManagerImpl::hasUser(OperationContext* opCtx,
+                                       const boost::optional<TenantId>& tenantId) {
+    return _externalState->hasAnyUserDocuments(opCtx, tenantId).isOK();
+}
+
 Status AuthorizationManagerImpl::rolesExist(OperationContext* opCtx,
                                             const std::vector<RoleName>& roleNames) {
     return _externalState->rolesExist(opCtx, roleNames);

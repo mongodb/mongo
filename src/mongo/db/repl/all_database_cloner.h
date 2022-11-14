@@ -127,6 +127,8 @@ private:
         return "admin db: { " + stage->getName() + ": 1 }";
     }
 
+    void handleAdminDbNotValid(const Status& errorStatus);
+
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //
@@ -139,7 +141,7 @@ private:
     ConnectStage _connectStage;                              // (R)
     ConnectStage _getInitialSyncIdStage;                     // (R)
     ClonerStage<AllDatabaseCloner> _listDatabasesStage;      // (R)
-    std::vector<std::string> _databases;                     // (X)
+    std::vector<DatabaseName> _databases;                    // (X)
     std::unique_ptr<DatabaseCloner> _currentDatabaseCloner;  // (MX)
     Stats _stats;                                            // (MX)
 };

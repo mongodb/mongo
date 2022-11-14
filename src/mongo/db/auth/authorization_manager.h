@@ -187,6 +187,11 @@ public:
     virtual bool isAuthEnabled() const = 0;
 
     /**
+     * Returns whether a schema version document exists.
+     */
+    virtual Status hasValidAuthSchemaVersionDocumentForInitialSync(OperationContext* opCtx) = 0;
+
+    /**
      * Returns via the output parameter "version" the version number of the authorization
      * system.  Returns Status::OK() if it was able to successfully fetch the current
      * authorization version.  If it has problems fetching the most up to date version it
@@ -221,6 +226,12 @@ public:
     virtual Status getUserDescription(OperationContext* opCtx,
                                       const UserName& userName,
                                       BSONObj* result) = 0;
+
+    /**
+     * Returns true if there exists at least one user document in the system. If `tenantId` is set,
+     * only looks for users associated with `tenantId`.
+     */
+    virtual bool hasUser(OperationContext* opCtx, const boost::optional<TenantId>& tenantId) = 0;
 
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.

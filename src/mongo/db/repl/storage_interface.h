@@ -213,11 +213,6 @@ public:
     virtual Status dropReplicatedDatabases(OperationContext* opCtx) = 0;
 
     /**
-     * Validates that the admin database is valid during initial sync.
-     */
-    virtual Status isAdminDbValid(OperationContext* opCtx) = 0;
-
-    /**
      * Finds at most "limit" documents returned by a collection or index scan on the collection in
      * the requested direction.
      * The documents returned will be copied and buffered. No cursors on the underlying collection

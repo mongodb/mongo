@@ -53,6 +53,11 @@ public:
 
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
         AuthorizationManager* authzManager) final;
+
+    Status hasValidStoredAuthorizationVersion(OperationContext* opCtx,
+                                              BSONObj* foundVersionDoc) override {
+        return {ErrorCodes::NotImplemented, "AuthzMongos::hasValidStoredAuthorizationVersion"};
+    }
     Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) override;
     Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) final;
     StatusWith<User> getUserObject(OperationContext* opCtx, const UserRequest& userReq) final;
@@ -88,6 +93,11 @@ public:
     }
 
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final;
+
+    Status hasAnyUserDocuments(OperationContext* opCtx,
+                               const boost::optional<TenantId>& tenantId) final {
+        return {ErrorCodes::NotImplemented, "AuthzMongos::hasValidStoredAuthorizationVersion"};
+    }
 };
 
 }  // namespace mongo

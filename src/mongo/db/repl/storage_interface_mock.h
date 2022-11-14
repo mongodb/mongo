@@ -127,7 +127,6 @@ public:
                                                        std::size_t)>;
     using PutSingletonFn =
         std::function<Status(OperationContext*, const NamespaceString&, const TimestampedBSONObj&)>;
-    using IsAdminDbValidFn = std::function<Status(OperationContext*)>;
     using GetCollectionUUIDFn =
         std::function<StatusWith<UUID>(OperationContext*, const NamespaceString&)>;
 
@@ -346,10 +345,6 @@ public:
 
     Timestamp getAllDurableTimestamp(ServiceContext* serviceCtx) const override;
 
-    Status isAdminDbValid(OperationContext* opCtx) override {
-        return isAdminDbValidFn(opCtx);
-    };
-
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
                                                  bool primaryOnly) override {
         return;
@@ -437,9 +432,7 @@ public:
         [](OperationContext* opCtx, const NamespaceString& nss, const TimestampedBSONObj& update) {
             return Status{ErrorCodes::IllegalOperation, "PutSingletonFn not implemented."};
         };
-    IsAdminDbValidFn isAdminDbValidFn = [](OperationContext*) {
-        return Status{ErrorCodes::IllegalOperation, "IsAdminDbValidFn not implemented."};
-    };
+
     GetCollectionUUIDFn getCollectionUUIDFn = [](OperationContext* opCtx,
                                                  const NamespaceString& nss) -> StatusWith<UUID> {
         return Status{ErrorCodes::IllegalOperation, "GetCollectionUUIDFn not implemented."};
