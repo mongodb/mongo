@@ -201,6 +201,11 @@ boost::optional<BSONObj> shouldCollectTelemetry(const AggregateCommandRequest& r
         return {};
     }
 
+    // Queries against metadata collections should never appear in telemetry data.
+    if (request.getNamespace().isFLE2StateCollection()) {
+        return {};
+    }
+
     if (!shouldCollect(opCtx->getServiceContext())) {
         return {};
     }
@@ -228,6 +233,11 @@ boost::optional<BSONObj> shouldCollectTelemetry(const FindCommandRequest& reques
                                                 const NamespaceString& collection,
                                                 const OperationContext* opCtx) {
     if (request.getEncryptionInformation()) {
+        return {};
+    }
+
+    // Queries against metadata collections should never appear in telemetry data.
+    if (collection.isFLE2StateCollection()) {
         return {};
     }
 

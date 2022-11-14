@@ -727,6 +727,10 @@ Status runAggregate(OperationContext* opCtx,
     auto catalog = CollectionCatalog::get(opCtx);
     boost::optional<BSONObj> telemetryKey;
 
+    // Since we remove encryptionInformation after rewriting a FLE2 query, this boolean keeps track
+    // of whether the input query did originally have enryption information.
+    bool didDoFLERewrite = false;
+
     {
         // If we are in a transaction, check whether the parsed pipeline supports being in
         // a transaction and if the transaction's read concern is supported.
@@ -953,6 +957,7 @@ Status runAggregate(OperationContext* opCtx,
             pipeline = processFLEPipelineD(
                 opCtx, nss, request.getEncryptionInformation().value(), std::move(pipeline));
             request.setEncryptionInformation(boost::none);
+            didDoFLERewrite = true;
         }
 
         pipeline->optimizePipeline();
@@ -1096,17 +1101,21 @@ Status runAggregate(OperationContext* opCtx,
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->debug().nreturned = stats.nReturned;
 
-        telemetryKey = telemetry::shouldCollectTelemetry(request, opCtx);
-        // Build the telemetry key and store it in the operation context
-        if (telemetryKey) {
-            // TODO SERVER-71315: should we store it in the CurOp instead? (or even PlanExplainer)
-            opCtx->storeQueryBSON(*telemetryKey);
-        }
+        // FLE2 queries should not be included in telemetry, so make sure that we did not
+        // rewrite this query before collecting telemetry.
+        if (!didDoFLERewrite) {
+            telemetryKey = telemetry::shouldCollectTelemetry(request, opCtx);
+            // Build the telemetry key and store it in the operation context
+            if (telemetryKey) {
+                // TODO SERVER-71315: should we store it in the CurOp instead? (or even
+                // PlanExplainer)
+                opCtx->storeQueryBSON(*telemetryKey);
+            }
 
-
-        if (telemetryKey) {
-            telemetry::collectTelemetry(
-                opCtx->getServiceContext(), *telemetryKey, curOp->debug(), true);
+            if (telemetryKey) {
+                telemetry::collectTelemetry(
+                    opCtx->getServiceContext(), *telemetryKey, curOp->debug(), true);
+            }
         }
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.

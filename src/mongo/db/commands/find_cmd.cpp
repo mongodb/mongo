@@ -81,29 +81,6 @@ MONGO_FAIL_POINT_DEFINE(allowExternalReadsForReverseOplogScanRule);
 
 const auto kTermField = "term"_sd;
 
-// Parses the command object to a FindCommandRequest. If the client request did not specify any
-// runtime constants, make them available to the query here.
-std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(OperationContext* opCtx,
-                                                                       NamespaceString nss,
-                                                                       BSONObj cmdObj) {
-    auto findCommand = query_request_helper::makeFromFindCommand(
-        std::move(cmdObj),
-        std::move(nss),
-        APIParameters::get(opCtx).getAPIStrict().value_or(false));
-
-    // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
-    if (shouldDoFLERewrite(findCommand)) {
-        invariant(findCommand->getNamespaceOrUUID().nss());
-        processFLEFindD(opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
-    }
-
-    if (findCommand->getMirrored().value_or(false)) {
-        const auto& invocation = CommandInvocation::get(opCtx);
-        invocation->markMirrored();
-    }
-
-    return findCommand;
-}
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
@@ -307,7 +284,7 @@ public:
             InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
 
             // Parse the command BSON to a FindCommandRequest.
-            auto findCommand = parseCmdObjectToFindCommandRequest(opCtx, nss, _request.body);
+            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, nss, _request.body);
 
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
@@ -404,7 +381,7 @@ public:
             const bool isExplain = false;
             const bool isOplogNss = (parsedNss == NamespaceString::kRsOplogNamespace);
             auto findCommand =
-                parseCmdObjectToFindCommandRequest(opCtx, std::move(parsedNss), cmdObj);
+                _parseCmdObjectToFindCommandRequest(opCtx, std::move(parsedNss), cmdObj);
             opCtx->beginPlanningTimer();
             // Only allow speculative majority for internal commands that specify the correct flag.
             uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
@@ -748,7 +725,10 @@ public:
 
             auto telemetryKey =
                 telemetry::shouldCollectTelemetry(originalFC, collection.get()->ns(), opCtx);
-            if (telemetryKey) {
+
+            // FLE2 queries should not be included in telemetry, so make sure that we did not
+            // rewrite this query before collecting telemetry.
+            if (telemetryKey && !_didDoFLERewrite) {
                 opCtx->storeQueryBSON(*telemetryKey);
 
                 telemetry::collectTelemetry(
@@ -783,6 +763,35 @@ public:
     private:
         const OpMsgRequest _request;
         const DatabaseName _dbName;
+
+        // Since we remove encryptionInformation after rewriting a FLE2 query, this boolean keeps
+        // track of whether the input query did originally have enryption information.
+        bool _didDoFLERewrite = false;
+
+        // Parses the command object to a FindCommandRequest. If the client request did not specify
+        // any runtime constants, make them available to the query here.
+        std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
+            OperationContext* opCtx, NamespaceString nss, BSONObj cmdObj) {
+            auto findCommand = query_request_helper::makeFromFindCommand(
+                std::move(cmdObj),
+                std::move(nss),
+                APIParameters::get(opCtx).getAPIStrict().value_or(false));
+
+            // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
+            if (shouldDoFLERewrite(findCommand)) {
+                invariant(findCommand->getNamespaceOrUUID().nss());
+                processFLEFindD(
+                    opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
+                _didDoFLERewrite = true;
+            }
+
+            if (findCommand->getMirrored().value_or(false)) {
+                const auto& invocation = CommandInvocation::get(opCtx);
+                invocation->markMirrored();
+            }
+
+            return findCommand;
+        }
     };
 
 } findCmd;
