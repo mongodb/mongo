@@ -42,6 +42,7 @@
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/scopeguard.h"

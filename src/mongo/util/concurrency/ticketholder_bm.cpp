@@ -35,6 +35,8 @@
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/concurrency/priority_ticketholder.h"
+#include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/tick_source_mock.h"
 

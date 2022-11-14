@@ -41,6 +41,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/bits.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/timer.h"
