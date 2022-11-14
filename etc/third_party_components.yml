@@ -199,6 +199,13 @@ components:
     local_directory_path: src/third_party/unwind
     team_owner: "Service Architecture"
 
+  mongo-c-driver:
+    homepage_url: https://github.com/mongodb/mongo-c-driver
+    open_hub_url: https://www.openhub.net/p/mongo-c-driver
+    release_monitoring_id: 10712
+    local_directory_path: src/third_party/libbson
+    team_owner: "Security"
+
   "Mozilla Firefox":
     homepage_url: https://www.mozilla.org/en-US/firefox/organizations/
     open_hub_url: https://www.openhub.net/p/firefox

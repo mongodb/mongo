@@ -176,6 +176,24 @@ if not use_system_version_of_library('kms-message'):
         'CPPDEFINES': ['KMS_MSG_STATIC'],
     }
 
+if not use_system_version_of_library('libbson'):
+
+    platform_directory = "build_linux"
+
+    if env.TargetOSIs('windows'):
+        platform_directory = "build_windows"
+    elif env.TargetOSIs('darwin'):
+        platform_directory = "build_osx"
+
+    thirdPartyEnvironmentModifications['libbson'] = {
+        'CPPPATH': [
+            '#/src/third_party/libbson/dist/src/libbson/src',
+            '#/src/third_party/libbson/' + platform_directory,
+            '#/src/third_party/libbson/' + platform_directory + '/bson',
+        ],
+        'CPPDEFINES': ['BSON_STATIC'],
+    }
+
 if use_system_libunwind:
     thirdPartyEnvironmentModifications['unwind'] = {
         'SYSLIBDEPS_PRIVATE': [env['LIBDEPS_UNWIND_SYSLIBDEP'], env['LIBDEPS_LZMA_SYSLIBDEP']],
@@ -599,3 +617,19 @@ if get_option('ssl') == 'on':
         ])
 
     kmsEnv.ShimLibrary(name="kms_message", )
+
+libbsonEnv = env.Clone()
+if get_option('ssl') == 'on':
+    if use_system_version_of_library("libbson"):
+        libbsonEnv = libbsonEnv.Clone(SYSLIBDEPS=[
+            env['LIBDEPS_LIBBSON_SYSLIBDEP'],
+        ])
+    else:
+        libbsonEnv = libbsonEnv.Clone()
+        libbsonEnv.InjectThirdParty(libraries=['libbson'])
+        libbsonEnv.SConscript('libbson/SConscript', exports={'env': libbsonEnv})
+        libbsonEnv = libbsonEnv.Clone(LIBDEPS_INTERFACE=[
+            'libbson/libbson',
+        ])
+
+    libbsonEnv.ShimLibrary(name="libbson", )

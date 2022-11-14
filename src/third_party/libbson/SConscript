@@ -1,0 +1,49 @@
+# -*- mode: python; -*-
+Import("env")
+
+env = env.Clone()
+
+env.Append(CPPDEFINES=[
+    'BSON_COMPILATION',
+])
+env.Append(CPPPATH=["dist/src/common"])
+
+# Libbson is not warning clean
+env['CCFLAGS_WERROR'] = []
+env['CXXFLAGS_WERROR'] = []
+
+additional_sources = []
+
+env.Library(
+    target="libbson",
+    source=[
+        'dist/src/common/common-b64.c',
+        'dist/src/common/common-md5.c',
+        'dist/src/common/common-thread.c',
+        'dist/src/libbson/src/bson/bcon.c',
+        'dist/src/libbson/src/bson/bson-atomic.c',
+        'dist/src/libbson/src/bson/bson.c',
+        'dist/src/libbson/src/bson/bson-clock.c',
+        'dist/src/libbson/src/bson/bson-context.c',
+        'dist/src/libbson/src/bson/bson-decimal128.c',
+        'dist/src/libbson/src/bson/bson-error.c',
+        'dist/src/libbson/src/bson/bson-iso8601.c',
+        'dist/src/libbson/src/bson/bson-iter.c',
+        'dist/src/libbson/src/bson/bson-json.c',
+        'dist/src/libbson/src/bson/bson-keys.c',
+        'dist/src/libbson/src/bson/bson-md5.c',
+        'dist/src/libbson/src/bson/bson-memory.c',
+        'dist/src/libbson/src/bson/bson-oid.c',
+        'dist/src/libbson/src/bson/bson-reader.c',
+        'dist/src/libbson/src/bson/bson-string.c',
+        'dist/src/libbson/src/bson/bson-timegm.c',
+        'dist/src/libbson/src/bson/bson-utf8.c',
+        'dist/src/libbson/src/bson/bson-value.c',
+        'dist/src/libbson/src/bson/bson-version-functions.c',
+        'dist/src/libbson/src/bson/bson-writer.c',
+        'dist/src/libbson/src/jsonsl/jsonsl.c',
+    ] + additional_sources,
+    LIBDEPS_TAGS=[
+        'init-no-global-side-effects',
+    ],
+)

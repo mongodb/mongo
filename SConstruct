@@ -468,6 +468,7 @@ for pack in [
     ('icu', 'ICU'),
     ('intel_decimal128', 'intel decimal128'),
     ('kms-message', ),
+    ('libbson', ),
     ('pcre2', ),
     ('snappy', ),
     ('stemmer', ),
