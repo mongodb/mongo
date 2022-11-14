@@ -3817,7 +3817,7 @@ tasks:
       num_files: 5
       num_tasks: 5
       npm_command: update-fuzzer
-      suite: generational_fuzzer
+      suite: update_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 ## jstestfuzz standalone update time-series generational fuzzer ##
@@ -3846,7 +3846,7 @@ tasks:
       num_files: 5
       num_tasks: 5
       npm_command: update-fuzzer
-      suite: generational_fuzzer_replication
+      suite: update_fuzzer_replication
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 ## rollback multiversion fuzzer ##

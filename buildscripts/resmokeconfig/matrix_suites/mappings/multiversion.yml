@@ -294,6 +294,20 @@
     - "multiversion.replica_sets_multiversion_testdata_last_continuous"
 
 
+- suite_name: update_fuzzer_last_lts
+  base_suite: update_fuzzer
+
+- suite_name: update_fuzzer_last_continuous
+  base_suite: update_fuzzer
+
+
+- suite_name: update_fuzzer_replication_last_lts
+  base_suite: update_fuzzer_replication
+
+- suite_name: update_fuzzer_replication_last_continuous
+  base_suite: update_fuzzer_replication
+
+
 - suite_name: rollback_fuzzer_last_lts
   base_suite: rollback_fuzzer
   overrides:
