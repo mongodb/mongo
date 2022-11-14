@@ -106,9 +106,14 @@ CostModelCoefficients CostModelManager::getDefaultCoefficients() {
 }
 
 void CostModelManager::updateCostModelCoefficients(const BSONObj& overrides) {
-    auto coefsObj = _coefficients.toBSON();
-    auto newCoefs = CostModelCoefficients::parse(IDLParserContext{"CostModelCoefficients"},
-                                                 coefsObj.addFields(overrides));
+    CostModelCoefficients newCoefs;
+    if (overrides.isEmpty()) {
+        initializeCoefficients(newCoefs);
+    } else {
+        auto coefsObj = _coefficients.toBSON();
+        newCoefs = CostModelCoefficients::parse(IDLParserContext{"CostModelCoefficients"},
+                                                coefsObj.addFields(overrides));
+    }
 
     stdx::unique_lock wLock(_mutex);
     _coefficients = std::move(newCoefs);

@@ -21,12 +21,7 @@ assert.commandWorked(coll.insert(Array.from({length: nDocuments}, (_, i) => {
 })));
 
 function executeAndGetScanCost(scanIncrementalCost) {
-    try {
-        assert.commandWorked(db.adminCommand({
-            'setParameter': 1,
-            'internalCostModelCoefficients': `{"scanIncrementalCost": ${scanIncrementalCost}}`
-        }));
-
+    const getScanCost = function() {
         const explain = coll.explain("executionStats").aggregate([]);
         assert.eq(nDocuments, explain.executionStats.nReturned);
 
@@ -34,9 +29,22 @@ function executeAndGetScanCost(scanIncrementalCost) {
         assertValueOnPath("PhysicalScan", scanNode, "nodeType");
 
         return scanNode.properties.cost;
+    };
+    const initCost = getScanCost();
+    try {
+        assert.commandWorked(db.adminCommand({
+            'setParameter': 1,
+            'internalCostModelCoefficients': `{"scanIncrementalCost": ${scanIncrementalCost}}`
+        }));
+
+        return getScanCost();
     } finally {
+        // Empty "internalCostModelCoefficients" should reset the cost model to default.
         assert.commandWorked(
             db.adminCommand({'setParameter': 1, 'internalCostModelCoefficients': ''}));
+        const resetCost = getScanCost();
+
+        assert.close(initCost, resetCost, 8 /*decimal places*/);
     }
 }
 
