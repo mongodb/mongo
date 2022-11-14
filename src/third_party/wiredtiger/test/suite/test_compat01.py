@@ -53,6 +53,7 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
     # and without the patch number.  Test both.
     start_compat = [
         ('def', dict(compat1='none', logv1=5)),
+        ('111', dict(compat1='11.1', logv1=5)),
         ('110', dict(compat1='11.0', logv1=5)),
         ('100', dict(compat1='10.0', logv1=5)),
         ('33', dict(compat1='3.3', logv1=4)),
@@ -66,6 +67,7 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
     ]
     restart_compat = [
         ('def2', dict(compat2='none', logv2=5)),
+        ('111_2', dict(compat2='11.1', logv2=5)),
         ('110_2', dict(compat2='11.0', logv2=5)),
         ('100_2', dict(compat2='10.0', logv2=5)),
         ('33_2', dict(compat2='3.3', logv2=4)),

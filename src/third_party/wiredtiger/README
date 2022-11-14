@@ -1,6 +1,6 @@
-WiredTiger 11.0.1: (June 24, 2022)
+WiredTiger 11.1.0: (November  2, 2022)
 
-This is version 11.0.1 of WiredTiger.
+This is version 11.1.0 of WiredTiger.
 
 WiredTiger release packages and documentation can be found at:
 
@@ -23,7 +23,3 @@ WiredTiger licensing information can be found at:
 For general questions and discussion, there's a WiredTiger group:
 
 	https://groups.google.com/group/wiredtiger-users
-
-For information about contributing to WiredTiger see:
-
-	https://github.com/wiredtiger/wiredtiger/wiki/Contributing-to-WiredTiger
