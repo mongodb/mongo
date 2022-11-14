@@ -503,6 +503,9 @@ error_codes:
     - {code: 385, name: ConflictingServerlessOperation}
 
     - {code: 386, name: DuplicateKeyId}
+
+    - {code: 387, name: EncounteredFLEPayloadWhileRedacting}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

@@ -193,6 +193,30 @@ void addToFindKey(BSONObjBuilder& builder, const StringData& fieldName, const BS
     serializeBSONWhenNotEmpty(value.redact(false), fieldName, &builder);
 }
 
+// Call this function from inside the redact() function on every BSONElement in the BSONObj.
+void throwIfEncounteringFLEPayload(BSONElement e) {
+    constexpr auto safeContentLabel = "__safeContent__"_sd;
+    constexpr auto fieldpath = "$__safeContent__"_sd;
+    if (e.type() == BSONType::Object) {
+        auto fieldname = e.fieldNameStringData();
+        uassert(ErrorCodes::EncounteredFLEPayloadWhileRedacting,
+                "Encountered __safeContent__, or an $_internalFle operator, which indicate a "
+                "rewritten FLE2 query.",
+                fieldname == safeContentLabel || fieldname.startsWith("$_internalFle"_sd));
+    } else if (e.type() == BSONType::String) {
+        auto val = e.valueStringData();
+        uassert(ErrorCodes::EncounteredFLEPayloadWhileRedacting,
+                "Encountered $__safeContent__ fieldpath, which indicates a rewritten FLE2 query.",
+                val == fieldpath);
+    } else if (e.type() == BSONType::BinData && e.isBinData(BinDataType::Encrypt)) {
+        int len;
+        auto data = e.binData(len);
+        uassert(ErrorCodes::EncounteredFLEPayloadWhileRedacting,
+                "FLE1 Payload encountered in expression.",
+                len > 1 && data[1] != char(EncryptedBinDataType::kDeterministic));
+    }
+}
+
 }  // namespace
 
 boost::optional<BSONObj> shouldCollectTelemetry(const AggregateCommandRequest& request,
@@ -212,19 +236,23 @@ boost::optional<BSONObj> shouldCollectTelemetry(const AggregateCommandRequest& r
 
     BSONObjBuilder telemetryKey;
     BSONObjBuilder pipelineBuilder = telemetryKey.subarrayStart("pipeline"_sd);
-    for (auto&& stage : request.getPipeline()) {
-        auto el = stage.firstElement();
-        BSONObjBuilder stageBuilder = pipelineBuilder.subobjStart("stage"_sd);
-        stageBuilder.append(el.fieldNameStringData(), el.Obj().redact(false));
-        stageBuilder.done();
-    }
-    pipelineBuilder.done();
-    telemetryKey.append("namespace", request.getNamespace().toString());
-    if (request.getReadConcern()) {
-        telemetryKey.append("readConcern", *request.getReadConcern());
-    }
-    if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-        telemetryKey.append("applicationName", metadata->getApplicationName());
+    try {
+        for (auto&& stage : request.getPipeline()) {
+            auto el = stage.firstElement();
+            BSONObjBuilder stageBuilder = pipelineBuilder.subobjStart("stage"_sd);
+            stageBuilder.append(el.fieldNameStringData(), el.Obj().redact(false));
+            stageBuilder.done();
+        }
+        pipelineBuilder.done();
+        telemetryKey.append("namespace", request.getNamespace().toString());
+        if (request.getReadConcern()) {
+            telemetryKey.append("readConcern", *request.getReadConcern());
+        }
+        if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
+            telemetryKey.append("applicationName", metadata->getApplicationName());
+        }
+    } catch (ExceptionFor<ErrorCodes::EncounteredFLEPayloadWhileRedacting>&) {
+        return {};
     }
     return {telemetryKey.obj()};
 }
@@ -247,21 +275,25 @@ boost::optional<BSONObj> shouldCollectTelemetry(const FindCommandRequest& reques
 
     BSONObjBuilder telemetryKey;
     BSONObjBuilder findBuilder = telemetryKey.subobjStart("find"_sd);
-    auto findBson = request.toBSON({});
-    for (auto&& findEntry : findBson) {
-        if (findEntry.isABSONObj()) {
-            telemetryKey.append(findEntry.fieldNameStringData(), findEntry.Obj().redact(false));
-        } else {
-            telemetryKey.append(findEntry.fieldNameStringData(), "###"_sd);
+    try {
+        auto findBson = request.toBSON({});
+        for (auto&& findEntry : findBson) {
+            if (findEntry.isABSONObj()) {
+                telemetryKey.append(findEntry.fieldNameStringData(), findEntry.Obj().redact(false));
+            } else {
+                telemetryKey.append(findEntry.fieldNameStringData(), "###"_sd);
+            }
         }
-    }
-    findBuilder.done();
-    telemetryKey.append("namespace", collection.toString());
-    if (request.getReadConcern()) {
-        telemetryKey.append("readConcern", *request.getReadConcern());
-    }
-    if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-        telemetryKey.append("applicationName", metadata->getApplicationName());
+        findBuilder.done();
+        telemetryKey.append("namespace", collection.toString());
+        if (request.getReadConcern()) {
+            telemetryKey.append("readConcern", *request.getReadConcern());
+        }
+        if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
+            telemetryKey.append("applicationName", metadata->getApplicationName());
+        }
+    } catch (ExceptionFor<ErrorCodes::EncounteredFLEPayloadWhileRedacting>&) {
+        return {};
     }
     return {telemetryKey.obj()};
 }
