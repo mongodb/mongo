@@ -3297,6 +3297,7 @@ buildvariants:
   - name: cqf_disabled_pipeline_opt
   - name: cqf_parallel
   - name: .jscore .common
+  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: noPassthrough_gen
   - name: query_golden_classic
   - name: query_golden_cqf
