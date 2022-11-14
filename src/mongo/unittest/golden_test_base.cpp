@@ -157,13 +157,14 @@ std::string GoldenTestContextBase::sanitizeName(const std::string& str) {
 }
 
 void GoldenTestContextBase::verifyOutput() {
+    std::string actualStr = _outStream.str();
+
     fs::path goldenDataPath = getGoldenDataPath();
     if (!fs::exists(goldenDataPath)) {
         failResultMismatch(
-            "<omitted>", boost::none, "Golden data file doesn't exist: {}"_format(goldenDataPath));
+            actualStr, boost::none, "Golden data file doesn't exist: {}"_format(goldenDataPath));
     }
 
-    std::string actualStr = _outStream.str();
     std::string expectedStr = readFile(goldenDataPath);
     if (actualStr != expectedStr) {
         failResultMismatch(actualStr, expectedStr, "Actual result doesn't match golden data.");
