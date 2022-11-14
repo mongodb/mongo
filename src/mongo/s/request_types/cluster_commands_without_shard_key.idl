@@ -36,6 +36,7 @@ structs:
   clusterQueryWithoutShardKeyResponse: 
     description: "The response for the '_clusterQueryWithoutShardKeyFind' command."
     is_command_reply: true
+    strict: false
     fields:
       targetDoc:
         description: >-
@@ -50,6 +51,7 @@ structs:
   clusterWriteWithoutShardKeyResponse: 
     description: "The response for the '_clusterWriteWithoutShardKeyFind' command."
     is_command_reply: true
+    strict: false
     fields:
       response:
         description: "Response of the write command."
