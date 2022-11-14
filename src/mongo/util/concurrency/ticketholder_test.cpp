@@ -406,6 +406,10 @@ TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
     PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
     Stats stats(&holder);
 
+    // This mutex is to avoid data race conditions between checking for the ticket state and setting
+    // it in the worker threads.
+    Mutex ticketCheckMutex;
+
     {
         // Allocate the only available ticket. Priority is irrelevant when there are tickets
         // available.
@@ -418,20 +422,22 @@ TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
         MockAdmission low1PriorityAdmission(this->getServiceContext(),
                                             AdmissionContext::Priority::kLow);
         stdx::thread low1PriorityThread([&]() {
-            low1PriorityAdmission.ticket =
-                holder.waitForTicket(low1PriorityAdmission.opCtx.get(),
-                                     &low1PriorityAdmission.admCtx,
-                                     TicketHolder::WaitMode::kUninterruptible);
+            auto ticket = holder.waitForTicket(low1PriorityAdmission.opCtx.get(),
+                                               &low1PriorityAdmission.admCtx,
+                                               TicketHolder::WaitMode::kUninterruptible);
+            stdx::lock_guard lk(ticketCheckMutex);
+            low1PriorityAdmission.ticket = std::move(ticket);
         });
 
 
         MockAdmission low2PriorityAdmission(this->getServiceContext(),
                                             AdmissionContext::Priority::kLow);
         stdx::thread low2PriorityThread([&]() {
-            low2PriorityAdmission.ticket =
-                holder.waitForTicket(low2PriorityAdmission.opCtx.get(),
-                                     &low2PriorityAdmission.admCtx,
-                                     TicketHolder::WaitMode::kUninterruptible);
+            auto ticket = holder.waitForTicket(low2PriorityAdmission.opCtx.get(),
+                                               &low2PriorityAdmission.admCtx,
+                                               TicketHolder::WaitMode::kUninterruptible);
+            stdx::lock_guard lk(ticketCheckMutex);
+            low2PriorityAdmission.ticket = std::move(ticket);
         });
 
 
@@ -444,6 +450,7 @@ TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
 
         sleepFor(Milliseconds{100});
         assertSoon([&] {
+            stdx::lock_guard lk(ticketCheckMutex);
             // Other low priority thread takes the ticket
             ASSERT_TRUE(low1PriorityAdmission.ticket || low2PriorityAdmission.ticket);
         });
@@ -451,10 +458,11 @@ TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
         MockAdmission low3PriorityAdmission(this->getServiceContext(),
                                             AdmissionContext::Priority::kLow);
         stdx::thread low3PriorityThread([&]() {
-            low3PriorityAdmission.ticket =
-                holder.waitForTicket(low3PriorityAdmission.opCtx.get(),
-                                     &low3PriorityAdmission.admCtx,
-                                     TicketHolder::WaitMode::kUninterruptible);
+            auto ticket = holder.waitForTicket(low3PriorityAdmission.opCtx.get(),
+                                               &low3PriorityAdmission.admCtx,
+                                               TicketHolder::WaitMode::kUninterruptible);
+            stdx::lock_guard lk(ticketCheckMutex);
+            low3PriorityAdmission.ticket = std::move(ticket);
         });
 
         // Wait for the new thread on the queue.
@@ -462,6 +470,7 @@ TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
         }
 
         auto releaseCurrentTicket = [&] {
+            stdx::lock_guard lk(ticketCheckMutex);
             ASSERT_TRUE(low1PriorityAdmission.ticket || low2PriorityAdmission.ticket ||
                         low3PriorityAdmission.ticket);
             // Ensure only one ticket is present.
