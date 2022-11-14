@@ -5627,6 +5627,12 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
                 auto [owned, tag, val] = getField(lhsTag, lhsVal, rhsTag, rhsVal);
 
+                // Copy value only if needed
+                if (lhsOwned && !owned) {
+                    owned = true;
+                    std::tie(tag, val) = value::copyValue(tag, val);
+                }
+
                 pushStack(owned, tag, val);
 
                 if (rhsOwned && popRhs) {
@@ -5648,6 +5654,12 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
                 auto [owned, tag, val] = getField(lhsTag, lhsVal, fieldName);
 
+                // Copy value only if needed
+                if (lhsOwned && !owned) {
+                    owned = true;
+                    std::tie(tag, val) = value::copyValue(tag, val);
+                }
+
                 pushStack(owned, tag, val);
 
                 if (lhsOwned && popLhs) {
@@ -5663,6 +5675,12 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
 
                 auto [owned, tag, val] = getElement(lhsTag, lhsVal, rhsTag, rhsVal);
+
+                // Copy value only if needed
+                if (lhsOwned && !owned) {
+                    owned = true;
+                    std::tie(tag, val) = value::copyValue(tag, val);
+                }
 
                 pushStack(owned, tag, val);
 
@@ -5727,6 +5745,12 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
 
                 auto [owned, tag, val] = getFieldOrElement(lhsTag, lhsVal, rhsTag, rhsVal);
+
+                // Copy value only if needed
+                if (lhsOwned && !owned) {
+                    owned = true;
+                    std::tie(tag, val) = value::copyValue(tag, val);
+                }
 
                 pushStack(owned, tag, val);
 
