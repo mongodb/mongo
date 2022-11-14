@@ -447,7 +447,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         primary.mongo_client().admin.command(cmd)
 
     def _do_teardown(self, mode=None):
-        self.logger.info("Stopping all members of the replica set...")
+        self.logger.info("Stopping all members of the replica set '%s'...", self.replset_name)
 
         running_at_start = self.is_running()
         if not running_at_start:
