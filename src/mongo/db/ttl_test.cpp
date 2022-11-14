@@ -306,6 +306,12 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
     RAIIServerParameterControllerForTest ttlMonitorSubPassTargetSecsController(
         "ttlMonitorSubPassTargetSecs", ttlMonitorSubPassTargetSecs);
 
+    // Do not limit the amount of time in performing a batched delete each pass by setting
+    // the target time to 0.
+    auto ttlIndexDeleteTargetTimeMS = 0;
+    RAIIServerParameterControllerForTest ttlIndexDeleteTargetTimeMSController(
+        "ttlIndexDeleteTargetTimeMS", ttlIndexDeleteTargetTimeMS);
+
     // Expect each sub-pass to delete up to 20 documents from each index.
     auto ttlIndexDeleteTargetDocs = 20;
     RAIIServerParameterControllerForTest ttlIndexDeleteTargetDocsController(
@@ -380,6 +386,12 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
     auto ttlMonitorSubPassTargetSecs = 0;
     RAIIServerParameterControllerForTest ttlMonitorSubPassTargetSecsController(
         "ttlMonitorSubPassTargetSecs", ttlMonitorSubPassTargetSecs);
+
+    // Do not limit the amount of time in performing a batched delete each pass by setting
+    // the target time to 0.
+    auto ttlIndexDeleteTargetTimeMS = 0;
+    RAIIServerParameterControllerForTest ttlIndexDeleteTargetTimeMSController(
+        "ttlIndexDeleteTargetTimeMS", ttlIndexDeleteTargetTimeMS);
 
     // Expect each sub-pass to delete up to 20 documents from each index.
     auto ttlIndexDeleteTargetDocs = 20;
@@ -459,6 +471,12 @@ TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
     auto ttlMonitorSubPassTargetSecs = 0;
     RAIIServerParameterControllerForTest ttlMonitorSubPassTargetSecsController(
         "ttlMonitorSubPassTargetSecs", ttlMonitorSubPassTargetSecs);
+
+    // Do not limit the amount of time in performing a batched delete each pass by setting
+    // the target time to 0.
+    auto ttlIndexDeleteTargetTimeMS = 0;
+    RAIIServerParameterControllerForTest ttlIndexDeleteTargetTimeMSController(
+        "ttlIndexDeleteTargetTimeMS", ttlIndexDeleteTargetTimeMS);
 
     // Expect each sub-pass to delete up to 20 documents from each index.
     auto ttlIndexDeleteTargetDocs = 20;
