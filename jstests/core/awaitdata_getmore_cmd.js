@@ -145,85 +145,97 @@ if (FixtureHelpers.isReplSet(db)) {
     }
 }
 
-// Test filtered inserts while writing to a capped collection.
-// Find with a filter which doesn't match any documents in the collection.
-cmdRes = assert.commandWorked(db.runCommand({
-    find: collName,
-    batchSize: 2,
-    filter: {x: 1},
-    awaitData: true,
-    tailable: true,
-    comment: "uniquifier_comment"
-}));
-assert.gt(cmdRes.cursor.id, NumberLong(0));
-assert.eq(cmdRes.cursor.ns, coll.getFullName());
-assert.eq(cmdRes.cursor.firstBatch.length, 0);
+let originalCmdLogLevel = assert.commandWorked(db.setLogLevel(5, 'command')).was.command.verbosity;
+let originalQueryLogLevel = assert.commandWorked(db.setLogLevel(5, 'query')).was.query.verbosity;
 
-// The code below will test for the tailable, awaitData cursor being awaken once a matching document
-// is inserted and expects the document to be returned in the next batch. However, the logic without
-// waiting for the timeout in order to receive the data only works if the read concern is not set to
-// majority. The reason for this is that the primary node will notify the waiting cursor on document
-// being inserted on its node and not on the majority of nodes. However, since the read concern is
-// set to majority, the awaken cursor won't find the newly inserted document, as at that time it is
-// present on the primary only. Therefore it will be waiting till the timeout. In order to avoid the
-// waiting we stop running this test if read concern majority.
-const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
-if (topology.type !== Topology.kStandalone) {
-    const readConcern =
-        assert.commandWorked(db.adminCommand({getDefaultRWConcern: 1})).defaultReadConcern;
-    if (readConcern.level == "majority" || TestData.defaultReadConcernLevel === "majority") {
-        return;
+try {
+    // Test filtered inserts while writing to a capped collection.
+    // Find with a filter which doesn't match any documents in the collection.
+    cmdRes = assert.commandWorked(db.runCommand({
+        find: collName,
+        batchSize: 2,
+        filter: {x: 1},
+        awaitData: true,
+        tailable: true,
+        comment: "uniquifier_comment"
+    }));
+    assert.gt(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
+    assert.eq(cmdRes.cursor.firstBatch.length, 0);
+
+    // The code below will test for the tailable, awaitData cursor being awaken once a matching
+    // document is inserted and expects the document to be returned in the next batch. However, the
+    // logic without waiting for the timeout in order to receive the data only works if the read
+    // concern is not set to majority. The reason for this is that the primary node will notify the
+    // waiting cursor on document being inserted on its node and not on the majority of nodes.
+    // However, since the read concern is set to majority, the awaken cursor won't find the newly
+    // inserted document, as at that time it is present on the primary only. Therefore it will be
+    // waiting till the timeout. In order to avoid the waiting we stop running this test if read
+    // concern majority.
+    const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
+    if (topology.type !== Topology.kStandalone) {
+        const readConcern =
+            assert.commandWorked(db.adminCommand({getDefaultRWConcern: 1})).defaultReadConcern;
+        if (readConcern.level == "majority" || TestData.defaultReadConcernLevel === "majority") {
+            return;
+        }
     }
+
+    // Test that a getMore command on a tailable, awaitData cursor does not return a new batch to
+    // the user if a document was inserted, but it did not match the filter.
+    let insertshell = startParallelShell(() => {
+        // Signal to the original shell that the parallel shell has successfully started.
+        assert.commandWorked(db.await_data.insert({_id: "signal parent shell"}));
+
+        // Wait for the parent shell to start watching for the next document.
+        jsTestLog("Checking getMore is being blocked...");
+        assert.soon(() => db.currentOp({
+                                op: "getmore",
+                                "cursor.originatingCommand.comment": "uniquifier_comment"
+                            }).inprog.length == 1,
+                    () => tojson(db.currentOp().inprog));
+
+        // Now write a non-matching document to the collection.
+        assert.commandWorked(db.await_data.insert({_id: "no match", x: 0}));
+
+        // Make sure the getMore has not ended after a while.
+        sleep(2000);
+        jsTestLog("Checking getMore is still being blocked...");
+        assert.eq(
+            db.currentOp({op: "getmore", "cursor.originatingCommand.comment": "uniquifier_comment"})
+                .inprog.length,
+            1,
+            tojson(db.currentOp().inprog));
+
+        // Now write a matching document to wake it up.
+        jsTestLog("Sending signal to getMore...");
+        assert.commandWorked(db.await_data.insert({_id: "match", x: 1}));
+        jsTestLog("Insertion shell finished successfully.");
+    });
+
+    // Wait until we receive confirmation that the parallel shell has started.
+    assert.soon(() => db.await_data.findOne({_id: "signal parent shell"}) !== null);
+
+    // Now issue a getMore which will match the parallel shell's currentOp filter, signalling it to
+    // write a non-matching document into the collection. Confirm that we do not receive this
+    // document and that we subsequently time out.
+    cmdRes = db.runCommand({
+        getMore: cmdRes.cursor.id,
+        collection: collName,
+        maxTimeMS: ReplSetTest.kDefaultTimeoutMS
+    });
+    assert.commandWorked(cmdRes);
+    jsTestLog("Waiting insertion shell to terminate...");
+    assert.eq(insertshell(), 0);
+    jsTestLog("Insertion shell terminated.");
+    assert.gt(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
+    assert.eq(cmdRes.cursor.nextBatch.length,
+              1,
+              'Collection documents: ' + tojson(db.await_data.find({}).toArray()));
+    assert.docEq(cmdRes.cursor.nextBatch[0], {_id: "match", x: 1});
+} finally {
+    db.setLogLevel(originalCmdLogLevel, 'command');
+    db.setLogLevel(originalQueryLogLevel, 'query');
 }
-
-// Test that a getMore command on a tailable, awaitData cursor does not return a new batch to
-// the user if a document was inserted, but it did not match the filter.
-let insertshell = startParallelShell(() => {
-    // Signal to the original shell that the parallel shell has successfully started.
-    assert.commandWorked(db.await_data.insert({_id: "signal parent shell"}));
-
-    // Wait for the parent shell to start watching for the next document.
-    jsTestLog("Checking getMore is being blocked...");
-    assert.soon(() => db.currentOp({
-                            op: "getmore",
-                            "cursor.originatingCommand.comment": "uniquifier_comment"
-                        }).inprog.length == 1,
-                () => tojson(db.currentOp().inprog));
-
-    // Now write a non-matching document to the collection.
-    assert.commandWorked(db.await_data.insert({_id: "no match", x: 0}));
-
-    // Make sure the getMore has not ended after a while.
-    sleep(2000);
-    jsTestLog("Checking getMore is still being blocked...");
-    assert.eq(
-        db.currentOp({op: "getmore", "cursor.originatingCommand.comment": "uniquifier_comment"})
-            .inprog.length,
-        1,
-        tojson(db.currentOp().inprog));
-
-    // Now write a matching document to wake it up.
-    jsTestLog("Sending signal to getMore...");
-    assert.commandWorked(db.await_data.insert({_id: "match", x: 1}));
-    jsTestLog("Insertion shell finished successfully.");
-});
-
-// Wait until we receive confirmation that the parallel shell has started.
-assert.soon(() => db.await_data.findOne({_id: "signal parent shell"}) !== null);
-
-// Now issue a getMore which will match the parallel shell's currentOp filter, signalling it to
-// write a non-matching document into the collection. Confirm that we do not receive this
-// document and that we subsequently time out.
-cmdRes = db.runCommand(
-    {getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: ReplSetTest.kDefaultTimeoutMS});
-assert.commandWorked(cmdRes);
-jsTestLog("Waiting insertion shell to terminate...");
-assert.eq(insertshell(), 0);
-jsTestLog("Insertion shell terminated.");
-assert.gt(cmdRes.cursor.id, NumberLong(0));
-assert.eq(cmdRes.cursor.ns, coll.getFullName());
-assert.eq(cmdRes.cursor.nextBatch.length,
-          1,
-          'Collection documents: ' + tojson(db.await_data.find({}).toArray()));
-assert.docEq(cmdRes.cursor.nextBatch[0], {_id: "match", x: 1});
 })();
