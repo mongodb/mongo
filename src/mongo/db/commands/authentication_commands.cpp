@@ -44,7 +44,6 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/authentication_session.h"
-#include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/privilege.h"
@@ -243,7 +242,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
             "No verified subject name available from client",
             !clientName.empty());
 
-    UserName userName = ([&] {
+    auto user = [&] {
         if (session->getUserName().empty()) {
             auto user = UserName(clientName.toString(), session->getDatabase().toString());
             session->updateUserName(user);
@@ -254,7 +253,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
                     session->getUserName() == clientName.toString());
             return UserName(session->getUserName().toString(), session->getDatabase().toString());
         }
-    })();
+    }();
 
     uassert(ErrorCodes::ProtocolError,
             "SSL support is required for the MONGODB-X509 mechanism.",
@@ -270,7 +269,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     uassert(ErrorCodes::ProtocolError,
             "X.509 authentication must always use the $external database.",
-            userName.getDB() == kExternalDB);
+            user.getDB() == kExternalDB);
 
     auto isInternalClient = [&]() -> bool {
         return opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient;
@@ -278,27 +277,11 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     const auto clusterAuthMode = ClusterAuthMode::get(opCtx->getServiceContext());
 
-    boost::optional<std::set<RoleName>> roles;
-    if (allowRolesFromX509Certificates) {
-        auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
-        if (!sslPeerInfo.roles.empty() &&
-            (sslPeerInfo.subjectName.toString() == userName.getUser())) {
-            roles = std::set<RoleName>();
-
-            // In order to be hashable, the role names must be converted from unordered_set to a
-            // set.
-            std::copy(sslPeerInfo.roles.begin(),
-                      sslPeerInfo.roles.end(),
-                      std::inserter(*roles, roles->begin()));
-        }
-    }
-    UserRequest request(std::move(userName), std::move(roles));
-
     auto authorizeExternalUser = [&] {
         uassert(ErrorCodes::BadValue,
                 kX509AuthenticationDisabledMessage,
                 !isX509AuthDisabled(opCtx->getServiceContext()));
-        uassertStatusOK(authorizationSession->addAndAuthorizeUser(opCtx, request));
+        uassertStatusOK(authorizationSession->addAndAuthorizeUser(opCtx, user));
     };
 
     if (sslConfiguration->isClusterMember(clientName)) {

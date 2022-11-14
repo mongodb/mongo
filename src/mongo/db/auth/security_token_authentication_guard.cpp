@@ -41,9 +41,9 @@ namespace auth {
 SecurityTokenAuthenticationGuard::SecurityTokenAuthenticationGuard(
     OperationContext* opCtx, const ValidatedTenancyScope& token) {
     if (token.hasAuthenticatedUser()) {
-        UserRequest request(token.authenticatedUser(), boost::none);
+        const auto& userName = token.authenticatedUser();
         auto* client = opCtx->getClient();
-        uassertStatusOK(AuthorizationSession::get(client)->addAndAuthorizeUser(opCtx, request));
+        uassertStatusOK(AuthorizationSession::get(client)->addAndAuthorizeUser(opCtx, userName));
         _client = client;
 
         LOGV2_DEBUG(5838100,

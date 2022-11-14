@@ -97,8 +97,7 @@ public:
                                     bool showBuiltinRoles,
                                     std::vector<BSONObj>* result) override;
 
-    StatusWith<UserHandle> acquireUser(OperationContext* opCtx,
-                                       const UserRequest& userRequest) override;
+    StatusWith<UserHandle> acquireUser(OperationContext* opCtx, const UserName& userName) override;
     StatusWith<UserHandle> reacquireUser(OperationContext* opCtx, const UserHandle& user) override;
 
     /**

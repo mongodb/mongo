@@ -139,7 +139,7 @@ Status getCurrentUserRoles(OperationContext* opCtx,
                            AuthorizationManager* authzManager,
                            const UserName& userName,
                            stdx::unordered_set<RoleName>* roles) {
-    auto swUser = authzManager->acquireUser(opCtx, UserRequest(userName, boost::none));
+    auto swUser = authzManager->acquireUser(opCtx, userName);
     if (!swUser.isOK()) {
         return swUser.getStatus();
     }
@@ -1385,8 +1385,7 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
             } else {
                 // Custom data is not required in the output, so it can be generated from a cached
                 // user object.
-                auto swUserHandle =
-                    authzManager->acquireUser(opCtx, UserRequest(userName, boost::none));
+                auto swUserHandle = authzManager->acquireUser(opCtx, userName);
                 if (swUserHandle.getStatus().code() == ErrorCodes::UserNotFound) {
                     continue;
                 }

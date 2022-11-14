@@ -203,7 +203,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     // The authentication database is also the source database for the user.
     auto authManager = AuthorizationManager::get(opCtx->getServiceContext());
 
-    auto swUser = authManager->acquireUser(opCtx, UserRequest(user, boost::none));
+    auto swUser = authManager->acquireUser(opCtx, user);
     if (!swUser.isOK()) {
         return swUser.getStatus();
     }

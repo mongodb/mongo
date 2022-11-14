@@ -70,7 +70,7 @@ public:
 
     void startContractTracking() override {}
 
-    Status addAndAuthorizeUser(OperationContext*, const UserRequest&) override {
+    Status addAndAuthorizeUser(OperationContext*, const UserName&) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

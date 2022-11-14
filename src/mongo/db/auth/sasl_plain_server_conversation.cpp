@@ -126,8 +126,7 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
 
     // The authentication database is also the source database for the user.
     auto swUser = authManager->acquireUser(
-        opCtx,
-        UserRequest({ServerMechanismBase::_principalName, _authenticationDatabase}, boost::none));
+        opCtx, UserName(ServerMechanismBase::_principalName, _authenticationDatabase));
 
     if (!swUser.isOK()) {
         return swUser.getStatus();

@@ -108,7 +108,7 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    StatusWith<UserHandle> acquireUser(OperationContext*, const UserRequest&) override {
+    StatusWith<UserHandle> acquireUser(OperationContext*, const UserName&) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

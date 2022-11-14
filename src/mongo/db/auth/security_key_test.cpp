@@ -160,8 +160,7 @@ TEST(SecurityFile, Test) {
 }
 
 TEST(SecurityKey, Test) {
-    UserRequest systemLocal(UserName("__system"_sd, "local"_sd), boost::none);
-    internalSecurity.setUser(std::make_shared<UserHandle>(User(systemLocal)));
+    internalSecurity.setUser(std::make_shared<UserHandle>(User(UserName("__system", "local"))));
 
     for (const auto& testCase : testCases) {
         TestFile file(testCase.fileContents, testCase.mode != TestCase::FailureMode::Permissions);

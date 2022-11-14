@@ -109,8 +109,12 @@ KillAllSessionsByPatternItem makeKillAllSessionsByPattern(OperationContext* opCt
                                                           const KillAllSessionsUser& kasu) {
     KillAllSessionsByPatternItem item = makeKillAllSessionsByPattern(opCtx);
 
-    User user(UserRequest(UserName(kasu.getUser(), kasu.getDb()), boost::none));
-    item.pattern.setUid(user.getDigest());
+    auto authMgr = AuthorizationManager::get(opCtx->getServiceContext());
+
+    UserName un(kasu.getUser(), kasu.getDb());
+
+    auto user = uassertStatusOK(authMgr->acquireUser(opCtx, un));
+    item.pattern.setUid(user->getDigest());
     return item;
 }
 

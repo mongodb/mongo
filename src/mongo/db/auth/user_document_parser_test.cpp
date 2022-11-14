@@ -63,8 +63,8 @@ public:
     BSONObj sha1_creds, sha256_creds;
 
     void setUp() {
-        user.reset(new User(UserRequest(UserName("spencer", "test"), boost::none)));
-        adminUser.reset(new User(UserRequest(UserName("admin", "admin"), boost::none)));
+        user.reset(new User(UserName("spencer", "test")));
+        adminUser.reset(new User(UserName("admin", "admin")));
 
         sha1_creds = scram::Secrets<SHA1Block>::generateCredentials(
             "a", saslGlobalParams.scramSHA1IterationCount.load());

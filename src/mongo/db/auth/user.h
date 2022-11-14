@@ -47,36 +47,6 @@
 namespace mongo {
 
 /**
- * Represents the properties required to request a UserHandle.
- * This type is hashable and may be used as a key describing requests
- */
-struct UserRequest {
-    UserRequest(UserName name, boost::optional<std::set<RoleName>> roles)
-        : name(std::move(name)), roles(std::move(roles)) {}
-
-
-    template <typename H>
-    friend H AbslHashValue(H h, const UserRequest& key) {
-        auto state = H::combine(std::move(h), key.name);
-        if (key.roles) {
-            for (const auto& role : *key.roles) {
-                state = H::combine(std::move(state), role);
-            }
-        }
-        return state;
-    }
-
-    bool operator==(const UserRequest& key) const {
-        return name == key.name && roles == key.roles;
-    }
-
-    // The name of the requested user
-    UserName name;
-    // Any authorization grants which should override and be used in favor of roles acquisition.
-    boost::optional<std::set<RoleName>> roles;
-};
-
-/**
  * Represents a MongoDB user.  Stores information about the user necessary for access control
  * checks and authentications, such as what privileges this user has, as well as what roles
  * the user belongs to.
@@ -188,7 +158,7 @@ public:
 
     using ResourcePrivilegeMap = stdx::unordered_map<ResourcePattern, Privilege>;
 
-    explicit User(UserRequest request);
+    explicit User(const UserName& name);
     User(User&&) = default;
     User& operator=(User&&) = default;
 
@@ -200,15 +170,11 @@ public:
         _id = std::move(id);
     }
 
-    const UserRequest& getUserRequest() const {
-        return _request;
-    }
-
     /**
      * Returns the user name for this user.
      */
     const UserName& getName() const {
-        return _request.name;
+        return _name;
     }
 
     /**
@@ -360,8 +326,8 @@ private:
     // Unique ID (often UUID) for this user. May be empty for legacy users.
     UserId _id;
 
-    // The original UserRequest which resolved into this user
-    UserRequest _request;
+    // The full user name (as specified by the administrator)
+    UserName _name;
 
     // User was explicitly invalidated
     bool _isInvalidated;
@@ -386,6 +352,36 @@ private:
 
     // Indirect restrictions inherited via roles.
     RestrictionDocuments _indirectRestrictions;
+};
+
+/**
+ * Represents the properties required to request a UserHandle.
+ * This type is hashable and may be used as a key describing requests
+ */
+struct UserRequest {
+    UserRequest(const UserName& name, boost::optional<std::set<RoleName>> roles)
+        : name(name), roles(std::move(roles)) {}
+
+
+    template <typename H>
+    friend H AbslHashValue(H h, const UserRequest& key) {
+        auto state = H::combine(std::move(h), key.name);
+        if (key.roles) {
+            for (const auto& role : *key.roles) {
+                state = H::combine(std::move(state), role);
+            }
+        }
+        return state;
+    }
+
+    bool operator==(const UserRequest& key) const {
+        return name == key.name && roles == key.roles;
+    }
+
+    // The name of the requested user
+    UserName name;
+    // Any authorization grants which should override and be used in favor of roles acquisition.
+    boost::optional<std::set<RoleName>> roles;
 };
 
 using UserCache = ReadThroughCache<UserRequest, User>;
