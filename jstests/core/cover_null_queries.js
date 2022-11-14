@@ -6,6 +6,8 @@
  *   requires_fcv_60,
  *   # This test could produce unexpected explain output if additional indexes are created.
  *   assumes_no_implicit_index_creation,
+ *   # TODO SERVER-67506: Dotted path equality to null matches non-object array elements in CQF.
+ *   cqf_incompatible,
  * ]
  */
 (function() {

@@ -113,7 +113,8 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
             continue;
         }
 
-        if (descriptor.isSparse() || descriptor.getIndexType() != IndexType::INDEX_BTREE ||
+        if (descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
+            descriptor.isSparse() || descriptor.getIndexType() != IndexType::INDEX_BTREE ||
             !descriptor.collation().isEmpty()) {
             uasserted(ErrorCodes::InternalErrorNotSupported, "Unsupported index type");
         }
@@ -489,6 +490,10 @@ void validateCommandOptions(const CanonicalQuery* query,
     uassert(ErrorCodes::InternalErrorNotSupported,
             "Timeseries collections are not supported",
             !collection || !collection->getTimeseriesOptions());
+
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "Capped collections are not supported",
+            !collection || !collection->isCapped());
 }
 
 Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,

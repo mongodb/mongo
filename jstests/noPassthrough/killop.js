@@ -2,6 +2,8 @@
 // @tags: [
 //   requires_replication,
 //   requires_sharding,
+//   # TODO SERVER-64007: Implement yielding for CQF.
+//   cqf_incompatible,
 // ]
 
 (function() {

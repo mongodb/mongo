@@ -3268,6 +3268,39 @@ buildvariants:
     - windows-vsCurrent-large
 
 ### QO & QE Patch-Specific Build Variants ###
+
+# The CQF feature flag is currently part of the always-disabled feature flags list, so it is not
+# enabled in all-feature-flags variants besides this one. This variant allows us to get some initial
+# coverage for CQF without disrupting coverage for other feature flags (in particular, SBE).
+# TODO SERVER-71163: Remove this variant once the CQF feature flag is not always-disabled.
+- <<: *linux_x86_dynamic_compile_variant_dependency
+  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled-patch-only
+  display_name: "Shared Library Enterprise RHEL 8.0 Query Patch Only (all feature flags and CQF enabled)"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  stepback: false
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
+    test_flags: >-
+      --excludeWithAnyTags=cqf_incompatible
+      --excludeWithAnyTags=resource_intensive
+      --mongosSetParameters="{featureFlagCommonQueryFramework: true}"
+      --mongodSetParameters="{featureFlagCommonQueryFramework: true}"
+  tasks:
+  - name: .aggregation .common
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: cqf
+  - name: cqf_disabled_pipeline_opt
+  - name: cqf_parallel
+  - name: .jscore .common
+  - name: noPassthrough_gen
+  - name: query_golden_classic
+  - name: query_golden_cqf
+  - name: retryable_writes_jscore_passthrough_gen
+
 - <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine
   name: &enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (Classic Engine)"

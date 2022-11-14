@@ -225,7 +225,8 @@ verifyProfiler(queryComment, framework.find.sbe);
 
 MongoRunner.stopMongod(conn);
 
-conn = MongoRunner.runMongod({restart: conn, setParameter: 'featureFlagCommonQueryFramework=1'});
+conn =
+    MongoRunner.runMongod({restart: conn, setParameter: {featureFlagCommonQueryFramework: true}});
 assert.neq(null, conn, "mongod was unable to start up");
 
 db = conn.getDB(jsTestName());

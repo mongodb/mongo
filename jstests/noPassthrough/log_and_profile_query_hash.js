@@ -1,6 +1,13 @@
-// @tags: [does_not_support_stepdowns, requires_profiling, assumes_read_preference_unchanged]
-//
-//  Confirms that profiled find queries and corresponding logs have matching queryHashes.
+/**
+ * Confirms that profiled find queries and corresponding logs have matching queryHashes.
+ * @tags: [
+ *  does_not_support_stepdowns,
+ *  requires_profiling,
+ *  assumes_read_preference_unchanged,
+ *  # TODO SERVER-67607: support query hash in slow query log lines.
+ *  cqf_incompatible,
+ * ]
+ */
 (function() {
 "use strict";
 

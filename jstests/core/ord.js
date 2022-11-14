@@ -4,6 +4,8 @@
 //   requires_getmore,
 //   # An index drop does not necessarily cause cursors to be killed on the secondary.
 //   does_not_support_causal_consistency,
+//   # TODO SERVER-64007: Enable yielding for plans generated from bonsai.
+//   cqf_incompatible,
 // ]
 (function() {
 "use strict";

@@ -1,6 +1,8 @@
 // @tags: [
 //   requires_profiling,
-//   does_not_support_stepdowns
+//   does_not_support_stepdowns,
+//   # TODO SERVER-67607: Test plan cache with CQF enabled.
+//   cqf_incompatible,
 // ]
 (function() {
 "use strict";

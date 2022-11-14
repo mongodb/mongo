@@ -5,6 +5,8 @@
 //   assumes_read_concern_unchanged,
 //   does_not_support_stepdowns,
 //   requires_profiling,
+//   # TODO SERVER-67607: Test plan cache with CQF enabled.
+//   cqf_incompatible,
 // ]
 (function() {
 "use strict";

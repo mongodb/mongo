@@ -1,5 +1,9 @@
 /**
  * Tests basic NaN handling. Note that WiredTiger indexes handle -NaN and NaN differently.
+ * @tags: [
+ *    # TODO SERVER-67818: NaN does not equal NaN in CQF.
+ *    cqf_incompatible,
+ * ]
  */
 (function() {
 "use strict";

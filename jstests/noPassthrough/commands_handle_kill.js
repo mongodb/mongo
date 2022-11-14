@@ -1,4 +1,8 @@
 // Tests that commands properly handle their underlying plan executor failing or being killed.
+// @tags: [
+//    # TODO SERVER-64007: Support yielding in CQF plans.
+//    cqf_incompatible,
+// ]
 (function() {
 'use strict';
 const dbpath = MongoRunner.dataPath + jsTest.name();

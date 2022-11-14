@@ -4,42 +4,12 @@ selector:
   roots:
   - jstests/aggregation/**/*.js
   - jstests/core/**/*.js
+  exclude_with_any_tags:
+  - cqf_incompatible
   exclude_files:
-  # TODO SERVER-67818
-  - jstests/core/nan.js
-  # TODO SERVER-67506
-  - jstests/core/arrayfind5.js
-  # TODO SERVER-67550
-  - jstests/aggregation/bugs/groupMissing.js
-  - jstests/core/null_query_semantics.js
-  # TODO SERVER-70142 Populate planSummary field which is shown in output of $currentOp.
-  - jstests/core/currentop_cursors.js
-  # TODO SERVER-67639
-  - jstests/core/index_stats.js
-  # TODO SERVER-67640
-  - jstests/aggregation/sources/collStats/query_exec_stats.js
-  - jstests/core/operation_latency_histogram.js
-  - jstests/core/top.js
-  # TODO SERVER-64007 Enable yielding for plans generated from bonsai.
-  - jstests/core/ord.js
-  # TODO SERVER-67607
-  - jstests/core/cached_plan_trial_does_not_discard_work.js
-  - jstests/core/index_filter_commands_invalidate_plan_cache_entries.js
-  - jstests/core/plan_cache_clear.js
-  - jstests/core/plan_cache_list_shapes.js
-  - jstests/core/plan_cache_list_plans.js
-  - jstests/core/plan_cache_sbe.js
-  - jstests/core/plan_cache_shell_helpers.js
-  - jstests/core/plan_cache_stats_shard_and_host.js
-  - jstests/core/profile_query_hash.js
-  - jstests/core/sbe/from_plan_cache_flag.js
-  - jstests/core/sbe/plan_cache_sbe_with_or_queries.js
-  - jstests/core/sbe_plan_cache_autoparameterize_collscan.js
   # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
   # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
   - jstests/core/txns/**/*.js
-  # TODO SERVER-67506
-  - jstests/core/cover_null_queries.js
 
 executor:
   archive:

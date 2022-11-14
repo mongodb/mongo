@@ -6,6 +6,8 @@
 // covered, which will not happen if the $sort is within a $facet stage.
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
+//   # TODO SERVER-67550: Equality to null does not match undefined in CQF.
+//   cqf_incompatible,
 // ]
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
 

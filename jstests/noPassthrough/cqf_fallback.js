@@ -256,6 +256,12 @@ assert.commandWorked(coll.createIndex({"$**": 1}));
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}});
 assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}});
 
+// TTL index is not supported.
+coll.drop();
+assert.commandWorked(coll.createIndex({a: 1}, {expireAfterSeconds: 50}));
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}});
+assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}});
+
 // Unsupported index with non-simple collation.
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr_CA"}}));
@@ -312,6 +318,12 @@ assertNotSupportedByBonsai({aggregate: bucketColl.getName(), pipeline: [], curso
 // Collection-default collation is not supported if non-simple.
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "fr_CA"}}));
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}}, false);
+assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}}, false);
+
+// Queries against capped collections are not supported.
+coll.drop();
+assert.commandWorked(db.createCollection(coll.getName(), {capped: true, size: 1000}));
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}}, false);
 assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}}, false);
 
@@ -397,6 +409,10 @@ MongoRunner.stopMongod(conn);
 
 // Restart the mongod and verify that we never use the bonsai optimizer if the feature flag is not
 // set.
+
+// To do this, we modify the TestData directly; this ensures we disable the feature flag even if
+// a variant has enabled it be default.
+TestData.setParameters.featureFlagCommonQueryFramework = false;
 conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 

@@ -70,3 +70,9 @@ SCons install directory is something more like `build/opt/install/bin`.
 **Note:** The 'cqf_passthrough' suite may also be useful for additional coverage,
 but due to the number of tests it takes quite a while to run locally
 (~15 minutes depending on parallelization and compile flags)
+
+## Evergreen Testing Recommendation
+In addition to the above suites, there is a patch-only variant which enables the CQF feature flag
+on a selection of existing suites. The variant, "Query Patch Only (all feature flags and CQF
+enabled)", runs the suites listed above and some others including: aggregation, jsCore,
+noPassthrough, and a handful of passthroughs (e.g. sharding_jscore_passthrough).

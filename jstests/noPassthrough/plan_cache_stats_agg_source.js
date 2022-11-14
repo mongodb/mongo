@@ -1,5 +1,9 @@
 /**
  * Tests for the $planCacheStats aggregation metadata source.
+ * @tags: [
+ *   # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   cqf_incompatible,
+ * ]
  */
 (function() {
 "use strict";

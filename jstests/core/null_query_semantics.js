@@ -1,6 +1,8 @@
 // Tests the behavior of queries with a {$eq: null} or {$ne: null} predicate.
 // @tags: [
 //   uses_column_store_index,
+//   # TODO SERVER-67550: Equality to null does not match undefined in CQF.
+//   cqf_incompatible,
 // ]
 //
 (function() {

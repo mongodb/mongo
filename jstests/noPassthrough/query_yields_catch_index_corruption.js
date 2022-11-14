@@ -1,5 +1,7 @@
 // @tags: [
 //   requires_persistence,
+//   # TODO: SERVER-64007 Plans produced by Cascades don't yield
+//   cqf_incompatible,
 // ]
 (function() {
 "use strict";

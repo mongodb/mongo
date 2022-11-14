@@ -2,6 +2,8 @@
 //   does_not_support_stepdowns,
 //   requires_getmore,
 //   requires_replication,
+//    # TODO SERVER-64007: Support yielding in CQF plans.
+//   cqf_incompatible,
 // ]
 //
 // Uses getMore to pin an open cursor.

@@ -1,6 +1,10 @@
 /**
  * Test that cache entries are removed and plan cache size is decreased on Plan Cache invalidation
  * and clearing.
+ * @tags: [
+ *   # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   cqf_incompatible,
+ * ]
  */
 
 (function() {
