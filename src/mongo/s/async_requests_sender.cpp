@@ -36,12 +36,12 @@
 #include <memory>
 
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/executor/hedge_options_util.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/hedge_options_util.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
@@ -227,8 +227,8 @@ auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(std::vector<HostAndP
                                              HostAndPort(data.getStringField("hostAndPort"))));
         });
 
-    executor::RemoteCommandRequestOnAny::Options options;
-    extractHedgeOptions(_cmdObj, _ars->_readPreference, options);
+    HedgeOptions options =
+        getHedgeOptions(_cmdObj.firstElementFieldNameStringData(), _ars->_readPreference);
     executor::RemoteCommandRequestOnAny request(
         std::move(hostAndPorts), _ars->_db, _cmdObj, _ars->_metadataObj, _ars->_opCtx, options);
 

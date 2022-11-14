@@ -68,17 +68,9 @@ public:
     const std::vector<HostAndPort> kEmptyHosts{};
     const std::vector<HostAndPort> kTwoHosts{HostAndPort("FakeHost1", 12345),
                                              HostAndPort("FakeHost2", 12345)};
-    const std::vector<HostAndPort> kThreeHosts{HostAndPort("FakeHost1", 12345),
-                                               HostAndPort("FakeHost2", 12345),
-                                               HostAndPort("FakeHost3", 12345)};
-
     using TwoHostCallback =
         std::function<void(NetworkInterfaceMock::NetworkOperationIterator authoritative,
                            NetworkInterfaceMock::NetworkOperationIterator hedged)>;
-    using ThreeHostCallback =
-        std::function<void(NetworkInterfaceMock::NetworkOperationIterator authoritative,
-                           NetworkInterfaceMock::NetworkOperationIterator hedged1,
-                           NetworkInterfaceMock::NetworkOperationIterator hedged2)>;
 
     NetworkInterface::Counters getNetworkInterfaceCounters() {
         auto counters = getNetworkInterfaceMock()->getCounters();
@@ -104,32 +96,6 @@ public:
         mockBehaviorFn(authoritative, hedged);
     }
 
-    void performAuthoritativeHedgeBehavior(NetworkInterfaceMock* network,
-                                           ThreeHostCallback mockBehaviorFn) {
-        std::vector<NetworkInterfaceMock::NetworkOperationIterator> nois{
-            network->getNextReadyRequest(),
-            network->getNextReadyRequest(),
-            network->getNextReadyRequest()};
-
-        NetworkInterfaceMock::NetworkOperationIterator authoritative;
-        std::vector<NetworkInterfaceMock::NetworkOperationIterator> hedged;
-        // Find authoritative and hedged NOIs.
-        std::for_each(
-            nois.begin(), nois.end(), [&](NetworkInterfaceMock::NetworkOperationIterator& noi) {
-                if (noi->getRequestOnAny().target[0] == kThreeHosts[0]) {
-                    authoritative = noi;
-                } else {
-                    hedged.push_back(noi);
-                }
-            });
-
-        auto hedged1 = hedged.back();
-        hedged.pop_back();
-        auto hedged2 = hedged.back();
-
-        mockBehaviorFn(authoritative, hedged1, hedged2);
-    }
-
     /**
      * Testing wrapper to perform common set up, then call sendHedgedCommand. Only safe to call once
      * per test fixture as to not create multiple OpCtx.
@@ -139,7 +105,9 @@ public:
         CommandType cmd,
         std::vector<HostAndPort> hosts,
         std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>()) {
-        ReadPreferenceSetting readPref;
+        // Use a readPreference that's elgible for hedging.
+        ReadPreferenceSetting readPref(ReadPreference::Nearest);
+        readPref.hedgingMode = HedgingMode();
 
         auto factory = RemoteCommandTargeterFactoryMock();
         std::shared_ptr<RemoteCommandTargeter> t;
@@ -156,7 +124,8 @@ public:
                                  std::move(targeter),
                                  getExecutorPtr(),
                                  CancellationToken::uncancelable(),
-                                 retryPolicy);
+                                 retryPolicy,
+                                 readPref);
     }
 
     const NamespaceString testNS = NamespaceString("testdb", "testcoll");
@@ -205,29 +174,6 @@ TEST_F(HedgedAsyncRPCTest, FindHedgeRequestTwoHosts) {
     auto counters = getNetworkInterfaceCounters();
     ASSERT_EQ(counters.succeeded, 1);
     ASSERT_EQ(counters.canceled, 1);
-
-    auto resCursor = resultFuture.get().response.getCursor();
-    ASSERT_EQ(resCursor->getNs(), testNS);
-    ASSERT_BSONOBJ_EQ(resCursor->getFirstBatch()[0], testFirstBatch);
-}
-
-TEST_F(HedgedAsyncRPCTest, FindHedgeRequestThreeHosts) {
-    auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kThreeHosts);
-
-    onCommand([&](const auto& request) {
-        ASSERT(request.cmdObj["find"]);
-        return CursorResponse(testNS, 0LL, {testFirstBatch})
-            .toBSON(CursorResponse::ResponseType::InitialResponse);
-    });
-
-    auto network = getNetworkInterfaceMock();
-    network->enterNetwork();
-    network->runReadyNetworkOperations();
-    network->exitNetwork();
-
-    auto counters = getNetworkInterfaceCounters();
-    ASSERT_EQ(counters.succeeded, 1);
-    ASSERT_EQ(counters.canceled, 2);
 
     auto resCursor = resultFuture.get().response.getCursor();
     ASSERT_EQ(resCursor->getNs(), testNS);
@@ -380,22 +326,20 @@ TEST_F(HedgedAsyncRPCTest, BothCommandsFailWithSkippableError) {
 }
 
 TEST_F(HedgedAsyncRPCTest, AllCommandsFailWithSkippableError) {
-    auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kThreeHosts);
+    auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
 
     auto network = getNetworkInterfaceMock();
     auto now = network->now();
     network->enterNetwork();
 
-    // Send "ignorable" responses for all three requests.
+    // Send "ignorable" responses for both requests.
     performAuthoritativeHedgeBehavior(
         network,
         [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
-            NetworkInterfaceMock::NetworkOperationIterator hedged1,
-            NetworkInterfaceMock::NetworkOperationIterator hedged2) {
+            NetworkInterfaceMock::NetworkOperationIterator hedged1) {
             network->scheduleResponse(
                 authoritative, now + Milliseconds(1000), testIgnorableErrorResponse);
             network->scheduleResponse(hedged1, now, testIgnorableErrorResponse);
-            network->scheduleResponse(hedged2, now, testIgnorableErrorResponse);
         });
 
     network->runUntil(now + Milliseconds(1500));
@@ -403,7 +347,7 @@ TEST_F(HedgedAsyncRPCTest, AllCommandsFailWithSkippableError) {
     auto counters = network->getCounters();
     network->exitNetwork();
 
-    ASSERT_EQ(counters.succeeded, 3);
+    ASSERT_EQ(counters.succeeded, 2);
     ASSERT_EQ(counters.canceled, 0);
 
     auto error = resultFuture.getNoThrow().getStatus();

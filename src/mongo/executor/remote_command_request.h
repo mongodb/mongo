@@ -35,6 +35,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/executor/hedge_options_util.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/concepts.h"
@@ -46,10 +47,13 @@ namespace executor {
 
 struct RemoteCommandRequestBase {
     struct Options {
+        Options() = default;
+        // Allow implicit conversion from HedgeOptions
+        Options(HedgeOptions opts) : hedgeOptions{opts} {}
+
         void resetHedgeOptions();
-        size_t hedgeCount = 0;
-        int maxTimeMSForHedgedReads = 0;
-        bool isHedgeEnabled = false;
+
+        HedgeOptions hedgeOptions = {};
         bool fireAndForget = false;
     };
 

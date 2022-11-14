@@ -31,20 +31,35 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/read_preference.h"
-#include "mongo/executor/remote_command_request.h"
 
 namespace mongo {
+/**
+ * HedgeOptions contains the information necessary for a particular command invocation to execute as
+ * a hedged read. Specifically, it contains:
+ *      clang-format off
+ *      (1) Whether or not the invocation should execute as a hedged read via `isHedgeEnabled`
+ *      (2) How many hedged operations should be sent, in *addition* to the non-hedged/authoriative
+ *          request (`hedgeCount`)
+ *      (3) The maxTimeMS each hedge should be executed with (`maxTimeMSForHedgedReads`)
+ *      clang-format on
+ */
+struct HedgeOptions {
+    bool isHedgeEnabled = false;
+    size_t hedgeCount = 0;
+    int maxTimeMSForHedgedReads = 0;
+};
 
 /**
- * Configure the hedge-related data members of `options`. If the command
- * specified by `cmdObj` and `readPref` is eligible for hedging, and hedging
- * is globally enabled for this server, then the hedge-related parameters of
- * `options` are set. Otherwise they are reset to their default values, which
- * specify unhedged behavior.
+ * Return appropriate HedgeOptions for an invocation of the command named 'command' with
+ * read preference 'readPref.' A command invocation can execute as a hedged read if all three of the
+ * following conditions are met:
+ *      clang-format off
+ *      (1) The server has hedging globaly enabled
+ *      (2) The read preference for the invocation allows for hedging
+ *      (3) The command-type is read-only/is capable of hedging
+ *      clang-format on
  */
-void extractHedgeOptions(const BSONObj& cmdObj,
-                         const ReadPreferenceSetting& readPref,
-                         executor::RemoteCommandRequestOnAny::Options& options);
+HedgeOptions getHedgeOptions(StringData command, const ReadPreferenceSetting& readPref);
 
 /**
  * We ignore a subset of errors that may occur while running hedged operations (e.g., maxTimeMS

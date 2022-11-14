@@ -27,10 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/s/hedge_options_util.h"
+#include "mongo/executor/hedge_options_util.h"
 
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/util/sort.h"
+
+#include "mongo/util/optional_util.h"
 
 namespace mongo {
 namespace {
@@ -53,24 +55,23 @@ static_assert(constexprIsSorted(hedgeCommands.begin(), hedgeCommands.end()));
 bool commandCanHedge(StringData command) {
     return std::binary_search(hedgeCommands.begin(), hedgeCommands.end(), command);
 }
+
+bool commandShouldHedge(StringData command, const ReadPreferenceSetting& readPref) {
+    if (gReadHedgingMode.load() != ReadHedgingMode::kOn) {
+        return false;  // Hedging is globally disabled.
+    }
+    auto&& mode = readPref.hedgingMode;
+    if (!mode || !mode->getEnabled()) {
+        return false;  // The read preference didn't enable hedging.
+    }
+    return commandCanHedge(command);
+}
 }  // namespace
 
-void extractHedgeOptions(const BSONObj& cmdObj,
-                         const ReadPreferenceSetting& readPref,
-                         executor::RemoteCommandRequestOnAny::Options& options) {
-    const bool canHedge = [&] {
-        if (gReadHedgingMode.load() != ReadHedgingMode::kOn)
-            return false;  // Hedging is globally disabled.
-        auto&& mode = readPref.hedgingMode;
-        if (!mode || !mode->getEnabled())
-            return false;  // The read preference didn't enable hedging.
-        auto cmdName = cmdObj.firstElement().fieldNameStringData();
-        if (!commandCanHedge(cmdName))
-            return false;  // This is not a command that can hedge.
-        return true;
-    }();
-    options.isHedgeEnabled = canHedge;
-    options.hedgeCount = canHedge ? 1 : 0;
-    options.maxTimeMSForHedgedReads = canHedge ? gMaxTimeMSForHedgedReads.load() : 0;
+HedgeOptions getHedgeOptions(StringData command, const ReadPreferenceSetting& readPref) {
+    bool shouldHedge = commandShouldHedge(command, readPref);
+    size_t hedgeCount = shouldHedge ? 1 : 0;
+    int maxTimeMSForHedgedReads = shouldHedge ? gMaxTimeMSForHedgedReads.load() : 0;
+    return {shouldHedge, hedgeCount, maxTimeMSForHedgedReads};
 }
 }  // namespace mongo

@@ -256,6 +256,15 @@ env.Library(
 )
 
 env.Library(
+    target='hedge_options_util', source=[
+        'hedge_options_util.cpp',
+    ], LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/s/mongos_server_parameters',
+    ])
+
+env.Library(
     target='async_rpc',
     source=[
         'async_rpc.cpp',
@@ -264,6 +273,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/rpc/command_status',
         'async_rpc_error_info',
+        'hedge_options_util',
         'remote_command',
         'task_executor_interface',
     ],
@@ -325,6 +335,7 @@ env.CppUnitTest(
         'connection_pool_test.cpp',
         'connection_pool_test_fixture.cpp',
         'hedged_async_rpc_test.cpp',
+        'hedge_options_util_test.cpp',
         'mock_async_rpc_test.cpp',
         'mock_network_fixture_test.cpp',
         'network_interface_mock_test.cpp',
@@ -345,6 +356,7 @@ env.CppUnitTest(
         'async_rpc',
         'connection_pool_executor',
         'egress_tag_closer_manager',
+        'hedge_options_util',
         'network_interface_mock',
         'network_interface_tl',
         'network_test_env',

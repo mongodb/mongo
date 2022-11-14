@@ -80,7 +80,7 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
                           << query_request_helper::kMaxTimeMSOpOnlyField,
             !cmdObj.hasField(query_request_helper::kMaxTimeMSOpOnlyField));
 
-    if (options.isHedgeEnabled) {
+    if (options.hedgeOptions.isHedgeEnabled) {
         operationKey.emplace(UUID::gen());
         cmdObj = cmdObj.addField(BSON("clientOperationKey" << operationKey.value()).firstElement());
     }
@@ -169,9 +169,9 @@ std::string RemoteCommandRequestImpl<T>::toString() const {
         out << " expDate:" << (*dateScheduled + timeout).toString();
     }
 
-    if (options.isHedgeEnabled) {
+    if (options.hedgeOptions.isHedgeEnabled) {
         invariant(operationKey);
-        out << " options.hedgeCount: " << options.hedgeCount;
+        out << " options.hedgeCount: " << options.hedgeOptions.hedgeCount;
         out << " operationKey: " << operationKey.value();
     }
 
@@ -199,9 +199,7 @@ template struct RemoteCommandRequestImpl<HostAndPort>;
 template struct RemoteCommandRequestImpl<std::vector<HostAndPort>>;
 
 void RemoteCommandRequestBase::Options::resetHedgeOptions() {
-    hedgeCount = 0;
-    maxTimeMSForHedgedReads = 0;
-    isHedgeEnabled = false;
+    hedgeOptions = {};
 }
 
 }  // namespace executor

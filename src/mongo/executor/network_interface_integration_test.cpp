@@ -369,7 +369,7 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
         RemoteCommandRequest::Options options;
-        options.isHedgeEnabled = true;
+        options.hedgeOptions.isHedgeEnabled = true;
         // Kick off an "echo" operation, which should block until cancelCommand causes
         // the operation to be killed.
         auto deferred = runCommand(
@@ -426,7 +426,7 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
         RemoteCommandRequest::Options options;
-        options.isHedgeEnabled = true;
+        options.hedgeOptions.isHedgeEnabled = true;
         // Kick off a blocking "echo" operation.
         auto deferred = runCommand(
             cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options));
@@ -613,7 +613,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
 
 TEST_F(NetworkInterfaceTest, StartCommand) {
     RemoteCommandRequest::Options options;
-    options.isHedgeEnabled = true;
+    options.hedgeOptions.isHedgeEnabled = true;
     auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options);
 
     auto deferred = runCommand(makeCallbackHandle(), std::move(request));
@@ -693,8 +693,8 @@ TEST_F(NetworkInterfaceInternalClientTest, StartCommandOnAny) {
     auto request = [&] {
         auto cs = fixture();
         RemoteCommandRequestBase::Options options;
-        options.isHedgeEnabled = true;
-        options.hedgeCount = 1;
+        options.hedgeOptions.isHedgeEnabled = true;
+        options.hedgeOptions.hedgeCount = 1;
 
         return RemoteCommandRequestOnAny({cs.getServers()},
                                          "admin",

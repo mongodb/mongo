@@ -38,10 +38,10 @@
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_targeter.h"
+#include "mongo/executor/hedge_options_util.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/hedge_options_util.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -56,18 +56,6 @@ namespace mongo {
 namespace async_rpc {
 
 namespace {
-// Only hedge commands that cannot trigger writes.
-const std::set<std::string> supportedCmds{"collStats",
-                                          "count",
-                                          "dataSize",
-                                          "dbStats",
-                                          "distinct",
-                                          "filemd5",
-                                          "find",
-                                          "listCollections",
-                                          "listIndexes",
-                                          "planCacheListFilters"};
-
 /**
  * Given a vector of input Futures, whenAnyThat returns a Future which holds the value
  * of the first of those futures to resolve with a status, value, and index that
@@ -126,24 +114,26 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     std::unique_ptr<Targeter> targeter,
     std::shared_ptr<executor::TaskExecutor> exec,
     CancellationToken token,
-    std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>()) {
+    std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
+    ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly)) {
     using SingleResponse = AsyncRPCResponse<typename CommandType::Reply>;
 
     // Set up cancellation token to cancel remaining hedged operations.
     CancellationSource hedgeCancellationToken{token};
     auto tryBody = [=, targeter = std::move(targeter)] {
         return targeter->resolve(token).thenRunOn(exec).then(
-            [cmd, opCtx, exec, token, hedgeCancellationToken](std::vector<HostAndPort> targets) {
+            [cmd, opCtx, exec, token, hedgeCancellationToken, readPref](
+                std::vector<HostAndPort> targets) {
                 uassert(ErrorCodes::HostNotFound, "No hosts available.", targets.size() != 0);
 
-                bool shouldHedge = (gReadHedgingMode.load() == ReadHedgingMode::kOn) &&
-                    (supportedCmds.count(CommandType::kCommandName.toString()));
-
-                // When hedging is disabled, the requests vector will be of size 1.
-                size_t hedgeCount = shouldHedge ? targets.size() : 1;
+                HedgeOptions opts = getHedgeOptions(CommandType::kCommandName, readPref);
 
                 std::vector<ExecutorFuture<SingleResponse>> requests;
-                for (size_t i = 0; i < hedgeCount; i++) {
+
+                // We'll send 1 authoritative command + however many hedges we can.
+                size_t hostsToTarget = std::min(opts.hedgeCount + 1, targets.size());
+
+                for (size_t i = 0; i < hostsToTarget; i++) {
                     std::unique_ptr<Targeter> t = std::make_unique<FixedTargeter>(targets[i]);
                     requests.emplace_back(
                         sendCommand(cmd, opCtx, std::move(t), exec, hedgeCancellationToken.token())

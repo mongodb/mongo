@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/read_preference.h"
-#include "mongo/s/hedge_options_util.h"
+#include "mongo/executor/hedge_options_util.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -71,8 +71,7 @@ protected:
         setParameters(serverParameters);
 
         auto readPref = uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(rspObj));
-        executor::RemoteCommandRequest::Options options;
-        extractHedgeOptions(cmdObj, readPref, options);
+        HedgeOptions options = getHedgeOptions(cmdObj.firstElementFieldNameStringData(), readPref);
 
         ASSERT_EQ(hedge, options.isHedgeEnabled);
         if (hedge) {
