@@ -58,8 +58,8 @@ public:
             .thenRunOn(exec)
             .then([dbName, cmdBSON, opCtx, exec = std::move(exec), token](
                       std::vector<HostAndPort> targets) {
-                uassert(ErrorCodes::HostNotFound, "No hosts availables", targets.size() != 0);
-
+                invariant(targets.size(),
+                          "Successful targeting implies there are hosts to target.");
                 executor::RemoteCommandRequestOnAny executorRequest(
                     targets, dbName.toString(), cmdBSON, rpc::makeEmptyMetadata(), opCtx);
                 return exec->scheduleRemoteCommandOnAny(executorRequest, token);

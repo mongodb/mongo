@@ -468,6 +468,31 @@ TEST_F(AsyncRPCTestFixture, ParseAndSeralizeNoop) {
                            "RemoteCommandExectionError illegally parsed from bson");
 }
 
+/**
+ * When the targeter returns an error, ensure we rewrite it correctly.
+ */
+TEST_F(AsyncRPCTestFixture, FailedTargeting) {
+    auto targeterFailStatus = Status{ErrorCodes::InternalError, "Fake targeter failure"};
+    auto targeter = std::make_unique<FailingTargeter>(targeterFailStatus);
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+    auto opCtxHolder = makeOperationContext();
+
+    auto resultFuture = sendCommand(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    // The error returned by our API should always be RemoteCommandExecutionError
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    // Make sure we can extract the extra error info
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+    // Make sure the extra info indicates the error was local, and that the
+    // local error (which is just a Status) has the correct code.
+    ASSERT(extraInfo->isLocal());
+    ASSERT_EQ(extraInfo->asLocal(), targeterFailStatus);
+}
+
 }  // namespace
 }  // namespace async_rpc
 }  // namespace mongo

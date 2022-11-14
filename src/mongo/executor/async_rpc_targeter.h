@@ -51,7 +51,9 @@ public:
 
     /*
      * Returns a collection of possible Hosts on which the command may run based on the specific
-     * settings (ReadPreference, etc.) of the targeter.
+     * settings (ReadPreference, etc.) of the targeter. Note that if no targets can be found on
+     * which to run the command, the returned future should be set with an error - an empty vector
+     * should never be returned and is treated as a programmer error.
      */
     virtual SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) = 0;
 

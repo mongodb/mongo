@@ -166,4 +166,26 @@ private:
     std::shared_ptr<TaskExecutor> _executor;
     std::shared_ptr<NetworkInterfaceMock> _net;
 };
+
+/**
+ * Targeter for use in tests. Returns a user-configurable error when asked to resolve
+ * targets; the error returned can be set when constructing this type.
+ */
+class FailingTargeter : public Targeter {
+public:
+    FailingTargeter(Status errorToFailWith) : _status{errorToFailWith} {}
+    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
+        return _status;
+    }
+
+    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override final {
+        return SemiFuture<void>::makeReady();
+    }
+
+    Status getErrorStatus() {
+        return _status;
+    }
+
+    Status _status;
+};
 }  // namespace mongo::async_rpc

@@ -65,7 +65,6 @@ using executor::RemoteCommandResponse;
 
 class HedgedAsyncRPCTest : public AsyncRPCTestFixture {
 public:
-    const std::vector<HostAndPort> kEmptyHosts{};
     const std::vector<HostAndPort> kTwoHosts{HostAndPort("FakeHost1", 12345),
                                              HostAndPort("FakeHost2", 12345)};
     using TwoHostCallback =
@@ -242,15 +241,48 @@ TEST_F(HedgedAsyncRPCTest, HedgedAsyncRPCWithRetryPolicy) {
 }
 
 /**
- * When the targeter returns no hosts, we get a HostNotFound error.
+ * When the targeter returns an error, ensure we rewrite it correctly.
  */
-TEST_F(HedgedAsyncRPCTest, NoShardsFound) {
-    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+TEST_F(HedgedAsyncRPCTest, FailedTargeting) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
-    auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kEmptyHosts);
+    auto opCtx = makeOperationContext();
+    auto targeterFailStatus = Status{ErrorCodes::InternalError, "Fake targeter failure"};
+    auto targeter = std::make_unique<FailingTargeter>(targeterFailStatus);
 
-    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::HostNotFound);
+    auto resultFuture = sendHedgedCommand(helloCmd,
+                                          opCtx.get(),
+                                          std::move(targeter),
+                                          getExecutorPtr(),
+                                          CancellationToken::uncancelable());
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isLocal());
+    auto localError = extraInfo->asLocal();
+    ASSERT_EQ(localError, targeterFailStatus);
+}
+
+// Ensure that the sendHedgedCommand correctly returns RemoteCommandExecutionError when the executor
+// is shutdown mid-remote-invocation, and that the executor shutdown error is contained
+// in the error's ExtraInfo.
+TEST_F(HedgedAsyncRPCTest, ExecutorShutdown) {
+    auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
+    getExecutorPtr()->shutdown();
+    auto error = resultFuture.getNoThrow().getStatus();
+    // The error returned by our API should always be RemoteCommandExecutionError
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    // Make sure we can extract the extra error info
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+    // Make sure the extra info indicates the error was local, and that the
+    // local error (which is just a Status) has the correct code.
+    ASSERT(extraInfo->isLocal());
+    ASSERT(ErrorCodes::isA<ErrorCategory::CancellationError>(extraInfo->asLocal()));
 }
 
 /**

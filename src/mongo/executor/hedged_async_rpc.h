@@ -121,10 +121,17 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     // Set up cancellation token to cancel remaining hedged operations.
     CancellationSource hedgeCancellationToken{token};
     auto tryBody = [=, targeter = std::move(targeter)] {
-        return targeter->resolve(token).thenRunOn(exec).then(
-            [cmd, opCtx, exec, token, hedgeCancellationToken, readPref](
-                std::vector<HostAndPort> targets) {
-                uassert(ErrorCodes::HostNotFound, "No hosts available.", targets.size() != 0);
+        return targeter->resolve(token)
+            .thenRunOn(exec)
+            .onError([](Status status) -> StatusWith<std::vector<HostAndPort>> {
+                // Targeting error; rewrite it to a RemoteCommandExecutionError and skip
+                // command execution body. We'll retry if the policy indicates to.
+                return Status{AsyncRPCErrorInfo(status), status.reason()};
+            })
+            .then([cmd, opCtx, exec, token, hedgeCancellationToken, readPref](
+                      std::vector<HostAndPort> targets) {
+                invariant(targets.size(),
+                          "Successful targeting implies there are hosts to target.");
 
                 HedgeOptions opts = getHedgeOptions(CommandType::kCommandName, readPref);
 
@@ -180,8 +187,29 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
         })
         .withBackoffBetweenIterations(detail::RetryDelayAsBackoff(retryPolicy.get()))
         .on(exec, CancellationToken::uncancelable())
-        .onCompletion([hedgeCancellationToken](StatusWith<SingleResponse> result) mutable {
+        // We go inline here to intercept executor-shutdown errors and re-write them
+        // so that the API always returns RemoteCommandExecutionError. Additionally,
+        // we need to make sure we cancel outstanding requests.
+        .unsafeToInlineFuture()
+        .onCompletion([hedgeCancellationToken](
+                          StatusWith<SingleResponse> result) mutable -> StatusWith<SingleResponse> {
             hedgeCancellationToken.cancel();
+            if (!result.isOK()) {
+                auto status = result.getStatus();
+                if (status.code() == ErrorCodes::RemoteCommandExecutionError) {
+                    return status;
+                }
+                // The API implementation guarantees that all errors are provided as
+                // RemoteCommandExecutionError, so if we've reached this code, it means that the API
+                // internals were unable to run due to executor shutdown. Today, the only guarantee
+                // we can make about an executor-shutdown error is that it is in the cancellation
+                // category. We dassert that this is the case to make it easy to find errors in the
+                // API implementation's error-handling while still ensuring that we always return
+                // the correct error code in production.
+                dassert(ErrorCodes::isA<ErrorCategory::CancellationError>(status.code()));
+                return Status{AsyncRPCErrorInfo(status),
+                              "Remote command execution failed due to executor shutdown"};
+            }
             return result;
         })
         .semi();
