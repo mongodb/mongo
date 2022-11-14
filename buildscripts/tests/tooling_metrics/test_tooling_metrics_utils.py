@@ -60,19 +60,41 @@ class TestIsVirtualWorkstation(unittest.TestCase):
     @patch("buildscripts.metrics.tooling_metrics_utils._toolchain_exists", return_value=False)
     @patch("buildscripts.metrics.tooling_metrics_utils._git_user_exists", return_value=True)
     def test_no_toolchain_has_email(self, mock_git_user_exists, mock_toolchain_exists):
-        assert not under_test.is_virtual_workstation()
+        assert not under_test._is_virtual_workstation()
 
     @patch("buildscripts.metrics.tooling_metrics_utils._toolchain_exists", return_value=True)
     @patch("buildscripts.metrics.tooling_metrics_utils._git_user_exists", return_value=True)
     def test_has_toolchain_has_email(self, mock_git_user_exists, mock_toolchain_exists):
-        assert under_test.is_virtual_workstation()
+        assert under_test._is_virtual_workstation()
 
     @patch("buildscripts.metrics.tooling_metrics_utils._toolchain_exists", return_value=True)
     @patch("buildscripts.metrics.tooling_metrics_utils._git_user_exists", return_value=False)
     def test_has_toolchain_no_email(self, mock_git_user_exists, mock_toolchain_exists):
-        assert not under_test.is_virtual_workstation()
+        assert not under_test._is_virtual_workstation()
 
     @patch("buildscripts.metrics.tooling_metrics_utils._toolchain_exists", return_value=False)
     @patch("buildscripts.metrics.tooling_metrics_utils._git_user_exists", return_value=False)
     def test_no_toolchain_no_email(self, mock_git_user_exists, mock_toolchain_exists):
-        assert not under_test.is_virtual_workstation()
+        assert not under_test._is_virtual_workstation()
+
+
+class TestHasMetricsOptOut(unittest.TestCase):
+    @patch("os.environ.get", return_value='1')
+    def test_opt_out(self, mock_environ_get):
+        assert under_test._has_metrics_opt_out()
+
+    @patch("os.environ.get", return_value=None)
+    def test_no_opt_out(self, mock_environ_get):
+        assert not under_test._has_metrics_opt_out()
+
+
+class TestShouldCollectMetrics(unittest.TestCase):
+    @patch("buildscripts.metrics.tooling_metrics_utils._is_virtual_workstation", return_value=True)
+    @patch("buildscripts.metrics.tooling_metrics_utils._has_metrics_opt_out", return_value=False)
+    def test_should_collect_metrics(self, mock_opt_out, mock_is_virtual_env):
+        assert under_test.should_collect_metrics()
+
+    @patch("buildscripts.metrics.tooling_metrics_utils._is_virtual_workstation", return_value=True)
+    @patch("buildscripts.metrics.tooling_metrics_utils._has_metrics_opt_out", return_value=True)
+    def test_no_collect_metrics_opt_out(self, mock_opt_out, mock_is_virtual_env):
+        assert not under_test.should_collect_metrics()

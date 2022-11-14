@@ -20,6 +20,10 @@ def _get_internal_tooling_metrics_client():
         host=INTERNAL_TOOLING_METRICS_HOSTNAME,
         username=INTERNAL_TOOLING_METRICS_USERNAME,
         password=INTERNAL_TOOLING_METRICS_PASSWORD,
+        socketTimeoutMS=1000,
+        serverSelectionTimeoutMS=1000,
+        connectTimeoutMS=1000,
+        waitQueueTimeoutMS=1000,
     )
 
 
@@ -39,9 +43,22 @@ def _git_user_exists() -> Optional[str]:
         return None
 
 
-def is_virtual_workstation() -> bool:
+def _is_virtual_workstation() -> bool:
     """Detect whether this is a MongoDB internal virtual workstation."""
     return _toolchain_exists() and _git_user_exists()
+
+
+TOOLING_METRICS_OPT_OUT = "TOOLING_METRICS_OPT_OUT"
+
+
+def _has_metrics_opt_out() -> bool:
+    """Check whether the opt out environment variable is set."""
+    return os.environ.get(TOOLING_METRICS_OPT_OUT, None) == '1'
+
+
+def should_collect_metrics() -> bool:
+    """Determine whether to collect tooling metrics."""
+    return _is_virtual_workstation() and not _has_metrics_opt_out()
 
 
 async def _save_metrics(metrics: ToolingMetrics) -> None:

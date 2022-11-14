@@ -5,7 +5,7 @@ import sys
 from typing import List
 
 from buildscripts.metrics.metrics_datatypes import ToolingMetrics
-from buildscripts.metrics.tooling_metrics_utils import is_virtual_workstation, save_tooling_metrics
+from buildscripts.metrics.tooling_metrics_utils import save_tooling_metrics, should_collect_metrics
 
 logger = logging.getLogger('scons_tooling_metrics')
 
@@ -39,7 +39,7 @@ def _save_scons_tooling_metrics(
 ):
     """Save SCons tooling metrics to atlas cluster."""
     try:
-        if not is_virtual_workstation():
+        if not should_collect_metrics():
             return
         tooling_metrics = ToolingMetrics.get_scons_metrics(utc_starttime, env_vars, env, parser,
                                                            args, exit_hook.exit_code)

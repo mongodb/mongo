@@ -23,11 +23,11 @@ if os.name == "nt":
     'buildscripts/scons.py', "CC=/opt/mongodbtoolchain/v3/bin/gcc",
     "CXX=/opt/mongodbtoolchain/v3/bin/g++", "NINJA_PREFIX=test_success", "--ninja"
 ])
-@patch("buildscripts.metrics.scons_tooling_metrics.is_virtual_workstation", return_value=True)
+@patch("buildscripts.metrics.scons_tooling_metrics.should_collect_metrics", return_value=True)
 @patch("atexit.register")
 class TestSconsAtExitMetricsCollection(unittest.TestCase):
     def test_scons_at_exit_metrics_collection(self, mock_atexit_register,
-                                              mock_is_virtual_workstation):
+                                              mock_should_collect_metrics):
         with self.assertRaises(SystemExit) as context:
             scons_entrypoint()
         assert context.exception.code == 0
@@ -36,7 +36,7 @@ class TestSconsAtExitMetricsCollection(unittest.TestCase):
 
     @patch("buildscripts.moduleconfig.get_module_sconscripts", side_effect=Exception())
     def test_scons_at_exit_metrics_collection_exc(self, mock_method, mock_atexit_register,
-                                                  mock_is_virtual_workstation):
+                                                  mock_should_collect_metrics):
         with self.assertRaises(SystemExit) as context:
             scons_entrypoint()
         assert context.exception.code == 2
@@ -46,19 +46,29 @@ class TestSconsAtExitMetricsCollection(unittest.TestCase):
 
 @patch("buildscripts.metrics.tooling_metrics_utils.INTERNAL_TOOLING_METRICS_HOSTNAME",
        TEST_INTERNAL_TOOLING_METRICS_HOSTNAME)
-@patch("buildscripts.metrics.scons_tooling_metrics.is_virtual_workstation", return_value=True)
-class TestSconsMetricsPersist(unittest.TestCase):
+class TestSconsMetricsCollection(unittest.TestCase):
     @mongomock.patch(servers=((TEST_INTERNAL_TOOLING_METRICS_HOSTNAME), ))
-    def test_scons_metrics_collection_success(self, mock_is_virtual_workstation):
+    @patch("buildscripts.metrics.scons_tooling_metrics.should_collect_metrics", return_value=True)
+    def test_scons_metrics_collection_success(self, mock_should_collect_metrics):
         client = pymongo.MongoClient(host=TEST_INTERNAL_TOOLING_METRICS_HOSTNAME)
         assert not client.metrics.tooling_metrics.find_one()
         under_test._save_scons_tooling_metrics(CURRENT_DATE_TIME, None, None, None, None,
                                                MagicMock(exit_code=0))
         assert client.metrics.tooling_metrics.find_one()
 
+    @patch("buildscripts.metrics.scons_tooling_metrics.should_collect_metrics", return_value=True)
     @mongomock.patch(servers=((TEST_INTERNAL_TOOLING_METRICS_HOSTNAME), ))
-    def test_scons_metrics_collection_fail(self, mock_is_virtual_workstation):
+    def test_scons_metrics_collection_fail(self, mock_should_collect_metrics):
         client = pymongo.MongoClient(host=TEST_INTERNAL_TOOLING_METRICS_HOSTNAME)
         assert not client.metrics.tooling_metrics.find_one()
         under_test._save_scons_tooling_metrics(None, None, None, None, None, None)
+        assert not client.metrics.tooling_metrics.find_one()
+
+    @patch("buildscripts.metrics.scons_tooling_metrics.should_collect_metrics", return_value=False)
+    @mongomock.patch(servers=((TEST_INTERNAL_TOOLING_METRICS_HOSTNAME), ))
+    def test_no_scons_metrics_collection(self, mock_should_collect_metrics):
+        client = pymongo.MongoClient(host=TEST_INTERNAL_TOOLING_METRICS_HOSTNAME)
+        assert not client.metrics.tooling_metrics.find_one()
+        under_test._save_scons_tooling_metrics(CURRENT_DATE_TIME, None, None, None, None,
+                                               MagicMock(exit_code=0))
         assert not client.metrics.tooling_metrics.find_one()

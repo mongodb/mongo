@@ -2,14 +2,14 @@ from datetime import datetime
 import logging
 
 from buildscripts.metrics.metrics_datatypes import ToolingMetrics
-from buildscripts.metrics.tooling_metrics_utils import is_virtual_workstation, save_tooling_metrics
+from buildscripts.metrics.tooling_metrics_utils import save_tooling_metrics, should_collect_metrics
 
 logger = logging.getLogger('resmoke_tooling_metrics')
 
 
 def save_resmoke_tooling_metrics(utc_starttime: datetime):
     try:
-        if not is_virtual_workstation():
+        if not should_collect_metrics():
             return
         tooling_metrics = ToolingMetrics.get_resmoke_metrics(utc_starttime)
         save_tooling_metrics(tooling_metrics)

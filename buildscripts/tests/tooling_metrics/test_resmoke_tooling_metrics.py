@@ -22,13 +22,13 @@ if os.name == "nt":
 @patch("buildscripts.metrics.tooling_metrics_utils.INTERNAL_TOOLING_METRICS_HOSTNAME",
        TEST_INTERNAL_TOOLING_METRICS_HOSTNAME)
 @patch("buildscripts.resmokelib.logging.flush._FLUSH_THREAD", None)
-@patch("buildscripts.metrics.resmoke_tooling_metrics.is_virtual_workstation", return_value=True)
 class TestResmokeMetricsCollection(unittest.TestCase):
     @mongomock.patch(servers=((TEST_INTERNAL_TOOLING_METRICS_HOSTNAME), ))
+    @patch("buildscripts.metrics.resmoke_tooling_metrics.should_collect_metrics", return_value=True)
     @patch("sys.argv", ['buildscripts/resmoke.py', 'run', '--suite', 'buildscripts_test'])
     @patch("buildscripts.resmokelib.testing.executor.TestSuiteExecutor._run_tests",
            side_effect=Exception())
-    def test_resmoke_metrics_collection_exc(self, mock_executor_run, mock_is_virtual_workstation):
+    def test_resmoke_metrics_collection_exc(self, mock_executor_run, mock_should_collect_metrics):
         client = pymongo.MongoClient(host=TEST_INTERNAL_TOOLING_METRICS_HOSTNAME)
         assert not client.metrics.tooling_metrics.find_one()
         with self.assertRaises(SystemExit):
@@ -36,9 +36,20 @@ class TestResmokeMetricsCollection(unittest.TestCase):
         assert client.metrics.tooling_metrics.find_one()
 
     @mongomock.patch(servers=((TEST_INTERNAL_TOOLING_METRICS_HOSTNAME), ))
+    @patch("buildscripts.metrics.resmoke_tooling_metrics.should_collect_metrics", return_value=True)
     @patch("sys.argv", ['buildscripts/resmoke.py', 'list-suites'])
-    def test_resmoke_metrics_collection(self, mock_is_virtual_workstation):
+    def test_resmoke_metrics_collection(self, mock_should_collect_metrics):
         client = pymongo.MongoClient(host=TEST_INTERNAL_TOOLING_METRICS_HOSTNAME)
         assert not client.metrics.tooling_metrics.find_one()
         resmoke_entrypoint()
         assert client.metrics.tooling_metrics.find_one()
+
+    @mongomock.patch(servers=((TEST_INTERNAL_TOOLING_METRICS_HOSTNAME), ))
+    @patch("buildscripts.metrics.resmoke_tooling_metrics.should_collect_metrics",
+           return_value=False)
+    @patch("sys.argv", ['buildscripts/resmoke.py', 'list-suites'])
+    def test_no_resmoke_metrics_collection(self, mock_should_collect_metrics):
+        client = pymongo.MongoClient(host=TEST_INTERNAL_TOOLING_METRICS_HOSTNAME)
+        assert not client.metrics.tooling_metrics.find_one()
+        resmoke_entrypoint()
+        assert not client.metrics.tooling_metrics.find_one()
