@@ -3243,6 +3243,7 @@ buildvariants:
   - name: test_api_version_compatibility
   - name: validate_commit_message
   - name: check_feature_flag_tags
+  - name: compile_venv_deps_check
 
 - name: &windows-dynamic-visibility-test windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"

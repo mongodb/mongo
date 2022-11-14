@@ -4,7 +4,7 @@ from datetime import datetime
 import time
 import os
 import psutil
-from buildscripts.metrics.tooling_metrics import save_tooling_metrics
+from buildscripts.metrics.resmoke_tooling_metrics import save_resmoke_tooling_metrics
 from buildscripts.resmokelib import parser
 
 
@@ -28,4 +28,4 @@ def main(argv):
     try:
         subcommand.execute()
     finally:
-        save_tooling_metrics(datetime.utcfromtimestamp(__start_time))
+        save_resmoke_tooling_metrics(datetime.utcfromtimestamp(__start_time))

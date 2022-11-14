@@ -15,6 +15,7 @@ import subprocess
 import sys
 import textwrap
 import uuid
+from datetime import datetime
 from glob import glob
 
 from pkg_resources import parse_version
@@ -38,6 +39,8 @@ from mongo.build_profiles import BUILD_PROFILES
 EnsurePythonVersion(3, 6)
 EnsureSConsVersion(3, 1, 1)
 
+utc_starttime = datetime.utcnow()
+
 
 # Monkey patch SCons.FS.File.release_target_info to be a no-op.
 # See https://github.com/SCons/scons/issues/3454
@@ -49,6 +52,7 @@ SCons.Node.FS.File.release_target_info = release_target_info_noop
 
 from buildscripts import utils
 from buildscripts import moduleconfig
+from buildscripts.metrics.scons_tooling_metrics import setup_scons_metrics_collection_atexit
 
 import psutil
 
@@ -1030,7 +1034,7 @@ env_vars.Add(
 
 
 def validate_dwarf_version(key, val, env):
-    if val == '4' or val == '5':
+    if val == '4' or val == '5' or val == '':
         return
 
     print(f"Invalid DWARF_VERSION '{val}'. Only valid versions are 4 or 5.")
@@ -1041,7 +1045,8 @@ env_vars.Add(
     'DWARF_VERSION',
     help='Sets the DWARF version (non-Windows). Incompatible with SPLIT_DWARF=1.',
     validator=validate_dwarf_version,
-    converter=int,
+    converter=lambda val: int(val) if val != '' else '',
+    default='',
 )
 
 env_vars.Add(
@@ -1545,6 +1550,11 @@ if get_option('build-tools') == 'next':
 env = Environment(variables=env_vars, **envDict)
 del envDict
 env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), 'AddOption')
+
+# Setup atexit method to store tooling metrics
+# The placement of this is intentional. We should only register this function atexit after
+# env, env_vars and the parser have been properly initialized.
+setup_scons_metrics_collection_atexit(utc_starttime, env_vars, env, _parser, sys.argv)
 
 if get_option('build-metrics'):
     env['BUILD_METRICS_ARTIFACTS_DIR'] = '$BUILD_ROOT/$VARIANT_DIR'

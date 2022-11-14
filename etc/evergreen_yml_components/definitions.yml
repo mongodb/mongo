@@ -2323,6 +2323,21 @@ tasks:
       content_type: application/tar
       display_name: Benchmarks
 
+- name: compile_venv_deps_check
+  commands:
+  - *f_expansions_write
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/compile_venv_dependency_check.sh"
+
 - name: determine_patch_tests
   commands:
   - *f_expansions_write
