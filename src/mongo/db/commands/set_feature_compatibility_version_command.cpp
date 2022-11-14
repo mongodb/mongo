@@ -495,6 +495,7 @@ private:
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             _createGlobalIndexesIndexes(opCtx, requestedVersion);
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion);
+            _createSchemaOnConfigSettings(opCtx, requestedVersion);
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             _createGlobalIndexesIndexes(opCtx, requestedVersion);
         } else {
@@ -580,6 +581,15 @@ private:
         }
     }
 
+    // TODO (SERVER-70763): Remove once FCV 7.0 becomes last-lts.
+    void _createSchemaOnConfigSettings(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (feature_flags::gConfigSettingsSchema.isEnabledOnVersion(requestedVersion)) {
+            LOGV2(6885200, "Creating schema on config.settings");
+            uassertStatusOK(ShardingCatalogManager::get(opCtx)->upgradeConfigSettings(opCtx));
+        }
+    }
+
     // _runUpgrade performs all the upgrade specific code for setFCV. Any new feature specific
     // upgrade code should be placed in the _runUpgrade helper functions:
     //  * _prepareForUpgrade: for any upgrade actions that should be done before taking the FCV full
@@ -587,8 +597,7 @@ private:
     //  * _userCollectionsWorkForUpgrade: for any user collections uasserts, creations, or deletions
     //    that need to happen during the upgrade. This happens after the FCV full transition lock.
     //  * _completeUpgrade: for updating metadata to make sure the new features in the upgraded
-    //  version
-    //    work for sharded and non-sharded clusters
+    //    version work for sharded and non-sharded clusters
     // Please read the comments on those helper functions for more details on what should be placed
     // in each function.
     void _runUpgrade(OperationContext* opCtx,
@@ -822,7 +831,7 @@ private:
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             _dropInternalGlobalIndexesCollection(opCtx, requestedVersion);
-
+            _removeSchemaOnConfigSettings(opCtx, requestedVersion);
             // Always abort the reshardCollection regardless of version to ensure that it will
             // run on a consistent version from start to finish. This will ensure that it will
             // be able to apply the oplog entries correctly.
@@ -899,6 +908,20 @@ private:
                 }()});
                 client.update(update);
             }
+        }
+    }
+
+    // TODO (SERVER-70763): Remove once FCV 7.0 becomes last-lts.
+    void _removeSchemaOnConfigSettings(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
+            LOGV2(6885201, "Removing schema on config.settings");
+            CollMod collModCmd{NamespaceString::kConfigSettingsNamespace};
+            collModCmd.getCollModRequest().setValidator(BSONObj());
+            collModCmd.getCollModRequest().setValidationLevel(ValidationLevelEnum::off);
+            BSONObjBuilder builder;
+            uassertStatusOKIgnoreNSNotFound(processCollModCommand(
+                opCtx, {NamespaceString::kConfigSettingsNamespace}, collModCmd, &builder));
         }
     }
 

@@ -533,6 +533,11 @@ public:
                               bool force,
                               const Timestamp& validAfter);
 
+    /**
+     * Creates config.settings (if needed) and adds a schema to the collection.
+     */
+    Status upgradeConfigSettings(OperationContext* opCtx);
+
 private:
     /**
      * Performs the necessary checks for version compatibility and creates a new config.version
@@ -544,6 +549,11 @@ private:
      * Builds all the expected indexes on the config server.
      */
     Status _initConfigIndexes(OperationContext* opCtx);
+
+    /**
+     * Creates config.settings (if needed) and adds a schema to the collection.
+     */
+    Status _initConfigSettings(OperationContext* opCtx);
 
     /**
      * Ensure that config.collections exists upon configsvr startup

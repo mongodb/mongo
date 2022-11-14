@@ -34,18 +34,22 @@
 #include <vector>
 
 #include "mongo/db/auth/authorization_session_impl.h"
+#include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -345,6 +349,13 @@ Status ShardingCatalogManager::initializeConfigDatabaseIfNeeded(OperationContext
         return status;
     }
 
+    if (feature_flags::gConfigSettingsSchema.isEnabled(serverGlobalParams.featureCompatibility)) {
+        status = _initConfigSettings(opCtx);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     // Make sure to write config.version last since we detect rollbacks of config.version and
     // will re-run initializeConfigDatabaseIfNeeded if that happens, but we don't detect rollback
     // of the index builds.
@@ -357,6 +368,10 @@ Status ShardingCatalogManager::initializeConfigDatabaseIfNeeded(OperationContext
     _configInitialized = true;
 
     return Status::OK();
+}
+
+Status ShardingCatalogManager::upgradeConfigSettings(OperationContext* opCtx) {
+    return _initConfigSettings(opCtx);
 }
 
 void ShardingCatalogManager::discardCachedConfigDatabaseInitializationState() {
@@ -464,6 +479,59 @@ Status ShardingCatalogManager::_initConfigCollections(OperationContext* opCtx) {
         }
     }
     return Status::OK();
+}
+
+Status ShardingCatalogManager::_initConfigSettings(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+
+    /**
+     * $jsonSchema: {
+     *   oneOf: [
+     *       {"properties": {_id: {enum: ["chunksize"]}},
+     *                      {value: {bsonType: "number", minimum: 1, maximum: 1024}}},
+     *       {"properties": {_id: {enum: ["balancer", "autosplit", "ReadWriteConcernDefaults",
+     *                                    "audit"]}}}
+     *   ]
+     * }
+     *
+     * Note: the schema uses "number" for the chunksize instead of "int" because "int" requires the
+     * user to pass NumberInt(x) as the value rather than x (as all of our docs recommend). Non-
+     * integer values will be handled as they were before the schema, by the balancer failing until
+     * a new value is set.
+     */
+    const auto chunkSizeValidator =
+        BSON("properties" << BSON("_id" << BSON("enum" << BSON_ARRAY(ChunkSizeSettingsType::kKey))
+                                        << "value"
+                                        << BSON("bsonType"
+                                                << "number"
+                                                << "minimum" << 1 << "maximum" << 1024))
+                          << "additionalProperties" << false);
+    const auto noopValidator =
+        BSON("properties" << BSON(
+                 "_id" << BSON("enum" << BSON_ARRAY(
+                                   BalancerSettingsType::kKey
+                                   << AutoSplitSettingsType::kKey
+                                   << ReadWriteConcernDefaults::kPersistedDocumentId << "audit"))));
+    const auto fullValidator =
+        BSON("$jsonSchema" << BSON("oneOf" << BSON_ARRAY(chunkSizeValidator << noopValidator)));
+
+    BSONObj cmd = BSON("create" << NamespaceString::kConfigSettingsNamespace.coll());
+    BSONObj result;
+    const bool ok =
+        client.runCommand(NamespaceString::kConfigSettingsNamespace.db().toString(), cmd, result);
+    if (!ok) {  // create returns error NamespaceExists if collection already exists
+        Status status = getStatusFromCommandResult(result);
+        if (status != ErrorCodes::NamespaceExists) {
+            return status.withContext("Could not create config.settings");
+        }
+    }
+
+    // Collection already exists, create validator on that collection
+    CollMod collModCmd{NamespaceString::kConfigSettingsNamespace};
+    collModCmd.getCollModRequest().setValidator(fullValidator);
+    BSONObjBuilder builder;
+    return processCollModCommand(
+        opCtx, {NamespaceString::kConfigSettingsNamespace}, collModCmd, &builder);
 }
 
 Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationContext* opCtx,

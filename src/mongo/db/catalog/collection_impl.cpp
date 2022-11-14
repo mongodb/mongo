@@ -100,7 +100,9 @@ Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
                               << " with UUID " << uuid};
     }
 
-    if (nss.isOnInternalDb()) {
+    // Allow schema on config.settings. This is created internally, and user changes to this
+    // validator are disallowed in the createCollection and collMod commands.
+    if (nss.isOnInternalDb() && nss != NamespaceString::kConfigSettingsNamespace) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Document validators are not allowed on collection " << nss.ns()
                               << " with UUID " << uuid << " in the " << nss.db()

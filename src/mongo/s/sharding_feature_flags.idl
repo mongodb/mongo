@@ -98,3 +98,9 @@ feature_flags:
                   the tolerance in case of a failure on donor and recipient nodes"
     cpp_varname: feature_flags::gResilientMovePrimary
     default: false
+  featureFlagConfigSettingsSchema:
+    description: "Feature flag for adding schema to config.settings collection"
+    cpp_varname: feature_flags::gConfigSettingsSchema
+    default: true
+    version: 6.2
+    
