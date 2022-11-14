@@ -1,6 +1,6 @@
 /**
- * Confirms inclusion of query, command object and planSummary in currentOp() for CRUD operations.
- * This test should not be run in the parallel suite as it sets fail points.
+ * Confirms inclusion of query, command object, planSummary, and queryFramework in currentOp() for
+ * CRUD operations. This test should not be run in the parallel suite as it sets fail points.
  * @tags: [
  *    requires_replication,
  *    requires_sharding,
@@ -8,6 +8,8 @@
  */
 (function() {
 "use strict";
+
+load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
@@ -77,6 +79,8 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
     const isLocalMongosCurOp = (FixtureHelpers.isMongos(testDB) && localOps);
     const isRemoteShardCurOp = (FixtureHelpers.isMongos(testDB) && !localOps);
 
+    const sbeEnabled = checkSBEEnabled(testDB, ["featureFlagSbeFull"]);
+
     // If 'truncatedOps' is true, run only the subset of tests designed to validate the
     // truncation behaviour. Otherwise, run the standard set of tests which assume that
     // truncation will not occur.
@@ -88,11 +92,12 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
 
     /**
      * Captures currentOp() for a given test command/operation and confirms that namespace,
-     * operation type and planSummary are correct.
+     * operation type, planSummary, and queryFramework are correct.
      *
      *  - 'testObj' - Contains test arguments.
      *  - 'testObj.test' - A function that runs the desired test op/cmd.
      *  - 'testObj.planSummary' - A string containing the expected planSummary.
+     *  - 'testObj.queryFramework' - A string containing the expected queryFramework.
      *  - 'testObj.currentOpFilter' - A filter to be used to narrow currentOp() output to only the
      *  relevant operation or command.
      *  - 'testObj.command]' - The command to test against. Will look for this to be a key in the
@@ -139,6 +144,9 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
         }
         if (!isLocalMongosCurOp) {
             testObj.currentOpFilter.planSummary = testObj.planSummary;
+            if (testObj.hasOwnProperty("queryFramework")) {
+                testObj.currentOpFilter.queryFramework = testObj.queryFramework;
+            }
         }
         if (testObj.hasOwnProperty("command")) {
             testObj.currentOpFilter["command." + testObj.command] = {$exists: true};
@@ -146,9 +154,9 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
             testObj.currentOpFilter.op = testObj.operation;
         }
 
-        // Capture currentOp record for the query and confirm that the 'query' and 'planSummary'
-        // fields contain the content expected. We are indirectly testing the 'ns' field as well
-        // with the currentOp query argument.
+        // Capture currentOp record for the query and confirm that the 'query', 'planSummary', and
+        // 'queryFramework' fields contain the content expected. We are indirectly testing the 'ns'
+        // field as well with the currentOp query argument.
         assert.soon(
             function() {
                 var result = currentOp(testDB, testObj.currentOpFilter, truncatedOps, localOps);
@@ -207,6 +215,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                               1);
                 },
                 planSummary: "IXSCAN { _id: 1 }",
+                queryFramework: sbeEnabled ? "sbe" : "classic",
                 currentOpFilter: commandOrOriginatingCommand({
                     "aggregate": {$exists: true},
                     "pipeline.0.$match.$comment": "currentop_query",
@@ -237,6 +246,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 },
                 command: "distinct",
                 planSummary: "COLLSCAN",
+                queryFramework: sbeEnabled ? "sbe" : "classic",
                 currentOpFilter:
                     {"command.query.$comment": "currentop_query", "command.collation.locale": "fr"}
             },
@@ -247,6 +257,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 },
                 command: "find",
                 planSummary: "COLLSCAN",
+                queryFramework: sbeEnabled ? "sbe" : "classic",
                 currentOpFilter: {"command.comment": "currentop_query"}
             },
             {
@@ -260,6 +271,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 // expected to work when running against a mongos with localOps=true.
                 skipMongosLocalOps: true,
                 planSummary: "COLLSCAN",
+                queryFramework: sbeEnabled ? "sbe" : "classic",
                 currentOpFilter: {"command.comment": "currentop_query", numYields: {$gt: 0}}
             },
             {
@@ -284,6 +296,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                     }));
                 },
                 planSummary: "COLLSCAN",
+                queryFramework: "classic",
                 // A mapReduce which gets sent to the shards is internally translated to an
                 // aggregation.
                 currentOpFilter:
@@ -343,6 +356,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
             },
             command: "find",
             planSummary: "COLLSCAN",
+            queryFramework: sbeEnabled ? "sbe" : "classic",
             currentOpFilter:
                 {"command.comment": "currentop_query", "command.collation.locale": "fr"}
         });
@@ -373,6 +387,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 }));
             },
             planSummary: "GEO_NEAR_2DSPHERE { loc: \"2dsphere\" }",
+            queryFramework: "classic",
             currentOpFilter: commandOrOriginatingCommand({
                 "aggregate": {$exists: true},
                 "pipeline.0.$geoNear.query.$comment": "currentop_query",
@@ -426,6 +441,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 },
                 command: "getMore",
                 planSummary: "COLLSCAN",
+                queryFramework: sbeEnabled ? "sbe" : "classic",
                 currentOpFilter: filter,
             });
 
@@ -481,6 +497,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 }));
             },
             planSummary: "COLLSCAN",
+            queryFramework: "classic",
             currentOpFilter: currentOpFilter
         });
 
@@ -497,6 +514,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                     db.runCommand({find: "currentop_query", filter: TestData.queryFilter}));
             },
             planSummary: "COLLSCAN",
+            queryFramework: "classic",
             currentOpFilter: currentOpFilter
         });
 
@@ -524,6 +542,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 assert.eq(cursor.itcount(), 0);
             },
             planSummary: "COLLSCAN",
+            queryFramework: "classic",
             currentOpFilter: currentOpFilter,
         });
 
@@ -550,6 +569,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 }));
             },
             planSummary: "COLLSCAN",
+            queryFramework: "classic",
             currentOpFilter: currentOpFilter,
         });
 

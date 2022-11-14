@@ -1479,7 +1479,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         const auto& mainColl = collections.getMainCollection();
         canonicalQuery->setSbeCompatible(
             isQuerySbeCompatible(&mainColl, canonicalQuery.get(), plannerParams.options));
-
         if (isEligibleForBonsai(*canonicalQuery, opCtx, mainColl)) {
             return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
                 getSBEExecutorViaCascadesOptimizer(mainColl, std::move(canonicalQuery)));
@@ -1517,6 +1516,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
             opCtx, mainColl, std::move(canonicalQuery), yieldPolicy, plannerParams);
     }();
     if (exec.isOK()) {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->debug().queryFramework = exec.getValue()->getQueryFramework();
     }
     return exec;

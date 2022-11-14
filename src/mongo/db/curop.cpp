@@ -675,6 +675,21 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
     appendAsObjOrString(
         "command", appendCommentField(opCtx, _opDescription), maxQuerySize, builder);
 
+    switch (_debug.queryFramework) {
+        case PlanExecutor::QueryFramework::kClassicOnly:
+        case PlanExecutor::QueryFramework::kClassicHybrid:
+            builder->append("queryFramework", "classic");
+            break;
+        case PlanExecutor::QueryFramework::kSBEOnly:
+        case PlanExecutor::QueryFramework::kSBEHybrid:
+            builder->append("queryFramework", "sbe");
+            break;
+        case PlanExecutor::QueryFramework::kCQF:
+            builder->append("queryFramework", "cqf");
+            break;
+        case PlanExecutor::QueryFramework::kUnknown:
+            break;
+    }
 
     if (!_planSummary.empty()) {
         builder->append("planSummary", _planSummary);
