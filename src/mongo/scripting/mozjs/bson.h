@@ -72,10 +72,11 @@ struct BSONInfo : public BaseInfo {
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(bsonWoCompare);
+        MONGO_DECLARE_JS_FUNCTION(bsonUnorderedFieldsCompare);
         MONGO_DECLARE_JS_FUNCTION(bsonBinaryEqual);
     };
 
-    static const JSFunctionSpec freeFunctions[3];
+    static const JSFunctionSpec freeFunctions[4];
 
     static std::tuple<BSONObj*, bool> originalBSON(JSContext* cx, JS::HandleObject obj);
     static void make(
