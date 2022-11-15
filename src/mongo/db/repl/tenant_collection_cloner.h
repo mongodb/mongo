@@ -44,13 +44,13 @@ namespace repl {
 class TenantCollectionCloner : public TenantBaseCloner {
 public:
     struct Stats {
-        static constexpr StringData kDocumentsToCopyFieldName = "documentsToCopy"_sd;
+        static constexpr StringData kDocumentsToCopyFieldName = "documentsToCopyAtStartOfClone"_sd;
         static constexpr StringData kDocumentsCopiedFieldName = "documentsCopied"_sd;
 
         std::string ns;
         Date_t start;
         Date_t end;
-        size_t documentToCopy{0};
+        size_t documentsToCopyAtStartOfClone{0};
         size_t documentsCopied{0};
         size_t indexes{0};
         size_t insertedBatches{0};

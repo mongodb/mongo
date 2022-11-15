@@ -17,8 +17,8 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   # The currentOp output field 'migrationCompleted' was renamed to 'garbageCollectable'.
- *   requires_fcv_61,
+ *   # The currentOp output field 'dataSyncCompleted' was renamed to 'migrationCompleted'.
+ *   requires_fcv_62,
  *   serverless,
  * ]
  */
@@ -99,7 +99,7 @@ let res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipien
 let currOp = res.inprog[0];
 // The migration should not be complete.
 assert.eq(currOp.garbageCollectable, false, tojson(res));
-assert.eq(currOp.dataSyncCompleted, false, tojson(res));
+assert.eq(currOp.migrationCompleted, false, tojson(res));
 // The sync source can only be 'donorSecondary'.
 assert.eq(donorSecondary.host, currOp.donorSyncSource, tojson(res));
 
@@ -138,7 +138,7 @@ res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient mi
 currOp = res.inprog[0];
 // The migration should not be complete.
 assert.eq(currOp.garbageCollectable, false, tojson(res));
-assert.eq(currOp.dataSyncCompleted, false, tojson(res));
+assert.eq(currOp.migrationCompleted, false, tojson(res));
 // Since 'donorSecondary' was shut down, the sync source can only be 'delayedSecondary'.
 assert.eq(delayedSecondary.host, currOp.donorSyncSource, tojson(res));
 

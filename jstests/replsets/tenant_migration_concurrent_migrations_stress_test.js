@@ -26,16 +26,6 @@ load("jstests/replsets/rslib.js");  // for 'setLogVerbosity'
 const kMigrationsCount = 300;
 const kConcurrentMigrationsCount = 120;
 
-// An object that mirrors the donor migration states.
-const migrationStates = {
-    kUninitialized: 0,
-    kAbortingIndexBuilds: 1,
-    kDataSync: 2,
-    kBlocking: 3,
-    kCommitted: 4,
-    kAborted: 5
-};
-
 const setParameterOpts = {
     maxTenantMigrationRecipientThreadPoolSize: 1000,
     maxTenantMigrationDonorServiceThreadPoolSize: 1000
@@ -158,7 +148,7 @@ while (setOfCompleteMigrations.size < kMigrationsCount) {
             assert(id >= 0, `${id}`);
             assert(id <= kMigrationsCount, `${id}`);
 
-            if (op.lastDurableState === migrationStates.kCommitted) {
+            if (op.lastDurableState === TenantMigrationTest.DonorState.kCommitted) {
                 // Check if this migration completed after previous check.
                 if (!setOfCompleteMigrations.has(id)) {
                     setOfCompleteMigrations.add(id);
@@ -166,7 +156,7 @@ while (setOfCompleteMigrations.size < kMigrationsCount) {
                 }
             }
 
-            if (op.lastDurableState === migrationStates.kAborted) {
+            if (op.lastDurableState === TenantMigrationTest.DonorState.kAborted) {
                 if (!seenAbortedMigration) {
                     seenAbortedMigration = true;
                     jsTestLog(`Found an aborted migration in ${tojson(currentOp)}`);
@@ -184,9 +174,9 @@ while (setOfCompleteMigrations.size < kMigrationsCount) {
     });
 
     // Abort a random migration until observed by the `currentOp`.
-    if (!seenAbortedMigration && migrationStates.kDataSync in migrationsByState &&
-        migrationsByState[migrationStates.kDataSync].size > 0) {
-        let items = Array.from(migrationsByState[migrationStates.kDataSync]);
+    if (!seenAbortedMigration && TenantMigrationTest.DonorState.kDataSync in migrationsByState &&
+        migrationsByState[TenantMigrationTest.DonorState.kDataSync].size > 0) {
+        let items = Array.from(migrationsByState[TenantMigrationTest.DonorState.kDataSync]);
         let id = items[Math.floor(Math.random() * items.length)];
         jsTestLog(`${id}`);
         tenantMigrationTest.tryAbortMigration(
