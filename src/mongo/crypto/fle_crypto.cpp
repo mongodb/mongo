@@ -3543,9 +3543,7 @@ OSTType_Double getTypeInfoDouble(double value,
     if (precision.has_value()) {
 
         // Subnormal representations can support up to 5x10^-324 as a number
-        uassert(6966801,
-                "Precision must be between 0 and 324 inclusive",
-                precision.get() >= 0 && precision.get() <= 324);
+        uassert(6966801, "Precision must be between 0 and 324 inclusive", precision.get() <= 324);
 
         uassert(6966803,
                 "Must specify both a lower bound, upper bound and precision",
