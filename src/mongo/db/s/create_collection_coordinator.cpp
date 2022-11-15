@@ -639,7 +639,9 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 
-                _releaseCriticalSections(opCtx);
+                // The critical section might have been taken by a migration, we force
+                // to skip the invariant check and we do nothing in case it was taken.
+                _releaseCriticalSections(opCtx, false /* throwIfReasonDiffers */);
             }
 
             return status;
