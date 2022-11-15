@@ -53,11 +53,18 @@ for (let orderType0 of kOrderTypes) {
     }
 }
 
+// This test requires the collection to contain at least a few thousands of documents to smooth out
+// the noise in the insertion order caused by the oplog application batching on secondaries.
+const numDocsRange = {
+    min: 2500,
+    max: 5000
+};
+
 {
     const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
-    testAnalyzeShardKeysUnshardedCollection(st.s, testCases);
-    testAnalyzeShardKeysShardedCollection(st, testCases);
+    testAnalyzeShardKeysUnshardedCollection(st.s, testCases, numDocsRange);
+    testAnalyzeShardKeysShardedCollection(st, testCases, numDocsRange);
 
     st.stop();
 }
@@ -68,7 +75,7 @@ for (let orderType0 of kOrderTypes) {
     rst.initiate();
     const primary = rst.getPrimary();
 
-    testAnalyzeShardKeysUnshardedCollection(primary, testCases);
+    testAnalyzeShardKeysUnshardedCollection(primary, testCases, numDocsRange);
 
     rst.stopSet();
 }

@@ -202,16 +202,13 @@ function makeDocuments(numDocs, fieldOpts) {
     return docs;
 }
 
-const minNumDocs = 2500;
-const maxNumDocs = 5000;
-
-function testMonotonicity(conn, dbName, collName, currentShardKey, testCases) {
+function testMonotonicity(conn, dbName, collName, currentShardKey, testCases, numDocsRange) {
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
 
     testCases.forEach(testCase => {
-        const numDocs = AnalyzeShardKeyUtil.getRandInteger(minNumDocs, maxNumDocs);
+        const numDocs = AnalyzeShardKeyUtil.getRandInteger(numDocsRange.min, numDocsRange.max);
         for (let i = 0; i < testCase.fieldOpts.length; i++) {
             const order = testCase.fieldOpts[i].order;
             if (order == "increasing" || order == "decreasing") {
@@ -251,7 +248,7 @@ function testMonotonicity(conn, dbName, collName, currentShardKey, testCases) {
     });
 }
 
-function testAnalyzeShardKeysUnshardedCollection(conn, testCases) {
+function testAnalyzeShardKeysUnshardedCollection(conn, testCases, numDocsRange) {
     const dbName = "testDbCandidateUnsharded";
     const collName = "testColl";
     const db = conn.getDB(dbName);
@@ -259,11 +256,11 @@ function testAnalyzeShardKeysUnshardedCollection(conn, testCases) {
     jsTest.log(`Testing analyzing a shard key for an unsharded collection: ${
         tojsononeline({dbName, collName})}`);
 
-    testMonotonicity(conn, dbName, collName, null /* currentShardKey */, testCases);
+    testMonotonicity(conn, dbName, collName, null /* currentShardKey */, testCases, numDocsRange);
     assert.commandWorked(db.dropDatabase());
 }
 
-function testAnalyzeShardKeysShardedCollection(st, testCases) {
+function testAnalyzeShardKeysShardedCollection(st, testCases, numDocsRange) {
     const dbName = "testDbCandidateSharded";
     const collName = "testColl";
     const ns = dbName + "." + collName;
@@ -280,6 +277,6 @@ function testAnalyzeShardKeysShardedCollection(st, testCases) {
     assert.commandWorked(st.s.adminCommand({split: ns, middle: currentShardKeySplitPoint}));
     assert.commandWorked(st.s.adminCommand(
         {moveChunk: ns, find: currentShardKeySplitPoint, to: st.shard1.shardName}));
-    testMonotonicity(st.s, dbName, collName, currentShardKey, testCases);
+    testMonotonicity(st.s, dbName, collName, currentShardKey, testCases, numDocsRange);
     assert.commandWorked(db.dropDatabase());
 }
