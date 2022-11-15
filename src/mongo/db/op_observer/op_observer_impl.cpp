@@ -1610,17 +1610,16 @@ void packTransactionStatementsForApplyOps(
     BSONObjBuilder* applyOpsBuilder,
     std::vector<StmtId>* stmtIdsWritten,
     boost::optional<repl::ReplOperation::ImageBundle>* imageToWrite,
-    std::vector<repl::ReplOperation>::iterator stmtBegin,
-    std::vector<repl::ReplOperation>::iterator stmtEnd,
+    std::vector<repl::ReplOperation>::const_iterator stmtBegin,
+    std::vector<repl::ReplOperation>::const_iterator stmtEnd,
     const std::vector<BSONObj>& operations) {
     tassert(6278508,
             "Number of operations does not match the number of transaction statements",
             operations.size() == static_cast<size_t>(stmtEnd - stmtBegin));
 
-    std::vector<repl::ReplOperation>::iterator stmtIter;
     auto operationsIter = operations.begin();
     BSONArrayBuilder opsArray(applyOpsBuilder->subarrayStart("applyOps"_sd));
-    for (stmtIter = stmtBegin; stmtIter != stmtEnd; stmtIter++) {
+    for (auto stmtIter = stmtBegin; stmtIter != stmtEnd; stmtIter++) {
         const auto& stmt = *stmtIter;
         opsArray.append(*operationsIter++);
         const auto stmtIds = stmt.getStatementIds();
@@ -1730,14 +1729,14 @@ OpTimeBundle logApplyOps(OperationContext* opCtx,
 // The number of oplog entries written is returned.
 int logOplogEntries(
     OperationContext* opCtx,
-    std::vector<repl::ReplOperation>* stmts,
+    const std::vector<repl::ReplOperation>& stmts,
     const std::vector<OplogSlot>& oplogSlots,
     const OpObserver::ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     boost::optional<repl::ReplOperation::ImageBundle>* prePostImageToWriteToImageCollection,
     bool prepare,
     Date_t wallClockTime,
     OplogWriter* oplogWriter) {
-    invariant(!stmts->empty());
+    invariant(!stmts.empty());
 
     // Storage transaction commit is the last place inside a transaction that can throw an
     // exception. In order to safely allow exceptions to be thrown at that point, this function must
@@ -1765,9 +1764,9 @@ int logOplogEntries(
     // first statement of the sequence of remaining, unpacked transaction statements. If all
     // statements have been packed, it should point to stmts.end(), which is the loop's
     // termination condition.
-    auto stmtsIter = stmts->begin();
+    auto stmtsIter = stmts.begin();
     auto applyOpsIter = applyOpsOperationAssignment.applyOpsEntries.begin();
-    while (stmtsIter != stmts->end()) {
+    while (stmtsIter != stmts.end()) {
         tassert(6278509,
                 "Not enough \"applyOps\" entries",
                 applyOpsIter != applyOpsOperationAssignment.applyOpsEntries.end());
@@ -1785,8 +1784,8 @@ int logOplogEntries(
 
         // If we packed the last op, then the next oplog entry we log should be the implicit
         // commit or implicit prepare, i.e. we omit the 'partialTxn' field.
-        auto firstOp = stmtsIter == stmts->begin();
-        auto lastOp = nextStmt == stmts->end();
+        auto firstOp = stmtsIter == stmts.begin();
+        auto lastOp = nextStmt == stmts.end();
 
         auto implicitCommit = lastOp && !prepare;
         auto implicitPrepare = lastOp && prepare;
@@ -1822,7 +1821,7 @@ int logOplogEntries(
         // The 'count' field gives the total number of individual operations in the
         // transaction, and is included on a non-initial implicit commit or prepare entry.
         if (lastOp && !firstOp) {
-            applyOpsBuilder.append("count", static_cast<long long>(stmts->size()));
+            applyOpsBuilder.append("count", static_cast<long long>(stmts.size()));
         }
 
         // For both prepared and unprepared transactions (but not for batched writes) update the
@@ -1974,7 +1973,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     // Log in-progress entries for the transaction along with the implicit commit.
     boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
     int numOplogEntries = logOplogEntries(opCtx,
-                                          statements,
+                                          *statements,
                                           oplogSlots,
                                           applyOpsOplogSlotAndOperationAssignment,
                                           &imageToWrite,
@@ -2051,7 +2050,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
 
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
     logOplogEntries(opCtx,
-                    batchedOps->getMutableOperationsForOpObserver(),
+                    *(batchedOps->getMutableOperationsForOpObserver()),
                     oplogSlots,
                     applyOpsOplogSlotAndOperationAssignment,
                     &noPrePostImage,
@@ -2149,7 +2148,7 @@ void OpObserverImpl::onTransactionPrepare(
                     // that as the prepare time.
                     boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
                     logOplogEntries(opCtx,
-                                    statements,
+                                    *statements,
                                     reservedSlots,
                                     *applyOpsOperationAssignment,
                                     &imageToWrite,
