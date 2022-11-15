@@ -3691,9 +3691,7 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
                 "Must specify both a lower bound, upper bound and precision",
                 min.has_value() == max.has_value() && max.has_value() == precision.has_value());
 
-        uassert(6966802,
-                "Precision must be between 0 and 6182 inclusive",
-                precision.get() >= 0 && precision.get() <= 6142);
+        uassert(6966802, "Precision must be between 0 and 6182 inclusive", precision.get() <= 6142);
 
 
         Decimal128 bounds = max.get().subtract(min.get()).add(Decimal128(1));
