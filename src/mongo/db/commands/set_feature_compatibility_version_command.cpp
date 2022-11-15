@@ -461,6 +461,10 @@ private:
                 ->waitForCoordinatorsOfGivenTypeToComplete(
                     opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData);
         }
+
+        if (requestedVersion > actualVersion) {
+            _createGlobalIndexesIndexes(opCtx, requestedVersion);
+        }
     }
 
     // This helper function is for any actions that should be done before taking the FCV full
@@ -493,11 +497,9 @@ private:
     void _completeUpgrade(OperationContext* opCtx,
                           const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            _createGlobalIndexesIndexes(opCtx, requestedVersion);
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion);
             _createSchemaOnConfigSettings(opCtx, requestedVersion);
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-            _createGlobalIndexesIndexes(opCtx, requestedVersion);
         } else {
             return;
         }
@@ -649,6 +651,8 @@ private:
 
             // TODO SERVER-68551: Remove once 7.0 becomes last-lts
             dropDistLockCollections(opCtx);
+
+            _createGlobalIndexesIndexes(opCtx, requestedVersion);
 
             // Tell the shards to enter phase-2 of setFCV (fully upgraded)
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);

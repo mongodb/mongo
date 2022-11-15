@@ -470,9 +470,15 @@ boost::optional<GlobalIndexesCache> CatalogCache::_getCollectionIndexInfoAt(
                                       "Index refresh failed",
                                       "namespace"_attr = nss,
                                       "exception"_attr = redact(ex));
+
             acquireTries++;
             if (acquireTries == kMaxInconsistentCollectionRefreshAttempts) {
                 throw;
+            }
+
+            // TODO (SERVER-71278) Remove this handling of SnapshotUnavailable
+            if (ex.code() == ErrorCodes::SnapshotUnavailable) {
+                sleepmillis(100);
             }
         }
 
