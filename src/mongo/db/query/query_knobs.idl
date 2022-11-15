@@ -51,6 +51,16 @@ enums:
             # Force the Bonsai optimizer for all queries.
             kForceBonsai: "forceBonsai"
 
+    QueryTelemetryFieldNameRedactionStrategy:
+        description: "Enum for possible values of queryFieldNameRedactionStrategy."
+        type: string
+        values:
+            kNoRedactionStrategy: "none"
+            # Use the constant redaction strategy.
+            kConstantRedactionStrategy: "constant"
+            # Use a prefix of sha256 redaction strategy
+            kSha256RedactionStrategy: "sha256"
+
 server_parameters:
 
   #
@@ -972,6 +982,17 @@ server_parameters:
     on_update: telemetry_util::onTelemetryStoreSizeUpdate
     validator:
       callback: telemetry_util::validateTelemetryStoreSize
+
+  internalQueryConfigureTelemetryFieldNameRedactionStrategy:
+    description:  Choose between the "none" implementation which will not redact any fields names, the "constant"
+      implementation, which will replace all field names with a constant, and the "sha256" implementation, which
+      preserves the identify of a field.
+    set_at: [ startup, runtime ]
+    cpp_class:
+      name: QueryTelemetryControl
+      data: synchronized_value<QueryTelemetryFieldNameRedactionStrategyEnum>
+    default:
+      expr: QueryTelemetryFieldNameRedactionStrategyEnum::kConstantRedactionStrategy
 
 
 # Note for adding additional query knobs:

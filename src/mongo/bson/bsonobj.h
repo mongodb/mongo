@@ -273,7 +273,9 @@ public:
     /**
      * @return a new full (and owned) redacted copy of the object.
      */
-    BSONObj redact(bool onlyEncryptedFields = false) const;
+    BSONObj redact(
+        bool onlyEncryptedFields = false,
+        std::function<std::string(const BSONElement&)> fieldNameRedactor = nullptr) const;
 
     /**
      * Readable representation of a BSON object in an extended JSON-style notation.

@@ -101,8 +101,9 @@ void DocumentSourceTelemetry::buildTelemetryStoreIterator() {
                 const auto partitionReadTime =
                     Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
                 for (auto&& [key, metrics] : *partition) {
-                    Document d{
-                        {{"key", key}, {"metrics", metrics.toBSON()}, {"asOf", partitionReadTime}}};
+                    Document d{{{"key", metrics.redactKey(key)},
+                                {"metrics", metrics.toBSON()},
+                                {"asOf", partitionReadTime}}};
                     _queue.push(std::move(d));
                 }
             });

@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/query/partitioned_cache.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -82,3 +83,18 @@ const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater
     telemetryStoreOnParamChangeUpdater =
         ServiceContext::declareDecoration<std::unique_ptr<OnParamChangeUpdater>>();
 }  // namespace mongo::telemetry_util
+
+namespace mongo {
+void QueryTelemetryControl::append(OperationContext*,
+                                   BSONObjBuilder* b,
+                                   StringData name,
+                                   const boost::optional<TenantId>&) {
+    *b << name << QueryTelemetryFieldNameRedactionStrategy_serializer(_data.get());
+}
+
+Status QueryTelemetryControl::setFromString(StringData value, const boost::optional<TenantId>&) {
+    _data = QueryTelemetryFieldNameRedactionStrategy_parse(
+        IDLParserContext("internalQueryConfigureTelemetryFieldNameRedactionStrategy"), value);
+    return Status::OK();
+}
+}  // namespace mongo

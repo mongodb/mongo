@@ -184,7 +184,6 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
     if (!telemetryRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
         return false;
     }
-    // TODO SERVER-71244: check if it's a FLE collection here (maybe pass in the request)
     return true;
 }
 
@@ -195,8 +194,10 @@ void addToFindKey(BSONObjBuilder& builder, const StringData& fieldName, const BS
     serializeBSONWhenNotEmpty(value.redact(false), fieldName, &builder);
 }
 
-// Call this function from inside the redact() function on every BSONElement in the BSONObj.
-void throwIfEncounteringFLEPayload(BSONElement e) {
+/**
+ * Recognize FLE payloads in a query and throw an exception if found.
+ */
+void throwIfEncounteringFLEPayload(const BSONElement& e) {
     constexpr auto safeContentLabel = "__safeContent__"_sd;
     constexpr auto fieldpath = "$__safeContent__"_sd;
     if (e.type() == BSONType::Object) {
@@ -204,12 +205,12 @@ void throwIfEncounteringFLEPayload(BSONElement e) {
         uassert(ErrorCodes::EncounteredFLEPayloadWhileRedacting,
                 "Encountered __safeContent__, or an $_internalFle operator, which indicate a "
                 "rewritten FLE2 query.",
-                fieldname == safeContentLabel || fieldname.startsWith("$_internalFle"_sd));
+                fieldname != safeContentLabel && !fieldname.startsWith("$_internalFle"_sd));
     } else if (e.type() == BSONType::String) {
         auto val = e.valueStringData();
         uassert(ErrorCodes::EncounteredFLEPayloadWhileRedacting,
                 "Encountered $__safeContent__ fieldpath, which indicates a rewritten FLE2 query.",
-                val == fieldpath);
+                val != fieldpath);
     } else if (e.type() == BSONType::BinData && e.isBinData(BinDataType::Encrypt)) {
         int len;
         auto data = e.binData(len);
@@ -263,7 +264,103 @@ private:
     TelemetryStore::Partition _partitionLock;
 };
 
+/**
+ * Upon reading telemetry data, we redact some keys. This is the list. See
+ * TelemetryMetrics::redactKey().
+ */
+const stdx::unordered_set<std::string> kKeysToRedact = {"pipeline", "find"};
+
+std::string sha256FieldNameHasher(const BSONElement& e) {
+    auto&& fieldName = e.fieldNameStringData();
+    auto hash = SHA256Block::computeHash({ConstDataRange(fieldName.rawData(), fieldName.size())});
+    return hash.toString().substr(0, 12);
+}
+
+std::string constantFieldNameHasher(const BSONElement& e) {
+    return {"###"};
+}
+
+/**
+ * Admittedly an abuse of the BSON redaction interface, we recognize FLE payloads here and avoid
+ * collecting telemetry for the query.
+ */
+std::string fleSafeFieldNameRedactor(const BSONElement& e) {
+    throwIfEncounteringFLEPayload(e);
+    // Ideally we would change interface to avoid copying here.
+    return e.fieldNameStringData().toString();
+}
+
 }  // namespace
+
+const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key) const {
+    if (_redactedKey) {
+        return *_redactedKey;
+    }
+
+    auto redactionStrategy = ServerParameterSet::getNodeParameterSet()
+                                 ->get<QueryTelemetryControl>(
+                                     "internalQueryConfigureTelemetryFieldNameRedactionStrategy")
+                                 ->_data.get();
+
+    // The telemetry key is of the following form:
+    // { "<CMD_TYPE>": {...}, "namespace": "...", "applicationName": "...", ... }
+    //
+    // The part of the key we need to redact is the object in the <CMD_TYPE> element. In the case of
+    // an aggregate() command, it will look something like:
+    // > "pipeline" : [ { "$telemetry" : {} },
+    //					{ "$addFields" : { "x" : { "$someExpr" {} } } } ],
+    // We should preserve the top-level stage names in the pipeline but redact all field names of
+    // children.
+    //
+    // The find-specific key will look like so:
+    // > "find" : { "find" : "###", "filter" : { "_id" : { "$ne" : "###" } } },
+    // Again, we should preserve the top-level keys and redact all field names of children.
+    BSONObjBuilder redacted;
+    for (BSONElement e : key) {
+        if ((e.type() == Object || e.type() == Array) &&
+            kKeysToRedact.count(e.fieldNameStringData().toString()) == 1) {
+            auto redactor = [&](BSONObjBuilder subObj, const BSONObj& obj) {
+                for (BSONElement e2 : obj) {
+                    if (e2.type() == Object) {
+                        switch (redactionStrategy) {
+                            case QueryTelemetryFieldNameRedactionStrategyEnum::
+                                kSha256RedactionStrategy:
+                                subObj.append(e2.fieldNameStringData(),
+                                              e2.Obj().redact(false, sha256FieldNameHasher));
+                                break;
+                            case QueryTelemetryFieldNameRedactionStrategyEnum::
+                                kConstantRedactionStrategy:
+                                subObj.append(e2.fieldNameStringData(),
+                                              e2.Obj().redact(false, constantFieldNameHasher));
+                                break;
+                            case QueryTelemetryFieldNameRedactionStrategyEnum::kNoRedactionStrategy:
+                                subObj.append(e2.fieldNameStringData(), e2.Obj().redact(false));
+                                break;
+                        }
+                    } else {
+                        subObj.append(e2);
+                    }
+                }
+                subObj.done();
+            };
+
+            // Now we're inside the <CMD_TYPE>:{} entry and want to preserve the top-level field
+            // names. If it's a [pipeline] array, we redact each element in isolation.
+            if (e.type() == Object) {
+                redactor(redacted.subobjStart(e.fieldNameStringData()), e.Obj());
+            } else {
+                BSONObjBuilder subArr = redacted.subarrayStart(e.fieldNameStringData());
+                for (BSONElement stage : e.Obj()) {
+                    redactor(subArr.subobjStart(""), stage.Obj());
+                }
+            }
+        } else {
+            redacted.append(e);
+        }
+    }
+    _redactedKey = redacted.obj();
+    return *_redactedKey;
+}
 
 void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx) {
     if (request.getEncryptionInformation()) {
@@ -285,7 +382,8 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
         for (auto&& stage : request.getPipeline()) {
             auto el = stage.firstElement();
             BSONObjBuilder stageBuilder = pipelineBuilder.subobjStart("stage"_sd);
-            stageBuilder.append(el.fieldNameStringData(), el.Obj().redact(false));
+            stageBuilder.append(el.fieldNameStringData(),
+                                el.Obj().redact(false, fleSafeFieldNameRedactor));
             stageBuilder.done();
         }
         pipelineBuilder.done();
@@ -340,7 +438,8 @@ void registerFindRequest(const FindCommandRequest& request,
         auto findBson = request.toBSON({});
         for (auto&& findEntry : findBson) {
             if (findEntry.isABSONObj()) {
-                telemetryKey.append(findEntry.fieldNameStringData(), findEntry.Obj().redact(false));
+                telemetryKey.append(findEntry.fieldNameStringData(),
+                                    findEntry.Obj().redact(false, fleSafeFieldNameRedactor));
             } else {
                 telemetryKey.append(findEntry.fieldNameStringData(), "###"_sd);
             }

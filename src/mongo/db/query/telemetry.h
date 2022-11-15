@@ -107,6 +107,11 @@ public:
     }
 
     /**
+     * Redact a given telemetry key.
+     */
+    const BSONObj& redactKey(const BSONObj& key) const;
+
+    /**
      * Timestamp for when this query shape was added to the store. Set on construction.
      */
     const Timestamp firstSeenTimestamp;
@@ -130,6 +135,12 @@ public:
     AggregatedMetric docsScanned;
 
     AggregatedMetric keysScanned;
+
+private:
+    /**
+     * We cache the redacted key the first time it's computed.
+     */
+    mutable boost::optional<BSONObj> _redactedKey;
 };
 
 struct TelemetryPartitioner {
@@ -139,9 +150,15 @@ struct TelemetryPartitioner {
     }
 };
 
+/**
+ * Average key size used to pad the metrics size. We store a cached redaction of the key in the
+ * TelemetryMetrics object.
+ */
+const size_t kAverageKeySize = 100;
+
 struct ComputeEntrySize {
     size_t operator()(const TelemetryMetrics& entry) {
-        return sizeof(TelemetryMetrics);
+        return sizeof(TelemetryMetrics) + kAverageKeySize;
     }
 };
 
