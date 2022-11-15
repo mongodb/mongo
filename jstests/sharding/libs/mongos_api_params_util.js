@@ -587,10 +587,6 @@ let MongosAPIParametersUtil = (function() {
             commandName: "getDiagnosticData",
             skip: "executes locally on mongos (not sent to any remote node)"
         },
-        {
-            commandName: "getLastError",
-            skip: "executes locally on mongos (not sent to any remote node)"
-        },
         {commandName: "getLog", skip: "executes locally on mongos (not sent to any remote node)"},
         {
             commandName: "getMore",

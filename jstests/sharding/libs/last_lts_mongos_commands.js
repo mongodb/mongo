@@ -7,6 +7,7 @@ const commandsRemovedFromMongosSinceLastLTS = [
     "repairShardedCollectionChunksHistory",
     // last-continuos
     "availableQueryOptions",  // TODO SERVER-67689: remove this once 7.0 becomes last-lts
+    "getLastError",
 
 ];
 // These commands were added in mongos since the last LTS version, so will not appear in the

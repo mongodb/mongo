@@ -649,12 +649,6 @@ const allCommands = {
         isAdminCommand: true,
         command: {getFreeMonitoringStatus: 1},
     },
-    getLastError: {
-        isAdminCommand: true,
-        command: {getLastError: 1},
-        expectFailure: true,
-        expectedErrorCode: 5739000  // getLastError is not supported anymore.
-    },
     getLog: {
         isAdminCommand: true,
         command: {getLog: "global"},

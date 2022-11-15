@@ -579,7 +579,6 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "explain",
                                           "find",
                                           "findAndModify",
-                                          "getLastError",
                                           "getMore",
                                           "getParameter",
                                           "httpClientRequest",

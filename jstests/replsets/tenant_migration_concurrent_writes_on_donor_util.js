@@ -608,7 +608,6 @@ TenantMigrationConcurrentWriteUtil.testCases = {
     getDefaultRWConcern: {skip: isNotRunOnUserDatabase},
     getDiagnosticData: {skip: isNotRunOnUserDatabase},
     getFreeMonitoringStatus: {skip: isNotRunOnUserDatabase},
-    getLastError: {skip: isNotWriteCommand},
     getLog: {skip: isNotRunOnUserDatabase},
     getMore: {skip: isNotWriteCommand},
     getParameter: {skip: isNotRunOnUserDatabase},

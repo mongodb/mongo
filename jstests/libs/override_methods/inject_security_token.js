@@ -122,8 +122,6 @@ const kCmdsAllowedWithSecurityToken = new Set([
     `findandmodify`,
     `geoNear`,
     `geoSearch`,
-    `getLastError`,
-    `getlasterror`,
     `getMore`,
     `getParameter`,
     `hello`,

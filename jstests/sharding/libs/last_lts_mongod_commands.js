@@ -8,6 +8,7 @@ const commandsRemovedFromMongodSinceLastLTS = [
     "_configsvrRepairShardedCollectionChunksHistory",
     "mapreduce.shardedfinish",
     "availableQueryOptions",  // TODO SERVER-67689: remove this once 7.0 becomes last-lts
+    "getLastError",
 ];
 // These commands were added in mongod since the last LTS version, so will not appear in the
 // listCommands output of a last LTS version mongod. We will allow these commands to have a

@@ -134,8 +134,7 @@ TEST(OpLegacy, GetLastError) {
     // 'getLastError' command is no longer supported and will always fail.
     auto status = getStatusFromCommandResult(replyObj);
     ASSERT_NOT_OK(status) << replyObj;
-    const auto expectedCode = conn->isMongos() ? 5739001 : 5739000;
-    ASSERT_EQ(status.code(), expectedCode) << replyObj;
+    ASSERT_EQ(status.code(), ErrorCodes::CommandNotFound) << replyObj;
 }
 
 TEST(OpLegacy, UnsupportedWriteOps) {

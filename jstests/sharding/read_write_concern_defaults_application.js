@@ -481,7 +481,6 @@ let testCases = {
     getDefaultRWConcern: {skip: "does not accept read or write concern"},
     getDiagnosticData: {skip: "does not accept read or write concern"},
     getFreeMonitoringStatus: {skip: "does not accept read or write concern"},
-    getLastError: {skip: "does not accept read or write concern"},
     getLog: {skip: "does not accept read or write concern"},
     getMore: {skip: "does not accept read or write concern"},
     getParameter: {skip: "does not accept read or write concern"},

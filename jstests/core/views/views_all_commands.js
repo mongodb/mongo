@@ -386,7 +386,6 @@ let viewsCommandTests = {
     getDefaultRWConcern: {skip: isUnrelated},
     getDiagnosticData: {skip: isUnrelated},
     getFreeMonitoringStatus: {skip: isUnrelated},
-    getLastError: {skip: isUnrelated},
     getLog: {skip: isUnrelated},
     getMore: {
         setup: function(conn) {

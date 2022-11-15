@@ -490,7 +490,6 @@ let testCases = {
     getCmdLineOpts: {skip: "executes locally on mongos (not sent to any remote node)"},
     getDefaultRWConcern: {skip: "executes locally on mongos (not sent to any remote node)"},
     getDiagnosticData: {skip: "executes locally on mongos (not sent to any remote node)"},
-    getLastError: {skip: "does not forward command to primary shard"},
     getLog: {skip: "executes locally on mongos (not sent to any remote node)"},
     getMore: {skip: "requires a previously established cursor"},
     getParameter: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -746,6 +745,10 @@ const st = new ShardingTest({shards: 2, mongos: 2});
 
 const listCommandsRes = st.s0.adminCommand({listCommands: 1});
 assert.commandWorked(listCommandsRes);
+print("--------------------------------------------");
+for (let command of Object.keys(listCommandsRes.commands)) {
+    print(command);
+}
 
 (() => {
     // Validate test cases for all commands.

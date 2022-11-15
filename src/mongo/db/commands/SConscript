@@ -308,7 +308,6 @@ env.Library(
         "explain_cmd.cpp",
         "find_and_modify.cpp",
         "find_cmd.cpp",
-        "get_last_error.cpp",
         "getmore_cmd.cpp",
         "http_client.cpp",
         'http_client.idl',
