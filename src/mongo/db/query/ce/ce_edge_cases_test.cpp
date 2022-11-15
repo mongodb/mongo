@@ -746,6 +746,8 @@ TEST(EstimatorTest, TwoBucketsMixedHistogram) {
     ASSERT_APPROX_EQUAL(45.5, expectedCard, kErrorBound);
 }
 
+// TODO: enable the following test after SERVER-71376 Fix histogram generation on MacOs
+#if 0
 /**
  * Tests for cardinality estimates for queries over minimum values of date, timestamp, and objectId
  * types. When the histogram has at least 2 buckets per data type, the minimum value, if present in
@@ -924,6 +926,7 @@ TEST(EstimatorTest, MinValueMixedHistogramFromData) {
                                      true /* includeScalar */);
     ASSERT_EQ(3.0, expectedCard);
 }
+#endif
 
 TEST(EstimatorTest, MinValueMixedHistogramFromBuckets) {
     const auto endOid = OID("63340dbed6cd8af737d4139a");
