@@ -85,6 +85,7 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
  * - must be prefixed by 'shardKey', and
  * - must not be a partial index.
  * - must have the simple collation.
+ * - must not be hidden.
  *
  * If the parameter 'requireSingleKey' is true, then this index additionally must not be
  * multi-key.
@@ -97,13 +98,13 @@ boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext* opCtx
                                                          std::string* errMsg = nullptr);
 
 /**
- * Returns true if the given index name is the last remaining index that is compatible with the
- * shard key index.
+ * Returns true if the given index name is the last remaining not hidden index that is compatible
+ * with the shard key index.
  */
-bool isLastShardKeyIndex(OperationContext* opCtx,
-                         const CollectionPtr& collection,
-                         const IndexCatalog* indexCatalog,
-                         const std::string& indexName,
-                         const BSONObj& shardKey);
+bool isLastNonHiddenShardKeyIndex(OperationContext* opCtx,
+                                  const CollectionPtr& collection,
+                                  const IndexCatalog* indexCatalog,
+                                  const std::string& indexName,
+                                  const BSONObj& shardKey);
 
 }  // namespace mongo
