@@ -102,11 +102,13 @@ Status _applyOps(OperationContext* opCtx,
                 [opCtx, nss, opObj, opType, alwaysUpsert, oplogApplicationMode, &info, &dbName] {
                     BSONObjBuilder builder;
                     // Remove 'hash' field if it is set. A bit slow as it rebuilds the object.
+                    // TODO(SERVER-69062): Remove this step.
+                    auto opObjectWithoutHash = opObj;
                     if (opObj.hasField(OplogEntry::kHashFieldName)) {
-                        opObj.removeField(OplogEntry::kHashFieldName);
+                        opObjectWithoutHash = opObj.removeField(OplogEntry::kHashFieldName);
                     }
 
-                    builder.appendElements(opObj);
+                    builder.appendElements(opObjectWithoutHash);
                     if (!builder.hasField(OplogEntry::kTimestampFieldName)) {
                         builder.append(OplogEntry::kTimestampFieldName, Timestamp());
                     }
@@ -134,8 +136,8 @@ Status _applyOps(OperationContext* opCtx,
                     // If the namespace and uuid passed into applyOps point to different
                     // namespaces, throw an error.
                     auto catalog = CollectionCatalog::get(opCtx);
-                    if (opObj.hasField("ui")) {
-                        auto uuid = UUID::parse(opObj["ui"]).getValue();
+                    if (opObjectWithoutHash.hasField("ui")) {
+                        auto uuid = UUID::parse(opObjectWithoutHash["ui"]).getValue();
                         auto nssFromUuid = catalog->lookupNSSByUUID(opCtx, uuid);
                         if (nssFromUuid != nss) {
                             return Status{ErrorCodes::Error(3318200),

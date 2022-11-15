@@ -274,6 +274,8 @@ last-continuous:
     ticket: SERVER-70436
   - test_file: jstests/sharding/prepare_transaction_then_migrate.js
     ticket: SERVER-68361
+  - test_file: jstests/replsets/apply_ops_strips_hash.js
+    ticket: SERVER-70841
   suites: null
 last-lts:
   all:
@@ -623,4 +625,6 @@ last-lts:
     ticket: SERVER-70436
   - test_file: jstests/sharding/prepare_transaction_then_migrate.js
     ticket: SERVER-68361
+  - test_file: jstests/replsets/apply_ops_strips_hash.js
+    ticket: SERVER-70841
   suites: null
