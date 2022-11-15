@@ -1506,24 +1506,6 @@ BucketCatalog::Bucket* BucketCatalog::_reopenBucket(Stripe* stripe,
 
     _expireIdleBuckets(stripe, stripeLock, stats, closedBuckets);
 
-    // If this bucket was archived, we need to remove it from the set of archived buckets.
-    if (auto setIt = stripe->archivedBuckets.find(key.hash);
-        setIt != stripe->archivedBuckets.end()) {
-        auto& archivedSet = setIt->second;
-        if (auto bucketIt = archivedSet.find(bucket->getTime());
-            bucketIt != archivedSet.end() && bucket->id() == bucketIt->second.bucketId) {
-            long long memory =
-                _marginalMemoryUsageForArchivedBucket(bucketIt->second, archivedSet.size() == 1);
-            if (archivedSet.size() == 1) {
-                stripe->archivedBuckets.erase(setIt);
-            } else {
-                archivedSet.erase(bucketIt);
-            }
-            _memoryUsage.fetchAndSubtract(memory);
-            _numberOfActiveBuckets.fetchAndSubtract(1);
-        }
-    }
-
     hangTimeseriesInsertBeforeReopeningBucket.pauseWhileSet();
 
     // We may need to initialize the bucket's state.
@@ -1542,6 +1524,24 @@ BucketCatalog::Bucket* BucketCatalog::_reopenBucket(Stripe* stripe,
         });
     if (!initialized) {
         return nullptr;
+    }
+
+    // If this bucket was archived, we need to remove it from the set of archived buckets.
+    if (auto setIt = stripe->archivedBuckets.find(key.hash);
+        setIt != stripe->archivedBuckets.end()) {
+        auto& archivedSet = setIt->second;
+        if (auto bucketIt = archivedSet.find(bucket->getTime());
+            bucketIt != archivedSet.end() && bucket->id() == bucketIt->second.bucketId) {
+            long long memory =
+                _marginalMemoryUsageForArchivedBucket(bucketIt->second, archivedSet.size() == 1);
+            if (archivedSet.size() == 1) {
+                stripe->archivedBuckets.erase(setIt);
+            } else {
+                archivedSet.erase(bucketIt);
+            }
+            _memoryUsage.fetchAndSubtract(memory);
+            _numberOfActiveBuckets.fetchAndSubtract(1);
+        }
     }
 
     // Pass ownership of the reopened bucket to the bucket catalog.
