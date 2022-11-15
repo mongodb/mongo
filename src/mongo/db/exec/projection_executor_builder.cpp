@@ -269,19 +269,21 @@ std::unique_ptr<ProjectionExecutor> buildProjectionExecutor(
     BuilderParamsBitSet params) {
     invariant(projection);
 
-    // Fast-path can only be used with inclusion-only projections, so we need to reset the
-    // fast-path flag.
-    if (!projection->isInclusionOnly()) {
-        params.reset(kAllowFastPath);
-    }
-
     switch (projection->type()) {
-        case kInclusion:
+        case kInclusion: {
+            if (!projection->isInclusionOnly()) {
+                params.reset(kAllowFastPath);
+            }
             return buildProjectionExecutor<InclusionProjectionExecutor>(
                 expCtx, projection->root(), policies, params);
-        case kExclusion:
+        }
+        case kExclusion: {
+            if (!projection->isExclusionOnly()) {
+                params.reset(kAllowFastPath);
+            }
             return buildProjectionExecutor<ExclusionProjectionExecutor>(
                 expCtx, projection->root(), policies, params);
+        }
         default:
             MONGO_UNREACHABLE;
     }

@@ -30,8 +30,17 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/exclusion_projection_executor.h"
+#include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo::projection_executor {
+
+Document FastPathEligibleExclusionNode::applyToDocument(const Document& inputDoc) const {
+    if (auto outputDoc = tryApplyFastPathProjection(inputDoc)) {
+        return outputDoc.get();
+    }
+    // A fast-path projection is not feasible, fall back to default implementation.
+    return ExclusionNode::applyToDocument(inputDoc);
+}
 
 std::pair<BSONObj, bool> ExclusionNode::extractProjectOnFieldAndRename(const StringData& oldName,
                                                                        const StringData& newName) {
@@ -59,4 +68,13 @@ std::pair<BSONObj, bool> ExclusionNode::extractProjectOnFieldAndRename(const Str
 
     return {extractedExclusion.obj(), _projectedFields.empty() && _children.empty()};
 }
+
+ExclusionProjectionExecutor::ExclusionProjectionExecutor(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    ProjectionPolicies policies,
+    bool allowFastPath)
+    : ProjectionExecutor(expCtx, policies),
+      _root((allowFastPath && !internalQueryDisableExclusionProjectionFastPath)
+                ? std::make_unique<FastPathEligibleExclusionNode>(policies)
+                : std::make_unique<ExclusionNode>(policies)) {}
 }  // namespace mongo::projection_executor

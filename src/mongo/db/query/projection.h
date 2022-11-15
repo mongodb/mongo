@@ -145,6 +145,14 @@ public:
             _deps.metadataRequested.none() && !_deps.requiresDocument && !_deps.hasExpressions;
     }
 
+    /**
+     * Check if this an exclusion only projection, without expressions or metadata dependencies.
+     */
+    bool isExclusionOnly() const {
+        return _type == ProjectType::kExclusion && !_deps.requiresMatchDetails &&
+            _deps.metadataRequested.none() && !_deps.hasExpressions;
+    }
+
     bool containsElemMatch() const {
         return _deps.containsElemMatch;
     }

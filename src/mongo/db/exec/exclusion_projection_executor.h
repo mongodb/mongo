@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/fastpath_projection_node.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_node.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
@@ -43,7 +44,7 @@ namespace mongo::projection_executor {
  * represents one 'level' of the parsed specification. The root ExclusionNode represents all top
  * level exclusions, with any child ExclusionNodes representing dotted or nested exclusions.
  */
-class ExclusionNode final : public ProjectionNode {
+class ExclusionNode : public ProjectionNode {
 public:
     ExclusionNode(ProjectionPolicies policies, std::string pathToNode = "")
         : ProjectionNode(policies, std::move(pathToNode)) {}
@@ -74,7 +75,7 @@ public:
                                                             const StringData& newName);
 
 protected:
-    std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const final {
+    std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const {
         return std::make_unique<ExclusionNode>(
             _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
     }
@@ -90,6 +91,52 @@ protected:
 };
 
 /**
+ * A fast-path exclusion projection implementation which applies a BSON-to-BSON transformation
+ * rather than constructing an output document using the Document/Value API. For exclusion-only
+ * projections (as defined by projection_ast::Projection::isExclusionOnly) it can be much faster
+ * than the default ExclusionNode implementation. On a document-by-document basis, if the fast-path
+ * projection cannot be applied to the input document, it will fall back to the default
+ * implementation.
+ */
+class FastPathEligibleExclusionNode final
+    : public FastPathProjectionNode<FastPathEligibleExclusionNode, ExclusionNode> {
+private:
+    using Base = FastPathProjectionNode<FastPathEligibleExclusionNode, ExclusionNode>;
+
+public:
+    using Base::Base;
+
+    Document applyToDocument(const Document& inputDoc) const final;
+
+protected:
+    std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const final {
+        return std::make_unique<FastPathEligibleExclusionNode>(
+            _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
+    }
+
+private:
+    void _applyToProjectedField(const BSONElement& element, BSONObjBuilder* bob) const {
+        // No-op -- this element is excluded.
+    }
+    void _applyToNonProjectedField(const BSONElement& element, BSONObjBuilder* bob) const {
+        // This element is not excluded by the projection, so it is added to the output.
+        bob->append(element);
+    }
+    void _applyToNonProjectedField(const BSONElement& element, BSONArrayBuilder* bab) const {
+        // This array element is not excluded by the projection, so it is added to the output.
+        bab->append(element);
+    }
+    void _applyToRemainingFields(BSONObjIterator& it, BSONObjBuilder* bob) const {
+        // We processed all exclusions, rest of the elements are added to the output.
+        while (it.more()) {
+            bob->append(it.next());
+        }
+    }
+
+    friend class FastPathProjectionNode<FastPathEligibleExclusionNode, ExclusionNode>;
+};
+
+/**
  * A ExclusionProjectionExecutor represents an execution tree for an exclusion projection.
  *
  * This class is mostly a wrapper around an ExclusionNode tree and defers most execution logic to
@@ -99,8 +146,7 @@ class ExclusionProjectionExecutor : public ProjectionExecutor {
 public:
     ExclusionProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                 ProjectionPolicies policies,
-                                bool allowFastPath = false)
-        : ProjectionExecutor(expCtx, policies), _root(new ExclusionNode(_policies)) {}
+                                bool allowFastPath = false);
 
     TransformerType getType() const final {
         return TransformerType::kExclusionProjection;

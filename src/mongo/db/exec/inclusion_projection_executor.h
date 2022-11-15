@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/db/exec/fastpath_projection_node.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_node.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
@@ -139,16 +140,18 @@ protected:
 /**
  * A fast-path inclusion projection implementation which applies a BSON-to-BSON transformation
  * rather than constructing an output document using the Document/Value API. For inclusion-only
- * projections (which are projections without expressions, metadata, find-only expressions ($slice,
- * $elemMatch, and positional), and not requiring an entire document) it can be much faster than the
- * default InclusionNode implementation. On a document-by-document basis, if the fast-path
+ * projections (as defined by projection_ast::Projection::isInclusionOnly) it can be much faster
+ * than the default InclusionNode implementation. On a document-by-document basis, if the fast-path
  * projection cannot be applied to the input document, it will fall back to the default
  * implementation.
  */
-class FastPathEligibleInclusionNode final : public InclusionNode {
+class FastPathEligibleInclusionNode final
+    : public FastPathProjectionNode<FastPathEligibleInclusionNode, InclusionNode> {
+private:
+    using Base = FastPathProjectionNode<FastPathEligibleInclusionNode, InclusionNode>;
+
 public:
-    FastPathEligibleInclusionNode(ProjectionPolicies policies, std::string pathToNode = "")
-        : InclusionNode(policies, std::move(pathToNode)) {}
+    using Base::Base;
 
     Document applyToDocument(const Document& inputDoc) const final;
 
@@ -159,8 +162,22 @@ protected:
     }
 
 private:
-    void _applyProjections(BSONObj bson, BSONObjBuilder* bob) const;
-    void _applyProjectionsToArray(BSONObj array, BSONArrayBuilder* bab) const;
+    void _applyToProjectedField(const BSONElement& element, BSONObjBuilder* bob) const {
+        // This element is included by the projection, so it is added to the output.
+        bob->append(element);
+    }
+    void _applyToNonProjectedField(const BSONElement& element, BSONObjBuilder* bob) const {
+        // No-op. This element is not included in the projection, so it is not added to the output.
+    }
+    void _applyToNonProjectedField(const BSONElement& element, BSONArrayBuilder* bab) const {
+        // No-op. This array element is not included in the projection, so it is not added to the
+        // output.
+    }
+    void _applyToRemainingFields(BSONObjIterator& it, BSONObjBuilder* bob) const {
+        // No-op. We processed all inclusions, rest of the elements can be discarded.
+    }
+
+    friend class FastPathProjectionNode<FastPathEligibleInclusionNode, InclusionNode>;
 };
 
 /**
