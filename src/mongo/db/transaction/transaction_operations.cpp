@@ -83,6 +83,40 @@ std::vector<BSONObj> packOperationsIntoApplyOps(
 
 }  // namespace
 
+// static
+void TransactionOperations::packTransactionStatementsForApplyOps(
+    std::vector<TransactionOperation>::const_iterator stmtBegin,
+    std::vector<TransactionOperation>::const_iterator stmtEnd,
+    const std::vector<BSONObj>& operations,
+    BSONObjBuilder* applyOpsBuilder,
+    std::vector<StmtId>* stmtIdsWritten,
+    boost::optional<repl::ReplOperation::ImageBundle>* imageToWrite) {
+    tassert(6278508,
+            "Number of operations does not match the number of transaction statements",
+            operations.size() == static_cast<size_t>(stmtEnd - stmtBegin));
+
+    auto operationsIter = operations.begin();
+    BSONArrayBuilder opsArray(applyOpsBuilder->subarrayStart("applyOps"_sd));
+    for (auto stmtIter = stmtBegin; stmtIter != stmtEnd; stmtIter++) {
+        const auto& stmt = *stmtIter;
+        opsArray.append(*operationsIter++);
+        const auto stmtIds = stmt.getStatementIds();
+        stmtIdsWritten->insert(stmtIdsWritten->end(), stmtIds.begin(), stmtIds.end());
+        stmt.extractPrePostImageForTransaction(imageToWrite);
+    }
+    try {
+        // BSONArrayBuilder will throw a BSONObjectTooLarge exception if we exceeded the max BSON
+        // size.
+        opsArray.done();
+    } catch (const AssertionException& e) {
+        // Change the error code to TransactionTooLarge if it is BSONObjectTooLarge.
+        uassert(ErrorCodes::TransactionTooLarge,
+                e.reason(),
+                e.code() != ErrorCodes::BSONObjectTooLarge);
+        throw;
+    }
+}
+
 bool TransactionOperations::isEmpty() const {
     return _transactionOperations.empty();
 }

@@ -1601,44 +1601,6 @@ void writeChangeStreamPreImagesForTransaction(
     }
 }
 
-// Accepts an empty BSON builder and appends the given transaction statements to an 'applyOps' array
-// field (and their corresponding statement ids to 'stmtIdsWritten'). The transaction statements are
-// represented as range ['stmtBegin', 'stmtEnd') and BSON serialized objects 'operations'. If any of
-// the statements has a pre-image or post-image that needs to be stored in the image collection,
-// stores it to 'imageToWrite'.
-void packTransactionStatementsForApplyOps(
-    BSONObjBuilder* applyOpsBuilder,
-    std::vector<StmtId>* stmtIdsWritten,
-    boost::optional<repl::ReplOperation::ImageBundle>* imageToWrite,
-    std::vector<repl::ReplOperation>::const_iterator stmtBegin,
-    std::vector<repl::ReplOperation>::const_iterator stmtEnd,
-    const std::vector<BSONObj>& operations) {
-    tassert(6278508,
-            "Number of operations does not match the number of transaction statements",
-            operations.size() == static_cast<size_t>(stmtEnd - stmtBegin));
-
-    auto operationsIter = operations.begin();
-    BSONArrayBuilder opsArray(applyOpsBuilder->subarrayStart("applyOps"_sd));
-    for (auto stmtIter = stmtBegin; stmtIter != stmtEnd; stmtIter++) {
-        const auto& stmt = *stmtIter;
-        opsArray.append(*operationsIter++);
-        const auto stmtIds = stmt.getStatementIds();
-        stmtIdsWritten->insert(stmtIdsWritten->end(), stmtIds.begin(), stmtIds.end());
-        stmt.extractPrePostImageForTransaction(imageToWrite);
-    }
-    try {
-        // BSONArrayBuilder will throw a BSONObjectTooLarge exception if we exceeded the max BSON
-        // size.
-        opsArray.done();
-    } catch (const AssertionException& e) {
-        // Change the error code to TransactionTooLarge if it is BSONObjectTooLarge.
-        uassert(ErrorCodes::TransactionTooLarge,
-                e.reason(),
-                e.code() != ErrorCodes::BSONObjectTooLarge);
-        throw;
-    }
-}
-
 // Logs one applyOps entry on a prepared transaction, or an unprepared transaction's commit, or on
 // committing a WUOW that is not necessarily tied to a multi-document transaction. It may update the
 // transactions table on multi-document transactions. Assumes that the given BSON builder object
@@ -1775,12 +1737,12 @@ int logOplogEntries(
         boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
 
         const auto nextStmt = stmtsIter + applyOpsEntry.operations.size();
-        packTransactionStatementsForApplyOps(&applyOpsBuilder,
-                                             &stmtIdsWritten,
-                                             &imageToWrite,
-                                             stmtsIter,
-                                             nextStmt,
-                                             applyOpsEntry.operations);
+        TransactionOperations::packTransactionStatementsForApplyOps(stmtsIter,
+                                                                    nextStmt,
+                                                                    applyOpsEntry.operations,
+                                                                    &applyOpsBuilder,
+                                                                    &stmtIdsWritten,
+                                                                    &imageToWrite);
 
         // If we packed the last op, then the next oplog entry we log should be the implicit
         // commit or implicit prepare, i.e. we omit the 'partialTxn' field.
