@@ -51,18 +51,18 @@ class CostDerivation {
 public:
     CostAndCEInternal operator()(const ABT& /*n*/, const PhysicalScanNode& /*node*/) {
         // Default estimate for scan.
-        const double collectionScanCost = _coefficients.getStartupCost() +
+        const double collectionScanCost = _coefficients.getScanStartupCost() +
             _coefficients.getScanIncrementalCost() * _cardinalityEstimate;
         return {collectionScanCost, _cardinalityEstimate};
     }
 
     CostAndCEInternal operator()(const ABT& /*n*/, const CoScanNode& /*node*/) {
         // Assumed to be free.
-        return {_coefficients.getStartupCost(), _cardinalityEstimate};
+        return {_coefficients.getDefaultStartupCost(), _cardinalityEstimate};
     }
 
     CostAndCEInternal operator()(const ABT& /*n*/, const IndexScanNode& node) {
-        const double indexScanCost = _coefficients.getStartupCost() +
+        const double indexScanCost = _coefficients.getIndexScanStartupCost() +
             _coefficients.getIndexScanIncrementalCost() * _cardinalityEstimate;
         return {indexScanCost, _cardinalityEstimate};
     }
@@ -72,7 +72,7 @@ public:
         // TODO: consider using node.getProjectionMap()._fieldProjections.size() to make the cost
         // dependent on the size of the projection
         const double seekCost =
-            _coefficients.getStartupCost() + _coefficients.getSeekCost() * _cardinalityEstimate;
+            _coefficients.getSeekStartupCost() + _coefficients.getSeekCost() * _cardinalityEstimate;
         return {seekCost, _cardinalityEstimate};
     }
 
@@ -113,7 +113,7 @@ public:
         double filterCost = childResult._cost;
         if (!isTrivialExpr<EvalFilter>(node.getFilter())) {
             // Non-trivial filter.
-            filterCost += _coefficients.getStartupCost() +
+            filterCost += _coefficients.getFilterStartupCost() +
                 _coefficients.getFilterIncrementalCost() * childResult._ce;
         }
         return {filterCost, _cardinalityEstimate};
@@ -124,7 +124,7 @@ public:
         double evalCost = childResult._cost;
         if (!isTrivialExpr<EvalPath>(node.getProjection())) {
             // Non-trivial projection.
-            evalCost += _coefficients.getStartupCost() +
+            evalCost += _coefficients.getEvalStartupCost() +
                 _coefficients.getEvalIncrementalCost() * _cardinalityEstimate;
         }
         return {evalCost, _cardinalityEstimate};
@@ -133,7 +133,7 @@ public:
     CostAndCEInternal operator()(const ABT& /*n*/, const BinaryJoinNode& node) {
         CostAndCEInternal leftChildResult = deriveChild(node.getLeftChild(), 0);
         CostAndCEInternal rightChildResult = deriveChild(node.getRightChild(), 1);
-        const double joinCost = _coefficients.getStartupCost() +
+        const double joinCost = _coefficients.getBinaryJoinStartupCost() +
             _coefficients.getBinaryJoinIncrementalCost() *
                 (leftChildResult._ce + rightChildResult._ce) +
             leftChildResult._cost + rightChildResult._cost;
@@ -145,7 +145,7 @@ public:
         CostAndCEInternal rightChildResult = deriveChild(node.getRightChild(), 1);
 
         // TODO: distinguish build side and probe side.
-        const double hashJoinCost = _coefficients.getStartupCost() +
+        const double hashJoinCost = _coefficients.getHashJoinStartupCost() +
             _coefficients.getHashJoinIncrementalCost() *
                 (leftChildResult._ce + rightChildResult._ce) +
             leftChildResult._cost + rightChildResult._cost;
@@ -156,7 +156,7 @@ public:
         CostAndCEInternal leftChildResult = deriveChild(node.getLeftChild(), 0);
         CostAndCEInternal rightChildResult = deriveChild(node.getRightChild(), 1);
 
-        const double mergeJoinCost = _coefficients.getStartupCost() +
+        const double mergeJoinCost = _coefficients.getMergeJoinStartupCost() +
             _coefficients.getMergeJoinIncrementalCost() *
                 (leftChildResult._ce + rightChildResult._ce) +
             leftChildResult._cost + rightChildResult._cost;
@@ -173,7 +173,7 @@ public:
             return {childResult._cost, _cardinalityEstimate};
         }
 
-        double totalCost = _coefficients.getStartupCost();
+        double totalCost = _coefficients.getUnionStartupCost();
         // The cost is the sum of the costs of its children and the cost to union each child.
         for (size_t childIdx = 0; childIdx < children.size(); childIdx++) {
             CostAndCEInternal childResult = deriveChild(children[childIdx], childIdx);
@@ -186,7 +186,7 @@ public:
 
     CostAndCEInternal operator()(const ABT& /*n*/, const GroupByNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
-        double groupByCost = _coefficients.getStartupCost();
+        double groupByCost = _coefficients.getGroupByStartupCost();
 
         // TODO: for now pretend global group by is free.
         if (node.getType() == GroupNodeType::Global) {
@@ -209,7 +209,7 @@ public:
 
     CostAndCEInternal operator()(const ABT& /*n*/, const UniqueNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
-        const double uniqueCost = _coefficients.getStartupCost() +
+        const double uniqueCost = _coefficients.getUniqueStartupCost() +
             _coefficients.getUniqueIncrementalCost() * childResult._ce + childResult._cost;
         return {uniqueCost, _cardinalityEstimate};
     }
@@ -230,7 +230,7 @@ public:
 
         // Notice that log2(x) < 0 for any x < 1, and log2(1) = 0. Generally it makes sense that
         // there is no cost to sort 1 document, so the only cost left is the startup cost.
-        const double sortCost = _coefficients.getStartupCost() + childResult._cost +
+        const double sortCost = _coefficients.getCollationStartupCost() + childResult._cost +
             ((logFactor <= 1.0)
                  ? 0.0
                  // TODO: The cost formula below is based on 1 field, mix of int and str. Instead we
@@ -242,13 +242,14 @@ public:
     CostAndCEInternal operator()(const ABT& /*n*/, const LimitSkipNode& node) {
         // Assumed to be free.
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
-        const double limitCost = _coefficients.getStartupCost() + childResult._cost;
+        const double limitCost = _coefficients.getLimitSkipStartupCost() + childResult._cost +
+            _cardinalityEstimate * _coefficients.getLimitSkipIncrementalCost();
         return {limitCost, _cardinalityEstimate};
     }
 
     CostAndCEInternal operator()(const ABT& /*n*/, const ExchangeNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
-        double localCost = _coefficients.getStartupCost() +
+        double localCost = _coefficients.getExchangeStartupCost() +
             _coefficients.getExchangeIncrementalCost() * _cardinalityEstimate;
 
         switch (node.getProperty().getDistributionAndProjections()._type) {

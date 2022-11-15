@@ -37,7 +37,7 @@ structs:
         description: "A type representing Cost Model coefficients."
         strict: true
         fields:
-            startupCost:
+            defaultStartupCost:
                 optional: false
                 type: double
                 stability: stable
@@ -45,7 +45,15 @@ structs:
                 optional: false
                 type: double
                 stability: stable
+            scanStartupCost:
+                optional: false
+                type: double
+                stability: stable
             indexScanIncrementalCost:
+                optional: false
+                type: double
+                stability: stable
+            indexScanStartupCost:
                 optional: false
                 type: double
                 stability: stable
@@ -53,7 +61,15 @@ structs:
                 optional: false
                 type: double
                 stability: stable
+            seekStartupCost:
+                optional: false
+                type: double
+                stability: stable
             filterIncrementalCost:
+                optional: false
+                type: double
+                stability: stable
+            filterStartupCost:
                 optional: false
                 type: double
                 stability: stable
@@ -61,7 +77,15 @@ structs:
                 optional: false
                 type: double
                 stability: stable
+            evalStartupCost:
+                optional: false
+                type: double
+                stability: stable
             groupByIncrementalCost:
+                optional: false
+                type: double
+                stability: stable
+            groupByStartupCost:
                 optional: false
                 type: double
                 stability: stable
@@ -69,7 +93,15 @@ structs:
                 optional: false
                 type: double
                 stability: stable
+            unwindStartupCost:
+                optional: false
+                type: double
+                stability: stable
             binaryJoinIncrementalCost:
+                optional: false
+                type: double
+                stability: stable
+            binaryJoinStartupCost:
                 optional: false
                 type: double
                 stability: stable
@@ -77,7 +109,15 @@ structs:
                 optional: false
                 type: double
                 stability: stable
+            hashJoinStartupCost:
+                optional: false
+                type: double
+                stability: stable
             mergeJoinIncrementalCost:
+                optional: false
+                type: double
+                stability: stable
+            mergeJoinStartupCost:
                 optional: false
                 type: double
                 stability: stable
@@ -85,7 +125,15 @@ structs:
                 optional: false
                 type: double
                 stability: stable
+            uniqueStartupCost:
+                optional: false
+                type: double
+                stability: stable
             collationIncrementalCost:
+                optional: false
+                type: double
+                stability: stable
+            collationStartupCost:
                 optional: false
                 type: double
                 stability: stable
@@ -93,7 +141,15 @@ structs:
                 optional: false
                 type: double
                 stability: stable
+            collationWithLimitStartupCost:
+                optional: false
+                type: double
+                stability: stable
             unionIncrementalCost:
+                optional: false
+                type: double
+                stability: stable
+            unionStartupCost:
                 optional: false
                 type: double
                 stability: stable
@@ -101,3 +157,16 @@ structs:
                 optional: false
                 type: double
                 stability: stable
+            exchangeStartupCost:
+                optional: false
+                type: double
+                stability: stable
+            limitSkipIncrementalCost:
+                optional: false
+                type: double
+                stability: stable
+            limitSkipStartupCost:
+                optional: false
+                type: double
+                stability: stable
+
