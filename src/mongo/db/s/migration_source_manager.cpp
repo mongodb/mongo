@@ -357,9 +357,6 @@ void MigrationSourceManager::enterCriticalSection() {
     uassertStatusOKWithContext(ShardingStateRecovery_DEPRECATED::startMetadataOp(_opCtx),
                                "Start metadata op");
 
-    // Checkpoint the vector clock to ensure causality in the event of a crash or shutdown.
-    VectorClockMutable::get(_opCtx)->waitForDurableConfigTime().get(_opCtx);
-
     LOGV2_DEBUG_OPTIONS(4817402,
                         2,
                         {logv2::LogComponent::kShardMigrationPerf},

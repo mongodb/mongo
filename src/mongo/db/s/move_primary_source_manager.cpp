@@ -163,9 +163,6 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
         return startMetadataOpStatus;
     }
 
-    // Checkpoint the vector clock to ensure causality in the event of a crash or shutdown.
-    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
-
     {
         // The critical section must be entered with the database X lock in order to ensure there
         // are no writes which could have entered and passed the database version check just before
