@@ -301,8 +301,13 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
                 for (int i = start; (doc = (*this)[i]); ++i) {
                     Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
                     if (!lessThan(v, threshold)) {
-                        // This is the first doc we've scanned that crossed the threshold.
-                        return i;
+                        // This is the first doc we've scanned that crossed the threshold,
+                        // so it's the first doc in the window (as long as it's the expected type).
+                        if (hasExpectedType(v)) {
+                            return i;
+                        } else {
+                            return boost::none;
+                        }
                     }
                 }
                 // We scanned every document in the partition, and none crossed the
