@@ -1033,7 +1033,9 @@ inline size_t getBSONBinDataSize(TypeTags tag, Value val) {
 
 inline BinDataType getBSONBinDataSubtype(TypeTags tag, Value val) {
     invariant(tag == TypeTags::bsonBinData);
-    return static_cast<BinDataType>((getRawPointerView(val) + sizeof(uint32_t))[0]);
+    uint8_t subtype =
+        ConstDataView(getRawPointerView(val) + sizeof(uint32_t)).read<LittleEndian<uint8_t>>();
+    return static_cast<BinDataType>(subtype);
 }
 
 inline uint8_t* getBSONBinData(TypeTags tag, Value val) {
