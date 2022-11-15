@@ -153,3 +153,38 @@ buildvariants:
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
   - name: .crypt
+
+- <<: *generic_linux_compile_params
+  name: &amazon-linux2-arm64-compile amazon-linux2-arm64-compile
+  display_name: "* Amazon Linux 2 arm64 Shared Library Compile"
+  run_on:
+    - amazon2-arm64-small
+  modules:
+    - enterprise
+  stepback: false
+  expansions:
+    <<: *generic_linux_compile_expansions
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
+    clang_tidy_toolchain: v3
+    compile_variant: *amazon-linux2-arm64-compile
+  tasks:
+    - name: compile_test_and_package_parallel_unittest_stream_TG
+    - name: compile_test_and_package_parallel_core_stream_TG
+    - name: compile_test_and_package_parallel_dbtest_stream_TG
+    - name: generate_buildid_to_debug_symbols_mapping
+    - name: server_discovery_and_monitoring_json_test_TG
+    - name: server_selection_json_test_TG
+    - name: libdeps_graph_linting_TG
+    - name: .crypt
+    - name: .stitch
+    - name: crypt_build_debug_and_test
+    - name: .integration

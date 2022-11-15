@@ -77,6 +77,14 @@ variables:
   - name: version_gen
     variant: generate-tasks-for-version
 
+- &amazon_linux2_arm64_compile_variant_dependency
+  activate: false
+  depends_on:
+  - name: archive_dist_test
+    variant: &amazon_linux2_arm64_compile_variant_name amazon-linux2-arm64-compile
+  - name: version_gen
+    variant: generate-tasks-for-version
+
 - &linux_x86_dynamic_debug_compile_variant_dependency
   depends_on:
   - name: archive_dist_test_debug
@@ -105,6 +113,17 @@ variables:
   large_distro_name: rhel80-medium
   num_scons_link_jobs_available: 0.99
   compile_variant: *linux_x86_dynamic_compile_variant_name
+
+- &linux_arm64_generic_expansions
+  multiversion_platform: amazon2
+  multiversion_edition: enterprise
+  multiversion_architecture: arm64
+  packager_arch: aarch64
+  packager_distro: amazon2
+  repo_edition: enterprise
+  large_distro_name: amazon2-arm64-large
+  num_scons_link_jobs_available: 0.99
+  compile_variant: *amazon_linux2_arm64_compile_variant_name
 
 # Use this template for enterprise Windows testing coverage on non-pushing
 # variants
@@ -2204,6 +2223,120 @@ buildvariants:
   tasks:
   - name: compile_upload_benchmarks_TG
   - name: .benchmarks
+
+###########################################
+#     Amazon Graviton buildvariants       #
+###########################################
+
+- &enterprise-amazon-linux2-arm64-all-feature-flags-template
+  <<: *amazon_linux2_arm64_compile_variant_dependency
+  name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
+  display_name: "* Amazon Linux 2 arm64 (all feature flags)"
+  cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+  modules:
+    - enterprise
+  run_on:
+    - amazon2-arm64-small
+  stepback: true
+  expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
+    <<: *linux_arm64_generic_expansions
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 5
+    idle_timeout_factor: 1.5
+    exec_timeout_factor: 1.5
+    test_flags: >-
+      --runAllFeatureFlagTests
+      --excludeWithAnyTags=incompatible_with_amazon_linux,incompatible_with_shard_merge
+  tasks:
+  - name: cqf
+  - name: cqf_disabled_pipeline_opt
+  - name: cqf_passthrough
+  - name: cqf_parallel
+  - name: query_golden_classic
+  - name: query_golden_cqf
+  - name: lint_fuzzer_sanity_patch
+  - name: test_api_version_compatibility
+  - name: burn_in_tests_gen
+  - name: check_feature_flag_tags
+  - name: check_for_todos
+  - name: .aggfuzzer
+  - name: .aggregation
+  - name: aggregation_repeat_queries
+  - name: audit
+  - name: .auth
+  #- name: burn_in_tags_gen
+  - name: buildscripts_test
+  - name: resmoke_end2end_tests
+  - name: unittest_shell_hang_analyzer_gen
+  - name: .causally_consistent !.sharding
+  - name: .change_streams
+  - name: .change_stream_fuzzer
+  - name: change_streams_multitenant_passthrough
+  - name: change_streams_multitenant_sharded_collections_passthrough
+  - name: .misc_js
+  - name: .clustered_collections
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+  - name: config_fuzzer_concurrency
+  - name: config_fuzzer_simulate_crash_concurrency_replication
+  - name: config_fuzzer_concurrency_replication
+  - name: config_fuzzer_jsCore
+  - name: config_fuzzer_replica_sets_jscore_passthrough
+  - name: disk_wiredtiger
+  - name: .encrypt
+  - name: feature_flag_multiversion_gen
+  - name: idl_tests
+  - name: initial_sync_fuzzer_gen
+  - name: .jscore .common
+  - name: jsCore_column_store_indexes
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_repeat_queries
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
+  - name: libunwind_tests
+  - name: .multiversion_sanity_check
+  - name: mqlrun
+  - name: .multi_shard
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multiversion_gen
+  - name: powercycle_smoke
+  - name: .query_fuzzer
+  - name: .random_multiversion_ds
+  - name: .read_write_concern .large
+  - name: .read_write_concern !.large
+  - name: .replica_sets !.encrypt !.auth
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
+  - name: .read_only
+  - name: .rollbackfuzzer
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: .sharding .txns
+  - name: .sharding .common
+  - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: .serverless
+    distros:
+    - amazon2-arm64-large
+  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: .updatefuzzer
+  - name: secondary_reads_passthrough_gen
+  - name: .shard_split
+  - name: .shard_merge
 
 
 ###########################################
