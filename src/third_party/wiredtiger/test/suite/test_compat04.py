@@ -54,6 +54,7 @@ class test_compat04(wttest.WiredTigerTestCase, suite_subprocess):
     #
     create_release = [
         ('def_rel', dict(create_rel='none', log_crrel=5)),
+        ('112_rel', dict(create_rel="11.2", log_crrel=5)),
         ('111_rel', dict(create_rel="11.1", log_crrel=5)),
         ('110_rel', dict(create_rel="11.0", log_crrel=5)),
         ('100_rel', dict(create_rel="10.0", log_crrel=5)),
@@ -64,6 +65,7 @@ class test_compat04(wttest.WiredTigerTestCase, suite_subprocess):
         ('26_rel', dict(create_rel="2.6", log_crrel=1)),
     ]
     reconfig_release = [
+        ('112_rel', dict(rel="11.2", log_rel=5)),
         ('111_rel', dict(rel="11.1", log_rel=5)),
         ('110_rel', dict(rel="11.0", log_rel=5)),
         ('100_rel', dict(rel="10.0", log_rel=5)),
