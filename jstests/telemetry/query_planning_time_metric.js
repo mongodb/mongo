@@ -43,7 +43,7 @@ verifyProfilerLog(commandProfilerFilter);
 // multiple batches require multiple plan executors. We want to confirm we are only storing the
 // metrics for the outer executor associated with planning the query, and not a subsequent executor
 // that is constructed when a new operation context gets created during getMore() calls.
-coll.aggregate([{$unionWith: collTwo.getName()}], {cursor: {batchSize: 2}});
+coll.aggregate([{$unionWith: {coll: collTwo.getName()}}], {cursor: {batchSize: 2}});
 verifyProfilerLog(commandProfilerFilter);
 
 // $lookup has inner executor (cursor??), we want to confirm we are only reporting metrics from the
