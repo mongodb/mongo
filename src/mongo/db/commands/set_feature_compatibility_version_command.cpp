@@ -910,6 +910,7 @@ private:
                     entry.setMulti(true);
                     return entry;
                 }()});
+                update.getWriteCommandRequestBase().setOrdered(false);
                 client.update(update);
             }
         }
