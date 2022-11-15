@@ -178,9 +178,11 @@ void GoldenTestContextBase::failResultMismatch(const std::string& actualStr,
     fs::path expectedOutputFilePath = getExpectedOutputPath();
 
     writeFile(actualOutputFilePath, actualStr);
-    if (expectedStr != boost::none) {
-        writeFile(expectedOutputFilePath, *expectedStr);
-    }
+
+    // Write empty expected file even if the expected result was not set.
+    // This improves interaction with diff tools that fail or don't show contents if
+    // one of the file is missing.
+    writeFile(expectedOutputFilePath, expectedStr.get_value_or(""));
 
     _onError(message, actualStr, expectedStr);
 }
