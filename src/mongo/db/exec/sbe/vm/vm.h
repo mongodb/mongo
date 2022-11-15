@@ -951,6 +951,9 @@ public:
         std::free(_argStack);
     }
 
+    ByteCode(const ByteCode&) = delete;
+    ByteCode& operator=(const ByteCode&) = delete;
+
     FastTuple<bool, value::TypeTags, value::Value> run(const CodeFragment* code);
     bool runPredicate(const CodeFragment* code);
 
