@@ -17,6 +17,7 @@ load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
 load("jstests/libs/optimizer_utils.js");      // For checkCascadesOptimizerEnabled.
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
+const collName = "ce_histogram";
 const fields = ["int", "dbl", "str", "date"];
 const tolerance = 0.01;
 
@@ -99,67 +100,60 @@ function verifyCEForMatch({coll, predicate, expected, hint}) {
  * produced for this test.
  */
 function verifyCEForNDV(ndv) {
-    /**
-     * For this test we create one collection and with an index for each field. We use a new
-     * collection name for each field because until SERVER-70856 is fixed we can't have multiple
-     * histograms on a collection because
-     * there is no logic to correctly filter on field name, which means we will always retrieve the
-     * first histogram generated for the collection (regardless of which field we care about), even
-     * though we have correct histograms in the system collection for all fields.
-     *
-     * TODO: rewrite this test to reuse the same collection SERVER-70856 is addressed.
-     */
+    const coll = db[collName];
+    coll.drop();
+
+    const expectedHistograms = [];
+    for (const field of fields) {
+        assert.commandWorked(coll.createIndex({[field]: 1}));
+        expectedHistograms.push(
+            {_id: field, statistics: {documents: 0, scalarHistogram: {buckets: [], bounds: []}}});
+    }
+
+    // Set up test collection and initialize the expected histograms in order to validate basic
+    // histogram construction. We generate 'ndv' distinct values for each 'field', such that the
+    // 'i'th distinct value has a frequency of 'i'. Because we have a small number of distinct
+    // values, we expect to have one bucket per distinct value.
+    _id = 0;
+    let cumulativeCount = 0;
+    let allDocs = [];
+    for (let val = 1; val <= ndv; val++) {
+        const docs = generateDocs(val);
+        assert.commandWorked(coll.insertMany(docs));
+        cumulativeCount += docs.length;
+        for (const expectedHistogram of expectedHistograms) {
+            const field = expectedHistogram._id;
+            const {statistics} = expectedHistogram;
+            statistics.documents = cumulativeCount;
+            statistics.scalarHistogram.buckets.push({
+                boundaryCount: val,
+                rangeCount: 0,
+                cumulativeCount,
+                rangeDistincts: 0,
+                cumulativeDistincts: val
+            });
+            statistics.scalarHistogram.bounds.push(docs[0][field]);
+        }
+        allDocs = allDocs.concat(docs);
+    }
+
+    // Set up histogram for test collection.
+    const stats = db.system.statistics[collName];
+
     for (const field of fields) {
         // We can't use forceBonsai here because the new optimizer doesn't know how to handle the
         // analyze command.
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
-
-        const collName = `ce_histogram_${field}`;
-        const coll = db[collName];
-        coll.drop();
-        assert.commandWorked(coll.createIndex({[field]: 1}));
-
-        const expectedHistograms = [];
-        expectedHistograms.push(
-            {_id: field, statistics: {documents: 0, scalarHistogram: {buckets: [], bounds: []}}});
-
-        // Set up test collection and initialize the expected histograms in order to validate basic
-        // histogram construction. We generate 'ndv' distinct values for each 'field', such that the
-        // 'i'th distinct value has a frequency of 'i'. Because we have a small number of distinct
-        // values, we expect to have one bucket per distinct value.
-        _id = 0;
-        let cumulativeCount = 0;
-        let allDocs = [];
-        for (let val = 1; val <= ndv; val++) {
-            const docs = generateDocs(val);
-            assert.commandWorked(coll.insertMany(docs));
-            cumulativeCount += docs.length;
-            for (const expectedHistogram of expectedHistograms) {
-                const field = expectedHistogram._id;
-                const {statistics} = expectedHistogram;
-                statistics.documents = cumulativeCount;
-                statistics.scalarHistogram.buckets.push({
-                    boundaryCount: val,
-                    rangeCount: 0,
-                    cumulativeCount,
-                    rangeDistincts: 0,
-                    cumulativeDistincts: val
-                });
-                statistics.scalarHistogram.bounds.push(docs[0][field]);
-            }
-            allDocs = allDocs.concat(docs);
-        }
-
-        // Set up histogram for test collection.
-        const stats = db.system.statistics[collName];
-
         const res = db.runCommand({analyze: collName, key: field});
         assert.commandWorked(res);
 
         // Validate histograms.
-        const actualHistograms = stats.aggregate().toArray();
-        assertArrayEq({actual: actualHistograms, expected: expectedHistograms});
+        const actualHistograms = stats.aggregate([{$match: {_id: field}}]).toArray();
+        const isField = (elem) => elem === field;
+
+        assertArrayEq(
+            {actual: actualHistograms.find(isField), expected: expectedHistograms.find(isField)});
 
         // We need to set the CE query knob to use histograms and force the use of the new optimizer
         // to ensure that we use histograms to estimate CE here.

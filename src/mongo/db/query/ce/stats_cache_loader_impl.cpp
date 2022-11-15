@@ -38,6 +38,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
 
 
@@ -49,14 +51,14 @@ SemiFuture<StatsCacheVal> StatsCacheLoaderImpl::getStats(OperationContext* opCtx
     NamespaceString statsNss(statsPath.first.db(), statsColl);
     DBDirectClient client(opCtx);
 
-    auto pathFilter = BSON("path" << statsPath.second);
 
     FindCommandRequest findRequest{statsNss};
-    // findRequest.setFilter(pathFilter);
-    BSONObj result;
+    BSONObj filter = BSON("_id" << statsPath.second);
+    LOGV2_DEBUG(7085600, 1, "findRequest filter", "filter"_attr = filter.toString());
+    findRequest.setFilter(filter.getOwned());
 
     try {
-        auto cursor = client.find(findRequest);
+        auto cursor = client.find(std::move(findRequest));
 
         if (!cursor) {
             uasserted(ErrorCodes::OperationFailed,

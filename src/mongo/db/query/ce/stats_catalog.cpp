@@ -57,7 +57,7 @@ StatsCatalog::StatsCatalog(ServiceContext* service,
           ThreadPool::Options options;
           options.poolName = "StatsCache";
           options.minThreads = 0;
-          options.maxThreads = 1;
+          options.maxThreads = 2;
           return options;
       }())),
       _statsCache(service, std::move(statsCacheLoader), *_executor, 1000) {
