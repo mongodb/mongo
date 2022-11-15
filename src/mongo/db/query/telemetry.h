@@ -163,33 +163,31 @@ std::unique_ptr<TelemetryStore> resetTelemetryStore(const ServiceContext* servic
 bool isTelemetryEnabled(const ServiceContext* serviceCtx);
 
 /**
- * Should we collect telemetry for a request? The decision is made based on the feature flag and
- * telemetry parameters such as rate limiting.
+ * Register a request for telemetry collection. The telemetry machinery may decide not to collect
+ * anything but this should be called for all requests. The decision is made based on the feature
+ * flag and telemetry parameters such as rate limiting.
  *
- * If the return value is a telemetry key in the form of BSONObj, this indicates the telemetry
- * should be collected. Otherwise, telemetry should not be collected.
+ * The caller is still responsible for subsequently calling collectTelemetry() once the request is
+ * completed.
  *
  * Note that calling this affects internal state. It should be called once for each request for
  * which telemetry may be collected.
  */
-boost::optional<BSONObj> shouldCollectTelemetry(const AggregateCommandRequest& request,
-                                                const OperationContext* opCtx);
+void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx);
 
-boost::optional<BSONObj> shouldCollectTelemetry(const FindCommandRequest& request,
-                                                const NamespaceString& collection,
-                                                const OperationContext* opCtx);
+void registerFindRequest(const FindCommandRequest& request,
+                         const NamespaceString& collection,
+                         OperationContext* opCtx);
 
-boost::optional<BSONObj> shouldCollectTelemetry(const OperationContext* opCtx,
-                                                const BSONObj& telemetryKey);
+void registerGetMoreRequest(OperationContext* opCtx, const PlanExplainer& planExplainer);
+
+void recordExecution(const OperationContext* opCtx, const OpDebug& opDebug, bool isFle);
 
 /**
  * Collect telemetry for the operation identified by `key`. The `isExec` flag should be set if it's
  * the beginning of execution (first batch) of results and not set for subsequent getMore() calls.
  */
-void collectTelemetry(const ServiceContext* serviceCtx,
-                      const BSONObj& key,
-                      const OpDebug& opDebug,
-                      bool isExec);
+void collectTelemetry(const OperationContext* opCtx, const OpDebug& opDebug);
 
 }  // namespace telemetry
 }  // namespace mongo

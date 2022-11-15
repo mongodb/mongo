@@ -566,6 +566,11 @@ public:
 
             cq->setUseCqfIfEligible(true);
 
+            if (collection) {
+                telemetry::registerFindRequest(
+                    cq->getFindCommandRequest(), collection.get()->ns(), opCtx);
+            }
+
             // Get the execution plan for the query.
             bool permitYield = true;
             auto exec =
@@ -723,17 +728,7 @@ public:
             query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj(),
                                                          nss.tenantId());
 
-            auto telemetryKey =
-                telemetry::shouldCollectTelemetry(originalFC, collection.get()->ns(), opCtx);
-
-            // FLE2 queries should not be included in telemetry, so make sure that we did not
-            // rewrite this query before collecting telemetry.
-            if (telemetryKey && !_didDoFLERewrite) {
-                opCtx->storeQueryBSON(*telemetryKey);
-
-                telemetry::collectTelemetry(
-                    opCtx->getServiceContext(), *telemetryKey, CurOp::get(opCtx)->debug(), true);
-            }
+            telemetry::recordExecution(opCtx, CurOp::get(opCtx)->debug(), _didDoFLERewrite);
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {

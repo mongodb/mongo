@@ -46,6 +46,8 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/telemetry.h"
+#include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/storage_engine_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -57,7 +59,6 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
 #include "mongo/util/system_tick_source.h"
-#include <mongo/db/stats/timer_stats.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -434,6 +435,8 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     done();
     _debug.executionTime = duration_cast<Microseconds>(elapsedTimeExcludingPauses());
     const auto executionTimeMillis = durationCount<Milliseconds>(_debug.executionTime);
+
+    telemetry::collectTelemetry(opCtx, CurOp::get(opCtx)->debug());
 
     if (_debug.isReplOplogGetMore) {
         oplogGetMoreStats.recordMillis(executionTimeMillis);

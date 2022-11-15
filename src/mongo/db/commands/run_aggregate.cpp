@@ -725,7 +725,8 @@ Status runAggregate(OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
     auto catalog = CollectionCatalog::get(opCtx);
-    boost::optional<BSONObj> telemetryKey;
+
+    telemetry::registerAggRequest(request, opCtx);
 
     // Since we remove encryptionInformation after rewriting a FLE2 query, this boolean keeps track
     // of whether the input query did originally have enryption information.
@@ -1101,22 +1102,7 @@ Status runAggregate(OperationContext* opCtx,
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->debug().nreturned = stats.nReturned;
 
-        // FLE2 queries should not be included in telemetry, so make sure that we did not
-        // rewrite this query before collecting telemetry.
-        if (!didDoFLERewrite) {
-            telemetryKey = telemetry::shouldCollectTelemetry(request, opCtx);
-            // Build the telemetry key and store it in the operation context
-            if (telemetryKey) {
-                // TODO SERVER-71315: should we store it in the CurOp instead? (or even
-                // PlanExplainer)
-                opCtx->storeQueryBSON(*telemetryKey);
-            }
-
-            if (telemetryKey) {
-                telemetry::collectTelemetry(
-                    opCtx->getServiceContext(), *telemetryKey, curOp->debug(), true);
-            }
-        }
+        telemetry::recordExecution(opCtx, curOp->debug(), didDoFLERewrite);
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.

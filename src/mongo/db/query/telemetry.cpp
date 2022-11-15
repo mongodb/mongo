@@ -43,7 +43,6 @@
 #include "mongo/db/query/telemetry_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/system_clock_source.h"
 #include <cstddef>
 
@@ -140,8 +139,8 @@ ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
             std::make_unique<TelemetryOnParamChangeUpdaterImpl>();
         auto status = memory_util::MemorySize::parse(queryTelemetryStoreSize.get());
         uassertStatusOK(status);
-        auto size = memory_util::getRequestedMemSizeInBytes(status.getValue());
-        auto cappedStoreSize = memory_util::capMemorySize(
+        size_t size = memory_util::getRequestedMemSizeInBytes(status.getValue());
+        size_t cappedStoreSize = memory_util::capMemorySize(
             size /*requestedSizeBytes*/, 1 /*maximumSizeGB*/, 25 /*percentTotalSystemMemory*/);
         // If capped size is less than requested size, the telemetry store has been capped at its
         // upper limit.
@@ -152,15 +151,18 @@ ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
                         "cappedSize"_attr = cappedStoreSize);
         }
         auto&& globalTelemetryStoreManager = telemetryStoreDecoration(serviceCtx);
-        const int kNumPartitions = 100;  // the more the merrier.
+        // Many partitions reduces lock contention on both reading and write telemetry data.
+        size_t numPartitions = 1024;
+        size_t partitionBytes = cappedStoreSize / numPartitions;
+        size_t metricsSize = sizeof(TelemetryMetrics);
+        if (partitionBytes < metricsSize * 10) {
+            numPartitions = cappedStoreSize / metricsSize;
+            if (numPartitions < 1) {
+                numPartitions = 1;
+            }
+        }
         globalTelemetryStoreManager =
-            std::make_unique<TelemetryStoreManager>(serviceCtx, cappedStoreSize, kNumPartitions);
-        // TODO there will be a rate limiter initialized somewhere, and we can get the value from
-        // there to save a .load(). We need the rate limiter to do rate limiting here anyway. int
-        // samplingRate = queryTelemetrySamplingRate.load(); Quick escape if it's turned off? if
-        // (!samplingRate) {
-        //    return;
-        //}
+            std::make_unique<TelemetryStoreManager>(serviceCtx, cappedStoreSize, numPartitions);
         telemetryRateLimiter(serviceCtx) =
             std::make_unique<RateLimiting>(queryTelemetrySamplingRate.load());
     }};
@@ -178,7 +180,7 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
     if (!isTelemetryEnabled(serviceCtx)) {
         return false;
     }
-    // Check if rate limiting allows us to accumulate.
+    // Check if rate limiting allows us to collect telemetry for this request.
     if (!telemetryRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
         return false;
     }
@@ -217,21 +219,64 @@ void throwIfEncounteringFLEPayload(BSONElement e) {
     }
 }
 
+/**
+ * Get the metrics for a given key holding the appropriate locks.
+ */
+class LockedMetrics {
+    LockedMetrics(TelemetryMetrics* metrics,
+                  Lock::ResourceLock telemetryStoreReadLock,
+                  TelemetryStore::Partition partitionLock)
+        : _metrics(metrics),
+          _telemetryStoreReadLock(std::move(telemetryStoreReadLock)),
+          _partitionLock(std::move(partitionLock)) {}
+
+public:
+    static LockedMetrics get(const OperationContext* opCtx, const BSONObj& telemetryKey) {
+        auto&& [telemetryStore, telemetryStoreReadLock] =
+            getTelemetryStoreForRead(opCtx->getServiceContext());
+        auto&& [statusWithMetrics, partitionLock] =
+            telemetryStore->getWithPartitionLock(telemetryKey);
+        TelemetryMetrics* metrics;
+        if (statusWithMetrics.isOK()) {
+            metrics = statusWithMetrics.getValue();
+        } else {
+            telemetryStore->put(telemetryKey, {}, partitionLock);
+            auto newMetrics = partitionLock->get(telemetryKey);
+            // This can happen if the budget is immediately exceeded. Specifically if the there is
+            // not enough room for a single new entry if the number of partitions is too high
+            // relative to the size.
+            tassert(7064700, "Should find telemetry store entry", newMetrics.isOK());
+            metrics = &newMetrics.getValue()->second;
+        }
+        return LockedMetrics{metrics, std::move(telemetryStoreReadLock), std::move(partitionLock)};
+    }
+
+    TelemetryMetrics* operator->() const {
+        return _metrics;
+    }
+
+private:
+    TelemetryMetrics* _metrics;
+
+    Lock::ResourceLock _telemetryStoreReadLock;
+
+    TelemetryStore::Partition _partitionLock;
+};
+
 }  // namespace
 
-boost::optional<BSONObj> shouldCollectTelemetry(const AggregateCommandRequest& request,
-                                                const OperationContext* opCtx) {
+void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx) {
     if (request.getEncryptionInformation()) {
-        return {};
+        return;
     }
 
     // Queries against metadata collections should never appear in telemetry data.
     if (request.getNamespace().isFLE2StateCollection()) {
-        return {};
+        return;
     }
 
     if (!shouldCollect(opCtx->getServiceContext())) {
-        return {};
+        return;
     }
 
     BSONObjBuilder telemetryKey;
@@ -252,25 +297,41 @@ boost::optional<BSONObj> shouldCollectTelemetry(const AggregateCommandRequest& r
             telemetryKey.append("applicationName", metadata->getApplicationName());
         }
     } catch (ExceptionFor<ErrorCodes::EncounteredFLEPayloadWhileRedacting>&) {
-        return {};
+        return;
     }
-    return {telemetryKey.obj()};
+    opCtx->storeQueryBSON(telemetryKey.obj());
+    // Management of the telemetry key works as follows.
+    //
+    // Query execution potentially spans more than one request/operation. For this reason, we need a
+    // mechanism to communicate the context (the telemetry key) across operations on the same query.
+    // In order to accomplish this, we store the telemetry key in the plan explainer which exists
+    // for the entire life of the query.
+    //
+    // - Telemetry key must be stored in the OperationContext before the PlanExecutor is created.
+    //   This is accomplished by calling registerXXXRequest() in run_aggregate.cpp and
+    //   find_cmd.cpp before the PlanExecutor is created.
+    //
+    // - During collectTelemetry(), the telemetry key is retrieved from the OperationContext to
+    //   write metrics into the telemetry store. This is done at the end of the operation.
+    //
+    // - Upon getMore() calls, registerGetMoreRequest() copy the telemetry key from the
+    //   PlanExplainer to the OperationContext.
 }
 
-boost::optional<BSONObj> shouldCollectTelemetry(const FindCommandRequest& request,
-                                                const NamespaceString& collection,
-                                                const OperationContext* opCtx) {
+void registerFindRequest(const FindCommandRequest& request,
+                         const NamespaceString& collection,
+                         OperationContext* opCtx) {
     if (request.getEncryptionInformation()) {
-        return {};
+        return;
     }
 
     // Queries against metadata collections should never appear in telemetry data.
     if (collection.isFLE2StateCollection()) {
-        return {};
+        return;
     }
 
     if (!shouldCollect(opCtx->getServiceContext())) {
-        return {};
+        return;
     }
 
     BSONObjBuilder telemetryKey;
@@ -293,17 +354,17 @@ boost::optional<BSONObj> shouldCollectTelemetry(const FindCommandRequest& reques
             telemetryKey.append("applicationName", metadata->getApplicationName());
         }
     } catch (ExceptionFor<ErrorCodes::EncounteredFLEPayloadWhileRedacting>&) {
-        return {};
+        return;
     }
-    return {telemetryKey.obj()};
+    opCtx->storeQueryBSON(telemetryKey.obj());
 }
 
-boost::optional<BSONObj> shouldCollectTelemetry(const OperationContext* opCtx,
-                                                const BSONObj& telemetryKey) {
+void registerGetMoreRequest(OperationContext* opCtx, const PlanExplainer& planExplainer) {
+    auto&& telemetryKey = planExplainer.getTelemetryKey();
     if (telemetryKey.isEmpty() || !shouldCollect(opCtx->getServiceContext())) {
-        return {};
+        return;
     }
-    return {telemetryKey};
+    opCtx->storeQueryBSON(telemetryKey);
 }
 
 std::pair<TelemetryStore*, Lock::ResourceLock> getTelemetryStoreForRead(
@@ -315,33 +376,25 @@ std::unique_ptr<TelemetryStore> resetTelemetryStore(const ServiceContext* servic
     return telemetryStoreDecoration(serviceCtx)->resetTelemetryStore();
 }
 
-void collectTelemetry(const ServiceContext* serviceCtx,
-                      const BSONObj& key,
-                      const OpDebug& opDebug,
-                      bool isExec) {
-    auto&& getTelemetryStoreResult = getTelemetryStoreForRead(serviceCtx);
-    auto telemetryStore = getTelemetryStoreResult.first;
-    auto&& result = telemetryStore->getWithPartitionLock(key);
-    auto statusWithMetrics = result.first;
-    auto partitionLock = std::move(result.second);
-    auto metrics = [&]() {
-        if (statusWithMetrics.isOK()) {
-            return statusWithMetrics.getValue();
-        } else {
-            TelemetryMetrics metrics;
-            telemetryStore->put(key, metrics, partitionLock);
-            auto newMetrics = partitionLock->get(key);
-            // This can happen if the budget is immediately exceeded. Specifically if the there is
-            // not enough room for a single new entry if the number of partitions is too high
-            // relative to the size.
-            tassert(7064700, "Should find telemetry store entry", newMetrics.isOK());
-            return &newMetrics.getValue()->second;
-        }
-    }();
-    if (isExec) {
-        metrics->execCount++;
-        metrics->queryOptMicros.aggregate(opDebug.planningTime.count());
+void recordExecution(const OperationContext* opCtx, const OpDebug& opDebug, bool isFle) {
+    if (isFle) {
+        return;
     }
+    auto&& telemetryKey = opCtx->getTelemetryKey();
+    if (telemetryKey.isEmpty()) {
+        return;
+    }
+    auto&& metrics = LockedMetrics::get(opCtx, telemetryKey);
+    metrics->execCount++;
+    metrics->queryOptMicros.aggregate(opDebug.planningTime.count());
+}
+
+void collectTelemetry(const OperationContext* opCtx, const OpDebug& opDebug) {
+    auto&& telemetryKey = opCtx->getTelemetryKey();
+    if (telemetryKey.isEmpty()) {
+        return;
+    }
+    auto&& metrics = LockedMetrics::get(opCtx, telemetryKey);
     metrics->docsReturned.aggregate(opDebug.nreturned);
     metrics->docsScanned.aggregate(opDebug.additiveMetrics.docsExamined.value_or(0));
     metrics->keysScanned.aggregate(opDebug.additiveMetrics.keysExamined.value_or(0));

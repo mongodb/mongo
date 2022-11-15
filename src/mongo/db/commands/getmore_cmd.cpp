@@ -561,6 +561,8 @@ public:
             exec->reattachToOperationContext(opCtx);
             exec->restoreState(readLock ? &readLock->getCollection() : nullptr);
 
+            telemetry::registerGetMoreRequest(opCtx, exec->getPlanExplainer());
+
             auto planSummary = exec->getPlanExplainer().getPlanSummary();
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -692,15 +694,6 @@ public:
             // Ensure log and profiler include the number of results returned in this getMore's
             // response batch.
             curOp->debug().nreturned = numResults;
-
-            auto telemetryKey = telemetry::shouldCollectTelemetry(
-                opCtx, exec->getPlanExplainer().getTelemetryKey());
-            if (telemetryKey) {
-                telemetry::collectTelemetry(opCtx->getServiceContext(),
-                                            exec->getPlanExplainer().getTelemetryKey(),
-                                            curOp->debug(),
-                                            false);
-            }
 
             if (respondWithId) {
                 cursorDeleter.dismiss();
