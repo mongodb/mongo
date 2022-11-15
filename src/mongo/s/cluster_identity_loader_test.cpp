@@ -123,12 +123,12 @@ TEST_F(ClusterIdentityTest, BasicLoadSuccess) {
 }
 
 TEST_F(ClusterIdentityTest, NoConfigVersionDocument) {
-    // If no version document is found on config server loadClusterId will return a newly generated
-    // clusterId
+    // If no version document is found on config server loadClusterId will return an error
     auto future = launchAsync([&] {
-        ASSERT_OK(
+        ASSERT_EQ(
             ClusterIdentityLoader::get(operationContext())
-                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern));
+                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern),
+            ErrorCodes::NoMatchingDocument);
     });
 
     expectConfigVersionLoad(

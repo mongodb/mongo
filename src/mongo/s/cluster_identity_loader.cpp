@@ -100,12 +100,6 @@ StatusWith<OID> ClusterIdentityLoader::_fetchClusterIdFromConfig(
     OperationContext* opCtx, const repl::ReadConcernLevel& readConcernLevel) {
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto loadResult = catalogClient->getConfigVersion(opCtx, readConcernLevel);
-
-    if (loadResult == ErrorCodes::NoMatchingDocument) {
-        // if no version document was found on config server return a zero filled ID
-        return OID{};
-    }
-
     if (!loadResult.isOK()) {
         return loadResult.getStatus().withContext("Error loading clusterID");
     }
