@@ -28,16 +28,12 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/document_source_count.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator.h"
@@ -196,14 +192,9 @@ void ShardingDDLCoordinatorService::_afterStepDown() {
 
 size_t ShardingDDLCoordinatorService::_countCoordinatorDocs(OperationContext* opCtx) {
     constexpr auto kNumCoordLabel = "numCoordinators"_sd;
+    static const auto countStage = BSON("$count" << kNumCoordLabel);
 
-    auto aggRequest = [&]() -> AggregateCommandRequest {
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, getStateDocumentsNS());
-        const auto countSpec = BSON("$count" << kNumCoordLabel);
-        auto stages = DocumentSourceCount::createFromBson(countSpec.firstElement(), expCtx);
-        auto pipeline = Pipeline::create(std::move(stages), expCtx);
-        return {getStateDocumentsNS(), pipeline->serializeToBson()};
-    }();
+    AggregateCommandRequest aggRequest{getStateDocumentsNS(), {countStage}};
 
     DBDirectClient client(opCtx);
     auto cursor = uassertStatusOKWithContext(
