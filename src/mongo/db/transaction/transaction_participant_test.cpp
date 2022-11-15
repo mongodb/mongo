@@ -108,8 +108,8 @@ public:
     void onTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
-        std::vector<repl::ReplOperation>* statements,
-        const ApplyOpsOplogSlotAndOperationAssignment* applyOpsOperationAssignment,
+        const std::vector<repl::ReplOperation>& statements,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime) override;
 
@@ -164,8 +164,8 @@ OpObserverMock::preTransactionPrepare(OperationContext* opCtx,
 void OpObserverMock::onTransactionPrepare(
     OperationContext* opCtx,
     const std::vector<OplogSlot>& reservedSlots,
-    std::vector<repl::ReplOperation>* statements,
-    const ApplyOpsOplogSlotAndOperationAssignment* applyOpsOperationAssignment,
+    const std::vector<repl::ReplOperation>& statements,
+    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     size_t numberOfPrePostImagesToWrite,
     Date_t wallClockTime) {
     ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());

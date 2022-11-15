@@ -1686,13 +1686,18 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.getTimestamp());
     opCtx->getWriteUnitOfWork()->prepare();
     p().needToWriteAbortEntry = true;
-    opObserver->onTransactionPrepare(
-        opCtx,
-        reservedSlots,
-        completedTransactionOperations->getMutableOperationsForOpObserver(),
-        applyOpsOplogSlotAndOperationAssignment.get(),
-        p().transactionOperations.getNumberOfPrePostImagesToWrite(),
-        wallClockTime);
+
+    const auto& statements = *(completedTransactionOperations->getMutableOperationsForOpObserver());
+    tassert(6278510,
+            "Operation assignments to applyOps entries should be present",
+            applyOpsOplogSlotAndOperationAssignment);
+
+    opObserver->onTransactionPrepare(opCtx,
+                                     reservedSlots,
+                                     statements,
+                                     *applyOpsOplogSlotAndOperationAssignment,
+                                     p().transactionOperations.getNumberOfPrePostImagesToWrite(),
+                                     wallClockTime);
 
     abortGuard.dismiss();
 

@@ -34,6 +34,8 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/session_update_tracker.h"
@@ -54,6 +56,24 @@
 
 namespace mongo {
 namespace {
+
+/**
+ * OpObserver for OplogApplierImpl test fixture.
+ */
+class ReshardingOplogSessionApplicationOpObserver : public OpObserverNoop {
+public:
+    /**
+     * Called when OplogApplierImpl prepares a multi-doc transaction using the
+     * TransactionParticipant.
+     */
+    std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        Date_t wallClockTime,
+        TransactionOperations* transactionOperations) override {
+        return std::make_unique<ApplyOpsOplogSlotAndOperationAssignment>();
+    }
+};
 
 class ReshardingOplogSessionApplicationTest : public ServiceContextMongoDTest {
 public:
@@ -79,6 +99,13 @@ public:
             auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
             mongoDSessionCatalog->onStepUp(opCtx.get());
         }
+
+        // Set up an OpObserver to ensure that preparing a multi-doc transaction has
+        // a valid description for mapping transaction operations to applyOps entries.
+        auto opObserverRegistry =
+            dynamic_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
+        opObserverRegistry->addObserver(
+            std::make_unique<ReshardingOplogSessionApplicationOpObserver>());
 
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     }

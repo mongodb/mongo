@@ -2109,17 +2109,14 @@ OpObserverImpl::preTransactionPrepare(OperationContext* opCtx,
 void OpObserverImpl::onTransactionPrepare(
     OperationContext* opCtx,
     const std::vector<OplogSlot>& reservedSlots,
-    std::vector<repl::ReplOperation>* statements,
-    const ApplyOpsOplogSlotAndOperationAssignment* applyOpsOperationAssignment,
+    const std::vector<repl::ReplOperation>& statements,
+    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     size_t numberOfPrePostImagesToWrite,
     Date_t wallClockTime) {
     invariant(!reservedSlots.empty());
     const auto prepareOpTime = reservedSlots.back();
     invariant(opCtx->getTxnNumber());
     invariant(!prepareOpTime.isNull());
-    tassert(6278510,
-            "Operation assignments to applyOps entries should be present",
-            applyOpsOperationAssignment);
 
     // Don't write oplog entry on secondaries.
     if (!opCtx->writesAreReplicated()) {
@@ -2128,7 +2125,7 @@ void OpObserverImpl::onTransactionPrepare(
 
     {
         // We should have reserved enough slots.
-        invariant(reservedSlots.size() >= statements->size());
+        invariant(reservedSlots.size() >= statements.size());
         TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
 
         writeConflictRetry(
@@ -2140,7 +2137,7 @@ void OpObserverImpl::onTransactionPrepare(
                 WriteUnitOfWork wuow(opCtx);
                 // It is possible that the transaction resulted in no changes, In that case, we
                 // should not write any operations other than the prepare oplog entry.
-                if (!statements->empty()) {
+                if (!statements.empty()) {
                     // We had reserved enough oplog slots for the worst case where each operation
                     // produced one oplog entry.  When operations are smaller and can be packed, we
                     // will waste the extra slots.  The implicit prepare oplog entry will still use
@@ -2148,9 +2145,9 @@ void OpObserverImpl::onTransactionPrepare(
                     // that as the prepare time.
                     boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
                     logOplogEntries(opCtx,
-                                    *statements,
+                                    statements,
                                     reservedSlots,
-                                    *applyOpsOperationAssignment,
+                                    applyOpsOperationAssignment,
                                     &imageToWrite,
                                     true /* prepare */,
                                     wallClockTime,
@@ -2188,7 +2185,7 @@ void OpObserverImpl::onTransactionPrepare(
             });
     }
 
-    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, *statements, prepareOpTime);
+    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, prepareOpTime);
 }
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,

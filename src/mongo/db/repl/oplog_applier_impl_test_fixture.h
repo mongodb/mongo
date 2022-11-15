@@ -143,6 +143,16 @@ public:
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo) override;
 
+    /**
+     * Called when OplogApplierImpl prepares a multi-doc transaction using the
+     * TransactionParticipant.
+     */
+    std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        Date_t wallClockTime,
+        TransactionOperations* transactionOperations) override;
+
     // Hooks for OpObserver functions. Defaults to a no-op function but may be overridden to
     // check actual documents mutated.
     std::function<void(OperationContext*, const NamespaceString&, const std::vector<BSONObj>&)>

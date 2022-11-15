@@ -136,6 +136,17 @@ public:
         return {};
     }
 
+    /**
+     * Called when we prepare a multi-doc transaction using the TransactionParticipant.
+     */
+    std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        Date_t wallClockTime,
+        TransactionOperations* transactionOperations) override {
+        return std::make_unique<ApplyOpsOplogSlotAndOperationAssignment>();
+    }
+
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
 
