@@ -2180,9 +2180,9 @@ void OpObserverImpl::onTransactionPrepare(
                     logApplyOps(opCtx,
                                 &oplogEntry,
                                 DurableTxnStateEnum::kPrepared,
-                                oplogSlot,
-                                {},
-                                true /* updateTxnTable */,
+                                /*startOpTime=*/oplogSlot,
+                                /*stmtIdsWritten=*/{},
+                                /*updateTxnTable=*/true,
                                 _oplogWriter.get());
                 }
                 wuow.commit();
