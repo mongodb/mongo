@@ -1655,7 +1655,7 @@ void packTransactionStatementsForApplyOps(
 // Returns the optime of the written oplog entry.
 OpTimeBundle logApplyOps(OperationContext* opCtx,
                          MutableOplogEntry* oplogEntry,
-                         boost::optional<DurableTxnStateEnum> txnState,
+                         DurableTxnStateEnum txnState,
                          boost::optional<repl::OpTime> startOpTime,
                          std::vector<StmtId> stmtIdsWritten,
                          const bool updateTxnTable,
