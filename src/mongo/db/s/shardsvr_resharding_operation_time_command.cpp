@@ -37,6 +37,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/sharding_data_transform_metrics.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/request_types/resharding_operation_time_gen.h"
 #include "mongo/util/duration.h"
@@ -108,6 +109,7 @@ public:
         }
 
         Response typedRun(OperationContext* opCtx) {
+            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             auto instances = resharding::getReshardingStateMachines<
                 ReshardingRecipientService,
                 ReshardingRecipientService::RecipientStateMachine>(opCtx, ns());
