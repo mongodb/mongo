@@ -1,8 +1,6 @@
 // @tags: [
 //   does_not_support_stepdowns,
 //   requires_profiling,
-//   # TODO SERVER-62034: Prevent distinct() from using CQF.
-//   cqf_incompatible,
 // ]
 
 // Confirms that profiled distinct execution contains all expected metrics with proper values.
