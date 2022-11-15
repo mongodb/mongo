@@ -338,7 +338,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         splitKeys.erase(splitKeys.begin());
 
         if (timer.millis() > serverGlobalParams.slowMS.load()) {
-            LOGV2_WARNING(
+            LOGV2_INFO(
                 22115,
                 "Finding the split vector for {namespace} over {keyPattern} keyCount: {keyCount} "
                 "numSplits: {numSplits} lookedAt: {currCount} took {duration}",
