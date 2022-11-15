@@ -123,6 +123,7 @@ buildvariants:
   - windows-vsCurrent-xlarge
   modules:
   - enterprise
+  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
   expansions:
     exe: ".exe"
     ext: zip
