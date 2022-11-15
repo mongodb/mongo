@@ -99,7 +99,6 @@ ClusterClientCursorImpl::~ClusterClientCursorImpl() {
 }
 
 StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
-
     invariant(_opCtx);
     const auto interruptStatus = _opCtx->checkForInterruptNoAssert();
     if (!interruptStatus.isOK()) {
@@ -119,6 +118,8 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
     if (next.isOK() && !next.getValue().isEOF()) {
         ++_numReturnedSoFar;
     }
+    // Record if we just got a MaxTimeMSExpired error.
+    _maxTimeMSExpired |= (next.getStatus().code() == ErrorCodes::MaxTimeMSExpired);
     return next;
 }
 
