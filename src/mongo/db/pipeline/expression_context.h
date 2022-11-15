@@ -300,6 +300,14 @@ public:
         return tailableMode == TailableModeEnum::kTailableAndAwaitData;
     }
 
+    /**
+     * Returns true if the pipeline is eligible for query sampling. That is, it is not an explain
+     * and either it is not nested or it is nested inside $lookup, $graphLookup and $unionWith.
+     */
+    bool eligibleForSampling() const {
+        return !explain && (subPipelineDepth == 0 || inLookup || inUnionWith);
+    }
+
     void setResolvedNamespaces(StringMap<ResolvedNamespace> resolvedNamespaces) {
         _resolvedNamespaces = std::move(resolvedNamespaces);
     }
@@ -439,6 +447,9 @@ public:
 
     // True if this 'ExpressionContext' object is for the inner side of a $lookup or $graphLookup.
     bool inLookup = false;
+
+    // True if this 'ExpressionContext' object is for the inner side of a $unionWith.
+    bool inUnionWith = false;
 
     // If set, this will disallow use of features introduced in versions above the provided version.
     boost::optional<multiversion::FeatureCompatibilityVersion> maxFeatureCompatibilityVersion;

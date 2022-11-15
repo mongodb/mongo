@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -712,6 +713,46 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
     ASSERT(arrayContains(expCtx, resultsArray, Value(target2)));
     ASSERT(!arrayContains(expCtx, resultsArray, Value(soloDoc)));
     ASSERT(graphLookupStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, IncrementNestedAggregateOpCounterOnCreateButNotOnCopy) {
+    auto testOpCounter = [&](const NamespaceString& nss, const int expectedIncrease) {
+        auto resolvedNss = StringMap<ExpressionContext::ResolvedNamespace>{
+            {nss.coll().toString(), {nss, std::vector<BSONObj>()}}};
+        auto countBeforeCreate = globalOpCounters.getNestedAggregate()->load();
+
+        // Create a DocumentSourceGraphLookUp and verify that the counter increases by the expected
+        // amount.
+        auto originalExpCtx = make_intrusive<ExpressionContextForTest>(getOpCtx(), nss);
+        originalExpCtx->setResolvedNamespaces(resolvedNss);
+        auto docSource = DocumentSourceGraphLookUp::createFromBson(
+            BSON("$graphLookup" << BSON("from" << nss.coll() << "startWith"
+                                               << "$x"
+                                               << "connectFromField"
+                                               << "id"
+                                               << "connectToField"
+                                               << "id"
+                                               << "as"
+                                               << "connections"))
+                .firstElement(),
+            originalExpCtx);
+        auto originalGraphLookup = static_cast<DocumentSourceGraphLookUp*>(docSource.get());
+        auto countAfterCreate = globalOpCounters.getNestedAggregate()->load();
+        ASSERT_EQ(countAfterCreate - countBeforeCreate, expectedIncrease);
+
+        // Copy the DocumentSourceGraphLookUp and verify that the counter doesn't increase.
+        auto newExpCtx = make_intrusive<ExpressionContextForTest>(getOpCtx(), nss);
+        newExpCtx->setResolvedNamespaces(resolvedNss);
+        DocumentSourceGraphLookUp newGraphLookup{*originalGraphLookup, newExpCtx};
+        auto countAfterCopy = globalOpCounters.getNestedAggregate()->load();
+        ASSERT_EQ(countAfterCopy - countAfterCreate, 0);
+    };
+
+    testOpCounter(NamespaceString{"testDb", "testColl"}, 1);
+    // $graphLookup against internal databases should not cause the counter to get incremented.
+    testOpCounter(NamespaceString{"config", "testColl"}, 0);
+    testOpCounter(NamespaceString{"admin", "testColl"}, 0);
+    testOpCounter(NamespaceString{"local", "testColl"}, 0);
 }
 
 

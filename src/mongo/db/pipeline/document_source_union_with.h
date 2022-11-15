@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
@@ -63,6 +64,11 @@ public:
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
         : DocumentSource(kStageName, expCtx), _pipeline(std::move(pipeline)) {
+        if (!_pipeline->getContext()->ns.isOnInternalDb()) {
+            globalOpCounters.gotNestedAggregate();
+        }
+        _pipeline->getContext()->inUnionWith = true;
+
         // If this pipeline is being run as part of explain, then cache a copy to use later during
         // serialization.
         if (expCtx->explain >= ExplainOptions::Verbosity::kExecStats) {
@@ -74,7 +80,9 @@ public:
                             const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
         : DocumentSource(kStageName,
                          newExpCtx ? newExpCtx : original.pExpCtx->copyWith(original.pExpCtx->ns)),
-          _pipeline(original._pipeline->clone()) {}
+          _pipeline(original._pipeline->clone()) {
+        _pipeline->getContext()->inUnionWith = true;
+    }
 
     ~DocumentSourceUnionWith();
 

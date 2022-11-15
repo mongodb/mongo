@@ -49,6 +49,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 namespace {
@@ -1422,6 +1423,41 @@ TEST_F(DocumentSourceLookUpTest, ShouldNotCacheIfCorrelatedStageIsAbsorbedIntoPl
         fromjson("[{mock: {}}, {$addFields: {varField: {$sum: ['$x', {$const: 0}]}}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
+}
+
+TEST_F(DocumentSourceLookUpTest, IncrementNestedAggregateOpCounterOnCreateButNotOnCopy) {
+    auto testOpCounter = [&](const NamespaceString& nss, const int expectedIncrease) {
+        auto resolvedNss = StringMap<ExpressionContext::ResolvedNamespace>{
+            {nss.coll().toString(), {nss, std::vector<BSONObj>()}}};
+        auto countBeforeCreate = globalOpCounters.getNestedAggregate()->load();
+
+        // Create a DocumentSourceLookUp and verify that the counter increases by the expected
+        // amount.
+        auto originalExpCtx = make_intrusive<ExpressionContextForTest>(getOpCtx(), nss);
+        originalExpCtx->setResolvedNamespaces(resolvedNss);
+        auto docSource = DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from" << nss.coll() << "pipeline"
+                                          << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
+                                          << "as"))
+                .firstElement(),
+            originalExpCtx);
+        auto originalLookup = static_cast<DocumentSourceLookUp*>(docSource.get());
+        auto countAfterCreate = globalOpCounters.getNestedAggregate()->load();
+        ASSERT_EQ(countAfterCreate - countBeforeCreate, expectedIncrease);
+
+        // Copy the DocumentSourceLookUp and verify that the counter doesn't increase.
+        auto newExpCtx = make_intrusive<ExpressionContextForTest>(getOpCtx(), nss);
+        newExpCtx->setResolvedNamespaces(resolvedNss);
+        DocumentSourceLookUp newLookup{*originalLookup, newExpCtx};
+        auto countAfterCopy = globalOpCounters.getNestedAggregate()->load();
+        ASSERT_EQ(countAfterCopy - countAfterCreate, 0);
+    };
+
+    testOpCounter(NamespaceString{"testDb", "testColl"}, 1);
+    // $lookup against internal databases should not cause the counter to get incremented.
+    testOpCounter(NamespaceString{"config", "testColl"}, 0);
+    testOpCounter(NamespaceString{"admin", "testColl"}, 0);
+    testOpCounter(NamespaceString{"local", "testColl"}, 0);
 }
 
 using DocumentSourceLookUpServerlessTest = ServerlessAggregationContextFixture;

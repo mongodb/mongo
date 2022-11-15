@@ -588,6 +588,40 @@ TEST_F(DocumentSourceUnionWithTest, StricterConstraintsFromSubSubPipelineAreInhe
     ASSERT_TRUE(unionStage.constraints(Pipeline::SplitState::kUnsplit) == expectedConstraints);
 }
 
+TEST_F(DocumentSourceUnionWithTest, IncrementNestedAggregateOpCounterOnCreateButNotOnCopy) {
+    auto testOpCounter = [&](const NamespaceString& nss, const int expectedIncrease) {
+        auto resolvedNss = StringMap<ExpressionContext::ResolvedNamespace>{
+            {nss.coll().toString(), {nss, std::vector<BSONObj>()}}};
+        auto countBeforeCreate = globalOpCounters.getNestedAggregate()->load();
+
+        // Create a DocumentSourceUnionWith and verify that the counter increases by the expected
+        // amount.
+        auto originalExpCtx = make_intrusive<ExpressionContextForTest>(getOpCtx(), nss);
+        originalExpCtx->setResolvedNamespaces(resolvedNss);
+        auto docSource = DocumentSourceUnionWith::createFromBson(
+            BSON("$unionWith" << BSON("coll" << nss.coll() << "pipeline"
+                                             << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))))
+                .firstElement(),
+            originalExpCtx);
+        auto originalUnionWith = static_cast<DocumentSourceUnionWith*>(docSource.get());
+        auto countAfterCreate = globalOpCounters.getNestedAggregate()->load();
+        ASSERT_EQ(countAfterCreate - countBeforeCreate, expectedIncrease);
+
+        // Copy the DocumentSourceUnionWith and verify that the counter doesn't increase.
+        auto newExpCtx = make_intrusive<ExpressionContextForTest>(getOpCtx(), nss);
+        newExpCtx->setResolvedNamespaces(resolvedNss);
+        DocumentSourceUnionWith newUnionWith{*originalUnionWith, newExpCtx};
+        auto countAfterCopy = globalOpCounters.getNestedAggregate()->load();
+        ASSERT_EQ(countAfterCopy - countAfterCreate, 0);
+    };
+
+    testOpCounter(NamespaceString{"testDb", "testColl"}, 1);
+    // $unionWith against internal databases should not cause the counter to get incremented.
+    testOpCounter(NamespaceString{"config", "testColl"}, 0);
+    testOpCounter(NamespaceString{"admin", "testColl"}, 0);
+    testOpCounter(NamespaceString{"local", "testColl"}, 0);
+}
+
 using DocumentSourceUnionWithServerlessTest = ServerlessAggregationContextFixture;
 
 TEST_F(DocumentSourceUnionWithServerlessTest,

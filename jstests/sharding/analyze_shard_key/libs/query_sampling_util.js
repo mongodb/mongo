@@ -27,12 +27,26 @@ var QuerySamplingUtil = (function() {
     }
 
     /**
-     * Waits for the given mongos to have one active collection for query sampling.
+     * Waits for the given node to have one active collection for query sampling.
      */
-    function waitForActiveSampling(mongosConn) {
+    function waitForActiveSampling(node) {
         assert.soon(() => {
-            const res = assert.commandWorked(mongosConn.adminCommand({serverStatus: 1}));
+            const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
             return res.queryAnalyzers.activeCollections == 1;
+        });
+    }
+
+    /**
+     * Waits for all shard nodes to have one active collection for query sampling.
+     */
+    function waitForActiveSamplingOnAllShards(st) {
+        st._rs.forEach(rs => {
+            rs.nodes.forEach(node => {
+                assert.soon(() => {
+                    const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
+                    return res.queryAnalyzers.activeCollections == 1;
+                });
+            });
         });
     }
 
@@ -133,18 +147,25 @@ var QuerySamplingUtil = (function() {
                   {actualSampledQueryDocs, expectedSampledQueryDocs});
 
         for (let {filter, shardNames, cmdName, cmdObj, diff} of expectedSampledQueryDocs) {
+            if (!filter) {
+                // The filer is not specified so skip verifying it.
+                continue;
+            }
             let shardName = null;
             for (let rs of st._rs) {
                 const primary = rs.test.getPrimary();
-                const queryDoc = primary.getCollection(kSampledQueriesNs).findOne(filter);
+                const queryDocs = primary.getCollection(kSampledQueriesNs).find(filter).toArray();
 
                 if (shardName) {
-                    assert.eq(queryDoc,
-                              null,
+                    assert.eq(queryDocs.length,
+                              0,
                               "Found a sampled query on more than one shard " +
                                   tojson({shardNames: [shardName, rs.test.name], cmdName, cmdObj}));
                     continue;
-                } else if (queryDoc) {
+                } else if (queryDocs.length > 0) {
+                    assert.eq(queryDocs.length, 1, queryDocs);
+                    const queryDoc = queryDocs[0];
+
                     shardName = rs.test.name;
                     assert(shardNames.includes(shardName),
                            "Found a sampled query on an unexpected shard " +
@@ -168,6 +189,18 @@ var QuerySamplingUtil = (function() {
     function assertNoSampledQueryDocuments(conn, ns) {
         const coll = conn.getCollection("config.sampledQueries");
         assert.eq(coll.find({ns}).itcount(), 0);
+    }
+
+    function clearSampledQueryCollection(primary) {
+        const coll = primary.getCollection(kSampledQueriesNs);
+        assert.commandWorked(coll.remove({}));
+    }
+
+    function clearSampledQueryCollectionOnAllShards(st) {
+        for (let rs of st._rs) {
+            const primary = rs.test.getPrimary();
+            clearSampledQueryCollection(primary);
+        }
     }
 
     /**
@@ -210,9 +243,11 @@ var QuerySamplingUtil = (function() {
         generateRandomCollation,
         makeCmdObjIgnoreSessionInfo,
         waitForActiveSampling,
+        waitForActiveSamplingOnAllShards,
         assertSoonSampledQueryDocuments,
         assertSoonSampledQueryDocumentsAcrossShards,
         assertNoSampledQueryDocuments,
+        clearSampledQueryCollectionOnAllShards,
         assertSoonSingleSampledDiffDocument,
         assertNoSampledDiffDocuments,
         clearSampledDiffCollection

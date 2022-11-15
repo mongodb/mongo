@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
 
@@ -654,6 +655,10 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _unwind(unwindSrc),
       _variables(expCtx->variables),
       _variablesParseState(expCtx->variablesParseState.copyWith(_variables.useIdGenerator())) {
+    if (!_from.isOnInternalDb()) {
+        globalOpCounters.gotNestedAggregate();
+    }
+
     const auto& resolvedNamespace = pExpCtx->getResolvedNamespace(_from);
     _fromExpCtx = pExpCtx->copyForSubPipeline(resolvedNamespace.ns, resolvedNamespace.uuid);
     _fromExpCtx->inLookup = true;

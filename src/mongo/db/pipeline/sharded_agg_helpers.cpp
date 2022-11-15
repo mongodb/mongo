@@ -786,7 +786,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
         dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
                               hasChangeStream,
                               startsWithDocuments,
-                              !aggRequest.getExplain() /* eligibleForSampling */,
+                              expCtx->eligibleForSampling(),
                               std::move(pipeline),
                               shardTargetingPolicy,
                               std::move(readConcern));
@@ -1495,7 +1495,7 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
         dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
                               hasChangeStream,
                               startsWithDocuments,
-                              false /* eligibleForSampling */,
+                              expCtx->eligibleForSampling(),
                               std::move(pipeline));
     BSONObjBuilder explainBuilder;
     auto appendStatus =

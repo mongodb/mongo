@@ -169,7 +169,6 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto cm = uassertStatusOK(
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, parsedMr.getNamespace()));
     auto expCtx = makeExpressionContext(opCtx, parsedMr, cm, verbosity);
-    const bool eligibleForSampling = !expCtx->explain;
 
     const auto pipelineBuilder = [&]() {
         return map_reduce_common::translateFromMR(parsedMr, expCtx);
@@ -202,15 +201,15 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 // needed in the normal aggregation path. For this translation, though, we need to
                 // build the pipeline to serialize and send to the primary shard.
                 auto serialized = serializeToCommand(cmd, parsedMr, pipelineBuilder().get());
-                uassertStatusOK(
-                    cluster_aggregation_planner::runPipelineOnPrimaryShard(expCtx,
-                                                                           namespaces,
-                                                                           *targeter.cm,
-                                                                           verbosity,
-                                                                           std::move(serialized),
-                                                                           privileges,
-                                                                           eligibleForSampling,
-                                                                           &tempResults));
+                uassertStatusOK(cluster_aggregation_planner::runPipelineOnPrimaryShard(
+                    expCtx,
+                    namespaces,
+                    *targeter.cm,
+                    verbosity,
+                    std::move(serialized),
+                    privileges,
+                    expCtx->eligibleForSampling(),
+                    &tempResults));
                 break;
             }
 
@@ -239,7 +238,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                     &tempResults,
                     false /* hasChangeStream */,
                     false /* startsWithDocuments */,
-                    eligibleForSampling));
+                    expCtx->eligibleForSampling()));
                 break;
             }
 

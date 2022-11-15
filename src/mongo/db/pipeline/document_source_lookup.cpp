@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
@@ -133,6 +134,10 @@ DocumentSourceLookUp::DocumentSourceLookUp(
       _as(std::move(as)),
       _variables(expCtx->variables),
       _variablesParseState(expCtx->variablesParseState.copyWith(_variables.useIdGenerator())) {
+    if (!_fromNs.isOnInternalDb()) {
+        globalOpCounters.gotNestedAggregate();
+    }
+
     const auto& resolvedNamespace = expCtx->getResolvedNamespace(_fromNs);
     _resolvedNs = resolvedNamespace.ns;
     _resolvedPipeline = resolvedNamespace.pipeline;
