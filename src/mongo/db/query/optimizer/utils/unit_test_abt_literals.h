@@ -83,17 +83,15 @@ inline auto operator"" _cstr(const char* c, size_t len) {
 }
 
 inline auto operator"" _cint32(const char* c, size_t len) {
-    std::istringstream is(std::string{c, len});
-    int32_t v;
-    is >> v;
-    return ExprHolder{Constant::int32(v)};
+    return ExprHolder{Constant::int32(std::stoi({c, len}))};
 }
 
 inline auto operator"" _cint64(const char* c, size_t len) {
-    std::istringstream is(std::string{c, len});
-    int64_t v;
-    is >> v;
-    return ExprHolder{Constant::int64(v)};
+    return ExprHolder{Constant::int64(std::stol({c, len}))};
+}
+
+inline auto operator"" _cdouble(const char* c, size_t len) {
+    return ExprHolder{Constant::fromDouble(std::stod({c, len}))};
 }
 
 inline auto operator"" _var(const char* c, size_t len) {
@@ -225,8 +223,8 @@ inline auto _scan(ProjectionName pn, std::string scanDefName) {
     return NodeHolder{make<ScanNode>(std::move(pn), std::move(scanDefName))};
 }
 
-inline auto _filter(ExprHolder expr, NodeHolder child) {
-    return NodeHolder{make<FilterNode>(std::move(expr._n), std::move(child._n))};
+inline auto _filter(ExprHolder expr, NodeHolder input) {
+    return NodeHolder{make<FilterNode>(std::move(expr._n), std::move(input._n))};
 }
 
 inline auto _eval(StringData pn, ExprHolder expr, NodeHolder input) {

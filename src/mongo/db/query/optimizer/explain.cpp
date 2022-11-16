@@ -842,13 +842,35 @@ public:
                 printer.printSingleLevel(boundPrinter);
             };
 
-            printer.print(lowBound.isInclusive() ? "[" : "(");
-            printBoundFn(printer, lowBound.getBound());
+            // Shortened output for half-open, fully open and point intervals.
+            if (interval.isFullyOpen()) {
+                printer.print("<fully open>");
+            } else if (interval.isEquality()) {
+                printer.print("=");
+                printBoundFn(printer, lowBound.getBound());
+            } else if (lowBound.isMinusInf()) {
+                printer.print("<");
+                if (highBound.isInclusive()) {
+                    printer.print("=");
+                }
+                printBoundFn(printer, highBound.getBound());
+            } else if (highBound.isPlusInf()) {
+                printer.print(">");
+                if (lowBound.isInclusive()) {
+                    printer.print("=");
+                }
+                printBoundFn(printer, lowBound.getBound());
+            } else {
+                // Output for a generic interval.
 
-            printer.print(", ");
-            printBoundFn(printer, highBound.getBound());
+                printer.print(lowBound.isInclusive() ? "[" : "(");
+                printBoundFn(printer, lowBound.getBound());
 
-            printer.print(highBound.isInclusive() ? "]" : ")");
+                printer.print(", ");
+                printBoundFn(printer, highBound.getBound());
+
+                printer.print(highBound.isInclusive() ? "]" : ")");
+            }
         } else if constexpr (version == ExplainVersion::V3) {
             ExplainPrinter lowBoundPrinter;
             lowBoundPrinter.fieldName("inclusive").print(lowBound.isInclusive());

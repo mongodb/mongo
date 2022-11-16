@@ -39,13 +39,13 @@ Root []
 |       Variable [scan_0]
 Sargable [Complete]
 |   |   |   |   |   requirementsMap: 
-|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U {{[Const [3], Const [3]]}}}
+|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
 |   |   |   |   candidateIndexes: 
-|   |   |   |       candidateId: 1, index1, {}, {0}, {{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U {{[Const [3], Const [3]]}}}
+|   |   |   |       candidateId: 1, index1, {}, {0}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
 |   |   |   scanParams: 
 |   |   |       {'a': evalTemp_0}
 |   |   |           residualReqs: 
-|   |   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U {{[Const [3], Const [3]]}}}, entryIndex: 0
+|   |   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0
 |   |   BindBlock:
 |   RefBlock: 
 |       Variable [scan_0]
@@ -96,13 +96,13 @@ Root []
 |       Variable [scan_0]
 Sargable [Complete]
 |   |   |   |   |   requirementsMap: 
-|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U {{[Const [3], Const [3]]}}}
+|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
 |   |   |   |   candidateIndexes: 
-|   |   |   |       candidateId: 1, index1, {}, {0}, {{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U {{[Const [3], Const [3]]}}}
+|   |   |   |       candidateId: 1, index1, {}, {0}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
 |   |   |   scanParams: 
 |   |   |       {'a': evalTemp_0}
 |   |   |           residualReqs: 
-|   |   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [1]]}} U {{[Const [2], Const [2]]}} U {{[Const [3], Const [3]]}}}, entryIndex: 0
+|   |   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0
 |   |   BindBlock:
 |   RefBlock: 
 |       Variable [scan_0]
@@ -465,7 +465,7 @@ BinaryJoin [joinType: Inner, {rid_0}]
 |   |           Source []
 |   RefBlock: 
 |       Variable [rid_0]
-IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {[Const [10], Const [10]]}]
+IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10]}]
     BindBlock:
         [rid_0]
             Source []
@@ -521,7 +521,7 @@ Evaluation []
 |           PathField [a]
 |           PathConstant []
 |           Variable [fieldProj_0]
-IndexScan [{'<indexKey> 0': fieldProj_0}, scanDefName: collection, indexDefName: index1, interval: {[Const [10], Const [10]]}]
+IndexScan [{'<indexKey> 0': fieldProj_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10]}]
     BindBlock:
         [fieldProj_0]
             Source []
@@ -577,7 +577,7 @@ Evaluation []
 |           PathField [a]
 |           PathConstant []
 |           Variable [fieldProj_0]
-IndexScan [{'<indexKey> 0': fieldProj_0}, scanDefName: collection, indexDefName: index1, interval: {[Const [10], Const [10]]}]
+IndexScan [{'<indexKey> 0': fieldProj_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10]}]
     BindBlock:
         [fieldProj_0]
             Source []
@@ -638,7 +638,7 @@ Evaluation []
 |           PathField [a]
 |           PathConstant []
 |           Variable [fieldProj_0]
-IndexScan [{'<indexKey> 0': fieldProj_0}, scanDefName: collection, indexDefName: index1, interval: {[Const [10], Const [10]], [Const [20], Const [20]]}]
+IndexScan [{'<indexKey> 0': fieldProj_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10], =Const [20]}]
     BindBlock:
         [fieldProj_0]
             Source []
@@ -712,7 +712,7 @@ Evaluation []
 |           PathField [a]
 |           PathConstant []
 |           Variable [fieldProj_0]
-IndexScan [{'<indexKey> 0': fieldProj_0, '<indexKey> 1': fieldProj_1, '<indexKey> 2': fieldProj_2}, scanDefName: collection, indexDefName: index1, interval: {[Const [10], Const [10]], [Const [20], Const [20]], [Const [30], Const [30]]}]
+IndexScan [{'<indexKey> 0': fieldProj_0, '<indexKey> 1': fieldProj_1, '<indexKey> 2': fieldProj_2}, scanDefName: collection, indexDefName: index1, interval: {=Const [10], =Const [20], =Const [30]}]
     BindBlock:
         [fieldProj_0]
             Source []
@@ -790,7 +790,7 @@ Evaluation []
 |           PathField [a]
 |           PathConstant []
 |           Variable [fieldProj_0]
-IndexScan [{'<indexKey> 0': fieldProj_0, '<indexKey> 1': fieldProj_1, '<indexKey> 2': fieldProj_2}, scanDefName: collection, indexDefName: index1, interval: {[Const [10], Const [10]], [Const [20], Const [20]], [Const [30], Const [30]]}]
+IndexScan [{'<indexKey> 0': fieldProj_0, '<indexKey> 1': fieldProj_1, '<indexKey> 2': fieldProj_2}, scanDefName: collection, indexDefName: index1, interval: {=Const [10], =Const [20], =Const [30]}]
     BindBlock:
         [fieldProj_0]
             Source []
@@ -860,7 +860,7 @@ BinaryJoin [joinType: Inner, {rid_0}]
 |   |           Source []
 |   RefBlock: 
 |       Variable [rid_0]
-IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {[Const [10], Const [10]]}]
+IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10]}]
     BindBlock:
         [rid_0]
             Source []
@@ -1016,7 +1016,7 @@ BinaryJoin [joinType: Inner, {rid_0}]
 |   |           Source []
 |   RefBlock: 
 |       Variable [rid_0]
-IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {[Const [2], Const [2]], [Const [2], Const [2]]}]
+IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [2], =Const [2]}]
     BindBlock:
         [rid_0]
             Source []
@@ -1084,7 +1084,7 @@ BinaryJoin [joinType: Inner, {rid_0}]
 |   |           Source []
 |   RefBlock: 
 |       Variable [rid_0]
-IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {[Const [2], Const [2]]}]
+IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [2]}]
     BindBlock:
         [rid_0]
             Source []

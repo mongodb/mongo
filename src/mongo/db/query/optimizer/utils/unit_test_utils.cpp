@@ -72,6 +72,13 @@ void maybePrintABT(const ABT& abt) {
     }
 }
 
+std::string getPropsStrForExplain(const OptPhaseManager& phaseManager) {
+    return ExplainGenerator::explainV2(
+        make<MemoPhysicalDelegatorNode>(phaseManager.getPhysicalNodeId()),
+        true /*displayPhysicalProperties*/,
+        &phaseManager.getMemo());
+}
+
 static std::vector<std::string> formatStr(const std::string& str) {
     std::vector<std::string> replacementLines;
     std::istringstream lineInput(str);
@@ -191,8 +198,8 @@ bool handleAutoUpdate(const std::string& expected,
     }
 
     // Add the current delta.
-    lineDeltas.emplace_back(lineNumber,
-                            static_cast<int64_t>(actualFormatted.size()) - expectedDelta);
+    const int64_t delta = static_cast<int64_t>(actualFormatted.size()) - expectedDelta;
+    lineDeltas.emplace_back(lineNumber, delta);
 
     // Do not assert in order to allow multiple tests to be updated.
     return true;

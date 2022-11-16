@@ -42,6 +42,8 @@
 namespace mongo::optimizer {
 namespace {
 
+using namespace unit_test_abt_literals;
+
 TEST(Optimizer, AutoUpdateExplain) {
     ABT tree = make<BinaryOp>(Operations::Add,
                               Constant::int64(1),
@@ -71,8 +73,6 @@ TEST(Optimizer, AutoUpdateExplain) {
 }
 
 TEST(Optimizer, ABTLiterals) {
-    using namespace unit_test_abt_literals;
-
     // Demonstrate shorthand tree initialization using the ABT string literal constructors.
 
     // Construct inline.
@@ -200,7 +200,7 @@ Constant* constEval(ABT& tree) {
 
 TEST(Optimizer, ConstEval) {
     // 1 + 2
-    ABT tree = make<BinaryOp>(Operations::Add, Constant::int64(1), Constant::int64(2));
+    ABT tree = _binary("Add", "1"_cint64, "2"_cint64)._n;
     Constant* result = constEval(tree);
     ASSERT_EQ(result->getValueInt64(), 3);
 }
@@ -208,10 +208,7 @@ TEST(Optimizer, ConstEval) {
 
 TEST(Optimizer, ConstEvalCompose) {
     // (1 + 2) + 3
-    ABT tree =
-        make<BinaryOp>(Operations::Add,
-                       make<BinaryOp>(Operations::Add, Constant::int64(1), Constant::int64(2)),
-                       Constant::int64(3));
+    ABT tree = _binary("Add", _binary("Add", "1"_cint64, "2"_cint64), "3"_cint64)._n;
     Constant* result = constEval(tree);
     ASSERT_EQ(result->getValueInt64(), 6);
 }
@@ -219,18 +216,14 @@ TEST(Optimizer, ConstEvalCompose) {
 
 TEST(Optimizer, ConstEvalCompose2) {
     // 3 - (5 - 4)
-    auto tree =
-        make<BinaryOp>(Operations::Sub,
-                       Constant::int64(3),
-                       make<BinaryOp>(Operations::Sub, Constant::int64(5), Constant::int64(4)));
+    auto tree = _binary("Sub", "3"_cint64, _binary("Sub", "5"_cint64, "4"_cint64))._n;
     Constant* result = constEval(tree);
     ASSERT_EQ(result->getValueInt64(), 2);
 }
 
 TEST(Optimizer, ConstEval3) {
     // 1.5 + 0.5
-    auto tree =
-        make<BinaryOp>(Operations::Add, Constant::fromDouble(1.5), Constant::fromDouble(0.5));
+    auto tree = _binary("Add", "1.5"_cdouble, "0.5"_cdouble)._n;
     Constant* result = constEval(tree);
     ASSERT_EQ(result->getValueDouble(), 2.0);
 }
@@ -900,30 +893,14 @@ TEST(Explain, ExplainBsonForConstant) {
 }
 
 TEST(IntervalNormalize, Basic) {
-    auto intervalExpr =
-        IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
-            IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::NodeVector{
-                IntervalReqExpr::make<IntervalReqExpr::Atom>(
-                    IntervalRequirement{{true /*inclusive*/, Constant::int64(3)},
-                                        {true /*inclusive*/, Constant::int64(4)}}),
-                IntervalReqExpr::make<IntervalReqExpr::Atom>(
-                    IntervalRequirement{{true /*inclusive*/, Constant::int64(1)},
-                                        {true /*inclusive*/, Constant::int64(2)}})}),
-            IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
-                IntervalReqExpr::make<IntervalReqExpr::Atom>(
-                    IntervalRequirement{{true /*inclusive*/, Constant::int64(3)},
-                                        {true /*inclusive*/, Constant::int64(4)}}),
-                IntervalReqExpr::make<IntervalReqExpr::Atom>(
-                    IntervalRequirement{{false /*inclusive*/, Constant::int64(3)},
-                                        {true /*inclusive*/, Constant::int64(4)}}),
-                IntervalReqExpr::make<IntervalReqExpr::Atom>(
-                    IntervalRequirement{{true /*inclusive*/, Constant::int64(3)},
-                                        {true /*inclusive*/, Constant::int64(2)}})}),
-            IntervalReqExpr::make<IntervalReqExpr::Atom>(
-                IntervalRequirement{{true /*inclusive*/, Constant::int64(5)},
-                                    {true /*inclusive*/, Constant::int64(6)}})});
+    auto intervalExpr = _disj(_conj(_interval(_incl("3"_cint64), _incl("4"_cint64)),
+                                    _interval(_incl("1"_cint64), _incl("2"_cint64))),
+                              _disj(_interval(_incl("3"_cint64), _incl("4"_cint64)),
+                                    _interval(_excl("3"_cint64), _incl("4"_cint64)),
+                                    _interval(_incl("3"_cint64), _incl("2"_cint64))),
+                              _interval(_incl("5"_cint64), _incl("6"_cint64)));
 
-    ASSERT_EQ(
+    ASSERT_INTERVAL(
         "{\n"
         "    {\n"
         "        {[Const [3], Const [4]]}\n"
@@ -941,13 +918,13 @@ TEST(IntervalNormalize, Basic) {
         " U \n"
         "    {[Const [5], Const [6]]}\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(intervalExpr));
+        intervalExpr);
 
     normalizeIntervals(intervalExpr);
 
     // Demonstrate that Atoms are sorted first, then conjunctions and disjunctions. Atoms are sorted
     // first on the lower then on the upper bounds.
-    ASSERT_EQ(
+    ASSERT_INTERVAL(
         "{\n"
         "    {[Const [5], Const [6]]}\n"
         " U \n"
@@ -965,7 +942,7 @@ TEST(IntervalNormalize, Basic) {
         "        {[Const [3], Const [4]]}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(intervalExpr));
+        intervalExpr);
 }
 
 TEST(Optimizer, ExplainRIDUnion) {

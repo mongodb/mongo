@@ -339,130 +339,131 @@ TEST(IntervalIntersection, MultiFieldIntersection) {
         optimizedQueryPlan(q4Text, testIndex));
 }
 
-TEST(IntervalIntersection, VariableIntervals) {
+TEST(IntervalIntersection, VariableIntervals1) {
     using namespace unit_test_abt_literals;
 
-    const auto constFold = ConstEval::constFold;
+    auto interval = _disj(
+        _conj(_interval(_incl("v1"_var), _plusInf()), _interval(_excl("v2"_var), _plusInf())));
 
-    {
-        auto interval = _disj(
-            _conj(_interval(_incl("v1"_var), _plusInf()), _interval(_excl("v2"_var), _plusInf())));
+    auto result = intersectDNFIntervals(interval, ConstEval::constFold);
+    ASSERT_TRUE(result);
 
-        auto result = intersectDNFIntervals(interval, constFold);
-        ASSERT_TRUE(result);
+    // (max(v1, v2), +inf) U [v2 >= v1 ? MaxKey : v1, max(v1, v2)]
+    ASSERT_INTERVAL(
+        "{\n"
+        "    {\n"
+        "        {[If [] BinaryOp [Gte] Variable [v2] Variable [v1] Const [maxKey] Variable [v1],"
+        " If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {>If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2]}\n"
+        "    }\n"
+        "}\n",
+        *result);
 
-        // (max(v1, v2), +inf) U [v2 >= v1 ? MaxKey : v1, max(v1, v2)]
-        ASSERT_EQ(
-            "{\n"
-            "    {\n"
-            "        {[If [] BinaryOp [Gte] Variable [v2] Variable [v1] Const [maxKey] Variable "
-            "[v1], If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2]]}\n"
-            "    }\n"
-            " U \n"
-            "    {\n"
-            "        {(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
-            "[v2], Const [maxKey]]}\n"
-            "    }\n"
-            "}\n",
-            ExplainGenerator::explainIntervalExpr(*result));
+    // Make sure repeated intersection does not change the result.
+    auto result1 = intersectDNFIntervals(*result, ConstEval::constFold);
+    ASSERT_TRUE(result1);
+    ASSERT_TRUE(*result == *result1);
+}
 
-        // Make sure repeated intersection does not change the result.
-        auto result1 = intersectDNFIntervals(*result, constFold);
-        ASSERT_TRUE(result1);
-        ASSERT_TRUE(*result == *result1);
-    }
+TEST(IntervalIntersection, VariableIntervals2) {
+    using namespace unit_test_abt_literals;
 
-    {
-        auto interval = _disj(_conj(_interval(_incl("v1"_var), _incl("v3"_var)),
-                                    _interval(_incl("v2"_var), _incl("v4"_var))));
+    auto interval = _disj(_conj(_interval(_incl("v1"_var), _incl("v3"_var)),
+                                _interval(_incl("v2"_var), _incl("v4"_var))));
 
-        auto result = intersectDNFIntervals(interval, constFold);
-        ASSERT_TRUE(result);
+    auto result = intersectDNFIntervals(interval, ConstEval::constFold);
+    ASSERT_TRUE(result);
 
-        // [v1, v3] ^ [v2, v4] -> [max(v1, v2), min(v3, v4)]
-        ASSERT_EQ(
-            "{\n"
-            "    {\n"
-            "        {[If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
-            "[v2], If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}\n"
-            "    }\n"
-            "}\n",
-            ExplainGenerator::explainIntervalExpr(*result));
+    // [v1, v3] ^ [v2, v4] -> [max(v1, v2), min(v3, v4)]
+    ASSERT_INTERVAL(
+        "{\n"
+        "    {\n"
+        "        {[If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
+        "[v2], If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}\n"
+        "    }\n"
+        "}\n",
+        *result);
 
-        // Make sure repeated intersection does not change the result.
-        auto result1 = intersectDNFIntervals(*result, constFold);
-        ASSERT_TRUE(result1);
-        ASSERT_TRUE(*result == *result1);
-    }
+    // Make sure repeated intersection does not change the result.
+    auto result1 = intersectDNFIntervals(*result, ConstEval::constFold);
+    ASSERT_TRUE(result1);
+    ASSERT_TRUE(*result == *result1);
+}
 
-    {
-        auto interval = _disj(_conj(_interval(_excl("v1"_var), _incl("v3"_var)),
-                                    _interval(_incl("v2"_var), _incl("v4"_var))));
+TEST(IntervalIntersection, VariableIntervals3) {
+    using namespace unit_test_abt_literals;
 
-        auto result = intersectDNFIntervals(interval, constFold);
-        ASSERT_TRUE(result);
+    auto interval = _disj(_conj(_interval(_excl("v1"_var), _incl("v3"_var)),
+                                _interval(_incl("v2"_var), _incl("v4"_var))));
 
-        ASSERT_EQ(
-            "{\n"
-            "    {\n"
-            "        {[If [] BinaryOp [Gte] Variable [v1] Variable [v2] Const [maxKey] Variable "
-            "[v2], If [] BinaryOp [Lte] If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable "
-            "[v1] Variable [v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] "
-            "Variable [v4] If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
-            "[v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}\n"
-            "    }\n"
-            " U \n"
-            "    {\n"
-            "        {(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
-            "[v2], If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}\n"
-            "    }\n"
-            "}\n",
-            ExplainGenerator::explainIntervalExpr(*result));
+    auto result = intersectDNFIntervals(interval, ConstEval::constFold);
+    ASSERT_TRUE(result);
 
-        // Make sure repeated intersection does not change the result.
-        auto result1 = intersectDNFIntervals(*result, constFold);
-        ASSERT_TRUE(result1);
-        ASSERT_TRUE(*result == *result1);
-    }
+    ASSERT_INTERVAL(
+        "{\n"
+        "    {\n"
+        "        {[If [] BinaryOp [Gte] Variable [v1] Variable [v2] Const [maxKey] Variable "
+        "[v2], If [] BinaryOp [Lte] If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable "
+        "[v1] Variable [v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] "
+        "Variable [v4] If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
+        "[v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
+        "[v2], If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}\n"
+        "    }\n"
+        "}\n",
+        *result);
 
-    {
-        auto interval = _disj(_conj(_interval(_excl("v1"_var), _incl("v3"_var)),
-                                    _interval(_incl("v2"_var), _excl("v4"_var))));
+    // Make sure repeated intersection does not change the result.
+    auto result1 = intersectDNFIntervals(*result, ConstEval::constFold);
+    ASSERT_TRUE(result1);
+    ASSERT_TRUE(*result == *result1);
+}
 
-        auto result = intersectDNFIntervals(interval, constFold);
-        ASSERT_TRUE(result);
+TEST(IntervalIntersection, VariableIntervals4) {
+    using namespace unit_test_abt_literals;
 
-        ASSERT_EQ(
-            "{\n"
-            "    {\n"
-            "        {[If [] BinaryOp [Gte] Variable [v1] Variable [v2] Const [maxKey] Variable "
-            "[v2], If [] BinaryOp [Lte] If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable "
-            "[v1] Variable [v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] "
-            "Variable [v4] If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
-            "[v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}\n"
-            "    }\n"
-            " U \n"
-            "    {\n"
-            "        {[If [] BinaryOp [Gte] If [] BinaryOp [Gte] Variable [v1] Variable [v2] "
-            "Variable [v1] Variable [v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable "
-            "[v3] Variable [v4] If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] "
-            "Variable [v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable "
-            "[v4], If [] BinaryOp [Lte] Variable [v4] Variable [v3] Const [minKey] Variable "
-            "[v3]]}\n"
-            "    }\n"
-            " U \n"
-            "    {\n"
-            "        {(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
-            "[v2], If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4])}\n"
-            "    }\n"
-            "}\n",
-            ExplainGenerator::explainIntervalExpr(*result));
+    auto interval = _disj(_conj(_interval(_excl("v1"_var), _incl("v3"_var)),
+                                _interval(_incl("v2"_var), _excl("v4"_var))));
 
-        // Make sure repeated intersection does not change the result.
-        auto result1 = intersectDNFIntervals(*result, constFold);
-        ASSERT_TRUE(result1);
-        ASSERT_TRUE(*result == *result1);
-    }
+    auto result = intersectDNFIntervals(interval, ConstEval::constFold);
+    ASSERT_TRUE(result);
+
+    ASSERT_INTERVAL(
+        "{\n"
+        "    {\n"
+        "        {[If [] BinaryOp [Gte] Variable [v1] Variable [v2] Const [maxKey] Variable "
+        "[v2], If [] BinaryOp [Lte] If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable "
+        "[v1] Variable [v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] "
+        "Variable [v4] If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
+        "[v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[If [] BinaryOp [Gte] If [] BinaryOp [Gte] Variable [v1] Variable [v2] "
+        "Variable [v1] Variable [v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable "
+        "[v3] Variable [v4] If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] "
+        "Variable [v2] If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable "
+        "[v4], If [] BinaryOp [Lte] Variable [v4] Variable [v3] Const [minKey] Variable "
+        "[v3]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
+        "[v2], If [] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4])}\n"
+        "    }\n"
+        "}\n",
+        *result);
+
+    // Make sure repeated intersection does not change the result.
+    auto result1 = intersectDNFIntervals(*result, ConstEval::constFold);
+    ASSERT_TRUE(result1);
+    ASSERT_TRUE(*result == *result1);
 }
 
 template <int N>

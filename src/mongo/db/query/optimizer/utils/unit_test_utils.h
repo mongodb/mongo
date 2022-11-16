@@ -40,18 +40,12 @@ namespace mongo::optimizer {
 
 void maybePrintABT(const ABT& abt);
 
+std::string getPropsStrForExplain(const OptPhaseManager& phaseManager);
+
 bool handleAutoUpdate(const std::string& expected,
                       const std::string& actual,
                       const std::string& fileName,
                       size_t lineNumber);
-
-#define ASSERT_EXPLAIN(expected, abt) \
-    maybePrintABT(abt);               \
-    ASSERT_EQ(expected, ExplainGenerator::explain(abt))
-
-#define ASSERT_EXPLAIN_V2(expected, abt) \
-    maybePrintABT(abt);                  \
-    ASSERT_EQ(expected, ExplainGenerator::explainV2(abt))
 
 /**
  * Auto update result back in the source file if the assert fails.
@@ -72,26 +66,72 @@ bool handleAutoUpdate(const std::string& expected,
  *
  * TODO: SERVER-71004: Extend the usability of the auto-update macro.
  */
+#define ASSERT_STR_EQ_AUTO(expected, actual) \
+    ASSERT(handleAutoUpdate(expected, actual, __FILE__, __LINE__))
+
+
+#define ASSERT_EXPLAIN(expected, abt) \
+    maybePrintABT(abt);               \
+    ASSERT_EQ(expected, ExplainGenerator::explain(abt))
+
+// Do not remove macro even if unused: used to update tests before committing code.
+#define ASSERT_EXPLAIN_AUTO(expected, abt) \
+    maybePrintABT(abt);                    \
+    ASSERT_STR_EQ(expected, ExplainGenerator::explain(abt))
+
+
+#define ASSERT_EXPLAIN_V2(expected, abt) \
+    maybePrintABT(abt);                  \
+    ASSERT_EQ(expected, ExplainGenerator::explainV2(abt))
+
+// Do not remove macro even if unused: used to update tests before committing code.
 #define ASSERT_EXPLAIN_V2_AUTO(expected, abt) \
     maybePrintABT(abt);                       \
-    ASSERT(handleAutoUpdate(expected, ExplainGenerator::explainV2(abt), __FILE__, __LINE__))
+    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainV2(abt))
+
 
 #define ASSERT_EXPLAIN_V2Compact(expected, abt) \
     maybePrintABT(abt);                         \
     ASSERT_EQ(expected, ExplainGenerator::explainV2Compact(abt))
 
+// Do not remove macro even if unused: used to update tests before committing code.
+#define ASSERT_EXPLAIN_V2Compact_AUTO(expected, abt) \
+    maybePrintABT(abt);                              \
+    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainV2Compact(abt))
+
+
 #define ASSERT_EXPLAIN_BSON(expected, abt) \
     maybePrintABT(abt);                    \
     ASSERT_EQ(expected, ExplainGenerator::explainBSONStr(abt))
 
-#define ASSERT_EXPLAIN_PROPS_V2(expected, phaseManager)                              \
-    ASSERT_EQ(expected,                                                              \
-              ExplainGenerator::explainV2(                                           \
-                  make<MemoPhysicalDelegatorNode>(phaseManager.getPhysicalNodeId()), \
-                  true /*displayPhysicalProperties*/,                                \
-                  &phaseManager.getMemo()))
+// Do not remove macro even if unused: used to update tests before committing code.
+#define ASSERT_EXPLAIN_BSON_AUTO(expected, abt) \
+    maybePrintABT(abt);                         \
+    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainBSONStr(abt))
+
+
+#define ASSERT_EXPLAIN_PROPS_V2(expected, phaseManager) \
+    ASSERT_EQ(expected, getPropsStrForExplain(phaseManager))
+
+// Do not remove macro even if unused: used to update tests before committing code.
+#define ASSERT_EXPLAIN_PROPS_V2_AUTO(expected, phaseManager) \
+    ASSERT_STR_EQ_AUTO(expected, getPropsStrForExplain(phaseManager))
+
 
 #define ASSERT_EXPLAIN_MEMO(expected, memo) ASSERT_EQ(expected, ExplainGenerator::explainMemo(memo))
+
+// Do not remove macro even if unused: used to update tests before committing code.
+#define ASSERT_EXPLAIN_MEMO_AUTO(expected, memo) \
+    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainMemo(memo))
+
+
+#define ASSERT_INTERVAL(expected, interval) \
+    ASSERT_EQ(expected, ExplainGenerator::explainIntervalExpr(interval))
+
+// Do not remove macro even if unused: used to update tests before committing code.
+#define ASSERT_INTERVAL_AUTO(expected, interval) \
+    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainIntervalExpr(interval))
+
 
 #define ASSERT_BSON_PATH(expected, bson, path)                      \
     ASSERT_EQ(expected,                                             \

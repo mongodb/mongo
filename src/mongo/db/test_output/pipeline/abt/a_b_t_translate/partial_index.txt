@@ -25,7 +25,7 @@ metadata:
 						distribution type: Centralized
 						distribution paths: 
 					requirementsMap: 
-					    refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [2], Const [2]]}}}
+					    refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{=Const [2]}}}
 
 			collection exists: 1
 			CE type: -1
@@ -68,7 +68,7 @@ BinaryJoin [joinType: Inner, {rid_0}]
 |   |           Source []
 |   RefBlock: 
 |       Variable [rid_0]
-IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {[Const [3], Const [3]]}]
+IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [3]}]
     BindBlock:
         [rid_0]
             Source []
@@ -101,7 +101,7 @@ metadata:
 						distribution type: Centralized
 						distribution paths: 
 					requirementsMap: 
-					    refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [2], Const [2]]}}}
+					    refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{=Const [2]}}}
 
 			collection exists: 1
 			CE type: -1
