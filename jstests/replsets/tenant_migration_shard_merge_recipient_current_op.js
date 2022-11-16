@@ -125,9 +125,9 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
     let res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
     checkStandardFieldsOK(res);
     let currOp = res.inprog[0];
-    assert.eq(currOp.state, TenantMigrationTest.RecipientState.kStarted, res);
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
     assert.eq(currOp.garbageCollectable, false, res);
-    assert.eq(currOp.migrationCompleted, false, res);
+    assert.eq(currOp.dataSyncCompleted, false, res);
     assert(!currOp.hasOwnProperty("startFetchingDonorOpTime"), res);
     assert(!currOp.hasOwnProperty("startApplyingDonorOpTime"), res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
@@ -150,10 +150,10 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
     let currOp = res.inprog[0];
     assert.gt(new Date(), currOp.receiveStart, tojson(res));
 
-    assert.eq(currOp.state, TenantMigrationTest.RecipientState.kLearnedFilenames, res);
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kLearnedFilenames, res);
 
     assert.eq(currOp.garbageCollectable, false, res);
-    assert.eq(currOp.migrationCompleted, false, res);
+    assert.eq(currOp.dataSyncCompleted, false, res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
     assert(!currOp.hasOwnProperty("cloneFinishedRecipientOpTime"), res);
     assert(currOp.hasOwnProperty("startFetchingDonorOpTime") &&
@@ -180,9 +180,9 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
     checkPostConsistentFieldsOK(res);
     let currOp = res.inprog[0];
     // State should have changed.
-    assert.eq(currOp.state, TenantMigrationTest.RecipientState.kConsistent, res);
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kConsistent, res);
     assert.eq(currOp.garbageCollectable, false, res);
-    assert.eq(currOp.migrationCompleted, false, res);
+    assert.eq(currOp.dataSyncCompleted, false, res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
 
     // Wait to receive recipientSyncData with returnAfterReachingDonorTimestamp.
@@ -194,9 +194,9 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
     checkPostConsistentFieldsOK(res);
     currOp = res.inprog[0];
     // State should have changed.
-    assert.eq(currOp.state, TenantMigrationTest.RecipientState.kConsistent, res);
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kConsistent, res);
     assert.eq(currOp.garbageCollectable, false, res);
-    assert.eq(currOp.migrationCompleted, false, res);
+    assert.eq(currOp.dataSyncCompleted, false, res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
     // The oplog applier should have applied at least the noop resume token.
     assert.gte(currOp.numOpsApplied, 1, tojson(res));
@@ -223,10 +223,10 @@ forgetMigrationThread.start();
     checkStandardFieldsOK(res);
     checkPostConsistentFieldsOK(res);
     let currOp = res.inprog[0];
-    assert.eq(currOp.state, TenantMigrationTest.RecipientState.kConsistent, res);
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kConsistent, res);
     assert.eq(currOp.garbageCollectable, false, res);
-    // migrationCompleted should have changed.
-    assert.eq(currOp.migrationCompleted, true, res);
+    // dataSyncCompleted should have changed.
+    assert.eq(currOp.dataSyncCompleted, true, res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
 
     jsTestLog("Allow the forgetMigration to complete.");
@@ -237,9 +237,9 @@ forgetMigrationThread.start();
     checkStandardFieldsOK(res);
     checkPostConsistentFieldsOK(res);
     currOp = res.inprog[0];
-    assert.eq(currOp.migrationCompleted, true, res);
+    assert.eq(currOp.dataSyncCompleted, true, res);
     // State, completion status and expireAt should have changed.
-    assert.eq(currOp.state, TenantMigrationTest.RecipientState.kDone, res);
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kDone, res);
     assert.eq(currOp.garbageCollectable, true, res);
     assert(currOp.hasOwnProperty("expireAt") && currOp.expireAt instanceof Date, res);
 }

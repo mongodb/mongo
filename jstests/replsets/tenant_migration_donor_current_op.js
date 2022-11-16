@@ -6,8 +6,8 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   # The currentOp output field 'lastDurableState' was changed from an enum to a string.
- *   requires_fcv_62,
+ *   # The currentOp output field 'migrationCompleted' was renamed to 'garbageCollectable'.
+ *   requires_fcv_61,
  *   serverless,
  * ]
  */
@@ -19,6 +19,16 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
+
+// An object that mirrors the donor migration states.
+const migrationStates = {
+    kUninitialized: 0,
+    kAbortingIndexBuilds: 1,
+    kDataSync: 2,
+    kBlocking: 3,
+    kCommitted: 4,
+    kAborted: 5
+};
 
 const kTenantId = 'testTenantId';
 const kReadPreference = {
@@ -70,7 +80,7 @@ function checkStandardFieldsOK(ops, {
 
     checkStandardFieldsOK(res.inprog, {
         migrationId,
-        lastDurableState: TenantMigrationTest.DonorState.kAbortingIndexBuilds,
+        lastDurableState: migrationStates.kAbortingIndexBuilds,
         tenantMigrationTest,
     });
 
@@ -101,7 +111,7 @@ function checkStandardFieldsOK(ops, {
 
     checkStandardFieldsOK(res.inprog, {
         migrationId,
-        lastDurableState: TenantMigrationTest.DonorState.kDataSync,
+        lastDurableState: migrationStates.kDataSync,
         tenantMigrationTest,
     });
     assert(res.inprog[0].startMigrationDonorTimestamp instanceof Timestamp);
@@ -133,7 +143,7 @@ function checkStandardFieldsOK(ops, {
 
     checkStandardFieldsOK(res.inprog, {
         migrationId,
-        lastDurableState: TenantMigrationTest.DonorState.kBlocking,
+        lastDurableState: migrationStates.kBlocking,
         tenantMigrationTest,
     });
     assert(res.inprog[0].blockTimestamp instanceof Timestamp);
@@ -165,7 +175,7 @@ function checkStandardFieldsOK(ops, {
 
     checkStandardFieldsOK(res.inprog, {
         migrationId,
-        lastDurableState: TenantMigrationTest.DonorState.kAborted,
+        lastDurableState: migrationStates.kAborted,
         tenantMigrationTest,
     });
     assert(res.inprog[0].startMigrationDonorTimestamp instanceof Timestamp);
@@ -199,7 +209,7 @@ function checkStandardFieldsOK(ops, {
 
     checkStandardFieldsOK(res.inprog, {
         migrationId,
-        lastDurableState: TenantMigrationTest.DonorState.kCommitted,
+        lastDurableState: migrationStates.kCommitted,
         tenantMigrationTest,
     });
     assert(res.inprog[0].startMigrationDonorTimestamp instanceof Timestamp);
@@ -215,7 +225,7 @@ function checkStandardFieldsOK(ops, {
 
     checkStandardFieldsOK(res.inprog, {
         migrationId,
-        lastDurableState: TenantMigrationTest.DonorState.kCommitted,
+        lastDurableState: migrationStates.kCommitted,
         tenantMigrationTest,
         garbageCollectable: true,
     });
