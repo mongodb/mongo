@@ -80,11 +80,46 @@ enum class PrepareConflictBehavior {
  * A RecoveryUnit is responsible for ensuring that data is persisted.
  * All on-disk information must be mutated through this interface.
  */
-class RecoveryUnit : public Decorable<RecoveryUnit> {
+class RecoveryUnit {
     RecoveryUnit(const RecoveryUnit&) = delete;
     RecoveryUnit& operator=(const RecoveryUnit&) = delete;
 
 public:
+    /**
+     * A Snapshot is a decorable type whose lifetime is tied to the the lifetime of a snapshot
+     * within the RecoveryUnit. Snapshots hold no storage engine state and are to be used for
+     * snapshot ID comparison on a single RecoveryUnit and to support decorated types that should be
+     * destructed when the storage snapshot is invalidated.
+     *
+     * Classes that decorate a Snapshot are constructed before a new storage snapshot is established
+     * and destructed after the storage engine snapshot has been released.
+     */
+    class Snapshot : public Decorable<Snapshot> {
+    public:
+        explicit Snapshot(SnapshotId id) : _id(id) {}
+        Snapshot(const Snapshot&) = delete;
+        Snapshot& operator=(const Snapshot&) = delete;
+        Snapshot(Snapshot&&) = default;
+        Snapshot& operator=(Snapshot&&) = default;
+
+        SnapshotId getId() const {
+            return _id;
+        }
+
+    private:
+        SnapshotId _id;
+    };
+
+    /**
+     * Returns the current snapshot on this RecoveryUnit. Will be destructed and re-constructed when
+     * the storage engine snapshot is closed via calls to abandonSnapshot, commitUnitOfWork, or
+     * abortUnitOfWork.
+     *
+     * Note that the RecoveryUnit does not make any guarantees that this reference remains valid
+     * except for the lifetime of the Snapshot.
+     */
+    Snapshot& getSnapshot();
+
     // Behavior for abandonSnapshot().
     enum class AbandonSnapshotMode {
         kAbort,  // default
@@ -277,7 +312,7 @@ public:
      * This is unrelated to Timestamp which must be globally comparable.
      */
     SnapshotId getSnapshotId() const {
-        return SnapshotId{_mySnapshotId};
+        return _snapshot->getId();
     }
 
     /**
@@ -666,50 +701,6 @@ public:
         registerChange(std::make_unique<OnCommitChange>(std::move(callback)));
     }
 
-    /**
-     * Registers a callback to be called when the snapshot is opened.
-     *
-     * Be careful about the lifetimes of all variables captured by the callback!
-     */
-    template <typename Callback>
-    void onOpenSnapshot(Callback cb) {
-        class OnOpenSnapshotChange final : public SnapshotChange {
-        public:
-            OnOpenSnapshotChange(Callback&& callback) : _callback(std::move(callback)) {}
-            void openSnapshot(OperationContext* opCtx) final {
-                _callback(opCtx);
-            }
-            void closeSnapshot(OperationContext* opCtx) final {}
-
-        private:
-            Callback _callback;
-        };
-
-        _registerSnapshotChange(std::make_unique<OnOpenSnapshotChange>(std::move(cb)));
-    }
-
-    /**
-     * Registers a callback to be called when the snapshot is closed.
-     *
-     * Be careful about the lifetimes of all variables captured by the callback!
-     */
-    template <typename Callback>
-    void onCloseSnapshot(Callback cb) {
-        class OnCloseSnapshotChange final : public SnapshotChange {
-        public:
-            OnCloseSnapshotChange(Callback&& callback) : _callback(std::move(callback)) {}
-            void openSnapshot(OperationContext* opCtx) final {}
-            void closeSnapshot(OperationContext* opCtx) final {
-                _callback(opCtx);
-            }
-
-        private:
-            Callback _callback;
-        };
-
-        _registerSnapshotChange(std::make_unique<OnCloseSnapshotChange>(std::move(cb)));
-    }
-
     virtual void setOrderedCommit(bool orderedCommit) = 0;
 
     /**
@@ -847,24 +838,13 @@ protected:
      */
     void _executeRollbackHandlers();
 
-    /**
-     * Executes all registered open snapshot handlers. This does not clear any registered snapshot
-     * changes in order to keep the close snapshot handlers around until the snapshot is closed.
-     */
-    void _executeOpenSnapshotHandlers();
-
-    /**
-     * Executes all registered close snapshot handlers and clears all registered snapshot changes.
-     */
-    void _executeCloseSnapshotHandlers();
-
     bool _noEvictionAfterRollback = false;
 
     AbandonSnapshotMode _abandonSnapshotMode = AbandonSnapshotMode::kAbort;
 
 private:
     // Sets the snapshot associated with this RecoveryUnit to a new globally unique id number.
-    void assignNextSnapshotId();
+    void assignNextSnapshot();
 
     virtual void doBeginUnitOfWork() = 0;
     virtual void doAbandonSnapshot() = 0;
@@ -873,28 +853,18 @@ private:
 
     virtual void validateInUnitOfWork() const;
 
-    /**
-     * The beginUnitOfWork() method calls  the openSnapshot() method. The abandonSnapshot(),
-     * commitUnitOfWork(), and abortUnitOfWork() methods call the closeSnapshot() method. All
-     * registered snapshot changes are called in the order of registration when a snapshot is opened
-     * and in reverse order when a snapshot is closed.
-     *
-     * This method may be called outside or inside of a WriteUnitOfWork.
-     */
-    void _registerSnapshotChange(std::unique_ptr<SnapshotChange> snapshotChange) {
-        _snapshotChanges.push_back(std::move(snapshotChange));
-    }
-
     std::vector<std::function<void(OperationContext*)>> _preCommitHooks;
 
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
     typedef std::vector<std::unique_ptr<SnapshotChange>> SnapshotChanges;
     SnapshotChanges _snapshotChanges;
+    // The Snapshot is always initialized by the RecoveryUnit constructor. We use an optional to
+    // simplify destructing and re-constructing the Snapshot in-place.
+    boost::optional<Snapshot> _snapshot;
     std::unique_ptr<Change> _changeForCatalogVisibility;
     State _state = State::kInactive;
     OperationContext* _opCtx = nullptr;
-    uint64_t _mySnapshotId;
     bool _readOnly = false;
 };
 

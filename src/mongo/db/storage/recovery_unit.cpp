@@ -47,14 +47,22 @@ namespace {
 // so there is a chance the snapshot ID will be reused.
 AtomicWord<unsigned long long> nextSnapshotId{1};
 MONGO_FAIL_POINT_DEFINE(widenWUOWChangesWindow);
+
+SnapshotId getNextSnapshotId() {
+    return SnapshotId(nextSnapshotId.fetchAndAdd(1));
+}
 }  // namespace
 
-RecoveryUnit::RecoveryUnit() {
-    assignNextSnapshotId();
+RecoveryUnit::RecoveryUnit() : _snapshot(getNextSnapshotId()) {}
+
+RecoveryUnit::Snapshot& RecoveryUnit::getSnapshot() {
+    return _snapshot.get();
 }
 
-void RecoveryUnit::assignNextSnapshotId() {
-    _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
+void RecoveryUnit::assignNextSnapshot() {
+    // The current snapshot's destructor will be called first, followed by the constructors for the
+    // next snapshot.
+    _snapshot.emplace(getNextSnapshotId());
 }
 
 void RecoveryUnit::registerPreCommitHook(std::function<void(OperationContext*)> callback) {
@@ -104,13 +112,13 @@ void RecoveryUnit::beginUnitOfWork(bool readOnly) {
 void RecoveryUnit::commitUnitOfWork() {
     invariant(!_readOnly);
     doCommitUnitOfWork();
-    assignNextSnapshotId();
+    assignNextSnapshot();
 }
 
 void RecoveryUnit::abortUnitOfWork() {
     invariant(!_readOnly);
     doAbortUnitOfWork();
-    assignNextSnapshotId();
+    assignNextSnapshot();
 }
 
 void RecoveryUnit::endReadOnlyUnitOfWork() {
@@ -119,7 +127,7 @@ void RecoveryUnit::endReadOnlyUnitOfWork() {
 
 void RecoveryUnit::abandonSnapshot() {
     doAbandonSnapshot();
-    assignNextSnapshotId();
+    assignNextSnapshot();
 }
 
 void RecoveryUnit::setOperationContext(OperationContext* opCtx) {
@@ -194,54 +202,8 @@ void RecoveryUnit::_executeRollbackHandlers() {
     }
 }
 
-void RecoveryUnit::_executeOpenSnapshotHandlers() {
-    invariant(_opCtx);
-    try {
-        for (auto& snapshotChange : _snapshotChanges) {
-            LOGV2_DEBUG(6825600,
-                        2,
-                        "Custom openSnapshot",
-                        "changeName"_attr = redact(demangleName(typeid(*snapshotChange))));
-            snapshotChange->openSnapshot(_opCtx);
-        }
-    } catch (...) {
-        std::terminate();
-    }
-}
-
-void RecoveryUnit::_executeCloseSnapshotHandlers() {
-    invariant(_opCtx);
-    try {
-        for (SnapshotChanges::const_reverse_iterator it = _snapshotChanges.rbegin(),
-                                                     end = _snapshotChanges.rend();
-             it != end;
-             ++it) {
-            SnapshotChange* snapshotChange = it->get();
-            LOGV2_DEBUG(6825601,
-                        2,
-                        "Custom closeSnapshot",
-                        "changeName"_attr = redact(demangleName(typeid(*snapshotChange))));
-            snapshotChange->closeSnapshot(_opCtx);
-        }
-        _snapshotChanges.clear();
-    } catch (...) {
-        std::terminate();
-    }
-}
-
 void RecoveryUnit::_setState(State newState) {
-    const bool isAlreadyActive = _isActive();
     _state = newState;
-
-    // When transitioning from an inactive to active state, execute the openSnapshot handlers.
-    if (!isAlreadyActive && _isActive()) {
-        _executeOpenSnapshotHandlers();
-    }
-
-    // When transitioning from an active to inactive state, execute the closeSnapshot handlers.
-    if (isAlreadyActive && !_isActive()) {
-        _executeCloseSnapshotHandlers();
-    }
 }
 
 void RecoveryUnit::validateInUnitOfWork() const {

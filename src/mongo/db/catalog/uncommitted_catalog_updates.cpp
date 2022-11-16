@@ -31,11 +31,11 @@
 
 namespace mongo {
 
-const RecoveryUnit::Decoration<UncommittedCatalogUpdates> getUncommittedCatalogUpdates =
-    RecoveryUnit::declareDecoration<UncommittedCatalogUpdates>();
+const RecoveryUnit::Snapshot::Decoration<UncommittedCatalogUpdates> getUncommittedCatalogUpdates =
+    RecoveryUnit::Snapshot::declareDecoration<UncommittedCatalogUpdates>();
 
 UncommittedCatalogUpdates& UncommittedCatalogUpdates::get(OperationContext* opCtx) {
-    return getUncommittedCatalogUpdates(opCtx->recoveryUnit());
+    return getUncommittedCatalogUpdates(opCtx->recoveryUnit()->getSnapshot());
 }
 
 UncommittedCatalogUpdates::CollectionLookupResult UncommittedCatalogUpdates::lookupCollection(
@@ -237,19 +237,6 @@ void UncommittedCatalogUpdates::removeView(const NamespaceString& nss) {
 void UncommittedCatalogUpdates::openCollection(OperationContext* opCtx,
                                                std::shared_ptr<Collection> coll) {
     _entries.push_back({Entry::Action::kOpenedCollection, coll, coll->ns()});
-
-    // Removes the collection instance when either the snapshot is abandoned, or the current
-    // WriteUnitOfWork commits or aborts.
-    opCtx->recoveryUnit()->onCloseSnapshot([this, nss = coll->ns()](OperationContext* opCtx) {
-        auto it = std::find_if(_entries.begin(), _entries.end(), [&](auto&& entry) {
-            return entry.action == Entry::Action::kOpenedCollection && entry.nss == nss;
-        });
-
-        if (it == _entries.end()) {
-            return;
-        }
-        _entries.erase(it);
-    });
 }
 
 const std::vector<UncommittedCatalogUpdates::Entry>& UncommittedCatalogUpdates::entries() const {
