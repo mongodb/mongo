@@ -1749,10 +1749,19 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
         return buildProjectionDefaultCovered(root, reqs);
     }
 
+    // If the projection doesn't need the whole document, then we take all the top-level fields
+    // referenced by expressions in the projection and we add them to 'fields'. At present, we
+    // intentionally ignore any basic inclusions that are part of the projection (ex. {a:1})
+    // for the purposes of populating 'fields'.
+    DepsTracker deps;
+    addProjectionExprDependencies(projection, &deps);
+    auto fields =
+        !deps.needWholeDocument ? getTopLevelFields(deps.fields) : std::vector<std::string>{};
+
     // The child must produce all of the slots required by the parent of this ProjectionNodeDefault.
     // In addition to that, the child must always produce 'kResult' because it's needed by the
     // projection logic below.
-    auto childReqs = reqs.copy().set(kResult).clearAllFields();
+    auto childReqs = reqs.copy().set(kResult).clearAllFields().setFields(fields);
 
     auto [stage, outputs] = build(pn->children[0].get(), childReqs);
 

@@ -831,34 +831,6 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
                                                    const FilterStateHelper& stateHelper);
 
 /**
- * Imagine that we have some parent QuerySolutionNode X and child QSN Y which both participate in a
- * covered plan. Stage X requests some slots to be constructed out of the index keys using
- * 'parentIndexKeyReqs'. Stage Y requests it's own slots, and adds those to the set requested by X,
- * resulting in 'childIndexKeyReqs'. Note the invariant that 'childIndexKeyReqs' is a superset of
- * 'parentIndexKeyReqs'. Let's notate the number of slots requested by 'childIndexKeyReqs' as |Y|
- * and the set of slots requested by 'parentIndexKeyReqs' as |X|.
- *
- * The underlying SBE plan is constructed, and returns a vector of |Y| slots. However, the parent
- * stage expects a vector of just |X| slots. The purpose of this function is to calculate and return
- * the appropriate subset of the slot vector so that the parent stage X receives its expected |X|
- * slots.
- *
- * As a concrete example, let's say the QSN tree is X => Y => IXSCAN and the index key pattern is
- * {a: 1, b: 1, c: 1, d: 1}. X requests "a" and "d" using the bit vector 1001. Y additionally
- * requires "c" so it requests three slots with the bit vector 1011. As a result, Y receives a
- * 3-element slot vector, <s1, s2, s3>. Here, s1 will contain the value of "a", s2 contains "c", and
- * s3 contain s"d".
- *
- * Parent QSN X expects just a two element slot vector where the first slot is for "a" and the
- * second is for "d". This function would therefore return the slot vector <s1, s3>.
- */
-sbe::value::SlotVector makeIndexKeyOutputSlotsMatchingParentReqs(
-    const BSONObj& indexKeyPattern,
-    sbe::IndexKeysInclusionSet parentIndexKeyReqs,
-    sbe::IndexKeysInclusionSet childIndexKeyReqs,
-    sbe::value::SlotVector childOutputSlots);
-
-/**
  * Given an index key pattern, and a subset of the fields of the index key pattern that are depended
  * on to compute the query, returns the corresponding 'IndexKeysInclusionSet' bit vector and field
  * name vector.
@@ -1021,7 +993,26 @@ std::unique_ptr<sbe::PlanStage> rehydrateIndexKey(std::unique_ptr<sbe::PlanStage
                                                   const sbe::value::SlotVector& indexKeySlots,
                                                   sbe::value::SlotId resultSlot);
 
+template <typename T>
+inline const char* getRawStringData(const T& str) {
+    if constexpr (std::is_same_v<T, StringData>) {
+        return str.rawData();
+    } else {
+        return str.data();
+    }
+}
+
 IndexKeyPatternTreeNode buildPatternTree(const projection_ast::Projection& projection);
+
+/**
+ * This function extracts the dependencies for expressions that appear inside a projection. Note
+ * that this function only looks at ExpressionASTNodes in the projection and ignores all other kinds
+ * of projection AST nodes.
+ *
+ * For example, for the projection {a: 1, b: "$c"}, this function will only extract the dependencies
+ * needed by the expression "$c".
+ */
+void addProjectionExprDependencies(const projection_ast::Projection& projection, DepsTracker* deps);
 
 /**
  * This method retrieves the values of the specified top-level fields ('fields') from 'resultSlot'
@@ -1054,15 +1045,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectNothin
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator);
 
-inline StringData getTopLevelField(const std::string& path) {
-    auto idx = path.find_first_of('.');
-    return StringData(path.c_str(), idx != std::string::npos ? idx : path.size());
+template <typename T>
+inline StringData getTopLevelField(const T& path) {
+    auto idx = path.find('.');
+    return StringData(getRawStringData(path), idx != std::string::npos ? idx : path.size());
 }
 
 template <typename T>
 inline std::vector<std::string> getTopLevelFields(const T& setOfPaths) {
     const bool testCommandsEnabled = getTestCommandsEnabled();
     std::vector<std::string> topLevelFields;
+    StringSet topLevelFieldsSet;
 
     for (const auto& path : setOfPaths) {
         auto field = getTopLevelField(path);
@@ -1072,7 +1065,10 @@ inline std::vector<std::string> getTopLevelFields(const T& setOfPaths) {
             continue;
         }
 
-        topLevelFields.emplace_back(std::string(field));
+        if (!topLevelFieldsSet.count(field)) {
+            topLevelFields.emplace_back(std::string(field));
+            topLevelFieldsSet.emplace(std::string(field));
+        }
     }
 
     return topLevelFields;

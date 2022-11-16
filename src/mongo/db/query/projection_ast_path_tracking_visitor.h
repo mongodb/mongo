@@ -107,8 +107,8 @@ namespace {
 /**
  * A path tracking pre-visitor used for maintaining field names while traversing the AST.
  *
- * This is intended to be used with the 'ProjectionPathTrackingWalker' only to correctly maintain
- * the state about the current path being visited.
+ * This is intended to be used with the 'PathTrackingWalker' only to correctly maintain the state
+ * about the current path being visited.
  */
 template <class UserData = PathTrackingDummyDefaultType, bool IsConst = true>
 class PathTrackingPreVisitor final : public ProjectionASTVisitor<IsConst> {
