@@ -112,6 +112,24 @@ __rec_child_deleted(
      * cells to the page. Copy out the current fast-truncate information for that function.
      */
     if (!visible_all) {
+        if (!__wt_process.fast_truncate_2022) {
+            /*
+             * Internal pages with deletes that aren't globally visible cannot be evicted if we
+             * don't write the page_del information, we don't have sufficient information to restore
+             * the page's information if subsequently read (we wouldn't know which transactions
+             * should see the original page and which should see the deleted page).
+             */
+            if (F_ISSET(r, WT_REC_EVICT))
+                return (__wt_set_return(session, EBUSY));
+
+            /*
+             * It is wrong to leave the page clean after checkpoint if we cannot write the deleted
+             * pages to disk in eviction. If we do so, the next eviction will discard the page
+             * without reconcile it again and we lose the time point information of the non-obsolete
+             * deleted pages.
+             */
+            r->leave_dirty = true;
+        }
         cmsp->del = *page_del;
         cmsp->state = WT_CHILD_PROXY;
         return (0);
