@@ -654,7 +654,7 @@ let testCases = {
                 writeConcern: {w: 1}
             }));
         },
-        command: {revokeRolesFromRole: "foo", roles: [{role: "foo", db: db}]},
+        command: {revokeRolesFromRole: "foo", roles: [{role: "bar", db: db}]},
         checkReadConcern: false,
         checkWriteConcern: true,
         shardedTargetsConfigServer: true,
