@@ -287,7 +287,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
 
     // If neither "include" nor "exclude" is specified, the default is "exclude": [] and
     // if that's the case, no field will be added to 'bucketSpec.fieldSet' in the for-loop below.
-    BucketUnpacker::Behavior unpackerBehavior = BucketUnpacker::Behavior::kExclude;
     BucketSpec bucketSpec;
     // Use extended-range support if any individual collection requires it, even if 'specElem'
     // doesn't mention this flag.
@@ -326,8 +325,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                         field.find('.') == std::string::npos);
                 bucketSpec.addIncludeExcludeField(field);
             }
-            unpackerBehavior = fieldName == kInclude ? BucketUnpacker::Behavior::kInclude
-                                                     : BucketUnpacker::Behavior::kExclude;
+            bucketSpec.setBehavior(fieldName == kInclude ? BucketSpec::Behavior::kInclude
+                                                         : BucketSpec::Behavior::kExclude);
             hasIncludeExclude = true;
         } else if (fieldName == kAssumeNoMixedSchemaData) {
             uassert(6067202,
@@ -421,13 +420,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             "The $_internalUnpackBucket stage requires a bucketMaxSpanSeconds parameter",
             hasBucketMaxSpanSeconds);
 
-    return make_intrusive<DocumentSourceInternalUnpackBucket>(
-        expCtx,
-        BucketUnpacker{std::move(bucketSpec), unpackerBehavior},
-        bucketMaxSpanSeconds,
-        eventFilterBson,
-        wholeBucketFilterBson,
-        assumeClean);
+    return make_intrusive<DocumentSourceInternalUnpackBucket>(expCtx,
+                                                              BucketUnpacker{std::move(bucketSpec)},
+                                                              bucketMaxSpanSeconds,
+                                                              eventFilterBson,
+                                                              wholeBucketFilterBson,
+                                                              assumeClean);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createFromBsonExternal(
@@ -473,26 +471,23 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             hasTimeField);
 
     return make_intrusive<DocumentSourceInternalUnpackBucket>(
-        expCtx,
-        BucketUnpacker{std::move(bucketSpec), BucketUnpacker::Behavior::kExclude},
-        3600,
-        assumeClean);
+        expCtx, BucketUnpacker{std::move(bucketSpec)}, 3600, assumeClean);
 }
 
 void DocumentSourceInternalUnpackBucket::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
     MutableDocument out;
     auto behavior =
-        _bucketUnpacker.behavior() == BucketUnpacker::Behavior::kInclude ? kInclude : kExclude;
+        _bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude ? kInclude : kExclude;
     const auto& spec = _bucketUnpacker.bucketSpec();
     std::vector<Value> fields;
     for (auto&& field : spec.fieldSet()) {
         fields.emplace_back(field);
     }
     if (((_bucketUnpacker.includeMetaField() &&
-          _bucketUnpacker.behavior() == BucketUnpacker::Behavior::kInclude) ||
+          _bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude) ||
          (!_bucketUnpacker.includeMetaField() &&
-          _bucketUnpacker.behavior() == BucketUnpacker::Behavior::kExclude && spec.metaField())) &&
+          _bucketUnpacker.behavior() == BucketSpec::Behavior::kExclude && spec.metaField())) &&
         std::find(spec.computedMetaProjFields().cbegin(),
                   spec.computedMetaProjFields().cend(),
                   *spec.metaField()) == spec.computedMetaProjFields().cend())
@@ -660,9 +655,8 @@ void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& proje
     // Update '_bucketUnpacker' state with the new fields and behavior.
     auto spec = _bucketUnpacker.bucketSpec();
     spec.setFieldSet(fields);
-    _bucketUnpacker.setBucketSpecAndBehavior(std::move(spec),
-                                             isInclusion ? BucketUnpacker::Behavior::kInclude
-                                                         : BucketUnpacker::Behavior::kExclude);
+    spec.setBehavior(isInclusion ? BucketSpec::Behavior::kInclude : BucketSpec::Behavior::kExclude);
+    _bucketUnpacker.setBucketSpec(std::move(spec));
 }
 
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProjectToInternalize(
@@ -1294,10 +1288,10 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         // interested in $count.
         auto deps = getRestPipelineDependencies(itr, container);
         if (deps.hasNoRequirements()) {
-            _bucketUnpacker.setBucketSpecAndBehavior({_bucketUnpacker.bucketSpec().timeField(),
-                                                      _bucketUnpacker.bucketSpec().metaField(),
-                                                      {}},
-                                                     BucketUnpacker::Behavior::kInclude);
+            _bucketUnpacker.setBucketSpec({_bucketUnpacker.bucketSpec().timeField(),
+                                           _bucketUnpacker.bucketSpec().metaField(),
+                                           {},
+                                           BucketSpec::Behavior::kInclude});
 
             // Keep going for next optimization.
         }
