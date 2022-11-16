@@ -1387,6 +1387,7 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
     _cancelableOpCtxFactory.emplace(_ctHolder->getAbortToken(), _markKilledExecutor);
 
     return _isReshardingOpRedundant(executor)
+        .thenRunOn(_coordinatorService->getInstanceCleanupExecutor())
         .onCompletion([this, self = shared_from_this(), executor](
                           StatusWith<bool> shardKeyMatchesSW) -> ExecutorFuture<void> {
             if (shardKeyMatchesSW.isOK() && shardKeyMatchesSW.getValue()) {
