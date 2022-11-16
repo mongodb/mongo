@@ -140,13 +140,6 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
     invariant(!_expCtx || _expCtx->opCtx == _opCtx);
     invariant(!_cq || !_expCtx || _cq->getExpCtx() == _expCtx);
 
-    // If this PlanExecutor is executing a COLLSCAN, keep a pointer directly to the COLLSCAN
-    // stage. This is used for change streams in order to keep the the latest oplog timestamp
-    // and post batch resume token up to date as the oplog scan progresses.
-    if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN)) {
-        _collScanStage = static_cast<CollectionScan*>(collectionScan);
-    }
-
     // If we don't yet have a namespace string, then initialize it from either 'collection' or
     // '_cq'.
     if (_nss.isEmpty()) {
@@ -177,6 +170,13 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
         auto subplanStage = static_cast<SubplanStage*>(subplan);
         _planExplainer->updateEnumeratorExplainInfo(
             subplanStage->compositeSolution()->_enumeratorExplainInfo);
+    }
+
+    // If this PlanExecutor is executing a COLLSCAN, keep a pointer directly to the COLLSCAN
+    // stage. This is used for change streams in order to keep the the latest oplog timestamp
+    // and post batch resume token up to date as the oplog scan progresses.
+    if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN)) {
+        _collScanStage = static_cast<CollectionScan*>(collectionScan);
     }
 }
 
