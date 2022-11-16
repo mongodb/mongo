@@ -2,7 +2,6 @@
 "use strict";
 
 load("jstests/libs/override_methods/continuous_stepdown.js");
-load("jstests/libs/override_methods/mongos_manual_intervention_actions.js");
 
 ContinuousStepdown.configure({
     configStepdown: true,

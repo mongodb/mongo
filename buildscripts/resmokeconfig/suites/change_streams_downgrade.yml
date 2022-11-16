@@ -364,7 +364,6 @@ executor:
       # uses_parallel_shell tags to denylist tests that uses them unsafely.
       eval: >-
         var testingReplication = true;
-        load("jstests/libs/override_methods/mongos_manual_intervention_actions.js");
         load('jstests/libs/override_methods/network_error_and_txn_override.js');
         db = connect(TestData.connectionString);
         load("jstests/libs/override_methods/enable_sessions.js");
