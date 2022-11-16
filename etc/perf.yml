@@ -320,7 +320,7 @@ functions:
           set -o errexit
           set -o verbose
           source "${workdir}/compile_venv/bin/activate"
-          python ./buildscripts/idl/gen_all_feature_flag_list.py --import-dir src --import-dir src/mongo/db/modules/enterprise/src
+          python ./buildscripts/idl/gen_all_feature_flag_list.py
           mkdir -p mongodb/feature_flags
           cp ./all_feature_flags.txt mongodb/feature_flags
     - command: shell.exec
