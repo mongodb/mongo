@@ -42,6 +42,6 @@ namespace scoped_timer_factory {
  */
 boost::optional<ScopedTimer> make(ServiceContext* context,
                                   QueryExecTimerPrecision precision,
-                                  Microseconds* counter);
+                                  Nanoseconds* counter);
 }  // namespace scoped_timer_factory
 }  // namespace mongo

@@ -34,12 +34,12 @@ namespace scoped_timer_factory {
 
 boost::optional<ScopedTimer> make(ServiceContext* context,
                                   QueryExecTimerPrecision precision,
-                                  Microseconds* counter) {
+                                  Nanoseconds* counter) {
     invariant(context);
     if (precision == QueryExecTimerPrecision::kMillis) {
         return {{counter, context->getFastClockSource()}};
     }
-    if (precision == QueryExecTimerPrecision::kMicros) {
+    if (precision == QueryExecTimerPrecision::kNanos) {
         return {{counter, context->getTickSource()}};
     }
 

@@ -47,14 +47,14 @@ class ScopedTimer {
 public:
     ScopedTimer(ScopedTimer&& other) = default;
 
-    ScopedTimer(Microseconds* counter, TickSource* ts);
-    ScopedTimer(Microseconds* counter, ClockSource* cs);
+    ScopedTimer(Nanoseconds* counter, TickSource* ts);
+    ScopedTimer(Nanoseconds* counter, ClockSource* cs);
 
     ~ScopedTimer();
 
 private:
     // Reference to the counter that we are incrementing with the elapsed time.
-    Microseconds* const _counter;
+    Nanoseconds* const _counter;
     TickSource* _tickSource = nullptr;
     ClockSource* _clockSource = nullptr;
 

@@ -361,8 +361,8 @@ public:
         invariant(durationCount<Microseconds>(_commonStats.executionTime.executionTimeEstimate) ==
                   0);
 
-        if (internalMeasureQueryExecutionTimeInMicroseconds.load()) {
-            _commonStats.executionTime.precision = QueryExecTimerPrecision::kMicros;
+        if (internalMeasureQueryExecutionTimeInNanoseconds.load()) {
+            _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;
         } else {
             _commonStats.executionTime.precision = QueryExecTimerPrecision::kMillis;
         }

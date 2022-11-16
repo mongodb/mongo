@@ -38,15 +38,15 @@
 
 namespace mongo {
 
-// The precision of 'executionTime'. Note that 'kMicros' precision requires a precise timer which
+// The precision of 'executionTime'. Note that 'kNanos' precision requires a precise timer which
 // is also slower than the default timer.
-enum class QueryExecTimerPrecision { kNoTiming = 0, kMicros, kMillis };
+enum class QueryExecTimerPrecision { kNoTiming = 0, kNanos, kMillis };
 
 struct QueryExecTime {
     // Precision/unit of 'executionTimeEstimate'.
     QueryExecTimerPrecision precision = QueryExecTimerPrecision::kNoTiming;
     // Time elapsed while executing this plan.
-    Microseconds executionTimeEstimate{0};
+    Nanoseconds executionTimeEstimate{0};
 };
 
 /**

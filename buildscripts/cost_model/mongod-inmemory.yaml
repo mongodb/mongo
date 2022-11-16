@@ -8,5 +8,5 @@ systemLog:
 setParameter:
   featureFlagCommonQueryFramework: true
   internalQueryFrameworkControl: "tryBonsai"
-  internalMeasureQueryExecutionTimeInMicroseconds: true
+  internalMeasureQueryExecutionTimeInNanoseconds: true
   enableTestCommands: 1

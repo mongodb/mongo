@@ -104,7 +104,7 @@ struct CommonStats {
     // The field must be populated when running explain or when running with the profiler on. It
     // must also be populated when multi planning, in order to gather stats stored in the plan
     // cache.
-    boost::optional<Microseconds> executionTime;
+    boost::optional<Nanoseconds> executionTime;
 
     bool failed;
     bool isEOF;
