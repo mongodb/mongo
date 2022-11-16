@@ -382,8 +382,11 @@ public:
 
         // Send a getMore with a namespace that is incorrect ('spoofed') for this cursor id.
         ASSERT_THROWS(
-            _client.getMore("unittests.querytests.GetMoreInvalidRequest_WRONG_NAMESPACE_FOR_CURSOR",
-                            cursor->getCursorId()),
+            _client.getMore(
+                NamespaceString(
+                    boost::none,
+                    "unittests.querytests.GetMoreInvalidRequest_WRONG_NAMESPACE_FOR_CURSOR"),
+                cursor->getCursorId()),
             AssertionException);
 
         // Check that the cursor still exists.

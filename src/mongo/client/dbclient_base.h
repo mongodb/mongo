@@ -382,8 +382,20 @@ public:
      * { name : "<short collection name>",
      *   options : { }
      * }
+     * // TODO SERVER-70433 Remove this function in favor of the one below which takes in a
+     * DatabaseName object.
      */
     std::list<BSONObj> getCollectionInfos(const std::string& db, const BSONObj& filter = BSONObj());
+
+    /**
+     * { name : "<short collection name>",
+     *   options : { }
+     * }
+     */
+    std::list<BSONObj> getCollectionInfos(
+        const DatabaseName& dbName,
+        const BSONObj& filter = BSONObj(),
+        const boost::optional<TenantId>& dollarTenant = boost::none);
 
     /**
      * Drops an entire database.
@@ -600,7 +612,7 @@ public:
      *   Returns an handle to a previously allocated cursor.
      *   Throws AssertionException.
      */
-    virtual std::unique_ptr<DBClientCursor> getMore(const std::string& ns, long long cursorId);
+    virtual std::unique_ptr<DBClientCursor> getMore(const NamespaceString& nss, long long cursorId);
 
     /**
      * Counts number of objects in collection ns that match the query criteria specified.

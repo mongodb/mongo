@@ -42,7 +42,7 @@ namespace repl {
 class DatabaseCloner final : public InitialSyncBaseCloner {
 public:
     struct Stats {
-        std::string dbname;
+        DatabaseName dbname;
         Date_t start;
         Date_t end;
         size_t collections{0};
@@ -54,7 +54,7 @@ public:
         void append(BSONObjBuilder* builder) const;
     };
 
-    DatabaseCloner(const std::string& dbName,
+    DatabaseCloner(const DatabaseName& dbName,
                    InitialSyncSharedData* sharedData,
                    const HostAndPort& source,
                    DBClientConnection* client,
@@ -94,7 +94,7 @@ private:
     void postStage() final;
 
     std::string describeForFuzzer(BaseClonerStage* stage) const final {
-        return _dbName + " db: { " + stage->getName() + ": 1 } ";
+        return _dbName.toStringWithTenantId() + " db: { " + stage->getName() + ": 1 } ";
     }
 
     // All member variables are labeled with one of the following codes indicating the
@@ -106,7 +106,7 @@ private:
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
     // (MX) Write access with mutex from main flow of control, read access with mutex from other
     //      threads, read access allowed from main flow without mutex.
-    const std::string _dbName;                                                // (R)
+    const DatabaseName _dbName;                                               // (R)
     ClonerStage<DatabaseCloner> _listCollectionsStage;                        // (R)
     std::vector<std::pair<NamespaceString, CollectionOptions>> _collections;  // (X)
     std::unique_ptr<CollectionCloner> _currentCollectionCloner;               // (MX)

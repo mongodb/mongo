@@ -108,8 +108,9 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        ASSERT_THROWS_CODE(
-            client.getMore("", 1)->nextSafe(), AssertionException, ErrorCodes::InvalidNamespace);
+        ASSERT_THROWS_CODE(client.getMore(NamespaceString(boost::none, ""), 1)->nextSafe(),
+                           AssertionException,
+                           ErrorCodes::InvalidNamespace);
     }
 };
 

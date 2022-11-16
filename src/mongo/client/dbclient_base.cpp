@@ -493,14 +493,22 @@ bool DBClientBase::createCollection(const string& ns,
     return runCommand(db.c_str(), b.done(), *info);
 }
 
-list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& filter) {
+list<BSONObj> DBClientBase::getCollectionInfos(const std::string& db, const BSONObj& filter) {
+    return getCollectionInfos(DatabaseName(boost::none, db), filter, boost::none);
+}
+
+list<BSONObj> DBClientBase::getCollectionInfos(const DatabaseName& dbName,
+                                               const BSONObj& filter,
+                                               const boost::optional<TenantId>& dollarTenant) {
     list<BSONObj> infos;
+    BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filter << "cursor" << BSONObj());
+    BSONObjBuilder b(cmdObj);
+    if (dollarTenant) {
+        dbName.tenantId()->serializeToBSON("$tenant", &b);
+    }
 
     BSONObj res;
-    if (runCommand(db,
-                   BSON("listCollections" << 1 << "filter" << filter << "cursor" << BSONObj()),
-                   res,
-                   QueryOption_SecondaryOk)) {
+    if (runCommand(DatabaseNameUtil::serialize(dbName), b.obj(), res, QueryOption_SecondaryOk)) {
         BSONObj cursorObj = res["cursor"].Obj();
         BSONObj collections = cursorObj["firstBatch"].Obj();
         BSONObjIterator it(collections);
@@ -516,8 +524,9 @@ list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& 
         const long long id = cursorObj["id"].Long();
 
         if (id != 0) {
-            const std::string ns = cursorObj["ns"].String();
-            unique_ptr<DBClientCursor> cursor = getMore(ns, id);
+            const NamespaceString nss =
+                NamespaceStringUtil::deserialize(dbName.tenantId(), cursorObj["ns"].String());
+            unique_ptr<DBClientCursor> cursor = getMore(nss, id);
             while (cursor->more()) {
                 infos.push_back(cursor->nextSafe().getOwned());
             }
@@ -579,7 +588,9 @@ vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
 
 bool DBClientBase::exists(const string& ns) {
     BSONObj filter = BSON("name" << nsToCollectionSubstring(ns));
-    list<BSONObj> results = getCollectionInfos(nsToDatabase(ns), filter);
+    // TODO SERVER-70433 Pass ns.dbName() once this function takes in a NamespaceString obj
+    list<BSONObj> results =
+        getCollectionInfos(DatabaseNameUtil::deserialize(boost::none, nsToDatabase(ns)), filter);
     return !results.empty();
 }
 
@@ -625,9 +636,8 @@ BSONObj DBClientBase::findOne(const NamespaceStringOrUUID& nssOrUuid, BSONObj fi
     return findOne(std::move(findRequest));
 }
 
-unique_ptr<DBClientCursor> DBClientBase::getMore(const string& ns, long long cursorId) {
-    unique_ptr<DBClientCursor> c(
-        new DBClientCursor(this, NamespaceString(ns), cursorId, false /*isExhaust*/));
+unique_ptr<DBClientCursor> DBClientBase::getMore(const NamespaceString& nss, long long cursorId) {
+    unique_ptr<DBClientCursor> c(new DBClientCursor(this, nss, cursorId, false /*isExhaust*/));
     if (c->init())
         return c;
     return nullptr;
@@ -811,7 +821,8 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
             if (nsOrUuid.nss()) {
                 invariant((*nsOrUuid.nss()).toString() == cursorNs);
             }
-            unique_ptr<DBClientCursor> cursor = getMore(cursorNs, id);
+            // TODO SERVER-70432 Use correctly deserialized cursorNs NamespaceString object.
+            unique_ptr<DBClientCursor> cursor = getMore(NamespaceString(cursorNs), id);
             while (cursor->more()) {
                 specs.push_back(cursor->nextSafe().getOwned());
             }

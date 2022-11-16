@@ -44,7 +44,7 @@
 namespace mongo {
 namespace repl {
 
-DatabaseCloner::DatabaseCloner(const std::string& dbName,
+DatabaseCloner::DatabaseCloner(const DatabaseName& dbName,
                                InitialSyncSharedData* sharedData,
                                const HostAndPort& source,
                                DBClientConnection* client,
@@ -54,7 +54,7 @@ DatabaseCloner::DatabaseCloner(const std::string& dbName,
           "DatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _dbName(dbName),
       _listCollectionsStage("listCollections", this, &DatabaseCloner::listCollectionsStage) {
-    invariant(!dbName.empty());
+    invariant(!dbName.db().empty());
     _stats.dbname = dbName;
 }
 
@@ -69,8 +69,8 @@ void DatabaseCloner::preStage() {
 
 BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
     BSONObj res;
-    auto collectionInfos =
-        getClient()->getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
+    auto collectionInfos = getClient()->getCollectionInfos(
+        _dbName, ListCollectionsFilter::makeTypeCollectionFilter(), _dbName.tenantId());
 
     stdx::unordered_set<std::string> seen;
     for (auto&& info : collectionInfos) {
@@ -116,7 +116,8 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
 }
 
 bool DatabaseCloner::isMyFailPoint(const BSONObj& data) const {
-    return data["database"].str() == _dbName && BaseCloner::isMyFailPoint(data);
+    return data["database"].str() == _dbName.toStringWithTenantId() &&
+        BaseCloner::isMyFailPoint(data);
 }
 
 void DatabaseCloner::postStage() {
@@ -190,7 +191,7 @@ std::string DatabaseCloner::Stats::toString() const {
 
 BSONObj DatabaseCloner::Stats::toBSON() const {
     BSONObjBuilder bob;
-    bob.append("dbname", dbname);
+    bob.append("dbname", DatabaseNameUtil::serialize(dbname));
     append(&bob);
     return bob.obj();
 }

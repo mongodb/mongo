@@ -575,9 +575,9 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     auto stats = cloner->getStats();
     ASSERT_EQUALS(0, stats.databasesCloned);
     ASSERT_EQUALS(3, stats.databaseStats.size());
-    ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
-    ASSERT_EQUALS("aab", stats.databaseStats[1].dbname);
-    ASSERT_EQUALS("a", stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "aab"), stats.databaseStats[1].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "a"), stats.databaseStats[2].dbname);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[0].start);
     ASSERT_EQUALS(Date_t(), stats.databaseStats[0].end);
     ASSERT_EQUALS(Date_t(), stats.databaseStats[1].start);
@@ -601,9 +601,9 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     stats = cloner->getStats();
     ASSERT_EQUALS(1, stats.databasesCloned);
     ASSERT_EQUALS(3, stats.databaseStats.size());
-    ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
-    ASSERT_EQUALS("aab", stats.databaseStats[1].dbname);
-    ASSERT_EQUALS("a", stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "aab"), stats.databaseStats[1].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "a"), stats.databaseStats[2].dbname);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[0].end);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[1].start);
     ASSERT_EQUALS(Date_t(), stats.databaseStats[1].end);
@@ -627,9 +627,9 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     stats = cloner->getStats();
     ASSERT_EQUALS(2, stats.databasesCloned);
     ASSERT_EQUALS(3, stats.databaseStats.size());
-    ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
-    ASSERT_EQUALS("aab", stats.databaseStats[1].dbname);
-    ASSERT_EQUALS("a", stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "aab"), stats.databaseStats[1].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "a"), stats.databaseStats[2].dbname);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[1].end);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[2].start);
     ASSERT_EQUALS(Date_t(), stats.databaseStats[2].end);
@@ -642,9 +642,9 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
 
     stats = cloner->getStats();
     ASSERT_EQUALS(3, stats.databasesCloned);
-    ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
-    ASSERT_EQUALS("aab", stats.databaseStats[1].dbname);
-    ASSERT_EQUALS("a", stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "aab"), stats.databaseStats[1].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "a"), stats.databaseStats[2].dbname);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[2].end);
 }
 
@@ -700,11 +700,12 @@ TEST_F(AllDatabaseClonerTest,
 
     // Wait for the failpoint to be reached
     dbClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
+
     auto databases = getDatabasesFromCloner(cloner.get());
     // Expect 4 dbs, since "local" should be removed
-    std::string adminWithTenantId = str::stream() << tid.toString() << "_admin";
-    std::string aWithTenantId = str::stream() << tid.toString() << "_a";
-    std::string aabWithTenantId = str::stream() << tid.toString() << "_aab";
+    DatabaseName adminWithTenantId = DatabaseName(tid, "admin");
+    DatabaseName aWithTenantId = DatabaseName(tid, "a");
+    DatabaseName aabWithTenantId = DatabaseName(tid, "aab");
     // Checks admin is first db.
     ASSERT_EQUALS(4u, databases.size());
     ASSERT_EQUALS("admin", databases[0].db());
@@ -715,7 +716,7 @@ TEST_F(AllDatabaseClonerTest,
     auto stats = cloner->getStats();
     ASSERT_EQUALS(0, stats.databasesCloned);
     ASSERT_EQUALS(4, stats.databaseStats.size());
-    ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
     ASSERT_EQUALS(adminWithTenantId, stats.databaseStats[1].dbname);
     ASSERT_EQUALS(aabWithTenantId, stats.databaseStats[2].dbname);
     ASSERT_EQUALS(aWithTenantId, stats.databaseStats[3].dbname);
@@ -734,20 +735,20 @@ TEST_F(AllDatabaseClonerTest,
         FailPoint::alwaysOn,
         0,
         fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << adminWithTenantId << "'}"));
+                               << adminWithTenantId.toStringWithTenantId() << "'}"));
+
     dbClonerAfterFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
         fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << adminWithTenantId << "'}"));
+                               << adminWithTenantId.toStringWithTenantId() << "'}"));
 
     // Wait for the failpoint to be reached.
     dbClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
-
     stats = cloner->getStats();
     ASSERT_EQUALS(1, stats.databasesCloned);
     ASSERT_EQUALS(4, stats.databaseStats.size());
-    ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
     ASSERT_EQUALS(adminWithTenantId, stats.databaseStats[1].dbname);
     ASSERT_EQUALS(aabWithTenantId, stats.databaseStats[2].dbname);
     ASSERT_EQUALS(aWithTenantId, stats.databaseStats[3].dbname);
@@ -765,19 +766,19 @@ TEST_F(AllDatabaseClonerTest,
         FailPoint::alwaysOn,
         0,
         fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << aabWithTenantId << "'}"));
+                               << aabWithTenantId.toStringWithTenantId() << "'}"));
     dbClonerAfterFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
         fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << aabWithTenantId << "'}"));
+                               << aabWithTenantId.toStringWithTenantId() << "'}"));
 
     // Wait for the failpoint to be reached.
     dbClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
     stats = cloner->getStats();
     ASSERT_EQUALS(2, stats.databasesCloned);
     ASSERT_EQUALS(4, stats.databaseStats.size());
-    ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
     ASSERT_EQUALS(adminWithTenantId, stats.databaseStats[1].dbname);
     ASSERT_EQUALS(aabWithTenantId, stats.databaseStats[2].dbname);
     ASSERT_EQUALS(aWithTenantId, stats.databaseStats[3].dbname);
@@ -794,20 +795,19 @@ TEST_F(AllDatabaseClonerTest,
         FailPoint::alwaysOn,
         0,
         fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << aWithTenantId << "'}"));
+                               << aWithTenantId.toStringWithTenantId() << "'}"));
     dbClonerAfterFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
         fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << aWithTenantId << "'}"));
+                               << aWithTenantId.toStringWithTenantId() << "'}"));
 
     // Wait for the failpoint to be reached.
     dbClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
-
     stats = cloner->getStats();
     ASSERT_EQUALS(3, stats.databasesCloned);
     ASSERT_EQUALS(4, stats.databaseStats.size());
-    ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
     ASSERT_EQUALS(adminWithTenantId, stats.databaseStats[1].dbname);
     ASSERT_EQUALS(aabWithTenantId, stats.databaseStats[2].dbname);
     ASSERT_EQUALS(aWithTenantId, stats.databaseStats[3].dbname);
@@ -823,7 +823,7 @@ TEST_F(AllDatabaseClonerTest,
 
     stats = cloner->getStats();
     ASSERT_EQUALS(4, stats.databasesCloned);
-    ASSERT_EQUALS("admin", stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
     ASSERT_EQUALS(adminWithTenantId, stats.databaseStats[1].dbname);
     ASSERT_EQUALS(aabWithTenantId, stats.databaseStats[2].dbname);
     ASSERT_EQUALS(aWithTenantId, stats.databaseStats[3].dbname);
