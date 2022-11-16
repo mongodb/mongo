@@ -12,6 +12,7 @@ pre:
   - func: "cleanup"
 post:
   - func: "dump stacktraces"
+  - func: "upload stacktraces"
   - func: "dump stderr/stdout"
   - func: "upload artifact"
     vars:
@@ -185,6 +186,25 @@ functions:
           set -o verbose
           echo '#undef HAVE_FTRUNCATE' >> config/wiredtiger_config.h
     - *make_wiredtiger
+  "dump stacktraces": &dump_stacktraces
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build"
+      script: |
+        set -o errexit
+        set -o verbose
+        ${python_binary|python3} ../test/evergreen/print_stack_trace.py
+  "upload stacktraces": &upload_stacktraces
+    command: s3.put
+    params:
+      aws_secret: ${aws_secret}
+      aws_key: ${aws_key}
+      local_files_include_filter:
+        - wiredtiger/cmake_build/*stacktrace.txt
+      bucket: build_external
+      permissions: public-read
+      content_type: text/plain
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/
   "run data validation stress test checkpoint":
     - *fetch_artifacts
     - command: shell.exec
@@ -366,11 +386,11 @@ functions:
           echo "$exit_code" > cppsuite_exit_code
           if [ "$exit_code" != 0 ]; then
             echo "[{\"info\":{\"test_name\": \"${test_name}\"},\"metrics\": []}]" > ${test_name}.json
-            # Since we later remove the WiredTiger folder, we need to check for core dumps now.
-            cd ../..
-            ${python_binary|python3} ../test/evergreen/print_stack_trace.py
           fi
           exit 0
+    # Since we later remove the WiredTiger folder, we need to check for core dumps now.
+    - *dump_stacktraces
+    - *upload_stacktraces
     - command: perf.send
       params:
         file: ./wiredtiger/cmake_build/test/cppsuite/${test_name}.json
@@ -587,26 +607,6 @@ functions:
         content_type: application/tar
         display_name: WT Hang Analyzer Output - Execution ${execution}
         remote_file: wiredtiger/${build_variant}/${revision}/wt_hang_analyzer/wt-hang-analyzer_${task_name}_${build_id}${postfix|}.tgz
-
-  "dump stacktraces":
-    - command: shell.exec
-      params:
-        working_dir: "wiredtiger/cmake_build"
-        script: |
-          set -o errexit
-          set -o verbose
-          ${python_binary|python3} ../test/evergreen/print_stack_trace.py
-
-    - command: s3.put
-      params:
-        aws_secret: ${aws_secret}
-        aws_key: ${aws_key}
-        local_files_include_filter:
-          - wiredtiger/cmake_build/*stacktrace.txt
-        bucket: build_external
-        permissions: public-read
-        content_type: text/plain
-        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/
 
   "dump stderr/stdout":
     command: shell.exec
