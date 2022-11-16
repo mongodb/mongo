@@ -131,7 +131,8 @@ test::run()
     db_create_config += _args.wt_open_config;
 
     /* Create connection. */
-    connection_manager::instance().create(db_create_config, DEFAULT_DIR);
+    connection_manager::instance().create(
+      db_create_config, _args.home.empty() ? DEFAULT_DIR : _args.home);
 
     /* Initiate the load stage of each component. */
     for (const auto &it : _components)
