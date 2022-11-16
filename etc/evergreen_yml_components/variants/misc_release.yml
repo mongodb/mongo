@@ -590,8 +590,6 @@ buildvariants:
     distros:
     - amazon2022-arm64-large
   - name: .publish_crypt
-    distros:
-    - amazon2022-arm64-large
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
