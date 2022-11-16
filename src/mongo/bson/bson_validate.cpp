@@ -231,8 +231,8 @@ private:
 
         // Skip the size bytes and BinData subtype byte to the actual encrypted data.
         auto data = static_cast<const char*>(binData.data);
-        auto encryptedBinDataType = static_cast<EncryptedBinDataType>(
-            (uint8_t)ConstDataView(data).read<LittleEndian<uint8_t>>());
+        uint8_t encryptedBinDataTypeByte = ConstDataView(data).read<LittleEndian<uint8_t>>();
+        auto encryptedBinDataType = static_cast<EncryptedBinDataType>(encryptedBinDataTypeByte);
         // Only subtype 1, 2, 6, 7, and 9 can exist in MongoDB collections.
         switch (encryptedBinDataType) {
             case EncryptedBinDataType::kDeterministic:
@@ -248,9 +248,9 @@ private:
                 uassert(ErrorCodes::NonConformantBSON,
                         fmt::format("Invalid Encrypted BSON Value length {}", len),
                         len >= minLength);
-                auto originalBsonType =
-                    static_cast<BSONType>((int8_t)ConstDataView(data + sizeof(uint8_t) + UUIDLength)
-                                              .read<LittleEndian<uint8_t>>());
+                int8_t originalBsonTypeByte = ConstDataView(data + sizeof(uint8_t) + UUIDLength)
+                                                  .read<LittleEndian<uint8_t>>();
+                auto originalBsonType = static_cast<BSONType>(originalBsonTypeByte);
                 uassert(ErrorCodes::NonConformantBSON,
                         fmt::format(
                             "BSON type '{}' is not supported for Encrypted BSON Value subtype {}",
