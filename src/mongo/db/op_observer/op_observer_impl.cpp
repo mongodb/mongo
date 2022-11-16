@@ -1810,9 +1810,7 @@ int logOplogEntries(
 
         // TODO SERVER-69286: replace this temporary fix to set the top-level tenantId to the
         // tenantId on the first op in the list
-        auto& ops = applyOpsEntry.operations;
-        if (!ops.empty() && !ops[0][repl::OplogEntry::kTidFieldName].eoo())
-            oplogEntry.setTid(TenantId::parseFromBSON(ops[0][repl::OplogEntry::kTidFieldName]));
+        oplogEntry.setTid(stmtsIter->getTid());
 
         auto txnState = isPartialTxn
             ? DurableTxnStateEnum::kInProgress
