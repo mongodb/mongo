@@ -187,6 +187,7 @@ conn_stats = [
     BlockCacheStat('block_cache_blocks_insert_read', 'total blocks inserted on read path'),
     BlockCacheStat('block_cache_blocks_insert_write', 'total blocks inserted on write path'),
     BlockCacheStat('block_cache_blocks_removed', 'removed blocks'),
+    BlockCacheStat('block_cache_blocks_removed_blocked', 'time sleeping to remove block (usecs)'),
     BlockCacheStat('block_cache_blocks_update', 'cached blocks updated'),
     BlockCacheStat('block_cache_bypass_chkpt', 'number of put bypasses on checkpoint I/O'),
     BlockCacheStat('block_cache_bypass_filesize', 'file size causing bypass'),
