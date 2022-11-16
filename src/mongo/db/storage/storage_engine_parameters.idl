@@ -76,8 +76,8 @@ server_parameters:
       gte: 0
 
 feature_flags:
-  featureFlagEnableExecutionControl:
-    description: Enables the new execution control queueing policy
+  featureFlagExecutionControl:
+    description: Enables the dynamic adjustment of the number of concurrent storage engine transactions
     cpp_varname: feature_flags::gFeatureFlagExecutionControl
     default: false
   featureFlagDeprioritizeLowPriorityOperations:
