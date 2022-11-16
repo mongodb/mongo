@@ -178,6 +178,20 @@ function testMovePrimary(dbName, fromPrimaryShardName, toPrimaryShardName) {
     assert.sameMembers(newDbInfo.shards, [toPrimaryShardName]);
 }
 
+function testDropDatabase(dbName, primaryShardName) {
+    // Create the database
+    testEnableSharding(dbName, primaryShardName);
+
+    // Drop the database
+    let db = st.s.getDB(dbName);
+    assert.commandWorked(db.dropDatabase());
+
+    // Verify the database is no longer present in the placement history
+    const dbPlacementInfo = getLatestPlacementInfoFor(dbName);
+    assert.neq(dbPlacementInfo, null);
+    assert.eq(dbPlacementInfo.shards.length, 0);
+}
+
 // TODO SERVER-69106 remove the logic to skip the test execution
 const historicalPlacementDataFeatureFlag = FeatureFlagUtil.isEnabled(
     st.configRS.getPrimary().getDB('admin'), "HistoricalPlacementShardingCatalog");
@@ -206,6 +220,10 @@ testMoveRange('explicitlyCreatedDB', 'testMoveRange');
 jsTest.log(
     'Testing placement entries added by movePrimary() over a new sharding-enabled DB with no data');
 testMovePrimary('movePrimaryDB', st.shard0.shardName, st.shard1.shardName);
+
+jsTest.log(
+    'Testing placement entries added by dropDatabase() over a new sharding-enabled DB with data');
+testDropDatabase('dropDatabaseDB', st.shard0.shardName);
 
 st.stop();
 }());

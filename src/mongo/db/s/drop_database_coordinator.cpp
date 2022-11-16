@@ -32,6 +32,7 @@
 
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/cluster_transaction_api.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/shard_metadata_util.h"
@@ -39,13 +40,17 @@
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_database.h"
+#include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_database_cache_updates_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -53,30 +58,92 @@
 namespace mongo {
 namespace {
 
-void removeDatabaseMetadataFromConfig(OperationContext* opCtx,
-                                      StringData dbName,
-                                      const DatabaseVersion& dbVersion) {
-    IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+void removeDatabaseFromConfigAndUpdatePlacementHistory(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    StringData& dbName,
+    const DatabaseVersion& dbVersion) {
 
-    ON_BLOCK_EXIT([&, dbName = dbName.toString()] {
+    // Run the remove database command on the config server and placemetHistory update in a
+    // multistatement transaction
+
+    // Ensure that this function will only return once the transaction gets majority committed (and
+    // restore the original write concern on exit).
+    IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
+
+    WriteConcernOptions originalWC = opCtx->getWriteConcern();
+    opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
+                                               WriteConcernOptions::SyncMode::UNSET,
+                                               WriteConcernOptions::kNoTimeout});
+
+    ScopeGuard guard([&, dbName = dbName.toString()] {
+        opCtx->setWriteConcern(originalWC);
         Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName);
     });
 
-    // Remove the database entry from the metadata. Making the dbVersion timestamp part of the query
-    // ensures idempotency.
-    const Status status = catalogClient->removeConfigDocuments(
+    auto txnClient = std::make_unique<txn_api::details::SEPTransactionClient>(
         opCtx,
-        NamespaceString::kConfigDatabasesNamespace,
-        BSON(DatabaseType::kNameFieldName
-             << dbName.toString()
-             << DatabaseType::kVersionFieldName + "." + DatabaseVersion::kTimestampFieldName
-             << dbVersion.getTimestamp()),
-        ShardingCatalogClient::kMajorityWriteConcern);
-    uassertStatusOKWithContext(status,
-                               str::stream()
-                                   << "Could not remove database metadata from config server for '"
-                                   << dbName << "'.");
+        executor,
+        std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
+            opCtx->getServiceContext()));
+    /*
+     * The transactionChain callback may be run on a separate thread. For this reason, all the
+     * referenced parameters have to be captured by value (shared_ptrs are used to reduce the memory
+     * footprint).
+     */
+    const auto transactionChain = [opCtx, dbName = dbName.toString(), dbVersion](
+                                      const txn_api::TransactionClient& txnClient,
+                                      ExecutorPtr txnExec) {
+        // Making the dbVersion timestamp part of the query ensures idempotency.
+        write_ops::DeleteOpEntry deleteDatabaseEntryOp{
+            BSON(DatabaseType::kNameFieldName
+                 << dbName
+                 << DatabaseType::kVersionFieldName + "." + DatabaseVersion::kTimestampFieldName
+                 << dbVersion.getTimestamp()),
+            false};
+
+        write_ops::DeleteCommandRequest deleteDatabaseEntry(
+            NamespaceString::kConfigDatabasesNamespace, {deleteDatabaseEntryOp});
+
+        return txnClient.runCRUDOp(deleteDatabaseEntry, {})
+            .thenRunOn(txnExec)
+            .then([&](const BatchedCommandResponse& deleteDatabaseEntryResponse) {
+                uassertStatusOKWithContext(
+                    deleteDatabaseEntryResponse.toStatus(),
+                    str::stream() << "Could not remove database metadata from config server for '"
+                                  << dbName << "'.");
+
+                // pre-check to guarantee idempotence: in case of a retry, the placement history
+                // entry may already exist
+                bool isHistoricalPlacementEnabled =
+                    feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
+                        serverGlobalParams.featureCompatibility);
+                if (!isHistoricalPlacementEnabled || deleteDatabaseEntryResponse.getN() == 0) {
+                    BatchedCommandResponse noOp;
+                    noOp.setN(0);
+                    noOp.setStatus(Status::OK());
+                    return SemiFuture<BatchedCommandResponse>(std::move(noOp));
+                }
+
+                const auto currentTime = VectorClock::get(opCtx)->getTime();
+                const auto currentTimestamp = currentTime.clusterTime().asTimestamp();
+
+                NamespacePlacementType placementInfo(NamespaceString(dbName), currentTimestamp, {});
+
+                write_ops::InsertCommandRequest insertPlacementEntry(
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
+                return txnClient.runCRUDOp(insertPlacementEntry, {});
+            })
+            .thenRunOn(txnExec)
+            .then([](const BatchedCommandResponse& insertPlacementEntryResponse) {
+                uassertStatusOK(insertPlacementEntryResponse.toStatus());
+            })
+            .semi();
+    };
+
+    txn_api::SyncTransactionWithRetries txn(
+        opCtx, executor, nullptr /*resourceYielder*/, std::move(txnClient));
+    txn.run(opCtx, transactionChain);
 }
 
 class ScopedDatabaseCriticalSection {
@@ -297,8 +364,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     // due to StaleDbVersion.
                     _clearDatabaseInfoOnSecondaries(opCtx);
 
-                    removeDatabaseMetadataFromConfig(
-                        opCtx, _dbName, *metadata().getDatabaseVersion());
+                    removeDatabaseFromConfigAndUpdatePlacementHistory(
+                        opCtx, **executor, _dbName, *metadata().getDatabaseVersion());
                 }
             }))
         .then([this, executor = executor, anchor = shared_from_this()] {
