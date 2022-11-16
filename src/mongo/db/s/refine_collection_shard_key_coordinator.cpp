@@ -110,7 +110,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kRefineCollectionShardKey,
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();

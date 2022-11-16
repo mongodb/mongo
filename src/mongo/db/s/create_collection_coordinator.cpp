@@ -482,7 +482,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 }
             }
         })
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kCommit,
             [this, executor = executor, token, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();

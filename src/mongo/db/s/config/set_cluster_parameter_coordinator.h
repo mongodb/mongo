@@ -78,7 +78,7 @@ private:
     const ConfigsvrCoordinatorMetadata& metadata() const override;
 
     template <typename Func>
-    auto _executePhase(const Phase& newPhase, Func&& func) {
+    auto _buildPhaseHandler(const Phase& newPhase, Func&& handlerFn) {
         return [=] {
             const auto& currPhase = _doc.getPhase();
 
@@ -90,7 +90,7 @@ private:
                 // Persist the new phase if this is the first time we are executing it.
                 _enterPhase(newPhase);
             }
-            return func();
+            return handlerFn();
         };
     }
 

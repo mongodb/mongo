@@ -129,7 +129,7 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kFreezeCollection,
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
@@ -172,7 +172,7 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                     sharding_ddl_util::stopMigrations(opCtx, nss(), _doc.getCollInfo()->getUuid());
                 }
             }))
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kDropCollection,
             [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();

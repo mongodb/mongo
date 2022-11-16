@@ -250,22 +250,22 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_executePhase(Phase::kRenameEcocForCompact,
-                            [this, anchor = shared_from_this()]() {
-                                doRenameOperation(_doc, &_skipCompact, &_ecocRenameUuid);
-                                stdx::unique_lock ul{_docMutex};
-                                _doc.setSkipCompact(_skipCompact);
-                                _doc.setEcocRenameUuid(_ecocRenameUuid);
-                            }))
-        .then(_executePhase(Phase::kCompactStructuredEncryptionData,
-                            [this, anchor = shared_from_this()]() {
-                                _response = doCompactOperation(_doc);
-                                if (!_isPre61Compatible()) {
-                                    stdx::lock_guard lg(_docMutex);
-                                    _doc.setResponse(_response);
-                                }
-                            }))
-        .then(_executePhase(Phase::kDropTempCollection, [this, anchor = shared_from_this()] {
+        .then(_buildPhaseHandler(Phase::kRenameEcocForCompact,
+                                 [this, anchor = shared_from_this()]() {
+                                     doRenameOperation(_doc, &_skipCompact, &_ecocRenameUuid);
+                                     stdx::unique_lock ul{_docMutex};
+                                     _doc.setSkipCompact(_skipCompact);
+                                     _doc.setEcocRenameUuid(_ecocRenameUuid);
+                                 }))
+        .then(_buildPhaseHandler(Phase::kCompactStructuredEncryptionData,
+                                 [this, anchor = shared_from_this()]() {
+                                     _response = doCompactOperation(_doc);
+                                     if (!_isPre61Compatible()) {
+                                         stdx::lock_guard lg(_docMutex);
+                                         _doc.setResponse(_response);
+                                     }
+                                 }))
+        .then(_buildPhaseHandler(Phase::kDropTempCollection, [this, anchor = shared_from_this()] {
             if (!_isPre61Compatible()) {
                 invariant(_doc.getResponse());
                 _response = *_doc.getResponse();

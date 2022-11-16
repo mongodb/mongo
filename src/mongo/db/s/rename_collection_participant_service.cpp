@@ -298,7 +298,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kBlockCRUDAndSnapshotRangeDeletions,
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
@@ -339,7 +339,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
 
                 snapshotRangeDeletionsForRename(opCtx, fromNss(), toNss());
             }))
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kRenameLocalAndRestoreRangeDeletions,
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
@@ -355,25 +355,25 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
 
                 restoreRangeDeletionTasksForRename(opCtx, toNss());
             }))
-        .then(
-            _executePhase(Phase::kDeleteFromRangeDeletions,
-                          [this, anchor = shared_from_this()] {
-                              auto opCtxHolder = cc().makeOperationContext();
-                              auto* opCtx = opCtxHolder.get();
-                              deleteRangeDeletionTasksForRename(opCtx, fromNss(), toNss());
+        .then(_buildPhaseHandler(
+            Phase::kDeleteFromRangeDeletions,
+            [this, anchor = shared_from_this()] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                deleteRangeDeletionTasksForRename(opCtx, fromNss(), toNss());
 
-                              {
-                                  stdx::lock_guard<Latch> lg(_mutex);
-                                  if (!_blockCRUDAndRenameCompletionPromise.getFuture().isReady()) {
-                                      _blockCRUDAndRenameCompletionPromise.setFrom(Status::OK());
-                                  }
-                              }
+                {
+                    stdx::lock_guard<Latch> lg(_mutex);
+                    if (!_blockCRUDAndRenameCompletionPromise.getFuture().isReady()) {
+                        _blockCRUDAndRenameCompletionPromise.setFrom(Status::OK());
+                    }
+                }
 
-                              LOGV2(5515106,
-                                    "Collection locally renamed, waiting for CRUD to be unblocked",
-                                    "fromNs"_attr = fromNss(),
-                                    "toNs"_attr = toNss());
-                          }))
+                LOGV2(5515106,
+                      "Collection locally renamed, waiting for CRUD to be unblocked",
+                      "fromNs"_attr = fromNss(),
+                      "toNs"_attr = toNss());
+            }))
         .then([this, anchor = shared_from_this()] {
             if (_doc.getPhase() < Phase::kUnblockCRUD) {
                 return _canUnblockCRUDPromise.getFuture();
@@ -381,7 +381,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
 
             return SemiFuture<void>::makeReady().share();
         })
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kUnblockCRUD,
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();

@@ -194,7 +194,7 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                 _doc.setClusterParameterTime(clusterParameterTime.asTimestamp());
             }
         })
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kSetClusterParameter, [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();

@@ -118,7 +118,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kCheckPreconditions,
             [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
@@ -259,7 +259,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     throw;
                 }
             }))
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kFreezeMigrations,
             [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
@@ -285,7 +285,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     sharding_ddl_util::stopMigrations(opCtx, toNss, _doc.getTargetUUID());
                 }
             }))
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kBlockCrudAndRename,
             [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
@@ -324,7 +324,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 sharding_ddl_util::sendAuthenticatedCommandToShards(
                     opCtx, fromNss.db(), cmdObj.addFields(osi.toBSON()), participants, **executor);
             }))
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kRenameMetadata,
             [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
@@ -364,7 +364,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         ShardingCatalogClient::kMajorityWriteConcern));
                 }
             }))
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kUnblockCRUD,
             [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
@@ -394,7 +394,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 sharding_ddl_util::sendAuthenticatedCommandToShards(
                     opCtx, fromNss.db(), cmdObj.addFields(osi.toBSON()), participants, **executor);
             }))
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kSetResponse,
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();

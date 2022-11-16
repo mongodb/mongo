@@ -145,7 +145,7 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kPrepare,
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
@@ -195,7 +195,7 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
                                                     WriteConcerns::kMajorityWriteConcernNoTimeout,
                                                     &ignoreResult));
             }))
-        .then(_executePhase(Phase::kComplete, [this, anchor = shared_from_this()] {
+        .then(_buildPhaseHandler(Phase::kComplete, [this, anchor = shared_from_this()] {
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();

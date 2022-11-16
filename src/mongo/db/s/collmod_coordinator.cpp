@@ -183,7 +183,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
             if (_isPre61Compatible()) {
                 return;
             }
-            _executePhase(
+            _buildPhaseHandler(
                 Phase::kFreezeMigrations, [this, executor = executor, anchor = shared_from_this()] {
                     auto opCtxHolder = cc().makeOperationContext();
                     auto* opCtx = opCtxHolder.get();
@@ -199,7 +199,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     }
                 })();
         })
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kBlockShards,
             [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
@@ -239,7 +239,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         opCtx, nss().db(), cmdObj, _shardingInfo->shardsOwningChunks, **executor);
                 }
             }))
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kUpdateConfig,
             [this, executor = executor, anchor = shared_from_this()] {
                 collModBeforeConfigServerUpdate.pauseWhileSet();
@@ -268,7 +268,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                                                 Shard::RetryPolicy::kIdempotent)));
                 }
             }))
-        .then(_executePhase(
+        .then(_buildPhaseHandler(
             Phase::kUpdateShards,
             [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
