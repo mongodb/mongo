@@ -740,14 +740,18 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
-            "--runAllFeatureFlagsNoTests", dest="run_all_feature_flags_no_tests",
-            action="store_true", help=
-            "Run MongoDB servers with all feature flags enabled but don't run any tests tagged with these feature flags; used for multiversion suites"
-        )
+            "--runNoFeatureFlagTests", dest="run_no_feature_flag_tests", action="store_true",
+            help=("Do not run any tests tagged with enabled feature flags."
+                  " This argument has precedence over --runAllFeatureFlagTests"
+                  "; used for multiversion suites"))
 
         parser.add_argument("--additionalFeatureFlags", dest="additional_feature_flags",
                             action="append", metavar="featureFlag1, featureFlag2, ...",
                             help="Additional feature flags")
+
+        parser.add_argument("--additionalFeatureFlagsFile", dest="additional_feature_flags_file",
+                            action="store", metavar="FILE",
+                            help="The path to a file with feature flags, delimited by newlines.")
 
         parser.add_argument("--maxTestQueueSize", type=int, dest="max_test_queue_size",
                             help=argparse.SUPPRESS)
@@ -1095,15 +1099,6 @@ def to_local_args(input_args=None):  # pylint: disable=too-many-branches,too-man
     origin_suite = getattr(parsed_args, "origin_suite", None)
     if origin_suite is not None:
         setattr(parsed_args, "suite_files", origin_suite)
-
-    # Replace --runAllFeatureFlagTests with an explicit list of feature flags. The former relies on
-    # all_feature_flags.txt which may not exist in the local dev environment.
-    run_all_feature_flag_tests = getattr(parsed_args, "run_all_feature_flag_tests", None)
-    if run_all_feature_flag_tests is not None:
-        setattr(parsed_args, "additional_feature_flags", config.ENABLED_FEATURE_FLAGS)
-        del parsed_args.run_all_feature_flag_tests
-
-    del parsed_args.run_all_feature_flags_no_tests
 
     # The top-level parser has one subparser that contains all subcommand parsers.
     command_subparser = [

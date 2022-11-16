@@ -30,7 +30,6 @@ Generate a file containing a list of disabled feature flags.
 Used by resmoke.py to run only feature flag tests.
 """
 
-import argparse
 import os
 import sys
 
@@ -43,6 +42,7 @@ sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), '../../
 
 # pylint: disable=wrong-import-position
 import buildscripts.idl.lib as lib
+from buildscripts.idl.idl import parser
 
 
 def is_third_party_idl(idl_path: str) -> bool:
@@ -56,13 +56,14 @@ def is_third_party_idl(idl_path: str) -> bool:
     return False
 
 
-def gen_all_feature_flags(idl_dir: str, import_dirs: List[str]):
+def gen_all_feature_flags(idl_dir: str = os.getcwd()):
     """Generate a list of all feature flags."""
     all_flags = []
     for idl_path in sorted(lib.list_idls(idl_dir)):
         if is_third_party_idl(idl_path):
             continue
-        for feature_flag in lib.parse_idl(idl_path, import_dirs).spec.feature_flags:
+        doc = parser.parse_file(open(idl_path), idl_path)
+        for feature_flag in doc.spec.feature_flags:
             if feature_flag.default.literal != "true":
                 all_flags.append(feature_flag.name)
 
@@ -72,18 +73,17 @@ def gen_all_feature_flags(idl_dir: str, import_dirs: List[str]):
     return list(set(all_flags) - set(force_disabled_flags))
 
 
+def gen_all_feature_flags_file(filename: str = lib.ALL_FEATURE_FLAG_FILE):
+    """Output generated list of feature flags to specified file."""
+    flags = gen_all_feature_flags()
+    with open(filename, "w") as output_file:
+        output_file.write("\n".join(flags))
+        print("Generated: ", os.path.realpath(output_file.name))
+
+
 def main():
     """Run the main function."""
-    arg_parser = argparse.ArgumentParser(description=__doc__)
-    arg_parser.add_argument("--import-dir", dest="import_dirs", type=str, action="append",
-                            help="Directory to search for IDL import files")
-
-    args = arg_parser.parse_args()
-
-    flags = gen_all_feature_flags(os.getcwd(), args.import_dirs)
-    with open(lib.ALL_FEATURE_FLAG_FILE, "w") as output_file:
-        for flag in flags:
-            output_file.write("%s\n" % flag)
+    gen_all_feature_flags_file()
 
 
 if __name__ == '__main__':
