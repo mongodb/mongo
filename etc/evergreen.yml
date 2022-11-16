@@ -2757,7 +2757,7 @@ buildvariants:
 
 - &enterprise-rhel80-debug-tsan-template
   name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan
-  display_name: ~ TSAN Enterprise RHEL 8.0 DEBUG
+  display_name: "* TSAN Enterprise RHEL 8.0 DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -2900,7 +2900,7 @@ buildvariants:
 
 - &enterprise-rhel80-debug-complete-tsan-template
   name: &enterprise-rhel80-debug-complete-tsan enterprise-rhel80-debug-complete-tsan
-  display_name: ~ TSAN Enterprise RHEL 8.0 COMPLETE DEBUG
+  display_name: "~ TSAN Enterprise RHEL 8.0 COMPLETE DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -2912,15 +2912,16 @@ buildvariants:
     compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
   - name: compile_test_and_package_serial_TG
-  # - name: test_api_version_compatibility # Not relevant for TSAN
-  # - name: burn_in_tests_gen # No burn in tests needed
-  - name: check_feature_flag_tags
+  - name: cqf
+  - name: cqf_disabled_pipeline_opt
+  - name: cqf_passthrough
+  - name: cqf_parallel
+  - name: query_golden_classic
+  - name: query_golden_cqf
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: audit
   - name: .auth
-  # - name: burn_in_tags_gen # No burn in tests needed
-  - name: buildscripts_test
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
@@ -2938,27 +2939,16 @@ buildvariants:
   - name: config_fuzzer_concurrency_replication
     distros:
     - rhel80-large
-  - name: config_fuzzer_jsCore
-    distros:
-    - rhel80-large
   - name: disk_wiredtiger
   - name: .encrypt
-  # - name: idl_tests # Not relevant for TSAN
   - name: initial_sync_fuzzer_gen
   - name: .integration
     distros:
     - rhel80-medium
-  - name: jsCore
-    distros:
-    - rhel80-xlarge
   - name: .jscore .common !jsCore
-  - name: jsCore_minimum_batch_size
-  - name: jsCore_txns_large_txns_format
-  - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   # - name: libunwind_tests # Cant be used because tsan does not use libunwind
   # - name: .multiversion_sanity_check # Multiversion does not pass yet, also making this work is going to be pretty tricky
-  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
@@ -2988,30 +2978,23 @@ buildvariants:
   - name: sasl
   - name: search
   - name: search_auth
-  - name: search_ssl
-  - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common
   - name: sharding_opportunistic_secondary_targeting_gen
-  - name: .stitch
   # - name: .crypt # Doesn't pass on v4
   #   distros:
   #   - rhel80-xlarge
   # - name: .updatefuzzer # Cannot find the variant on older versions
   - name: secondary_reads_passthrough_gen
-  - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
-    distros:
-    - rhel80-xlarge
-  - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
 
 - <<: *enterprise-rhel80-debug-tsan-template
   name: &enterprise-rhel80-debug-v4tsan-experimental enterprise-rhel80-debug-v4tsan-experimental
-  display_name: "~ V4 Toolchain TSAN Enterprise RHEL 8.0 DEBUG"
+  display_name: "* V4 Toolchain TSAN Enterprise RHEL 8.0 DEBUG"
   expansions:
     toolchain_version: v4
     compile_variant: *enterprise-rhel80-debug-v4tsan-experimental
