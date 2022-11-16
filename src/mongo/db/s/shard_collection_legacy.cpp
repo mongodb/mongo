@@ -572,9 +572,10 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 
         checkCollation(opCtx, request);
 
+        bool indexCreated = false;
         if (request.getImplicitlyCreateIndex().value_or(true)) {
             // Create the collection locally
-            shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+            indexCreated = shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                 opCtx,
                 nss,
                 ShardKeyPattern(request.getKey()),
@@ -594,12 +595,19 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
                         shardkeyutil::ValidationBehaviorsShardCollection(opCtx)));
         }
 
+        auto replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+
+        if (!indexCreated) {
+            replClientInfo.setLastOpToSystemLastOpTime(opCtx);
+        }
+
         // Wait until the index is majority written, to prevent having the collection commited to
         // the config server, but the index creation rolled backed on stepdowns.
         WriteConcernResult ignoreResult;
-        auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-        uassertStatusOK(waitForWriteConcern(
-            opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
+        uassertStatusOK(waitForWriteConcern(opCtx,
+                                            replClientInfo.getLastOp(),
+                                            ShardingCatalogClient::kMajorityWriteConcern,
+                                            &ignoreResult));
 
         targetState = calculateTargetState(opCtx, nss, request);
 
