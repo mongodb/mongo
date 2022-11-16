@@ -508,13 +508,17 @@ bool isHintIndexKey(const BSONObj& obj) {
 bool collectionHasIndexSupportingReopeningQuery(OperationContext* opCtx,
                                                 const IndexCatalog* indexCatalog,
                                                 const TimeseriesOptions& tsOptions) {
-    if (!tsOptions.getMetaField().has_value()) {
-        return false;
-    }
-
-    auto indexIt = indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
     const std::string controlTimeField =
         timeseries::kControlMinFieldNamePrefix.toString() + tsOptions.getTimeField();
+
+    // Populate a vector of index key fields which we check against existing indexes.
+    boost::container::small_vector<std::string, 2> expectedPrefix;
+    if (tsOptions.getMetaField().has_value()) {
+        expectedPrefix.push_back(kBucketMetaFieldName.toString());
+    }
+    expectedPrefix.push_back(controlTimeField);
+
+    auto indexIt = indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
     while (indexIt->more()) {
         auto indexEntry = indexIt->next();
         auto indexDesc = indexEntry->descriptor();
@@ -525,18 +529,20 @@ bool collectionHasIndexSupportingReopeningQuery(OperationContext* opCtx,
         }
 
         auto indexKey = indexDesc->keyPattern();
-        int index = 0;
+        size_t index = 0;
         for (auto& elem : indexKey) {
             // The index must include the meta and time field (in that order), but may have
             // additional fields included.
-            if (index == 0 && elem.fieldName() != kBucketMetaFieldName) {
-                break;
-            } else if (index == 1 && elem.fieldName() == controlTimeField) {
-                return true;
-            } else if (index > 1) {
+            //
+            // In cases where there collections do not have a meta field specified, an index on time
+            // suffices.
+            if (elem.fieldName() != expectedPrefix.at(index)) {
                 break;
             }
             index++;
+            if (index == expectedPrefix.size()) {
+                return true;
+            }
         }
     }
     return false;

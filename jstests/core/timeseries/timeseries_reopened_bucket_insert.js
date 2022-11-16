@@ -22,15 +22,16 @@ if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
     return;
 }
 
-const coll = db.timeseries_reopened_bucket_insert;
-const bucketsColl = db["system.buckets." + coll.getName()];
+const testDB = db.getSiblingDB(jsTestName());
+const coll = testDB.timeseries_reopened_bucket_insert;
+const bucketsColl = testDB["system.buckets." + coll.getName()];
 const timeField = "time";
 const metaField = "mm";
 const metaTimeIndexName = [[metaField], "1", [timeField], "1"].join("_");
 
 const resetCollection = function() {
     coll.drop();
-    assert.commandWorked(db.createCollection(
+    assert.commandWorked(testDB.createCollection(
         coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
 };
 
@@ -91,7 +92,7 @@ const expectToReopenBuckets = function() {
     };
 
     const bucketDoc = {
-        "_id": ObjectId("63091c2c050b7495eaef4580"),
+        "_id": ObjectId("01091c2c050b7495eaef4580"),
         "control": {
             "version": 1,
             "min": {
@@ -111,7 +112,7 @@ const expectToReopenBuckets = function() {
         }
     };
     const missingClosedFlagBucketDoc = {
-        "_id": ObjectId("63091c2c050b7495eaef4581"),
+        "_id": ObjectId("02091c2c050b7495eaef4581"),
         "control": {
             "version": 1,
             "min": {
@@ -157,7 +158,7 @@ const expectToReopenBucketsWithComplexMeta = function() {
     const measurement2 = {[timeField]: ISODate("2022-08-26T19:19:00Z"), [metaField]: {b: 2, a: 2}};
 
     const bucketDoc = {
-        "_id": ObjectId("63091c2c050b7495eaef4580"),
+        "_id": ObjectId("03091c2c050b7495eaef4580"),
         "control": {
             "version": 1,
             "min": {
@@ -240,7 +241,7 @@ const failToReopenNonSuitableBuckets = function() {
     };
 
     const closedBucketDoc = {
-        "_id": ObjectId("63091c2c050b7495eaef4582"),
+        "_id": ObjectId("04091c2c050b7495eaef4582"),
         "control": {
             "version": 1,
             "min": {
@@ -260,7 +261,7 @@ const failToReopenNonSuitableBuckets = function() {
         }
     };
     const compressedBucketDoc = {
-        "_id": ObjectId("63091c2c050b7495eaef4583"),
+        "_id": ObjectId("05091c2c050b7495eaef4583"),
         "control": {
             "version": 2,
             "min": {
@@ -280,7 +281,7 @@ const failToReopenNonSuitableBuckets = function() {
         }
     };
     const closedAndCompressedBucketDoc = {
-        "_id": ObjectId("63091c2c050b7495eaef4584"),
+        "_id": ObjectId("06091c2c050b7495eaef4584"),
         "control": {
             "version": 2,
             "min": {
@@ -300,7 +301,7 @@ const failToReopenNonSuitableBuckets = function() {
         }
     };
     const year2000BucketDoc = {
-        "_id": ObjectId("63091c2c050b7495eaef4585"),
+        "_id": ObjectId("07091c2c050b7495eaef4585"),
         "control": {
             "version": 1,
             "min": {
@@ -320,7 +321,7 @@ const failToReopenNonSuitableBuckets = function() {
         }
     };
     const metaMismatchFieldBucketDoc = {
-        "_id": ObjectId("63091c2c050b7495eaef4586"),
+        "_id": ObjectId("08091c2c050b7495eaef4586"),
         "control": {
             "version": 1,
             "min": {
@@ -382,7 +383,7 @@ const failToReopenBucketWithNoMetaTimeIndex = function() {
     };
 
     const closedBucketDoc1 = {
-        "_id": ObjectId("63091c2c050b7495eaef4581"),
+        "_id": ObjectId("09091c2c050b7495eaef4581"),
         "control": {
             "version": 1,
             "min": {
@@ -402,7 +403,7 @@ const failToReopenBucketWithNoMetaTimeIndex = function() {
         }
     };
     const closedBucketDoc2 = {
-        "_id": ObjectId("63091c2c050b7495eaef4582"),
+        "_id": ObjectId("10091c2c050b7495eaef4582"),
         "control": {
             "version": 1,
             "min": {
@@ -422,7 +423,7 @@ const failToReopenBucketWithNoMetaTimeIndex = function() {
         }
     };
     const closedBucketDoc3 = {
-        "_id": ObjectId("63091c2c050b7495eaef4583"),
+        "_id": ObjectId("11091c2c050b7495eaef4583"),
         "control": {
             "version": 1,
             "min": {
@@ -497,7 +498,7 @@ const reopenBucketsWhenSuitableIndexExists = function() {
     };
 
     const closedBucketDoc1 = {
-        "_id": ObjectId("63091c2c050b7495eaef4584"),
+        "_id": ObjectId("12091c2c050b7495eaef4584"),
         "control": {
             "version": 1,
             "min": {
@@ -517,7 +518,7 @@ const reopenBucketsWhenSuitableIndexExists = function() {
         }
     };
     const closedBucketDoc2 = {
-        "_id": ObjectId("63091c2c050b7495eaef4585"),
+        "_id": ObjectId("13091c2c050b7495eaef4585"),
         "control": {
             "version": 1,
             "min": {
@@ -537,7 +538,7 @@ const reopenBucketsWhenSuitableIndexExists = function() {
         }
     };
     const closedBucketDoc3 = {
-        "_id": ObjectId("63091c2c050b7495eaef4586"),
+        "_id": ObjectId("14091c2c050b7495eaef4586"),
         "control": {
             "version": 1,
             "min": {
@@ -557,7 +558,7 @@ const reopenBucketsWhenSuitableIndexExists = function() {
         }
     };
     const closedBucketDoc4 = {
-        "_id": ObjectId("63091c2c050b7495eaef4587"),
+        "_id": ObjectId("15091c2c050b7495eaef4587"),
         "control": {
             "version": 1,
             "min": {
@@ -621,5 +622,109 @@ const reopenBucketsWhenSuitableIndexExists = function() {
     checkIfBucketReopened(measurement4, /* willCreateBucket */ false, /* willReopenBucket */ true);
 
     jsTestLog("Exiting reopenBucketsWhenSuitableIndexExists.");
+}();
+
+const reopenBucketsWhenSuitableIndexExistsNoMeta = function() {
+    jsTestLog("Entering reopenBucketsWhenSuitableIndexExistsNoMeta...");
+    coll.drop();
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField}}));
+
+    const measurement1 = {[timeField]: ISODate("2022-08-26T19:19:00Z")};
+    const measurement2 = {[timeField]: ISODate("2022-09-26T19:19:00Z")};
+    const measurement3 = {[timeField]: ISODate("2022-10-26T19:19:00Z")};
+
+    const closedBucketDoc1 = {
+        "_id": ObjectId("16091c2c050b7495eaef4584"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
+    const closedBucketDoc2 = {
+        "_id": ObjectId("17091c2c050b7495eaef4585"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-09-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-09-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-09-26T19:19:30Z")}
+        }
+    };
+    const closedBucketDoc3 = {
+        "_id": ObjectId("18091c2c050b7495eaef4586"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-10-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-10-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-10-26T19:19:30Z")}
+        }
+    };
+
+    // Since the collection was created without a meta field, the index on meta and time shouldn't
+    // exist.
+    let metaTimeIndex = coll.getIndexes().filter(function(index) {
+        return index.name == metaTimeIndexName;
+    });
+    assert(metaTimeIndex.length == 0);
+
+    // Create a partial index on time.
+    assert.commandWorked(coll.createIndex(
+        {[timeField]: 1}, {name: "partialTimeIndex", partialFilterExpression: {b: {$lt: 12}}}));
+
+    assert.commandWorked(bucketsColl.insert(closedBucketDoc1));
+    // We expect no buckets to be reopened because a partial index on time cannot be used  for query
+    // based reopening.
+    checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
+
+    // Create an index on an arbitrary field.
+    assert.commandWorked(coll.createIndex({"a": 1, [timeField]: 1}, {name: "arbitraryIndex"}));
+
+    assert.commandWorked(bucketsColl.insert(closedBucketDoc2));
+    // We expect no buckets to be reopened because the index created cannot be used for query-based
+    // reopening.
+    checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
+
+    // Create an index on time.
+    assert.commandWorked(coll.createIndex({[timeField]: 1}, {name: "timeIndex"}));
+
+    assert.commandWorked(bucketsColl.insert(closedBucketDoc3));
+    // We expect to be able to reopen the suitable bucket when inserting the measurement because as
+    // long as an index covers time field (when the collection has no metaField), it can have
+    // additional keys.
+    checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
+
+    jsTestLog("Exiting reopenBucketsWhenSuitableIndexExistsNoMeta.");
 }();
 })();
