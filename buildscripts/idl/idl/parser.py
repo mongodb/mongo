@@ -976,7 +976,7 @@ def _propagate_globals(spec):
         idltype.cpp_type = _prefix_with_namespace(cpp_namespace, idltype.cpp_type)
 
 
-def _parse(stream, error_file_name):
+def parse_file(stream, error_file_name):
     # type: (Any, str) -> syntax.IDLParsedSpec
     """
     Parse a YAML document into an idl.syntax tree.
@@ -1080,7 +1080,7 @@ def parse(stream, input_file_name, resolver):
     """
     # pylint: disable=too-many-locals
 
-    root_doc = _parse(stream, input_file_name)
+    root_doc = parse_file(stream, input_file_name)
 
     if root_doc.errors:
         return root_doc
@@ -1117,7 +1117,7 @@ def parse(stream, input_file_name, resolver):
 
         # Parse imported file
         with resolver.open(resolved_file_name) as file_stream:
-            parsed_doc = _parse(file_stream, resolved_file_name)
+            parsed_doc = parse_file(file_stream, resolved_file_name)
 
         # Check for errors
         if parsed_doc.errors:
