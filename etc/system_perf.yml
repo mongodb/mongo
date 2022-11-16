@@ -1421,6 +1421,65 @@ buildvariants:
     depends_on: *_compile_amazon2
     tasks: *classic_engine_1nodereplset_tasks
 
+  - name: linux-standalone-telemetry
+    display_name: Linux Standalone (Telemetry)
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup: standalone-telemetry
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    #TODO SERVER-72436 unblock bestbuy_agg and bestbuy_query
+    #tasks: *classic_engine_tasks
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads
+     # - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+     # - name: bestbuy_query
+      - name: cursor_manager
+      - name: map_reduce_workloads
+      - name: tpcc
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
+
+  - name: linux-1-node-replSet-telemetry
+    display_name: Linux 1-Node ReplSet (Telemetry)
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup: single-replica-telemetry
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    # TODO SERVER-72433 unblock linkbench
+    # tasks: *classic_engine_1nodereplset_tasks
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+    #  - name: linkbench
+      - name: linkbench2
+      - name: snapshot_reads
+
   - name: linux-1-node-replSet-all-feature-flags
     display_name: Linux 1-Node ReplSet (all feature flags) Legacy
     modules: *modules
