@@ -154,6 +154,57 @@ TEST_F(ClusterClientCursorImplTest, RemotesExhausted) {
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 2LL);
 }
 
+TEST_F(ClusterClientCursorImplTest, RemoteTimeoutPartialResultsDisallowed) {
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
+    mockStage->queueResult(BSON("a" << 1));
+    mockStage->queueError(Status(ErrorCodes::MaxTimeMSExpired, "timeout"));
+    mockStage->markRemotesExhausted();
+
+    ClusterClientCursorImpl cursor(_opCtx.get(),
+                                   std::move(mockStage),
+                                   ClusterClientCursorParams(NamespaceString("unused"), {}),
+                                   boost::none);
+    ASSERT_TRUE(cursor.remotesExhausted());
+
+    auto firstResult = cursor.next();
+    ASSERT_OK(firstResult.getStatus());
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
+    ASSERT_TRUE(cursor.remotesExhausted());
+
+    auto thirdResult = cursor.next();
+    ASSERT_EQ(thirdResult.getStatus().code(), ErrorCodes::MaxTimeMSExpired);
+    ASSERT_TRUE(cursor.remotesExhausted());
+    ASSERT_FALSE(cursor.partialResultsReturned());
+    ASSERT_EQ(cursor.getNumReturnedSoFar(), 1LL);
+}
+
+TEST_F(ClusterClientCursorImplTest, RemoteTimeoutPartialResultsAllowed) {
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
+    mockStage->queueResult(BSON("a" << 1));
+    mockStage->queueError(Status(ErrorCodes::MaxTimeMSExpired, "timeout"));
+    mockStage->markRemotesExhausted();
+
+    auto params = ClusterClientCursorParams(NamespaceString("unused"), {});
+    params.isAllowPartialResults = true;
+
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(), std::move(mockStage), std::move(params), boost::none);
+    ASSERT_TRUE(cursor.remotesExhausted());
+
+    auto firstResult = cursor.next();
+    ASSERT_OK(firstResult.getStatus());
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
+    ASSERT_TRUE(cursor.remotesExhausted());
+
+    auto thirdResult = cursor.next();
+    ASSERT_EQ(thirdResult.getStatus().code(), ErrorCodes::MaxTimeMSExpired);
+    ASSERT_TRUE(cursor.remotesExhausted());
+    ASSERT_TRUE(cursor.partialResultsReturned());
+    ASSERT_EQ(cursor.getNumReturnedSoFar(), 1LL);
+}
+
 TEST_F(ClusterClientCursorImplTest, ForwardsAwaitDataTimeout) {
     auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
     auto mockStagePtr = mockStage.get();
