@@ -54,10 +54,16 @@ namespace mongo {
  */
 class BucketSpec {
 public:
+    // When unpackin buckets with kInclude we must produce measurements that contain the
+    // set of fields. Otherwise, if the kExclude option is used, the measurements will include the
+    // set difference between all fields in the bucket and the provided fields.
+    enum class Behavior { kInclude, kExclude };
+
     BucketSpec() = default;
     BucketSpec(const std::string& timeField,
                const boost::optional<std::string>& metaField,
                const std::set<std::string>& fields = {},
+               Behavior behavior = Behavior::kExclude,
                const std::set<std::string>& computedProjections = {},
                bool usesExtendedRange = false);
     BucketSpec(const BucketSpec&);
@@ -91,6 +97,14 @@ public:
 
     const std::set<std::string>& fieldSet() const {
         return _fieldSet;
+    }
+
+    void setBehavior(Behavior behavior) {
+        _behavior = behavior;
+    }
+
+    Behavior behavior() const {
+        return _behavior;
     }
 
     void addComputedMetaProjFields(const StringData& field) {
@@ -211,6 +225,7 @@ public:
 private:
     // The set of field names in the data region that should be included or excluded.
     std::set<std::string> _fieldSet;
+    Behavior _behavior = Behavior::kExclude;
 
     // Set of computed meta field projection names. Added at the end of materialized
     // measurements.
@@ -229,10 +244,6 @@ private:
  */
 class BucketUnpacker {
 public:
-    // When BucketUnpacker is created with kInclude it must produce measurements that contain the
-    // set of fields. Otherwise, if the kExclude option is used, the measurements will include the
-    // set difference between all fields in the bucket and the provided fields.
-    enum class Behavior { kInclude, kExclude };
     /**
      * Returns the number of measurements in the bucket in O(1) time.
      */
@@ -242,7 +253,7 @@ public:
     static const std::set<StringData> reservedBucketFieldNames;
 
     BucketUnpacker();
-    BucketUnpacker(BucketSpec spec, Behavior unpackerBehavior);
+    BucketUnpacker(BucketSpec spec);
     BucketUnpacker(const BucketUnpacker& other) = delete;
     BucketUnpacker(BucketUnpacker&& other);
     ~BucketUnpacker();
@@ -274,7 +285,6 @@ public:
      */
     BucketUnpacker copy() const {
         BucketUnpacker unpackerCopy;
-        unpackerCopy._unpackerBehavior = _unpackerBehavior;
         unpackerCopy._spec = _spec;
         unpackerCopy._includeMetaField = _includeMetaField;
         unpackerCopy._includeTimeField = _includeTimeField;
@@ -286,8 +296,8 @@ public:
      */
     void reset(BSONObj&& bucket, bool bucketMatchedQuery = false);
 
-    Behavior behavior() const {
-        return _unpackerBehavior;
+    BucketSpec::Behavior behavior() const {
+        return _spec.behavior();
     }
 
     const BucketSpec& bucketSpec() const {
@@ -338,7 +348,7 @@ public:
         return std::string{timeseries::kControlMaxFieldNamePrefix} + field;
     }
 
-    void setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior behavior);
+    void setBucketSpec(BucketSpec&& bucketSpec);
     void setIncludeMinTimeAsMetadata();
     void setIncludeMaxTimeAsMetadata();
 
@@ -363,7 +373,6 @@ private:
     void eraseExcludedComputedMetaProjFields();
 
     BucketSpec _spec;
-    Behavior _unpackerBehavior;
 
     std::unique_ptr<UnpackingImpl> _unpackingImpl;
 
@@ -418,9 +427,9 @@ private:
  * Determines if an arbitrary field should be included in the materialized measurements.
  */
 inline bool determineIncludeField(StringData fieldName,
-                                  BucketUnpacker::Behavior unpackerBehavior,
+                                  BucketSpec::Behavior unpackerBehavior,
                                   const std::set<std::string>& unpackFieldsToIncludeExclude) {
-    const bool isInclude = unpackerBehavior == BucketUnpacker::Behavior::kInclude;
+    const bool isInclude = unpackerBehavior == BucketSpec::Behavior::kInclude;
     const bool unpackFieldsContains = unpackFieldsToIncludeExclude.find(fieldName.toString()) !=
         unpackFieldsToIncludeExclude.cend();
     return isInclude == unpackFieldsContains;
