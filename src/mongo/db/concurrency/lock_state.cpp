@@ -828,9 +828,7 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
     invariant(_modeForTicket == MODE_NONE);
     invariant(_clientState.load() == kInactive);
 
-    if (opCtx) {
-        getFlowControlTicket(opCtx, state.globalMode);
-    }
+    getFlowControlTicket(opCtx, state.globalMode);
 
     std::vector<OneLock>::const_iterator it = state.locks.begin();
     // If we locked the PBWM, it must be locked before the resourceIdGlobal and

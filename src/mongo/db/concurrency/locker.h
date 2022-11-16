@@ -397,7 +397,6 @@ public:
      * @param opCtx An operation context that enables the restoration to be interrupted.
      */
     virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) = 0;
-    virtual void restoreLockState(const LockSnapshot& stateToRestore) = 0;
 
     /**
      * releaseWriteUnitOfWorkAndUnlock opts out of two-phase locking and yields the locks after a

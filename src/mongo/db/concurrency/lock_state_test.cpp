@@ -252,7 +252,7 @@ TEST_F(LockerImplTest, saveAndRestoreGlobal) {
     ASSERT_EQUALS(MODE_IX, lockInfo.globalMode);
 
     // Restore the lock(s) we had.
-    locker.restoreLockState(lockInfo);
+    locker.restoreLockState(opCtx.get(), lockInfo);
 
     ASSERT(locker.isLocked());
     ASSERT(locker.unlockGlobal());
@@ -286,7 +286,7 @@ TEST_F(LockerImplTest, saveAndRestoreRSTL) {
     ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
 
     // Restore the lock(s) we had.
-    locker.restoreLockState(lockInfo);
+    locker.restoreLockState(opCtx.get(), lockInfo);
 
     // Check locks are re-locked.
     ASSERT(locker.isLocked());
@@ -350,7 +350,7 @@ TEST_F(LockerImplTest, saveAndRestoreDBAndCollection) {
     ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdCollection));
 
     // Restore lock state.
-    locker.restoreLockState(lockInfo);
+    locker.restoreLockState(opCtx.get(), lockInfo);
 
     // Make sure things were re-locked.
     ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
@@ -419,7 +419,7 @@ TEST_F(LockerImplTest, restoreWriteUnitOfWork) {
     ASSERT_FALSE(locker.isLocked());
 
     // Restore lock state.
-    locker.restoreWriteUnitOfWorkAndLock(nullptr, lockInfo);
+    locker.restoreWriteUnitOfWorkAndLock(opCtx.get(), lockInfo);
 
     // Make sure things were re-locked.
     ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
@@ -584,7 +584,7 @@ TEST_F(LockerImplTest, releaseAndRestoreReadOnlyWriteUnitOfWork) {
     ASSERT_FALSE(locker.isLocked());
 
     // Restore lock state.
-    locker.restoreWriteUnitOfWorkAndLock(nullptr, lockInfo);
+    locker.restoreWriteUnitOfWorkAndLock(opCtx.get(), lockInfo);
 
     ASSERT_EQUALS(MODE_IS, locker.getLockMode(resIdDatabase));
     ASSERT_EQUALS(MODE_IS, locker.getLockMode(resIdCollection));
@@ -684,7 +684,7 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithRecursiveLocks) {
     ASSERT_FALSE(locker.isLocked());
 
     // Restore lock state.
-    locker.restoreWriteUnitOfWorkAndLock(nullptr, lockInfo);
+    locker.restoreWriteUnitOfWorkAndLock(opCtx.get(), lockInfo);
 
     // Make sure things were re-locked in the correct mode.
     ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));

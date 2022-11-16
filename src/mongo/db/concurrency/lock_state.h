@@ -194,9 +194,6 @@ public:
     virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut);
 
     virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore);
-    virtual void restoreLockState(const LockSnapshot& stateToRestore) {
-        restoreLockState(nullptr, stateToRestore);
-    }
 
     bool releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) override;
     void restoreWriteUnitOfWorkAndLock(OperationContext* opCtx,

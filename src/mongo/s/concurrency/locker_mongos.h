@@ -173,10 +173,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void restoreLockState(const LockSnapshot& stateToRestore) override {
-        MONGO_UNREACHABLE;
-    }
-
     bool releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) override {
         MONGO_UNREACHABLE;
     }
