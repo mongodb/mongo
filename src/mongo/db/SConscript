@@ -302,6 +302,7 @@ env.Library(
         'server_feature_flags.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         'server_base',
     ],
 )

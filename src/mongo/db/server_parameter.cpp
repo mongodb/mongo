@@ -77,18 +77,22 @@ ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
     return &*obj;
 }
 
-bool ServerParameter::featureFlagIsDisabled() const {
-    if (!_featureFlag) {
-        return false;
-    }
+bool ServerParameter::isEnabled() const {
+    return isEnabledOnVersion(
+        serverGlobalParams.featureCompatibility.isVersionInitialized()
+            ? serverGlobalParams.featureCompatibility.getVersion()
+            : multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
+}
 
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        // Minor race-condition at startup.
-        // Pretend it's not enabled until we know for certain that it is.
-        return true;
-    }
+bool ServerParameter::isEnabledOnVersion(
+    const multiversion::FeatureCompatibilityVersion& targetFCV) const {
+    return minFCVIsLessThanOrEqualToVersion(targetFCV) &&
+        !featureFlagIsDisabledOnVersion(targetFCV);
+}
 
-    return !_featureFlag->isEnabled(serverGlobalParams.featureCompatibility);
+bool ServerParameter::featureFlagIsDisabledOnVersion(
+    const multiversion::FeatureCompatibilityVersion& targetFCV) const {
+    return _featureFlag && !_featureFlag->isEnabledOnVersion(targetFCV);
 }
 
 ServerParameterSet* ServerParameterSet::getClusterParameterSet() {
@@ -224,7 +228,7 @@ public:
         return setFromString("", boost::none);
     }
 
-    bool isEnabled() const override {
+    bool isEnabledOnVersion(const multiversion::FeatureCompatibilityVersion&) const override {
         return false;
     }
 

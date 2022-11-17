@@ -958,6 +958,10 @@ def _bind_condition(condition, condition_for):
         assert condition_for == 'server_parameter'
         ast_condition.feature_flag = condition.feature_flag
 
+    if condition.min_fcv:
+        assert condition_for == 'server_parameter'
+        ast_condition.min_fcv = condition.min_fcv
+
     return ast_condition
 
 

@@ -124,8 +124,8 @@ function runTest(st, startupRefreshIntervalMS) {
                                      clusterParameterDocuments: [{
                                          "tenantId": "none",
                                          "updatedParameters": [
-                                             {_id: "testIntClusterParameter", intData: 2028},
-                                             {_id: "testBoolClusterParameter", boolData: true}
+                                             {_id: "testBoolClusterParameter", boolData: true},
+                                             {_id: "testIntClusterParameter", intData: 2028}
                                          ]
                                      }]
                                  },

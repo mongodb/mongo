@@ -818,6 +818,45 @@ private:
         }
     }
 
+    // Remove cluster parameters from the clusterParameters collections which are not enabled on
+    // requestedVersion.
+    void _cleanUpClusterParameters(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        std::set<TenantId> tenantIds;
+        if (gMultitenancySupport) {
+            auto catalog = CollectionCatalog::get(opCtx);
+            {
+                Lock::GlobalLock lk(opCtx, MODE_IS);
+                tenantIds = catalog->getAllTenants();
+            }
+        }
+
+        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+        const auto& [fromVersion, _] =
+            getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
+
+        auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+        std::vector<write_ops::DeleteOpEntry> deletes;
+        for (const auto& [name, sp] : clusterParameters->getMap()) {
+            if (sp->isEnabledOnVersion(fromVersion) && !sp->isEnabledOnVersion(requestedVersion)) {
+                deletes.emplace_back(
+                    write_ops::DeleteOpEntry(BSON("_id" << name), false /*multi*/));
+            }
+        }
+        if (deletes.size() > 0) {
+            DBDirectClient client(opCtx);
+            // Delete disabled parameters' values from all cluster parameter collections.
+            for (const auto& tenantId : tenantIds) {
+                write_ops::DeleteCommandRequest deleteOp(
+                    NamespaceString::makeClusterParametersNSS(tenantId));
+                deleteOp.setDeletes(deletes);
+                write_ops::checkWriteErrors(client.remove(deleteOp));
+            }
+            write_ops::DeleteCommandRequest deleteOp(NamespaceString::kClusterParametersNamespace);
+            deleteOp.setDeletes(deletes);
+            write_ops::checkWriteErrors(client.remove(deleteOp));
+        }
+    }
 
     // This helper function is for any internal server downgrade cleanup, such as dropping
     // collections or aborting. This cleanup will happen after user collection downgrade
@@ -833,6 +872,7 @@ private:
     // expected to occur in practice, but if they did, they would turn into a Support case.
     void _internalServerCleanupForDowngrade(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        _cleanUpClusterParameters(opCtx, requestedVersion);
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             _dropInternalGlobalIndexesCollection(opCtx, requestedVersion);
             _removeSchemaOnConfigSettings(opCtx, requestedVersion);

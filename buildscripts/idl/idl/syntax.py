@@ -735,6 +735,7 @@ class Condition(common.SourceLocation):
         self.constexpr = None  # type: str
         self.preprocessor = None  # type: str
         self.feature_flag = None  # type: str
+        self.min_fcv = None  # type: str
 
         super(Condition, self).__init__(file_name, line, column)
 

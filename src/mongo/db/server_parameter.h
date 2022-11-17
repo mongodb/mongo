@@ -44,6 +44,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/version/releases.h"
 
 #define MONGO_SERVER_PARAMETER_REGISTER(name) \
     MONGO_INITIALIZER_GENERAL(                \
@@ -217,16 +218,28 @@ public:
         _redact = true;
     }
 
-    virtual bool isEnabled() const {
-        return !featureFlagIsDisabled();
-    }
+    bool isEnabled() const;
+
+    // Return whether this server parameter is compatible with the given FCV.
+    virtual bool isEnabledOnVersion(
+        const multiversion::FeatureCompatibilityVersion& targetFCV) const;
 
     void setFeatureFlag(FeatureFlag* featureFlag) {
         _featureFlag = featureFlag;
     }
 
+    void setMinFCV(const multiversion::FeatureCompatibilityVersion& minFCV) {
+        _minFCV = minFCV;
+    }
+
 protected:
-    bool featureFlagIsDisabled() const;
+    bool featureFlagIsDisabledOnVersion(
+        const multiversion::FeatureCompatibilityVersion& targetFCV) const;
+
+    bool minFCVIsLessThanOrEqualToVersion(
+        const multiversion::FeatureCompatibilityVersion& fcv) const {
+        return !_minFCV || fcv >= *_minFCV;
+    }
 
     // Helper for translating setParameter values from BSON to string.
     StatusWith<std::string> _coerceToString(const BSONElement&);
@@ -234,6 +247,7 @@ protected:
 private:
     std::string _name;
     FeatureFlag* _featureFlag = nullptr;
+    boost::optional<multiversion::FeatureCompatibilityVersion> _minFCV = boost::none;
     ServerParameterType _type;
     bool _testOnly = false;
     bool _redact = false;

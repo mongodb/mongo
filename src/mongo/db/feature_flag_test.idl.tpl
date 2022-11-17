@@ -19,6 +19,23 @@
 ##
 global:
   cpp_namespace: "mongo::feature_flags"
+  cpp_includes:
+  - "mongo/db/change_streams_cluster_parameter.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/idl/cluster_server_parameter.idl"
+
+structs:
+    CWSPIntStorage:
+      description: "Storage used for cwspTestNeedsLatestFCV"
+      inline_chained_structs: true
+      chained_structs:
+          ClusterServerParameter: ClusterServerParameter
+      fields:
+          intData:
+              type: safeInt64
+              default: 0
 
 feature_flags:
     featureFlagToaster:
@@ -57,3 +74,41 @@ server_parameters:
       default: false
       condition:
         feature_flag: featureFlagToaster
+
+    spTestNeedsLatestFCV:
+      description: "Server parameter gated on FCV >= latestFCV"
+      set_at: runtime
+      cpp_varname: gSPTestLatestFCV
+      cpp_vartype: int
+      test_only: true
+      default: 0
+      condition:
+        min_fcv: $ver_str(latest)
+
+    cwspTestNeedsLatestFCV:
+      description: "Cluster server parameter gated on latest FCV"
+      set_at: cluster
+      cpp_varname: gCWSPTestLatestFCV
+      cpp_vartype: CWSPIntStorage
+      test_only: true
+      condition:
+        min_fcv: $ver_str(latest)
+
+    spTestNeedsFeatureFlagBlender:
+      description: "Server Parameter gated on featureFlagBlender"
+      set_at: runtime
+      cpp_varname: gSPTestFeatureFlagBlender
+      cpp_vartype: int
+      test_only: true
+      default: 0
+      condition:
+        feature_flag: featureFlagBlender
+
+    cwspTestNeedsFeatureFlagBlender:
+      description: "Cluster server Parameter gated on featureFlagBlender"
+      set_at: cluster
+      cpp_varname: gCWSPTestFeatureFlagBlender
+      cpp_vartype: CWSPIntStorage
+      test_only: true
+      condition:
+        feature_flag: featureFlagBlender
