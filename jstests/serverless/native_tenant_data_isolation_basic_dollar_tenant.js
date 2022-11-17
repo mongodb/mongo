@@ -39,23 +39,57 @@ function runTest(featureFlagRequireTenantId) {
     // for the tenant (defined by kTenant) will be reused by all command tests. So, any test which
     // changes the collection name or document should reset it.
 
-    // Test create and listCollections command on collection.
+    // Test create and listCollections commands, plus $listCatalog aggregate, on collection.
     {
+        const viewName = "view1";
+        const targetViews = 'system.views';
+
         // Create a collection for the tenant kTenant, and then create a view on the collection.
         assert.commandWorked(
             testColl.getDB().createCollection(testColl.getName(), {'$tenant': kTenant}));
         assert.commandWorked(testDb.runCommand(
-            {"create": "view1", "viewOn": kCollName, pipeline: [], '$tenant': kTenant}));
+            {"create": viewName, "viewOn": kCollName, pipeline: [], '$tenant': kTenant}));
 
         const colls = assert.commandWorked(
             testDb.runCommand({listCollections: 1, nameOnly: true, '$tenant': kTenant}));
         assert.eq(3, colls.cursor.firstBatch.length, tojson(colls.cursor.firstBatch));
         const expectedColls = [
             {"name": kCollName, "type": "collection"},
-            {"name": "system.views", "type": "collection"},
-            {"name": "view1", "type": "view"}
+            {"name": targetViews, "type": "collection"},
+            {"name": viewName, "type": "view"}
         ];
         assert(arrayEq(expectedColls, colls.cursor.firstBatch), tojson(colls.cursor.firstBatch));
+
+        const prefixedDbName = kTenant + '_' + testDb.getName();
+        const targetDb = featureFlagRequireTenantId ? testDb.getName() : prefixedDbName;
+
+        // Get catalog without specifying target collection (collectionless).
+        let result = adminDb.runCommand(
+            {aggregate: 1, pipeline: [{$listCatalog: {}}], cursor: {}, '$tenant': kTenant});
+        let resultArray = result.cursor.firstBatch;
+
+        // Check that the resulting array of catalog entries contains our target databases and
+        // namespaces.
+        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)));
+
+        // Also check that the resulting array contains views specific to our target database.
+        assert(
+            resultArray.some((entry) => (entry.db === targetDb) && (entry.name === targetViews)));
+        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === viewName)));
+
+        // Get catalog when specifying our target collection, which should only return one result.
+        result = testDb.runCommand({
+            aggregate: testColl.getName(),
+            pipeline: [{$listCatalog: {}}],
+            cursor: {},
+            '$tenant': kTenant
+        });
+        resultArray = result.cursor.firstBatch;
+
+        // Check that the resulting array of catalog entries contains our target database and
+        // namespace.
+        assert(resultArray.length == 1);
+        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)));
 
         // These collections should not be accessed with a different tenant.
         const collsWithDiffTenant = assert.commandWorked(

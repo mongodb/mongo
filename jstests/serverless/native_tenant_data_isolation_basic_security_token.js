@@ -115,21 +115,58 @@ function runTest(featureFlagRequireTenantId) {
         }
 
         // Create a view on the collection, and check that listCollections sees the original
-        // collection, the view, and the system.views collection.
+        // collection, the view, and the system.views collection.  Then, call $listCatalog on
+        // the collection and views and validate the results.
         {
+            const viewName = "view1";
+            const targetViews = 'system.views';
+
             assert.commandWorked(
-                tokenDB.runCommand({"create": "view1", "viewOn": kCollName, pipeline: []}));
+                tokenDB.runCommand({"create": viewName, "viewOn": kCollName, pipeline: []}));
 
             const colls =
                 assert.commandWorked(tokenDB.runCommand({listCollections: 1, nameOnly: true}));
             assert.eq(3, colls.cursor.firstBatch.length, tojson(colls.cursor.firstBatch));
             const expectedColls = [
                 {"name": kCollName, "type": "collection"},
-                {"name": "system.views", "type": "collection"},
-                {"name": "view1", "type": "view"}
+                {"name": targetViews, "type": "collection"},
+                {"name": viewName, "type": "view"}
             ];
             assert(arrayEq(expectedColls, colls.cursor.firstBatch),
                    tojson(colls.cursor.firstBatch));
+
+            const prefixedDbName = kTenant + '_' + tokenDB.getName();
+            const targetDb = featureFlagRequireTenantId ? tokenDB.getName() : prefixedDbName;
+
+            const tokenAdminDB = tokenConn.getDB('admin');
+
+            // Get catalog without specifying target collection (collectionless).
+            let result =
+                tokenAdminDB.runCommand({aggregate: 1, pipeline: [{$listCatalog: {}}], cursor: {}});
+            let resultArray = result.cursor.firstBatch;
+
+            // Check that the resulting array of catalog entries contains our target databases and
+            // namespaces.
+            assert(
+                resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)));
+
+            // Also check that the resulting array contains views specific to our target database.
+            assert(resultArray.some((entry) =>
+                                        (entry.db === targetDb) && (entry.name === targetViews)));
+            assert(
+                resultArray.some((entry) => (entry.db === targetDb) && (entry.name === viewName)));
+
+            // Get catalog when specifying our target collection, which should only return one
+            // result.
+            result = tokenDB.runCommand(
+                {aggregate: kCollName, pipeline: [{$listCatalog: {}}], cursor: {}});
+            resultArray = result.cursor.firstBatch;
+
+            // Check that the resulting array of catalog entries contains our target databases and
+            // namespaces.
+            assert(resultArray.length == 1);
+            assert(
+                resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)));
         }
 
         // Test explain command with find

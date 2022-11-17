@@ -76,6 +76,8 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -145,13 +147,14 @@ void listDurableCatalog(OperationContext* opCtx,
             continue;
         }
 
-        NamespaceString ns(obj.getStringField("ns"));
+        NamespaceString ns(NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+            obj.getStringField("ns")));
         if (ns.isSystemDotViews()) {
             systemViewsNamespaces->push_back(ns);
         }
 
         BSONObjBuilder builder;
-        builder.append("db", ns.db());
+        builder.append("db", DatabaseNameUtil::serialize(ns.dbName()));
         builder.append("name", ns.coll());
         builder.append("type", "collection");
         if (!shardName.empty()) {
@@ -289,11 +292,12 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
             while (auto record = cursor->next()) {
                 BSONObj obj = record->data.releaseToBson();
 
-                NamespaceString ns(obj.getStringField("_id"));
-                NamespaceString viewOnNs(ns.db(), obj.getStringField("viewOn"));
+                NamespaceString ns(NamespaceStringUtil::deserialize((*svns.nss()).tenantId(),
+                                                                    obj.getStringField("_id")));
+                NamespaceString viewOnNs(ns.dbName(), obj.getStringField("viewOn"));
 
                 BSONObjBuilder builder;
-                builder.append("db", ns.db());
+                builder.append("db", DatabaseNameUtil::serialize(ns.dbName()));
                 builder.append("name", ns.coll());
                 if (viewOnNs.isTimeseriesBucketsCollection()) {
                     builder.append("type", "timeseries");
@@ -325,12 +329,13 @@ boost::optional<BSONObj> CommonMongodProcessInterface::getCatalogEntry(
     auto cursor = rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
         auto obj = record->data.toBson();
-        if (NamespaceString{obj.getStringField("ns")} != ns) {
+        if (NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+                obj.getStringField("ns")) != ns) {
             continue;
         }
 
         BSONObjBuilder builder;
-        builder.append("db", ns.db());
+        builder.append("db", DatabaseNameUtil::serialize(ns.dbName()));
         builder.append("name", ns.coll());
         builder.append("type", "collection");
         if (auto shardName = getShardName(opCtx); !shardName.empty()) {
