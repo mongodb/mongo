@@ -56,7 +56,6 @@ StatusWith<std::string> WiredTigerColumnStore::generateCreateString(
     sb << "type=file,internal_page_max=16k,leaf_page_max=16k,";
     sb << "checksum=on,";
     sb << "prefix_compression=true,";
-    sb << "lsm=(chunk_size=100M),";
     // Ignoring wiredTigerGlobalOptions.useIndexPrefixCompression because we *always* want prefix
     // compression for column indexes.
 
