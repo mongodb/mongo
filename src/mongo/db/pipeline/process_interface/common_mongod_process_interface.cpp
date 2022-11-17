@@ -879,7 +879,7 @@ boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocumentLoca
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const Document& documentKey) {
-    AutoGetCollectionForRead autoColl(expCtx->opCtx, nss);
+    AutoGetCollectionForReadMaybeLockFree autoColl(expCtx->opCtx, nss);
     BSONObj document;
     if (!Helpers::findById(expCtx->opCtx, nss, documentKey.toBson(), document)) {
         return boost::none;
