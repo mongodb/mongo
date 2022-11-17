@@ -273,8 +273,9 @@ Status buildDupKeyErrorStatus(OperationContext* opCtx,
                               const BSONObj& key,
                               const IndexDescriptor* desc) {
     NamespaceString nss;
-    // In testing these may be nullptr, and being a bit more lenient during error handling is OK.
-    if (desc && desc->getEntry())
+    invariant(desc);
+    // In testing this may be nullptr, and being a bit more lenient during error handling is OK.
+    if (desc->getEntry())
         nss = desc->getEntry()->getNSSFromCatalog(opCtx);
     return buildDupKeyErrorStatus(
         key, nss, desc->indexName(), desc->keyPattern(), desc->collation());
