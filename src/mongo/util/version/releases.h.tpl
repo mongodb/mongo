@@ -32,8 +32,8 @@
 
 #include <array>
 #include <fmt/format.h>
-#include <utility>
 #include <map>
+#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
