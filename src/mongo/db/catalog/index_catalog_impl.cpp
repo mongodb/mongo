@@ -218,6 +218,11 @@ Status IndexCatalogImpl::_init(OperationContext* opCtx,
         BSONObj keyPattern = spec.getObjectField("key");
 
         if (fromExisting) {
+            // Only ready indexes need to be included when init'ing from an existing collection
+            // for a point-in-time read.
+            if (!collection->isIndexReady(indexName)) {
+                continue;
+            }
             auto preexistingIt = std::find_if(
                 preexistingIndexes.begin(),
                 preexistingIndexes.end(),
@@ -232,13 +237,7 @@ Status IndexCatalogImpl::_init(OperationContext* opCtx,
                             logAttrs(collection->ns()),
                             "index"_attr = existingEntry->descriptor()->infoObj());
 
-                if (existingEntry->isReady(opCtx)) {
-                    _readyIndexes.add(std::move(existingEntry));
-                } else if (existingEntry->isFrozen()) {
-                    _frozenIndexes.add(std::move(existingEntry));
-                } else {
-                    _buildingIndexes.add(std::move(existingEntry));
-                }
+                _readyIndexes.add(std::move(existingEntry));
                 continue;
             }
         }

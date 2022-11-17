@@ -952,6 +952,67 @@ public:
         wuow.commit();
     }
 
+    /**
+     * Starts an index build, but leaves the build in progress rather than ready. Returns the
+     * IndexBuildBlock performing the build, necessary to finish the build later via
+     * finishIndexBuild below.
+     */
+    std::unique_ptr<IndexBuildBlock> createIndexWithoutFinishingBuild(OperationContext* opCtx,
+                                                                      const NamespaceString& nss,
+                                                                      BSONObj indexSpec,
+                                                                      Timestamp createTimestamp) {
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        opCtx->recoveryUnit()->abandonSnapshot();
+
+        if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+            opCtx->recoveryUnit()->clearCommitTimestamp();
+        }
+        opCtx->recoveryUnit()->setCommitTimestamp(createTimestamp);
+
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+        CollectionWriter collection(opCtx, nss);
+
+        auto writableColl = collection.getWritableCollection(opCtx);
+
+        StatusWith<BSONObj> statusWithSpec = writableColl->getIndexCatalog()->prepareSpecForCreate(
+            opCtx, writableColl, indexSpec, boost::none);
+        uassertStatusOK(statusWithSpec.getStatus());
+        indexSpec = statusWithSpec.getValue();
+
+        auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
+            writableColl->ns(), indexSpec, IndexBuildMethod::kForeground, UUID::gen());
+        uassertStatusOK(indexBuildBlock->init(opCtx, writableColl, /*forRecover=*/false));
+        uassertStatusOK(indexBuildBlock->getEntry(opCtx, writableColl)
+                            ->accessMethod()
+                            ->initializeAsEmpty(opCtx));
+        wuow.commit();
+
+        return indexBuildBlock;
+    }
+
+    /**
+     * Finishes an index build that was started by createIndexWithoutFinishingBuild.
+     */
+    void finishIndexBuild(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          std::unique_ptr<IndexBuildBlock> indexBuildBlock,
+                          Timestamp readyTimestamp) {
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        opCtx->recoveryUnit()->abandonSnapshot();
+
+        if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+            opCtx->recoveryUnit()->clearCommitTimestamp();
+        }
+        opCtx->recoveryUnit()->setCommitTimestamp(readyTimestamp);
+
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+        CollectionWriter collection(opCtx, nss);
+        indexBuildBlock->success(opCtx, collection.getWritableCollection(opCtx));
+        wuow.commit();
+    }
+
     void dropIndex(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const std::string& indexName,
@@ -1223,6 +1284,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithDropPendingIndex
     auto coll =
         CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(coll);
+    ASSERT_EQ(coll->getIndexCatalog()->numIndexesReady(), 2);
 
     // Collection is not shared from the latest instance. This has to be done in an  alternative
     // client as we already have an open snapshot from an earlier point-in-time above.
@@ -2461,6 +2523,50 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionNoTimestamp) {
 
     // Ensure the idents are shared between the up-to-date instances.
     ASSERT_EQ(coll->getSharedIdent(), currentColl->getSharedIdent());
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenCollectionBetweenIndexBuildInProgressAndReady) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp indexReadyTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+
+    auto indexBuildBlock = createIndexWithoutFinishingBuild(opCtx.get(),
+                                                            nss,
+                                                            BSON("v" << 2 << "name"
+                                                                     << "x_1"
+                                                                     << "key" << BSON("x" << 1)),
+                                                            createIndexTs);
+
+    // Confirm openCollection with timestamp createCollectionTs indicates no indexes.
+    {
+        OneOffRead oor(opCtx.get(), createCollectionTs);
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+
+        auto coll = CollectionCatalog::get(opCtx.get())
+                        ->openCollection(opCtx.get(), nss, createCollectionTs);
+        ASSERT(coll);
+        ASSERT_EQ(coll->getIndexCatalog()->numIndexesReady(), 0);
+    }
+
+    finishIndexBuild(opCtx.get(), nss, std::move(indexBuildBlock), indexReadyTs);
+
+    // Confirm openCollection with timestamp createIndexTs returns the same value as before, once
+    // the index build has finished (since it can no longer use the latest state).
+    {
+        OneOffRead oor(opCtx.get(), createIndexTs);
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+
+        auto coll =
+            CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createIndexTs);
+        ASSERT(coll);
+        ASSERT_EQ(coll->getIndexCatalog()->numIndexesReady(), 0);
+    }
 }
 }  // namespace
 }  // namespace mongo

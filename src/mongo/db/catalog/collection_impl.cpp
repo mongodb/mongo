@@ -394,6 +394,9 @@ Status CollectionImpl::initFromExisting(OperationContext* opCtx,
     // initialized collection. The remaining indexes will be initialized by the IndexCatalog.
     IndexCatalogEntryContainer preexistingIndexes;
     for (const auto& index : _metadata->indexes) {
+        if (!isIndexReady(index.nameStringData())) {
+            continue;
+        }
         // First check the index catalog of the existing collection for the index entry.
         auto latestEntry = [&]() -> std::shared_ptr<IndexCatalogEntry> {
             if (!collection)
