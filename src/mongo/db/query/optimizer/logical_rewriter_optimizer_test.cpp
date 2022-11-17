@@ -34,6 +34,7 @@
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/unittest/unittest.h"
 
@@ -2064,6 +2065,150 @@ TEST(LogicalRewriter, RelaxComposeM) {
         "        [root]\n"
         "            Source []\n",
         optimized);
+}
+
+TEST(PhysRewriter, FilterIndexingRIN) {
+    using namespace properties;
+    using namespace unit_test_abt_literals;
+    PrefixId prefixId;
+
+    // Construct a query which tests "a" = 1 and "b" = 2 and "c" = 3.
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .filter(_evalf(_get("e", _traverse1(_cmp("Eq", "3"_cint64))), "root"_var))
+                       .filter(_evalf(_get("c", _traverse1(_cmp("Eq", "2"_cint64))), "root"_var))
+                       .filter(_evalf(_get("a", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                       .finish(_scan("root", "c1"));
+
+    // We have one index with 5 fields: "a", "b", "c", "d", "e".
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase},
+        prefixId,
+        {{{"c1",
+           createScanDef(
+               {},
+               {{"index1",
+                 IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("b"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("c"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("d"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("e"), CollationOp::Ascending}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = std::move(rootNode);
+    phaseManager.getHints()._maxIndexEqPrefixes = 3;
+    phaseManager.optimize(optimized);
+    // No plans explored: testing only substitution phase.
+    ASSERT_EQ(0, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // The resulting sargable node is too big to explain in its entirety. We explain the important
+    // pieces.
+    const SargableNode& node = *optimized.cast<RootNode>()->getChild().cast<SargableNode>();
+
+    // Demonstrate we encode intervals for "a", "c", and "e".
+    ASSERT_EQ(
+        "requirementsMap: \n"
+        "    refProjection: root, path: 'PathGet [a] PathIdentity []', intervals: {{{=Const "
+        "[1]}}}\n"
+        "    refProjection: root, path: 'PathGet [c] PathIdentity []', intervals: {{{=Const "
+        "[2]}}}\n"
+        "    refProjection: root, path: 'PathGet [e] PathIdentity []', intervals: {{{=Const "
+        "[3]}}}\n",
+        ExplainGenerator::explainPartialSchemaReqMap(node.getReqMap()));
+
+    const auto& ci = node.getCandidateIndexes();
+
+    ASSERT_EQ(3, ci.size());
+
+    // We have one equality prefix for the first candidate index.
+    ASSERT_EQ(1, ci.at(0)._intervals.size());
+
+    // The first index field ("a") is constrained to 1, the remaining fields are not constrained.
+    ASSERT_EQ(
+        "{\n"
+        "    {\n"
+        "        {=Const [1], <fully open>, <fully open>, <fully open>, <fully open>}\n"
+        "    }\n"
+        "}\n",
+        ExplainGenerator::explainIntervalExpr(ci.at(0)._intervals.front()));
+
+    // We have two residual predicates for "c" and "e".
+    ASSERT_EQ(
+        "residualReqs: \n"
+        "    refProjection: evalTemp_24, path: 'PathIdentity []', intervals: {{{=Const [2]}}}, "
+        "entryIndex: 1\n"
+        "    refProjection: evalTemp_25, path: 'PathIdentity []', intervals: {{{=Const [3]}}}, "
+        "entryIndex: 2\n",
+        ExplainGenerator::explainResidualRequirements(ci.at(0)._residualRequirements));
+
+
+    // The second candidate index has two equality prefixes.
+    ASSERT_EQ(2, ci.at(1)._intervals.size());
+
+    // The first index field ("a") is again constrained to 1, and the remaining ones are not.
+    ASSERT_EQ(
+        "{\n"
+        "    {\n"
+        "        {=Const [1], <fully open>, <fully open>, <fully open>, <fully open>}\n"
+        "    }\n"
+        "}\n",
+        ExplainGenerator::explainIntervalExpr(ci.at(1)._intervals.at(0)));
+
+    // The first two index fields are constrained to variables obtained from the first scan, the
+    // third one ("c") is bound to "2". The last two fields are unconstrained.
+    ASSERT_EQ(
+        "{\n"
+        "    {\n"
+        "        {=Variable [evalTemp_26], =Variable [evalTemp_27], =Const [2], <fully open>, "
+        "<fully open>}\n"
+        "    }\n"
+        "}\n",
+        ExplainGenerator::explainIntervalExpr(ci.at(1)._intervals.at(1)));
+
+    // We have only one residual predicates for "e".
+    ASSERT_EQ(
+        "residualReqs: \n"
+        "    refProjection: evalTemp_28, path: 'PathIdentity []', intervals: {{{=Const [3]}}}, "
+        "entryIndex: 2\n",
+        ExplainGenerator::explainResidualRequirements(ci.at(1)._residualRequirements));
+
+
+    // The third candidate index has three equality prefixes.
+    ASSERT_EQ(3, ci.at(2)._intervals.size());
+
+    // The first index field ("a") is again constrained to 1.
+    ASSERT_EQ(
+        "{\n"
+        "    {\n"
+        "        {=Const [1], <fully open>, <fully open>, <fully open>, <fully open>}\n"
+        "    }\n"
+        "}\n",
+        ExplainGenerator::explainIntervalExpr(ci.at(2)._intervals.at(0)));
+
+    // The first two index fields are constrained to variables obtained from the first scan, the
+    // third one ("c") is bound to "2". The last two fields are unconstrained.
+    ASSERT_EQ(
+        "{\n"
+        "    {\n"
+        "        {=Variable [evalTemp_29], =Variable [evalTemp_30], =Const [2], <fully open>, "
+        "<fully open>}\n"
+        "    }\n"
+        "}\n",
+        ExplainGenerator::explainIntervalExpr(ci.at(2)._intervals.at(1)));
+
+    // The first 4 index fields are constrained to variables from the second scan, and the last one
+    // to 4.
+    ASSERT_EQ(
+        "{\n"
+        "    {\n"
+        "        {=Variable [evalTemp_29], =Variable [evalTemp_30], =Variable [evalTemp_31], "
+        "=Variable [evalTemp_32], =Const [3]}\n"
+        "    }\n"
+        "}\n",
+        ExplainGenerator::explainIntervalExpr(ci.at(2)._intervals.at(2)));
 }
 
 }  // namespace

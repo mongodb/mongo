@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/unittest/unittest.h"
+
 
 namespace mongo::optimizer {
 using PartialSchemaSelHints = ce::PartialSchemaSelHints;
@@ -2854,6 +2855,96 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
     ASSERT_BSON_PATH("1", explainRoot, "child.leftChild.interval.0.highBound.bound.value");
 }
 
+TEST(PhysRewriter, CompoundIndex5) {
+    using namespace properties;
+    using namespace unit_test_abt_literals;
+
+    PrefixId prefixId;
+
+    // Test the following scenario: (a = 0 or a = 1) and (b = 2 or b = 3) over a compound index on
+    // {a, b}.
+    ABT rootNode =
+        NodeBuilder{}
+            .root("root")
+            .filter(_evalf(_traverse1(_composea(_cmp("Eq", "0"_cint64), _cmp("Eq", "1"_cint64))),
+                           "pa"_var))
+            .eval("pa", _evalp(_get("a", _id()), "root"_var))
+            .filter(_evalf(_traverse1(_composea(_cmp("Eq", "2"_cint64), _cmp("Eq", "3"_cint64))),
+                           "pb"_var))
+            .eval("pb", _evalp(_get("b", _id()), "root"_var))
+            .finish(_scan("root", "c1"));
+
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1",
+           createScanDef(
+               {},
+               {{"index1",
+                 IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
+                                 false /*isMultiKey*/}}})}}},
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
+    ASSERT_BETWEEN(7, 12, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // Demonstrate that we create four compound {a, b} index bounds: [=0, =2], [=0, =3], [=1, =2]
+    // and [=1, =3].
+    // TODO: SERVER-70298: we should be seeing merge joins instead of union+groupby.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [root]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "GroupBy []\n"
+        "|   |   groupings: \n"
+        "|   |       RefBlock: \n"
+        "|   |           Variable [rid_0]\n"
+        "|   aggregations: \n"
+        "Union []\n"
+        "|   |   |   |   BindBlock:\n"
+        "|   |   |   |       [rid_0]\n"
+        "|   |   |   |           Source []\n"
+        "|   |   |   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{=Const [1], =Const [3]}]\n"
+        "|   |   |       BindBlock:\n"
+        "|   |   |           [rid_0]\n"
+        "|   |   |               Source []\n"
+        "|   |   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{=Const [0], =Const [3]}]\n"
+        "|   |       BindBlock:\n"
+        "|   |           [rid_0]\n"
+        "|   |               Source []\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const "
+        "[1], =Const [2]}]\n"
+        "|       BindBlock:\n"
+        "|           [rid_0]\n"
+        "|               Source []\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const "
+        "[0], =Const [2]}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimized);
+}
+
 TEST(PhysRewriter, IndexBoundsIntersect) {
     using namespace properties;
     PrefixId prefixId;
@@ -3556,7 +3647,6 @@ TEST(PhysRewriter, ElemMatchIndex1) {
     phaseManager.optimize(optimized);
     ASSERT_BETWEEN(8, 12, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-
     // Demonstrate we can cover both the filter and the extracted elemMatch predicate with the
     // index.
     ASSERT_EXPLAIN_V2(
@@ -3569,15 +3659,15 @@ TEST(PhysRewriter, ElemMatchIndex1) {
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_19]\n"
+        "|   |   |   Variable [evalTemp_17]\n"
         "|   |   PathArr []\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
         "|   |       limit: 1\n"
         "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_19}, c1]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_17}, c1]\n"
         "|   |   BindBlock:\n"
-        "|   |       [evalTemp_19]\n"
+        "|   |       [evalTemp_17]\n"
         "|   |           Source []\n"
         "|   |       [root]\n"
         "|   |           Source []\n"
@@ -3745,22 +3835,22 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
         "|       rid_0\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_20]\n"
+        "|   |   Variable [evalTemp_14]\n"
         "|   PathComposeA []\n"
         "|   |   PathArr []\n"
         "|   PathObj []\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_20]\n"
+        "|   |   Variable [evalTemp_14]\n"
         "|   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [1]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_20]\n"
+        "|   |   Variable [evalTemp_14]\n"
         "|   PathGet [b] PathTraverse [1] PathCompare [Eq] Const [1]\n"
-        "IndexScan [{'<indexKey> 1': evalTemp_20, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
+        "IndexScan [{'<indexKey> 1': evalTemp_14, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
         "index1, interval: {<fully open>, <fully open>}]\n"
         "    BindBlock:\n"
-        "        [evalTemp_20]\n"
+        "        [evalTemp_14]\n"
         "            Source []\n"
         "        [rid_0]\n"
         "            Source []\n",

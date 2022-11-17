@@ -895,17 +895,6 @@ public:
         }
     }
 
-    std::string printInterval(const IntervalRequirement& interval) {
-        ExplainPrinter printer;
-        printInterval(printer, interval);
-        return printer.str();
-    }
-
-    ExplainPrinter printIntervalExpr(const IntervalReqExpr::Node& intervalExpr) {
-        IntervalPrinter<IntervalReqExpr> intervalPrinter(*this);
-        return intervalPrinter.print(intervalExpr);
-    }
-
     void printInterval(ExplainPrinter& printer, const CompoundIntervalRequirement& interval) {
         if constexpr (version < ExplainVersion::V3) {
             bool first = true;
@@ -928,6 +917,19 @@ public:
         } else {
             MONGO_UNREACHABLE;
         }
+    }
+
+    template <class T>
+    std::string printInterval(const T& interval) {
+        ExplainPrinter printer;
+        printInterval(printer, interval);
+        return printer.str();
+    }
+
+    template <class T>
+    ExplainPrinter printIntervalExpr(const typename T::Node& intervalExpr) {
+        IntervalPrinter<T> intervalPrinter(*this);
+        return intervalPrinter.print(intervalExpr);
     }
 
     template <class T>
@@ -1159,7 +1161,7 @@ public:
 
             local.fieldName("intervals");
             {
-                ExplainPrinter intervals = printIntervalExpr(req.getIntervals());
+                ExplainPrinter intervals = printIntervalExpr<IntervalReqExpr>(req.getIntervals());
                 local.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
             }
 
@@ -1189,7 +1191,7 @@ public:
 
             local.fieldName("intervals");
             {
-                ExplainPrinter intervals = printIntervalExpr(req.getIntervals());
+                ExplainPrinter intervals = printIntervalExpr<IntervalReqExpr>(req.getIntervals());
                 local.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
             }
             local.separator(", ").fieldName("entryIndex").print(entryIndex);
@@ -1273,12 +1275,33 @@ public:
                     }
                 }
 
-                local.separator("}, ").fieldName("intervals", ExplainVersion::V3);
+                local.separator("}, ");
                 {
                     IntervalPrinter<CompoundIntervalReqExpr> intervalPrinter(*this);
-                    ExplainPrinter intervals =
-                        intervalPrinter.print(candidateIndexEntry._intervals);
-                    local.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
+                    if (candidateIndexEntry._intervals.size() == 1) {
+                        local.fieldName("intervals", ExplainVersion::V3);
+
+                        ExplainPrinter intervals =
+                            intervalPrinter.print(candidateIndexEntry._intervals.front());
+                        local.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
+                    } else {
+                        local.fieldName("intervals", ExplainVersion::V3);
+
+                        ExplainPrinter intervalVector;
+                        intervalVector.separator(" [");
+                        for (size_t i = 0; i < candidateIndexEntry._intervals.size(); i++) {
+                            const auto& entry = candidateIndexEntry._intervals.at(i);
+                            if (i > 0) {
+                                intervalVector.separator(", ");
+                            }
+                            ExplainPrinter intervals = intervalPrinter.print(entry);
+                            intervalVector
+                                .fieldName(str::stream() << "interval" << i, ExplainVersion::V3)
+                                .printSingleLevel(intervals, "" /*singleLevelSpacer*/);
+                        }
+
+                        local.printSingleLevel(intervalVector).separator("]");
+                    }
                 }
 
                 if (const auto& residualReqs = candidateIndexEntry._residualRequirements;
@@ -2672,14 +2695,32 @@ std::string ExplainGenerator::explainPartialSchemaReqMap(const PartialSchemaRequ
     return result.str();
 }
 
+std::string ExplainGenerator::explainResidualRequirements(const ResidualRequirements& resReqs) {
+    ExplainGeneratorV2 gen;
+    ExplainGeneratorV2::ExplainPrinter result;
+    gen.printResidualRequirements(result, resReqs);
+    return result.str();
+}
+
 std::string ExplainGenerator::explainInterval(const IntervalRequirement& interval) {
+    ExplainGeneratorV2 gen;
+    return gen.printInterval(interval);
+}
+
+std::string explainInterval(const CompoundIntervalRequirement& interval) {
     ExplainGeneratorV2 gen;
     return gen.printInterval(interval);
 }
 
 std::string ExplainGenerator::explainIntervalExpr(const IntervalReqExpr::Node& intervalExpr) {
     ExplainGeneratorV2 gen;
-    return gen.printIntervalExpr(intervalExpr).str();
+    return gen.printIntervalExpr<IntervalReqExpr>(intervalExpr).str();
+}
+
+std::string ExplainGenerator::explainIntervalExpr(
+    const CompoundIntervalReqExpr::Node& intervalExpr) {
+    ExplainGeneratorV2 gen;
+    return gen.printIntervalExpr<CompoundIntervalReqExpr>(intervalExpr).str();
 }
 
 }  // namespace mongo::optimizer

@@ -551,7 +551,12 @@ public:
                     }
                 }
 
-                const auto& intervals = candidateIndexEntry._intervals;
+                // TODO: SERVER-69027. Support RIN with multiple equality prefixes.
+                tassert(6624113,
+                        "For now we only support single equality prefix",
+                        candidateIndexEntry._intervals.size() == 1);
+                const auto& intervals = candidateIndexEntry._intervals.front();
+
                 ABT physNode = make<Blackhole>();
                 NodeCEMap nodeCEMap;
 
@@ -575,26 +580,16 @@ public:
                 if (needsRID || needsUniqueStage) {
                     indexProjectionMap._ridProjection = ridProjName;
                 }
-                if (singularInterval) {
-                    physNode =
-                        make<IndexScanNode>(std::move(indexProjectionMap),
-                                            IndexSpecification{scanDefName,
-                                                               indexDefName,
-                                                               *singularInterval,
-                                                               !availableDirections._forward});
-                    nodeCEMap.emplace(physNode.cast<Node>(), indexCE);
-                } else {
-                    physNode = lowerIntervals(_prefixId,
-                                              ridProjName,
-                                              std::move(indexProjectionMap),
-                                              scanDefName,
-                                              indexDefName,
-                                              intervals,
-                                              !availableDirections._forward,
-                                              indexCE,
-                                              scanGroupCE,
-                                              nodeCEMap);
-                }
+                physNode = lowerIntervals(_prefixId,
+                                          ridProjName,
+                                          std::move(indexProjectionMap),
+                                          scanDefName,
+                                          indexDefName,
+                                          intervals,
+                                          !availableDirections._forward,
+                                          indexCE,
+                                          scanGroupCE,
+                                          nodeCEMap);
 
                 lowerPartialSchemaRequirements(scanGroupCE,
                                                std::move(indexPredSels),

@@ -202,7 +202,7 @@ ResidualRequirementWithCE::ResidualRequirementWithCE(PartialSchemaKey key,
 CandidateIndexEntry::CandidateIndexEntry(std::string indexDefName)
     : _indexDefName(std::move(indexDefName)),
       _fieldProjectionMap(),
-      _intervals(CompoundIntervalReqExpr::makeSingularDNF()),
+      _intervals(),
       _residualRequirements(),
       _fieldsToCollate(),
       _intervalPrefixSize(0) {}

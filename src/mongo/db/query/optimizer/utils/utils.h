@@ -253,6 +253,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
                                          bool fastNullHandling,
+                                         size_t maxIndexEqPrefixes,
                                          bool& hasEmptyInterval,
                                          const ConstFoldFn& constFold);
 

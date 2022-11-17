@@ -279,6 +279,9 @@ struct QueryHints {
     // Controls if we prefer to insert redundant index predicates on the Seek side in order to
     // prevent issues arising from yielding.
     bool _disableYieldingTolerantPlans = true;
+
+    // Controls the maximum number of equalityPrefixes we generate for a candidate index.
+    size_t _maxIndexEqPrefixes = 1;
 };
 
 }  // namespace mongo::optimizer

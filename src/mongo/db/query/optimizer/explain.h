@@ -113,9 +113,15 @@ public:
 
     static std::string explainPartialSchemaReqMap(const PartialSchemaRequirements& reqMap);
 
+    static std::string explainResidualRequirements(const ResidualRequirements& resReqs);
+
     static std::string explainInterval(const IntervalRequirement& interval);
 
+    static std::string explainInterval(const CompoundIntervalRequirement& interval);
+
     static std::string explainIntervalExpr(const IntervalReqExpr::Node& intervalExpr);
+
+    static std::string explainIntervalExpr(const CompoundIntervalReqExpr::Node& intervalExpr);
 };
 
 }  // namespace mongo::optimizer

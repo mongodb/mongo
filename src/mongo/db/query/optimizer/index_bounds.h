@@ -178,13 +178,38 @@ struct ResidualRequirementWithCE {
 using ResidualRequirementsWithCE = std::vector<ResidualRequirementWithCE>;
 
 
-// A sequence of intervals corresponding, one for each index key.
+// A sequence of intervals corresponding to a compound bound, with one entry for each index key.
 using CompoundIntervalRequirement = std::vector<IntervalRequirement>;
 
 // Unions and conjunctions of individual compound intervals.
 using CompoundIntervalReqExpr = BoolExpr<CompoundIntervalRequirement>;
 
-// Used to pre-compute candidate indexes for SargableNodes.
+/**
+ * Used to pre-compute candidate indexes for SargableNodes.
+ * We keep track of the following:
+ *  1. Name of index this entry applies to. There may be multiple entries for the same index if we
+ * have more than one equality prefix (see below).
+ *  2. A map from index field to projection we deliver the field under. We can select which index
+ * fields we want to bind to which projections.
+ *  3. A vector of equality prefixes. The equality prefix refers to the predicates applied to each
+ * of the index fields. It consists of 0+ equalities followed by at most one inequality, and
+ * followed by 0+ unconstrained fields. For example, suppose we have an index consisting of five
+ * fields with the following intervals applied to each: _field1: [0, 0], _field2: [1, 1], _field3:
+ * [2, MaxKey], _field4: (unconstrained), _field5: [MinKey, 10], _field6: [100, MaxKey]. In this
+ * example we have 3 equality prefixes: {_field1, field_2, field3, _field4}, {_field5}, {_field6}.
+ * If we have more than one prefixes, we may choose to perform recursive index navigation. If in the
+ * simplest case with one equality prefix we perform an index scan with some residual predicates
+ * applied.
+ *  4. Residual predicates. We may not satisfy all intervals directly by converting into index
+ * bounds, and instead may satisfy some as residual predicates. Consider the example: _field1: [0,
+ * MaxKey], _field2: [1, MaxKey]. If we were to constrain the candidate indexes to just one equality
+ * prefix, we would create compound index bound [{0, MinKey}, {MaxKey, MaxKey}] effectively encoding
+ * the interval over the first field into the bound, the binding _field2 to a temporary variable,
+ * and applying a filter encoding [1, MaxKey] over the index scan.
+ *  5. Fields to collate. We keep track of which fields need collation. This is needed during the
+ * physical rewrite phase where we need to match the collation requirements with the collation of
+ * the index. Essentially, we may ignore collation requirements for fields which are equalities.
+ */
 struct CandidateIndexEntry {
     CandidateIndexEntry(std::string indexDefName);
 
@@ -192,8 +217,11 @@ struct CandidateIndexEntry {
 
     std::string _indexDefName;
 
+    // Indicates which fields we are retrieving and how we assign them to projections.
     FieldProjectionMap _fieldProjectionMap;
-    CompoundIntervalReqExpr::Node _intervals;
+
+    // Contains the intervals we compute for each "equality prefix" of query predicates.
+    std::vector<CompoundIntervalReqExpr::Node> _intervals;
 
     // Requirements which are not satisfied directly by the IndexScan. They are intended to be
     // sorted in their containing vector from most to least selective.
