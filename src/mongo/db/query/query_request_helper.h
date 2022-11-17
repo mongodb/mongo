@@ -102,13 +102,14 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand);
  */
 bool isTextScoreMeta(BSONElement elt);
 
-// Read preference is attached to commands in "wrapped" form, e.g.
-//   { $query: { <cmd>: ... } , <kWrappedReadPrefField>: { ... } }
+// Historically for the OP_QUERY wire protocol message, read preference was sent to the server in a
+// "wrapped" form: {$query: <cmd payload>, $readPreference: ...}. Internally, this was converted to
+// the so-called "unwrapped" format for convenience:
 //
-// However, mongos internally "unwraps" the read preference and adds it as a parameter to the
-// command, e.g.
-//  { <cmd>: ... , <kUnwrappedReadPrefField>: { <kWrappedReadPrefField>: { ... } } }
-static constexpr auto kWrappedReadPrefField = "$readPreference";
+//   {<cmd payload>, $queryOptions: {$readPreference: ...}}
+//
+// TODO SERVER-29091: This is a holdover from when OP_QUERY was supported by the server and should
+// be deleted.
 static constexpr auto kUnwrappedReadPrefField = "$queryOptions";
 
 // Names of the maxTimeMS command and query option.

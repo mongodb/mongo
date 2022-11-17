@@ -66,34 +66,6 @@ void checkUpconvert(const BSONObj& legacyCommand,
 }
 
 TEST(Metadata, UpconvertValidMetadata) {
-    // Wrapped in $query, with readPref and slaveOk bit set.
-    checkUpconvert(BSON("$query" << BSON("ping" << 1) <<  //
-                        "$readPreference"
-                                 << BSON("mode"
-                                         << "secondary")),
-                   mongo::QueryOption_SecondaryOk,
-                   BSON("ping" << 1 << "$readPreference"
-                               << BSON("mode"
-                                       << "secondary")));
-
-    // Wrapped in 'query', with readPref.
-    checkUpconvert(BSON("query" << BSON("pong" << 1 << "foo"
-                                               << "bar")
-                                << "$readPreference"
-                                << BSON("mode"
-                                        << "primary"
-                                        << "tags"
-                                        << BSON("dc"
-                                                << "ny"))),
-                   0,
-                   BSON("pong" << 1 << "foo"
-                               << "bar"
-                               << "$readPreference"
-                               << BSON("mode"
-                                       << "primary"
-                                       << "tags"
-                                       << BSON("dc"
-                                               << "ny"))));
     // Unwrapped, no readPref, no slaveOk
     checkUpconvert(BSON("ping" << 1), 0, BSON("ping" << 1));
 
@@ -117,38 +89,6 @@ TEST(Metadata, UpconvertValidMetadata) {
                                         << "city"))));
 }
 
-TEST(Metadata, UpconvertInvalidMetadata) {
-    // has $maxTimeMS option
-    ASSERT_THROWS_CODE(upconvertRequest("db",
-                                        BSON("query" << BSON("foo"
-                                                             << "bar")
-                                                     << "$maxTimeMS" << 200),
-                                        0),
-                       AssertionException,
-                       ErrorCodes::InvalidOptions);
-    ASSERT_THROWS_CODE(upconvertRequest("db",
-                                        BSON("$query" << BSON("foo"
-                                                              << "bar")
-                                                      << "$maxTimeMS" << 200),
-                                        0),
-                       AssertionException,
-                       ErrorCodes::InvalidOptions);
-
-    // invalid wrapped query
-    ASSERT_THROWS(upconvertRequest("db", BSON("$query" << 1), 0), AssertionException);
-    ASSERT_THROWS(upconvertRequest("db",
-                                   BSON("$query"
-                                        << ""),
-                                   0),
-                  AssertionException);
-    ASSERT_THROWS(upconvertRequest("db", BSON("query" << 0), 0), AssertionException);
-    ASSERT_THROWS(upconvertRequest("db",
-                                   BSON("query"
-                                        << ""),
-                                   0),
-                  AssertionException);
-}
-
 TEST(Metadata, UpconvertDuplicateReadPreference) {
     auto secondaryReadPref = BSON("mode"
                                   << "secondary");
@@ -156,7 +96,7 @@ TEST(Metadata, UpconvertDuplicateReadPreference) {
                                 << "nearest");
 
     BSONObjBuilder bob;
-    bob.append("query", BSON("$readPreference" << secondaryReadPref));
+    bob.append("$queryOptions", BSON("$readPreference" << secondaryReadPref));
     bob.append("$readPreference", nearestReadPref);
 
     ASSERT_THROWS_CODE(

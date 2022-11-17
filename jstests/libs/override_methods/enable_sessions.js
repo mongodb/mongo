@@ -18,15 +18,7 @@ function runCommandWithLsidCheck(conn, dbName, cmdName, cmdObj, func, makeFuncAr
         return func.apply(conn, makeFuncArgs(cmdObj));
     }
 
-    // If the command is in a wrapped form, then we look for the actual command object
-    // inside the query/$query object.
-    let cmdObjUnwrapped = cmdObj;
-    if (cmdName === "query" || cmdName === "$query") {
-        cmdObj[cmdName] = Object.assign({}, cmdObj[cmdName]);
-        cmdObjUnwrapped = cmdObj[cmdName];
-    }
-
-    if (!cmdObjUnwrapped.hasOwnProperty("lsid")) {
+    if (!cmdObj.hasOwnProperty("lsid")) {
         // Throw an error for requests not using sessions.
         throw new Error("command object does not have session id: " + tojson(cmdObj));
     }

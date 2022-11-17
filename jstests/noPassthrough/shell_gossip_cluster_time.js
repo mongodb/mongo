@@ -41,15 +41,6 @@ function testCommandGossipedWithClusterTime(func, expectedClusterTime) {
         throw new Error("Mongo.prototype.runCommand() was never called: " + func.toString());
     }
 
-    let cmdName = Object.keys(cmdObjSeen)[0];
-
-    // If the command is in a wrapped form, then we look for the actual command object inside
-    // the query/$query object.
-    if (cmdName === "query" || cmdName === "$query") {
-        cmdObjSeen = cmdObjSeen[cmdName];
-        cmdName = Object.keys(cmdObjSeen)[0];
-    }
-
     if (expectedClusterTime === undefined) {
         assert(!cmdObjSeen.hasOwnProperty("$clusterTime"),
                "Expected operation " + tojson(cmdObjSeen) +

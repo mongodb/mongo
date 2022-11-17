@@ -23,11 +23,6 @@ function runShellScript(uri, cmdArgs, insertShouldHaveTxnNumber, shellFn) {
             let cmdObjSeen = cmdObj;
             let cmdName = Object.keys(cmdObjSeen)[0];
 
-            if (cmdName === "query" || cmdName === "$query") {
-                cmdObjSeen = cmdObjSeen[cmdName];
-                cmdName = Object.keys(cmdObj)[0];
-            }
-
             if (cmdName === "insert") {
                 insertFound = true;
                 if (insertShouldHaveTxnNumber) {

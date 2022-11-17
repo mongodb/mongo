@@ -66,26 +66,23 @@ DB.prototype.commandHelp = function(name) {
     return res.help;
 };
 
-// utility to attach readPreference if needed.
+// Utility to attach readPreference if needed.
 DB.prototype._attachReadPreferenceToCommand = function(cmdObj, readPref) {
     "use strict";
-    // if the user has not set a readpref, return the original cmdObj
+    // If the user has not set a read pref, return the original 'cmdObj'.
     if ((readPref === null) || typeof (readPref) !== "object") {
         return cmdObj;
     }
 
-    // if user specifies $readPreference manually, then don't change it
+    // If user specifies $readPreference manually, then don't change it.
     if (cmdObj.hasOwnProperty("$readPreference")) {
         return cmdObj;
     }
 
-    // copy object so we don't mutate the original
+    // Copy object so we don't mutate the original.
     var clonedCmdObj = Object.extend({}, cmdObj);
-    // The server selection spec mandates that the key is '$query', but
-    // the shell has historically used 'query'. The server accepts both,
-    // so we maintain the existing behavior
-    var cmdObjWithReadPref = {query: clonedCmdObj, $readPreference: readPref};
-    return cmdObjWithReadPref;
+    clonedCmdObj["$readPreference"] = readPref;
+    return clonedCmdObj;
 };
 
 /**

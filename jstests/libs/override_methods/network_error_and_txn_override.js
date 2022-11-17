@@ -1086,13 +1086,6 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     currentCommandID.push(newestCommandID++);
     nestingLevel++;
 
-    // If the command is in a wrapped form, then we look for the actual command object
-    // inside the query/$query object.
-    if (cmdName === "query" || cmdName === "$query") {
-        cmdObj = cmdObj[cmdName];
-        cmdName = Object.keys(cmdObj)[0];
-    }
-
     const lsid = cmdObj.lsid;
     try {
         const res = runCommandOverrideBody(

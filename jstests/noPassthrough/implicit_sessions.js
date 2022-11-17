@@ -29,14 +29,6 @@ function inspectCommandForSessionId(func, {shouldIncludeId, expectedId, differen
         throw new Error("Mongo.prototype.runCommand() was never called: " + func.toString());
     }
 
-    // If the command is in a wrapped form, then we look for the actual command object inside
-    // the query/$query object.
-    let cmdName = Object.keys(cmdObjSeen)[0];
-    if (cmdName === "query" || cmdName === "$query") {
-        cmdObjSeen = cmdObjSeen[cmdName];
-        cmdName = Object.keys(cmdObjSeen)[0];
-    }
-
     if (shouldIncludeId) {
         assert(cmdObjSeen.hasOwnProperty("lsid"),
                "Expected operation " + tojson(cmdObjSeen) + " to have a logical session id.");

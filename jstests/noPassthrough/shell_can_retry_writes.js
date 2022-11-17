@@ -35,15 +35,6 @@ function testCommandCanBeRetried(func, expected = true) {
         throw new Error("Mongo.prototype.runCommand() was never called: " + func.toString());
     }
 
-    let cmdName = Object.keys(cmdObjSeen)[0];
-
-    // If the command is in a wrapped form, then we look for the actual command object inside
-    // the query/$query object.
-    if (cmdName === "query" || cmdName === "$query") {
-        cmdObjSeen = cmdObjSeen[cmdName];
-        cmdName = Object.keys(cmdObjSeen)[0];
-    }
-
     assert(cmdObjSeen.hasOwnProperty("lsid"),
            "Expected operation " + tojson(cmdObjSeen) +
                " to have a logical session id: " + func.toString());

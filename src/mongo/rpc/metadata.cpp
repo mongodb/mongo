@@ -137,26 +137,14 @@ OpMsgRequest upconvertRequest(StringData db, BSONObj cmdObj, int queryFlags) {
     cmdObj = cmdObj.getOwned();  // Usually this is a no-op since it is already owned.
 
     auto readPrefContainer = BSONObj();
-    const StringData firstFieldName = cmdObj.firstElementFieldName();
-    if (firstFieldName == "$query" || firstFieldName == "query") {
-        // Commands sent over OP_QUERY specify read preference by putting it at the top level and
-        // putting the command in a nested field called either query or $query.
-
-        // Check if legacyCommand has an invalid $maxTimeMS option.
-        uassert(ErrorCodes::InvalidOptions,
-                "cannot use $maxTimeMS query option with commands; use maxTimeMS command option "
-                "instead",
-                !cmdObj.hasField("$maxTimeMS"));
-
-        if (auto readPref = cmdObj["$readPreference"])
-            readPrefContainer = readPref.wrap();
-
-        cmdObj = cmdObj.firstElement().Obj().shareOwnershipWith(cmdObj);
-    } else if (auto queryOptions = cmdObj["$queryOptions"]) {
+    if (auto queryOptions = cmdObj["$queryOptions"]) {
         // Mongos rewrites commands with $readPreference to put it in a field nested inside of
         // $queryOptions. Its command implementations often forward commands in that format to
         // shards. This function is responsible for rewriting it to a format that the shards
         // understand.
+        //
+        // TODO SERVER-29091: The use of $queryOptions is a holdover related to the
+        // no-longer-supported OP_QUERY format. We should remove it from the code base.
         readPrefContainer = queryOptions.Obj().shareOwnershipWith(cmdObj);
         cmdObj = cmdObj.removeField("$queryOptions");
     }

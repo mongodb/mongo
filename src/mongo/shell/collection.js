@@ -244,8 +244,7 @@ DBCollection.prototype.find = function(filter, projection, limit, skip, batchSiz
 
         const client = session._getSessionAwareClient();
         const readConcern = client.getReadConcern(session);
-        if (readConcern !== null &&
-            client.canUseReadConcern(session, cursor._convertToCommand(true))) {
+        if (readConcern !== null && client.canUseReadConcern(session, cursor._convertToCommand())) {
             cursor.readConcern(readConcern.level);
         }
     }

@@ -42,8 +42,7 @@ commandsRan = [];
 db.getMongo().setReadPref("secondary");
 db.foo.count();
 
-// Check that we have wrapped the command and attached the read preference.
+// Check that we have correctly attached the read preference to the command.
 assert.eq(commandsRan.length, 1);
-assert.docEq(commandsRan[0].cmd,
-             {query: {count: "foo", query: {}}, $readPreference: {mode: "secondary"}});
+assert.docEq(commandsRan[0].cmd, {count: "foo", query: {}, $readPreference: {mode: "secondary"}});
 })();

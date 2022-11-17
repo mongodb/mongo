@@ -13,21 +13,13 @@ function runCommandInMultiStmtTxnPassthrough(
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 
-    // If the command is in a wrapped form, then we look for the actual command object inside
-    // the query/$query object.
-    let commandObjUnwrapped = commandObj;
-    if (commandName === "query" || commandName === "$query") {
-        commandObjUnwrapped = commandObj[commandName];
-        commandName = Object.keys(commandObjUnwrapped)[0];
-    }
-
     // Ignore all commands that are part of multi statement transactions.
     if (commandObj.hasOwnProperty("autocommit")) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 
     const majority = {w: 'majority'};
-    let massagedCmd = Object.extend(commandObjUnwrapped, {});
+    let massagedCmd = Object.extend(commandObj, {});
 
     // Adjust mapReduce and drop to use { w: majority } to make sure that all pending drops that
     // occurred while running these commands are finished after the command returns. This

@@ -68,9 +68,12 @@ function confirmReadPreference(primary, secondary) {
             //
             let comment = name + "_explain_within_query";
             assert.commandWorked(mongosDB.runCommand({
-                query:
-                    {aggregate: "coll", pipeline: [], comment: comment, cursor: {}, explain: true},
-                $readPreference: {mode: pref, tags: tagSets}
+                aggregate: "coll",
+                pipeline: [],
+                comment: comment,
+                cursor: {},
+                explain: true,
+                $readPreference: {mode: pref, tags: tagSets},
             }));
 
             // Look for an operation without an exception, since the shard throws a stale config
@@ -92,16 +95,17 @@ function confirmReadPreference(primary, secondary) {
                 }
             });
 
-            //
-            // Tests that an aggregation command wrapped in an explain with explicit
-            // $queryOptions targets the correct node in the replica set given by 'target'.
-            //
+            // Tests that an aggregation command wrapped in an explain with explicit $readPreference
+            // targets the correct node in the replica set given by 'target'.
             comment = name + "_explain_wrapped_agg";
             assert.commandWorked(mongosDB.runCommand({
-                $query: {
-                    explain: {aggregate: "coll", pipeline: [], cursor: {}, comment: comment},
+                explain: {
+                    aggregate: "coll",
+                    pipeline: [],
+                    cursor: {},
+                    comment: comment,
                 },
-                $readPreference: {mode: pref, tags: tagSets}
+                $readPreference: {mode: pref, tags: tagSets},
             }));
 
             // Look for an operation without an exception, since the shard throws a stale config

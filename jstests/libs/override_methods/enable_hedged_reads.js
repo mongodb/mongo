@@ -27,14 +27,6 @@ function runCommandWithHedgedReads(conn, dbName, commandName, commandObj, func, 
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 
-    // If the command is in a wrapped form, then we look for the actual command object inside
-    // the query/$query object.
-    let commandObjUnwrapped = commandObj;
-    if (commandName === "query" || commandName === "$query") {
-        commandObjUnwrapped = commandObj[commandName];
-        commandName = Object.keys(commandObjUnwrapped)[0];
-    }
-
     // The profile collection is not replicated
     if (commandObj[commandName] === "system.profile" || commandName === 'profile') {
         throw new Error(
@@ -43,11 +35,11 @@ function runCommandWithHedgedReads(conn, dbName, commandName, commandObj, func, 
     }
 
     let shouldForceReadPreference = kCommandsSupportingReadPreference.has(commandName);
-    if (OverrideHelpers.isAggregationWithOutOrMergeStage(commandName, commandObjUnwrapped)) {
+    if (OverrideHelpers.isAggregationWithOutOrMergeStage(commandName, commandObj)) {
         // An aggregation with a $out stage must be sent to the primary.
         shouldForceReadPreference = false;
     } else if ((commandName === "mapReduce" || commandName === "mapreduce") &&
-               !OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObjUnwrapped)) {
+               !OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObj)) {
         // A map-reduce operation with non-inline output must be sent to the primary.
         shouldForceReadPreference = false;
     } else if (!conn.isMongos()) {
@@ -65,16 +57,6 @@ function runCommandWithHedgedReads(conn, dbName, commandName, commandObj, func, 
     }
 
     if (shouldForceReadPreference) {
-        if (commandObj === commandObjUnwrapped) {
-            // We wrap the command object using a "query" field rather than a "$query" field to
-            // match the implementation of DB.prototype._attachReadPreferenceToCommand().
-            commandObj = {query: commandObj};
-        } else {
-            // We create a copy of 'commandObj' to avoid mutating the parameter the caller
-            // specified.
-            commandObj = Object.assign({}, commandObj);
-        }
-
         if (commandObj.hasOwnProperty("$readPreference")) {
             if (commandObj.$readPreference.hasOwnProperty("hedge") &&
                 bsonBinaryEqual({_: commandObj.$readPreference.hedge}, {_: {enabled: false}})) {

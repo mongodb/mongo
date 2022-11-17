@@ -251,9 +251,9 @@ TEST(ReadPreferenceSetting, ParseInvalid) {
                                   << "hedge" << BSONObj()),
                              ErrorCodes::InvalidOptions);
 
-    checkParseContainerFailsWithError(BSON("$query" << BSON("pang"
-                                                            << "pong")
-                                                    << "$readPreference" << 2),
+    checkParseContainerFailsWithError(BSON("abc" << BSON("pang"
+                                                         << "pong")
+                                                 << "$readPreference" << 2),
                                       ErrorCodes::TypeMismatch);
 }
 

@@ -44,14 +44,6 @@ function runCommandWithReadAndWriteConcerns(
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 
-    // If the command is in a wrapped form, then we look for the actual command object inside
-    // the query/$query object.
-    let commandObjUnwrapped = commandObj;
-    if (commandName === "query" || commandName === "$query") {
-        commandObjUnwrapped = commandObj[commandName];
-        commandName = Object.keys(commandObjUnwrapped)[0];
-    }
-
     let shouldForceReadConcern = kCommandsSupportingReadConcern.has(commandName);
     if (kDefaultReadConcern.level === "snapshot" && !kCommandsSupportingSnapshot.has(commandName)) {
         shouldForceReadConcern = false;
@@ -70,13 +62,12 @@ function runCommandWithReadAndWriteConcerns(
         }
     }
     if (commandName === "aggregate") {
-        if (OverrideHelpers.isAggregationWithListLocalSessionsStage(commandName,
-                                                                    commandObjUnwrapped)) {
+        if (OverrideHelpers.isAggregationWithListLocalSessionsStage(commandName, commandObj)) {
             // The $listLocalSessions stage can only be used with readConcern={level: "local"}.
             shouldForceReadConcern = false;
         }
 
-        if (OverrideHelpers.isAggregationWithOutOrMergeStage(commandName, commandObjUnwrapped)) {
+        if (OverrideHelpers.isAggregationWithOutOrMergeStage(commandName, commandObj)) {
             // The $out stage can only be used with readConcern={level: "local"} or
             // readConcern={level: "majority"}
             if (TestData.defaultReadConcernLevel === "linearizable") {
@@ -87,18 +78,18 @@ function runCommandWithReadAndWriteConcerns(
             shouldForceWriteConcern = false;
         }
 
-        if (OverrideHelpers.isAggregationWithCurrentOpStage(commandName, commandObjUnwrapped)) {
+        if (OverrideHelpers.isAggregationWithCurrentOpStage(commandName, commandObj)) {
             // The $currentOp stage can only be used with readConcern={level: "local"}.
             shouldForceReadConcern = false;
         }
 
-        if (commandObjUnwrapped.explain) {
+        if (commandObj.explain) {
             // Attempting to specify a readConcern while explaining an aggregation would always
             // return an error prior to SERVER-30582 and it otherwise only compatible with
             // readConcern={level: "local"}.
             shouldForceReadConcern = false;
         }
-    } else if (OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObjUnwrapped)) {
+    } else if (OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObj)) {
         // A writeConcern can only be used with non-inline output.
         shouldForceWriteConcern = false;
     } else if (commandName === "moveChunk") {
@@ -114,23 +105,14 @@ function runCommandWithReadAndWriteConcerns(
         shouldForceReadConcern = true;
     }
 
-    const inWrappedForm = commandObj !== commandObjUnwrapped;
-
     // Only override read concern if an override level was specified.
     if (shouldForceReadConcern && (kDefaultReadConcern.level !== null)) {
-        // We create a copy of 'commandObj' to avoid mutating the parameter the caller
-        // specified.
+        // We create a copy of 'commandObj' to avoid mutating the parameter the caller specified.
         commandObj = Object.assign({}, commandObj);
-        if (inWrappedForm) {
-            commandObjUnwrapped = Object.assign({}, commandObjUnwrapped);
-            commandObj[Object.keys(commandObj)[0]] = commandObjUnwrapped;
-        } else {
-            commandObjUnwrapped = commandObj;
-        }
 
         let readConcern;
-        if (commandObjUnwrapped.hasOwnProperty("readConcern")) {
-            readConcern = commandObjUnwrapped.readConcern;
+        if (commandObj.hasOwnProperty("readConcern")) {
+            readConcern = commandObj.readConcern;
 
             if (typeof readConcern !== "object" || readConcern === null ||
                 (readConcern.hasOwnProperty("level") &&
@@ -145,23 +127,16 @@ function runCommandWithReadAndWriteConcerns(
         // We create a copy of the readConcern object to avoid mutating the parameter the
         // caller specified.
         readConcern = Object.assign({}, readConcern, kDefaultReadConcern);
-        commandObjUnwrapped.readConcern = readConcern;
+        commandObj.readConcern = readConcern;
     }
 
     if (shouldForceWriteConcern) {
-        // We create a copy of 'commandObj' to avoid mutating the parameter the caller
-        // specified.
+        // We create a copy of 'commandObj' to avoid mutating the parameter the caller specified.
         commandObj = Object.assign({}, commandObj);
-        if (inWrappedForm) {
-            commandObjUnwrapped = Object.assign({}, commandObjUnwrapped);
-            commandObj[Object.keys(commandObj)[0]] = commandObjUnwrapped;
-        } else {
-            commandObjUnwrapped = commandObj;
-        }
 
         let writeConcern;
-        if (commandObjUnwrapped.hasOwnProperty("writeConcern")) {
-            writeConcern = commandObjUnwrapped.writeConcern;
+        if (commandObj.hasOwnProperty("writeConcern")) {
+            writeConcern = commandObj.writeConcern;
 
             if (typeof writeConcern !== "object" || writeConcern === null ||
                 (writeConcern.hasOwnProperty("w") &&
@@ -175,7 +150,7 @@ function runCommandWithReadAndWriteConcerns(
         // We create a copy of the writeConcern object to avoid mutating the parameter the
         // caller specified.
         writeConcern = Object.assign({}, writeConcern, kDefaultWriteConcern);
-        commandObjUnwrapped.writeConcern = writeConcern;
+        commandObj.writeConcern = writeConcern;
     }
 
     return func.apply(conn, makeFuncArgs(commandObj));

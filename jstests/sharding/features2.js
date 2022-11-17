@@ -157,25 +157,9 @@ db.countaa.save({"regex": /foo/i});
 assert.eq(3, db.countaa.count(), "counta1");
 assert.eq(3, db.countaa.find().itcount(), "counta1");
 
-// hello and query-wrapped-command
 let hello = db.runCommand({hello: 1});
 assert(hello.isWritablePrimary);
 assert.eq('isdbgrid', hello.msg);
-delete hello.localTime;
-delete hello.$clusterTime;
-delete hello.operationTime;
-
-let hello2 = db.runCommand({query: {hello: 1}});
-delete hello2.localTime;
-delete hello2.$clusterTime;
-delete hello2.operationTime;
-assert.eq(hello, hello2);
-
-hello2 = db.runCommand({$query: {hello: 1}});
-delete hello2.localTime;
-delete hello2.$clusterTime;
-delete hello2.operationTime;
-assert.eq(hello, hello2);
 
 s.stop();
 })();
