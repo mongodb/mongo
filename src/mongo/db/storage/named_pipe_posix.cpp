@@ -28,7 +28,8 @@
  */
 
 #ifndef _WIN32
-#include "named_pipe.h"
+
+#include "mongo/db/storage/named_pipe.h"
 
 #include <fmt/format.h>
 #include <string>
@@ -91,6 +92,14 @@ NamedPipeInput::~NamedPipeInput() {
 }
 
 void NamedPipeInput::doOpen() {
+    // MultiBsonStreamCursor's (MBSC) assembly buffer is designed to perform well without a lower-
+    // layer IO buffer. Removing std::ifstream's default 8k "associated buffer" improves throughput
+    // by 1.9% by eliminating the hidden copies from that buffer to MBSC's buffer. MBSC itself will
+    // never copy data except when it (rarely) needs to expand its buffer, so by removing
+    // std::ifstream's buffer we get an essentially zero-copy cursor that still avoids lots of tiny
+    // IOs due to MBSC's assembly buffer algorithm.
+    _ifs.rdbuf()->pubsetbuf(0, 0);
+
     // Retry open every 1 ms for up to 1 sec in case writer has not created the pipe yet.
     int retries = 0;
     do {

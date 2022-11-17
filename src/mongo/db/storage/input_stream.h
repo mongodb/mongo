@@ -98,7 +98,6 @@ public:
         // If we reach this point, we accumulated fewer than 'count' bytes.
 
         if (MONGO_likely(InputT::isEof())) {
-            LOGV2_INFO(7005001, "Named pipe is closed", "path"_attr = InputT::getAbsolutePath());
             return nReadTotal;
         }
 

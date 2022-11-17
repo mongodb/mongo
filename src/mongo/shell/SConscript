@@ -123,6 +123,7 @@ env.Library(
     target='shell_utils',
     source=[
         'mongo-server.cpp',
+        'named_pipe_test_helper.cpp',
         'shell_options.cpp',
         'shell_utils.cpp',
         'shell_utils_extended.cpp',
@@ -143,6 +144,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/util/bson_column',
         '$BUILD_DIR/mongo/db/auth/security_token',
+        '$BUILD_DIR/mongo/db/storage/record_store_base',
     ],
 )
 

@@ -256,7 +256,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes1) {
             (ExternalDataSourceMetadata::kUrlProtocolFile + pipePaths[pipeIdx]),
             StorageTypeEnum::pipe,
             FileTypeEnum::bson);
-        vopts.dataSources.push_back(meta);
+        vopts.dataSources.emplace_back(meta);
     }
     MultiBsonStreamCursor msbc = MultiBsonStreamCursor(vopts);
 
@@ -273,7 +273,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes1) {
             ASSERT_EQ(recIdExpected, recId)
                 << "Expected record->id {} but got {}"_format(recIdExpected, recId);
             ASSERT_EQ(record->data.size(), bsonObjs[pipeIdx][0].objsize())
-                << "record.data.size() {} != original size {}"_format(
+                << "record->data.size() {} != original size {}"_format(
                        record->data.size(), bsonObjs[pipeIdx][0].objsize());
             ASSERT_EQ(std::memcmp(record->data.data(),
                                   bsonObjs[pipeIdx][0].objdata(),
@@ -357,7 +357,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes2) {
             (ExternalDataSourceMetadata::kUrlProtocolFile + pipePaths[pipeIdx]),
             StorageTypeEnum::pipe,
             FileTypeEnum::bson);
-        vopts.dataSources.push_back(meta);
+        vopts.dataSources.emplace_back(meta);
     }
     MultiBsonStreamCursor msbc(vopts);
 
@@ -374,8 +374,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes2) {
             ASSERT_EQ(recIdExpected, recId)
                 << "Expected record->id {} but got {}"_format(recIdExpected, recId);
             ASSERT_EQ(record->data.size(), bsonObjs[objIdx].objsize())
-                << "record.data.size() {} != original size {}"_format(record->data.size(),
-                                                                      bsonObjs[objIdx].objsize());
+                << "record->data.size() {} != original size {}"_format(record->data.size(),
+                                                                       bsonObjs[objIdx].objsize());
             ASSERT_EQ(std::memcmp(record->data.data(),
                                   bsonObjs[objIdx].objdata(),
                                   bsonObjs[objIdx].objsize()),
@@ -443,7 +443,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes3) {
             (ExternalDataSourceMetadata::kUrlProtocolFile + pipePaths[pipeIdx]),
             StorageTypeEnum::pipe,
             FileTypeEnum::bson);
-        vopts.dataSources.push_back(meta);
+        vopts.dataSources.emplace_back(meta);
     }
     MultiBsonStreamCursor msbc(vopts);
 
@@ -459,8 +459,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes3) {
             ASSERT_EQ(recIdExpected, recId)
                 << "Expected record->id {} but got {}"_format(recIdExpected, recId);
             ASSERT_EQ(record->data.size(), bsonObjs[0].objsize())
-                << "record.data.size() {} != original size {}"_format(record->data.size(),
-                                                                      bsonObjs[0].objsize());
+                << "record->data.size() {} != original size {}"_format(record->data.size(),
+                                                                       bsonObjs[0].objsize());
             ASSERT_EQ(
                 std::memcmp(record->data.data(), bsonObjs[0].objdata(), bsonObjs[0].objsize()), 0)
                 << "Read data is not same as the source data";
@@ -496,7 +496,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
         objsWritten += numObjs;
         std::string fieldName = "field_{}"_format(pipeIdx);
         for (int objIdx = 0; objIdx < numObjs; ++objIdx) {
-            pipeBsonObjs[pipeIdx].push_back(BSON(fieldName << getRandomString(rand() % 2048)));
+            pipeBsonObjs[pipeIdx].emplace_back(BSON(fieldName << getRandomString(rand() % 2048)));
         }
     }
 
@@ -527,7 +527,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
             (ExternalDataSourceMetadata::kUrlProtocolFile + pipePaths[pipeIdx]),
             StorageTypeEnum::pipe,
             FileTypeEnum::bson);
-        vopts.dataSources.push_back(meta);
+        vopts.dataSources.emplace_back(meta);
     }
     MultiBsonStreamCursor msbc(vopts);
 
@@ -551,7 +551,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
             ASSERT_EQ(recIdExpected, recId)
                 << "Expected record->id {} but got {}"_format(recIdExpected, recId);
             ASSERT_EQ(record->data.size(), pipeBsonObjs[pipeIdx][pipeObjsRead - 1].objsize())
-                << "record.data.size() {} != original size {}"_format(
+                << "record->data.size() {} != original size {}"_format(
                        record->data.size(), pipeBsonObjs[pipeIdx][pipeObjsRead - 1].objsize());
             ASSERT_EQ(std::memcmp(record->data.data(),
                                   pipeBsonObjs[pipeIdx][pipeObjsRead - 1].objdata(),
