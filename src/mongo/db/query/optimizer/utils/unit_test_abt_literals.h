@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include <boost/core/demangle.hpp>
+#include <typeinfo>
+
 #include "mongo/db/query/optimizer/node.h"
+
 
 namespace mongo::optimizer::unit_test_abt_literals {
 
@@ -38,6 +42,9 @@ namespace mongo::optimizer::unit_test_abt_literals {
  * testing. This utility is meant to be used exclusively for tests. It does not necessarily provide
  * an efficient way to construct the tree (e.g. we need to shuffle arguments through a lambda and
  * wrap/unwrap the holders).
+ *
+ * Note if renaming, changing, etc names of shorthand functions, also update the corresponding
+ * 'ExplainInShorthand' transport in order to continue generating valid construction code.
  */
 
 template <class Tag>
@@ -78,26 +85,32 @@ inline ABTVector holdersToABTs(T holders) {
     return v;
 }
 
+// String constant.
 inline auto operator"" _cstr(const char* c, size_t len) {
     return ExprHolder{Constant::str({c, len})};
 }
 
+// Int32 constant.
 inline auto operator"" _cint32(const char* c, size_t len) {
     return ExprHolder{Constant::int32(std::stoi({c, len}))};
 }
 
+// Int64 constant.
 inline auto operator"" _cint64(const char* c, size_t len) {
     return ExprHolder{Constant::int64(std::stol({c, len}))};
 }
 
+// Double constant.
 inline auto operator"" _cdouble(const char* c, size_t len) {
     return ExprHolder{Constant::fromDouble(std::stod({c, len}))};
 }
 
+// Variable.
 inline auto operator"" _var(const char* c, size_t len) {
     return ExprHolder{make<Variable>(ProjectionName{{c, len}})};
 }
 
+// Vector of variable names.
 template <typename... Ts>
 inline auto _varnames(Ts&&... pack) {
     ProjectionNameVector names;
@@ -357,5 +370,196 @@ inline auto _plusInf() {
 inline auto _minusInf() {
     return BoundRequirement::makeMinusInf();
 }
+
+/**
+ * Shorthand explainer: generate C++ code to construct ABTs in shorthand form. The use case is to
+ * provide an easy way to capture an ABT from a JS test and convert it to use in a C++ unit test.
+ */
+class ExplainInShorthand {
+public:
+    ExplainInShorthand(std::string nodeSeparator = "\n")
+        : _nodeSeparator(std::move(nodeSeparator)) {}
+
+    /**
+     * ABT Expressions.
+     */
+    std::string transport(const Constant& expr) {
+        str::stream out;
+        out << "\"" << expr.get() << "\"";
+
+        if (expr.isValueInt32()) {
+            out << "_cint32";
+        } else if (expr.isValueInt64()) {
+            out << "_cint64";
+        } else if (expr.isValueDouble()) {
+            out << "_cdouble";
+        } else if (expr.isString()) {
+            out << "_cstr";
+        } else {
+            out << "<non-standard constant>";
+        }
+
+        return out;
+    }
+
+    std::string transport(const Variable& expr) {
+        return str::stream() << "\"" << expr.name() << "\""
+                             << "_var";
+    }
+
+    std::string transport(const UnaryOp& expr, std::string inResult) {
+        return str::stream() << "_unary(\"" << OperationsEnum::toString[static_cast<int>(expr.op())]
+                             << "\", " << inResult << ")";
+    }
+
+    std::string transport(const BinaryOp& expr, std::string leftResult, std::string rightResult) {
+        return str::stream() << "_binary(\""
+                             << OperationsEnum::toString[static_cast<int>(expr.op())] << "\", "
+                             << leftResult << ", " << rightResult << ")";
+    }
+
+    std::string transport(const EvalPath& expr, std::string pathResult, std::string inputResult) {
+        return str::stream() << "_evalp(" << pathResult << ", " << inputResult << ")";
+    }
+
+    std::string transport(const EvalFilter& expr, std::string pathResult, std::string inputResult) {
+        return str::stream() << "_evalf(" << pathResult << ", " << inputResult << ")";
+    }
+
+    /**
+     * ABT Paths.
+     */
+    std::string transport(const PathIdentity& path) {
+        return "_id()";
+    }
+
+    std::string transport(const PathArr& path) {
+        return "_arr()";
+    }
+
+    std::string transport(const PathObj& path) {
+        return "_obj()";
+    }
+
+    std::string transport(const PathCompare& path, std::string valueResult) {
+        return str::stream() << "_cmp(\"" << OperationsEnum::toString[static_cast<int>(path.op())]
+                             << "\", " << valueResult << ")";
+    }
+
+    std::string transport(const PathTraverse& path, std::string inResult) {
+        str::stream os;
+
+        if (path.getMaxDepth() == PathTraverse::kSingleLevel) {
+            os << "_traverse1";
+        } else if (path.getMaxDepth() == PathTraverse::kUnlimited) {
+            os << "_traverseN";
+        } else {
+            os << "<non-standard traverse>";
+        }
+
+        return os << "(" << inResult << ")";
+    }
+
+    std::string transport(const PathField& path, std::string inResult) {
+        return str::stream() << "_field(\"" << path.name() << "\", " << inResult << ")";
+    }
+
+    std::string transport(const PathGet& path, std::string inResult) {
+        return str::stream() << "_get(\"" << path.name() << "\", " << inResult << ")";
+    }
+
+    std::string transport(const PathComposeM& path,
+                          std::string leftResult,
+                          std::string rightResult) {
+        return str::stream() << "_composem(" << leftResult << ", " << rightResult << ")";
+    }
+
+    std::string transport(const PathComposeA& path,
+                          std::string leftResult,
+                          std::string rightResult) {
+        return str::stream() << "_composea(" << leftResult << ", " << rightResult << ")";
+    }
+
+    /**
+     * ABT Nodes.
+     */
+    std::string transport(const ScanNode& node, std::string /*bindResult*/) {
+        return str::stream() << ".finish(_scan(\"" << node.getProjectionName() << "\", \""
+                             << node.getScanDefName() << "\"))";
+    }
+
+    std::string transport(const FilterNode& node,
+                          std::string childResult,
+                          std::string filterResult) {
+        return str::stream() << ".filter(" << explain(node.getFilter()) << ")" << _nodeSeparator
+                             << childResult;
+    }
+
+    std::string transport(const EvaluationNode& node,
+                          std::string childResult,
+                          std::string projResult) {
+        return str::stream() << ".eval(\"" << node.getProjectionName() << "\", "
+                             << explain(node.getProjection()) << ")" << _nodeSeparator
+                             << childResult;
+    }
+
+    std::string transport(const GroupByNode& node,
+                          std::string childResult,
+                          std::string /*bindAggResult*/,
+                          std::string /*refsAggResult*/,
+                          std::string /*bindGbResult*/,
+                          std::string /*refsGbResult*/) {
+        str::stream os;
+        os << ".gb(_varnames(";
+        printProjNames(os, node.getGroupByProjectionNames());
+        os << "), _varnames(";
+        printProjNames(os, node.getAggregationProjectionNames());
+        os << "), {";
+
+        bool first = true;
+        for (const ABT& n : node.getAggregationExpressions()) {
+            if (first) {
+                first = false;
+            } else {
+                os << ", ";
+            }
+            os << explain(n);
+        }
+
+        return os << "})" << _nodeSeparator << childResult;
+    }
+
+    std::string transport(const RootNode& node, std::string childResult, std::string refsResult) {
+        str::stream os;
+        os << ".root(";
+        printProjNames(os, node.getProperty().getProjections().getVector());
+        return os << ")" << _nodeSeparator << childResult;
+    }
+
+    template <typename T, typename... Ts>
+    std::string transport(const T& node, Ts&&...) {
+        return str::stream() << "<transport not implemented for type: '"
+                             << boost::core::demangle(typeid(node).name()) << "'>";
+    }
+
+    std::string explain(const ABT& n) {
+        return algebra::transport<false>(n, *this);
+    }
+
+private:
+    static void printProjNames(str::stream& os, const ProjectionNameVector& v) {
+        bool first = true;
+        for (const auto& p : v) {
+            if (first) {
+                first = false;
+            } else {
+                os << ", ";
+            }
+            os << "\"" << p << "\"";
+        }
+    }
+
+    const std::string _nodeSeparator;
+};
 
 }  // namespace mongo::optimizer::unit_test_abt_literals

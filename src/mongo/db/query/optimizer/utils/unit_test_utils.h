@@ -32,6 +32,7 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/ce/ce_hinted.h"
 #include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 

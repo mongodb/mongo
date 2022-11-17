@@ -131,6 +131,7 @@ env.CppUnitTest(
         "physical_rewriter_optimizer_test.cpp",
         "reference_tracker_test.cpp",
         "rewrites/path_optimizer_test.cpp",
+        "unit_test_infra_test.cpp",
     ],
     LIBDEPS=[
         "unit_test_utils",
