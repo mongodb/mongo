@@ -668,7 +668,7 @@ Status runAggregate(OperationContext* opCtx,
         // generated this query. We determine the version by checking for the "use44SortKeys" flag
         // in the aggregation request.
         // TODO (SERVER-43361): This check will be unnecessary after branching for 4.5.
-        if (expCtx->fromMongos) {
+        if (expCtx->fromMongos || request.getPassthroughToShard().has_value()) {
             if (request.getUse44SortKeys()) {
                 // This request originated with 4.4-or-newer mongoS, which can understand the new
                 // sort key format. Note: it's possible that merging will actually occur on a mongoD

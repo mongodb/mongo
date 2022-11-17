@@ -47,28 +47,44 @@ st.shardColl(collName,
 // 'changeStream' cursor, verify that the change stream results have monotonically increasing
 // timestamps, and return the resume token.
 var nextId = 0;
-function insertAndValidateChanges(coll, changeStream) {
+function insertAndValidateChanges(coll, options) {
+    const changeStream = coll.watch([], options);
+    // Also set up a per shard cursor.
+    const pscRes = coll.getDB().runCommand({
+        aggregate: coll.getName(),
+        cursor: {},
+        pipeline: [{$changeStream: options}],
+        $_passthroughToShard: {shard: st.shard0.shardName}
+    });
+    assert.commandWorked(pscRes);
+    const psc = new DBCommandCursor(coll.getDB(), pscRes);
+
     const docsToInsert =
-        Array.from({length: 10}, (_, i) => ({_id: nextId + i, shard: i % 2, val: i}));
+        Array.from({length: 10}, (_, i) => ({_id: nextId + i, shard: i % 2 + 1, val: i}));
     nextId += docsToInsert.length;
 
     assert.commandWorked(coll.insert(docsToInsert));
 
-    const changeList = [];
-    assert.soon(function() {
-        while (changeStream.hasNext()) {
-            const change = changeStream.next();
-            changeList.push(change);
-        }
+    [{changeStream, expectedNEvents: docsToInsert.length, type: "normal"},
+     {changeStream: psc, expectedNEvents: docsToInsert.length / 2, type: "per-shard"}]
+        .forEach(({changeStream, expectedNEvents, type}) => {
+            jsTestLog(`Validating ${type} change stream`);
+            const changeList = [];
+            assert.soon(function() {
+                while (changeStream.hasNext()) {
+                    const change = changeStream.next();
+                    changeList.push(change);
+                }
+                jsTestLog(`Have ${changeList.length} of ${expectedNEvents} expected events`);
+                return changeList.length === expectedNEvents;
+            }, changeList);
 
-        return changeList.length === docsToInsert.length;
-    }, changeList);
-
-    for (let i = 0; i + 1 < changeList.length; ++i) {
-        assert(timestampCmp(changeList[i].clusterTime, changeList[i + 1].clusterTime) <= 0,
-               "Change timestamps are not monotonically increasing: " + tojson(changeList));
-    }
-    // TODO SERVER-70084 update this test to check PSCs work with mixed (4.4/4.2) clusters.
+            for (let i = 0; i + 1 < changeList.length; ++i) {
+                assert(
+                    timestampCmp(changeList[i].clusterTime, changeList[i + 1].clusterTime) <= 0,
+                    `Change timestamps are not monotonically increasing:  ${tojson(changeList)}`);
+            }
+        });
 
     return changeStream.getResumeToken();
 }
@@ -77,7 +93,7 @@ function insertAndValidateChanges(coll, changeStream) {
 // Open and read a change stream on the "last-stable" cluster.
 //
 let coll = mongosConn.getDB(dbName)[collName];
-let resumeToken = insertAndValidateChanges(coll, coll.watch());
+let resumeToken = insertAndValidateChanges(coll, {});
 
 //
 // Upgrade the config db and the shards to the "latest" binVersion.
@@ -90,7 +106,7 @@ st.upgradeCluster(
 // Open and read a change stream on the upgraded cluster but still using a "last-stable" version of
 // mongos and "last-stable" for the FCV.
 //
-resumeToken = insertAndValidateChanges(coll, coll.watch([], {resumeAfter: resumeToken}));
+resumeToken = insertAndValidateChanges(coll, {resumeAfter: resumeToken});
 
 //
 // Upgrade mongos to the "latest" binVersion and then open and read a change stream, this time with
@@ -102,7 +118,7 @@ st.upgradeCluster(
 mongosConn = st.s;
 coll = mongosConn.getDB(dbName)[collName];
 
-resumeToken = insertAndValidateChanges(coll, coll.watch([], {resumeAfter: resumeToken}));
+resumeToken = insertAndValidateChanges(coll, {resumeAfter: resumeToken});
 
 //
 // Set the FCV to the "latest" version, and then open and read a change stream on the completely
@@ -116,7 +132,7 @@ checkFCV(st.rs1.getPrimary().getDB("admin"), latestFCV);
 //
 // Open and read a change stream on the upgraded cluster.
 //
-resumeToken = insertAndValidateChanges(coll, coll.watch([], {resumeAfter: resumeToken}));
+resumeToken = insertAndValidateChanges(coll, {resumeAfter: resumeToken});
 
 st.stop();
 }());

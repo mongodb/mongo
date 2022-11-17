@@ -347,6 +347,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 kSpecificShardOnly: {
                 // Mark expCtx as tailable and await data so CCC behaves accordingly.
                 expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
+                expCtx->forPerShardCursor = true;
 
                 uassert(6273801,
                         "per shard cursor pipeline must contain $changeStream",
