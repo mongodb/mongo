@@ -38,6 +38,8 @@ if (lastContinuousFCV == "6.1") {
     split.forget();
     test.cleanupSuccesfulAborted(split.migrationId, tenantIds);
 
+    test.addRecipientNodes();
+    const pauseAfterBlockingFp = configureFailPoint(donorPrimary, "pauseShardSplitAfterBlocking");
     const secondSplit = test.createSplitOperation(tenantIds);
     const commitThread = secondSplit.commitAsync();
     pauseAfterBlockingFp.wait();
