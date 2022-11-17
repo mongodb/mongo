@@ -68,11 +68,10 @@ function runBasicTest(failPoint) {
         key: {[metaField]: 1},
     }));
 
-    // Normal collMod commands works for the sharded time-series collection.
-    assert.commandWorked(
-        db.runCommand({collMod: collName, index: {name: indexName, hidden: true}}));
-    assert.commandWorked(
-        db.runCommand({collMod: collName, index: {name: indexName, hidden: false}}));
+    // Check that collMod commands works for the sharded time-series collection.
+    assert.commandWorked(db[collName].createIndex({'a': 1}));
+    assert.commandWorked(db.runCommand({collMod: collName, index: {name: 'a_1', hidden: true}}));
+    assert.commandWorked(db.runCommand({collMod: collName, index: {name: 'a_1', hidden: false}}));
 
     if (failPoint) {
         // Granularity update disabled for sharded time-series collection, when we're using primary

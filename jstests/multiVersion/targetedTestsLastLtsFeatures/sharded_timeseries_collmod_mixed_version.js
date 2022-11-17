@@ -32,11 +32,12 @@ assert.commandWorked(mongos.adminCommand({
 assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: '5.0'}));
 
 const oldDb = st.s1.getDB(dbName);
+
+assert.commandWorked(db[collName].createIndex({[timeField]: 1}));
 // Assert that collMod works with matching versions of mongos and mongod.
-assert.commandWorked(db.runCommand({collMod: collName, index: {name: indexName, hidden: true}}));
+assert.commandWorked(db.runCommand({collMod: collName, index: {name: 'tm_1', hidden: true}}));
 // Assert that collMod still works with old version of mongos.
-assert.commandWorked(
-    oldDb.runCommand({collMod: collName, index: {name: indexName, hidden: false}}));
+assert.commandWorked(oldDb.runCommand({collMod: collName, index: {name: 'tm_1', hidden: false}}));
 
 // Assert that collMod with granularity update fails with matching versions of mongos and mongod.
 assert.commandFailedWithCode(db.runCommand({collMod: collName, timeseries: {granularity: 'hours'}}),

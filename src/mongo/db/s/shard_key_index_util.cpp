@@ -64,6 +64,10 @@ const boost::optional<ShardKeyIndex> _findShardKeyPrefixedIndex(
             continue;
         }
 
+        if (indexDescriptor->hidden()) {
+            continue;
+        }
+
         if (isCompatibleWithShardKey(opCtx, collection, indexEntry, shardKey, requireSingleKey)) {
             if (!indexEntry->isMultikey(opCtx, collection)) {
                 return ShardKeyIndex(indexDescriptor);
@@ -128,11 +132,11 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
     return false;
 }
 
-bool isLastShardKeyIndex(OperationContext* opCtx,
-                         const CollectionPtr& collection,
-                         const IndexCatalog* indexCatalog,
-                         const std::string& indexName,
-                         const BSONObj& shardKey) {
+bool isLastNonHiddenShardKeyIndex(OperationContext* opCtx,
+                                  const CollectionPtr& collection,
+                                  const IndexCatalog* indexCatalog,
+                                  const std::string& indexName,
+                                  const BSONObj& shardKey) {
     return !_findShardKeyPrefixedIndex(
                 opCtx, collection, indexCatalog, indexName, shardKey, false /* requireSingleKey */)
                 .is_initialized();
