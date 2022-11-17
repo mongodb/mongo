@@ -123,6 +123,8 @@ void NamedPipeHelper::writeToPipe(const std::string& pipeRelativePath,
                                   long objects,
                                   long stringMinSize,
                                   long stringMaxSize) noexcept {
+    const std::string method = "NamedPipeHelper::writeToPipe";
+
     try {
         NamedPipeOutput pipeWriter(pipeRelativePath);  // producer
 
@@ -134,10 +136,11 @@ void NamedPipeHelper::writeToPipe(const std::string& pipeRelativePath,
         }
         pipeWriter.close();
     } catch (const DBException& exc) {
-        std::cout << "NamedPipeHelper::writeToPipe caught exception: " << exc.toString()
-                  << std::endl;
+        std::cout << method << " caught DBException exception: " << exc.toString() << std::endl;
+    } catch (const std::exception& exc) {
+        std::cout << method << " caught STL exception: " << exc.what() << std::endl;
     } catch (...) {
-        // absorb
+        std::cout << method << " caught unknown exception" << std::endl;
     }
 }
 
@@ -162,6 +165,8 @@ void NamedPipeHelper::writeToPipeAsync(const std::string& pipeRelativePath,
 void NamedPipeHelper::writeToPipeObjects(const std::string& pipeRelativePath,
                                          long objects,
                                          const std::vector<BSONObj>& bsonObjs) noexcept {
+    const std::string method = "NamedPipeHelper::writeToPipeObjects";
+
     try {
         const int kNumBsonObjs = bsonObjs.size();
         NamedPipeOutput pipeWriter(pipeRelativePath);  // producer
@@ -173,10 +178,11 @@ void NamedPipeHelper::writeToPipeObjects(const std::string& pipeRelativePath,
         }
         pipeWriter.close();
     } catch (const DBException& exc) {
-        std::cout << "NamedPipeHelper::writeToPipeObjects caught exception: " << exc.toString()
-                  << std::endl;
+        std::cout << method << " caught DBException exception: " << exc.toString() << std::endl;
+    } catch (const std::exception& exc) {
+        std::cout << method << " caught STL exception: " << exc.what() << std::endl;
     } catch (...) {
-        // absorb
+        std::cout << method << " caught unknown exception" << std::endl;
     }
 }
 
