@@ -4,6 +4,11 @@
 (function() {
 "use strict";
 
+// TODO SERVER-65078: remove this block.
+// Disable the testing proctor. When the testing proctor is enabled, 'validate' will only warn about
+// non-compliant documents, even when the validation action is 'error'.
+TestData.testingDiagnosticsEnabled = false;
+
 const conn = MongoRunner.runMongod();
 
 const dbName = "test";

@@ -29,7 +29,7 @@ const collName = "collectionWithMalformedValidator";
     assert.commandWorked(
         testDB.runCommand({collMod: collName, validator: {email: {$regex: invalidRegex}}}));
 
-    MongoRunner.stopMongod(conn, null, {skipValidation: true});
+    MongoRunner.stopMongod(conn);
 })();
 
 (function startUpWithMalformedValidator() {
@@ -48,6 +48,6 @@ const collName = "collectionWithMalformedValidator";
     assert.commandWorked(testDB.someOtherCollection.insert({a: 1}));
     assert.eq(testDB.someOtherCollection.find().itcount(), 1);
 
-    MongoRunner.stopMongod(conn, null, {skipValidation: true});
+    MongoRunner.stopMongod(conn);
 })();
 })();
