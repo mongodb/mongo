@@ -9,11 +9,13 @@ env.CppUnitTest(
     source=[
         'logv2_component_test.cpp',
         'logv2_test.cpp',
+        'log_severity_suppressor_test.cpp',
         'redaction_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
 
