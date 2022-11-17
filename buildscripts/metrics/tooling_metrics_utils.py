@@ -1,6 +1,5 @@
 import logging
 import os
-import asyncio
 from typing import Optional
 from git import Repo
 import pymongo
@@ -24,6 +23,7 @@ def _get_internal_tooling_metrics_client():
         serverSelectionTimeoutMS=1000,
         connectTimeoutMS=1000,
         waitQueueTimeoutMS=1000,
+        retryWrites=False,
     )
 
 
@@ -61,7 +61,7 @@ def should_collect_metrics() -> bool:
     return _is_virtual_workstation() and not _has_metrics_opt_out()
 
 
-async def _save_metrics(metrics: ToolingMetrics) -> None:
+def _save_metrics(metrics: ToolingMetrics) -> None:
     """Save tooling metrics data."""
     client = _get_internal_tooling_metrics_client()
     client.metrics.tooling_metrics.insert_one(metrics.dict())
@@ -70,12 +70,8 @@ async def _save_metrics(metrics: ToolingMetrics) -> None:
 def save_tooling_metrics(tooling_metrics: ToolingMetrics) -> None:
     """Persist tooling metrics data to MongoDB Internal Atlas Cluster."""
     try:
-        asyncio.run(asyncio.wait_for(_save_metrics(tooling_metrics), timeout=1.0))
-    except asyncio.TimeoutError as exc:
-        logger.warning(
-            "%s\nTimeout: Tooling metrics collection is not available -- this is a non-issue.\nIf this message persists, feel free to reach out to #server-development-platform",
-            exc)
+        _save_metrics(tooling_metrics)
     except Exception as exc:  # pylint: disable=broad-except
         logger.warning(
-            "%s\nUnexpected: Tooling metrics collection is not available -- this is a non-issue.\nIf this message persists, feel free to reach out to #server-development-platform",
+            "\n%s\n\nUnexpected: Tooling metrics collection is not available -- this is a non-issue.\nIf this message persists, feel free to reach out to #server-development-platform",
             exc)

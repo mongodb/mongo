@@ -16,11 +16,6 @@ import buildscripts.metrics.tooling_metrics_utils as under_test
 TEST_INTERNAL_TOOLING_METRICS_HOSTNAME = 'mongodb://testing:27017'
 CURRENT_DATE_TIME = datetime(2022, 10, 4)
 
-
-async def extended_sleep(arg):
-    await asyncio.sleep(2)
-
-
 # Metrics collection is not supported for Windows
 if os.name == "nt":
     sys.exit()
@@ -43,15 +38,6 @@ class TestSaveToolingMetrics(unittest.TestCase):
             under_test.save_tooling_metrics(ToolingMetrics.get_resmoke_metrics(CURRENT_DATE_TIME))
         assert "Error Information" in cm.output[0]
         assert "Unexpected: Tooling metrics collection is not available" in cm.output[0]
-        client = pymongo.MongoClient(host=TEST_INTERNAL_TOOLING_METRICS_HOSTNAME)
-        assert not client.metrics.tooling_metrics.find_one()
-
-    @mongomock.patch(servers=((TEST_INTERNAL_TOOLING_METRICS_HOSTNAME), ))
-    @patch("buildscripts.metrics.tooling_metrics_utils._save_metrics", side_effect=extended_sleep)
-    def test_timeout_caught(self, mock_save_metrics):
-        with self.assertLogs('tooling_metrics_utils') as cm:
-            under_test.save_tooling_metrics(ToolingMetrics.get_resmoke_metrics(CURRENT_DATE_TIME))
-        assert "Timeout: Tooling metrics collection is not available" in cm.output[0]
         client = pymongo.MongoClient(host=TEST_INTERNAL_TOOLING_METRICS_HOSTNAME)
         assert not client.metrics.tooling_metrics.find_one()
 
