@@ -1296,7 +1296,6 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
   - name: .jscore .common !.decimal !.sharding
-  - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
