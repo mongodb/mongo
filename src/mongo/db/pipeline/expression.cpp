@@ -8049,6 +8049,27 @@ Value ExpressionTsIncrement::evaluate(const Document& root, Variables* variables
 
 REGISTER_STABLE_EXPRESSION(tsIncrement, ExpressionTsIncrement::parse);
 
+/* ----------------------- ExpressionBitNot ---------------------------- */
+
+Value ExpressionBitNot::evaluateNumericArg(const Value& numericArg) const {
+    BSONType type = numericArg.getType();
+
+    if (type == NumberInt) {
+        return Value(~numericArg.getInt());
+    } else if (type == NumberLong) {
+        return Value(~numericArg.getLong());
+    } else {
+        uasserted(ErrorCodes::TypeMismatch,
+                  str::stream() << getOpName()
+                                << " only supports int and long, not: " << typeName(type) << ".");
+    }
+}
+
+REGISTER_STABLE_EXPRESSION(bitNot, ExpressionBitNot::parse);
+const char* ExpressionBitNot::getOpName() const {
+    return "$bitNot";
+}
+
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())

@@ -87,6 +87,10 @@ public:
         unsupportedExpression(expr->getOpName());
     }
 
+    void visit(const ExpressionBitNot* expr) override final {
+        unsupportedExpression(expr->getOpName());
+    }
+
     void visit(const ExpressionFirst* expr) override final {
         unsupportedExpression(expr->getOpName());
     }

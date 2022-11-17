@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/config.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -43,10 +44,13 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/summation.h"
 #include "mongo/util/time_support.h"
+#include <limits>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -4277,5 +4281,58 @@ TEST(ExpressionFLETest, ParseAndSerializeBetween) {
     ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
 }
 
+TEST(ExpressionBitNotTest, Int) {
+    int min = numeric_limits<int>::min();
+    int max = numeric_limits<int>::max();
+    assertExpectedResults("$bitNot",
+                          {
+                              {{0}, -1},
+                              {{-1}, 0},
+                              {{1}, -2},
+                              {{3}, -4},
+                              {{100}, -101},
+                              {{min}, ~min},
+                              {{max}, ~max},
+                              {{max}, min},
+                              {{min}, max},
+                          });
+}
+
+TEST(ExpressionBitNotTest, Long) {
+    long long min = numeric_limits<long long>::min();
+    long long max = numeric_limits<long long>::max();
+    assertExpectedResults("$bitNot",
+                          {
+                              {{0LL}, -1LL},
+                              {{-1LL}, 0LL},
+                              {{1LL}, -2LL},
+                              {{3LL}, -4LL},
+                              {{100LL}, -101LL},
+                              {{2147483649LL}, ~2147483649LL},
+                              {{-2147483655LL}, ~(-2147483655LL)},
+                              {{min}, ~min},
+                              {{max}, ~max},
+                              {{max}, min},
+                              {{min}, max},
+                          });
+}
+
+TEST(ExpressionBitNotTest, OtherNumerics) {
+    ASSERT_THROWS_CODE(
+        evaluateExpression("$bitNot", {1.5}), AssertionException, ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(evaluateExpression("$bitNot", {Decimal128("0")}),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+}
+
+TEST(ExpressionBitNotTest, NonNumerics) {
+    ASSERT_THROWS_CODE(evaluateExpression("$bitNot", {"hi"_sd}), AssertionException, 28765);
+    ASSERT_THROWS_CODE(evaluateExpression("$bitNot", {true}), AssertionException, 28765);
+}
+
+TEST(ExpressionBitNotTest, Arrays) {
+    ASSERT_THROWS_CODE(evaluateExpression("$bitNot", {1, 2, 3}), AssertionException, 16020);
+    ASSERT_THROWS_CODE(evaluateExpression("$bitNot", {1LL, 2LL, 3LL}), AssertionException, 16020);
+}
 }  // namespace ExpressionTests
 }  // namespace mongo

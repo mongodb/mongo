@@ -48,6 +48,7 @@ class ExpressionAnd;
 class ExpressionAnyElementTrue;
 class ExpressionArray;
 class ExpressionArrayElemAt;
+class ExpressionBitNot;
 class ExpressionFirst;
 class ExpressionLast;
 class ExpressionObjectToArray;
@@ -217,6 +218,7 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTestApiVersion>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArray>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArrayElemAt>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBitNot>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionFirst>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionLast>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionObjectToArray>) = 0;
@@ -400,6 +402,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionAnyElementTrue*) override {}
     void visit(const ExpressionArray*) override {}
     void visit(const ExpressionArrayElemAt*) override {}
+    void visit(const ExpressionBitNot*) override {}
     void visit(const ExpressionFirst*) override {}
     void visit(const ExpressionLast*) override {}
     void visit(const ExpressionObjectToArray*) override {}

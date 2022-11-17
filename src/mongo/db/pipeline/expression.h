@@ -4350,4 +4350,27 @@ public:
     }
 };
 
+class ExpressionBitNot final : public ExpressionSingleNumericArg<ExpressionBitNot> {
+public:
+    explicit ExpressionBitNot(ExpressionContext* const expCtx)
+        : ExpressionSingleNumericArg<ExpressionBitNot>(expCtx) {
+        expCtx->sbeCompatible = false;
+    }
+    explicit ExpressionBitNot(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionSingleNumericArg<ExpressionBitNot>(expCtx, std::move(children)) {
+        expCtx->sbeCompatible = false;
+    }
+
+    Value evaluateNumericArg(const Value& numericArg) const final;
+    const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+};
+
 }  // namespace mongo

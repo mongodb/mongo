@@ -329,6 +329,7 @@ public:
     void visit(const ExpressionAnyElementTrue* expr) final {}
     void visit(const ExpressionArray* expr) final {}
     void visit(const ExpressionArrayElemAt* expr) final {}
+    void visit(const ExpressionBitNot* expr) final {}
     void visit(const ExpressionFirst* expr) final {}
     void visit(const ExpressionLast* expr) final {}
     void visit(const ExpressionObjectToArray* expr) final {}
@@ -506,6 +507,7 @@ public:
     void visit(const ExpressionAnyElementTrue* expr) final {}
     void visit(const ExpressionArray* expr) final {}
     void visit(const ExpressionArrayElemAt* expr) final {}
+    void visit(const ExpressionBitNot* expr) final {}
     void visit(const ExpressionFirst* expr) final {}
     void visit(const ExpressionLast* expr) final {}
     void visit(const ExpressionObjectToArray* expr) final {}
@@ -949,6 +951,11 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(arrayElemAtExpr)),
             std::move(stage));
     }
+
+    void visit(const ExpressionBitNot* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+
     void visit(const ExpressionFirst* expr) final {
         buildArrayAccessByConstantIndex(_context, expr->getOpName(), 0);
     }
