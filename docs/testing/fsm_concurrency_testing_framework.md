@@ -19,7 +19,7 @@ has reached the number of iterations defined by the workload. Once all the
 worker threads have finished, the runner executes the workload's teardown
 function.
 
-![fsm.png](/docs/images/testing/fsm.png)
+![fsm.png](../images/testing/fsm.png)
 
 The runner provides three modes of execution for workloads: serial, parallel,
 and composed. Serial mode runs the provided workloads one after the other,
@@ -338,7 +338,7 @@ above. Setup is run single threaded, data is copied into multiple threads where
 the states are executed, and once all the threads have finished a teardown
 function is run and the runner moves onto the next workload. 
 
-![fsm_serial_example.png](/docs/images/testing/fsm_serial_example.png)
+![fsm_serial_example.png](../images/testing/fsm_serial_example.png)
 
 #### Parallel (Simultaneous)
 
@@ -347,7 +347,7 @@ inconsistent), the ordering becomes a little different. All workloads have their
 setup functions run, then threads are spawned for each workload, and once they
 all complete, all threads have their teardown function run.
 
-![fsm_simultaneous_example.png](/docs/images/testing/fsm_simultaneous_example.png)
+![fsm_simultaneous_example.png](../images/testing/fsm_simultaneous_example.png)
 
 #### Composed
 
@@ -364,7 +364,7 @@ the second step becomes choosing a state from all the other workloads with equal
 probability. For a walkthrough of this process, see the slides under "Other
 Resources".
 
-![fsm_composed_example.png](/docs/images/testing/fsm_composed_example.png)
+![fsm_composed_example.png](../images/testing/fsm_composed_example.png)
 
 
 ### Existing runners
