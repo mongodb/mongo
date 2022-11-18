@@ -2751,13 +2751,6 @@ var ReplSetTest = function(opts) {
             defaults.serverless = true;
         }
 
-        if (options && options.binVersion &&
-            jsTest.options().useRandomBinVersionsWithinReplicaSet) {
-            throw new Error(
-                "Can only specify one of binVersion and useRandomBinVersionsWithinReplicaSet, not both.");
-        }
-
-        //
         // Note : this replaces the binVersion of the shared startSet() options the first time
         // through, so the full set is guaranteed to have different versions if size > 1.  If using
         // start() independently, independent version choices will be made
@@ -2785,6 +2778,12 @@ var ReplSetTest = function(opts) {
                 Object.merge(this.nodeOptions["n" + n], {rsConfig: options.rsConfig});
         }
         delete options.rsConfig;
+
+        if (options && options.binVersion &&
+            jsTest.options().useRandomBinVersionsWithinReplicaSet) {
+            throw new Error(
+                "Can only specify one of binVersion and useRandomBinVersionsWithinReplicaSet, not both.");
+        }
 
         if (jsTest.options().useRandomBinVersionsWithinReplicaSet) {
             if (self.isConfigServer) {
