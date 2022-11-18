@@ -2502,7 +2502,6 @@ tasks:
       separate_debug: off
       task_compile_flags: >-
         --build-profile=default
-        --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
         --ninja
   - *f_expansions_write
   - func: "ninja compile"
@@ -2565,6 +2564,24 @@ tasks:
   - func: "ninja compile"
     vars:
       ninja_file: "san.ninja"
+
+- name: compile_ninja_compiledb_profile
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      separate_debug: off
+      task_compile_flags: >-
+        --build-profile=compiledb
+        --ninja
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "compiledb.ninja"
 
 - name: compile_ninja_next
   tags: []
@@ -7972,6 +7989,11 @@ task_groups:
   name: compile_ninja_fast_profile_TG
   tasks:
   - compile_ninja_fast_profile
+
+- <<: *compile_task_group_template
+  name: compile_ninja_compiledb_profile_TG
+  tasks:
+  - compile_ninja_compiledb_profile
 
 - <<: *compile_task_group_template
   name: server_discovery_and_monitoring_json_test_TG

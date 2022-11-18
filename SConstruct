@@ -22,6 +22,7 @@ from pkg_resources import parse_version
 
 import SCons
 import SCons.Script
+from site_scons.mongo import build_profiles
 
 # This must be first, even before EnsureSConsVersion, if
 # we are to avoid bulk loading all tools in the DefaultEnvironment.
@@ -34,7 +35,6 @@ import mongo.platform as mongo_platform
 import mongo.toolchain as mongo_toolchain
 import mongo.generators as mongo_generators
 import mongo.install_actions as install_actions
-from mongo.build_profiles import BUILD_PROFILES
 
 EnsurePythonVersion(3, 6)
 EnsureSConsVersion(3, 1, 1)
@@ -135,8 +135,8 @@ SetOption('random', 1)
 
 add_option(
     'build-profile',
-    choices=list(BUILD_PROFILES.keys()),
-    default='default',
+    choices=[type for type in build_profiles.BuildProfileType],
+    default=build_profiles.BuildProfileType.DEFAULT,
     type='choice',
     help='''Short hand for common build configurations. These profiles are well supported by the build
     and are kept up to date. The 'default' profile should be used unless you have the required
@@ -146,7 +146,7 @@ add_option(
     site_scons/mongo/build_profiles.py to see each profile.''',
 )
 
-build_profile = BUILD_PROFILES[get_option('build-profile')]
+build_profile = build_profiles.get_build_profile(get_option('build-profile'))
 
 add_option(
     'ninja',

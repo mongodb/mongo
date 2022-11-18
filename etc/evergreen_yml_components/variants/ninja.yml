@@ -31,6 +31,59 @@ buildvariants:
   - name: compile_ninja_next_TG
   - name: compile_ninja_TG
 
+- name: macos-ninja-build-profiles
+  display_name: "Ninja Build Profiles: macOS"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - macos-1100
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++
+  tasks:
+  - name: compile_ninja_default_profile_TG
+  - name: compile_ninja_opt_profile_TG
+  - name: compile_ninja_fast_profile_TG
+  - name: compile_ninja_compiledb_profile_TG
+
+- name: macos-arm-ninja-build-profiles
+  display_name: "Ninja Build Profiles: macOS ARM"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - macos-1100-arm64
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++
+  tasks:
+  - name: compile_ninja_default_profile_TG
+  - name: compile_ninja_opt_profile_TG
+  - name: compile_ninja_fast_profile_TG
+  - name: compile_ninja_compiledb_profile_TG
+
+- name: windows-ninja-build-profiles
+  display_name: "Ninja Build Profiles: Windows"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
+  tasks:
+  - name: compile_ninja_default_profile_TG
+    distros:
+    - windows-vsCurrent-large
+  - name: compile_ninja_opt_profile_TG
+    distros:
+    - windows-vsCurrent-large
+  - name: compile_ninja_fast_profile_TG
+    distros:
+    - windows-vsCurrent-large
+  - name: compile_ninja_compiledb_profile_TG
+    distros:
+    - windows-vsCurrent-large
+
 - name: ubuntu1804-ninja-build-profiles
   display_name: "Ninja Build Profiles: Ubuntu 18.04"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -55,6 +108,9 @@ buildvariants:
     distros:
     - ubuntu1804-xlarge
   - name: compile_ninja_fast_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_ninja_compiledb_profile_TG
     distros:
     - ubuntu1804-xlarge
 

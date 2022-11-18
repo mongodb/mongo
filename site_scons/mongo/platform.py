@@ -5,6 +5,7 @@ hooks live in mongo_platform_<PLATFORM>.py files.
 """
 
 import os
+import platform
 
 # --- OS identification ---
 #
@@ -66,3 +67,12 @@ def is_running_os(*os_list):
 
 def env_os_is_wrapper(self, *os_list):
     return is_os_raw(self['TARGET_OS'], os_list)
+
+
+def is_arm_processor():
+    arch = platform.machine().lower()
+
+    if "arm" in arch or "aarch64" in arch:
+        return True
+
+    return False
