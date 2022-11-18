@@ -1074,20 +1074,6 @@ functions:
           fi
 
           echo "python set to $(which $python)"
-      - key: add_nodejs_to_path
-        value: |
-          # Add node and npm binaries to PATH
-          if [ "Windows_NT" = "$OS" ]; then
-            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
-            # Work around the issue by specifying a different %APPDATA% path.
-            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
-            export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
-            # TODO: this is to work around BUILD-8652
-            cd "$(pwd -P | sed 's,cygdrive/c/,cygdrive/z/,')"
-          else
-            export PATH="$PATH:/opt/node/bin"
-          fi
       - key: posix_workdir
         value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
       # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
@@ -2190,14 +2176,7 @@ functions:
           set -o errexit
           set -o verbose
 
-          ${add_nodejs_to_path}
-
           git clone git@github.com:10gen/jstestfuzz.git
-
-          pushd jstestfuzz
-            npm install
-            npm run prepare
-          popd
 
   "lint fuzzer sanity patch":
     - command: shell.exec
@@ -2209,11 +2188,9 @@ functions:
           set -eo pipefail
           set -o verbose
 
-          ${add_nodejs_to_path}
-
           # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
           # Grep returns 1 if it fails to find a match.
-          (grep "\.js$" modified_and_created_patch_files.txt || true) | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
+          (grep "\.js$" modified_and_created_patch_files.txt || true) | xargs -P 32 -L 50 ./jstestfuzz/src/scripts/npm_run.sh --prefix jstestfuzz parse-jsfiles --
 
   "lint fuzzer sanity all":
     - command: shell.exec
@@ -2225,10 +2202,8 @@ functions:
           set -eo pipefail
           set -o verbose
 
-          ${add_nodejs_to_path}
-
           # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
-          find "$PWD/jstests" "$PWD/src/mongo/db/modules/enterprise" -path "$PWD/jstests/third_party" -prune -o -name "*.js" -print | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
+          find "$PWD/jstests" "$PWD/src/mongo/db/modules/enterprise" -path "$PWD/jstests/third_party" -prune -o -name "*.js" -print | xargs -P 32 -L 50 ./jstestfuzz/src/scripts/npm_run.sh --prefix jstestfuzz parse-jsfiles --
 
   "run jstestfuzz":
     - command: shell.exec
@@ -2249,9 +2224,7 @@ functions:
           set -o errexit
           set -o verbose
 
-          ${add_nodejs_to_path}
-
-          npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars} --branch ${branch_name}
+          ./src/scripts/npm_run.sh ${npm_command|jstestfuzz} -- ${jstestfuzz_vars} --branch ${branch_name}
 
     - command: archive.targz_pack
       params:
