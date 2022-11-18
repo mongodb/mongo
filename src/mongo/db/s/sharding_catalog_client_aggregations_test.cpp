@@ -173,15 +173,16 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_S
     ASSERT(shards[1] == "shard2");
     ASSERT(shards[2] == "shard3");
 
-    // 3 shards should own collection1 at timestamp 5
+    // 3 shards should own collection1 at timestamp 5 + primary shard
     shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
         opCtx, NamespaceString("db.collection1"), Timestamp(5, 0));
 
-    ASSERT_EQ(3U, shards.size());
+    ASSERT_EQ(4U, shards.size());
     std::sort(shards.begin(), shards.end());
     ASSERT(shards[0] == "shard1");
     ASSERT(shards[1] == "shard2");
     ASSERT(shards[2] == "shard3");
+    ASSERT(shards[3] == "shard4");
 
     // 3 shards should own collection1 at timestamp 7
     shards = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(

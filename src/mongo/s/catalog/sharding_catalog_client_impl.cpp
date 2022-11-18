@@ -412,15 +412,9 @@ std::vector<ShardId> makeAndRunPlacementHistoryAggregation(
         namespace
         Stage 4. Discard the entries with empty shards (i.e. the collection was dropped or
         renamed)
+        Stage 5. Group all documents and concat shards (this will generate an array of arrays)
+        Stage 6. Flatten the array of arrays into a set (this will also remove duplicates)
 
-        CASE COLLECTION
-            Stage 5. Sort by namespace to ensure that the collection is before the database
-            Stage 6. Extract only one document (the collection or the database if the first was
-            discarded at Stage 4.)
-        ELSE
-            Stage 5. Group all documents and concat shards (this will generate an array of arrays)
-            Stage 6. Flatten the array of arrays into a set (this will also remove duplicates)
-        END
         Stage 7. Access to the list of shards currently active in the cluster
         Stage 8. Count the number of shards obtained on stage 6 that also appear in the list of
         active shards
@@ -442,27 +436,23 @@ std::vector<ShardId> makeAndRunPlacementHistoryAggregation(
                 }
             },
             { "$match": { shards: { $not: { $size: 0 } } } },
-            CASE DATABASE or ALL DATA :
-                {
-                    "$group": {
-                        _id: "",
-                        shards: { $push: "$shards" }
+            {
+                "$group": {
+                    _id: "",
+                    shards: { $push: "$shards" }
+                }
+            },
+            {
+                $project: {
+                    "shards": {
+                            $reduce: {
+                            input: "$shards",
+                            initialValue: [],
+                            in: { "$setUnion": [ "$$this", "$$value"] }
+                            }
                     }
-                },
-                {
-                    $project: {
-                        "shards": {
-                                $reduce: {
-                                input: "$shards",
-                                initialValue: [],
-                                in: { "$setUnion": [ "$$this", "$$value"] }
-                                }
-                        }
-                    }
-                },
-            CASE COLLECTION:
-                { $sort: { _id: -1  } },
-                { $limit: 1 },
+                }
+            },
             {
                 $lookup:
                 {
@@ -490,7 +480,6 @@ std::vector<ShardId> makeAndRunPlacementHistoryAggregation(
     // 1. Get all the history entries prior to the requested time concerning either the collection
     // or the parent database.
 
-    bool isCollectionSearch = nss.has_value() ? !nss->db().empty() && !nss->coll().empty() : false;
 
     auto matchStage = [&]() {
         bool isClusterSearch = !nss.has_value();
@@ -498,8 +487,10 @@ std::vector<ShardId> makeAndRunPlacementHistoryAggregation(
             return DocumentSourceMatch::create(BSON("timestamp" << BSON("$lte" << minClusterTime)),
                                                expCtx);
 
-        auto collSearch = isCollectionSearch ? pcre_util::quoteMeta(nss->coll()) : ".*";
-        auto regexString = "^" + pcre_util::quoteMeta(nss->db()) + "(\\." + collSearch + ")?$";
+        bool isCollectionSearch = !nss->db().empty() && !nss->coll().empty();
+        auto collMatchExpression = isCollectionSearch ? pcre_util::quoteMeta(nss->coll()) : ".*";
+        auto regexString =
+            "^" + pcre_util::quoteMeta(nss->db()) + "(\\." + collMatchExpression + ")?$";
         return DocumentSourceMatch::create(BSON("timestamp" << BSON("$lte" << minClusterTime)
                                                             << "nss"
                                                             << BSON("$regex" << regexString)),
@@ -520,48 +511,25 @@ std::vector<ShardId> makeAndRunPlacementHistoryAggregation(
     auto noShardsFilter =
         DocumentSourceMatch::create(BSON("shards" << BSON("$not" << BSON("$size" << 0))), expCtx);
 
+    // Stage 5. Group all documents and concat shards (this will generate an array of arrays)
+    auto groupStageBson2 = BSON("_id"
+                                << ""
+                                << "shards"
+                                << BSON("$push"
+                                        << "$shards"));
+    auto groupStageConcat = DocumentSourceGroup::createFromBson(
+        Document{{"$group", std::move(groupStageBson2)}}.toBson().firstElement(), expCtx);
 
-    // Create pipeline
-    Pipeline::SourceContainer stages;
-    stages.emplace_back(std::move(matchStage));
-    stages.emplace_back(std::move(sortStage));
-    stages.emplace_back(std::move(groupStage));
-    stages.emplace_back(std::move(noShardsFilter));
+    // Stage 6. Flatten the array of arrays into a set (this will also remove duplicates)
+    auto projectStageBson =
+        BSON("shards" << BSON("$reduce" << BSON("input"
+                                                << "$shards"
+                                                << "initialValue" << BSONArray() << "in"
+                                                << BSON("$setUnion" << BSON_ARRAY("$$this"
+                                                                                  << "$$value")))));
+    auto projectStageFlatten = DocumentSourceProject::createFromBson(
+        Document{{"$project", std::move(projectStageBson)}}.toBson().firstElement(), expCtx);
 
-    // case only specific collection is requested
-    if (isCollectionSearch) {
-        // Stage 5. Sort by namespace to ensure that the collection is before the database
-        auto sortStage2 = DocumentSourceSort::create(expCtx, BSON("_id" << -1));
-
-        // Stage 6. Extract only one document (the collection or the database if the first was
-        // discarded at Stage 4)
-        auto limitStage = DocumentSourceLimit::create(expCtx, 1);
-
-        stages.emplace_back(std::move(sortStage2));
-        stages.emplace_back(std::move(limitStage));
-    } else {
-        // Stage 5. Group all documents and concat shards (this will generate an array of arrays)
-        auto groupStageBson2 = BSON("_id"
-                                    << ""
-                                    << "shards"
-                                    << BSON("$push"
-                                            << "$shards"));
-        auto groupStageConcat = DocumentSourceGroup::createFromBson(
-            Document{{"$group", std::move(groupStageBson2)}}.toBson().firstElement(), expCtx);
-
-        // Stage 6. Flatten the array of arrays into a set (this will also remove duplicates)
-        auto projectStageBson = BSON(
-            "shards" << BSON("$reduce" << BSON("input"
-                                               << "$shards"
-                                               << "initialValue" << BSONArray() << "in"
-                                               << BSON("$setUnion" << BSON_ARRAY("$$this"
-                                                                                 << "$$value")))));
-        auto projectStageFlatten = DocumentSourceProject::createFromBson(
-            Document{{"$project", std::move(projectStageBson)}}.toBson().firstElement(), expCtx);
-
-        stages.emplace_back(std::move(groupStageConcat));
-        stages.emplace_back(std::move(projectStageFlatten));
-    }
 
     // Stage 7. Lookup active shards with left outer join on config.shards
     Document lookupStageDoc = {
@@ -584,6 +552,14 @@ std::vector<ShardId> makeAndRunPlacementHistoryAggregation(
     auto projectStage = DocumentSourceProject::create(
         projectStageDoc.toBson(), expCtx, "getShardsThatOwnDataForNamespaceAtClusterTime");
 
+    // Create pipeline
+    Pipeline::SourceContainer stages;
+    stages.emplace_back(std::move(matchStage));
+    stages.emplace_back(std::move(sortStage));
+    stages.emplace_back(std::move(groupStage));
+    stages.emplace_back(std::move(noShardsFilter));
+    stages.emplace_back(std::move(groupStageConcat));
+    stages.emplace_back(std::move(projectStageFlatten));
     stages.emplace_back(std::move(lookupStage));
     stages.emplace_back(std::move(setStage));
     stages.emplace_back(std::move(projectStage));
