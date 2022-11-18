@@ -53,22 +53,17 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildArgument(
  * Translates an input AccumulationStatement into an SBE EExpression for accumulation expressions.
  * The 'stage' parameter provides the input subtree to build on top of.
  */
-std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulator(
+std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     StageBuilderState& state,
     const AccumulationStatement& acc,
-    EvalStage stage,
-    std::unique_ptr<sbe::EExpression> argExpr,
-    PlanNodeId planNodeId);
+    std::unique_ptr<sbe::EExpression> argExpr);
 
 /**
  * Translates an input AccumulationStatement into an SBE EExpression that represents an
  * AccumulationStatement's finalization step. The 'stage' parameter provides the input subtree to
  * build on top of.
  */
-std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalize(
-    StageBuilderState& state,
-    const AccumulationStatement& acc,
-    const sbe::value::SlotVector& aggSlots,
-    EvalStage stage,
-    PlanNodeId planNodeId);
+std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
+                                                const AccumulationStatement& acc,
+                                                const sbe::value::SlotVector& aggSlots);
 }  // namespace mongo::stage_builder

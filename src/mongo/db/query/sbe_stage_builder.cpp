@@ -2395,8 +2395,7 @@ std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
     // as sum(1).
-    auto [accExprs, accProjEvalStage] = stage_builder::buildAccumulator(
-        state, accStmt, std::move(accArgEvalStage), std::move(argExpr), nodeId);
+    auto accExprs = stage_builder::buildAccumulator(state, accStmt, std::move(argExpr));
 
     sbe::value::SlotVector aggSlots;
     for (auto& accExpr : accExprs) {
@@ -2405,7 +2404,7 @@ std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
         accSlotToExprMap.emplace(slot, std::move(accExpr));
     }
 
-    return {std::move(aggSlots), std::move(accProjEvalStage)};
+    return {std::move(aggSlots), std::move(accArgEvalStage)};
 }
 
 std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generateGroupFinalStage(
@@ -2442,13 +2441,11 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
 
     auto finalSlots{sbe::value::SlotVector{finalGroupBySlot}};
     std::vector<std::string> fieldNames{"_id"};
-    auto groupFinalEvalStage = std::move(groupEvalStage);
     size_t idxAccFirstSlot = dedupedGroupBySlots.size();
     for (size_t idxAcc = 0; idxAcc < accStmts.size(); ++idxAcc) {
         // Gathers field names for the output object from accumulator statements.
         fieldNames.push_back(accStmts[idxAcc].fieldName);
-        auto [finalExpr, tempEvalStage] = stage_builder::buildFinalize(
-            state, accStmts[idxAcc], aggSlotsVec[idxAcc], std::move(groupFinalEvalStage), nodeId);
+        auto finalExpr = stage_builder::buildFinalize(state, accStmts[idxAcc], aggSlotsVec[idxAcc]);
 
         // The final step may not return an expression if it's trivial. For example, $first and
         // $last's final steps are trivial.
@@ -2463,15 +2460,13 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
         // Some accumulator(s) like $avg generate multiple expressions and slots. So, need to
         // advance this index by the number of those slots for each accumulator.
         idxAccFirstSlot += aggSlotsVec[idxAcc].size();
-
-        groupFinalEvalStage = std::move(tempEvalStage);
     }
 
     // Gathers all accumulator results. If there're no project expressions, does not add a project
     // stage.
     auto retEvalStage = prjSlotToExprMap.empty()
-        ? std::move(groupFinalEvalStage)
-        : makeProject(std::move(groupFinalEvalStage), std::move(prjSlotToExprMap), nodeId);
+        ? std::move(groupEvalStage)
+        : makeProject(std::move(groupEvalStage), std::move(prjSlotToExprMap), nodeId);
 
     return {std::move(fieldNames), std::move(finalSlots), std::move(retEvalStage)};
 }
