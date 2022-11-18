@@ -826,10 +826,10 @@ namespace {
  * the case of a $sort with a non-null value for getLimitSrc(), indicating that there was previously
  * a $limit stage that was optimized away.
  */
-std::pair<boost::intrusive_ptr<DocumentSourceSort>, boost::intrusive_ptr<DocumentSourceGroup>>
+std::pair<boost::intrusive_ptr<DocumentSourceSort>, boost::intrusive_ptr<DocumentSourceGroupBase>>
 getSortAndGroupStagesFromPipeline(const Pipeline::SourceContainer& sources) {
     boost::intrusive_ptr<DocumentSourceSort> sortStage = nullptr;
-    boost::intrusive_ptr<DocumentSourceGroup> groupStage = nullptr;
+    boost::intrusive_ptr<DocumentSourceGroupBase> groupStage = nullptr;
 
     auto sourcesIt = sources.begin();
     if (sourcesIt != sources.end()) {
@@ -845,7 +845,7 @@ getSortAndGroupStagesFromPipeline(const Pipeline::SourceContainer& sources) {
     }
 
     if (sourcesIt != sources.end()) {
-        groupStage = dynamic_cast<DocumentSourceGroup*>(sourcesIt->get());
+        groupStage = dynamic_cast<DocumentSourceGroupBase*>(sourcesIt->get());
     }
 
     return std::make_pair(sortStage, groupStage);
@@ -1688,7 +1688,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
             // will handle the sort, and the groupTransform (added below) will handle the $group
             // stage.
             pipeline->popFrontWithName(DocumentSourceSort::kStageName);
-            pipeline->popFrontWithName(DocumentSourceGroup::kStageName);
+            pipeline->popFrontWithName(rewrittenGroupStage->originalStageName());
 
             boost::intrusive_ptr<DocumentSource> groupTransform(
                 new DocumentSourceSingleDocumentTransformation(

@@ -42,7 +42,7 @@ function createIndexes() {
 }
 createIndexes();
 
-assert.commandWorked(coll.insert([
+const documents = [
     {_id: 0, a: 1, b: 1, c: 1},
     {_id: 1, a: 1, b: 2, c: 2},
     {_id: 2, a: 1, b: 2, c: 3},
@@ -71,7 +71,8 @@ assert.commandWorked(coll.insert([
     {_id: 21, str: "FoO", d: 2},
     {_id: 22, str: "bar", d: 4},
     {_id: 23, str: "bAr", d: 3}
-]));
+];
+assert.commandWorked(coll.insert(documents));
 
 // Helper for dropping an index and removing it from the list of indexes.
 function removeIndex(pattern) {
@@ -741,4 +742,24 @@ assertResultsMatchWithAndWithoutHintandIndexes(
 explain = coll.explain().aggregate(pipeline, collationOption);
 assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
 assert.eq({str: 1, d: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
+
+//
+// Verify that a $sort-$_internalStreamingGroup pipeline can use DISTINCT_SCAN
+//
+pipeline = [
+    {$sort: {_id: 1}},
+    {$_internalStreamingGroup: {_id: "$_id", value: {$first: "$a"}, $monotonicIdFields: ["_id"]}}
+];
+const expectedResult = [];
+for (let i = 0; i <= 23; i++) {
+    let resultDocument = {_id: i, value: null};
+    if (documents[i].hasOwnProperty("a")) {
+        resultDocument["value"] = documents[i].a;
+    }
+    expectedResult.push(resultDocument);
+}
+assertResultsMatchWithAndWithoutHintandIndexes(pipeline, expectedResult);
+explain = coll.explain().aggregate(pipeline);
+assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
+assert.eq({_id: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
 }());
