@@ -52,7 +52,7 @@ public:
         static constexpr StringData kDocumentsToCopyFieldName = "documentsToCopy"_sd;
         static constexpr StringData kDocumentsCopiedFieldName = "documentsCopied"_sd;
 
-        std::string ns;
+        NamespaceString nss;
         Date_t start;
         Date_t end;
         size_t documentToCopy{0};

@@ -285,11 +285,18 @@ long long DBClientBase::count(const NamespaceStringOrUUID nsOrUuid,
                               int options,
                               int limit,
                               int skip,
-                              boost::optional<BSONObj> readConcernObj) {
-    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
-    BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip, readConcernObj);
+                              boost::optional<BSONObj> readConcernObj,
+                              const boost::optional<TenantId>& dollarTenant) {
+    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbName() : (*nsOrUuid.nss()).dbName());
+    massert(7043201,
+            str::stream() << "TenantIds in dbName and $tenant must match. dbName: "
+                          << dbName->tenantId()->toString()
+                          << ", $tenant: " << dollarTenant->toString(),
+            (dbName->tenantId() && dollarTenant) ? (dbName->tenantId() == dollarTenant) : true);
+
+    BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip, readConcernObj, dollarTenant);
     BSONObj res;
-    if (!runCommand(dbName, cmd, res, options)) {
+    if (!runCommand(DatabaseNameUtil::serialize(*dbName), cmd, res, options)) {
         auto status = getStatusFromCommandResult(res);
         uassertStatusOK(status.withContext("count fails:"));
     }
@@ -302,7 +309,8 @@ BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID nsOrUuid,
                                 int options,
                                 int limit,
                                 int skip,
-                                boost::optional<BSONObj> readConcernObj) {
+                                boost::optional<BSONObj> readConcernObj,
+                                const boost::optional<TenantId>& dollarTenant) {
     BSONObjBuilder b;
     if (nsOrUuid.uuid()) {
         const auto uuid = *nsOrUuid.uuid();
@@ -317,6 +325,9 @@ BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID nsOrUuid,
         b.append("skip", skip);
     if (readConcernObj) {
         b.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcernObj);
+    }
+    if (dollarTenant) {
+        dollarTenant->serializeToBSON("$tenant", &b);
     }
     return b.obj();
 }
@@ -500,6 +511,12 @@ list<BSONObj> DBClientBase::getCollectionInfos(const std::string& db, const BSON
 list<BSONObj> DBClientBase::getCollectionInfos(const DatabaseName& dbName,
                                                const BSONObj& filter,
                                                const boost::optional<TenantId>& dollarTenant) {
+    massert(7043202,
+            str::stream() << "TenantIds in dbName and $tenant must match. dbName: "
+                          << dbName.tenantId()->toString()
+                          << ", $tenant: " << dollarTenant->toString(),
+            (dbName.tenantId() && dollarTenant) ? (dbName.tenantId() == dollarTenant) : true);
+
     list<BSONObj> infos;
     BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filter << "cursor" << BSONObj());
     BSONObjBuilder b(cmdObj);
@@ -773,7 +790,9 @@ namespace {
 /**
  * Constructs command object for listIndexes.
  */
-BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid, bool includeBuildUUIDs) {
+BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid,
+                               bool includeBuildUUIDs,
+                               const boost::optional<TenantId>& dollarTenant) {
     BSONObjBuilder bob;
     if (nsOrUuid.nss()) {
         bob.append("listIndexes", (*nsOrUuid.nss()).coll());
@@ -786,6 +805,9 @@ BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid, bool inclu
     if (includeBuildUUIDs) {
         bob.appendBool("includeBuildUUIDs", true);
     }
+    if (dollarTenant) {
+        dollarTenant->serializeToBSON("$tenant"_sd, &bob);
+    }
     return bob.obj();
 }
 
@@ -793,17 +815,28 @@ BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid, bool inclu
 
 std::list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                                bool includeBuildUUIDs,
-                                               int options) {
-    return _getIndexSpecs(nsOrUuid, makeListIndexesCommand(nsOrUuid, includeBuildUUIDs), options);
+                                               int options,
+                                               const boost::optional<TenantId>& dollarTenant) {
+    return _getIndexSpecs(nsOrUuid,
+                          makeListIndexesCommand(nsOrUuid, includeBuildUUIDs, dollarTenant),
+                          options,
+                          dollarTenant);
 }
 
 std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                                 const BSONObj& cmd,
-                                                int options) {
+                                                int options,
+                                                const boost::optional<TenantId>& dollarTenant) {
     list<BSONObj> specs;
-    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
+    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbName() : (*nsOrUuid.nss()).dbName());
+    massert(7043200,
+            str::stream() << "TenantIds in dbName and $tenant must match. dbName: "
+                          << dbName->tenantId()->toString()
+                          << ", $tenant: " << dollarTenant->toString(),
+            (dbName->tenantId() && dollarTenant) ? (dbName->tenantId() == dollarTenant) : true);
+
     BSONObj res;
-    if (runCommand(dbName, cmd, res, options)) {
+    if (runCommand(DatabaseNameUtil::serialize(*dbName), cmd, res, options)) {
         BSONObj cursorObj = res["cursor"].Obj();
         BSONObjIterator i(cursorObj["firstBatch"].Obj());
         while (i.more()) {
@@ -815,14 +848,13 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
         }
 
         const long long id = cursorObj["id"].Long();
-
         if (id != 0) {
-            const auto cursorNs = cursorObj["ns"].String();
+            const auto cursorNs =
+                NamespaceStringUtil::deserialize(dbName->tenantId(), cursorObj["ns"].String());
             if (nsOrUuid.nss()) {
-                invariant((*nsOrUuid.nss()).toString() == cursorNs);
+                invariant((*nsOrUuid.nss()) == cursorNs);
             }
-            // TODO SERVER-70432 Use correctly deserialized cursorNs NamespaceString object.
-            unique_ptr<DBClientCursor> cursor = getMore(NamespaceString(cursorNs), id);
+            unique_ptr<DBClientCursor> cursor = getMore(cursorNs, id);
             while (cursor->more()) {
                 specs.push_back(cursor->nextSafe().getOwned());
             }

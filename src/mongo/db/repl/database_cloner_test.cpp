@@ -456,8 +456,8 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     ASSERT_EQ(2, stats.collections);
     ASSERT_EQ(0, stats.clonedCollections);
     ASSERT_EQ(2, stats.collectionStats.size());
-    ASSERT_EQ(_dbName.db() + ".a", stats.collectionStats[0].ns);
-    ASSERT_EQ(_dbName.db() + ".b", stats.collectionStats[1].ns);
+    ASSERT_EQ(NamespaceString(_dbName, "a"), stats.collectionStats[0].nss);
+    ASSERT_EQ(NamespaceString(_dbName, "b"), stats.collectionStats[1].nss);
     ASSERT_EQ(_clock.now(), stats.collectionStats[0].start);
     ASSERT_EQ(Date_t(), stats.collectionStats[0].end);
     ASSERT_EQ(Date_t(), stats.collectionStats[1].start);
@@ -479,8 +479,8 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     ASSERT_EQ(2, stats.collections);
     ASSERT_EQ(1, stats.clonedCollections);
     ASSERT_EQ(2, stats.collectionStats.size());
-    ASSERT_EQ(_dbName.db() + ".a", stats.collectionStats[0].ns);
-    ASSERT_EQ(_dbName.db() + ".b", stats.collectionStats[1].ns);
+    ASSERT_EQ(NamespaceString(_dbName, "a"), stats.collectionStats[0].nss);
+    ASSERT_EQ(NamespaceString(_dbName, "b"), stats.collectionStats[1].nss);
     ASSERT_EQ(2, stats.collectionStats[0].indexes);
     ASSERT_EQ(0, stats.collectionStats[1].indexes);
     ASSERT_EQ(_clock.now(), stats.collectionStats[0].end);
@@ -498,8 +498,8 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     ASSERT_EQ(2, stats.collections);
     ASSERT_EQ(2, stats.clonedCollections);
     ASSERT_EQ(2, stats.collectionStats.size());
-    ASSERT_EQ(_dbName.db() + ".a", stats.collectionStats[0].ns);
-    ASSERT_EQ(_dbName.db() + ".b", stats.collectionStats[1].ns);
+    ASSERT_EQ(NamespaceString(_dbName, "a"), stats.collectionStats[0].nss);
+    ASSERT_EQ(NamespaceString(_dbName, "b"), stats.collectionStats[1].nss);
     ASSERT_EQ(2, stats.collectionStats[0].indexes);
     ASSERT_EQ(1, stats.collectionStats[1].indexes);
     ASSERT_EQ(_clock.now(), stats.collectionStats[1].end);
@@ -511,6 +511,8 @@ public:
 
 protected:
     void setUp() override {
+        RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport",
+                                                                           true);
         DatabaseClonerTest::setUp();
     }
     std::unique_ptr<DatabaseCloner> makeDatabaseCloner() {
@@ -526,7 +528,6 @@ protected:
 };
 
 TEST_F(DatabaseClonerMultitenancyTest, ListCollectionsMultitenancySupport) {
-    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
     auto cloner = makeDatabaseCloner();
     cloner->setStopAfterStage_forTest("listCollections");
     auto uuid1 = UUID::gen();
@@ -559,7 +560,6 @@ TEST_F(DatabaseClonerMultitenancyTest, ListCollectionsMultitenancySupport) {
 
 TEST_F(DatabaseClonerMultitenancyTest,
        ListCollectionsMultitenancySupportFeatureFlagRequireTenantId) {
-    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     auto cloner = makeDatabaseCloner();
     cloner->setStopAfterStage_forTest("listCollections");

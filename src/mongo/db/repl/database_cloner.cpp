@@ -69,8 +69,13 @@ void DatabaseCloner::preStage() {
 
 BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
     BSONObj res;
+    auto dollarTenant = gMultitenancySupport &&
+            serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)
+        ? _dbName.tenantId()
+        : boost::none;
     auto collectionInfos = getClient()->getCollectionInfos(
-        _dbName, ListCollectionsFilter::makeTypeCollectionFilter(), _dbName.tenantId());
+        _dbName, ListCollectionsFilter::makeTypeCollectionFilter(), dollarTenant);
 
     stdx::unordered_set<std::string> seen;
     for (auto&& info : collectionInfos) {
@@ -85,6 +90,7 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
                     .withContext(str::stream() << "Collection info could not be parsed : " << info)
                     .reason());
         }
+
         NamespaceString collectionNamespace(_dbName, result.getName());
         if (collectionNamespace.isSystem() && !collectionNamespace.isReplicated()) {
             LOGV2_DEBUG(21146,
@@ -127,7 +133,7 @@ void DatabaseCloner::postStage() {
         _stats.collectionStats.reserve(_collections.size());
         for (const auto& coll : _collections) {
             _stats.collectionStats.emplace_back();
-            _stats.collectionStats.back().ns = coll.first.ns();
+            _stats.collectionStats.back().nss = coll.first;
         }
     }
     for (const auto& coll : _collections) {
@@ -210,7 +216,8 @@ void DatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
     }
 
     for (auto&& collection : collectionStats) {
-        BSONObjBuilder collectionBuilder(builder->subobjStart(collection.ns));
+        BSONObjBuilder collectionBuilder(
+            builder->subobjStart(NamespaceStringUtil::serialize(collection.nss)));
         collection.append(&collectionBuilder);
         collectionBuilder.doneFast();
     }

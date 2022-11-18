@@ -39,6 +39,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
@@ -55,9 +56,11 @@ public:
     }
 };
 
+const std::string kTestNs = "testDb.testColl";
+
 class CollectionClonerTest : public InitialSyncClonerTestFixture {
 public:
-    CollectionClonerTest() {}
+    CollectionClonerTest() : _nss(boost::none, kTestNs) {}
 
 protected:
     void setUp() override {
@@ -77,6 +80,7 @@ protected:
 
             return std::move(localLoader);
         };
+
         _storageInterface.createCollectionForBulkFn = _standardCreateCollectionFn;
 
         _mockServer->assignCollectionUuid(_nss.ns(), _collUuid);
@@ -125,7 +129,7 @@ protected:
     CollectionBulkLoaderMock* _loader = nullptr;  // Owned by CollectionCloner.
     CollectionOptions _options;
 
-    NamespaceString _nss = {"testDb", "testColl"};
+    NamespaceString _nss;
     UUID _collUuid = UUID::gen();
     BSONObj _idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
                                     << "_id_");
@@ -137,7 +141,8 @@ protected:
 };
 
 class CollectionClonerTestResumable : public CollectionClonerTest {
-    void setUp() final {
+protected:
+    void setUp() {
         CollectionClonerTest::setUp();
         setInitialSyncId();
     }
@@ -1006,6 +1011,74 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryTwoResumes) {
     ASSERT_EQUALS(7u, stats.documentsCopied);
 }
 
+class CollectionClonerMultitenancyTest : public CollectionClonerTestResumable {
+public:
+    CollectionClonerMultitenancyTest() : _nss(TenantId(OID::gen()), kTestNs) {}
+
+protected:
+    void setUp() final {
+        RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport",
+                                                                           true);
+        CollectionClonerTestResumable::setUp();
+    }
+
+    std::unique_ptr<CollectionCloner> makeCollectionCloner(
+        CollectionOptions options = CollectionOptions()) {
+        options.uuid = _collUuid;
+        _options = options;
+        return std::make_unique<CollectionCloner>(_nss,
+                                                  options,
+                                                  getSharedData(),
+                                                  _source,
+                                                  _mockClient.get(),
+                                                  &_storageInterface,
+                                                  _dbWorkThreadPool.get());
+    }
+
+    NamespaceString _nss;
+};
+
+TEST_F(CollectionClonerMultitenancyTest, CollectionClonerMultitenancy) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+
+    auto cloner = makeCollectionCloner();
+    cloner->setBatchSize_forTest(1);
+
+    int numOperations = 2;
+
+    // Set up responses to be returned from upstream node.
+    setMockServerReplies(
+        BSON("size" << 10),
+        createCountResponse(numOperations),
+        createCursorResponse(
+            _nss.ns(),
+            BSON_ARRAY(_secondaryIndexSpecs[0] << _idIndexSpec << _secondaryIndexSpecs[1])));
+
+    // Set up documents to be returned from upstream node.
+    for (int i = 0; i < numOperations; ++i) {
+        _mockServer->insert(_nss.ns(), BSON("_id" << i));
+    }
+
+    ASSERT_OK(cloner->run());
+
+    // Check the count stage correctly updated the number of documents to copy.
+    ASSERT_EQ(numOperations, cloner->getStats().documentToCopy);
+
+    // Check the listIndexes stage correctly found the indexes to copy.
+    ASSERT_BSONOBJ_EQ(_idIndexSpec, getIdIndexSpec(cloner.get()));
+    ASSERT_EQ(_secondaryIndexSpecs.size(), getIndexSpecs(cloner.get()).size());
+    ASSERT_BSONOBJ_EQ(_secondaryIndexSpecs[0], getIndexSpecs(cloner.get())[0]);
+    ASSERT_BSONOBJ_EQ(_secondaryIndexSpecs[1], getIndexSpecs(cloner.get())[1]);
+    // Account for the _id index as well
+    ASSERT_EQ(_secondaryIndexSpecs.size() + 1, cloner->getStats().indexes);
+
+    // Check the documents to copy were inserted correctly.
+    ASSERT_EQUALS(numOperations, _collectionStats->insertCount);
+    ASSERT_TRUE(_collectionStats->commitCalled);
+    auto stats = cloner->getStats();
+    ASSERT_EQUALS(2u, stats.receivedBatches);
+    ASSERT_EQ(numOperations, cloner->getStats().documentsCopied);
+}
 
 }  // namespace repl
 }  // namespace mongo

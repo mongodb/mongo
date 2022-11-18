@@ -184,8 +184,12 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
             _databases.emplace_back(dbName);
 
             // Put admin dbs in the front of the vector.
-            if (dbName.db() == "admin" && _databases.size() > 1) {
-                std::iter_swap(_databases.begin() + idxToInsertNextAdmin, _databases.end() - 1);
+            if (dbName.db() == "admin") {
+                if (_databases.size() > 1) {
+                    std::iter_swap(_databases.begin() + idxToInsertNextAdmin, _databases.end() - 1);
+                }
+                // Index to track where the last admin db is in the list. If the first db returned
+                // is an admin db, we still must bump this.
                 idxToInsertNextAdmin++;
             }
         }

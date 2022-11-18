@@ -496,9 +496,11 @@ public:
      * If 'includeBuildUUIDs' is false, only the index spec will be returned without a way to
      * distinguish between ready and in-progress index specs.
      */
-    virtual std::list<BSONObj> getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
-                                             bool includeBuildUUIDs,
-                                             int options);
+    virtual std::list<BSONObj> getIndexSpecs(
+        const NamespaceStringOrUUID& nsOrUuid,
+        bool includeBuildUUIDs,
+        int options,
+        const boost::optional<TenantId>& dollarTenant = boost::none);
     /*
      * SERVER-70433 Remove 'tenantId' as parameter.
      */
@@ -623,7 +625,8 @@ public:
                             int options = 0,
                             int limit = 0,
                             int skip = 0,
-                            boost::optional<BSONObj> readConcernObj = boost::none);
+                            boost::optional<BSONObj> readConcernObj = boost::none,
+                            const boost::optional<TenantId>& dollarTenant = boost::none);
 
     /**
      * Executes an acknowledged command to insert a vector of documents.
@@ -731,7 +734,8 @@ protected:
                       int options,
                       int limit,
                       int skip,
-                      boost::optional<BSONObj> readConcernObj);
+                      boost::optional<BSONObj> readConcernObj,
+                      const boost::optional<TenantId>& dollarTenant);
 
     virtual void _auth(const BSONObj& params);
 
@@ -753,7 +757,8 @@ private:
      */
     std::list<BSONObj> _getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                       const BSONObj& cmd,
-                                      int options);
+                                      int options,
+                                      const boost::optional<TenantId>& dollarTenant);
 
     auth::RunCommandHook _makeAuthRunCommandHook();
 
