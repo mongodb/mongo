@@ -47,9 +47,9 @@ const test = new ShardSplitTest({
 });
 test.addRecipientNodes();
 
-const tenantId = "bulkUnorderedInserts-committed";
+const tenantId = ObjectId();
 
-const dbName = test.tenantDB(tenantId, kTenantDefinedDbName);
+const dbName = test.tenantDB(tenantId.str, kTenantDefinedDbName);
 const primary = test.donor.getPrimary();
 const primaryDB = primary.getDB(dbName);
 const numWriteOps =

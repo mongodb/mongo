@@ -33,7 +33,7 @@ const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
 
 const testCases = TenantMigrationConcurrentWriteUtil.testCases;
-const kTenantID = "tenantId";
+const kTenantID = ObjectId();
 
 function setupTest(testCase, collName, testOpts) {
     if (testCase.explicitlyCreateCollection) {
@@ -50,21 +50,19 @@ function setupTest(testCase, collName, testOpts) {
  * Tests that the donor does not reject writes after the migration aborts.
  */
 function testDoNotRejectWritesAfterMigrationAborted(testCase, testOpts) {
-    const tenantId = testOpts.dbName.split('_')[0];
-
     // Wait until the in-memory migration state is updated after the migration has majority
     // committed the abort decision. Otherwise, the command below is expected to block and then get
     // rejected.
     assert.soon(() => {
-        const mtab =
-            ShardSplitTest.getTenantMigrationAccessBlocker({node: testOpts.primaryDB, tenantId});
+        const mtab = ShardSplitTest.getTenantMigrationAccessBlocker(
+            {node: testOpts.primaryDB, tenantId: kTenantID});
         return mtab.donor.state === TenantMigrationTest.DonorAccessState.kAborted;
     });
 
     runCommandForConcurrentWritesTest(testOpts);
     testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
     ShardSplitTest.checkShardSplitAccessBlocker(
-        testOpts.primaryDB, tenantId, {numTenantMigrationAbortedErrors: 0});
+        testOpts.primaryDB, kTenantID, {numTenantMigrationAbortedErrors: 0});
 }
 
 const testOptsMap = {};
@@ -74,7 +72,7 @@ const testOptsMap = {};
  */
 function setupTestsBeforeMigration() {
     for (const [commandName, testCase] of Object.entries(testCases)) {
-        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        let baseDbName = kTenantID.str + "_" + commandName;
 
         if (testCase.skip) {
             print("Skipping " + commandName + ": " + testCase.skip);
@@ -110,7 +108,7 @@ function setupTestsBeforeMigration() {
  */
 function runTestsAfterMigration() {
     for (const [commandName, testCase] of Object.entries(testCases)) {
-        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        let baseDbName = kTenantID.str + "_" + commandName;
         if (testCase.skip) {
             continue;
         }

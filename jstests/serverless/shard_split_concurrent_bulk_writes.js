@@ -38,11 +38,6 @@ const kNumWriteBatchesWithoutMigrationConflict =
     2;  // num of write batches we allow to complete before split blocks writes.
 const kNumUpdatesWithoutMigrationConflict = 2;
 const kMaxSleepTimeMS = 1000;
-const kBatchTypes = {
-    insert: 1,
-    update: 2,
-    remove: 3
-};
 
 function setup() {
     const test = new ShardSplitTest({
@@ -154,9 +149,9 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const test = setup();
 
-    const tenantId = "bulkUnorderedInserts-committed";
+    const tenantId = ObjectId();
 
-    const dbName = test.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantId.str, kTenantDefinedDbName);
     const primary = test.getDonorPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -201,9 +196,9 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const test = setup();
 
-    const tenantId = "bulkUnorderedInserts-blocks-committed";
+    const tenantId = ObjectId();
 
-    const dbName = test.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantId.str, kTenantDefinedDbName);
     const primary = test.getDonorPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -259,9 +254,9 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const test = setup();
 
-    const tenantId = "bulkUnorderedInserts-aborted";
+    const tenantId = ObjectId();
 
-    const dbName = test.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantId.str, kTenantDefinedDbName);
     const primary = test.getDonorPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -321,9 +316,9 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const test = setup();
 
-    const tenantId = "bulkOrderedInserts-committed";
+    const tenantId = ObjectId();
 
-    const dbName = test.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantId.str, kTenantDefinedDbName);
     const primary = test.getDonorPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -362,9 +357,9 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const test = setup();
 
-    const tenantId = "bulkOrderedInserts-blocks-committed";
+    const tenantId = ObjectId();
 
-    const dbName = test.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantId.str, kTenantDefinedDbName);
     const primary = test.getDonorPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -414,9 +409,9 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const test = setup();
 
-    const tenantId = "bulkOrderedInserts-aborted";
+    const tenantId = ObjectId();
 
-    const dbName = test.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantId.str, kTenantDefinedDbName);
     const primary = test.getDonorPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -473,9 +468,9 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const test = setup();
 
-    const tenantId = "bulkUnorderedMultiUpdates-blocks";
+    const tenantId = ObjectId();
 
-    const dbName = test.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantId.str, kTenantDefinedDbName);
     const primary = test.getDonorPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -520,9 +515,9 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const test = setup();
 
-    const tenantId = "bulkOrderedMultiUpdates-blocks";
+    const tenantId = ObjectId();
 
-    const dbName = test.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantId.str, kTenantDefinedDbName);
     const primary = test.getDonorPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -566,9 +561,9 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     jsTestLog("Testing unordered multi updates against a shard split that has completed.");
 
     const test = setup();
-    const tenantId = "bulkUnorderedMultiUpdates-completed";
+    const tenantId = ObjectId();
 
-    const dbName = test.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantId.str, kTenantDefinedDbName);
     const primary = test.getDonorPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -601,9 +596,9 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const test = setup();
 
-    const tenantId = "bulkOrderedMultiUpdates-completed";
+    const tenantId = ObjectId();
 
-    const dbName = test.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantId.str, kTenantDefinedDbName);
     const primary = test.getDonorPrimary();
     const primaryDB = primary.getDB(dbName);
 

@@ -25,8 +25,8 @@ const test =
     new ShardSplitTest({recipientSetName: "recipientSet", recipientTagName: "recipientTag"});
 test.addRecipientNodes();
 
-const kTenantId = "testTenantId";
-const kDbName = test.tenantDB(kTenantId, "testDB");
+const kTenantId = ObjectId();
+const kDbName = test.tenantDB(kTenantId.str, "testDB");
 const kCollName = "testColl";
 
 const donorPrimary = test.donor.getPrimary();

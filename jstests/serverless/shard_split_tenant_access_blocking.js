@@ -21,7 +21,7 @@ const test = new ShardSplitTest({quickGarbageCollection: true});
 test.addRecipientNodes();
 
 const donorPrimary = test.donor.getPrimary();
-const tenantIds = ["tenant1", "tenant2"];
+const tenantIds = [ObjectId(), ObjectId()];
 
 jsTestLog("Asserting no state document exist before command");
 const operation = test.createSplitOperation(tenantIds);
@@ -29,8 +29,8 @@ assert.isnull(findSplitOperation(donorPrimary, operation.migrationId));
 
 jsTestLog("Asserting we can write before the migration");
 tenantIds.forEach(id => {
-    const tenantDB = donorPrimary.getDB(`${id}_data`);
-    const insertedObj = {name: `${id}_1`, payload: "testing_data"};
+    const tenantDB = donorPrimary.getDB(`${id.str}_data`);
+    const insertedObj = {name: `${id.str}_1`, payload: "testing_data"};
     assert.commandWorked(
         tenantDB.runCommand({insert: "testing_collection", documents: [insertedObj]}));
 });
@@ -57,7 +57,7 @@ tenantIds.forEach((id, index) => {
         const insertedObj = {name: `${id}_2`, payload: "testing_data2"};
         const res = tenantDB.runCommand({insert: "testing_collection", documents: [insertedObj]});
         jsTestLog("Get response for write command: " + tojson(res));
-    }, donorPrimary.host, id);
+    }, donorPrimary.host, id.str);
     writeThreads[index].start();
 });
 // Poll the numBlockedWrites of tenant migration access blocker from donor and expect it's
@@ -66,7 +66,7 @@ assert.soon(function() {
     return tenantIds.every(id => {
         const mtab = donorPrimary.getDB('admin')
                          .adminCommand({serverStatus: 1})
-                         .tenantMigrationAccessBlocker[id]
+                         .tenantMigrationAccessBlocker[id.str]
                          .donor;
         return mtab.numBlockedWrites > 0;
     });

@@ -79,6 +79,28 @@ inline Status validateDatabasePrefix(const std::vector<std::string>& tenantsId) 
     return Status::OK();
 }
 
+inline Status validateDatabasePrefix(const TenantId& tenantId) {
+    auto tId = tenantId.toString();
+    const bool isPrefixSupported = kUnsupportedTenantIds.find(tId) == kUnsupportedTenantIds.end() &&
+        tId.find('_') == std::string::npos;
+
+    return isPrefixSupported
+        ? Status::OK()
+        : Status(ErrorCodes::BadValue,
+                 str::stream() << "cannot migrate databases for tenant \'" << tId << "'");
+}
+
+inline Status validateDatabasePrefix(const std::vector<TenantId>& tenantsId) {
+    for (const auto& tenantId : tenantsId) {
+        auto status = validateDatabasePrefix(tenantId);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    return Status::OK();
+}
+
 inline Status validateProtocolFCVCompatibility(
     const boost::optional<MigrationProtocolEnum>& protocol) {
     if (!protocol)

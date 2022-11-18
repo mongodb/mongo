@@ -9,7 +9,7 @@ load("jstests/serverless/libs/shard_split_test.js");
 (function() {
 "use strict";
 
-const tenantIds = ["tenant1", "tenant2"];
+const tenantIds = [ObjectId(), ObjectId()];
 const test = new ShardSplitTest({quickGarbageCollection: true});
 
 test.addRecipientNodes();

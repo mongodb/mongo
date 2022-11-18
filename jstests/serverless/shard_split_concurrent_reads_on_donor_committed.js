@@ -24,7 +24,6 @@ load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/serverless/shard_split_concurrent_reads_on_donor_util.js");
 
 const kCollName = "testColl";
-const kTenantDefinedDbName = "0";
 
 /**
  * Tests that after the split commits, the donor rejects linearizable reads and reads with
@@ -82,7 +81,7 @@ const test = new ShardSplitTest({
 });
 test.addRecipientNodes();
 
-const tenantId = "tenantId";
+const tenantId = ObjectId();
 
 let donorRst = test.donor;
 const donorPrimary = test.getDonorPrimary();
@@ -106,7 +105,7 @@ donorRst.awaitLastOpCommitted();
 
 for (const [testCaseName, testCase] of Object.entries(testCases)) {
     jsTest.log(`Testing inCommitted with testCase ${testCaseName}`);
-    const dbName = `${tenantId}_${testCaseName}-inCommitted-${kTenantDefinedDbName}`;
+    const dbName = `${tenantId.str}_${testCaseName}`;
     testRejectReadsAfterMigrationCommitted(
         testCase, donorPrimary, dbName, kCollName, operation.migrationId);
 }

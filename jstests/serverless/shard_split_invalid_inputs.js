@@ -23,7 +23,7 @@ const test =
 
 const donorPrimary = test.donor.getPrimary();
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId();
 
 jsTestLog("Testing 'commitShardSplit' command without recipient nodes.");
 

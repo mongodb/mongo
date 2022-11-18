@@ -19,7 +19,7 @@ TestData.skipCheckDBHashes = true;
 const test = new ShardSplitTest({quickGarbageCollection: true});
 
 (() => {
-    const tenantIds = ["tenant1", "tenant2"];
+    const tenantIds = [ObjectId(), ObjectId()];
     test.addRecipientNodes();
 
     const donorPrimary = test.donor.getPrimary();
@@ -32,7 +32,7 @@ const test = new ShardSplitTest({quickGarbageCollection: true});
     jsTestLog(
         `Starting a shard split that is expected to abort due to setting
             abortShardSplitBeforeLeavingBlockingState failpoint. migrationId:
-            ${operation.migrationId} , tenantIds: ${tenantIds}`);
+            ${operation.migrationId} , tenantIds: ${tojson(tenantIds)}`);
 
     operation.commit();
     abortFp.off();
@@ -49,7 +49,7 @@ const test = new ShardSplitTest({quickGarbageCollection: true});
     const operation2 = test.createSplitOperation(tenantIds);
     jsTestLog(
         `Attempting to run a shard split with the same tenantIds. New migrationId:
-            ${operation2.migrationId}, tenantIds: ${tenantIds}`);
+            ${operation2.migrationId}, tenantIds: ${tojson(tenantIds)}`);
 
     operation2.commit();
     assertMigrationState(donorPrimary, operation2.migrationId, "committed");
@@ -59,7 +59,7 @@ const test = new ShardSplitTest({quickGarbageCollection: true});
 })();
 
 (() => {
-    const tenantIds = ["tenant3", "tenant4"];
+    const tenantIds = [ObjectId(), ObjectId()];
 
     test.addRecipientNodes();
 
@@ -69,7 +69,7 @@ const test = new ShardSplitTest({quickGarbageCollection: true});
     const operation = test.createSplitOperation(tenantIds);
     jsTestLog(
         `Starting a shard split that is expected to abort in blocking state due to receiving
-        abortShardSplit. migrationId: ${operation.migrationId}, tenantIds: ${tenantIds}`);
+        abortShardSplit. migrationId: ${operation.migrationId}, tenantIds: ${tojson(tenantIds)}`);
     const commitAsyncRes = operation.commitAsync();
 
     fp.wait();
@@ -94,7 +94,7 @@ const test = new ShardSplitTest({quickGarbageCollection: true});
     const operation2 = test.createSplitOperation(tenantIds);
     jsTestLog(
         `Attempting to run a new shard split with the same tenantIds. New migrationId:
-        ${operation2.migrationId}, tenantIds: ${tenantIds}`);
+        ${operation2.migrationId}, tenantIds: ${tojson(tenantIds)}`);
     operation2.commit();
 
     assertMigrationState(donorPrimary, operation2.migrationId, "committed");

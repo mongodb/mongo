@@ -31,7 +31,7 @@ function testDroppingStateDocCollections(
     test.addRecipientNodes();
     let donorPrimary = test.donor.getPrimary();
 
-    const tenantIds = ["tenant1", "tenant2"];
+    const tenantIds = [ObjectId(), ObjectId()];
 
     const operation = test.createSplitOperation(tenantIds);
     let migrationId = operation.migrationId;

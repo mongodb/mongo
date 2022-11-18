@@ -33,7 +33,7 @@ const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
 
 const testCases = TenantMigrationConcurrentWriteUtil.testCases;
-const kTenantID = "tenantId";
+const kTenantID = ObjectId();
 
 let countTenantMigrationCommittedErrors = 0;
 
@@ -63,7 +63,7 @@ const testOptsMap = {};
  */
 function setupTestsBeforeMigration() {
     for (const [commandName, testCase] of Object.entries(testCases)) {
-        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        let baseDbName = kTenantID.str + "_" + commandName;
 
         if (testCase.skip) {
             print("Skipping " + commandName + ": " + testCase.skip);
@@ -99,7 +99,7 @@ function setupTestsBeforeMigration() {
  */
 function runTestsAfterMigration() {
     for (const [commandName, testCase] of Object.entries(testCases)) {
-        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        let baseDbName = kTenantID.str + "_" + commandName;
         if (testCase.skip) {
             continue;
         }

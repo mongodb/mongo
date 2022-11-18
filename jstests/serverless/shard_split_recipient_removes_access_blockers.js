@@ -17,7 +17,7 @@ const test = new ShardSplitTest({quickGarbageCollection: true});
 test.addRecipientNodes();
 
 const donorPrimary = test.donor.getPrimary();
-const tenantIds = ["tenant1", "tenant2"];
+const tenantIds = [ObjectId(), ObjectId()];
 const operation = test.createSplitOperation(tenantIds);
 
 const donorAfterBlockingFailpoint =
@@ -30,9 +30,11 @@ donorAfterBlockingFailpoint.wait();
 
 jsTestLog("Asserting recipient nodes have installed access blockers");
 assert.soon(() => test.recipientNodes.every(node => {
-    const accessBlockers = ShardSplitTest.getTenantMigrationAccessBlocker({node});
-    return tenantIds.every(tenantId => accessBlockers && accessBlockers.hasOwnProperty(tenantId) &&
-                               !!accessBlockers[tenantId].donor);
+    return tenantIds.every(tenantId => {
+        const accessBlocker = ShardSplitTest.getTenantMigrationAccessBlocker({node, tenantId});
+        return accessBlocker && accessBlocker.hasOwnProperty(tenantId.str) &&
+            !!accessBlocker[tenantId.str].donor;
+    });
 }));
 donorAfterBlockingFailpoint.off();
 

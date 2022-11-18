@@ -18,7 +18,7 @@ const test = new ShardSplitTest({
 
 test.addAndAwaitRecipientNodes();
 
-const tenantIds = ["tenant1", "tenant2"];
+const tenantIds = [ObjectId(), ObjectId()];
 const operation = test.createSplitOperation(tenantIds);
 const donorPrimary = test.donor.getPrimary();
 const blockingFP = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
@@ -28,8 +28,8 @@ const splitThread = operation.commitAsync();
 blockingFP.wait();
 
 // Assert there are no blocked writes for tenants so we can confirm there were blocks later
-tenantIds.forEach(
-    tenantId => assert.eq(TenantMigrationUtil.getNumBlockedWrites(donorPrimary, tenantId), 0));
+tenantIds.forEach(tenantId =>
+                      assert.eq(ShardSplitTest.getNumBlockedWrites(donorPrimary, tenantId), 0));
 
 // Now perform one write for each tenantId being split and wait for the writes to become blocked
 const writes = tenantIds.map(tenantId => {
@@ -39,7 +39,7 @@ const writes = tenantIds.map(tenantId => {
         const res = coll.insert([{_id: 0, x: 0}, {_id: 1, x: 1}, {_id: 2, x: 2}],
                                 {writeConcern: {w: "majority"}});
         assert.commandFailedWithCode(res, ErrorCodes.TenantMigrationAborted);
-    }, donorPrimary.host, tenantId);
+    }, donorPrimary.host, tenantId.str);
 
     writeThread.start();
     return writeThread;
@@ -53,8 +53,7 @@ tenantIds.forEach(tenantId => {
         // there are two writes for each insert though.
         const kExpectedBlockedWrites = tenantIds.length * 2;
 
-        return TenantMigrationUtil.getNumBlockedWrites(donorPrimary, tenantId) ==
-            kExpectedBlockedWrites;
+        return ShardSplitTest.getNumBlockedWrites(donorPrimary, tenantId) == kExpectedBlockedWrites;
     });
 });
 

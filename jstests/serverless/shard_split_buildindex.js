@@ -22,11 +22,11 @@ load("jstests/serverless/libs/shard_split_test.js");
 const shardSplitTest = new ShardSplitTest({quickGarbageCollection: true});
 shardSplitTest.addRecipientNodes();
 
-const kTenantId = "testTenantId1";
+const kTenantId = ObjectId();
 const tenantIds = [kTenantId];
-const kUnrelatedTenantId = "testTenantId2";
-const kDbName = shardSplitTest.tenantDB(kTenantId, "testDB");
-const kUnrelatedDbName = shardSplitTest.tenantDB(kUnrelatedTenantId, "testDB");
+const kUnrelatedTenantId = ObjectId();
+const kDbName = shardSplitTest.tenantDB(kTenantId.str, "testDB");
+const kUnrelatedDbName = shardSplitTest.tenantDB(kUnrelatedTenantId.str, "testDB");
 const kEmptyCollName = "testEmptyColl";
 const kNonEmptyCollName = "testNonEmptyColl";
 const kNewCollName1 = "testNewColl1";

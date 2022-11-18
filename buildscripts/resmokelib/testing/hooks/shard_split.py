@@ -9,6 +9,8 @@ import uuid
 import bson
 import pymongo.errors
 
+from bson.objectid import ObjectId
+
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import shard_split
 from buildscripts.resmokelib.testing.fixtures.replicaset import ReplicaSetFixture
@@ -212,7 +214,9 @@ class _ShardSplitThread(threading.Thread):
         self.daemon = True
         self.logger = logger
         self._shard_split_fixture = shard_split_fixture
-        self._tenant_ids = shell_options["global_vars"]["TestData"]["tenantIds"]
+        self._tenant_ids = []
+        for tenant_id in shell_options["global_vars"]["TestData"]["tenantIds"]:
+            self._tenant_ids.append(ObjectId(tenant_id))
         self._auth_options = shell_options["global_vars"]["TestData"]["authOptions"]
         self._test = None
         self._test_report = test_report

@@ -33,7 +33,7 @@ let donorPrimary = test.donor.getPrimary();
 // Pause the shard split before waiting to mark the doc for garbage collection.
 let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
 
-const tenantIds = ["tenant5", "tenant6"];
+const tenantIds = [ObjectId(), ObjectId()];
 const operation = test.createSplitOperation(tenantIds);
 assert.commandFailed(operation.commit());
 fp.wait();

@@ -24,7 +24,6 @@ load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/serverless/shard_split_concurrent_reads_on_donor_util.js");
 
 const kCollName = "testColl";
-const kTenantDefinedDbName = "0";
 
 const kMaxTimeMS = 1 * 1000;
 
@@ -61,7 +60,7 @@ function testBlockReadsAfterMigrationEnteredBlocking(testCase, primary, dbName, 
 
 const testCases = shardSplitConcurrentReadTestCases;
 
-const tenantId = "tenantId";
+const tenantId = ObjectId();
 const test = new ShardSplitTest({
     recipientTagName: "recipientTag",
     recipientSetName: "recipientSet",
@@ -89,7 +88,7 @@ donorRst.awaitLastOpCommitted();
 
 for (const [testCaseName, testCase] of Object.entries(testCases)) {
     jsTest.log(`Testing inBlocking with testCase ${testCaseName}`);
-    const dbName = `${tenantId}_${testCaseName}-inBlocking-${kTenantDefinedDbName}`;
+    const dbName = `${tenantId.str}_${testCaseName}`;
     testBlockReadsAfterMigrationEnteredBlocking(testCase, donorPrimary, dbName, kCollName);
 }
 

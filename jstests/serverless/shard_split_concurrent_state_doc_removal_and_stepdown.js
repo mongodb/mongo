@@ -27,7 +27,7 @@ const test = new ShardSplitTest({
 });
 test.addRecipientNodes();
 
-const tenantIds = ["testTenantId"];
+const tenantIds = [ObjectId() /*tenantA*/];
 
 let donorPrimary = test.donor.getPrimary();
 

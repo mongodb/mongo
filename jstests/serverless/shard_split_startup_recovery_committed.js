@@ -31,7 +31,7 @@ let donorPrimary = test.donor.getPrimary();
 let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterDecision");
 
 jsTestLog("Running Shard Split restart after committed");
-const tenantIds = ["tenant3", "tenant4"];
+const tenantIds = [ObjectId(), ObjectId()];
 const operation = test.createSplitOperation(tenantIds);
 const splitThread = operation.commitAsync();
 fp.wait();

@@ -36,7 +36,7 @@ assert.isnull(findSplitOperation(donorPrimary, migrationId));
 // Pause the shard split before waiting to mark the doc for garbage collection.
 let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterDecision");
 
-const tenantIds = ["tenant5", "tenant6"];
+const tenantIds = [ObjectId(), ObjectId()];
 
 assert.commandWorked(donorPrimary.adminCommand({abortShardSplit: 1, migrationId}));
 

@@ -16,7 +16,7 @@ const test = new ShardSplitTest({quickGarbageCollection: true});
 test.addRecipientNodes();
 
 const donorPrimary = test.donor.getPrimary();
-const tenantIds = ["tenant1", "tenant2"];
+const tenantIds = [ObjectId(), ObjectId()];
 const pauseAfterBlockingFp = configureFailPoint(donorPrimary, "pauseShardSplitAfterBlocking");
 
 jsTestLog("Test FCV Downgrade");

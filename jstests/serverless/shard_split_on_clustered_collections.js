@@ -31,8 +31,8 @@ const test = new ShardSplitTest({
 });
 test.addRecipientNodes();
 
-const kTenantId = "testTenantId1";
-const kDbName = test.tenantDB(kTenantId, "testDB");
+const kTenantId = ObjectId();
+const kDbName = test.tenantDB(kTenantId.str, "testDB");
 const kEmptyCollName = "testEmptyColl";
 const kNonEmptyCollName = "testNonEmptyColl";
 

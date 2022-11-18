@@ -25,9 +25,13 @@ const doWriteOperations = function(rstArgs, tenantIds) {
     const donorPrimary = donorRst.getPrimary();
 
     const writeResults = [];
+    // TenantIds is an array of ObjectId which does not serialize correctly when passed through the
+    // Thread constructor. We pass tenantIds converted into a json form (stringfield) to this
+    // function and then use `eval()` to rebuild into an array of ObjectId.
+    const tenantIdsObjs = eval(tenantIds);
 
-    tenantIds.forEach(id => {
-        const kDbName = `${id}_testDb`;
+    tenantIdsObjs.forEach(id => {
+        const kDbName = `${id.str}_testDb`;
         const kCollName = "testColl";
         const kNs = `${kDbName}.${kCollName}`;
 
@@ -102,7 +106,7 @@ const runCommitSplitThreadWrapper = function(rstArgs,
     const commitShardSplitCmdObj = {
         commitShardSplit: 1,
         migrationId: UUID(migrationIdString),
-        tenantIds: tenantIds,
+        tenantIds: eval(tenantIds),  // tenantIds were passed as a json instead of array<objectId>
         recipientTagName: recipientTagName,
         recipientSetName: recipientSetName
     };
@@ -125,7 +129,7 @@ const waitForGarbageCollectionForSplit = function(donorNodes, migrationId, tenan
         const donorDocumentDeleted =
             node.getCollection(ShardSplitTest.kConfigSplitDonorsNS).count({_id: migrationId}) === 0;
         const allAccessBlockersRemoved = tenantIds.every(
-            id => ShardSplitTest.getTenantMigrationAccessBlocker({node, id}) == null);
+            id => ShardSplitTest.getTenantMigrationAccessBlocker({node, tenantId: id}) == null);
 
         const result = donorDocumentDeleted && allAccessBlockersRemoved;
         if (!result) {
@@ -138,8 +142,9 @@ const waitForGarbageCollectionForSplit = function(donorNodes, migrationId, tenan
             }
 
             if (!allAccessBlockersRemoved) {
-                const tenantsWithBlockers = tenantIds.filter(
-                    id => ShardSplitTest.getTenantMigrationAccessBlocker({node, id}) != null);
+                const tenantsWithBlockers =
+                    tenantIds.filter(id => ShardSplitTest.getTenantMigrationAccessBlocker(
+                                               {node, tenantId: id}) != null);
                 status.push(`access blockers to be removed (${tenantsWithBlockers})`);
             }
         }
@@ -170,7 +175,7 @@ const commitSplitAsync = function({
     const thread = new Thread(runCommitSplitThreadWrapper,
                               rstArgs,
                               migrationIdString,
-                              tenantIds,
+                              tojson(tenantIds),
                               recipientTagName,
                               recipientSetName,
                               retryOnRetryableErrors,
@@ -517,7 +522,8 @@ class ShardSplitTest {
         const stateDoc = findSplitOperation(donorPrimary, migrationId);
         assert.soon(() => tenantIds.every(tenantId => {
             const donorMtab =
-                ShardSplitTest.getTenantMigrationAccessBlocker({node: donorPrimary, tenantId})
+                ShardSplitTest
+                    .getTenantMigrationAccessBlocker({node: donorPrimary, tenantId: tenantId})
                     .donor;
             const tenantAccessBlockersBlockRW = donorMtab.state == expectedState;
             const tenantAccessBlockersBlockTimestamp =
@@ -567,7 +573,7 @@ class ShardSplitTest {
     /*
      * Lookup and return the tenant migration access blocker on a node for the given tenant.
      * @param {donorNode} donor node on which the request will be sent.
-     * @param {tenantId} tenant id to lookup for tenant access blockers.
+     * @param {tenantId} tenant id (ObjectId) to lookup for tenant access blockers.
      */
     static getTenantMigrationAccessBlocker({node, tenantId}) {
         const res = node.adminCommand({serverStatus: 1});
@@ -579,8 +585,8 @@ class ShardSplitTest {
             return undefined;
         }
 
-        tenantMigrationAccessBlocker.donor =
-            tenantMigrationAccessBlocker[tenantId] && tenantMigrationAccessBlocker[tenantId].donor;
+        tenantMigrationAccessBlocker.donor = tenantMigrationAccessBlocker[tenantId.str] &&
+            tenantMigrationAccessBlocker[tenantId.str].donor;
 
         return tenantMigrationAccessBlocker;
     }

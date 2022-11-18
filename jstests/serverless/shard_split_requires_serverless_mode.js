@@ -8,7 +8,7 @@
 
 const conn = MongoRunner.runMongod();
 const migrationId = UUID();
-const tenantIds = ["tenantA", "tenantB"];
+const tenantIds = [ObjectId(), ObjectId()];
 const recipientSetName = "recipient";
 const recipientTagName = "recipientNode";
 assert.commandFailedWithCode(

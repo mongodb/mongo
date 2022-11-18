@@ -66,7 +66,8 @@ const test = new ShardSplitTest({
 });
 test.addRecipientNodes();
 
-const tenantId = "tenantId";
+const ktenantId = ObjectId();
+const tenantIds = [ktenantId];
 
 const donorRst = test.donor;
 const donorPrimary = test.getDonorPrimary();
@@ -80,7 +81,7 @@ donorRst.nodes.forEach(node => {
 
 let blockFp = configureFailPoint(donorPrimary, "pauseShardSplitAfterBlocking");
 
-const operation = test.createSplitOperation([tenantId]);
+const operation = test.createSplitOperation(tenantIds);
 const splitThread = operation.commitAsync();
 
 blockFp.wait();
@@ -99,7 +100,7 @@ donorRst.awaitLastOpCommitted();
 
 for (const [testCaseName, testCase] of Object.entries(testCases)) {
     jsTest.log(`Testing inAborted with testCase ${testCaseName}`);
-    const dbName = `${tenantId}_${testCaseName}-inAborted-${kTenantDefinedDbName}`;
+    const dbName = `${ktenantId.str}_${testCaseName}`;
     testDoNotRejectReadsAfterMigrationAborted(testCase, dbName, kCollName);
 }
 

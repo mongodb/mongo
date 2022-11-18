@@ -29,7 +29,7 @@ let donorPrimary = test.donor.getPrimary();
 const fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
 
 jsTestLog("Running Shard Split restart after blocking");
-const tenantIds = ["tenant1", "tenant2"];
+const tenantIds = [ObjectId(), ObjectId()];
 const operation = test.createSplitOperation(tenantIds);
 const splitThread = operation.commitAsync();
 

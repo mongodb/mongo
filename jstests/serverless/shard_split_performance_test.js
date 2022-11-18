@@ -63,7 +63,7 @@ function runOneSplit() {
 
     const primary = test.donor.getPrimary();
 
-    const tenantIds = ["tenant1", "tenant2"];
+    const tenantIds = [ObjectId(), ObjectId()];
     const operation = test.createSplitOperation(tenantIds);
     assert.commandWorked(operation.commit());
 

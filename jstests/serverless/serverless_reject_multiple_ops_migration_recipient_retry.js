@@ -15,7 +15,7 @@ function cannotStartMigrationWhileShardSplitIsInProgressOnRecipient(protocol) {
     // Test that we cannot start a migration while a shard split is in progress.
     const recipientTagName = "recipientTag";
     const recipientSetName = "recipient";
-    const tenantIds = ["tenant1", "tenant2"];
+    const tenantIds = [ObjectId(), ObjectId()];
     const splitMigrationId = UUID();
     const tenantMigrationId = UUID();
     const secondTenantMigrationId = UUID();
@@ -45,7 +45,7 @@ function cannotStartMigrationWhileShardSplitIsInProgressOnRecipient(protocol) {
         protocol,
     };
     if (protocol != "shard merge") {
-        migrationOpts["tenantId"] = tenantIds[0];
+        migrationOpts["tenantId"] = tenantIds[0].str;
     }
     jsTestLog("Starting tenant migration");
     assert.commandWorked(test.startMigration(migrationOpts));
@@ -75,7 +75,7 @@ function cannotStartMigrationWhileShardSplitIsInProgressOnRecipient(protocol) {
         protocol,
     };
     if (protocol != "shard merge") {
-        secondMigrationOpts["tenantId"] = tenantIds[0];
+        secondMigrationOpts["tenantId"] = tenantIds[0].str;
     }
     jsTestLog("Starting tenant migration");
     assert.commandWorked(test.startMigration(secondMigrationOpts));

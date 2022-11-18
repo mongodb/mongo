@@ -31,7 +31,7 @@ function splitConfigRemovedAfterDecision(simulateErrorToAbortOperation) {
 
     // Skip db hash check because secondary is left with a different config.
     TestData.skipCheckDBHashes = true;
-    const tenantIds = ["tenant1", "tenant2"];
+    const tenantIds = [ObjectId(), ObjectId()];
     const test = new ShardSplitTest({quickGarbageCollection: true});
     test.addRecipientNodes();
 

@@ -14,7 +14,7 @@ load("jstests/libs/uuid_util.js");
 function canStartShardSplitWithAbortedMigration({protocol, runOnRecipient}) {
     const recipientTagName = "recipientTag";
     const recipientSetName = "recipient";
-    const tenantIds = ["tenant1", "tenant2"];
+    const tenantIds = [ObjectId(), ObjectId()];
     const splitMigrationId = UUID();
     const tenantMigrationId = UUID();
 
@@ -34,7 +34,7 @@ function canStartShardSplitWithAbortedMigration({protocol, runOnRecipient}) {
         protocol,
     };
     if (protocol != "shard merge") {
-        migrationOpts["tenantId"] = tenantIds[0];
+        migrationOpts["tenantId"] = tenantIds[0].str;
     }
     jsTestLog("Starting tenant migration");
     assert.commandWorked(test.startMigration(migrationOpts));

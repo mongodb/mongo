@@ -26,7 +26,7 @@ function retrySplit({protocol, recipientTagName, recipientSetName, tenantIds, te
         protocol,
     };
     if (protocol != "shard merge") {
-        migrationOpts["tenantId"] = tenantIds[0];
+        migrationOpts["tenantId"] = tenantIds[0].str;
     }
     jsTestLog("Starting tenant migration");
     assert.commandWorked(test.startMigration(migrationOpts));
@@ -74,7 +74,7 @@ function retrySplit({protocol, recipientTagName, recipientSetName, tenantIds, te
 // Test that we cannot start a shard split while a migration is in progress.
 const recipientTagName = "recipientTag";
 const recipientSetName = "recipient";
-const tenantIds = ["tenant1", "tenant2"];
+const tenantIds = [ObjectId(), ObjectId()];
 
 sharedOptions = {
     setParameter: {

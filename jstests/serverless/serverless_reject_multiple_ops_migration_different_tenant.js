@@ -16,7 +16,7 @@ function cannotStartMigrationWithDifferentTenantWhileShardSplitIsInProgress(prot
     // tenantId uninvolved in the split.
     const recipientTagName = "recipientTag";
     const recipientSetName = "recipient";
-    const tenantIds = ["tenant1", "tenant2"];
+    const tenantIds = [ObjectId(), ObjectId()];
     const splitMigrationId = UUID();
     const tenantMigrationId = UUID();
 

@@ -46,10 +46,10 @@ function insertDocument(primaryHost, dbName, collName) {
     const test =
         new ShardSplitTest({nodeOptions: Object.assign({setParameter: kGarbageCollectionParams})});
     test.addRecipientNodes();
-    const tenantIds = ["migrationOutcome-committed"];
+    const tenantIds = [ObjectId() /*tenantA*/];
     const operation = test.createSplitOperation(tenantIds);
 
-    const dbName = test.tenantDB(tenantIds[0], kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantIds[0].str, kTenantDefinedDbName);
     const primary = test.donor.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -94,10 +94,10 @@ function insertDocument(primaryHost, dbName, collName) {
     const test =
         new ShardSplitTest({nodeOptions: Object.assign({setParameter: kGarbageCollectionParams})});
     test.addRecipientNodes();
-    const tenantIds = ["migrationOutcome-committed"];
+    const tenantIds = [ObjectId() /*tenantA*/];
     const operation = test.createSplitOperation(tenantIds);
 
-    const dbName = test.tenantDB(tenantIds[0], kTenantDefinedDbName);
+    const dbName = test.tenantDB(tenantIds[0].str, kTenantDefinedDbName);
     const primary = test.donor.getPrimary();
     const primaryDB = primary.getDB(dbName);
 

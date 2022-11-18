@@ -15,7 +15,7 @@ function cannotStartMigrationWhenThereIsAnExistingAccessBlocker(protocol) {
     // Test that we cannot start a tenant migration for a tenant that already has an access blocker.
     const recipientTagName = "recipientTag";
     const recipientSetName = "recipient";
-    const tenantIds = ["tenant1", "tenant2"];
+    const tenantIds = [ObjectId(), ObjectId()];
     const splitMigrationId = UUID();
     const tenantMigrationId = UUID();
 

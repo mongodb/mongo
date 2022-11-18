@@ -21,7 +21,7 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/serverless/libs/shard_split_test.js");
 
-const kTenantIds = ["testTenantId"];
+const kTenantIds = [ObjectId()];
 
 function checkStandardFieldsOK(ops, {migrationId, reachedDecision, tenantIds}) {
     assert.eq(ops.length, 1);
@@ -30,7 +30,12 @@ function checkStandardFieldsOK(ops, {migrationId, reachedDecision, tenantIds}) {
     assert.eq(op.reachedDecision, reachedDecision);
 
     if (tenantIds) {
-        assert.eq(bsonWoCompare(op.tenantIds, tenantIds), 0);
+        // we need to convert tenantIds to an array of string objects.
+        let tenantIdsStrings = [];
+        tenantIds.forEach(tenantId => {
+            tenantIdsStrings.push(tenantId.str);
+        });
+        assert.eq(bsonWoCompare(op.tenantIds, tenantIdsStrings), 0);
     }
 }
 

@@ -45,7 +45,6 @@ function startWriteThread(node, dbName, collName) {
     return writeThread;
 }
 
-const kTenantIdPrefix = "testTenantId";
 const kDbName = "testDb";
 const kCollName = "testColl";
 
@@ -62,7 +61,7 @@ const kCollName = "testColl";
 
     const donorPrimary = test.donor.getPrimary();
     const donorsColl = donorPrimary.getCollection(ShardSplitTest.kConfigSplitDonorsNS);
-    const tenantId = kTenantIdPrefix + "LaggedSecondaryMigrationAborted";
+    const tenantId = ObjectId();
     const dbName = tenantId + "_" + kDbName;
     assert.commandWorked(
         donorPrimary.getDB(dbName).runCommand({insert: kCollName, documents: [{_id: 0}]}));
@@ -114,8 +113,8 @@ const kCollName = "testColl";
 
     const donorPrimary = test.donor.getPrimary();
     const donorsColl = donorPrimary.getCollection(ShardSplitTest.kConfigSplitDonorsNS);
-    const tenantId = kTenantIdPrefix + "LaggedSecondaryMigrationCommitted";
-    const dbName = tenantId + "_" + kDbName;
+    const tenantId = ObjectId();
+    const dbName = tenantId.str + "_" + kDbName;
     assert.commandWorked(
         donorPrimary.getDB(dbName).runCommand({insert: kCollName, documents: [{_id: 0}]}));
 
@@ -167,8 +166,8 @@ const kCollName = "testColl";
 
     const donorPrimary = test.donor.getPrimary();
     const donorsColl = donorPrimary.getCollection(ShardSplitTest.kConfigSplitDonorsNS);
-    const tenantId = kTenantIdPrefix + "DropStateDocCollection";
-    const dbName = tenantId + "_" + kDbName;
+    const tenantId = ObjectId();
+    const dbName = tenantId.str + "_" + kDbName;
     assert.commandWorked(
         donorPrimary.getDB(dbName).runCommand({insert: kCollName, documents: [{_id: 0}]}));
 

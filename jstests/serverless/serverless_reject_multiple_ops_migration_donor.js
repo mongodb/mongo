@@ -16,7 +16,7 @@ function canStartMigrationAfterSplitGarbageCollection(protocol) {
     // Test that we can start a migration after a shard split has been garbage collected.
     const recipientTagName = "recipientTag";
     const recipientSetName = "recipient";
-    const tenantIds = ["tenant1", "tenant2"];
+    const tenantIds = [ObjectId(), ObjectId()];
     const splitMigrationId = UUID();
     const tenantMigrationId = UUID();
 
@@ -53,7 +53,7 @@ function canStartMigrationAfterSplitGarbageCollection(protocol) {
         protocol,
     };
     if (protocol != "shard merge") {
-        migrationOpts["tenantId"] = tenantIds[0];
+        migrationOpts["tenantId"] = tenantIds[0].str;
     }
     assert.commandWorked(test.startMigration(migrationOpts));
 

@@ -28,7 +28,7 @@ const test = new ShardSplitTest({
 test.addRecipientNodes();
 
 const donorPrimary = test.donor.getPrimary();
-const tenantIds = ["tenant1", "tenant2"];
+const tenantIds = [ObjectId(), ObjectId()];
 
 // Stop replication on recipient nodes, and write a lot of data to the set
 test.recipientNodes.forEach(node => stopServerReplication(node));

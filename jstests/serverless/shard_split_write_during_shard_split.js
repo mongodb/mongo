@@ -13,11 +13,11 @@ const test = new ShardSplitTest();
 test.addAndAwaitRecipientNodes();
 
 const donorPrimary = test.donor.getPrimary();
-const tenantIds = ["tenant1", "tenant2"];
+const tenantIds = [ObjectId(), ObjectId()];
 
 jsTestLog("Writing data before split");
 tenantIds.forEach(id => {
-    const kDbName = test.tenantDB(id, "testDb");
+    const kDbName = test.tenantDB(id.str, "testDb");
     const kCollName = "testColl";
     const kNs = `${kDbName}.${kCollName}`;
 
@@ -35,7 +35,7 @@ blockingFP.wait();
 
 const donorRst = createRstArgs(test.donor);
 test.removeRecipientsFromRstArgs(donorRst);
-const writeThread = new Thread(doWriteOperations, donorRst, tenantIds);
+const writeThread = new Thread(doWriteOperations, donorRst, tojson(tenantIds));
 writeThread.start();
 
 blockingFP.off();

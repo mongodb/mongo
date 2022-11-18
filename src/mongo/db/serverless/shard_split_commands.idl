@@ -67,7 +67,7 @@ commands:
         type: string
       tenantIds:
         description: "The identifier for the list of tenants being migrated."
-        type: array<string>
+        type: array<tenant_id>
         validator:
           callback: "tenant_migration_util::validateDatabasePrefix"
 

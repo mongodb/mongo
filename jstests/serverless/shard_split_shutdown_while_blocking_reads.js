@@ -26,8 +26,8 @@ const test =
     new ShardSplitTest({recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
 test.addRecipientNodes();
 
-const kTenantIds = ["testTenantId"];
-const kDbName = kTenantIds[0] + "_testDb";
+const kTenantIds = [ObjectId()];
+const kDbName = kTenantIds[0].str + "_testDb";
 const kCollName = "testColl";
 
 const donorRst = test.donor;

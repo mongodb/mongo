@@ -11,7 +11,7 @@ load("jstests/serverless/libs/shard_split_test.js");
 (function() {
 "use strict";
 
-const tenantIds = ["tenant1", "tenant2"];
+const tenantIds = [ObjectId(), ObjectId()];
 
 function commitShardSplitConcurrently() {
     const test = new ShardSplitTest({quickGarbageCollection: true});
@@ -32,7 +32,7 @@ function commitShardSplitConcurrently() {
     assert.commandFailedWithCode(donorPrimary.adminCommand({
         commitShardSplit: 1,
         migrationId: UUID(),
-        tenantIds: ["tenant3", "tenant4"],
+        tenantIds: [ObjectId(), ObjectId()],
         recipientTagName: test.recipientTagName,
         recipientSetName: test.recipientSetName
     }),
@@ -48,7 +48,7 @@ function commitShardSplitConcurrently() {
     assert.commandFailedWithCode(donorPrimary.adminCommand({
         commitShardSplit: 1,
         migrationId: UUID(),
-        tenantIds: ["tenant1", "tenant3"],  // re use one tenantid
+        tenantIds: [ObjectId(), ObjectId()],  // re use one tenantid
         recipientTagName: test.recipientTagName,
         recipientSetName: test.recipientSetName
     }),
@@ -64,7 +64,7 @@ function commitShardSplitConcurrently() {
     assert.commandWorked(donorPrimary.adminCommand({
         commitShardSplit: 1,
         migrationId: UUID(),
-        tenantIds: ["tenant10", "tenant11"],
+        tenantIds: [ObjectId(), ObjectId()],
         recipientTagName: test.recipientTagName,
         recipientSetName: test.recipientSetName
     }));

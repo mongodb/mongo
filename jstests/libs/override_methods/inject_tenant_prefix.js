@@ -456,7 +456,9 @@ function getOperationStateDocument(conn) {
     const collection = isShardSplitPassthrough() ? "shardSplitDonors" : "tenantMigrationDonors";
     let filter = {tenantId: TestData.tenantId};
     if (isShardSplitPassthrough()) {
-        filter = {tenantIds: TestData.tenantIds};
+        let tenantIdsAsStrings = [];
+        TestData.tenantIds.forEach(tenantId => tenantIdsAsStrings.push(tenantId));
+        filter = {tenantIds: tenantIdsAsStrings};
     } else if (isShardMergePassthrough(conn)) {
         // TODO (SERVER-68643) No longer require to check for shard merge since shard merge will be
         // the only protocol left.

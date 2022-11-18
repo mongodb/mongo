@@ -27,8 +27,8 @@ test.addRecipientNodes();
 
 const donorPrimary = test.donor.getPrimary();
 
-const tenantId = "testTenantId";
-const tsDB = test.tenantDB(tenantId, "tsDB");
+const tenantId = ObjectId();
+const tsDB = test.tenantDB(tenantId.str, "tsDB");
 const donorTSDB = donorPrimary.getDB(tsDB);
 assert.commandWorked(donorTSDB.createCollection("tsColl", {timeseries: {timeField: "time"}}));
 assert.commandWorked(donorTSDB.runCommand(
