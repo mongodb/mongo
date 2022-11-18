@@ -32,7 +32,6 @@
 #include "mongo/db/pipeline/abt/algebrizer_context.h"
 #include "mongo/db/pipeline/abt/collation_translation.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
-#include "mongo/db/pipeline/abt/projection_ast_visitor.h"
 #include "mongo/db/pipeline/abt/transformer_visitor.h"
 
 namespace mongo::optimizer {
@@ -57,18 +56,7 @@ ABT translateCanonicalQueryToABT(const Metadata& metadata,
     }
 
     if (auto proj = canonicalQuery.getProj()) {
-        // TODO: SERVER-68516: this is a workaround to support computed projection
-        // in the short term. Remove this workaround and complete projection translation via
-        // projeciton_ast_visitor instead.
-        try {
-            translateProjection(ctx, *proj);
-        } catch (const DBException& ex) {
-            if (ex.code() == ErrorCodes::InternalErrorNotSupported) {
-                translateProjection(ctx, scanProjName, canonicalQuery.getExpCtx(), proj);
-            } else {
-                throw;
-            }
-        }
+        translateProjection(ctx, scanProjName, canonicalQuery.getExpCtx(), proj);
     }
 
     auto skipAmount = canonicalQuery.getFindCommandRequest().getSkip();

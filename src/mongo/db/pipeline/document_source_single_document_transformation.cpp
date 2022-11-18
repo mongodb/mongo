@@ -53,18 +53,6 @@ DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransfor
       _name(name.toString()),
       _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {}
 
-DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransformation(
-    const intrusive_ptr<ExpressionContext>& pExpCtx,
-    std::unique_ptr<TransformerInterface> parsedTransform,
-    const StringData name,
-    bool isIndependentOfAnyCollection,
-    std::unique_ptr<projection_ast::Projection> projectionAST)
-    : DocumentSource(name, pExpCtx),
-      _parsedTransform(std::move(parsedTransform)),
-      _name(name.toString()),
-      _isIndependentOfAnyCollection(isIndependentOfAnyCollection),
-      _projectionAST(std::move(projectionAST)) {}
-
 const char* DocumentSourceSingleDocumentTransformation::getSourceName() const {
     return _name.c_str();
 }

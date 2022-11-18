@@ -33,7 +33,6 @@
 #include "mongo/db/pipeline/abt/algebrizer_context.h"
 #include "mongo/db/pipeline/abt/collation_translation.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
-#include "mongo/db/pipeline/abt/projection_ast_visitor.h"
 #include "mongo/db/pipeline/abt/transformer_visitor.h"
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
@@ -473,31 +472,6 @@ public:
     }
 
     void visit(const DocumentSourceSingleDocumentTransformation* source) override {
-        switch (source->getType()) {
-            case TransformerInterface::TransformerType::kComputedProjection:
-            case TransformerInterface::TransformerType::kGroupFromFirstDocument:
-            case TransformerInterface::TransformerType::kReplaceRoot:
-                break;
-            case TransformerInterface::TransformerType::kExclusionProjection:
-            case TransformerInterface::TransformerType::kInclusionProjection: {
-                tassert(6684600,
-                        "Translating Inclusion or Exclusion projection but there's no AST in "
-                        "DocumentSource",
-                        source->hasProjectionAST());
-                try {
-                    translateProjection(_ctx, *source->getProjectionAST());
-                    return;
-                } catch (const DBException& ex) {
-                    if (ex.code() != ErrorCodes::InternalErrorNotSupported) {
-                        throw;
-                    }
-                }
-            }
-        }
-
-        // TODO: SERVER-68516: this is a workaround to support computed projection
-        // in the short term. Remove this workaround and complete projection translation via
-        // projection_ast_visitor instead.
         const ProjectionName& rootProjName = _ctx.getNode()._rootProjection;
         FieldMapBuilder builder(rootProjName, rootProjName == _ctx.getScanProjName());
         ABTTransformerVisitor visitor(_ctx, builder);

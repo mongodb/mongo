@@ -67,10 +67,10 @@ void ABTTransformerVisitor::visit(const ReplaceRootTransformation* transformer) 
 
 void ABTTransformerVisitor::generateCombinedProjection() const {
     auto result = _builder.generateABT();
+    // ReplaceRootTransformer won't integrate any paths using the field map builder.
     if (!result) {
         return;
     }
-
     auto entry = _ctx.getNode();
     const ProjectionName projName = _ctx.getNextId("combinedProjection");
     _ctx.setNode<EvaluationNode>(projName, projName, std::move(*result), std::move(entry._node));
@@ -206,9 +206,6 @@ void ABTTransformerVisitor::visitExclusionNode(const projection_executor::Exclus
     }
 }
 
-/**
- * TODO SERVER-68690: Refactor this function to be shared with the DocumentSource implementation.
- */
 void translateProjection(AlgebrizerContext& ctx,
                          ProjectionName scanProjName,
                          boost::intrusive_ptr<ExpressionContext> expCtx,

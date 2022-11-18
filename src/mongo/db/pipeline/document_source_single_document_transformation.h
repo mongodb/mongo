@@ -58,13 +58,6 @@ public:
         StringData name,
         bool independentOfAnyCollection);
 
-    DocumentSourceSingleDocumentTransformation(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-        std::unique_ptr<TransformerInterface> parsedTransform,
-        StringData name,
-        bool independentOfAnyCollection,
-        std::unique_ptr<projection_ast::Projection> projectionAST);
-
     // virtuals from DocumentSource
     const char* getSourceName() const final;
 
@@ -105,15 +98,6 @@ public:
     }
     auto& getTransformer() {
         return *_parsedTransform;
-    }
-
-    const projection_ast::Projection* getProjectionAST() const {
-        tassert(6684603, "Expected a projection AST but found none", hasProjectionAST());
-        return _projectionAST.get();
-    }
-
-    bool hasProjectionAST() const {
-        return _projectionAST != nullptr;
     }
 
     /**
@@ -170,9 +154,6 @@ private:
     // Cached stage options in case this DocumentSource is disposed before serialized (e.g. explain
     // with a sort which will auto-dispose of the pipeline).
     Document _cachedStageOptions;
-
-    // Stores a projectionAST if the DocumentSource is a projection/addFields, otherwise is nullptr
-    std::unique_ptr<projection_ast::Projection> _projectionAST = nullptr;
 };
 
 }  // namespace mongo

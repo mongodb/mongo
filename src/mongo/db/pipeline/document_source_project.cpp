@@ -68,37 +68,39 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
     const intrusive_ptr<ExpressionContext>& expCtx,
     StringData specifiedName) {
     const bool isIndependentOfAnyCollection = false;
-
-    // The ProjectionExecutor will internally perform a check to see if the provided
-    // specification is valid, and throw an exception if it was not. The exception is caught
-    // here so we can add the name that was actually specified by the user, be it $project
-    // or an alias.
-    try {
-        // We won't optimize the executor on creation, and will do it as part of the
-        // pipeline optimization process when requested via the 'optimize()' method on
-        // 'DocumentSourceSingleDocumentTransformation', so we won't pass the
-        // 'kOptimzeExecutor' flag to the projection executor builder.
-        //
-        // Note that this is also important for $lookup inner pipelines to not being
-        // optimized too early, as it may lead to incorrect positioning of the caching
-        // stage due to missing dependencies on certain variables, as they could have been
-        // optimized away.
-        auto builderParams =
-            projection_executor::BuilderParamsBitSet{projection_executor::kDefaultBuilderParams};
-        builderParams.reset(projection_executor::kOptimizeExecutor);
-        auto parsedTransform = projection_executor::buildProjectionExecutor(
-            expCtx, &projection, ProjectionPolicies::aggregateProjectionPolicies(), builderParams);
-
-        return new DocumentSourceSingleDocumentTransformation(
-            expCtx,
-            std::move(parsedTransform),
-            kStageName,
-            isIndependentOfAnyCollection,
-            std::make_unique<projection_ast::Projection>(std::move(projection)));
-    } catch (DBException& ex) {
-        ex.addContext("Invalid " + specifiedName.toString());
-        throw;
-    }
+    intrusive_ptr<DocumentSource> project(new DocumentSourceSingleDocumentTransformation(
+        expCtx,
+        [&]() {
+            // The ProjectionExecutor will internally perform a check to see if the provided
+            // specification is valid, and throw an exception if it was not. The exception is caught
+            // here so we can add the name that was actually specified by the user, be it $project
+            // or an alias.
+            try {
+                // We won't optimize the executor on creation, and will do it as part of the
+                // pipeline optimization process when requested via the 'optimize()' method on
+                // 'DocumentSourceSingleDocumentTransformation', so we won't pass the
+                // 'kOptimzeExecutor' flag to the projection executor builder.
+                //
+                // Note that this is also important for $lookup inner pipelines to not being
+                // optimized too early, as it may lead to incorrect positioning of the caching
+                // stage due to missing dependencies on certain variables, as they could have been
+                // optimized away.
+                auto builderParams = projection_executor::BuilderParamsBitSet{
+                    projection_executor::kDefaultBuilderParams};
+                builderParams.reset(projection_executor::kOptimizeExecutor);
+                return projection_executor::buildProjectionExecutor(
+                    expCtx,
+                    &projection,
+                    ProjectionPolicies::aggregateProjectionPolicies(),
+                    builderParams);
+            } catch (DBException& ex) {
+                ex.addContext("Invalid " + specifiedName.toString());
+                throw;
+            }
+        }(),
+        kStageName,
+        isIndependentOfAnyCollection));
+    return project;
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceProject::createUnset(

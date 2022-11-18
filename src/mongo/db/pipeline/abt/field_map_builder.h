@@ -57,8 +57,6 @@ struct FieldMapEntry {
     bool _hasDrop = false;
     boost::optional<ProjectionName> _constVarName;
 
-    // TODO SERVER-68516: Consider maintaining children as a vector of FieldMapEntry's. Then we can
-    // remove the _fieldMap member of FieldMapBuilder.
     // Child paths are potentially dotted field paths.
     OrderedPathSet _childPaths;
 };

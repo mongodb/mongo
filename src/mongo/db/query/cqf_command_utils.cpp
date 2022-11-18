@@ -30,6 +30,10 @@
 #include "mongo/db/query/cqf_command_utils.h"
 
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/exec/add_fields_projection_executor.h"
+#include "mongo/db/exec/exclusion_projection_executor.h"
+#include "mongo/db/exec/inclusion_projection_executor.h"
+#include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -107,7 +111,7 @@
 #include "mongo/db/pipeline/visitors/document_source_visitor.h"
 #include "mongo/db/pipeline/visitors/document_source_walker.h"
 #include "mongo/db/pipeline/visitors/transformer_interface_walker.h"
-#include "mongo/db/query/projection_ast_path_tracking_visitor.h"
+#include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -358,52 +362,635 @@ private:
     bool& _eligible;
 };
 
-class ABTProjectionVisitor final : public projection_ast::ProjectionASTConstVisitor {
+class ABTUnsupportedAggExpressionVisitor : public ExpressionConstVisitor {
 public:
-    ABTProjectionVisitor(projection_ast::PathTrackingVisitorContext<>* context, bool& eligible)
-        : _context{context}, _eligible(eligible) {
-        invariant(_context);
+    ABTUnsupportedAggExpressionVisitor(bool& eligible) : _eligible(eligible) {}
+
+    void visit(const ExpressionConstant* expr) override final {
+        unsupportedExpression();
     }
 
-    void visit(const projection_ast::ProjectionPositionalASTNode* node) final {
-        unsupportedProjectionType();
+    void visit(const ExpressionAbs* expr) override final {
+        unsupportedExpression();
     }
 
-    void visit(const projection_ast::ProjectionSliceASTNode* node) final {
-        unsupportedProjectionType();
+    void visit(const ExpressionAdd* expr) override final {
+        unsupportedExpression();
     }
 
-    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {
-        unsupportedProjectionType();
+    void visit(const ExpressionAllElementsTrue* expr) override final {
+        unsupportedExpression();
     }
 
-    void visit(const projection_ast::ExpressionASTNode* node) final {
-        unsupportedProjectionType();
+    void visit(const ExpressionAnd* expr) override final {
+        unsupportedExpression();
     }
 
-    void visit(const projection_ast::BooleanConstantASTNode* node) final {
-        const auto& path = _context->fullPath();
-        assertSupportedPath(path.fullPath());
+    void visit(const ExpressionAnyElementTrue* expr) override final {
+        unsupportedExpression();
     }
 
-    void visit(const projection_ast::ProjectionPathASTNode* node) final {}
+    void visit(const ExpressionArray* expr) override final {
+        unsupportedExpression();
+    }
 
-    void visit(const projection_ast::MatchExpressionASTNode* node) final {
-        unsupportedProjectionType();
+    void visit(const ExpressionArrayElemAt* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFirst* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionLast* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionObjectToArray* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionArrayToObject* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionBsonSize* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionCeil* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionCoerceToBool* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionCompare* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionConcat* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionConcatArrays* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionCond* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDateFromString* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDateFromParts* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDateDiff* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDateToParts* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDateToString* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDateTrunc* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDivide* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionExp* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFieldPath* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFilter* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFloor* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionIfNull* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionIn* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionIndexOfArray* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionIndexOfBytes* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionIndexOfCP* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionIsNumber* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionLet* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionLn* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionLog* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionLog10* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionInternalFLEEqual* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionInternalFLEBetween* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionMap* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionMeta* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionMod* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionMultiply* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionNot* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionObject* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionOr* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionPow* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionRange* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionReduce* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionReplaceOne* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionReplaceAll* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSetDifference* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSetEquals* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSetIntersection* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSetIsSubset* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSetUnion* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSize* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionReverseArray* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSortArray* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSlice* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionIsArray* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionInternalFindAllValuesAtPath* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionRound* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSplit* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSqrt* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionStrcasecmp* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSubstrBytes* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSubstrCP* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionStrLenBytes* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionBinarySize* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionStrLenCP* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSubtract* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSwitch* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionTestApiVersion* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionToLower* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionToUpper* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionTrim* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionTrunc* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionType* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionZip* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionConvert* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionRegexFind* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionRegexFindAll* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionRegexMatch* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionCosine* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSine* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionTangent* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionArcCosine* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionArcSine* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionArcTangent* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionArcTangent2* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionHyperbolicArcTangent* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionHyperbolicArcCosine* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionHyperbolicArcSine* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionHyperbolicTangent* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionHyperbolicCosine* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionHyperbolicSine* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDegreesToRadians* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionRadiansToDegrees* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDayOfMonth* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDayOfWeek* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDayOfYear* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionHour* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionMillisecond* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionMinute* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionMonth* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSecond* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionWeek* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionIsoWeekYear* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionIsoDayOfWeek* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionIsoWeek* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionYear* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionTests::Testable* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionInternalJsEmit* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionInternalFindSlice* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionInternalFindPositional* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionInternalFindElemMatch* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFunction* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionRandom* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionToHashedIndexKey* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDateAdd* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionDateSubtract* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionSetField* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionGetField* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionTsSecond* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionTsIncrement* expr) override final {
+        unsupportedExpression();
     }
 
 private:
-    projection_ast::PathTrackingVisitorContext<>* _context;
-    bool& _eligible;
-
-    void assertSupportedPath(const std::string& path) {
-        if (FieldRef(path).hasNumericPathComponents())
-            _eligible = false;
-    }
-
-    void unsupportedProjectionType() {
+    void unsupportedExpression() {
         _eligible = false;
     }
+
+    bool& _eligible;
+};
+
+class ABTTransformerVisitor : public TransformerInterfaceConstVisitor {
+public:
+    ABTTransformerVisitor(bool& eligible) : _eligible(eligible) {}
+
+    void visit(const projection_executor::ExclusionProjectionExecutor* transformer) override {
+        checkUnsupportedInclusionExclusion(transformer);
+    }
+
+    void visit(const projection_executor::InclusionProjectionExecutor* transformer) override {
+        checkUnsupportedInclusionExclusion(transformer);
+    }
+
+    void visit(const projection_executor::AddFieldsProjectionExecutor* transformer) override {
+        unsupportedTransformer(transformer);
+    }
+
+    void visit(const GroupFromFirstDocumentTransformation* transformer) override {
+        unsupportedTransformer(transformer);
+    }
+
+    void visit(const ReplaceRootTransformation* transformer) override {
+        unsupportedTransformer(transformer);
+    }
+
+private:
+    void unsupportedTransformer(const TransformerInterface* transformer) {
+        _eligible = false;
+    }
+
+    template <typename T>
+    void checkUnsupportedInclusionExclusion(const T* transformer) {
+        OrderedPathSet computedPaths;
+        StringMap<std::string> renamedPaths;
+        transformer->getRoot()->reportComputedPaths(&computedPaths, &renamedPaths);
+
+        // Non-simple projections are supported under test only.
+        if (computedPaths.size() > 0 || renamedPaths.size() > 0) {
+            unsupportedTransformer(transformer);
+            return;
+        }
+
+        OrderedPathSet preservedPaths;
+        transformer->getRoot()->reportProjectedPaths(&preservedPaths);
+
+        for (const std::string& path : preservedPaths) {
+            if (FieldRef(path).hasNumericPathComponents()) {
+                unsupportedTransformer(transformer);
+                return;
+            }
+        }
+
+        ABTUnsupportedAggExpressionVisitor aggVisitor(_eligible);
+        stage_builder::ExpressionWalker walker{&aggVisitor, nullptr, nullptr};
+        expression_walker::walk(transformer->rootReplacementExpression().get(), &walker);
+    }
+
+    bool& _eligible;
 };
 
 /**
@@ -560,26 +1147,9 @@ public:
     }
 
     void visit(const DocumentSourceSingleDocumentTransformation* source) override {
-        switch (source->getType()) {
-            case TransformerInterface::TransformerType::kComputedProjection:
-            case TransformerInterface::TransformerType::kGroupFromFirstDocument:
-            case TransformerInterface::TransformerType::kReplaceRoot:
-                eligible = false;
-                break;
-            case TransformerInterface::TransformerType::kExclusionProjection:
-            case TransformerInterface::TransformerType::kInclusionProjection: {
-                tassert(6684602,
-                        "Translating Inclusion or Exclusion projection but there's no AST in "
-                        "DocumentSource",
-                        source->hasProjectionAST());
-
-                projection_ast::PathTrackingVisitorContext context;
-                ABTProjectionVisitor visitor(&context, eligible);
-                projection_ast::PathTrackingWalker walker{&context, {&visitor}, {}};
-                tree_walker::walk<true, projection_ast::ASTNode>(source->getProjectionAST()->root(),
-                                                                 &walker);
-            }
-        }
+        ABTTransformerVisitor visitor(eligible);
+        TransformerInterfaceWalker walker(&visitor);
+        walker.walk(&source->getTransformer());
     }
 
     void unsupportedStage(const DocumentSource* source) {
@@ -749,10 +1319,14 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
     tree_walker::walk<true, MatchExpression>(expression, &walker);
 
     if (cq.getProj()) {
-        projection_ast::PathTrackingVisitorContext context;
-        ABTProjectionVisitor visitor(&context, eligible);
-        projection_ast::PathTrackingWalker walker{&context, {&visitor}, {}};
-        tree_walker::walk<true, projection_ast::ASTNode>(cq.getProj()->root(), &walker);
+        auto projExecutor = projection_executor::buildProjectionExecutor(
+            cq.getExpCtx(),
+            cq.getProj(),
+            ProjectionPolicies::findProjectionPolicies(),
+            projection_executor::BuilderParamsBitSet{projection_executor::kDefaultBuilderParams});
+        ABTTransformerVisitor visitor(eligible);
+        TransformerInterfaceWalker walker(&visitor);
+        walker.walk(projExecutor.get());
     }
 
     return eligible;

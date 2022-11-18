@@ -92,6 +92,14 @@ public:
     }
 
     /**
+     * Returns the root-replacement expression to this tree. Can return nullptr if this tree does
+     * not have a root replacing expression.
+     */
+    boost::intrusive_ptr<Expression> rootReplacementExpression() const {
+        return _rootReplacementExpression;
+    }
+
+    /**
      * Returns the exhaustive set of all paths that will be preserved by this projection, or
      * boost::none if the exhaustive set cannot be determined.
      */
