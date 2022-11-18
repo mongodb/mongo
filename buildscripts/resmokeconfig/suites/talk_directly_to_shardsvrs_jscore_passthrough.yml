@@ -11,6 +11,9 @@ selector:
   # test sets fail point with error code NotWritablePrimary, the test driver changes its topology to
   # ReplicaSetNoPrimary and create a new connection once it get the primary again.
   - jstests/core/failcommand_failpoint.js
+  # TODO: SERVER-71487 Legacy shell does not carry over encryption information through
+  # getMores in reconfig suites.
+  - src/mongo/db/modules/*/jstests/fle2/query/*getMore*.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
