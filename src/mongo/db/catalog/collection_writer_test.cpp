@@ -192,7 +192,7 @@ TEST_F(CollectionWriterTest, CommitAfterDestroy) {
 }
 
 TEST_F(CollectionWriterTest, CatalogWrite) {
-    auto catalog = CollectionCatalog::get(getServiceContext());
+    auto catalog = CollectionCatalog::latest(getServiceContext());
     CollectionCatalog::write(
         getServiceContext(), [this, &catalog](CollectionCatalog& writableCatalog) {
             // We should see a different catalog instance than a reader would
@@ -202,7 +202,7 @@ TEST_F(CollectionWriterTest, CatalogWrite) {
                 writableCatalog.lookupCollectionByNamespaceForRead(operationContext(), kNss).get(),
                 catalog->lookupCollectionByNamespaceForRead(operationContext(), kNss).get());
         });
-    auto after = CollectionCatalog::get(getServiceContext());
+    auto after = CollectionCatalog::latest(getServiceContext());
     ASSERT_NE(&catalog, &after);
 }
 

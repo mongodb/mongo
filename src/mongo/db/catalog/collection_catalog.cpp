@@ -67,8 +67,8 @@ const ServiceContext::Decoration<LatestCollectionCatalog> getCatalog =
 
 std::shared_ptr<CollectionCatalog> batchedCatalogWriteInstance;
 
-const OperationContext::Decoration<std::shared_ptr<const CollectionCatalog>> stashedCatalog =
-    OperationContext::declareDecoration<std::shared_ptr<const CollectionCatalog>>();
+const RecoveryUnit::Snapshot::Decoration<std::shared_ptr<const CollectionCatalog>> stashedCatalog =
+    RecoveryUnit::Snapshot::declareDecoration<std::shared_ptr<const CollectionCatalog>>();
 
 /**
  * Returns true if the collection is compatible with the read timestamp.
@@ -440,7 +440,7 @@ bool CollectionCatalog::iterator::_exhausted() {
     return _mapIter == _catalog->_orderedCollections.end() || _mapIter->first.first != _dbName;
 }
 
-std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(ServiceContext* svcCtx) {
+std::shared_ptr<const CollectionCatalog> CollectionCatalog::latest(ServiceContext* svcCtx) {
     return atomic_load(&getCatalog(svcCtx).catalog);
 }
 
@@ -452,15 +452,15 @@ std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(OperationContext
         return batchedCatalogWriteInstance;
     }
 
-    const auto& stashed = stashedCatalog(opCtx);
+    const auto& stashed = stashedCatalog(opCtx->recoveryUnit()->getSnapshot());
     if (stashed)
         return stashed;
-    return get(opCtx->getServiceContext());
+    return latest(opCtx->getServiceContext());
 }
 
 void CollectionCatalog::stash(OperationContext* opCtx,
                               std::shared_ptr<const CollectionCatalog> catalog) {
-    stashedCatalog(opCtx) = std::move(catalog);
+    stashedCatalog(opCtx->recoveryUnit()->getSnapshot()) = std::move(catalog);
 }
 
 void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {

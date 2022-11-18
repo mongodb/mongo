@@ -99,7 +99,7 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
               // The global lock is held by the timestamp monitor while callbacks are executed, so
               // there can be no batched CollectionCatalog writer and we are thus safe to write
               // using the service context.
-              if (CollectionCatalog::get(serviceContext)
+              if (CollectionCatalog::latest(serviceContext)
                       ->needsCleanupForOldestTimestamp(timestamp)) {
                   CollectionCatalog::write(serviceContext, [timestamp](CollectionCatalog& catalog) {
                       catalog.cleanupForOldestTimestampAdvanced(timestamp);
@@ -891,8 +891,8 @@ RecoveryUnit* StorageEngineImpl::newRecoveryUnit() {
 std::vector<DatabaseName> StorageEngineImpl::listDatabases(
     boost::optional<TenantId> tenantId) const {
     auto res = tenantId
-        ? CollectionCatalog::get(getGlobalServiceContext())->getAllDbNamesForTenant(tenantId)
-        : CollectionCatalog::get(getGlobalServiceContext())->getAllDbNames();
+        ? CollectionCatalog::latest(getGlobalServiceContext())->getAllDbNamesForTenant(tenantId)
+        : CollectionCatalog::latest(getGlobalServiceContext())->getAllDbNames();
     return res;
 }
 

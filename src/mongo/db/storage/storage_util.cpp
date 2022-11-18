@@ -56,7 +56,7 @@ auto removeEmptyDirectory =
         // If we don't support supportsPendingDrops then this is executing before the collection is
         // removed from the catalog. In that case, just blindly attempt to delete the directory, it
         // will only succeed if it is empty which is the behavior we want.
-        auto collectionCatalog = CollectionCatalog::get(svcCtx);
+        auto collectionCatalog = CollectionCatalog::latest(svcCtx);
         const DatabaseName& dbName = ns.dbName();
         if (!storageEngine->isUsingDirectoryPerDb() ||
             (storageEngine->supportsPendingDrops() &&

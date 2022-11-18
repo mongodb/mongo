@@ -113,12 +113,20 @@ public:
         }
     };
 
-    static std::shared_ptr<const CollectionCatalog> get(ServiceContext* svcCtx);
+    /**
+     * Returns a CollectionCatalog instance. Normally returns the latest stored instance but returns
+     * the stashed or batch write instance if set for this operation/snapshot.
+     */
     static std::shared_ptr<const CollectionCatalog> get(OperationContext* opCtx);
 
     /**
-     * Stashes provided CollectionCatalog pointer on the OperationContext.
-     * Will cause get() to return it for this OperationContext.
+     * Returns the latest stored CollectionCatalog instance. Bypasses stashing and batched writing.
+     */
+    static std::shared_ptr<const CollectionCatalog> latest(ServiceContext* svcCtx);
+
+    /**
+     * Stashes provided CollectionCatalog pointer on the RecoveryUnit snapshot.
+     * Will cause get() to return this instance while the snapshot remains open.
      */
     static void stash(OperationContext* opCtx, std::shared_ptr<const CollectionCatalog> catalog);
 
