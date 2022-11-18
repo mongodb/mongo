@@ -133,7 +133,6 @@ void schemaValidationFailed(CollectionValidation::ValidateState* state,
 
     state->setCollectionSchemaViolated();
 
-    // TODO SERVER-65078: remove the testing proctor check.
     // When testing is enabled, only warn about non-compliant documents to prevent test failures.
     if (TestingProctor::instance().isEnabled() ||
         Collection::SchemaValidationResult::kWarn == result) {
