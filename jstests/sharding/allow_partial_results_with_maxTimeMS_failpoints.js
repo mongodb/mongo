@@ -33,8 +33,8 @@ function isError(res) {
 // Set up a 2-shard single-node replicaset cluster with MongoBridge.
 const st = new ShardingTest({name: jsTestName(), shards: 2, useBridge: true, rs: {nodes: 1}});
 
-const dbName = "test-SERVER-57469";
-const collName = "test-SERVER-57469-coll";
+const dbName = "test-SERVER-57469-failpoints";
+const collName = "test-SERVER-57469-failpoints-coll";
 
 const coll = st.s0.getDB(dbName)[collName];
 
@@ -78,9 +78,10 @@ function runQueryWithTimeout(doAllowPartialResults, timeout) {
     });
 }
 
-// Set ampleTimeMS to at least 100ms, plus ten times the basic query runtime.
-// This timeout will provide ample time for our queries to run to completion.
-const ampleTimeMS = 100 + 10 * runtimeMillis(() => runQueryWithTimeout(true, 999999999));
+// Set ampleTimeMS to at least 2000ms, plus ten times the basic query runtime.
+// This timeout must provide ample time for our queries to run to completion, even on passthrough
+// suites with resource contention.
+const ampleTimeMS = 2000 + 10 * runtimeMillis(() => runQueryWithTimeout(true, 999999999));
 print("ampleTimeMS: " + ampleTimeMS);
 
 // Try to fetch all the data in one batch, with ample time allowed.
@@ -288,6 +289,10 @@ function getMoreShardTimeout(allowPartialResults, failureController, batchSize) 
     const res = assert.commandWorked(coll.runCommand({
         find: collName,
         filter: {$where: whereCode()},
+        // FindWhereSleepController only works with getMore if docs are _id-ordered.  We use a hint
+        // instead of sort here because we want to avoid blocking on missing docs -- we want the
+        // AsyncResultsMerger to return results from the live shard while the other is failing.
+        hint: {_id: 1},
         allowPartialResults: allowPartialResults,
         batchSize: batchSize,
         maxTimeMS: ampleTimeMS
