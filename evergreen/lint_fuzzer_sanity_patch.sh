@@ -6,8 +6,6 @@ cd src
 set -eo pipefail
 set -o verbose
 
-add_nodejs_to_path
-
 mkdir -p jstestfuzzinput jstestfuzzoutput
 
 indir="$(pwd)/jstestfuzzinput"
@@ -25,8 +23,8 @@ if [[ "$(ls -A $indir)" ]]; then
     num_files=50
   fi
 
-  npm run --prefix jstestfuzz jstestfuzz -- --jsTestsDir $indir --out $outdir --numSourceFiles $num_files --numGeneratedFiles 50
+  ./jstestfuzz/src/scripts/npm_run.sh --prefix jstestfuzz jstestfuzz -- --jsTestsDir $indir --out $outdir --numSourceFiles $num_files --numGeneratedFiles 50
 
   # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
-  ls -1 -d $outdir/* | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
+  ls -1 -d $outdir/* | xargs -P 32 -L 50 ./jstestfuzz/src/scripts/npm_run.sh --prefix jstestfuzz parse-jsfiles --
 fi
