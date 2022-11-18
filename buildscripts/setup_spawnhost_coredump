@@ -177,6 +177,12 @@ fi' >> .bash_profile
     # harmless. gdb expects the .debug files to live adjacent to the physical binary.
     find bin -type f -perm -o=x -exec ln -s {} . \;
 
+    # Boost-Pretty-Printer supports auto-detection for the boost version but relies on the system
+    # installed version of boost. To avoid this behavior we explicitly specify the boost_version.
+    # Moreover, the most recent version of boost that Boost-Pretty-Printer verifies it supports is
+    # version 1.73.0. While 1.73.0 is older than the version in the src/third_party/boost/
+    # directory, the pretty printer in Boost-Pretty-Printer will display boost::optional values
+    # correctly.
     cat >> ~/.gdbinit <<EOF
 set auto-load safe-path /
 set solib-search-path ./lib/
@@ -189,7 +195,7 @@ python
 import sys
 sys.path.insert(0, './Boost-Pretty-Printer')
 import boost
-boost.register_printers()
+boost.register_printers(boost_version=(1, 73, 0))
 end
 dir $HOME/debug
 EOF
