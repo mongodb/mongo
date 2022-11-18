@@ -63,8 +63,5 @@ assert.eq(125,
           "Number of documents on the recipient shard after moveChunk is incorrect.");
 assert.eq(175, testColl.find().itcount(), "Number of total documents is incorrect");
 
-// Set the validationAction to "warn" to avoid failing collection validation.
-assert.commandWorked(testColl.runCommand("collMod", {validationAction: "warn"}));
-
 st.stop();
 })();

@@ -32,9 +32,9 @@ function printCollectionOptions(rollbackTest, time) {
 let CommonOps = (node) => {
     let testDb = node.getDB(dbName);
     assert.commandWorked(testDb[coll1Name].insert({a: 1, b: 1}));
-    assert.commandWorked(testDb[coll2Name].insert({a: 1, b: 1}));
-    assert.commandWorked(testDb[coll3Name].insert({a: 1, b: 1}));
-    assert.commandWorked(testDb[coll4Name].insert({a: 1, b: 1}));
+    assert.commandWorked(testDb[coll2Name].insert({a: 2, b: 2}));
+    assert.commandWorked(testDb[coll3Name].insert({a: 3, b: 3}));
+    assert.commandWorked(testDb[coll4Name].insert({a: 4, b: 4}));
 
     // Start with no validation action.
     assert.commandWorked(testDb.runCommand({

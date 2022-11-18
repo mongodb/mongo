@@ -10,7 +10,7 @@
  * Asserts that 'doc' matches 'schema' if and only if 'valid' is true. Drops 'coll' in the process,
  * so do not pass a collection whose contents you wish to preserve.
  */
-function assertSchemaMatch(coll, schema, doc, valid, removeValidator = false) {
+function assertSchemaMatch(coll, schema, doc, valid) {
     const errmsg = "Document " + tojson(doc) +
         (valid ? " should have matched the schema " : " unexpectedly matched the schema ") +
         tojson(schema);
@@ -59,13 +59,5 @@ function assertSchemaMatch(coll, schema, doc, valid, removeValidator = false) {
         assert.writeErrorWithCode(res,
                                   ErrorCodes.DocumentValidationFailure,
                                   errmsg + " during update document validation in strict mode");
-    }
-
-    if (removeValidator) {
-        // Remove the validator to avoid failing collection validation.
-        assert.commandWorked(coll.runCommand("collMod", {validator: {}}));
-    } else {
-        // Set the validationAction to "warn" to avoid failing collection validation.
-        assert.commandWorked(coll.runCommand("collMod", {validationAction: "warn"}));
     }
 }

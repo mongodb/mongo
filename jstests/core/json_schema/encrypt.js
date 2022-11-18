@@ -15,48 +15,41 @@ const encryptedBinDataElement = BinData(6, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 const nonEncryptedBinDataElement = BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 
 // Only elements of type BinData with subtype '6' should match.
+assertSchemaMatch(coll, {properties: {bin: {encrypt: {}}}}, {bin: encryptedBinDataElement}, true);
+assertSchemaMatch(coll, {properties: {bin: {encrypt: {}}}}, {bin: {}}, false);
 assertSchemaMatch(
-    coll, {properties: {bin: {encrypt: {}}}}, {bin: encryptedBinDataElement}, true, true);
-assertSchemaMatch(coll, {properties: {bin: {encrypt: {}}}}, {bin: {}}, false, true);
-assertSchemaMatch(
-    coll, {properties: {bin: {encrypt: {}}}}, {bin: nonEncryptedBinDataElement}, false, true);
+    coll, {properties: {bin: {encrypt: {}}}}, {bin: nonEncryptedBinDataElement}, false);
 // Nested in object.
 assertSchemaMatch(coll,
                   {properties: {obj: {type: 'object', properties: {a: {encrypt: {}}}}}},
                   {obj: {a: encryptedBinDataElement}},
-                  true,
                   true);
 assertSchemaMatch(coll,
                   {properties: {obj: {type: 'object', properties: {a: {encrypt: {}}}}}},
                   {obj: {a: {}}},
-                  false,
-                  true);
+                  false);
 assertSchemaMatch(coll,
                   {properties: {obj: {type: 'object', properties: {a: {encrypt: {}}}}}},
                   {obj: {a: nonEncryptedBinDataElement}},
-                  false,
-                  true);
+                  false);
 
 // Nested in array.
 assertSchemaMatch(coll,
                   {properties: {arr: {type: 'array', items: {encrypt: {}}}}},
                   {arr: [encryptedBinDataElement, encryptedBinDataElement]},
-                  true,
                   true);
 assertSchemaMatch(
-    coll, {properties: {arr: {type: 'array', items: {encrypt: {}}}}}, {arr: [{}, {}]}, false, true);
+    coll, {properties: {arr: {type: 'array', items: {encrypt: {}}}}}, {arr: [{}, {}]}, false);
 assertSchemaMatch(coll,
                   {properties: {arr: {type: 'array', items: {encrypt: {}}}}},
                   {arr: [encryptedBinDataElement, nonEncryptedBinDataElement]},
-                  false,
-                  true);
+                  false);
 
 // If array is not specified, should not traverse array of encrypted BinData's.
 assertSchemaMatch(coll,
                   {properties: {bin: {encrypt: {}}}},
                   {bin: [encryptedBinDataElement, encryptedBinDataElement]},
-                  false,
-                  true);
+                  false);
 
 // Encrypt alongside type/bsontype should fail to parse.
 assert.commandFailedWithCode(

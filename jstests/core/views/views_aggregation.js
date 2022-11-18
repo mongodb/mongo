@@ -151,10 +151,6 @@ assert.commandWorked(viewsDB.runCommand({
     assert.commandWorked(
         viewsDB.runCommand({aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}}),
         "Expected aggregate to succeed since 'allowDiskUse' is true by default");
-
-    // Set the validationAction to "warn" to avoid failing collection validation.
-    assert.commandWorked(
-        viewsDB.runCommand({collMod: validatedCollName, validationAction: "warn"}));
 })();
 
 // Test explain modes on a view.
