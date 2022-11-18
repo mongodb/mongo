@@ -39,9 +39,25 @@ namespace mongo {
 bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& query);
 
 /**
- * Checks if the given query can be executed with the SBE engine.
+ * Checks if the given query can be executed with the SBE engine based on the canonical query.
+ *
+ * This method determines whether the query may be compatible with SBE based only on high-level
+ * information from the canonical query, before query planning has taken place (such as ineligible
+ * expressions or collections).
+ *
+ * If this method returns true, query planning should be done, followed by another layer of
+ * validation to make sure the query plan can be executed with SBE. If it returns false, SBE query
+ * planning can be short-circuited as it is already known that the query is ineligible for SBE.
  */
-bool isQuerySbeCompatible(const CollectionPtr* collection,
-                          const CanonicalQuery* cq,
-                          size_t plannerOptions);
+bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery* cq);
+
+/**
+ * Checks if the given query can be executed with the SBE engine based on the query solution.
+ *
+ * This method determines whether the query may be compatible with SBE based on the query solution
+ * (such as ineligible plan stages). It should be used in conjunction with the higher level
+ * isQuerySbeCompatible() check to ensure that all aspects of the query are validated for
+ * compatibility.
+ */
+bool isQueryPlanSbeCompatible(const QuerySolution* root);
 }  // namespace mongo

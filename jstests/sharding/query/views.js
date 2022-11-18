@@ -1,11 +1,18 @@
 /**
  * Tests for expected behavior when querying a view that is based on a sharded collection.
+ * @tags: [
+ *  requires_fcv_63,
+ * ]
  */
 (function() {
 "use strict";
 
 // For profilerHasSingleMatchingEntryOrThrow.
 load("jstests/libs/profiler.js");
+// For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");
+// For areAllCollectionsClustered.
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 // Given sharded explain output in 'shardedExplain', verifies that the explain mode 'verbosity'
 // affected the output verbosity appropriately, and that the response has the expected format.
@@ -45,6 +52,9 @@ let mongos = st.s;
 let config = mongos.getDB("config");
 let db = mongos.getDB(jsTestName());
 db.dropDatabase();
+
+const sbeEnabled = checkSBEEnabled(db);
+const isClustered = ClusteredCollectionUtil.areAllCollectionsClustered(st.rs0.getPrimary());
 
 let coll = db.getCollection("coll");
 
@@ -108,10 +118,20 @@ for (let verbosity of explainVerbosities) {
 assert.eq(5, view.count({a: {$lte: 8}}));
 
 result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}});
-verifyExplainResult({shardedExplain: result, verbosity: "allPlansExecution"});
+// Allow success whether or not the pipeline is optimized away, as it differs based on test
+// environment and execution engine used.
+verifyExplainResult({
+    shardedExplain: result,
+    verbosity: "allPlansExecution",
+    optimizedAwayPipeline: sbeEnabled && !isClustered
+});
 for (let verbosity of explainVerbosities) {
     result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}, verbosity: verbosity});
-    verifyExplainResult({shardedExplain: result, verbosity: verbosity});
+    verifyExplainResult({
+        shardedExplain: result,
+        verbosity: verbosity,
+        optimizedAwayPipeline: sbeEnabled && !isClustered
+    });
 }
 
 //

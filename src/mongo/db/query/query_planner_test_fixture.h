@@ -252,6 +252,10 @@ protected:
         markQueriesSbeCompatible = sbeCompatible;
     }
 
+    void setCountQuery() {
+        isCount = true;
+    }
+
     //
     // Data members.
     //
@@ -275,6 +279,8 @@ protected:
     // Value used for the forceGenerateRecordId flag in the CanonicalQuery objects created by the
     // test.
     bool forceRecordId = false;
+    // Value used for the isCount flag in the CanonicalQuery objects created by the test.
+    bool isCount = false;
 };
 
 }  // namespace mongo

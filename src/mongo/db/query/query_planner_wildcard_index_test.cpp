@@ -629,7 +629,8 @@ TEST_F(QueryPlannerWildcardTest, DottedFieldCovering) {
 }
 
 TEST_F(QueryPlannerWildcardTest, CoveredIxscanForCountOnIndexedPath) {
-    params.options = QueryPlannerParams::IS_COUNT;
+    params.options = QueryPlannerParams::DEFAULT;
+    setCountQuery();
     addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: 5}"));
 

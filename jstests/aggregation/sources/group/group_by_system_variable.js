@@ -5,23 +5,25 @@
 (function() {
 "use strict";
 
-const coll = db.group_by_system_variable;
-coll.drop();
-assert.commandWorked(coll.insert({}));
-
-// These explains all should not throw.
-coll.explain().aggregate({$group: {_id: "$$IS_MR"}});
-coll.explain().aggregate({$group: {_id: "$$JS_SCOPE"}});
-coll.explain().aggregate({$group: {_id: "$$CLUSTER_TIME"}});
-
-// These queries throw, but the server should stay up.
-assert.throws(() => coll.aggregate({$group: {_id: "$$IS_MR"}}));
-assert.throws(() => coll.aggregate({$group: {_id: "$$JS_SCOPE"}}));
-try {
-    // This one may or may not throw: CLUSTER_TIME may or may not be defined,
-    // depending on what kind of cluster we're running against.
-    coll.aggregate({$group: {_id: "$$CLUSTER_TIME"}});
-} catch (e) {
+function testAggWithSystemVariable(varName, explain) {
+    try {
+        // This query might or might not throw depending on the engine used
+        // and whether the variable is defined.
+        if (explain)
+            call.explain().aggregate({$group: {_id: varName}});
+        else
+            call.aggregate({$group: {_id: varName}});
+    } catch (e) {
+    } finally {
+        // Make sure the server didn't crash.
+        db.hello();
+    }
 }
-db.hello();
+
+testAggWithSystemVariable("$$IS_MR", true);
+testAggWithSystemVariable("$$JS_SCOPE", true);
+testAggWithSystemVariable("$$CLUSTER_TIME", true);
+testAggWithSystemVariable("$$IS_MR");
+testAggWithSystemVariable("$$JS_SCOPE");
+testAggWithSystemVariable("$$CLUSTER_TIME");
 })();

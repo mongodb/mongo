@@ -70,7 +70,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     const ExtensionsCallback& extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     const ProjectionPolicies& projectionPolicies,
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline) {
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
+    bool isCount) {
     auto status = query_request_helper::validateFindCommandRequest(*findCommand);
     if (!status.isOK()) {
         return status;
@@ -139,7 +140,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                  parsingCanProduceNoopMatchNodes(extensionsCallback, allowedFeatures),
                  std::move(me),
                  projectionPolicies,
-                 std::move(pipeline));
+                 std::move(pipeline),
+                 isCount);
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -171,7 +173,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                                  baseQuery.canHaveNoopMatchNodes(),
                                  root->shallowClone(),
                                  ProjectionPolicies::findProjectionPolicies(),
-                                 {} /* an empty pipeline */);
+                                 {} /* an empty pipeline */,
+                                 baseQuery.isCount());
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -185,7 +188,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
                             bool canHaveNoopMatchNodes,
                             std::unique_ptr<MatchExpression> root,
                             const ProjectionPolicies& projectionPolicies,
-                            std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline) {
+                            std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
+                            bool isCount) {
     _expCtx = expCtx;
     _findCommand = std::move(findCommand);
 
@@ -193,6 +197,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     _forceClassicEngine = ServerParameterSet::getNodeParameterSet()
                               ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
                               ->_data.get() == QueryFrameworkControlEnum::kForceClassicEngine;
+
+    _isCount = isCount;
 
     auto validStatus = isValid(root.get(), *_findCommand);
     if (!validStatus.isOK()) {

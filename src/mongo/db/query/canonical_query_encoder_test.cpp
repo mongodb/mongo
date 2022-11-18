@@ -71,7 +71,8 @@ unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
                                         BSONObj proj,
                                         BSONObj collation,
                                         std::unique_ptr<FindCommandRequest> findCommand = nullptr,
-                                        std::vector<BSONObj> pipelineObj = {}) {
+                                        std::vector<BSONObj> pipelineObj = {},
+                                        bool isCount = false) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
@@ -101,7 +102,8 @@ unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures,
                                      ProjectionPolicies::findProjectionPolicies(),
-                                     std::move(pipeline));
+                                     std::move(pipeline),
+                                     isCount);
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -144,7 +146,8 @@ void testComputeSBEKey(unittest::GoldenTestContext& gctx,
                        const char* sortStr,
                        const char* projStr,
                        std::unique_ptr<FindCommandRequest> findCommand = nullptr,
-                       std::vector<BSONObj> pipelineObj = {}) {
+                       std::vector<BSONObj> pipelineObj = {},
+                       bool isCount = false) {
     auto& stream = gctx.outStream();
     stream << "==== VARIATION: sbe, query=" << queryStr << ", sort=" << sortStr
            << ", proj=" << projStr;
@@ -153,6 +156,9 @@ void testComputeSBEKey(unittest::GoldenTestContext& gctx,
                << ", returnKey=" << findCommand->getReturnKey()
                << ", requestResumeToken=" << findCommand->getRequestResumeToken();
     }
+    if (isCount) {
+        stream << ", isCount=true";
+    }
     stream << std::endl;
     BSONObj collation;
     unique_ptr<CanonicalQuery> cq(canonicalize(fromjson(queryStr),
@@ -160,7 +166,8 @@ void testComputeSBEKey(unittest::GoldenTestContext& gctx,
                                                fromjson(projStr),
                                                collation,
                                                std::move(findCommand),
-                                               std::move(pipelineObj)));
+                                               std::move(pipelineObj),
+                                               isCount));
     cq->setSbeCompatible(true);
     const auto key = canonical_query_encoder::encodeSBE(*cq);
     gctx.outStream() << key << std::endl;
@@ -441,6 +448,10 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
     testComputeSBEKey(gctx, "{}", "{}", "{a: 1}");
     testComputeSBEKey(gctx, "{}", "{}", "{a: true}");
     testComputeSBEKey(gctx, "{}", "{}", "{a: false}");
+
+    // With count
+    testComputeSBEKey(
+        gctx, "{}", "{}", "{}", nullptr /* findCommand */, {} /* pipeline */, true /* isCount */);
 
     // With FindCommandRequest
     auto findCommand = std::make_unique<FindCommandRequest>(nss);

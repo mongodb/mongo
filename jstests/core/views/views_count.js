@@ -5,10 +5,15 @@
 //   requires_fastcount,
 //   # Explain of a resolved view must be executed by mongos.
 //   directly_against_shardsvrs_incompatible,
+//   requires_fcv_63,
 // ]
 
 (function() {
 "use strict";
+
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
+const sbeEnabled = checkSBEEnabled(db);
 
 var viewsDB = db.getSiblingDB("views_count");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -70,14 +75,18 @@ explainPlan =
     assert.commandWorked(lessThanSevenView.explain("executionStats").count({x: {$gte: 5}}));
 assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_count.coll");
 assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
-assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 2, tojson(explainPlan));
+assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned,
+          sbeEnabled ? 1 : 2,  // SBE group push down causes count to be emitted in first stage.
+          tojson(explainPlan));
 assert(!explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
 
 explainPlan =
     assert.commandWorked(lessThanSevenView.explain("allPlansExecution").count({x: {$gte: 5}}));
 assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_count.coll");
 assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
-assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 2);
+assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned,
+          sbeEnabled ? 1 : 2,  // SBE group push down causes count to be emitted in first stage.
+          tojson(explainPlan));
 assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
 
 // Count with hint works on a view.

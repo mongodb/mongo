@@ -160,4 +160,10 @@ assert(!planHasStage(db, explain, "COLUMN_SCAN"), explain);
 // SBE is not supported for the count command.
 explain = coll.explain().find({a: 2}).count();
 assert(!planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
+// Count-like queries that can use another index should prefer that to column scan.
+assert.commandWorked(coll.createIndex({a: 1}));
+explain = coll.explain().aggregate([{$match: {a: 1}}, {$count: "count"}]);
+assert(aggPlanHasStage(explain, "COUNT_SCAN") || aggPlanHasStage(explain, "IXSCAN"), explain);
+assert.commandWorked(coll.dropIndex({a: 1}));
 }());

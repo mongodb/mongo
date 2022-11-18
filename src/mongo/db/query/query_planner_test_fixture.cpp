@@ -364,7 +364,8 @@ void QueryPlannerTest::runQueryFull(
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures,
                                      ProjectionPolicies::findProjectionPolicies(),
-                                     std::move(pipeline));
+                                     std::move(pipeline),
+                                     isCount);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
     cq->setSbeCompatible(markQueriesSbeCompatible);
@@ -442,7 +443,10 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                      false,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures,
+                                     ProjectionPolicies::findProjectionPolicies(),
+                                     {},
+                                     isCount);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
     cq->setSbeCompatible(markQueriesSbeCompatible);
@@ -472,7 +476,10 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
                                      isExplain,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures,
+                                     ProjectionPolicies::findProjectionPolicies(),
+                                     {},
+                                     isCount);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
     cq->setSbeCompatible(markQueriesSbeCompatible);
@@ -501,7 +508,10 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
                                      isExplain,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures,
+                                     ProjectionPolicies::findProjectionPolicies(),
+                                     {},
+                                     isCount);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
     cq->setSbeCompatible(markQueriesSbeCompatible);

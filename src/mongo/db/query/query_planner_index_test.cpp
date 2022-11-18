@@ -40,7 +40,8 @@ namespace {
 
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesQuery) {
-    params.options = QueryPlannerParams::IS_COUNT;
+    params.options = QueryPlannerParams::DEFAULT;
+    setCountQuery();
     addIndex(BSON("x" << 1));
     runQuery(BSON("x" << 5));
     ASSERT_EQUALS(getNumSolutions(), 1U);
@@ -48,7 +49,8 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesQuery
 }
 
 TEST_F(QueryPlannerTest, PlannerAddsFetchToIxscanForCountWhenFetchFilterNonempty) {
-    params.options = QueryPlannerParams::IS_COUNT;
+    params.options = QueryPlannerParams::DEFAULT;
+    setCountQuery();
     addIndex(BSON("x" << 1));
     runQuery(BSON("y" << 3 << "x" << 5));
     ASSERT_EQUALS(getNumSolutions(), 1U);
@@ -58,7 +60,8 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchToIxscanForCountWhenFetchFilterNonempty
 }
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesNullQuery) {
-    params.options = QueryPlannerParams::IS_COUNT;
+    params.options = QueryPlannerParams::DEFAULT;
+    setCountQuery();
     addIndex(BSON("x" << 1));
     runQuery(fromjson("{x: null}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
@@ -68,7 +71,8 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesNullQ
 }
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenIndexSatisfiesNullAndOtherQuery) {
-    params.options = QueryPlannerParams::IS_COUNT;
+    params.options = QueryPlannerParams::DEFAULT;
+    setCountQuery();
     addIndex(BSON("x" << 1));
     runQuery(fromjson("{x: {$in: [null, 2]}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
@@ -78,7 +82,8 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenIndexSatisfiesNullAndOtherQ
 }
 
 TEST_F(QueryPlannerTest, PlannerAddsFetchForCountWhenMultikeyIndexSatisfiesNullQuery) {
-    params.options = QueryPlannerParams::IS_COUNT;
+    params.options = QueryPlannerParams::DEFAULT;
+    setCountQuery();
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(fromjson("{x: 1}"), multikeyPaths);
     runQuery(fromjson("{x: null}"));
@@ -90,7 +95,8 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchForCountWhenMultikeyIndexSatisfiesNullQ
 }
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenMultikeyIndexSatisfiesNullEmptyQuery) {
-    params.options = QueryPlannerParams::IS_COUNT;
+    params.options = QueryPlannerParams::DEFAULT;
+    setCountQuery();
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(fromjson("{x: 1}"), multikeyPaths);
     runQuery(fromjson("{x: {$in: [null, []]}}"));
@@ -101,7 +107,8 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenMultikeyIndexSatisf
 }
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenMultikeyIndexSatisfiesNullEmptyAndOtherQuery) {
-    params.options = QueryPlannerParams::IS_COUNT;
+    params.options = QueryPlannerParams::DEFAULT;
+    setCountQuery();
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(fromjson("{x: 1}"), multikeyPaths);
     runQuery(fromjson("{x: {$in: [null, [], 2]}}"));

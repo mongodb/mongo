@@ -74,7 +74,8 @@ public:
         MatchExpressionParser::AllowedFeatureSet allowedFeatures =
             MatchExpressionParser::kDefaultSpecialFeatures,
         const ProjectionPolicies& projectionPolicies = ProjectionPolicies::findProjectionPolicies(),
-        std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline = {});
+        std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline = {},
+        bool isCount = false);
 
     /**
      * For testing or for internal clients to use.
@@ -281,6 +282,21 @@ public:
         return _pipeline;
     }
 
+    /**
+     * Returns true if the query is a count-like query, i.e. has no dependencies on inputs (see
+     * DepsTracker::hasNoRequirements()). These queries can be served without accessing the source
+     * documents (e.g. {$group: {_id: null, c: {$min: 42}}}) in which case we might be able to avoid
+     * scanning the collection and instead use COUNT_SCAN or other optimizations.
+     *
+     * Note that this applies to the find/non-pipeline portion of the query. If the count-like group
+     * is pushed down, later execution stages cannot be treated like a count. In other words, a
+     * query with a pushed-down group may be considered a count at the data access layer but not
+     * above the canonical query.
+     */
+    bool isCount() const {
+        return _isCount;
+    }
+
 private:
     // You must go through canonicalize to create a CanonicalQuery.
     CanonicalQuery() {}
@@ -291,7 +307,8 @@ private:
                 bool canHaveNoopMatchNodes,
                 std::unique_ptr<MatchExpression> root,
                 const ProjectionPolicies& projectionPolicies,
-                std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline);
+                std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
+                bool isCount);
 
     // Initializes '_sortPattern', adding any metadata dependencies implied by the sort.
     //
@@ -343,6 +360,9 @@ private:
 
     // A map from assigned InputParamId's to parameterised MatchExpression's.
     std::vector<const MatchExpression*> _inputParamIdToExpressionMap;
+
+    // True if this is a count-like query, i.e. can emit empty documents.
+    bool _isCount = false;
 };
 
 }  // namespace mongo

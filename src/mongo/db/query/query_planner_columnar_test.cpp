@@ -1175,4 +1175,77 @@ TEST_F(QueryPlannerColumnarTest, NoColumnIndexCoversQuery) {
     assertSolutionExists(R"({proj: {spec: {a: 1}, node: {cscan: {dir: 1}}}})");
 }
 
+TEST_F(QueryPlannerColumnarTest, ColumnIndexForCount) {
+    setCountQuery();
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    runQuerySortProj(BSONObj(), BSONObj(), BSONObj());
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {},
+            outputFields: [],
+            matchFields: []
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, ColumnIndexForCountIncludesShardFilter) {
+    setCountQuery();
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.shardKey = BSON("sk1" << 1 << "sk2.nested" << 1);
+
+    runQuerySortProj(BSONObj(), BSONObj(), BSONObj());
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        sharding_filter: {
+            node: {
+                column_scan: {
+                    filtersByPath: {},
+                    outputFields: ['sk1', 'sk2.nested'],
+                    matchFields: []
+                }
+            }
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, ColumnIndexForCountWithColumnPathFilter) {
+    setCountQuery();
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    runQuerySortProj(BSON("a" << BSON("$gt" << 3)), BSONObj(), BSONObj());
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {a: {a: {$gt: 3}}},
+            outputFields: [],
+            matchFields: ['a']
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, ColumnIndexForCountWithPostAssemblyFilter) {
+    setCountQuery();
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    runQuerySortProj(
+        BSON("$or" << BSON_ARRAY(BSON("a" << 3) << BSON("b" << 4))), BSONObj(), BSONObj());
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {},
+            outputFields: [],
+            matchFields: ['a', 'b'],
+            postAssemblyFilter: {$or: [{a: 3}, {b: 4}]}
+        }
+    })");
+}
+
 }  // namespace mongo

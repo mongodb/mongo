@@ -31,7 +31,6 @@
 #include "mongo/db/query/query_utils.h"
 
 #include "mongo/db/exec/sbe/match_path.h"
-#include "mongo/db/query/query_planner_params.h"
 
 namespace mongo {
 
@@ -44,15 +43,12 @@ bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery
         CollatorInterface::collatorsMatch(query.getCollator(), collection->getDefaultCollator());
 }
 
-bool isQuerySbeCompatible(const CollectionPtr* collection,
-                          const CanonicalQuery* cq,
-                          size_t plannerOptions) {
+bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery* cq) {
     tassert(6071400, "Expected CanonicalQuery pointer to not be nullptr", cq);
     invariant(cq);
     auto expCtx = cq->getExpCtxRaw();
     const auto& sortPattern = cq->getSortPattern();
     const bool allExpressionsSupported = expCtx && expCtx->sbeCompatible;
-    const bool isNotCount = !(plannerOptions & QueryPlannerParams::IS_COUNT);
     const bool isNotOplog = !cq->nss().isOplog();
     const bool isNotChangeCollection = !cq->nss().isChangeCollection();
     const bool doesNotContainMetadataRequirements = cq->metadataDeps().none();
@@ -77,10 +73,19 @@ bool isQuerySbeCompatible(const CollectionPtr* collection,
 
     const bool isNotInnerSideOfLookup = !(expCtx && expCtx->inLookup);
 
-    return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
+    return allExpressionsSupported && doesNotContainMetadataRequirements &&
         isQueryNotAgainstTimeseriesCollection && isQueryNotAgainstClusteredCollection &&
         doesNotSortOnMetaOrPathWithNumericComponents && isNotOplog && doesNotRequireMatchDetails &&
         doesNotHaveElemMatchProject && isNotChangeCollection && isNotInnerSideOfLookup &&
         !(*collection && isIdHackEligibleQuery(*collection, *cq));
 }
+
+bool isQueryPlanSbeCompatible(const QuerySolution* root) {
+    tassert(7061701, "Expected QuerySolution pointer to not be nullptr", root);
+
+    const bool isNotCountScan = !root->hasNode(StageType::STAGE_COUNT_SCAN);
+
+    return isNotCountScan;
+}
+
 }  // namespace mongo

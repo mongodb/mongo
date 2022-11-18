@@ -204,18 +204,26 @@ std::pair<DepsTracker, DepsTracker> computeDeps(const QueryPlannerParams& params
     DepsTracker filterDeps;
     match_expression::addDependencies(query.root(), &filterDeps);
     DepsTracker outputDeps;
-    if (!query.getProj() || query.getProj()->requiresDocument()) {
+    if ((!query.getProj() || query.getProj()->requiresDocument()) && !query.isCount()) {
         outputDeps.needWholeDocument = true;
         return {std::move(filterDeps), std::move(outputDeps)};
-    }
-    outputDeps.fields = query.getProj()->getRequiredFields();
-    if (auto sortPattern = query.getSortPattern()) {
-        sortPattern->addDependencies(&outputDeps);
     }
     if (params.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
         for (auto&& field : params.shardKey) {
             outputDeps.fields.emplace(field.fieldNameStringData());
         }
+    }
+    if (query.isCount()) {
+        // If this is a count, we won't have required projections, but may still need to output the
+        // shard filter.
+        return {std::move(filterDeps), std::move(outputDeps)};
+    }
+
+    const auto& reqFields = query.getProj()->getRequiredFields();
+    outputDeps.fields.insert(reqFields.begin(), reqFields.end());
+
+    if (auto sortPattern = query.getSortPattern()) {
+        sortPattern->addDependencies(&outputDeps);
     }
     // There's no known way a sort would depend on the whole document, and we already verified
     // that the projection doesn't depend on the whole document.
@@ -457,9 +465,6 @@ string optionString(size_t options) {
                 break;
             case QueryPlannerParams::INDEX_INTERSECTION:
                 ss << "INDEX_INTERSECTION ";
-                break;
-            case QueryPlannerParams::IS_COUNT:
-                ss << "IS_COUNT ";
                 break;
             case QueryPlannerParams::GENERATE_COVERED_IXSCANS:
                 ss << "GENERATE_COVERED_IXSCANS ";
@@ -988,13 +993,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> handleClusteredScanHint(
 
 StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     const CanonicalQuery& query, const QueryPlannerParams& params) {
-    // It's a little silly to ask for a count and for owned data. This could indicate a bug
-    // earlier on.
-    tassert(5397500,
-            "Count and owned data requested",
-            !((params.options & QueryPlannerParams::IS_COUNT) &&
-              (params.options & QueryPlannerParams::RETURN_OWNED_DATA)));
-
     LOGV2_DEBUG(20967,
                 5,
                 "Beginning planning",

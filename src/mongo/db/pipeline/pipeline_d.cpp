@@ -225,7 +225,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     const AggregateCommandRequest* aggRequest,
     const QueryPlannerParams& plannerOpts,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-    Pipeline* pipeline) {
+    Pipeline* pipeline,
+    bool* hasNoRequirements) {
+    invariant(hasNoRequirements);
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     query_request_helper::setTailableMode(expCtx->tailableMode, findCommand.get());
     findCommand->setFilter(queryObj.getOwned());
@@ -256,13 +258,19 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     // that is not pushed down contains expressions not supported by SBE.
     expCtx->sbeCompatible = true;
 
+    // This query might be eligible for count optimizations, since the remaining stages in the
+    // pipeline don't actually need to read any data produced by the query execution layer.
+    const bool isCount = *hasNoRequirements;
+
     auto cq = CanonicalQuery::canonicalize(expCtx->opCtx,
                                            std::move(findCommand),
                                            isExplain,
                                            expCtx,
                                            extensionsCallback,
                                            matcherFeatures,
-                                           ProjectionPolicies::aggregateProjectionPolicies());
+                                           ProjectionPolicies::aggregateProjectionPolicies(),
+                                           {} /* empty pipeline */,
+                                           isCount);
 
     if (!cq.isOK()) {
         // Return an error instead of uasserting, since there are cases where the combination of
@@ -310,6 +318,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
                            collections,
                            std::move(cq.getValue()),
                            [&](auto* canonicalQuery, bool attachOnly) {
+                               // Queries that can use SBE may push down compatible pipeline stages.
+                               // This is done by calling this lambda in two phases: 1) determine
+                               // compatible stages and attach them to the canonical query, and 2)
+                               // finalize the push down and trim the pushed-down stages from the
+                               // original pipeline.
                                if (attachOnly) {
                                    canonicalQuery->setPipeline(findSbeCompatibleStagesForPushdown(
                                        expCtx, collections, canonicalQuery, pipeline));
@@ -317,6 +330,29 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
                                    // Not attaching - we need to trim the already pushed down
                                    // pipeline stages from the pipeline.
                                    trimPipelineStages(pipeline, canonicalQuery->pipeline().size());
+
+                                   // hasNoRequirements determines whether $cursor stage could use
+                                   // kEmptyDocuments cursor type. If we are pushing down some
+                                   // stages but cannot optimize out the aggregation layer
+                                   // completely, even if the source documents don't need to be
+                                   // accessed, the $cursor stage might still produce a document so
+                                   // must reset hasNoRequirements.
+                                   // An example of this is if we have a count query that would have
+                                   // emitted 1000 kEmptyDocuments from the $cursor before counting
+                                   // with a $group stage -- when the $group is pushed down, the
+                                   // $cursor stage will now emit a single non-empty document with
+                                   // {count:1000}.
+                                   bool hasPushedDownGroupStage = std::any_of(
+                                       canonicalQuery->pipeline().begin(),
+                                       canonicalQuery->pipeline().end(),
+                                       [](const auto& stage) {
+                                           return dynamic_cast<DocumentSourceGroup*>(
+                                                      stage->documentSource()) != nullptr;
+                                       });
+                                   if (canonicalQuery->isCount() && hasPushedDownGroupStage &&
+                                       !canonicalQuery->pipeline().back()->isLastSource()) {
+                                       *hasNoRequirements = false;
+                                   }
                                }
                            },
                            permitYield,
@@ -1637,11 +1673,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     *hasNoRequirements = deps.hasNoRequirements();
 
     BSONObj projObj;
-    if (*hasNoRequirements) {
-        // This query might be eligible for count optimizations, since the remaining stages in the
-        // pipeline don't actually need to read any data produced by the query execution layer.
-        plannerOpts.options |= QueryPlannerParams::IS_COUNT;
-    } else {
+    if (!*hasNoRequirements) {
         // Build a BSONObj representing a projection eligible for pushdown. If there is an inclusion
         // projection at the front of the pipeline, it will be removed and handled by the PlanStage
         // layer. If a projection cannot be pushed down, an empty BSONObj will be returned.
@@ -1659,8 +1691,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         bool allowExpressions = !sortStage && !skipThenLimit.getSkip() && !skipThenLimit.getLimit();
         projObj = buildProjectionForPushdown(
             deps, pipeline, allowExpressions, timeseriesBoundedSortOptimization);
-        plannerOpts.options |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
+
+    plannerOpts.options |= QueryPlannerParams::RETURN_OWNED_DATA;
 
     if (rewrittenGroupStage) {
         // See if the query system can handle the $group and $sort stage using a DISTINCT_SCAN
@@ -1677,7 +1710,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                                       aggRequest,
                                                       plannerOpts,
                                                       matcherFeatures,
-                                                      pipeline);
+                                                      pipeline,
+                                                      hasNoRequirements);
 
         if (swExecutorGrouped.isOK()) {
             // Any $limit stage before the $group stage should make the pipeline ineligible for this
@@ -1726,7 +1760,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                 aggRequest,
                                 plannerOpts,
                                 matcherFeatures,
-                                pipeline);
+                                pipeline,
+                                hasNoRequirements);
 }
 
 Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {
