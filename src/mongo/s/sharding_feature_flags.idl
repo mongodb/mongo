@@ -78,9 +78,7 @@ feature_flags:
     default: true
     version: 6.1
   featureFlagCatalogShard:
-    description: "Must be enabled for any mongod process started with the --catalogsvr option.  The
-                  --catalogsvr flag indicates to the node that it is part of a replica set that hosts both
-                  config data and user data.  It is a shard server, and the config server."
+    description: "Feature flag for enabling shared config server/shard server cluster role"
     cpp_varname: feature_flags::gCatalogShard
     default: false
   featureFlagConcurrencyInChunkMigration:
