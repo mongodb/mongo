@@ -966,17 +966,11 @@ private:
     }
 
     BSONObj groupSpec() final {
-        BSONObjBuilder builder;
-        builder.append("_id", "$a");
-        BSONObjBuilder accum(builder.subobjStart("big_array"));
-        accum.append("$push", "$b");
-        accum.done();
-
         if constexpr (groupStageType == GroupStageType::Streaming) {
-            BSONArrayBuilder sub(builder.subarrayStart("$monotonicIdFields"));
-            sub.append("_id").done();
+            return fromjson("{_id: '$a', big_array: {$push: '$b'}, $monotonicIdFields: ['_id']}");
+        } else {
+            return fromjson("{_id: '$a', big_array: {$push: '$b'}}");
         }
-        return builder.done();
     }
 
     boost::optional<size_t> getMaxMemoryUsageBytes() final {
@@ -986,7 +980,7 @@ private:
     BSONObj expectedResultSet() final {
         BSONArrayBuilder result;
         for (int i = 0; i < kCount; ++i) {
-            result.append(BSON("_id" << i << "big_array" << BSON_ARRAY(kBigString)));
+            result << BSON("_id" << i << "big_array" << BSON_ARRAY(kBigString));
         }
         return result.arr();
     }
@@ -1031,9 +1025,9 @@ private:
         BSONArrayBuilder result;
         for (int i = 0; i < kCount; ++i) {
             auto id = BSON("x" << 0 << "y" << i);
-            result.append(BSON("_id" << id << "big_array" << BSON_ARRAY(kBigString)));
+            result << BSON("_id" << id << "big_array" << BSON_ARRAY(kBigString));
         }
-        return result.done();
+        return result.arr();
     }
 };
 
@@ -1073,13 +1067,13 @@ private:
     BSONObj expectedResultSet() final {
         BSONArrayBuilder result;
         for (int i = 0; i < kCount; ++i) {
-            BSONArrayBuilder bigArray;
+            BSONArrayBuilder bigArrayBuilder;
             for (int j = 0; j < (i % 3) + 1; ++j) {
-                bigArray.append(kBigString);
+                bigArrayBuilder << kBigString;
             }
-            result.append(BSON("_id" << i << "big_array" << bigArray.arr()));
+            result << BSON("_id" << i << "big_array" << bigArrayBuilder.arr());
         }
-        return result.done();
+        return result.arr();
     }
 };
 
@@ -1121,8 +1115,8 @@ private:
         BSONArrayBuilder result;
         for (int i = 0; i < kCount; ++i) {
             for (int j = 0; j < kCount; ++j) {
-                result.append(BSON("_id" << BSON("x" << i << "y" << j) << "sum"
-                                         << (kCount * (kCount - 1)) / 2));
+                result << BSON("_id" << BSON("x" << i << "y" << j) << "sum"
+                                     << (kCount * (kCount - 1)) / 2);
             }
         }
         return result.arr();
@@ -1146,18 +1140,8 @@ private:
     }
 
     BSONObj groupSpec() final {
-        BSONObjBuilder builder;
-
-        BSONObjBuilder id(builder.subobjStart("_id"));
-        id.append("x", "$x").append("y", "$y").done();
-
-        BSONObjBuilder accum(builder.subobjStart("sum"));
-        accum.append("$sum", "$z").done();
-
-        BSONArrayBuilder sub(builder.subarrayStart("$monotonicIdFields"));
-        sub.append("x").append("y").done();
-
-        return builder.done();
+        return fromjson(
+            "{_id: {x: '$x', y: '$y'}, sum: {$sum: '$z'}, $monotonicIdFields: ['x', 'y']}");
     }
 
     boost::optional<size_t> getMaxMemoryUsageBytes() final {
@@ -1166,14 +1150,9 @@ private:
 
     BSONObj expectedResultSet() final {
         BSONArrayBuilder result;
-        generateInputOutput([&result](int x, int y) {
-            BSONObjBuilder builder(result.subobjStart());
-
-            BSONObjBuilder id(builder.subobjStart("_id"));
-            id.append("x", x).append("y", y).done();
-
-            builder.append("sum", (kCount * (kCount - 1)) / 2);
-            builder.done();
+        const int sum = (kCount * (kCount - 1)) / 2;
+        generateInputOutput([&](int x, int y) {
+            result << BSON("_id" << BSON("x" << x << "y" << y) << "sum" << sum);
         });
         return result.arr();
     }
