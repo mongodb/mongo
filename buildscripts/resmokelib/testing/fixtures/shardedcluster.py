@@ -24,7 +24,7 @@ class ShardedClusterFixture(interface.Fixture):
                  preserve_dbpath=False, num_shards=1, num_rs_nodes_per_shard=1, num_mongos=1,
                  enable_sharding=None, enable_balancer=True, enable_autosplit=True,
                  auth_options=None, configsvr_options=None, shard_options=None,
-                 cluster_logging_prefix=None):
+                 cluster_logging_prefix=None, catalog_shard=None):
         """Initialize ShardedClusterFixture with different options for the cluster processes."""
 
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
@@ -42,6 +42,7 @@ class ShardedClusterFixture(interface.Fixture):
             mongod_options.get("set_parameters", {})).copy()
         self.mongod_options["set_parameters"]["migrationLockAcquisitionMaxWaitMS"] = \
                 self.mongod_options["set_parameters"].get("migrationLockAcquisitionMaxWaitMS", 30000)
+        self.catalog_shard = catalog_shard
         self.preserve_dbpath = preserve_dbpath
         self.num_shards = num_shards
         self.num_rs_nodes_per_shard = num_rs_nodes_per_shard
@@ -91,7 +92,8 @@ class ShardedClusterFixture(interface.Fixture):
 
     def setup(self):
         """Set up the sharded cluster."""
-        self.configsvr.setup()
+        if self.catalog_shard is None:
+            self.configsvr.setup()
 
         # Start up each of the shards
         for shard in self.shards:
@@ -234,6 +236,8 @@ class ShardedClusterFixture(interface.Fixture):
             teardown_handler.teardown(mongos, "mongos", mode=mode)
 
         for shard in self.shards:
+            if shard is self.configsvr:
+                continue
             teardown_handler.teardown(shard, "shard", mode=mode)
 
         if self.configsvr is not None:
@@ -334,6 +338,11 @@ class ShardedClusterFixture(interface.Fixture):
         mongod_options["shardsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard{}".format(index))
         mongod_options["replSet"] = self._SHARD_REPLSET_NAME_PREFIX + str(index)
+
+        if self.catalog_shard == index:
+            del mongod_options["shardsvr"]
+            mongod_options["configsvr"] = ""
+            replset_config_options["configsvr"] = True
 
         shard_logging_prefix = self._get_rs_shard_logging_prefix(index)
 

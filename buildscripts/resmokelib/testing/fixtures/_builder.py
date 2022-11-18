@@ -18,7 +18,7 @@ from buildscripts.resmokelib.testing.fixtures.replicaset import \
 from buildscripts.resmokelib.testing.fixtures.shardedcluster import \
     ShardedClusterFixture
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
-from buildscripts.resmokelib.utils import autoloader, default_if_none
+from buildscripts.resmokelib.utils import autoloader, default_if_none, pick_catalog_shard_node
 
 MONGO_REPO_LOCATION = "."
 FIXTURE_DIR = "buildscripts/resmokelib/testing/fixtures"
@@ -402,13 +402,19 @@ class ShardedClusterBuilder(FixtureBuilder):
                                                           **kwargs)
 
         is_multiversion = mixed_bin_versions is not None
-        config_svr = self._new_configsvr(sharded_cluster, is_multiversion, old_bin_version)
-        sharded_cluster.install_configsvr(config_svr)
 
         for rs_shard_index in range(kwargs["num_shards"]):
             rs_shard = self._new_rs_shard(sharded_cluster, mixed_bin_versions, old_bin_version,
                                           rs_shard_index, kwargs["num_rs_nodes_per_shard"])
             sharded_cluster.install_rs_shard(rs_shard)
+
+        catalog_shard = kwargs["catalog_shard"]
+        config_svr = None
+        if catalog_shard is None:
+            config_svr = self._new_configsvr(sharded_cluster, is_multiversion, old_bin_version)
+        else:
+            config_svr = sharded_cluster.shards[catalog_shard]
+        sharded_cluster.install_configsvr(config_svr)
 
         for mongos_index in range(kwargs["num_mongos"]):
             mongos = self._new_mongos(sharded_cluster, mongos_executables, mongos_classes,
@@ -438,6 +444,10 @@ class ShardedClusterBuilder(FixtureBuilder):
             kwargs.get("mongos_executable"), config.MONGOS_EXECUTABLE,
             config.DEFAULT_MONGOS_EXECUTABLE)
         kwargs["mongos_executable"] = mongos_executable
+
+        catalog_shard = pick_catalog_shard_node(
+            kwargs.pop("catalog_shard", config.CATALOG_SHARD), num_shards)
+        kwargs["catalog_shard"] = catalog_shard
 
     @staticmethod
     def _validate_multiversion_options(kwargs: Dict[str, Any],

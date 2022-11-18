@@ -937,6 +937,10 @@ class RunPlugin(PluginInterface):
                                             metavar="PATH",
                                             help="Sets the seed used by storage config fuzzer")
 
+        mongodb_server_options.add_argument(
+            "--catalogShard", dest="catalog_shard", metavar="CONFIG",
+            help="If set, specifies which node is the catalog shard. Can also be set to 'any'.")
+
         internal_options = parser.add_argument_group(
             title=_INTERNAL_OPTIONS_TITLE,
             description=("Internal options for advanced users and resmoke developers."

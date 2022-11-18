@@ -1,6 +1,7 @@
 """Helper functions."""
 
 import contextlib
+import random
 import re
 import sys
 
@@ -89,3 +90,21 @@ def get_task_name_without_suffix(task_name, variant_name):
     """
     task_name = task_name if task_name else ""
     return re.sub(fr"(_[0-9]+)?(_{variant_name})?$", "", task_name)
+
+
+def pick_catalog_shard_node(catalog_shard, num_shards):
+    """Get catalog_shard node index or None if no catalog_shard."""
+    if catalog_shard is None:
+        return None
+
+    if num_shards is None or int(num_shards) <= 0:
+        raise ValueError("Num shards > 0 for catalog shard to exist")
+
+    if catalog_shard == "any":
+        return random.randrange(0, num_shards)
+
+    catalog_shard_index = int(catalog_shard)
+    if catalog_shard_index < 0 or catalog_shard_index >= num_shards:
+        raise ValueError("Catalog shard value must be in range 0..num_shards-1 or \"any\"")
+
+    return catalog_shard_index

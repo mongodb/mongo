@@ -57,6 +57,7 @@ DEFAULTS = {
     "base_port": 20000,
     "backup_on_restart_dir": None,
     "buildlogger_url": "https://logkeeper2.build.10gen.cc",
+    "catalog_shard": None,
     "continue_on_failure": False,
     "dbpath_prefix": None,
     "dbtest_executable": None,
@@ -299,6 +300,9 @@ DBTEST_EXECUTABLE = None
 # If set to "tests", then resmoke.py will output the tests that would be run by each suite (without
 # actually running them).
 DRY_RUN = None
+
+# If set, specifies which node is the catalog shard. Can also be set to 'any'.
+CATALOG_SHARD = None
 
 # URL to connect to the Evergreen service.
 EVERGREEN_URL = None
