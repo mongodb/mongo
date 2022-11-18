@@ -10,46 +10,49 @@
  *   does_not_support_causal_consistency,
  * ]
  */
-
+(function() {
+'use strict';
+const testDb = db.getSiblingDB("test");
+const coll = testDb.getCollection("test_db");
 /*
  *  test drop
  */
-db.getCollection("test_db").drop();
-assert.eq(0, db.getCollection("test_db").find().length(), "1");
+coll.drop();
+assert.eq(0, coll.find().length(), "1");
 
-db.getCollection("test_db").save({a: 1});
-assert.eq(1, db.getCollection("test_db").find().length(), "2");
+coll.save({a: 1});
+assert.eq(1, coll.find().length(), "2");
 
-db.getCollection("test_db").drop();
-assert.eq(0, db.getCollection("test_db").find().length(), "3");
+coll.drop();
+assert.eq(0, coll.find().length(), "3");
 
 /*
  * test count
  */
 
-assert.eq(0, db.getCollection("test_db").count(), "4");
-db.getCollection("test_db").save({a: 1});
-assert.eq(1, db.getCollection("test_db").count(), "5");
-for (i = 0; i < 100; i++) {
-    db.getCollection("test_db").save({a: 1});
+assert.eq(0, coll.count(), "4");
+coll.save({a: 1});
+assert.eq(1, coll.count(), "5");
+for (var i = 0; i < 100; i++) {
+    coll.save({a: 1});
 }
-assert.eq(101, db.getCollection("test_db").count(), "6");
-db.getCollection("test_db").drop();
-assert.eq(0, db.getCollection("test_db").count(), "7");
+assert.eq(101, coll.count(), "6");
+coll.drop();
+assert.eq(0, coll.count(), "7");
 
 /*
  * test validate
  */
 
-db.getCollection("test_db").drop();
-assert.eq(0, db.getCollection("test_db").count(), "8");
+coll.drop();
+assert.eq(0, coll.count(), "8");
 
-for (i = 0; i < 100; i++) {
-    db.getCollection("test_db").save({a: 1});
+for (var i = 0; i < 100; i++) {
+    coll.save({a: 1});
 }
 
 (function() {
-var validateResult = assert.commandWorked(db.getCollection("test_db").validate());
+var validateResult = assert.commandWorked(coll.validate());
 // Extract validation results from mongos output if running in a sharded context.
 var isShardedNS = validateResult.hasOwnProperty('raw');
 
@@ -84,7 +87,7 @@ if (isShardedNS) {
 
 assert.eq('test.test_db',
           validateResult.ns,
-          'incorrect namespace in db.collection.validate() result: ' + tojson(validateResult));
+          'incorrect namespace in testDb.collection.validate() result: ' + tojson(validateResult));
 assert(validateResult.valid, 'collection validation failed');
 assert.eq(100, validateResult.nrecords, "11");
 }());
@@ -93,70 +96,70 @@ assert.eq(100, validateResult.nrecords, "11");
  * test deleteIndex, deleteIndexes
  */
 
-db.getCollection("test_db").drop();
-assert.eq(0, db.getCollection("test_db").count(), "12");
-db.getCollection("test_db").dropIndexes();
-assert.eq(0, db.getCollection("test_db").getIndexes().length, "13");
+coll.drop();
+assert.eq(0, coll.count(), "12");
+coll.dropIndexes();
+assert.eq(0, coll.getIndexes().length, "13");
 
-db.getCollection("test_db").save({a: 10});
-assert.eq(1, db.getCollection("test_db").getIndexes().length, "14");
+coll.save({a: 10});
+assert.eq(1, coll.getIndexes().length, "14");
 
-db.getCollection("test_db").createIndex({a: 1});
-db.getCollection("test_db").save({a: 10});
+coll.createIndex({a: 1});
+coll.save({a: 10});
 
-print(tojson(db.getCollection("test_db").getIndexes()));
-assert.eq(2, db.getCollection("test_db").getIndexes().length, "15");
+print(tojson(coll.getIndexes()));
+assert.eq(2, coll.getIndexes().length, "15");
 
-db.getCollection("test_db").dropIndex({a: 1});
-assert.eq(1, db.getCollection("test_db").getIndexes().length, "16");
+coll.dropIndex({a: 1});
+assert.eq(1, coll.getIndexes().length, "16");
 
-db.getCollection("test_db").save({a: 10});
-db.getCollection("test_db").createIndex({a: 1});
-db.getCollection("test_db").save({a: 10});
+coll.save({a: 10});
+coll.createIndex({a: 1});
+coll.save({a: 10});
 
-assert.eq(2, db.getCollection("test_db").getIndexes().length, "17");
+assert.eq(2, coll.getIndexes().length, "17");
 
-db.getCollection("test_db").dropIndex("a_1");
-assert.eq(1, db.getCollection("test_db").getIndexes().length, "18");
+coll.dropIndex("a_1");
+assert.eq(1, coll.getIndexes().length, "18");
 
-db.getCollection("test_db").save({a: 10, b: 11});
-db.getCollection("test_db").createIndex({a: 1});
-db.getCollection("test_db").createIndex({b: 1});
-db.getCollection("test_db").save({a: 10, b: 12});
+coll.save({a: 10, b: 11});
+coll.createIndex({a: 1});
+coll.createIndex({b: 1});
+coll.save({a: 10, b: 12});
 
-assert.eq(3, db.getCollection("test_db").getIndexes().length, "19");
+assert.eq(3, coll.getIndexes().length, "19");
 
-db.getCollection("test_db").dropIndex({b: 1});
-assert.eq(2, db.getCollection("test_db").getIndexes().length, "20");
-db.getCollection("test_db").dropIndex({a: 1});
-assert.eq(1, db.getCollection("test_db").getIndexes().length, "21");
+coll.dropIndex({b: 1});
+assert.eq(2, coll.getIndexes().length, "20");
+coll.dropIndex({a: 1});
+assert.eq(1, coll.getIndexes().length, "21");
 
-db.getCollection("test_db").save({a: 10, b: 11});
-db.getCollection("test_db").createIndex({a: 1});
-db.getCollection("test_db").createIndex({b: 1});
-db.getCollection("test_db").save({a: 10, b: 12});
+coll.save({a: 10, b: 11});
+coll.createIndex({a: 1});
+coll.createIndex({b: 1});
+coll.save({a: 10, b: 12});
 
-assert.eq(3, db.getCollection("test_db").getIndexes().length, "22");
+assert.eq(3, coll.getIndexes().length, "22");
 
-db.getCollection("test_db").dropIndexes();
-assert.eq(1, db.getCollection("test_db").getIndexes().length, "23");
+coll.dropIndexes();
+assert.eq(1, coll.getIndexes().length, "23");
 
-db.getCollection("test_db").find();
+coll.find();
 
-db.getCollection("test_db").drop();
-assert.eq(0, db.getCollection("test_db").getIndexes().length, "24");
+coll.drop();
+assert.eq(0, coll.getIndexes().length, "24");
 
 /*
  * stats()
  */
 
 (function() {
-var t = db.apttest_dbcollection;
+var t = testDb.apttest_dbcollection;
 
 // Non-existent collection.
 t.drop();
-var noCollStats =
-    assert.commandWorked(t.stats(), 'db.collection.stats() should work on non-existent collection');
+var noCollStats = assert.commandWorked(
+    t.stats(), 'testDb.collection.stats() should work on non-existent collection');
 assert.eq(0, noCollStats.size, "All properties should be 0 on nonexistant collections");
 assert.eq(0, noCollStats.count, "All properties should be 0 on nonexistant collections");
 assert.eq(0, noCollStats.storageSize, "All properties should be 0 on nonexistant collections");
@@ -166,29 +169,30 @@ assert.eq(0, noCollStats.totalSize, "All properties should be 0 on nonexistant c
 
 // scale - passed to stats() as sole numerical argument or part of an options object.
 t.drop();
-assert.commandWorked(db.createCollection(t.getName(), {capped: true, size: 10 * 1024 * 1024}));
+assert.commandWorked(testDb.createCollection(t.getName(), {capped: true, size: 10 * 1024 * 1024}));
 var collectionStats = assert.commandWorked(t.stats(1024 * 1024));
 assert.eq(10,
           collectionStats.maxSize,
-          'db.collection.stats(scale) - capped collection size scaled incorrectly: ' +
+          'testDb.collection.stats(scale) - capped collection size scaled incorrectly: ' +
               tojson(collectionStats));
 var collectionStats = assert.commandWorked(t.stats({scale: 1024 * 1024}));
 assert.eq(10,
           collectionStats.maxSize,
-          'db.collection.stats({scale: N}) - capped collection size scaled incorrectly: ' +
+          'testDb.collection.stats({scale: N}) - capped collection size scaled incorrectly: ' +
               tojson(collectionStats));
 
 // Ensure that collStats can handle large values for 'scale'.
 var collectionStats = assert.commandWorked(t.stats(Number.MAX_VALUE));
-assert.eq(0,
-          collectionStats.maxSize,
-          'db.collection.stats(Number.MAX_VALUE) - capped collection size scaled incorrectly: ' +
-              tojson(collectionStats));
+assert.eq(
+    0,
+    collectionStats.maxSize,
+    'testDb.collection.stats(Number.MAX_VALUE) - capped collection size scaled incorrectly: ' +
+        tojson(collectionStats));
 var collectionStats = assert.commandWorked(t.stats({scale: Number.MAX_VALUE}));
 assert.eq(
     0,
     collectionStats.maxSize,
-    'db.collection.stats({scale: Number.MAX_VALUE}) - capped collection size scaled incorrectly: ' +
+    'testDb.collection.stats({scale: Number.MAX_VALUE}) - capped collection size scaled incorrectly: ' +
         tojson(collectionStats));
 
 // indexDetails - If true, includes 'indexDetails' field in results. Default: false.
@@ -197,14 +201,15 @@ t.save({a: 1});
 t.createIndex({a: 1});
 collectionStats = assert.commandWorked(t.stats());
 assert(!collectionStats.hasOwnProperty('indexDetails'),
-       'unexpected indexDetails found in db.collection.stats() result: ' + tojson(collectionStats));
+       'unexpected indexDetails found in testDb.collection.stats() result: ' +
+           tojson(collectionStats));
 collectionStats = assert.commandWorked(t.stats({indexDetails: false}));
 assert(!collectionStats.hasOwnProperty('indexDetails'),
-       'unexpected indexDetails found in db.collection.stats({indexDetails: true}) result: ' +
+       'unexpected indexDetails found in testDb.collection.stats({indexDetails: true}) result: ' +
            tojson(collectionStats));
 collectionStats = assert.commandWorked(t.stats({indexDetails: true}));
 assert(collectionStats.hasOwnProperty('indexDetails'),
-       'indexDetails missing from db.collection.stats({indexDetails: true}) result: ' +
+       'indexDetails missing from testDb.collection.stats({indexDetails: true}) result: ' +
            tojson(collectionStats));
 
 // Returns index name.
@@ -222,7 +227,8 @@ function checkIndexDetails(options, indexName) {
     var collectionStats = assert.commandWorked(t.stats(options));
     assert(collectionStats.hasOwnProperty('indexDetails'),
            'indexDetails missing from ' +
-               'db.collection.stats(' + tojson(options) + ') result: ' + tojson(collectionStats));
+               'testDb.collection.stats(' + tojson(options) +
+               ') result: ' + tojson(collectionStats));
     // Currently, indexDetails is only supported with WiredTiger.
     var storageEngine = jsTest.options().storageEngine;
     if (storageEngine && storageEngine !== 'wiredTiger') {
@@ -253,38 +259,41 @@ var error = assert.throws(function() {
 }, [], 'indexDetailsKey and indexDetailsName cannot be used at the same time');
 assert.eq(Error,
           error.constructor,
-          'db.collection.stats() failed when both indexDetailsKey and indexDetailsName ' +
+          'testDb.collection.stats() failed when both indexDetailsKey and indexDetailsName ' +
               'are used but with incorrect error type');
 
 t.drop();
 }());
 
 /*
- * test db.collection.totalSize()
+ * test testDb.collection.totalSize()
  */
 (function() {
 'use strict';
 
-var t = db.apitest_dbcollection;
+var t = testDb.apitest_dbcollection;
 
 t.drop();
 var emptyStats = assert.commandWorked(t.stats());
 assert.eq(emptyStats.storageSize, 0);
 assert.eq(emptyStats.totalIndexSize, 0);
 
-assert.eq(0, t.storageSize(), 'db.collection.storageSize() on empty collection should return 0');
 assert.eq(
-    0, t.totalIndexSize(), 'db.collection.totalIndexSize() on empty collection should return 0');
-assert.eq(0, t.totalSize(), 'db.collection.totalSize() on empty collection should return 0');
+    0, t.storageSize(), 'testDb.collection.storageSize() on empty collection should return 0');
+assert.eq(0,
+          t.totalIndexSize(),
+          'testDb.collection.totalIndexSize() on empty collection should return 0');
+assert.eq(0, t.totalSize(), 'testDb.collection.totalSize() on empty collection should return 0');
 
 t.save({a: 1});
 var stats = assert.commandWorked(t.stats());
 assert.neq(undefined,
            t.storageSize(),
-           'db.collection.storageSize() cannot be undefined on a non-empty collection');
+           'testDb.collection.storageSize() cannot be undefined on a non-empty collection');
 assert.neq(undefined,
            t.totalIndexSize(),
-           'db.collection.totalIndexSize() cannot be undefined on a non-empty collection');
+           'testDb.collection.totalIndexSize() cannot be undefined on a non-empty collection');
 
 t.drop();
 }());
+})();

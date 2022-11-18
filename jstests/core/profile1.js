@@ -12,7 +12,8 @@
 //   requires_fcv_61,
 // ]
 
-(function() {
+// function argument overwritten won't affect original value and it can be run in parallel tests
+(function(db) {
 "use strict";
 function profileCursor(query) {
     query = query || {};
@@ -26,8 +27,6 @@ function resetProfile(level, slowms) {
     db.setProfilingLevel(level, slowms);
 }
 
-// special db so that it can be run in parallel tests
-var stddb = db;
 db = db.getSiblingDB("profile1");
 var username = "jstests_profile1_user";
 
@@ -110,6 +109,5 @@ try {
     // disable profiling for subsequent tests
     assert.commandWorked(db.runCommand({profile: 0}));
     db.logout();
-    db = stddb;
 }
-}());
+}(db));
