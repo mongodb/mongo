@@ -2,7 +2,7 @@
 'use strict';
 
 const mongo = MongoRunner.runMongod();
-const regexMatch = /sh([0-9]{5}|[0-9]{4})\|/;
+const regexMatch = /sh([0-9]{4,7})\|/;
 
 // Test that a normal mongo shell gives us some noise in the raw output.
 {
