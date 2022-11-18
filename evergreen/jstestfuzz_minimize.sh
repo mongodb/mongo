@@ -6,8 +6,6 @@ cd src/jstestfuzz
 set -o errexit
 set -o verbose
 
-add_nodejs_to_path
-
 if [ -f "../minimizer-outputs.json" ]; then
-  eval npm run ${npm_command} -- -j "../minimizer-outputs.json"
+  eval ./src/scripts/npm_run.sh ${npm_command} -- -j "../minimizer-outputs.json"
 fi
