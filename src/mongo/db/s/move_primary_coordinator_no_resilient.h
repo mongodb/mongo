@@ -35,13 +35,15 @@
 
 namespace mongo {
 
-class MovePrimaryCoordinator final
+// TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
+class MovePrimaryCoordinatorNoResilient final
     : public ShardingDDLCoordinatorImpl<MovePrimaryCoordinatorDocument> {
 public:
-    MovePrimaryCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+    MovePrimaryCoordinatorNoResilient(ShardingDDLCoordinatorService* service,
+                                      const BSONObj& initialState)
         : ShardingDDLCoordinatorImpl(service, "MovePrimaryCoordinator", initialState) {}
 
-    ~MovePrimaryCoordinator() = default;
+    ~MovePrimaryCoordinatorNoResilient() = default;
 
     void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
 

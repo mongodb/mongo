@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/move_primary_coordinator.h"
+#include "mongo/db/s/move_primary_coordinator_no_resilient.h"
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/s/move_primary_source_manager.h"
@@ -46,12 +46,12 @@
 
 namespace mongo {
 
-void MovePrimaryCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+void MovePrimaryCoordinatorNoResilient::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
     stdx::lock_guard lk{_docMutex};
     cmdInfoBuilder->append("request", BSON(_doc.kToShardIdFieldName << _doc.getToShardId()));
 };
 
-void MovePrimaryCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
+void MovePrimaryCoordinatorNoResilient::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two shard collections on the same namespace, then the arguments must be the same.
     const auto otherDoc = MovePrimaryCoordinatorDocument::parse(
         IDLParserContext("MovePrimaryCoordinatorDocument"), doc);
@@ -63,7 +63,7 @@ void MovePrimaryCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
 }
 
 
-ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
+ExecutorFuture<void> MovePrimaryCoordinatorNoResilient::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)

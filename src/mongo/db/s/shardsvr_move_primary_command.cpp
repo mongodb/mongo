@@ -32,7 +32,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/s/move_primary_coordinator.h"
+#include "mongo/db/s/move_primary_coordinator_no_resilient.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
@@ -119,6 +119,7 @@ public:
         ON_BLOCK_EXIT(
             [opCtx, dbNss] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db()); });
 
+        // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
         if (!feature_flags::gResilientMovePrimary.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
             auto coordinatorDoc = MovePrimaryCoordinatorDocument();
@@ -127,7 +128,7 @@ public:
             coordinatorDoc.setToShardId(toShard.toString());
 
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
-            auto movePrimaryCoordinator = checked_pointer_cast<MovePrimaryCoordinator>(
+            auto movePrimaryCoordinator = checked_pointer_cast<MovePrimaryCoordinatorNoResilient>(
                 service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
             movePrimaryCoordinator->getCompletionFuture().get(opCtx);
 

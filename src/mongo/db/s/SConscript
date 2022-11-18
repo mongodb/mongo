@@ -477,7 +477,7 @@ env.Library(
         'migration_chunk_cloner_source_legacy_commands.cpp',
         'migration_destination_manager_legacy_commands.cpp',
         'move_primary_coordinator_document.idl',
-        'move_primary_coordinator.cpp',
+        'move_primary_coordinator_no_resilient.cpp',
         'refine_collection_shard_key_coordinator_document.idl',
         'refine_collection_shard_key_coordinator.cpp',
         'refresh_query_analyzer_configuration_cmd.cpp',
