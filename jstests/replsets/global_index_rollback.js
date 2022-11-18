@@ -4,7 +4,7 @@
  *
  * @tags: [
  *     featureFlagGlobalIndexes,
- *     requires_fcv_62,
+ *     requires_fcv_63,
  *     requires_replication,
  * ]
  */
