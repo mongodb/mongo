@@ -268,7 +268,7 @@ const std::map<
 #end for
 };
 
-inline const auto getTransitionFCVFromAndTo(FeatureCompatibilityVersion v) {
+inline const auto& getTransitionFCVFromAndTo(FeatureCompatibilityVersion v) {
     return transitionFCVMap.at(v);
 }
 
