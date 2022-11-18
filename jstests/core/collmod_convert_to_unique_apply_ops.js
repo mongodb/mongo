@@ -1,7 +1,9 @@
 /**
  * Basic js tests for applying the collMod command converting regular indexes to unique indexes.
  *
+ * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   # applyOps is not supported on mongos
  *   assumes_against_mongod_not_mongos,
  *   # Cannot implicitly shard accessed collections because of collection existing when none

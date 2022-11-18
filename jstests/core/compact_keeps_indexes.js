@@ -1,7 +1,9 @@
 // SERVER-16676 Make sure compact doesn't leave the collection with bad indexes
 // SERVER-16967 Make sure compact doesn't crash while collections are being dropped
 // in a different database.
+// The test runs commands that are not allowed with security token: compact.
 // @tags: [
+//   not_allowed_with_security_token,
 //   # compact command is not available on embedded
 //   incompatible_with_embedded,
 //   uses_multiple_connections,

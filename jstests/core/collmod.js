@@ -50,7 +50,7 @@ function findCollectionInfo() {
 }
 
 // ensure we fail with gibberish options
-assert.commandFailed(t.runCommand('collmod', {NotARealOption: 1}));
+assert.commandFailed(t.runCommand('collMod', {NotARealOption: 1}));
 
 // add a TTL index
 t.createIndex({a: 1}, {"name": "index1", "expireAfterSeconds": 50});
@@ -130,4 +130,4 @@ assert.commandFailed(
 
 // Fails with an unknown key pattern.
 assert.commandFailed(db.runCommand(
-    {collmod: coll, index: {keyPattern: {doesnotexist: 1}, expireAfterSeconds: 100}}));
+    {collMod: coll, index: {keyPattern: {doesnotexist: 1}, expireAfterSeconds: 100}}));

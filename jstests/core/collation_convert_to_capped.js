@@ -2,7 +2,9 @@
  * Test that the collection created with the "convertToCapped" command inherits the default
  * collation of the corresponding collection.
  *
+ * The test runs commands that are not allowed with security token: convertToCapped.
  * @tags: [
+ *  not_allowed_with_security_token,
  *  requires_non_retryable_commands,
  *  requires_capped,
  * ]

@@ -1,7 +1,10 @@
 /**
  * Test cloneCollectionAsCapped
  *
+ * The test runs commands that are not allowed with security token: cloneCollectionAsCapped,
+ * convertToCapped.
  * @tags: [
+ *  not_allowed_with_security_token,
  *  requires_non_retryable_commands,
  *  requires_fastcount,
  *  requires_capped,

@@ -1,7 +1,12 @@
 // Cannot implicitly shard accessed collections because the error response from the shard about
 // using the empty string as the out collection name is converted to an error and no longer retains
 // the "code" property.
+// The test runs commands that are not allowed with security token: cleanupOrphaned,
+// cloneCollectionAsCapped, compact, dataSize, enableSharding, godinsert, mapreduce, mergeChunks,
+// moveChunk, movePrimary, planCacheClear, planCacheClearFilters, planCacheListFilters,
+// planCacheSetFilter, reIndex, shardCollection, split, updateZoneKeyRange.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 //   requires_fastcount,

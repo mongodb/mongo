@@ -1,7 +1,9 @@
 /**
  * Tests that benchRun can understand pipeline-style updates and findAndModifys.
  *
+ * The test runs commands that are not allowed with security token: benchRun.
  * @tags: [
+ *     not_allowed_with_security_token,
  *     uses_multiple_connections,
  *     # This test uses exhaust which does not use runCommand (required by the
  *     # inject_tenant_prefix.js override).

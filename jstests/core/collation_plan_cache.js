@@ -1,6 +1,9 @@
 // Integration testing for the plan cache and index filter commands with collation.
 //
+// The test runs commands that are not allowed with security token: planCacheClear,
+// planCacheClearFilters, planCacheListFilters, planCacheSetFilter.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_read_concern_unchanged,
 //   # This test attempts to perform queries and introspect the server's plan cache entries. The
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be

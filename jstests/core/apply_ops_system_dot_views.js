@@ -1,6 +1,8 @@
 /**
  * Tests that applyOps can include operations on the system.views namespace.
+ * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   # applyOps is not supported on mongos
  *   assumes_against_mongod_not_mongos,
  *   assumes_superuser_permissions,

@@ -1,6 +1,9 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
+// The test runs commands that are not allowed with security token: applyOps,
+// cloneCollectionAsCapped, mapReduce, reIndex.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_no_implicit_collection_creation_after_drop,
 //   # Asserts that some queries use a collection scan.
 //   assumes_no_implicit_index_creation,

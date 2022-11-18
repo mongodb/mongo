@@ -1,4 +1,6 @@
+// The test runs commands that are not allowed with security token: applyOps, mapReduce.
 // @tags: [
+//   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   does_not_support_transactions,
 //   requires_fastcount,

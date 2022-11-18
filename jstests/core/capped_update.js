@@ -2,7 +2,9 @@
  * Tests various update scenarios on capped collections:
  *  -- SERVER-58865: Allow modifications that change capped document sizes.
  *  -- SERVER-11983: Don't create _id field on capped updates
+ * The test runs commands that are not allowed with security token: godinsert.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   requires_capped,
  *   uses_testing_only_commands,
  *   # godinsert and can't run under replication

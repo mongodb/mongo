@@ -1,7 +1,9 @@
 /**
  * Tests that language features introduced in version 5.2 are included in API Version 1.
  *
+ * The test runs commands that are not allowed with security token: top.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   requires_fcv_60,
  *   uses_api_parameters,
  * ]

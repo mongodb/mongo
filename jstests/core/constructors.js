@@ -1,6 +1,8 @@
 // Tests to see what validity checks are done for 10gen specific object construction
 //
+// The test runs commands that are not allowed with security token: mapReduce.
 // @tags: [
+//   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_non_retryable_commands,
 //   uses_map_reduce_with_temp_collections,

@@ -1,7 +1,9 @@
 /**
  * SERVER-32125 Check that applyOps commands with collMod without UUID don't strip it
  *
+ * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
+ *   not_allowed_with_security_token,
  *  requires_non_retryable_commands,
  *  # applyOps is not supported on mongos
  *  assumes_against_mongod_not_mongos,

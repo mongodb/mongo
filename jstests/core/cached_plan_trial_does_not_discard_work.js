@@ -2,7 +2,9 @@
 // invalidate the plan (and discard its results) at the end of the trial unless replanning is
 // needed.
 //
+// The test runs commands that are not allowed with security token: setProfilingLevel.
 // @tags: [
+//   not_allowed_with_security_token,
 //   # This test attempts to perform queries and introspect the server's plan cache entries. The
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be
 //   # routed to the primary.
