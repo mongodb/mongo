@@ -2,11 +2,9 @@
  * Tests that a columnstore index can be persisted and found in listIndexes after a server restart.
  *
  * @tags: [
+ *   requires_fcv_63,
  *   requires_persistence,
  *   requires_replication,
- *   # column store indexes are still under a feature flag and require full sbe
- *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  * ]
  */
 

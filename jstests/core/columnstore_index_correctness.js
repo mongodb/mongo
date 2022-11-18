@@ -1,11 +1,9 @@
 /**
  * Testing of just the query layer's integration for columnar index.
  * @tags: [
+ *   requires_fcv_63,
  *   # Runs explain on an aggregate command which is only compatible with readConcern local.
  *   assumes_read_concern_unchanged,
- *   # column store indexes are still under a feature flag and require full sbe
- *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
  *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
  *   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may
@@ -235,7 +233,7 @@ assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
     for (let res of results) {
         const trueResult = coll.find({num: res.num}, kProjection).hint({$natural: 1}).toArray()[0];
         const originalDoc = coll.findOne({num: res.num});
-        assert.eq(res, trueResult, "Mismatched projection of " + tojson(originalDoc));
+        assert.docEq(res, trueResult, "Mismatched projection of " + tojson(originalDoc));
     }
 })();
 

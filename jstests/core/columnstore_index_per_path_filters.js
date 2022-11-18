@@ -3,11 +3,9 @@
  * might be pushed down into the column scan stage.
  *
  * @tags: [
+ *   requires_fcv_63,
  *   # Runs explain on an aggregate command which is only compatible with readConcern local.
  *   assumes_read_concern_unchanged,
- *   # column store indexes are still under a feature flag and require full sbe
- *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
  *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
  *   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may

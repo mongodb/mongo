@@ -5,6 +5,11 @@
 // test from running in the 'aggregation_facet_unwind_passthrough' suite.
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
+//
+//   # This test makes assertions about queries erroring or returning null depending on whether SBE
+//   # is used or not. SBE may be chosen if an implicit column index is created, so we ban this
+//   # tests from implicit index creation suites.
+//   assumes_no_implicit_index_creation,
 // ]
 (function() {
 "use strict";

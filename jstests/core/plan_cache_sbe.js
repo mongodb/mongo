@@ -18,6 +18,9 @@
  *   tenant_migration_incompatible,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_incompatible,
+ *   # Checks that SBE is never used when SBE full is not enabled. For implicitly created column
+ *   # indexes this check would be violated, since it is not covered by other SBE feature flags.
+ *   assumes_no_implicit_index_creation,
  * ]
  */
 (function() {

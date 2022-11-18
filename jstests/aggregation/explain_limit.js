@@ -5,6 +5,8 @@
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
 //   requires_pipeline_optimization,
+//   # Implicit index creation may change the plan/engine used.
+//   assumes_no_implicit_index_creation,
 // ]
 (function() {
 "use strict";

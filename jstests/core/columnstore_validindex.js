@@ -1,11 +1,9 @@
 /**
  * Tests parsing and validation of columnstore indexes.
  * @tags: [
+ *   requires_fcv_63,
  *   # Uses index building in background.
  *   requires_background_index,
- *   # column store indexes are still under a feature flag and require full sbe
- *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
  *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
  *   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may

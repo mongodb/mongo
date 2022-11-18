@@ -1,14 +1,12 @@
 /**
  * Tests the eligibility of certain queries to use a columnstore index.
  * @tags: [
+ *   requires_fcv_63,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
  *   # Cannot run aggregate with explain in a transaction.
  *   does_not_support_transactions,
- *   # column store indexes are still under a feature flag and require full sbe
- *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
  *   # server parameters are stored in-memory only so are not transferred onto the recipient.
  *   tenant_migration_incompatible,
@@ -21,10 +19,13 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 load("jstests/libs/fixture_helpers.js");   // For FixtureHelpers.isMongos.
+load("jstests/libs/sbe_util.js");          // For checkSBEEnabled.
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     return;
 }
+
+const sbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 const coll = db.columnstore_eligibility;
 coll.drop();
@@ -64,7 +65,14 @@ assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 // Filter is not eligible for use during column scan, but set of fields is limited enough. Filter
 // will be applied after assembling an intermediate result containing both "a" and "b".
 explain = coll.find({$or: [{a: 2}, {b: 2}]}, {_id: 0, a: 1}).explain();
-assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
+// For top-level $or queries, COLUMN_SCAN is only used when sbeFull is also enabled due to a
+// quirk in the engine selection logic. TODO: SERVER-XYZ.
+if (sbeFull) {
+    assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+} else {
+    assert(planHasStage(db, explain, "COLLSCAN"), explain);
+}
 
 // Simplest case: just scan "a" column.
 explain = coll.find({a: {$exists: true}}, {_id: 0, a: 1}).explain();

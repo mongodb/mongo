@@ -1,6 +1,8 @@
 /**
  * Tests some basic use cases and functionality of a columnstore index.
  * @tags: [
+ *   requires_fcv_63,
+ *
  *   # Uses $indexStats which is not supported inside a transaction.
  *   does_not_support_transactions,
  *
@@ -10,10 +12,6 @@
  *   does_not_support_repeated_reads,
  *   does_not_support_stepdowns,
  *   assumes_read_preference_unchanged,
- *
- *   # column store indexes are still under a feature flag and require full sbe
- *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  *
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
  *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,

@@ -794,6 +794,27 @@ public:
         return buildMultiPlan(std::move(solutions));
     }
 
+    /**
+     * Fills out planner parameters if not already filled.
+     */
+    void initializePlannerParamsIfNeeded() {
+        if (_plannerParamsInitialized) {
+            return;
+        }
+
+        auto& mainColl = getMainCollection();
+        if (mainColl) {
+            fillOutPlannerParams(_opCtx, mainColl, _cq, &_plannerParams);
+        }
+
+        _plannerParamsInitialized = true;
+    }
+
+    const QueryPlannerParams& plannerParams() const {
+        invariant(_plannerParamsInitialized);
+        return _plannerParams;
+    }
+
 protected:
     static constexpr bool ShouldDeferExecutionTreeGeneration = DeferExecutionTreeGeneration;
 
@@ -824,18 +845,6 @@ protected:
         } else {
             result->emplace(std::move(solution));
         }
-    }
-
-    /**
-     * Fills out planner parameters if not already filled.
-     */
-    void initializePlannerParamsIfNeeded() {
-        if (_plannerParamsInitialized) {
-            return;
-        }
-        fillOutPlannerParams(_opCtx, getMainCollection(), _cq, &_plannerParams);
-
-        _plannerParamsInitialized = true;
     }
 
     /**
@@ -1413,21 +1422,56 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 /**
  * Checks if the result of query planning is SBE compatible.
  */
-bool isPlanSbeCompatible(const SlotBasedPrepareExecutionResult& planningResult) {
+bool shouldPlanningResultUseSbe(bool sbeFull,
+                                bool columnIndexPresent,
+                                bool aggSpecificStagesPushedDown,
+                                const SlotBasedPrepareExecutionResult& planningResult) {
+    // For now this function assumes one of these is true. If all are false, we should not use
+    // SBE.
+    tassert(6164401,
+            "Expected sbeFull, or a CSI present, or agg specific stages pushed down",
+            sbeFull || columnIndexPresent || aggSpecificStagesPushedDown);
+
     const auto& solutions = planningResult.solutions();
     if (solutions.empty()) {
         // Query needs subplanning (plans are generated later, we don't have access yet).
-        // This is *currently* fine because subplans will never be turned into COUNT_SCANs.
         invariant(planningResult.needsSubplanning());
-        return true;
+
+        // TODO: SERVER-71798 if the below conditions are not met, a column index will not be used
+        // even if it could be.
+        return sbeFull || aggSpecificStagesPushedDown;
     }
 
     // Check that the query solution is SBE compatible.
-    return std::all_of(solutions.begin(), solutions.end(), [](const auto& solution) {
-        return solution->root() ==
-            nullptr /* we won't have a query solution if we pulled it from the cache */
-            || isQueryPlanSbeCompatible(solution.get());
-    });
+    const bool allStagesCompatible =
+        std::all_of(solutions.begin(), solutions.end(), [](const auto& solution) {
+            return solution->root() ==
+                nullptr /* we won't have a query solution if we pulled it from the cache */
+                || isQueryPlanSbeCompatible(solution.get());
+        });
+
+    if (!allStagesCompatible) {
+        return false;
+    }
+
+    if (sbeFull || aggSpecificStagesPushedDown) {
+        return true;
+    }
+
+    // If no pipeline is pushed down and SBE full is off, the only other case we'll use SBE for
+    // is when a column index plan was constructed.
+    tassert(6164400, "Expected CSI to be present", columnIndexPresent);
+
+    // The only time a query solution is not available is when the plan comes from the SBE plan
+    // cache. The plan cache is gated by sbeFull, which was already checked earlier. So, at this
+    // point we're guaranteed sbeFull is off, and this further implies that the returned plan(s)
+    // did not come from the cache.
+    tassert(6164402,
+            "Did not expect a plan from the plan cache",
+            !sbeFull && solutions.front()->root());
+
+    return solutions.size() == 1 &&
+        solutions.front()->root()->hasNode(StageType::STAGE_COLUMN_SCAN);
 }
 
 /**
@@ -1455,25 +1499,31 @@ attemptToGetSlotBasedExecutor(
         extractAndAttachPipelineStages(canonicalQuery.get(), true /* attachOnly */);
     }
 
-    // Use SBE if we find any $group/$lookup stages eligible for execution in SBE or if SBE
-    // is fully enabled. Otherwise, fallback to the classic engine.
-    if (canonicalQuery->pipeline().empty() &&
-        !feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-        canonicalQuery->setSbeCompatible(false);
-    } else {
-        // Construct the SBE query solution - this will be our final decision stage to determine
-        // whether SBE should be used.
-        auto sbeYieldPolicy = makeSbeYieldPolicy(
-            opCtx, yieldPolicy, &collections.getMainCollection(), canonicalQuery->nss());
+    // Create the SBE prepare execution helper and initialize the params for the planner. Our
+    // decision about using SBE will depend on whether there is a column index present.
+    auto sbeYieldPolicy = makeSbeYieldPolicy(
+        opCtx, yieldPolicy, &collections.getMainCollection(), canonicalQuery->nss());
+    SlotBasedPrepareExecutionHelper helper{
+        opCtx, collections, canonicalQuery.get(), sbeYieldPolicy.get(), plannerParams.options};
+    helper.initializePlannerParamsIfNeeded();
 
-        SlotBasedPrepareExecutionHelper helper{
-            opCtx, collections, canonicalQuery.get(), sbeYieldPolicy.get(), plannerParams.options};
+    const bool csiPresent = !helper.plannerParams().columnStoreIndexes.empty();
+    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV();
+    const bool aggSpecificStagesPushedDown = !canonicalQuery->pipeline().empty();
+
+    // Attempt to use SBE if we find any $group/$lookup stages eligible for execution in SBE, if a
+    // column index is present or if SBE is fully enabled. Otherwise, fallback to the classic
+    // engine right away.
+    if (aggSpecificStagesPushedDown || csiPresent || sbeFull) {
         auto planningResultWithStatus = helper.prepare();
         if (!planningResultWithStatus.isOK()) {
             return planningResultWithStatus.getStatus();
         }
 
-        if (isPlanSbeCompatible(*planningResultWithStatus.getValue())) {
+        if (shouldPlanningResultUseSbe(sbeFull,
+                                       csiPresent,
+                                       aggSpecificStagesPushedDown,
+                                       *planningResultWithStatus.getValue())) {
             if (extractAndAttachPipelineStages) {
                 // We know now that we will use SBE, so we need to remove the pushed-down stages
                 // from the original pipeline object.
@@ -1492,14 +1542,16 @@ attemptToGetSlotBasedExecutor(
                 return statusWithExecutor.getStatus();
             }
         }
-
         // Query plan was not SBE compatible - reset any fields that may have been modified, and
         // fall back to classic engine.
-        canonicalQuery->setSbeCompatible(false);
         canonicalQuery->setPipeline({});
+
+        // Fall through to below.
     }
 
-    // Return ownership of the canonical query to the caller.
+    // Either we did not meet the criteria for attempting SBE, or we attempted query planning and
+    // determined that SBE should not be used.
+    canonicalQuery->setSbeCompatible(false);
     return std::move(canonicalQuery);
 }
 

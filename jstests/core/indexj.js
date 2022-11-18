@@ -4,6 +4,9 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   no_selinux,
+//   # Different assertions are made depending on whether SBE or classic is used. Implicitly
+//   # creating an index can change which engine is used.
+//   assumes_no_implicit_index_creation,
 // ]
 
 (function() {
