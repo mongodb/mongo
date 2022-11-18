@@ -39,7 +39,7 @@ namespace mongo::optimizer {
 
 unittest::GoldenTestConfig goldenTestConfigABTOptimization{"src/mongo/db/test_output/pipeline/abt"};
 
-TEST(ABTTranslate, OptimizePipelineTests) {
+TEST(ABTOptimizationTest, OptimizePipelineTests) {
     unittest::GoldenTestContext gctx(&goldenTestConfigABTOptimization);
 
     const auto explainedOr = testABTTranslationAndOptimization(
@@ -318,7 +318,7 @@ TEST(ABTTranslate, OptimizePipelineTests) {
         defaultConvertPathToInterval);
 }
 
-TEST(ABTTranslate, PartialIndex) {
+TEST(ABTOptimizationTest, PartialIndex) {
     unittest::GoldenTestContext gctx(&goldenTestConfigABTOptimization);
 
     PrefixId prefixId;

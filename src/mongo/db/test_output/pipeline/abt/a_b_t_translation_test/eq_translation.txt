@@ -1,0 +1,106 @@
+==== VARIATION: $match basic ====
+-- INPUTS:
+pipeline: [{$match: {a: 1}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathTraverse [1]
+|   PathCompare [Eq]
+|   Const [1]
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: $match with $expr $eq with dotted path ====
+-- INPUTS:
+pipeline: [{$match: {$expr: {$eq: ['$a.b', 1]}}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathConstant []
+|   BinaryOp [Eq]
+|   |   Const [1]
+|   EvalPath []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathTraverse [inf]
+|   PathGet [b]
+|   PathIdentity []
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: $match with $expr $eq ====
+-- INPUTS:
+pipeline: [{$match: {$expr: {$eq: ['$a', 1]}}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathCompare [Eq]
+|   Const [1]
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+

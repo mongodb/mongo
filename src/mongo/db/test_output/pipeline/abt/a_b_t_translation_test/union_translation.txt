@@ -1,0 +1,56 @@
+==== VARIATION: union ====
+-- INPUTS:
+pipeline: [{$unionWith: 'collB'}, {$match: {_id: 1}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collA: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+		collB: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [_id]
+|   PathTraverse [1]
+|   PathCompare [Eq]
+|   Const [1]
+Union []
+|   |   BindBlock:
+|   |       [scan_0]
+|   |           Source []
+|   Evaluation []
+|   |   BindBlock:
+|   |       [scan_0]
+|   |           EvalPath []
+|   |           |   Variable [scan_1]
+|   |           PathIdentity []
+|   Scan [collB]
+|       BindBlock:
+|           [scan_1]
+|               Source []
+Scan [collA]
+    BindBlock:
+        [scan_0]
+            Source []
+
+

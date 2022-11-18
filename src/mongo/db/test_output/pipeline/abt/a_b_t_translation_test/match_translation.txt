@@ -1,0 +1,285 @@
+==== VARIATION: $match basic ====
+-- INPUTS:
+pipeline: [{$match: {a: 1, b: 2}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathTraverse [1]
+|   PathCompare [Eq]
+|   Const [1]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [b]
+|   PathTraverse [1]
+|   PathCompare [Eq]
+|   Const [2]
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: $match with $expr $eq with dotted path ====
+-- INPUTS:
+pipeline: [{$match: {$expr: {$eq: ['$a.b', 1]}}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathConstant []
+|   BinaryOp [Eq]
+|   |   Const [1]
+|   EvalPath []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathTraverse [inf]
+|   PathGet [b]
+|   PathIdentity []
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: $match with $expr $eq ====
+-- INPUTS:
+pipeline: [{$match: {$expr: {$eq: ['$a', 1]}}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathCompare [Eq]
+|   Const [1]
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: $match sort index ====
+-- INPUTS:
+pipeline: [{$match: {'a': 10}}, {$sort: {'a': 1}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Collation []
+|   |   collation: 
+|   |       sort_0: Ascending
+|   RefBlock: 
+|       Variable [sort_0]
+Evaluation []
+|   BindBlock:
+|       [sort_0]
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathGet [a]
+|           PathIdentity []
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathTraverse [1]
+|   PathCompare [Eq]
+|   Const [10]
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: $match with range ====
+-- INPUTS:
+pipeline: [{$match: {'a': {$gt: 70, $lt: 90}}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathTraverse [1]
+|   PathComposeM []
+|   |   PathCompare [Lt]
+|   |   Const [""]
+|   PathCompare [Gt]
+|   Const [70]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathTraverse [1]
+|   PathComposeM []
+|   |   PathCompare [Gte]
+|   |   Const [nan]
+|   PathCompare [Lt]
+|   Const [90]
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: index on two keys ====
+-- INPUTS:
+pipeline: [{$match: {'a': 2, 'b': 2}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathTraverse [1]
+|   PathCompare [Eq]
+|   Const [2]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [b]
+|   PathTraverse [1]
+|   PathCompare [Eq]
+|   Const [2]
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: $match with $ne ====
+-- INPUTS:
+pipeline: [{$match: {'a': {$ne: 2}}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathConstant []
+|   UnaryOp [Not]
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathTraverse [1]
+|   PathCompare [Eq]
+|   Const [2]
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+

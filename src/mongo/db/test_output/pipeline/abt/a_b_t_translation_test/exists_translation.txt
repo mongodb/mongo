@@ -1,0 +1,105 @@
+==== VARIATION: $match exists ====
+-- INPUTS:
+pipeline: [{$match: {a: {$exists: true}}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathDefault []
+|   Const [false]
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: $match exists ====
+-- INPUTS:
+pipeline: [{$match: {a: {$exists: false}}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathConstant []
+|   UnaryOp [Not]
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathDefault []
+|   Const [false]
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: $match exists ====
+-- INPUTS:
+pipeline: [{$match: {'a.b': {$exists: true}}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       scan_0
+|   RefBlock: 
+|       Variable [scan_0]
+Filter []
+|   EvalFilter []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathTraverse [1]
+|   PathGet [b]
+|   PathDefault []
+|   Const [false]
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+

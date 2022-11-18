@@ -1,0 +1,292 @@
+==== VARIATION: project rename through addFields: since '$z' is a single element, it will be considered a renamed path ====
+-- INPUTS:
+pipeline: [{$addFields: {a: '$z'}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       combinedProjection_0
+|   RefBlock: 
+|       Variable [combinedProjection_0]
+Evaluation []
+|   BindBlock:
+|       [combinedProjection_0]
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathComposeM []
+|           |   PathDefault []
+|           |   Const [{}]
+|           PathField [a]
+|           PathConstant []
+|           Variable [projRenamedPath_0]
+Evaluation []
+|   BindBlock:
+|       [projRenamedPath_0]
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathGet [z]
+|           PathIdentity []
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: project rename: since '$c' is a single element, it will be considered a renamed path ====
+-- INPUTS:
+pipeline: [{$project: {'a.b': '$c'}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       combinedProjection_0
+|   RefBlock: 
+|       Variable [combinedProjection_0]
+Evaluation []
+|   BindBlock:
+|       [combinedProjection_0]
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathComposeM []
+|           |   PathField [a]
+|           |   PathTraverse [inf]
+|           |   PathComposeM []
+|           |   |   PathDefault []
+|           |   |   Const [{}]
+|           |   PathComposeM []
+|           |   |   PathField [b]
+|           |   |   PathConstant []
+|           |   |   Variable [projRenamedPath_0]
+|           |   PathKeep [b]
+|           PathKeep [_id, a]
+Evaluation []
+|   BindBlock:
+|       [projRenamedPath_0]
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathGet [c]
+|           PathIdentity []
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: project rename dotted paths ====
+-- INPUTS:
+pipeline: [{$project: {'a.b.c': '$x.y.z'}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       combinedProjection_0
+|   RefBlock: 
+|       Variable [combinedProjection_0]
+Evaluation []
+|   BindBlock:
+|       [combinedProjection_0]
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathComposeM []
+|           |   PathField [a]
+|           |   PathTraverse [inf]
+|           |   PathComposeM []
+|           |   |   PathField [b]
+|           |   |   PathTraverse [inf]
+|           |   |   PathComposeM []
+|           |   |   |   PathDefault []
+|           |   |   |   Const [{}]
+|           |   |   PathComposeM []
+|           |   |   |   PathField [c]
+|           |   |   |   PathConstant []
+|           |   |   |   Variable [projGetPath_0]
+|           |   |   PathKeep [c]
+|           |   PathKeep [b]
+|           PathKeep [_id, a]
+Evaluation []
+|   BindBlock:
+|       [projGetPath_0]
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathGet [x]
+|           PathTraverse [inf]
+|           PathGet [y]
+|           PathTraverse [inf]
+|           PathGet [z]
+|           PathIdentity []
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: inclusion project with computed field ====
+-- INPUTS:
+pipeline: [{$project: {a: {$add: ['$c.d', 2]}, b: 1}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       combinedProjection_0
+|   RefBlock: 
+|       Variable [combinedProjection_0]
+Evaluation []
+|   BindBlock:
+|       [combinedProjection_0]
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathComposeM []
+|           |   PathDefault []
+|           |   Const [{}]
+|           PathComposeM []
+|           |   PathField [a]
+|           |   PathConstant []
+|           |   Variable [projGetPath_0]
+|           PathKeep [_id, a, b]
+Evaluation []
+|   BindBlock:
+|       [projGetPath_0]
+|           BinaryOp [Add]
+|           |   Const [2]
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathGet [c]
+|           PathTraverse [inf]
+|           PathGet [d]
+|           PathIdentity []
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: replaceRoot ====
+-- INPUTS:
+pipeline: [{$replaceRoot: {newRoot: '$a'}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       newRoot_0
+|   RefBlock: 
+|       Variable [newRoot_0]
+Evaluation []
+|   BindBlock:
+|       [newRoot_0]
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathGet [a]
+|           PathIdentity []
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
+==== VARIATION: $project with computed array ====
+-- INPUTS:
+pipeline: [{$project: {a: ['$b', '$c']}}]
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: -1
+
+-- OUTPUT:
+Root []
+|   |   projections: 
+|   |       combinedProjection_0
+|   RefBlock: 
+|       Variable [combinedProjection_0]
+Evaluation []
+|   BindBlock:
+|       [combinedProjection_0]
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathComposeM []
+|           |   PathDefault []
+|           |   Const [{}]
+|           PathComposeM []
+|           |   PathField [a]
+|           |   PathConstant []
+|           |   Variable [projGetPath_0]
+|           PathKeep [_id, a]
+Evaluation []
+|   BindBlock:
+|       [projGetPath_0]
+|           FunctionCall [newArray]
+|           |   EvalPath []
+|           |   |   Variable [scan_0]
+|           |   PathGet [c]
+|           |   PathIdentity []
+|           EvalPath []
+|           |   Variable [scan_0]
+|           PathGet [b]
+|           PathIdentity []
+Scan [collection]
+    BindBlock:
+        [scan_0]
+            Source []
+
+
