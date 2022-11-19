@@ -330,6 +330,8 @@ public:
     ValueGuard(const std::pair<TypeTags, Value> typedValue)
         : ValueGuard(typedValue.first, typedValue.second) {}
     ValueGuard(TypeTags tag, Value val) : _tag(tag), _value(val) {}
+    ValueGuard(bool owned, TypeTags tag, Value val)
+        : ValueGuard(owned ? tag : TypeTags::Nothing, owned ? val : 0) {}
     ValueGuard() = delete;
     ValueGuard(const ValueGuard&) = delete;
     ValueGuard(ValueGuard&& other) = delete;

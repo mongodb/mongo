@@ -35,6 +35,8 @@
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/sbe/vm/vm_printer.h"
+#include "mongo/unittest/golden_test.h"
 
 namespace mongo::sbe {
 
@@ -62,6 +64,7 @@ protected:
     value::SlotId bindAccessor(value::SlotAccessor* accessor) {
         auto slot = _slotIdGenerator.generate();
         _ctx.pushCorrelated(slot, accessor);
+        boundAccessors.push_back(std::make_pair(slot, accessor));
         return slot;
     }
 
@@ -89,6 +92,39 @@ protected:
 
     bool runCompiledExpressionPredicate(const vm::CodeFragment* compiledExpr) {
         return _vm.runPredicate(compiledExpr);
+    }
+
+
+    void printInputExpression(std::ostream& os, const EExpression& expr) {
+        os << "-- INPUT EXPRESSION:" << std::endl;
+        os << DebugPrinter().print(expr.debugPrint()) << std::endl << std::endl;
+    }
+
+    void printCompiledExpression(std::ostream& os, const vm::CodeFragment& code) {
+        os << "-- COMPILED EXPRESSION:" << std::endl;
+        vm::CodeFragmentPrinter(vm::CodeFragmentPrinter::PrintFormat::Stable).print(os, code);
+        os << std::endl << std::endl;
+    }
+
+    void executeAndPrintVariation(std::ostream& os, const vm::CodeFragment& code) {
+        os << "-- EXECUTE VARIATION:" << std::endl;
+        if (!boundAccessors.empty()) {
+            bool first = true;
+            os << "SLOTS: [";
+            for (auto& p : boundAccessors) {
+                if (!first) {
+                    os << ", ";
+                } else {
+                    first = false;
+                }
+                os << p.first << ": " << p.second->getViewOfValue();
+            }
+            os << "]" << std::endl;
+
+            auto [owned, tag, val] = _vm.run(&code);
+            value::ValueGuard guard(owned, tag, val);
+            os << "RESULT: " << std::make_pair(tag, val) << std::endl << std::endl;
+        }
     }
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpression) {
@@ -185,6 +221,7 @@ private:
     CoScanStage _emptyStage{kEmptyPlanNodeId};
     CompileCtx _ctx;
     vm::ByteCode _vm;
+    std::vector<std::pair<value::SlotId, value::SlotAccessor*>> boundAccessors;
 };
 
 }  // namespace mongo::sbe

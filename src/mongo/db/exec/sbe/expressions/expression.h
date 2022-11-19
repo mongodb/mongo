@@ -331,6 +331,17 @@ public:
         return dynamic_cast<T*>(this);
     }
 
+    /**
+     * Utility for casting to derived types.
+     */
+    template <typename T>
+    const T* as() const {
+        return dynamic_cast<const T*>(this);
+    }
+
+    // For printing from an interactive debugger.
+    std::string toString() const;
+
 protected:
     Vector _nodes;
 
@@ -343,9 +354,16 @@ protected:
         }
     }
 
-private:
-    // For printing from an interactive debugger.
-    std::string toString() const;
+    template <typename P>
+    void collectDescendants(P&& expandPredicate, std::vector<const EExpression*>* acc) const {
+        if (expandPredicate(this)) {
+            for (auto& child : _nodes) {
+                child->collectDescendants(expandPredicate, acc);
+            }
+        } else {
+            acc->push_back(this);
+        }
+    }
 };
 
 template <typename T, typename... Args>
@@ -528,6 +546,10 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
     size_t estimateSize() const final;
+
+private:
+    std::vector<const EExpression*> collectOrClauses() const;
+    std::vector<const EExpression*> collectAndClauses() const;
 
 private:
     Op _op;

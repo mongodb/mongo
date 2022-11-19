@@ -8,8 +8,7 @@ const coll = db.big_predicate;
 coll.drop();
 
 let filter = {};
-// TODO SERVER-70110: Revert number of branches to 2500.
-for (let i = 0; i < 25; ++i) {
+for (let i = 0; i < 2500; ++i) {
     filter["field" + i] = i;
 }
 
@@ -21,6 +20,7 @@ assert.commandWorked(coll.explain().find(filter).finish());
 
 assert.eq(coll.find({$or: [filter]}).itcount(), 1);
 assert.commandWorked(coll.explain().find({$or: [filter]}).finish());
+assert.commandWorked(coll.explain().find({$and: [filter]}).finish());
 })();
 
 /**

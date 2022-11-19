@@ -74,6 +74,7 @@
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_stage_builder_projection.h"
 #include "mongo/db/query/shard_filterer_factory_impl.h"
@@ -753,18 +754,14 @@ std::unique_ptr<sbe::EExpression> generatePerColumnLogicalAndExpr(StageBuilderSt
     const auto cTerms = me->numChildren();
     tassert(7072600, "AND should have at least one child", cTerms > 0);
 
-    auto logical = generateLeafExpr(state, me->getChild(cTerms - 1), lambdaFrameId, inputSlot);
-    if (cTerms == 1)
-        return logical;
-
-    // TODO SERVER-70110: Replace the right-handed tree with a folded AND node when it becomes
-    // available.
-    for (int i = cTerms - 2; i >= 0; i--) {
-        logical = makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                               generateLeafExpr(state, me->getChild(i), lambdaFrameId, inputSlot),
-                               std::move(logical));
+    std::vector<std::unique_ptr<sbe::EExpression>> leaves;
+    leaves.reserve(cTerms);
+    for (size_t i = 0; i < cTerms; i++) {
+        leaves.push_back(generateLeafExpr(state, me->getChild(i), lambdaFrameId, inputSlot));
     }
-    return logical;
+
+    // Create the balanced binary tree to keep the tree shallow and safe for recursion.
+    return makeBalancedBooleanOpTree(sbe::EPrimBinary::logicAnd, leaves);
 }
 
 std::unique_ptr<sbe::EExpression> generatePerColumnFilterExpr(StageBuilderState& state,

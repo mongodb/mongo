@@ -553,6 +553,27 @@ EvalExprStagePair generateSingleResultUnion(std::vector<EvalExprStagePair> branc
                       unionEvalStage.extractOutSlots()}};
 }
 
+std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
+    sbe::EPrimBinary::Op logicOp,
+    std::vector<std::unique_ptr<sbe::EExpression>>& leaves,
+    size_t from,
+    size_t until) {
+    invariant(from < until);
+    if (from + 1 == until) {
+        return std::move(leaves[from]);
+    } else {
+        size_t mid = (from + until) / 2;
+        auto lhs = makeBalancedBooleanOpTree(logicOp, leaves, from, mid);
+        auto rhs = makeBalancedBooleanOpTree(logicOp, leaves, mid, until);
+        return makeBinaryOp(logicOp, std::move(lhs), std::move(rhs));
+    }
+}
+
+std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
+    sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>>& leaves) {
+    return makeBalancedBooleanOpTree(logicOp, leaves, 0, leaves.size());
+}
+
 EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
                                                    std::vector<EvalExprStagePair> branches,
                                                    PlanNodeId planNodeId,
@@ -583,16 +604,14 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
     }
 
     if (exprOnlyBranches) {
-        std::unique_ptr<sbe::EExpression> exprOnlyOp;
-        for (int32_t i = branches.size() - 1; i >= 0; i--) {
-            auto& [expr, _] = branches[i];
-            auto stateExpr = stateHelper.getBool(expr.extractExpr());
-            if (exprOnlyOp) {
-                exprOnlyOp = makeBinaryOp(logicOp, std::move(stateExpr), std::move(exprOnlyOp));
-            } else {
-                exprOnlyOp = std::move(stateExpr);
-            }
+        std::vector<std::unique_ptr<sbe::EExpression>> leaves;
+        leaves.reserve(branches.size());
+        for (auto& branch : branches) {
+            auto& [expr, _] = branch;
+            leaves.push_back(stateHelper.getBool(expr.extractExpr()));
         }
+        // Create the balanced binary tree to keep the tree shallow and safe for recursion.
+        auto exprOnlyOp = makeBalancedBooleanOpTree(logicOp, leaves, 0, branches.size());
         return {EvalExpr{std::move(exprOnlyOp)}, EvalStage{}};
     }
 

@@ -815,6 +815,12 @@ public:
 std::unique_ptr<FilterStateHelper> makeFilterStateHelper(bool trackIndex);
 
 /**
+ * Creates a balanced boolean binary expression tree from given collection of leaf expression.
+ */
+std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
+    sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>>& leaves);
+
+/**
  * Creates tree with short-circuiting for OR and AND. Each element in 'braches' argument represents
  * logical expression and sub-tree generated for it.
  */

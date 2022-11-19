@@ -920,7 +920,7 @@ void ByteCode::traverseP(const CodeFragment* code, int64_t position, int64_t max
     auto [own, tag, val] = getFromStack(0);
 
     if (value::isArray(tag) && maxDepth > 0) {
-        value::ValueGuard input(own ? tag : value::TypeTags::Nothing, own ? val : 0);
+        value::ValueGuard input(own, tag, val);
         popStack();
 
         if (maxDepth != std::numeric_limits<int64_t>::max()) {
@@ -1014,8 +1014,7 @@ bool ByteCode::runLambdaPredicate(const CodeFragment* code, int64_t position) {
 void ByteCode::traverseFInArray(const CodeFragment* code, int64_t position, bool compareArray) {
     auto [ownInput, tagInput, valInput] = getFromStack(0);
 
-    value::ValueGuard input(ownInput ? tagInput : value::TypeTags::Nothing,
-                            ownInput ? valInput : 0);
+    value::ValueGuard input(ownInput, tagInput, valInput);
     popStack();
 
     // Return true if any of the array elements is true.

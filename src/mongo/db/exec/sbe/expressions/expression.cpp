@@ -33,6 +33,8 @@
 
 #include <iomanip>
 #include <sstream>
+#include <stack>
+#include <vector>
 
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
@@ -191,42 +193,125 @@ vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
     invariant(!hasCollatorArg || isComparisonOp(_op));
 
     if (_op == EPrimBinary::logicAnd) {
-        auto lhs = _nodes[0]->compileDirect(ctx);
-        auto rhs = _nodes[1]->compileDirect(ctx);
+        /*
+         * We collect all connected AND clauses, named [lhs1,...,lhsN-1, rhs],
+         *  and compile them as following byte code:
+         *
+         * @true1:    lhs1
+         *            jumpNothing @end
+         *            jumpTrue @true2
+         *            jump @false
+         * ...
+         * @trueN-1:  lhsN-1
+         *            jumpNothing @end
+         *            jumpTrue @trueN
+         *            jump @false // this is elided
+         * @false:    push false
+         *            jmp @end
+         * @trueN:    rhs
+         * @end:
+         */
+        auto clauses = collectAndClauses();
+        invariant(clauses.size() >= 2);
+
+        auto it = clauses.rbegin();
+        auto rhs = (*it)->compileDirect(ctx);
 
         vm::CodeFragment codeFalseBranch;
         codeFalseBranch.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
-
-        // Jump to the merge point that will be right after the thenBranch (rhs).
         codeFalseBranch.appendJump(rhs.instrs().size());
 
-        code.append(std::move(lhs));
-        code = wrapNothingTest(std::move(code), [&](vm::CodeFragment&& code) {
-            code.appendJumpTrue(codeFalseBranch.instrs().size());
-            code.append(std::move(codeFalseBranch), std::move(rhs));
+        int32_t falseBranchOffset = 0;
+        int32_t trueBranchOffset = codeFalseBranch.instrs().size();
 
-            return std::move(code);
-        });
+        code.append(std::move(codeFalseBranch), std::move(rhs));
 
+        ++it;
+        invariant(it != clauses.rend());
+
+        for (; it != clauses.rend(); ++it) {
+            auto lhs = (*it)->compileDirect(ctx);
+
+            vm::CodeFragment jumpCode;
+            if (falseBranchOffset != 0) {
+                jumpCode.appendJump(falseBranchOffset);
+            }
+
+            vm::CodeFragment jumpTrueCode;
+            jumpTrueCode.appendJumpTrue(jumpCode.instrs().size() + trueBranchOffset);
+
+            vm::CodeFragment jumpNothingCode;
+            jumpNothingCode.appendJumpNothing(jumpTrueCode.instrs().size() +
+                                              jumpCode.instrs().size() + code.instrs().size());
+
+            vm::CodeFragment tmpCode;
+            tmpCode.append(std::move(lhs));
+            tmpCode.append(std::move(jumpNothingCode));
+            tmpCode.append(std::move(jumpTrueCode));
+            tmpCode.append(std::move(jumpCode));
+
+            falseBranchOffset += tmpCode.instrs().size();
+            trueBranchOffset = 0;
+
+            tmpCode.append(std::move(code));
+            code = std::move(tmpCode);
+        }
         return code;
     } else if (_op == EPrimBinary::logicOr) {
-        auto lhs = _nodes[0]->compileDirect(ctx);
-        auto rhs = _nodes[1]->compileDirect(ctx);
+        /*
+         * We collect all connected OR clauses, named [lhs1,...,lhsN-1, rhs],
+         * and compile them as following byte code:
+         *
+         * @false1:   lhs1
+         *            jumpNothing @end
+         *            jumpTrue @true
+         * ...
+         * @falseN-1: lhsN-1
+         *            jumpNothing @end
+         *            jumpTrue @true
+         * @tfalseN:  rhs
+         *            jmp @end
+         * @true:     push true
+         * @end:
+         */
+        auto clauses = collectOrClauses();
+        invariant(clauses.size() >= 2);
+
+        auto it = clauses.rbegin();
+        auto rhs = (*it)->compileDirect(ctx);
 
         vm::CodeFragment codeTrueBranch;
         codeTrueBranch.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
 
-        // Jump to the merge point that will be right after the thenBranch (true branch).
         rhs.appendJump(codeTrueBranch.instrs().size());
 
-        code.append(std::move(lhs));
-        code = wrapNothingTest(std::move(code), [&](vm::CodeFragment&& code) {
-            code.appendJumpTrue(rhs.instrs().size());
-            code.append(std::move(rhs), std::move(codeTrueBranch));
+        int32_t trueBranchOffset = rhs.instrs().size();
 
-            return std::move(code);
-        });
+        code.append(std::move(rhs), std::move(codeTrueBranch));
 
+        ++it;
+        invariant(it != clauses.rend());
+
+        for (; it != clauses.rend(); ++it) {
+            auto lhs = (*it)->compileDirect(ctx);
+
+            vm::CodeFragment jumpTrueCode;
+            jumpTrueCode.appendJumpTrue(trueBranchOffset);
+
+
+            vm::CodeFragment jumpNothingCode;
+            jumpNothingCode.appendJumpNothing(jumpTrueCode.instrs().size() + code.instrs().size());
+
+            vm::CodeFragment tmpCode;
+            tmpCode.append(std::move(lhs));
+            tmpCode.append(std::move(jumpNothingCode));
+            tmpCode.append(std::move(jumpTrueCode));
+
+            trueBranchOffset += tmpCode.instrs().size();
+
+            tmpCode.append(std::move(code));
+            code = std::move(tmpCode);
+        }
         return code;
     } else if (_op == EPrimBinary::fillEmpty) {
         // Special cases: rhs is trivial to evaluate -> avoid a jump
@@ -336,6 +421,29 @@ vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
             MONGO_UNREACHABLE;
     }
     return code;
+}
+
+std::vector<const EExpression*> EPrimBinary::collectOrClauses() const {
+    invariant(_op == EPrimBinary::Op::logicOr);
+
+    auto expandPredicate = [](const EExpression* expr) {
+        const EPrimBinary* binaryExpr = expr->as<EPrimBinary>();
+        return binaryExpr != nullptr && binaryExpr->_op == EPrimBinary::Op::logicOr;
+    };
+
+    std::vector<const EExpression*> acc;
+    collectDescendants(expandPredicate, &acc);
+    return acc;
+}
+std::vector<const EExpression*> EPrimBinary::collectAndClauses() const {
+    auto expandPredicate = [](const EExpression* expr) {
+        const EPrimBinary* binaryExpr = expr->as<EPrimBinary>();
+        return binaryExpr != nullptr && binaryExpr->_op == EPrimBinary::Op::logicAnd;
+    };
+
+    std::vector<const EExpression*> acc;
+    collectDescendants(expandPredicate, &acc);
+    return acc;
 }
 
 std::vector<DebugPrinter::Block> EPrimBinary::debugPrint() const {
@@ -467,6 +575,7 @@ std::unique_ptr<EExpression> EFunction::clone() const {
     }
     return std::make_unique<EFunction>(_name, std::move(args));
 }
+
 
 namespace {
 /**
