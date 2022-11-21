@@ -141,6 +141,9 @@ def main():
 
         # The field of interest is execfn: '/usr/bin/python3' from the example above.
         start = output.find('execfn: ')
+        if start < 0:
+            print("The 'execfn' is missing, skipping core...")
+            continue
         # Fetch the value of execfn. This is the executable path!
         executable_path = re.search(r'\'.*?\'', output[start:]).group(0)
         executable_path = executable_path.replace("'", "")
