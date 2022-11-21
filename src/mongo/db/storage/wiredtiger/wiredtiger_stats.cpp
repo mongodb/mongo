@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_operation_stats.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -43,7 +43,7 @@ struct StatInfo {
     StatType type;
 };
 
-stdx::unordered_map<int, StatInfo> statInfo = {
+const stdx::unordered_map<int, StatInfo> kWiredTigerStatCodeToStatInfo = {
     {WT_STAT_SESSION_BYTES_READ, {"bytesRead"_sd, StatType::kData}},
     {WT_STAT_SESSION_BYTES_WRITE, {"bytesWritten"_sd, StatType::kData}},
     {WT_STAT_SESSION_LOCK_DHANDLE_WAIT, {"handleLock"_sd, StatType::kWait}},
@@ -54,7 +54,7 @@ stdx::unordered_map<int, StatInfo> statInfo = {
 
 }  // namespace
 
-WiredTigerOperationStats::WiredTigerOperationStats(WT_SESSION* session) {
+WiredTigerStats::WiredTigerStats(WT_SESSION* session) {
     invariant(session);
 
     WT_CURSOR* c;
@@ -70,12 +70,9 @@ WiredTigerOperationStats::WiredTigerOperationStats(WT_SESSION* session) {
         fassert(51035, c->get_value(c, nullptr, nullptr, &value) == 0);
         _stats[key] = WiredTigerUtil::castStatisticsValue<long long>(value);
     }
-
-    // Reset the statistics so that the next fetch gives the recent values.
-    invariantWTOK(c->reset(c), c->session);
 }
 
-BSONObj WiredTigerOperationStats::toBSON() const {
+BSONObj WiredTigerStats::toBSON() const {
     boost::optional<BSONObjBuilder> dataSection;
     boost::optional<BSONObjBuilder> waitSection;
 
@@ -84,8 +81,8 @@ BSONObj WiredTigerOperationStats::toBSON() const {
             continue;
         }
 
-        auto it = statInfo.find(stat);
-        if (it == statInfo.end()) {
+        auto it = kWiredTigerStatCodeToStatInfo.find(stat);
+        if (it == kWiredTigerStatCodeToStatInfo.end()) {
             continue;
         }
         auto&& [name, type] = it->second;
@@ -119,22 +116,36 @@ BSONObj WiredTigerOperationStats::toBSON() const {
     return builder.obj();
 }
 
-std::shared_ptr<StorageStats> WiredTigerOperationStats::clone() const {
-    auto copy = std::make_shared<WiredTigerOperationStats>();
-    *copy += *this;
-    return copy;
+std::unique_ptr<StorageStats> WiredTigerStats::clone() const {
+    return std::make_unique<WiredTigerStats>(*this);
 }
 
-WiredTigerOperationStats& WiredTigerOperationStats::operator+=(
-    const WiredTigerOperationStats& other) {
+WiredTigerStats& WiredTigerStats::operator=(WiredTigerStats&& other) {
+    _stats = std::move(other._stats);
+    return *this;
+}
+
+WiredTigerStats& WiredTigerStats::operator+=(const WiredTigerStats& other) {
     for (auto&& [stat, value] : other._stats) {
         _stats[stat] += value;
     }
     return *this;
 }
 
-StorageStats& WiredTigerOperationStats::operator+=(const StorageStats& other) {
-    return *this += checked_cast<const WiredTigerOperationStats&>(other);
+StorageStats& WiredTigerStats::operator+=(const StorageStats& other) {
+    return *this += checked_cast<const WiredTigerStats&>(other);
+}
+
+WiredTigerStats& WiredTigerStats::operator-=(const WiredTigerStats& other) {
+    for (auto const& otherStat : other._stats) {
+        _stats[otherStat.first] -= otherStat.second;
+    }
+    return (*this);
+}
+
+StorageStats& WiredTigerStats::operator-=(const StorageStats& other) {
+    *this -= checked_cast<const WiredTigerStats&>(other);
+    return (*this);
 }
 
 }  // namespace mongo

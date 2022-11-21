@@ -281,7 +281,7 @@ public:
     AdditiveMetrics additiveMetrics;
 
     // Stores storage statistics.
-    std::shared_ptr<StorageStats> storageStats;
+    std::unique_ptr<StorageStats> storageStats;
 
     bool waitingForFlowControl{false};
 

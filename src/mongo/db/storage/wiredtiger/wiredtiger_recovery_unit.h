@@ -45,8 +45,8 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 #include "mongo/util/timer.h"
-
 namespace mongo {
 
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
@@ -139,7 +139,7 @@ public:
         return _readOnce;
     };
 
-    std::shared_ptr<StorageStats> getOperationStatistics() const override;
+    std::unique_ptr<StorageStats> computeOperationStatisticsSinceLastCall() override;
 
     void refreshSnapshot() override;
 
@@ -276,6 +276,7 @@ private:
     std::unique_ptr<Timer> _timer;
     bool _isOplogReader = false;
     boost::optional<int64_t> _oplogVisibleTs = boost::none;
+    WiredTigerStats _sessionStatsAfterLastOperation;
 };
 
 }  // namespace mongo

@@ -656,8 +656,8 @@ public:
         }
 
 
-        SingleTransactionStats getSingleTransactionStatsForTest() const {
-            return o().transactionMetricsObserver.getSingleTransactionStats();
+        SingleTransactionStats& getSingleTransactionStatsForTest() {
+            return _tp->_o.transactionMetricsObserver.getSingleTransactionStats();
         }
 
         std::vector<repl::ReplOperation> getTransactionOperationsForTest() const {
