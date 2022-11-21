@@ -453,8 +453,6 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                         "got TemporarilyUnavailable exception on a plan that cannot auto-yield");
                 }
 
-                CurOp::get(_opCtx)->debug().additiveMetrics.incrementTemporarilyUnavailableErrors(
-                    1);
                 tempUnavailErrorsInARow++;
                 handleTemporarilyUnavailableException(
                     _opCtx,
