@@ -376,9 +376,10 @@ public:
     }
 
     /**
-     * Fetches the storage level statistics.
+     * Computes the storage level statistics accrued since the last call to this function, or
+     * since the recovery unit was instantiated. Should be called at the end of each operation.
      */
-    virtual std::shared_ptr<StorageStats> getOperationStatistics() const {
+    virtual std::unique_ptr<StorageStats> computeOperationStatisticsSinceLastCall() {
         return (nullptr);
     }
 

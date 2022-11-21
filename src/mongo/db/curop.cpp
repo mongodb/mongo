@@ -464,7 +464,8 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                                     Date_t::now() + Milliseconds(500),
                                     Lock::InterruptBehavior::kLeaveUnlocked);
                 if (lk.isLocked()) {
-                    _debug.storageStats = opCtx->recoveryUnit()->getOperationStatistics();
+                    _debug.storageStats =
+                        opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
                 } else {
                     LOGV2_WARNING_OPTIONS(
                         20525,

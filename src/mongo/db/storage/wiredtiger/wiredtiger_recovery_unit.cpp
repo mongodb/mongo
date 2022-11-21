@@ -37,9 +37,9 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_operation_stats.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/hex.h"
@@ -48,6 +48,7 @@
 
 #include <fmt/compile.h>
 #include <fmt/format.h>
+#include <memory>
 
 namespace mongo {
 namespace {
@@ -880,8 +881,21 @@ void WiredTigerRecoveryUnit::beginIdle() {
     }
 }
 
-std::shared_ptr<StorageStats> WiredTigerRecoveryUnit::getOperationStatistics() const {
-    return _session ? std::make_shared<WiredTigerOperationStats>(_session->getSession()) : nullptr;
+std::unique_ptr<StorageStats> WiredTigerRecoveryUnit::computeOperationStatisticsSinceLastCall() {
+    if (!_session)
+        return nullptr;
+
+    // We compute operation statistics as the difference between the current session statistics and
+    // the session statistics of the last time the method was called, which should correspond to the
+    // end of one operation.
+    WiredTigerStats currentSessionStats{_session->getSession()};
+
+    auto operationStats =
+        std::make_unique<WiredTigerStats>(currentSessionStats - _sessionStatsAfterLastOperation);
+
+    _sessionStatsAfterLastOperation = std::move(currentSessionStats);
+
+    return operationStats;
 }
 
 void WiredTigerRecoveryUnit::setCatalogConflictingTimestamp(Timestamp timestamp) {

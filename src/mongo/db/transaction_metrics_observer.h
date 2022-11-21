@@ -107,6 +107,14 @@ public:
     }
 
     /**
+     * Returns a reference to the SingleTransactionStats object stored in this
+     * TransactionMetricsObserver instance.
+     */
+    SingleTransactionStats& getSingleTransactionStats() {
+        return _singleTransactionStats;
+    }
+
+    /**
      * Resets the SingleTransactionStats object stored in this TransactionMetricsObserver instance,
      * preparing it for the new transaction or retryable write with the given number.
      */

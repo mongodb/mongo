@@ -728,7 +728,7 @@ public:
                     // The stats collected here will not get overwritten, as the service entry
                     // point layer will only set these stats when they're not empty.
                     CurOp::get(opCtx)->debug().storageStats =
-                        opCtx->recoveryUnit()->getOperationStatistics();
+                        opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
                 }
             } else {
                 endQueryOp(opCtx, collection, *exec, numResults, cursorId);
