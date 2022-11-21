@@ -276,8 +276,15 @@ config_table(TABLE *table, void *arg)
     }
 
 #ifndef WT_STANDALONE_BUILD
-    /* Turn off truncate for non-standalone build if timestamp is enabled. */
-    if (GV(TRANSACTION_TIMESTAMPS) || config_explicit(NULL, "transaction.timestamps"))
+    /*
+     * Non-standalone builds do not support writing fast truncate information to disk, as this
+     * information is required to rollback any unstable fast truncate operation.
+     *
+     * To avoid this problem to occur during the test, disable the truncate operation whenever
+     * timestamp or prepare is enabled.
+     */
+    if (GV(TRANSACTION_TIMESTAMPS) || config_explicit(NULL, "transaction.timestamps") ||
+      GV(OPS_PREPARE) || config_explicit(NULL, "ops.prepare"))
         config_off(table, "ops.truncate");
 #endif
 
