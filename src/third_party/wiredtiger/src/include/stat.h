@@ -364,6 +364,7 @@ struct __wt_connection_stats {
     int64_t block_cache_misses;
     int64_t block_cache_bypass_chkpt;
     int64_t block_cache_blocks_removed;
+    int64_t block_cache_blocks_removed_blocked;
     int64_t block_cache_blocks;
     int64_t block_cache_blocks_insert_read;
     int64_t block_cache_blocks_insert_write;

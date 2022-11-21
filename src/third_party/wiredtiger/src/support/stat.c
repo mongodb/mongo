@@ -1217,6 +1217,7 @@ static const char *const __stats_connection_desc[] = {
   "block-cache: number of misses",
   "block-cache: number of put bypasses on checkpoint I/O",
   "block-cache: removed blocks",
+  "block-cache: time sleeping to remove block (usecs)",
   "block-cache: total blocks",
   "block-cache: total blocks inserted on read path",
   "block-cache: total blocks inserted on write path",
@@ -1834,6 +1835,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_cache_misses = 0;
     stats->block_cache_bypass_chkpt = 0;
     stats->block_cache_blocks_removed = 0;
+    stats->block_cache_blocks_removed_blocked = 0;
     stats->block_cache_blocks = 0;
     stats->block_cache_blocks_insert_read = 0;
     stats->block_cache_blocks_insert_write = 0;
@@ -2407,6 +2409,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_cache_misses += WT_STAT_READ(from, block_cache_misses);
     to->block_cache_bypass_chkpt += WT_STAT_READ(from, block_cache_bypass_chkpt);
     to->block_cache_blocks_removed += WT_STAT_READ(from, block_cache_blocks_removed);
+    to->block_cache_blocks_removed_blocked +=
+      WT_STAT_READ(from, block_cache_blocks_removed_blocked);
     to->block_cache_blocks += WT_STAT_READ(from, block_cache_blocks);
     to->block_cache_blocks_insert_read += WT_STAT_READ(from, block_cache_blocks_insert_read);
     to->block_cache_blocks_insert_write += WT_STAT_READ(from, block_cache_blocks_insert_write);
