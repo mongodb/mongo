@@ -69,17 +69,21 @@ function verifyChangeCollectionEntries(
 class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
     constructor(config) {
         // Instantiate the 'ReplSetTest' with 'serverless' as an option.
-        const newConfig = Object.assign(
+        const nodeConfig = Object.assign(
             {name: "ChangeStreamMultitenantReplicaSetTest", serverless: true}, config);
-        super(newConfig);
+        super(nodeConfig);
 
-        // Start and initialize the replica set.
-        const setParameter = Object.assign({}, config.setParameter || {}, {
+        // A dictionary of parameters required for multitenancy.
+        this._multitenancyParameters = {
             featureFlagServerlessChangeStreams: true,
             multitenancySupport: true,
             featureFlagMongoStore: true,
             featureFlagRequireTenantID: true
-        });
+        };
+
+        // Start and initialize the replica set.
+        const setParameter =
+            Object.assign({}, config.setParameter || {}, this._multitenancyParameters);
         this.startSet({setParameter: setParameter});
         this.initiate();
 
@@ -87,6 +91,21 @@ class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
         // commands.
         assert.commandWorked(this.getPrimary().getDB("admin").runCommand(
             {createUser: "root", pwd: "pwd", roles: ["root"]}));
+    }
+
+    // Adds a node to the replica set with the provided configuration 'config'.
+    addNode(config) {
+        // Get the a copy of the 'config' dictionary and add required multitenancy flags to it.
+        const nodeConfig = Object.assign({serverless: true}, config);
+        nodeConfig.setParameter =
+            Object.assign({}, nodeConfig.setParameter || {}, this._multitenancyParameters);
+
+        // Initiate the replica set with the newly added node.
+        const node = this.add(nodeConfig);
+        this.reInitiate();
+
+        // Return the newly added node.
+        return node;
     }
 
     // Returns a connection to the 'hostAddr' with 'tenantId' stamped to it for the created user.
