@@ -29,6 +29,7 @@
 #ifndef THREAD_WORKER_H
 #define THREAD_WORKER_H
 
+#include <optional>
 #include <string>
 
 #include "database.h"
