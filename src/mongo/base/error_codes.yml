@@ -506,6 +506,8 @@ error_codes:
 
     - {code: 387, name: EncounteredFLEPayloadWhileRedacting}
 
+    - {code: 388, name: TransactionTooLargeForCache}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

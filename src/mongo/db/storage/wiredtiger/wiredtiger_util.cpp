@@ -52,6 +52,9 @@
 // From src/third_party/wiredtiger/src/include/txn.h
 #define WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION \
     "oldest pinned transaction ID rolled back for eviction"
+
+#define WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE \
+    "transaction is too large and will not fit in the storage engine cache"
 namespace mongo {
 
 namespace {
@@ -126,18 +129,75 @@ bool wasRollbackReasonCachePressure(WT_SESSION* session) {
     return false;
 }
 
+/**
+ * Configured WT cache is deemed insufficient for a transaction when its dirty bytes in cache
+ * exceed a certain threshold on the proportion of total cache which is used by transaction.
+ *
+ * For instance, if the transaction uses 80% of WT cache and the threshold is set to 75%, the
+ * transaction is considered too large.
+ */
+bool isCacheInsufficientForTransaction(WT_SESSION* session, double threshold) {
+    StatusWith<int64_t> txnDirtyBytes = WiredTigerUtil::getStatisticsValue(
+        session, "statistics:session", "", WT_STAT_SESSION_TXN_BYTES_DIRTY);
+    if (!txnDirtyBytes.isOK()) {
+        tasserted(6190900,
+                  str::stream() << "unable to gather the WT session's txn dirty bytes: "
+                                << txnDirtyBytes.getStatus());
+    }
+
+    StatusWith<int64_t> cacheDirtyBytes = WiredTigerUtil::getStatisticsValue(
+        session, "statistics:", "", WT_STAT_CONN_CACHE_BYTES_DIRTY);
+    if (!cacheDirtyBytes.isOK()) {
+        tasserted(6190901,
+                  str::stream() << "unable to gather the WT connection's cache dirty bytes: "
+                                << txnDirtyBytes.getStatus());
+    }
+
+
+    double txnBytesDirtyOverCacheBytesDirty =
+        static_cast<double>(txnDirtyBytes.getValue()) / cacheDirtyBytes.getValue();
+
+    LOGV2_DEBUG(6190902,
+                2,
+                "Checking if transaction can eventually succeed",
+                "txnDirtyBytes"_attr = txnDirtyBytes.getValue(),
+                "cacheDirtyBytes"_attr = cacheDirtyBytes.getValue(),
+                "txnBytesDirtyOverCacheBytesDirty"_attr = txnBytesDirtyOverCacheBytesDirty,
+                "threshold"_attr = threshold);
+
+    return txnBytesDirtyOverCacheBytesDirty > threshold;
+}
+
 Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     if (retCode == 0)
         return Status::OK();
 
+    const auto generateContextStrStream = [&](StringData reason) {
+        str::stream contextStrStream;
+        if (!prefix.empty())
+            contextStrStream << prefix << " ";
+        contextStrStream << retCode << ": " << reason;
+
+        return contextStrStream;
+    };
+
     if (retCode == WT_ROLLBACK) {
-        if (gEnableTemporarilyUnavailableExceptions.load() &&
-            wasRollbackReasonCachePressure(session)) {
-            str::stream s;
-            if (!prefix.empty())
-                s << prefix << " ";
-            s << retCode << ": " << WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION;
-            throwTemporarilyUnavailableException(s);
+        double cacheThreshold = gTransactionTooLargeForCacheThreshold.load();
+        bool txnTooLargeEnabled = cacheThreshold < 1.0;
+        bool temporarilyUnavailableEnabled = gEnableTemporarilyUnavailableExceptions.load();
+        bool reasonWasCachePressure = (txnTooLargeEnabled || temporarilyUnavailableEnabled) &&
+            wasRollbackReasonCachePressure(session);
+
+        if (reasonWasCachePressure) {
+            if (txnTooLargeEnabled && isCacheInsufficientForTransaction(session, cacheThreshold)) {
+                auto s = generateContextStrStream(WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE);
+                throwTransactionTooLargeForCache(s);
+            }
+
+            if (temporarilyUnavailableEnabled) {
+                auto s = generateContextStrStream(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION);
+                throwTemporarilyUnavailableException(s);
+            }
         }
 
         throwWriteConflictException(prefix);
@@ -146,10 +206,7 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
     fassert(28559, retCode != WT_PANIC || storageGlobalParams.repair);
 
-    str::stream s;
-    if (!prefix.empty())
-        s << prefix << " ";
-    s << retCode << ": " << wiredtiger_strerror(retCode);
+    auto s = generateContextStrStream(wiredtiger_strerror(retCode));
 
     if (retCode == EINVAL) {
         return Status(ErrorCodes::BadValue, s);

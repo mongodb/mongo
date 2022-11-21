@@ -5025,7 +5025,9 @@ tasks:
   - func: "run tests"
     vars:
       suite: core
-      resmoke_args: --fuzzMongodConfigs
+      resmoke_args: >-
+        --fuzzMongodConfigs
+        --excludeWithAnyTags=does_not_support_config_fuzzer
 
 - <<: *task_template
   name: config_fuzzer_concurrency
@@ -5035,7 +5037,9 @@ tasks:
   - func: "run tests"
     vars:
       suite: concurrency
-      resmoke_args: --fuzzMongodConfigs
+      resmoke_args: >-
+        --fuzzMongodConfigs
+        --excludeWithAnyTags=does_not_support_config_fuzzer
 
 - <<: *task_template
   name: config_fuzzer_simulate_crash_concurrency_replication
@@ -5045,7 +5049,9 @@ tasks:
   - func: "run tests"
     vars:
       suite: simulate_crash_concurrency_replication
-      resmoke_args: --fuzzMongodConfigs
+      resmoke_args: >-
+        --fuzzMongodConfigs
+        --excludeWithAnyTags=does_not_support_config_fuzzer
 
 - <<: *task_template
   name: config_fuzzer_concurrency_replication
@@ -5055,7 +5061,9 @@ tasks:
   - func: "run tests"
     vars:
       suite: concurrency_replication
-      resmoke_args: --fuzzMongodConfigs
+      resmoke_args: >-
+        --fuzzMongodConfigs
+        --excludeWithAnyTags=does_not_support_config_fuzzer
 
 - <<: *task_template
   name: config_fuzzer_replica_sets_jscore_passthrough
@@ -5065,7 +5073,9 @@ tasks:
   - func: "run tests"
     vars:
       suite: replica_sets_jscore_passthrough
-      resmoke_args: --fuzzMongodConfigs
+      resmoke_args: >-
+        --fuzzMongodConfigs
+        --excludeWithAnyTags=does_not_support_config_fuzzer
 
 - <<: *task_template
   name: jsCore_ese
