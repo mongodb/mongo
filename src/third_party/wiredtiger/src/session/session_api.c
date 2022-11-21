@@ -1396,7 +1396,8 @@ __session_salvage_worker(WT_SESSION_IMPL *session, const char *uri, const char *
 {
     WT_RET(__wt_schema_worker(
       session, uri, __wt_salvage, NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
-    WT_RET(__wt_schema_worker(session, uri, NULL, __wt_rollback_to_stable_one, cfg, 0));
+    WT_RET(
+      __wt_schema_worker(session, uri, NULL, S2C(session)->rts->rollback_to_stable_one, cfg, 0));
     return (0);
 }
 

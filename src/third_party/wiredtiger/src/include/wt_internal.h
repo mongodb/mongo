@@ -313,6 +313,8 @@ struct __wt_ref;
 typedef struct __wt_ref WT_REF;
 struct __wt_ref_hist;
 typedef struct __wt_ref_hist WT_REF_HIST;
+struct __wt_rollback_to_stable;
+typedef struct __wt_rollback_to_stable WT_ROLLBACK_TO_STABLE;
 struct __wt_row;
 typedef struct __wt_row WT_ROW;
 struct __wt_rwlock;
@@ -445,6 +447,7 @@ typedef uint64_t wt_timestamp_t;
 #include "optrack.h"
 #include "os.h"
 #include "reconcile.h"
+#include "rollback_to_stable.h"
 #include "schema.h"
 #include "thread_group.h"
 #include "tiered.h"

@@ -194,6 +194,12 @@ src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_compact.c
 src/session/session_dhandle.c
+src/rollback_to_stable/rts_api.c
+src/rollback_to_stable/rts_btree.c
+src/rollback_to_stable/rts_btree_walk.c
+src/rollback_to_stable/rts.c
+src/rollback_to_stable/rts_history.c
+src/rollback_to_stable/rts_visibility.c
 src/support/cond_auto.c
 src/support/crypto.c
 src/support/err.c
@@ -221,5 +227,4 @@ src/txn/txn.c
 src/txn/txn_ckpt.c
 src/txn/txn_log.c
 src/txn/txn_recover.c
-src/txn/txn_rollback_to_stable.c
 src/txn/txn_timestamp.c

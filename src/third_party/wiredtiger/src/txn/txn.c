@@ -2432,7 +2432,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
             __wt_verbose(session, WT_VERB_RTS,
               "performing shutdown rollback to stable with stable timestamp: %s",
               __wt_timestamp_to_string(conn->txn_global.stable_timestamp, ts_string));
-            WT_TRET(__wt_rollback_to_stable(session, cfg, true));
+            WT_TRET(conn->rts->rollback_to_stable(session, cfg, true));
         }
 
         s = NULL;
