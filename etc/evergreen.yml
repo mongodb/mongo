@@ -1839,6 +1839,7 @@ buildvariants:
   - name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
   - name: concurrency_sharded_with_stepdowns_gen
   - name: concurrency_sharded_with_stepdowns_and_balancer_gen
+  - name: concurrency_sharded_initial_sync_gen
   - name: initial_sync_fuzzer_gen
   - name: jsCore
   - name: jsCore_txns

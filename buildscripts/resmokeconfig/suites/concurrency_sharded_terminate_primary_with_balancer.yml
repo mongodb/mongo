@@ -192,12 +192,12 @@ executor:
         TestData:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
-          useStepdownPermittedFile: true
+          useActionPermittedFile: true
   hooks:
   - class: ContinuousStepdown
     config_stepdown: true
     shard_stepdown: true
-    use_stepdown_permitted_file: true
+    use_action_permitted_file: true
     wait_for_mongos_retarget: true
     terminate: true
   - class: CheckReplDBHash

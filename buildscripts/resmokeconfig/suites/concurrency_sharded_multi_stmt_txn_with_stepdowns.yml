@@ -216,12 +216,12 @@ executor:
           runningWithSessions: true
           runningWithShardStepdowns: true
           traceExceptions: false
-          useStepdownPermittedFile: true
+          useActionPermittedFile: true
   hooks:
   - class: ContinuousStepdown
     config_stepdown: true
     shard_stepdown: true
-    use_stepdown_permitted_file: true
+    use_action_permitted_file: true
     wait_for_mongos_retarget: true
   - class: CheckReplDBHash
   - class: CheckOrphansDeleted

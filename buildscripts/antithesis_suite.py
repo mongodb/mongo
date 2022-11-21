@@ -55,7 +55,7 @@ def update_test_data(suite):
     """Update TestData to be compatible with antithesis."""
     suite.setdefault("executor", {}).setdefault(
         "config", {}).setdefault("shell_options", {}).setdefault("global_vars", {}).setdefault(
-            "TestData", {}).update({"useStepdownPermittedFile": False})
+            "TestData", {}).update({"useActionPermittedFile": False})
 
 
 def update_shell(suite):

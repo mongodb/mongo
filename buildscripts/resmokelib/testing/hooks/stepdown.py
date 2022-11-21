@@ -15,6 +15,7 @@ from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.fixtures import tenant_migration
 from buildscripts.resmokelib.testing.hooks import interface
+from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
 
 
 class ContinuousStepdown(interface.Hook):
@@ -30,7 +31,7 @@ class ContinuousStepdown(interface.Hook):
 
     def __init__(self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
                  stepdown_interval_ms=8000, terminate=False, kill=False,
-                 use_stepdown_permitted_file=False, wait_for_mongos_retarget=False,
+                 use_action_permitted_file=False, wait_for_mongos_retarget=False,
                  background_reconfig=False, auth_options=None, should_downgrade=False):
         """Initialize the ContinuousStepdown.
 
@@ -42,7 +43,7 @@ class ContinuousStepdown(interface.Hook):
             stepdown_interval_ms: the number of milliseconds between stepdowns.
             terminate: shut down the node cleanly as a means of stepping it down.
             kill: With a 50% probability, kill the node instead of shutting it down cleanly.
-            use_stepdown_permitted_file: use a file to control if stepdown thread should do a stepdown.
+            use_action_permitted_file: use a file to control if stepdown thread should do a stepdown.
             wait_for_mongos_retarget: whether to run validate on all mongoses for each collection
                 in each database, after pausing the stepdown thread.
             auth_options: dictionary of auth options.
@@ -73,25 +74,27 @@ class ContinuousStepdown(interface.Hook):
         self._auth_options = auth_options
         self._should_downgrade = should_downgrade
 
-        # The stepdown file names need to match the same construction as found in
+        # The action file names need to match the same construction as found in
         # jstests/concurrency/fsm_libs/resmoke_runner.js.
         dbpath_prefix = fixture.get_dbpath_prefix()
 
-        if use_stepdown_permitted_file:
-            self.__stepdown_files = StepdownFiles._make(
-                [os.path.join(dbpath_prefix, field) for field in StepdownFiles._fields])
+        if use_action_permitted_file:
+            self.__action_files = lifecycle_interface.ActionFiles._make([
+                os.path.join(dbpath_prefix, field)
+                for field in lifecycle_interface.ActionFiles._fields
+            ])
         else:
-            self.__stepdown_files = None
+            self.__action_files = None
 
     def before_suite(self, test_report):
         """Before suite."""
         if not self._rs_fixtures:
             self._add_fixture(self._fixture)
 
-        if self.__stepdown_files is not None:
-            lifecycle = FileBasedStepdownLifecycle(self.__stepdown_files)
+        if self.__action_files is not None:
+            lifecycle = lifecycle_interface.FileBasedThreadLifecycle(self.__action_files)
         else:
-            lifecycle = FlagBasedStepdownLifecycle()
+            lifecycle = lifecycle_interface.FlagBasedThreadLifecycle()
 
         self._stepdown_thread = _StepdownThread(
             self.logger, self._mongos_fixtures, self._rs_fixtures, self._stepdown_interval_secs,
@@ -155,216 +158,6 @@ class ContinuousStepdown(interface.Hook):
                 self._rs_fixtures.append(rs_fixture)
 
 
-class FlagBasedStepdownLifecycle(object):
-    """Class for managing the various states of the stepdown thread.
-
-    The job thread alternates between calling mark_test_started() and mark_test_finished(). The
-    stepdown thread is allowed to perform stepdowns at any point between these two calls. Note that
-    the job thread synchronizes with the stepdown thread outside the context of this object to know
-    it isn't in the process of running a stepdown.
-    """
-
-    _TEST_STARTED_STATE = "start"
-    _TEST_FINISHED_STATE = "finished"
-
-    def __init__(self):
-        """Initialize the FlagBasedStepdownLifecycle instance."""
-        self.__lock = threading.Lock()
-        self.__cond = threading.Condition(self.__lock)
-
-        self.__test_state = self._TEST_FINISHED_STATE
-        self.__should_stop = False
-
-    def mark_test_started(self):
-        """Signal to the stepdown thread that a new test has started.
-
-        This function should be called during before_test(). Calling it causes the
-        wait_for_stepdown_permitted() function to no longer block and to instead return true.
-        """
-        with self.__lock:
-            self.__test_state = self._TEST_STARTED_STATE
-            self.__cond.notify_all()
-
-    def mark_test_finished(self):
-        """Signal to the stepdown thread that the current test has finished.
-
-        This function should be called during after_test(). Calling it causes the
-        wait_for_stepdown_permitted() function to block until mark_test_started() is called again.
-        """
-        with self.__lock:
-            self.__test_state = self._TEST_FINISHED_STATE
-            self.__cond.notify_all()
-
-    def stop(self):
-        """Signal to the stepdown thread that it should exit.
-
-        This function should be called during after_suite(). Calling it causes the
-        wait_for_stepdown_permitted() function to no longer block and to instead return false.
-        """
-        with self.__lock:
-            self.__should_stop = True
-            self.__cond.notify_all()
-
-    def wait_for_stepdown_permitted(self):
-        """Block until stepdowns are permitted, or until stop() is called.
-
-        :return: true if stepdowns are permitted, and false if steps are not permitted.
-        """
-        with self.__lock:
-            while not self.__should_stop:
-                if self.__test_state == self._TEST_STARTED_STATE:
-                    return True
-
-                self.__cond.wait()
-
-        return False
-
-    def wait_for_stepdown_interval(self, timeout):
-        """Block for 'timeout' seconds, or until stop() is called."""
-        with self.__lock:
-            self.__cond.wait(timeout)
-
-    def poll_for_idle_request(self):  # noqa: D205,D400
-        """Return true if the stepdown thread should continue running stepdowns, or false if it
-        should temporarily stop running stepdowns.
-        """
-        with self.__lock:
-            return self.__test_state == self._TEST_FINISHED_STATE
-
-    def send_idle_acknowledgement(self):
-        """No-op.
-
-        This method exists so this class has the same interface as FileBasedStepdownLifecycle.
-        """
-        pass
-
-
-StepdownFiles = collections.namedtuple("StepdownFiles", ["permitted", "idle_request", "idle_ack"])
-
-
-class FileBasedStepdownLifecycle(object):
-    """Class for managing the various states of the stepdown thread using files.
-
-    Unlike in the FlagBasedStepdownLifecycle class, the job thread alternating between calls to
-    mark_test_started() and mark_test_finished() doesn't automatically grant permission for the
-    stepdown thread to perform stepdowns. Instead, the test will part-way through allow stepdowns to
-    be performed and then will part-way through disallow stepdowns from continuing to be performed.
-
-    See jstests/concurrency/fsm_libs/resmoke_runner.js for the other half of the file-base protocol.
-
-        Python inside of resmoke.py                     JavaScript inside of the mongo shell
-        ---------------------------                     ------------------------------------
-
-                                                        FSM workload starts.
-                                                        Call $config.setup() function.
-                                                        Create "permitted" file.
-
-        Wait for "permitted" file to be created.
-
-        Stepdown runs.
-        Check if "idle_request" file exists.
-
-        Stepdown runs.
-        Check if "idle_request" file exists.
-
-                                                        FSM workload threads all finish.
-                                                        Create "idle_request" file.
-
-        Stepdown runs.
-        Check if "idle_request" file exists.
-        Create "idle_ack" file.
-        (No more stepdowns run.)
-
-                                                        Wait for "idle_ack" file.
-                                                        Call $config.teardown() function.
-                                                        FSM workload finishes.
-
-    Note that the job thread still synchronizes with the stepdown thread outside the context of this
-    object to know it isn't in the process of running a stepdown.
-    """
-
-    def __init__(self, stepdown_files):
-        """Initialize the FileBasedStepdownLifecycle instance."""
-        self.__stepdown_files = stepdown_files
-
-        self.__lock = threading.Lock()
-        self.__cond = threading.Condition(self.__lock)
-
-        self.__should_stop = False
-
-    def mark_test_started(self):
-        """Signal to the stepdown thread that a new test has started.
-
-        This function should be called during before_test(). Calling it does nothing because
-        permission for running stepdowns is given by the test itself writing the "permitted" file.
-        """
-        pass
-
-    def mark_test_finished(self):
-        """Signal to the stepdown thread that the current test has finished.
-
-        This function should be called during after_test(). Calling it causes the
-        wait_for_stepdown_permitted() function to block until the next test gives permission for
-        running stepdowns.
-        """
-        # It is possible something went wrong during the test's execution and prevented the
-        # "permitted" and "idle_request" files from being created. We therefore don't consider it an
-        # error if they don't exist after the test has finished.
-        fs.remove_if_exists(self.__stepdown_files.permitted)
-        fs.remove_if_exists(self.__stepdown_files.idle_request)
-        fs.remove_if_exists(self.__stepdown_files.idle_ack)
-
-    def stop(self):
-        """Signal to the stepdown thread that it should exit.
-
-        This function should be called during after_suite(). Calling it causes the
-        wait_for_stepdown_permitted() function to no longer block and to instead return false.
-        """
-        with self.__lock:
-            self.__should_stop = True
-            self.__cond.notify_all()
-
-    def wait_for_stepdown_permitted(self):
-        """Block until stepdowns are permitted, or until stop() is called.
-
-        :return: true if stepdowns are permitted, and false if steps are not permitted.
-        """
-        with self.__lock:
-            while not self.__should_stop:
-                if os.path.isfile(self.__stepdown_files.permitted):
-                    return True
-
-                # Wait a little bit before checking for the "permitted" file again.
-                self.__cond.wait(0.1)
-
-        return False
-
-    def wait_for_stepdown_interval(self, timeout):
-        """Block for 'timeout' seconds, or until stop() is called."""
-        with self.__lock:
-            self.__cond.wait(timeout)
-
-    def poll_for_idle_request(self):  # noqa: D205,D400
-        """Return true if the stepdown thread should continue running stepdowns, or false if it
-        should temporarily stop running stepdowns.
-        """
-        if os.path.isfile(self.__stepdown_files.idle_request):
-            with self.__lock:
-                return True
-
-        return False
-
-    def send_idle_acknowledgement(self):
-        """Signal to the running test that stepdown thread won't continue to run stepdowns."""
-
-        with open(self.__stepdown_files.idle_ack, "w"):
-            pass
-
-        # We remove the "permitted" file to revoke permission for the stepdown thread to continue
-        # performing stepdowns.
-        os.remove(self.__stepdown_files.permitted)
-
-
 def is_shard_split(fixture):
     """Used to determine if the provided fixture is an instance of the ShardSplitFixture class."""
     return fixture.__class__.__name__ == 'ShardSplitFixture'
@@ -413,7 +206,7 @@ class _StepdownThread(threading.Thread):
             while True:
                 self._is_idle_evt.set()
 
-                permitted = self.__lifecycle.wait_for_stepdown_permitted()
+                permitted = self.__lifecycle.wait_for_action_permitted()
                 if not permitted:
                     break
 
@@ -446,7 +239,7 @@ class _StepdownThread(threading.Thread):
                 # the last stepdown command was sent.
                 now = time.time()
                 wait_secs = max(0, self._stepdown_interval_secs - (now - self._last_exec))
-                self.__lifecycle.wait_for_stepdown_interval(wait_secs)
+                self.__lifecycle.wait_for_action_interval(wait_secs)
         except Exception:  # pylint: disable=W0703
             # Proactively log the exception when it happens so it will be
             # flushed immediately.

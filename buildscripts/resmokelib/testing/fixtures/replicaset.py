@@ -42,11 +42,12 @@ class ReplicaSetFixture(interface.ReplFixture):
 
     def __init__(self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
                  dbpath_prefix=None, preserve_dbpath=False, num_nodes=2,
-                 start_initial_sync_node=False, write_concern_majority_journal_default=None,
-                 auth_options=None, replset_config_options=None, voting_secondaries=True,
-                 all_nodes_electable=False, use_replica_set_connection_string=None,
-                 linear_chain=False, default_read_concern=None, default_write_concern=None,
-                 shard_logging_prefix=None, replicaset_logging_prefix=None, replset_name=None):
+                 start_initial_sync_node=False, electable_initial_sync_node=False,
+                 write_concern_majority_journal_default=None, auth_options=None,
+                 replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
+                 use_replica_set_connection_string=None, linear_chain=False,
+                 default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
+                 replicaset_logging_prefix=None, replset_name=None):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, fixturelib,
@@ -57,6 +58,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             self.fixturelib.default_if_none(mongod_options, {}))
         self.preserve_dbpath = preserve_dbpath
         self.start_initial_sync_node = start_initial_sync_node
+        self.electable_initial_sync_node = electable_initial_sync_node
         self.write_concern_majority_journal_default = write_concern_majority_journal_default
         self.auth_options = auth_options
         self.replset_config_options = self.fixturelib.make_historic(
@@ -139,11 +141,16 @@ class ReplicaSetFixture(interface.ReplFixture):
                     member_info["votes"] = 0
             members.append(member_info)
         if self.initial_sync_node:
-            members.append({
+            member_config = {
                 "_id": self.initial_sync_node_idx,
-                "host": self.initial_sync_node.get_internal_connection_string(), "priority": 0,
-                "hidden": 1, "votes": 0
-            })
+                "host": self.initial_sync_node.get_internal_connection_string(),
+            }
+            if not self.electable_initial_sync_node:
+                member_config["hidden"] = 1
+                member_config["votes"] = 0
+                member_config["priority"] = 0
+
+            members.append(member_config)
 
         repl_config = {"_id": self.replset_name, "protocolVersion": 1}
         client = self.nodes[0].mongo_client()
@@ -509,8 +516,13 @@ class ReplicaSetFixture(interface.ReplFixture):
             timeout_secs = self.AWAIT_REPL_TIMEOUT_MINS * 60
         start = time.time()
         clients = {}
+
+        all_nodes = self.nodes.copy()
+        if self.electable_initial_sync_node:
+            all_nodes.append(self.initial_sync_node)
+
         while True:
-            for node in self.nodes:
+            for node in all_nodes:
                 now = time.time()
                 if (now - start) >= timeout_secs:
                     msg = "Timed out while {} for replica set '{}'.".format(msg, self.replset_name)

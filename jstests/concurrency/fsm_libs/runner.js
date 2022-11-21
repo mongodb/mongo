@@ -43,7 +43,7 @@ var runner = (function() {
             'dbNamePrefix',
             'iterationMultiplier',
             'sessionOptions',
-            'stepdownFiles',
+            'actionFiles',
             'threadMultiplier'
         ];
 
@@ -98,18 +98,18 @@ var runner = (function() {
                    1,
                    'expected iterationMultiplier to be greater than or equal to 1');
 
-        if (typeof options.stepdownFiles !== 'undefined') {
+        if (typeof options.actionFiles !== 'undefined') {
             assert.eq('string',
-                      typeof options.stepdownFiles.permitted,
-                      'expected stepdownFiles.permitted to be a string');
+                      typeof options.actionFiles.permitted,
+                      'expected actionFiles.permitted to be a string');
 
             assert.eq('string',
-                      typeof options.stepdownFiles.idleRequest,
-                      'expected stepdownFiles.idleRequest to be a string');
+                      typeof options.actionFiles.idleRequest,
+                      'expected actionFiles.idleRequest to be a string');
 
             assert.eq('string',
-                      typeof options.stepdownFiles.idleAck,
-                      'expected stepdownFiles.idleAck to be a string');
+                      typeof options.actionFiles.idleAck,
+                      'expected actionFiles.idleAck to be a string');
         }
 
         options.threadMultiplier = options.threadMultiplier || 1;

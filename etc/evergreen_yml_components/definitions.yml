@@ -5876,6 +5876,15 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
+  name: concurrency_sharded_initial_sync_gen
+  tags: ["concurrency", "stepdowns", "initsync", "large", "sharded", "no_debug_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: concurrency_sharded_terminate_primary_with_balancer_gen
   tags: ["concurrency", "stepdowns", "kill_terminate", "sharded", "no_debug_mode"]
   commands:

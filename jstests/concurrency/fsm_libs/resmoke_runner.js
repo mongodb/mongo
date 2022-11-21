@@ -98,9 +98,9 @@ function runWorkloads(workloads,
             cleanup.push(workload);
         });
 
-        // Await replication after running the $config.setup() function when stepdowns are
+        // Await replication after running the $config.setup() function when actions are
         // permitted to ensure its effects aren't rolled back.
-        if (cluster.isReplication() && executionOptions.stepdownFiles !== undefined) {
+        if (cluster.isReplication() && executionOptions.actionFiles !== undefined) {
             cluster.awaitReplication();
         }
 
@@ -118,16 +118,16 @@ function runWorkloads(workloads,
             cluster.synchronizeMongosClusterTimes();
         }
 
-        // After the $config.setup() function has been called, it is safe for the stepdown
-        // thread to start running. The main thread won't attempt to interact with the cluster
-        // until all of the spawned worker threads have finished.
+        // After the $config.setup() function has been called, it is safe for the hook thread
+        // to start running. The main thread won't attempt to interact with the cluster until
+        // all of the spawned worker threads have finished.
         //
 
-        // Indicate that the stepdown thread can run. It is unnecessary for the stepdown thread
-        // to indicate that it is going to start running because it will eventually after the
+        // Indicate that the hook thread can run. It is unnecessary for the hook thread to
+        // indicate that it is going to start running because it will eventually after the
         // worker threads have started.
-        if (executionOptions.stepdownFiles !== undefined) {
-            writeFile(executionOptions.stepdownFiles.permitted, '');
+        if (executionOptions.actionFiles !== undefined) {
+            writeFile(executionOptions.actionFiles.permitted, '');
         }
 
         // Since the worker threads may be running with causal consistency enabled, we set the
@@ -167,21 +167,21 @@ function runWorkloads(workloads,
                         e.err, e.stack, e.tid, 'Foreground ' + e.workloads.join(' '))));
             }
         } finally {
-            // Until we are guaranteed that the stepdown thread isn't running, it isn't safe for
+            // Until we are guaranteed that the hook thread isn't running, it isn't safe for
             // the $config.teardown() function to be called. We should signal to resmoke.py that
-            // the stepdown thread should stop running and wait for the stepdown thread to
-            // signal that it has stopped.
+            // the hook thread should stop running and wait for the hook thread to signal that
+            // it has stopped.
             //
-            // Signal to the stepdown thread to stop stepping down the cluster.
-            if (executionOptions.stepdownFiles !== undefined) {
-                writeFile(executionOptions.stepdownFiles.idleRequest, '');
+            // Signal to the hook thread to stop any actions.
+            if (executionOptions.actionFiles !== undefined) {
+                writeFile(executionOptions.actionFiles.idleRequest, '');
 
-                // Wait for the acknowledgement file to be created by the stepdown thread.
+                // Wait for the acknowledgement file to be created by the hook thread.
                 assert.soonNoExcept(function() {
                     // The cat() function will throw an exception if the file isn't found.
-                    cat(executionOptions.stepdownFiles.idleAck);
+                    cat(executionOptions.actionFiles.idleAck);
                     return true;
-                }, "stepdown still in progress");
+                }, "thread action still in progress");
             }
         }
     } finally {
@@ -266,10 +266,10 @@ const executionOptions = {
 };
 const resmokeDbPathPrefix = TestData.resmokeDbPathPrefix || ".";
 
-// The stepdown file names need to match the same construction as found in
-// buildscripts/resmokelib/testing/hooks/stepdown.py.
-if (TestData.useStepdownPermittedFile) {
-    executionOptions.stepdownFiles = {
+// The action file names need to match the same construction as found in
+// buildscripts/resmokelib/testing/hooks/lifecycle_interface.py.
+if (TestData.useActionPermittedFile) {
+    executionOptions.actionFiles = {
         permitted: resmokeDbPathPrefix + '/permitted',
         idleRequest: resmokeDbPathPrefix + '/idle_request',
         idleAck: resmokeDbPathPrefix + '/idle_ack',
