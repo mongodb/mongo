@@ -1949,6 +1949,16 @@ struct __wt_session {
 	 */
 	int __F(timestamp_transaction_uint)(WT_SESSION *session, WT_TS_TXN_TYPE which,
 	        uint64_t ts);
+
+	/*!
+	 * Returns the number of records in the table.
+	 *
+	 * @param session the session handle
+	 * @param uri the URI of the table, such as \c "table:old"
+	 * @param count the number of records in the table
+	 * @errors
+	 */
+	int __F(count)(WT_SESSION *session, const char *uri, int64_t *count);
 	/*! @} */
 
 	/*!

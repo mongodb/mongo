@@ -30,6 +30,7 @@
  * wiredtiger.i
  *	The SWIG interface file defining the wiredtiger python API.
  */
+%include <cpointer.i>
 %include <pybuffer.i>
 
 %define DOCSTRING
@@ -321,6 +322,11 @@ from packing import pack, unpack
 %typemap(out) uint64_t {
 	$result = PyLong_FromUnsignedLongLong($1);
 }
+%typemap(out) int64_t {
+	$result = PyLong_FromLongLong($1);
+}
+
+%pointer_class(int64_t, int64_t_ptr);
 
 /* Internal _set_key, _set_value methods take a 'bytes' object as parameter. */
 %pybuffer_binary(unsigned char *data, int);

@@ -827,6 +827,45 @@ err:
 }
 
 /*
+ * __wt_session_count --
+ *     WT_SESSION->count method.
+ */
+int
+__wt_session_count(WT_SESSION *wt_session, const char *uri, int64_t *count)
+{
+    WT_DECL_RET;
+
+    WT_UNUSED(uri);
+    WT_UNUSED(wt_session);
+
+    *count = -1;
+    if (*count == -1)
+        ret = WT_NOTFOUND;
+
+    return (ret);
+}
+
+/*
+ * __wt_session_count_notsup --
+ *     WT_SESSION->count method; not supported version.
+ */
+static int
+__wt_session_count_notsup(WT_SESSION *wt_session, const char *uri, int64_t *count)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    WT_UNUSED(uri);
+    WT_UNUSED(count);
+
+    session = (WT_SESSION_IMPL *)wt_session;
+    SESSION_API_CALL_NOCONF(session, count);
+    ret = __wt_session_notsup(session);
+err:
+    API_END_RET(session, ret);
+}
+
+/*
  * __wt_session_create --
  *     Internal version of WT_SESSION::create.
  */
@@ -2318,8 +2357,9 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_truncate, __session_upgrade, __session_verify, __session_begin_transaction,
         __session_commit_transaction, __session_prepare_transaction, __session_rollback_transaction,
         __session_query_timestamp, __session_timestamp_transaction,
-        __session_timestamp_transaction_uint, __session_checkpoint, __session_reset_snapshot,
-        __session_transaction_pinned_range, __session_get_rollback_reason, __wt_session_breakpoint},
+        __session_timestamp_transaction_uint, __wt_session_count, __session_checkpoint,
+        __session_reset_snapshot, __session_transaction_pinned_range, __session_get_rollback_reason,
+        __wt_session_breakpoint},
       stds_min = {NULL, NULL, __session_close, __session_reconfigure_notsup,
         __session_flush_tier_readonly, __wt_session_strerror, __session_open_cursor,
         __session_alter_readonly, __session_create_readonly, __wt_session_compact_readonly,
@@ -2330,7 +2370,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_commit_transaction_notsup, __session_prepare_transaction_readonly,
         __session_rollback_transaction_notsup, __session_query_timestamp_notsup,
         __session_timestamp_transaction_notsup, __session_timestamp_transaction_uint_notsup,
-        __session_checkpoint_readonly, __session_reset_snapshot_notsup,
+        __wt_session_count_notsup, __session_checkpoint_readonly, __session_reset_snapshot_notsup,
         __session_transaction_pinned_range_notsup, __session_get_rollback_reason,
         __wt_session_breakpoint},
       stds_readonly = {NULL, NULL, __session_close, __session_reconfigure,
@@ -2342,7 +2382,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_verify, __session_begin_transaction, __session_commit_transaction,
         __session_prepare_transaction_readonly, __session_rollback_transaction,
         __session_query_timestamp, __session_timestamp_transaction,
-        __session_timestamp_transaction_uint, __session_checkpoint_readonly,
+        __session_timestamp_transaction_uint, __wt_session_count, __session_checkpoint_readonly,
         __session_reset_snapshot, __session_transaction_pinned_range, __session_get_rollback_reason,
         __wt_session_breakpoint};
     WT_DECL_RET;
