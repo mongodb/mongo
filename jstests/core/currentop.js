@@ -1,7 +1,9 @@
 /**
  * Tests that long-running operations show up in currentOp and report the locks they are holding.
  *
+ * The test runs commands that are not allowed with security token: fsyncUnlock.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   assumes_superuser_permissions,
  *   # fsync command is not available on embedded
  *   incompatible_with_embedded,

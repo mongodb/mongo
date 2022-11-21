@@ -1,6 +1,8 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
+// The test runs commands that are not allowed with security token: eval.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_non_retryable_commands,
 // ]

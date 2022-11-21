@@ -1,6 +1,8 @@
 // Test that interrupting a count returns an error code.
 //
+// The test runs commands that are not allowed with security token: killOp.
 // @tags: [
+//   not_allowed_with_security_token,
 //   # This test attempts to perform a count command and find it using the currentOp command. The
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be
 //   # routed to the primary.

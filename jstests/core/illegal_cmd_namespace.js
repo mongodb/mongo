@@ -2,7 +2,9 @@
  * Test that an attempt to run a query over a $cmd namespace is not treated specially by the shell,
  * but is rejected by the server.
  *
+ * The test runs commands that are not allowed with security token: killop.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   assumes_unsharded_collection,
  * ]
  */

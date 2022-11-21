@@ -1,6 +1,8 @@
 // Test that the plan summary string appears in db.currentOp() for count operations. SERVER-14064.
 //
+// The test runs commands that are not allowed with security token: killOp.
 // @tags: [
+//   not_allowed_with_security_token,
 //   # This test attempts to perform a find command and find it using the currentOp command. The
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be
 //   # routed to the primary.

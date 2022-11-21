@@ -1,6 +1,8 @@
 // Tests that the properties available on the 'this' object during js execution are only those found
 // in the database's BSON object.
+// The test runs commands that are not allowed with security token: mapReduce.
 // @tags: [
+//   not_allowed_with_security_token,
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,
 // ]

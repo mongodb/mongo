@@ -1,6 +1,8 @@
 /**
  * Tests the "failCommand" failpoint.
+ * The test runs commands that are not allowed with security token: whatsmyuri.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   no_selinux,

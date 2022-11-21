@@ -1,4 +1,6 @@
+// The test runs commands that are not allowed with security token: reIndex.
 // @tags: [
+//   not_allowed_with_security_token,
 //     # Asserts on the output of listIndexes.
 //     assumes_no_implicit_index_creation,
 //     # Cannot implicitly shard accessed collections because of not being able to create unique

@@ -2,7 +2,10 @@
  * This test ensures that ConvertToCapped()ing a nonexistent collection will not cause the server to
  * abort (SERVER-13750)
  *
+ * The test runs commands that are not allowed with security token: ConvertToCapped,
+ * convertToCapped.
  * @tags: [
+ *   not_allowed_with_security_token,
  *  requires_non_retryable_commands,
  *
  *  # capped collections is not available on embedded

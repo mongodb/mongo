@@ -1,6 +1,8 @@
 // Test that the server cleans up correctly when creating a collection fails.
 //
-// @tags: [requires_capped]
+// The test runs commands that are not allowed with security token: top.
+// @tags: [
+//   not_allowed_with_security_token,requires_capped]
 (function() {
 "use strict";
 

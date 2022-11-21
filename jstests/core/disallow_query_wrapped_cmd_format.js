@@ -1,8 +1,10 @@
 /**
  * Test that the "wrapped" command format using {$query: <cmd>} fails cleanly.
  *
+ * The test runs commands that are not allowed with security token: query.
  * @tags: [
  *    requires_fcv_63,
+ *    not_allowed_with_security_token,
  * ]
  */
 (function() {

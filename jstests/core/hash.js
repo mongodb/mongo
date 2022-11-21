@@ -4,7 +4,9 @@
  * time or across architectures. This is a good place to put tests for any edge cases in the hash
  * function that might be prone to change because of code changes or because of differences between
  * architectures.
+ * The test runs commands that are not allowed with security token: _hashBSONElement.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   no_selinux,
  * ]
  */

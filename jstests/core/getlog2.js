@@ -1,6 +1,8 @@
 // tests getlog as well as slow querying logging
 //
+// The test runs commands that are not allowed with security token: getLog.
 // @tags: [
+//   not_allowed_with_security_token,
 //   # This test attempts to perform a find command and see that it ran using the getLog command.
 //   # The former operation may be routed to a secondary in the replica set, whereas the latter must
 //   # be routed to the primary.

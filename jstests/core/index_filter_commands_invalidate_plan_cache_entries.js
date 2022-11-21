@@ -1,7 +1,10 @@
 /**
  * Test that index filter commands (planCacheSetFilter, planCacheClearFilters) invalidate the
  * corresponding plan cache entries.
+ * The test runs commands that are not allowed with security token: planCacheClearFilters,
+ * planCacheSetFilter.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   # This test attempts to perform queries with plan cache filters set up. The index filter
  *   # commands and the queries to which those index filters apply could be routed to different
  *   # nodes.

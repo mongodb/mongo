@@ -1,4 +1,6 @@
+// The test runs commands that are not allowed with security token: dbhash.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_superuser_permissions,
 //   # dbhash command is not available on embedded
 //   incompatible_with_embedded,
