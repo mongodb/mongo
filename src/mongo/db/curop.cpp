@@ -479,7 +479,8 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(500),
                                     Lock::InterruptBehavior::kThrow);
-                _debug.storageStats = opCtx->recoveryUnit()->getOperationStatistics();
+                _debug.storageStats =
+                    opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
             } catch (const DBException& ex) {
                 LOGV2_WARNING_OPTIONS(20526,
                                       {component},
