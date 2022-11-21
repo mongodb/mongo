@@ -1285,6 +1285,7 @@ packv
 pagedump
 pageref
 pagesize
+pagestat
 param
 parens
 pareto

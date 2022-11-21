@@ -195,7 +195,7 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, WT_TIME_AGGREG
  */
 static inline size_t
 __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type, uint64_t recno,
-  WT_PAGE_DELETED *page_del, WT_TIME_AGGREGATE *ta, size_t size)
+  WT_PAGE_DELETED *page_del, WT_PAGE_STAT *ps, WT_TIME_AGGREGATE *ta, size_t size)
 {
     uint8_t *p;
 
@@ -223,6 +223,14 @@ __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type, ui
         cell->__chunk[0] |= (uint8_t)(cell_type | WT_CELL_64V);
         /* Record number */
         WT_IGNORE_RET(__wt_vpack_uint(&p, 0, recno));
+    }
+
+    /* If passed page stat information, append the row and byte counts. */
+    if (ps != NULL && __wt_process.page_stats_2022) {
+        if (WT_PAGE_STAT_HAS_BYTE_COUNT(ps))
+            WT_IGNORE_RET(__wt_vpack_int(&p, 0, ps->byte_count));
+        if (WT_PAGE_STAT_HAS_ROW_COUNT(ps))
+            WT_IGNORE_RET(__wt_vpack_int(&p, 0, ps->row_count));
     }
 
     /* Length */
@@ -684,6 +692,7 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CE
         WT_TIME_WINDOW tw;
     } copy;
     WT_CELL_UNPACK_COMMON *unpack;
+    WT_PAGE_STAT *ps;
     WT_PAGE_DELETED *page_del;
     WT_TIME_AGGREGATE *ta;
     WT_TIME_WINDOW *tw;
@@ -696,6 +705,8 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CE
     copy.len = 0; /* [-Wconditional-uninitialized] */
     copy.v = 0;   /* [-Wconditional-uninitialized] */
 
+    ps = unpack_addr == NULL ? NULL : &unpack_addr->ps;
+
     if (unpack_addr == NULL) {
         unpack = (WT_CELL_UNPACK_COMMON *)unpack_value;
         tw = &unpack_value->tw;
@@ -705,6 +716,7 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CE
         WT_ASSERT(session, unpack_value == NULL);
 
         unpack = (WT_CELL_UNPACK_COMMON *)unpack_addr;
+        WT_PAGE_STAT_INIT(ps);
         ta = &unpack_addr->ta;
         WT_TIME_AGGREGATE_INIT(ta);
         tw = NULL;
@@ -922,6 +934,14 @@ copy_cell_restart:
     case WT_CELL_ADDR_INT:
     case WT_CELL_ADDR_LEAF:
     case WT_CELL_ADDR_LEAF_NO:
+        /* Unpack the row and/or byte counts if the chunk of data includes it. */
+        if (F_ISSET(dsk, WT_PAGE_STAT_ROWBYTE)) {
+            if (WT_PAGE_STAT_HAS_BYTE_COUNT(&unpack_addr->ps))
+                WT_RET(__wt_vunpack_int(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &ps->byte_count));
+            if (WT_PAGE_STAT_HAS_ROW_COUNT(&unpack_addr->ps))
+                WT_RET(__wt_vunpack_int(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &ps->row_count));
+        }
+        /* FALLTHROUGH */
     case WT_CELL_KEY:
     case WT_CELL_KEY_PFX:
     case WT_CELL_VALUE:
