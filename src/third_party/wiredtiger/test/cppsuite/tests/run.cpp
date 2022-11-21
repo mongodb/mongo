@@ -54,8 +54,8 @@ extern "C" {
 /* Declarations to avoid the error raised by -Werror=missing-prototypes. */
 const std::string parse_configuration_from_file(const std::string &filename);
 void print_help();
-int64_t run_test(
-  const std::string &test_name, const std::string &config, const std::string &wt_open_config);
+int64_t run_test(const std::string &test_name, const std::string &config,
+  const std::string &wt_open_config, const std::string &home);
 
 const std::string
 parse_configuration_from_file(const std::string &filename)
@@ -91,6 +91,7 @@ print_help()
     std::cout << "\trun -C [WIREDTIGER_OPEN_CONFIGURATION]" << std::endl;
     std::cout << "\trun -c [TEST_FRAMEWORK_CONFIGURATION]" << std::endl;
     std::cout << "\trun -f [FILE]" << std::endl;
+    std::cout << "\trun -H [HOME]" << std::endl;
     std::cout << "\trun -l [TRACE_LEVEL]" << std::endl;
     std::cout << "\trun --list" << std::endl;
     std::cout << "\trun -t [TEST_NAME]" << std::endl;
@@ -107,10 +108,11 @@ print_help()
       << std::endl;
     std::cout << std::endl;
     std::cout << "OPTIONS" << std::endl;
-    std::cout << "\t-h Output a usage message and exit." << std::endl;
     std::cout << "\t-C Additional WiredTiger open configuration." << std::endl;
     std::cout << "\t-c Test framework configuration. Cannot be used with -f." << std::endl;
     std::cout << "\t-f File that contains the configuration. Cannot be used with -C." << std::endl;
+    std::cout << "\t-H Specifies the database home directory." << std::endl;
+    std::cout << "\t-h Output a usage message and exit." << std::endl;
     std::cout << "\t-l Trace level from 0 to 3. "
                  "1 is the default level, all warnings and errors are logged."
               << std::endl;
@@ -124,13 +126,16 @@ print_help()
  * - config: defines the configuration used for the test.
  */
 int64_t
-run_test(const std::string &test_name, const std::string &config, const std::string &wt_open_config)
+run_test(const std::string &test_name, const std::string &config, const std::string &wt_open_config,
+  const std::string &home)
 {
     int error_code = 0;
 
     test_harness::logger::log_msg(LOG_TRACE, "Configuration\t:" + config);
-    test_harness::test_args args = {
-      .test_config = config, .test_name = test_name, .wt_open_config = wt_open_config};
+    test_harness::test_args args = {.test_config = config,
+      .test_name = test_name,
+      .wt_open_config = wt_open_config,
+      .home = home};
 
     if (test_name == "bounded_cursor_perf")
         bounded_cursor_perf(args).run();
@@ -178,7 +183,8 @@ get_default_config_path(const std::string &test_name)
 int
 main(int argc, char *argv[])
 {
-    std::string cfg, config_filename, current_cfg, current_test_name, test_name, wt_open_config;
+    std::string cfg, config_filename, current_cfg, current_test_name, home, test_name,
+      wt_open_config;
     int64_t error_code = 0;
     const std::vector<std::string> all_tests = {"bounded_cursor_perf",
       "bounded_cursor_prefix_indices", "bounded_cursor_prefix_search_near",
@@ -234,6 +240,11 @@ main(int argc, char *argv[])
             for (const auto &test_name : all_tests)
                 std::cout << "\t" << test_name << std::endl;
             return 0;
+        } else if (option == "-H") {
+            if ((i + 1) < argc)
+                home = argv[++i];
+            else
+                error_code = -1;
         } else
             error_code = -1;
     }
@@ -255,7 +266,7 @@ main(int argc, char *argv[])
                 else
                     current_cfg = cfg;
 
-                error_code = run_test(current_test_name, current_cfg, wt_open_config);
+                error_code = run_test(current_test_name, current_cfg, wt_open_config, home);
                 /*
                  * The connection is usually closed using the destructor of the connection manager.
                  * Because it is a singleton and we are executing all tests, we are not going
@@ -280,7 +291,7 @@ main(int argc, char *argv[])
                     cfg = parse_configuration_from_file(config_filename);
                 else if (cfg.empty())
                     cfg = parse_configuration_from_file(get_default_config_path(current_test_name));
-                error_code = run_test(current_test_name, cfg, wt_open_config);
+                error_code = run_test(current_test_name, cfg, wt_open_config, home);
             }
         }
 
