@@ -401,10 +401,6 @@ sh.verifyCollectionIsBalanced = function(coll) {
 
         let kChunkSize = 1024 * 1024 *
             assert.commandWorked(sh._adminCommand({balancerCollectionStatus: ns})).chunkSize;
-        // TODO SERVER-67898 delete kChunkSize overwrite after completing the ticket
-        if (kChunkSize == 0) {
-            kChunkSize = collection.maxChunkSizeBytes;
-        }
 
         // Get coll size per shard
         const storageStats = coll.aggregate(collStatsPipeline).toArray();
