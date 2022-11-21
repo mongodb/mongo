@@ -469,6 +469,7 @@ for pack in [
     ('intel_decimal128', 'intel decimal128'),
     ('kms-message', ),
     ('libbson', ),
+    ('libmongocrypt', ),
     ('pcre2', ),
     ('snappy', ),
     ('stemmer', ),
