@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_timestamp14.py
-#   Global timestamps: oldest reader, all committed, pinned
+#   Global timestamps: oldest reader, all durable, pinned
 #
 
 from suite_subprocess import suite_subprocess
@@ -104,7 +104,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), "5")
 
         session1.begin_transaction()
-        # All committed will now move back to 3 as it is the point at which
+        # All durable will now move back to 3 as it is the point at which
         # all transactions up to that point have committed.
         session1.timestamp_transaction('commit_timestamp=4')
 
@@ -113,7 +113,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         session1.commit_transaction()
 
         # Now that the transaction at timestamp 4 has completed the
-        # all committed timestamp is back at 5.
+        # all durable timestamp is back at 5.
         self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), "5")
 
         # Scenario 4: Holding a transaction open without a commit timestamp
