@@ -1,6 +1,8 @@
 // check notablescan mode
 //
+// The test runs commands that are not allowed with security token: setParameter.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_against_mongod_not_mongos,
 //   # This test attempts to perform read operations after having enabled the notablescan server
 //   # parameter. The former operations may be routed to a secondary in the replica set, whereas the

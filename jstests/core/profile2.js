@@ -1,7 +1,9 @@
 // Tests that large queries and updates are properly profiled.
 
 // Special db so that it can be run in parallel tests.
+// The test runs commands that are not allowed with security token: profile.
 // @tags: [
+//   not_allowed_with_security_token,
 //   requires_profiling,
 // ]
 

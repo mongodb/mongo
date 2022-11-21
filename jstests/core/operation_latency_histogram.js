@@ -5,7 +5,10 @@
 // may be routed to a secondary. This is incompatible with embedded right now since the command
 // compact does not exist on such storage engines.
 //
+// The test runs commands that are not allowed with security token: compact, dataSize,reIndex,
+// whatsmyuri.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_read_preference_unchanged,
 //   does_not_support_repeated_reads,
 //   incompatible_with_embedded,

@@ -1,3 +1,5 @@
+// The test runs commands that are not allowed with security token: mapReduce.
+// @tags: [not_allowed_with_security_token]
 (function() {
 "use strict";
 const coll = db.bar;

@@ -1,7 +1,9 @@
 /**
  * SERVER-25942 Test that views are not validated in the case that only collections are queried.
  *
+ * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   assumes_against_mongod_not_mongos,
  *   assumes_superuser_permissions,
  *   # applyOps is not retryable.

@@ -1,5 +1,7 @@
 // Tests that invalid options to the mapReduce command are rejected.
+// The test runs commands that are not allowed with security token: mapReduce.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_no_implicit_collection_creation_after_drop,
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,

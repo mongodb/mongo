@@ -1,5 +1,7 @@
 // Test that opcounters get incremented properly.
 // @tags: [
+//   # unrecognized command "invalid" is not allowed with security tolen.
+//   not_allowed_with_security_token,
 //   uses_multiple_connections,
 //   assumes_standalone_mongod,
 //   does_not_support_repeated_reads,

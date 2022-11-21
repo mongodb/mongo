@@ -1,7 +1,9 @@
 // Test clearing of the plan cache, either manually through the planCacheClear command,
 // or due to system events such as an index build.
 //
+// The test runs commands that are not allowed with security token: planCacheClear, reIndex.
 // @tags: [
+//   not_allowed_with_security_token,
 //   # This test attempts to perform queries and introspect/manipulate the server's plan cache
 //   # entries. The former operation may be routed to a secondary in the replica set, whereas the
 //   # latter must be routed to the primary.

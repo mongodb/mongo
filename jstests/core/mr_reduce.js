@@ -1,7 +1,9 @@
 // Tests the 'reduce' output mode for mapReduce.
 // Cannot implicitly shard accessed collections because of following errmsg: Cannot output to a
 // non-sharded collection because sharded collection exists already.
+// The test runs commands that are not allowed with security token: mapReduce.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_unsharded_collection,
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,

@@ -1,6 +1,8 @@
 // This test expects a function stored in the system.js collection to be available for a map/reduce,
 // which may not be the case if it is implicitly sharded in a passthrough.
+// The test runs commands that are not allowed with security token: mapReduce.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_unsharded_collection,
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,

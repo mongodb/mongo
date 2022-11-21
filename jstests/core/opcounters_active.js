@@ -1,4 +1,6 @@
 // checks that db.serverStatus will not throw errors when metrics tree is not present.
+// The test runs commands that are not allowed with security token: mapreduce.
+// @tags: [not_allowed_with_security_token]
 
 (function() {
 "use strict";

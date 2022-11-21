@@ -1,4 +1,6 @@
+// The test runs commands that are not allowed with security token: getLog, logRotate.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
 //   no_selinux,
