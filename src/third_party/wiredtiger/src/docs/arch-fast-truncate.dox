@@ -829,10 +829,10 @@ Call \c __wt_txn_op_delete_apply_prepare_state.}
 @row{txn.c, Hook, in \c __wt_txn_rollback,
 Call \c __wt_delete_page_rollback.}
 
-@row{txn_rollback_to_stable.c, Hook, in \c __rollback_page_needs_abort,
+@row{rts_visibility.c, Hook, in \c __wt_rollback_page_needs_abort,
 Check \c page_del when deciding whether the page contains unstable values that need to be
 examined.}
-@row{txn_rollback_to_stable.c, Hook, in \c __rollback_to_stable_page_skip,
+@row{rts_btree_walk.c, Hook, in \c __rollback_to_stable_page_skip,
 Check \c page del when deciding whether to skip over the page.}
 
 </table>

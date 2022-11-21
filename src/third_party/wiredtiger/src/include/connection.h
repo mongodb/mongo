@@ -497,6 +497,7 @@ struct __wt_connection_impl {
     uint16_t log_req_min;                  /* Min required log version */
     uint32_t txn_logsync;                  /* Log sync configuration */
 
+    WT_ROLLBACK_TO_STABLE *rts, _rts;   /* Rollback to stable subsystem */
     WT_SESSION_IMPL *meta_ckpt_session; /* Metadata checkpoint session */
 
     /*

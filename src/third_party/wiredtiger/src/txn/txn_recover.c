@@ -1014,7 +1014,7 @@ done:
           __wt_timestamp_to_string(conn->txn_global.stable_timestamp, ts_string[0]),
           __wt_timestamp_to_string(conn->txn_global.oldest_timestamp, ts_string[1]));
         rts_executed = true;
-        WT_ERR(__wt_rollback_to_stable(session, NULL, true));
+        WT_ERR(conn->rts->rollback_to_stable(session, NULL, true));
     }
 
     /*
