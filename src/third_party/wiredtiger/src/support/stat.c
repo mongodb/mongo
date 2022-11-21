@@ -15,6 +15,8 @@ static const char *const __stats_dsrc_desc[] = {
   "LSM: sleep for LSM checkpoint throttle",
   "LSM: sleep for LSM merge throttle",
   "LSM: total size of bloom filters",
+  "autocommit: retries for readonly operations",
+  "autocommit: retries for update operations",
   "block-manager: allocations requiring file extension",
   "block-manager: blocks allocated",
   "block-manager: blocks freed",
@@ -334,6 +336,8 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->lsm_checkpoint_throttle = 0;
     stats->lsm_merge_throttle = 0;
     stats->bloom_size = 0;
+    stats->autocommit_readonly_retry = 0;
+    stats->autocommit_update_retry = 0;
     stats->block_extension = 0;
     stats->block_alloc = 0;
     stats->block_free = 0;
@@ -614,6 +618,8 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->lsm_checkpoint_throttle += from->lsm_checkpoint_throttle;
     to->lsm_merge_throttle += from->lsm_merge_throttle;
     to->bloom_size += from->bloom_size;
+    to->autocommit_readonly_retry += from->autocommit_readonly_retry;
+    to->autocommit_update_retry += from->autocommit_update_retry;
     to->block_extension += from->block_extension;
     to->block_alloc += from->block_alloc;
     to->block_free += from->block_free;
@@ -904,6 +910,8 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->lsm_checkpoint_throttle += WT_STAT_READ(from, lsm_checkpoint_throttle);
     to->lsm_merge_throttle += WT_STAT_READ(from, lsm_merge_throttle);
     to->bloom_size += WT_STAT_READ(from, bloom_size);
+    to->autocommit_readonly_retry += WT_STAT_READ(from, autocommit_readonly_retry);
+    to->autocommit_update_retry += WT_STAT_READ(from, autocommit_update_retry);
     to->block_extension += WT_STAT_READ(from, block_extension);
     to->block_alloc += WT_STAT_READ(from, block_alloc);
     to->block_free += WT_STAT_READ(from, block_free);
@@ -1202,6 +1210,8 @@ static const char *const __stats_connection_desc[] = {
   "LSM: tree maintenance operations executed",
   "LSM: tree maintenance operations scheduled",
   "LSM: tree queue hit maximum",
+  "autocommit: retries for readonly operations",
+  "autocommit: retries for update operations",
   "block-cache: cached blocks updated",
   "block-cache: cached bytes updated",
   "block-cache: evicted blocks",
@@ -1820,6 +1830,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->lsm_work_units_done = 0;
     stats->lsm_work_units_created = 0;
     stats->lsm_work_queue_max = 0;
+    stats->autocommit_readonly_retry = 0;
+    stats->autocommit_update_retry = 0;
     stats->block_cache_blocks_update = 0;
     stats->block_cache_bytes_update = 0;
     stats->block_cache_blocks_evicted = 0;
@@ -2394,6 +2406,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->lsm_work_units_done += WT_STAT_READ(from, lsm_work_units_done);
     to->lsm_work_units_created += WT_STAT_READ(from, lsm_work_units_created);
     to->lsm_work_queue_max += WT_STAT_READ(from, lsm_work_queue_max);
+    to->autocommit_readonly_retry += WT_STAT_READ(from, autocommit_readonly_retry);
+    to->autocommit_update_retry += WT_STAT_READ(from, autocommit_update_retry);
     to->block_cache_blocks_update += WT_STAT_READ(from, block_cache_blocks_update);
     to->block_cache_bytes_update += WT_STAT_READ(from, block_cache_bytes_update);
     to->block_cache_blocks_evicted += WT_STAT_READ(from, block_cache_blocks_evicted);

@@ -124,28 +124,29 @@
             F_SET((s)->txn, WT_TXN_UPDATE);
 
 /* End a transactional API call, optional retry on rollback. */
-#define TXN_API_END(s, ret, retry)                         \
-    API_END(s, ret);                                       \
-    if (__update)                                          \
-        F_CLR((s)->txn, WT_TXN_UPDATE);                    \
-    if (__autotxn) {                                       \
-        if (F_ISSET((s)->txn, WT_TXN_AUTOCOMMIT))          \
-            F_CLR((s)->txn, WT_TXN_AUTOCOMMIT);            \
-        else if ((ret) == 0)                               \
-            (ret) = __wt_txn_commit((s), NULL);            \
-        else {                                             \
-            if (retry)                                     \
-                WT_TRET(__wt_session_copy_values(s));      \
-            WT_TRET(__wt_txn_rollback((s), NULL));         \
-            if ((retry) && (ret) == WT_ROLLBACK) {         \
-                (ret) = 0;                                 \
-                continue;                                  \
-            }                                              \
-            WT_TRET(__wt_session_reset_cursors(s, false)); \
-        }                                                  \
-    }                                                      \
-    break;                                                 \
-    }                                                      \
+#define TXN_API_END(s, ret, retry)                                  \
+    API_END(s, ret);                                                \
+    if (__update)                                                   \
+        F_CLR((s)->txn, WT_TXN_UPDATE);                             \
+    if (__autotxn) {                                                \
+        if (F_ISSET((s)->txn, WT_TXN_AUTOCOMMIT))                   \
+            F_CLR((s)->txn, WT_TXN_AUTOCOMMIT);                     \
+        else if ((ret) == 0)                                        \
+            (ret) = __wt_txn_commit((s), NULL);                     \
+        else {                                                      \
+            if (retry)                                              \
+                WT_TRET(__wt_session_copy_values(s));               \
+            WT_TRET(__wt_txn_rollback((s), NULL));                  \
+            if ((retry) && (ret) == WT_ROLLBACK) {                  \
+                (ret) = 0;                                          \
+                WT_STAT_CONN_DATA_INCR(s, autocommit_update_retry); \
+                continue;                                           \
+            }                                                       \
+            WT_TRET(__wt_session_reset_cursors(s, false));          \
+        }                                                           \
+    }                                                               \
+    break;                                                          \
+    }                                                               \
     while (1)
 
 /*
@@ -252,6 +253,22 @@
     API_CALL_NOCONF(s, WT_CURSOR, n, ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle); \
     if (F_ISSET(cur, WT_CURSTD_CACHED))                                                    \
     WT_ERR(__wt_cursor_cached(cur))
+
+/*
+ * API_RETRYABLE and API_RETRYABLE_END are used to wrap API calls so that they are silently
+ * retried on rollback errors. Generally, these only need to be used with readonly APIs, as
+ * writable APIs have their own retry code via TXN_API_CALL.  These macros may be used with
+ * *API_CALL and API_END* provided they are ordered in a balanced way.
+ */
+#define API_RETRYABLE(s) do {
+
+#define API_RETRYABLE_END(s, ret)                                                                \
+    if ((ret) != WT_ROLLBACK || F_ISSET((s)->txn, WT_TXN_RUNNING) || (s)->api_call_counter != 1) \
+        break;                                                                                   \
+    (ret) = 0;                                                                                   \
+    WT_STAT_CONN_DATA_INCR(s, autocommit_readonly_retry);                                        \
+    }                                                                                            \
+    while (1)
 
 #define JOINABLE_CURSOR_CALL_CHECK(cur) \
     if (F_ISSET(cur, WT_CURSTD_JOINED)) \
