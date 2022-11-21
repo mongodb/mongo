@@ -1,7 +1,9 @@
 /**
  * Tests the creation of view with a duplicate name to a collection.
  *
+ * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   assumes_unsharded_collection,
  *   assumes_against_mongod_not_mongos,
  *   assumes_superuser_permissions,

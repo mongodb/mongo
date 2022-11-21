@@ -66,7 +66,7 @@ function checkDbNameInString(str, requestDbName, logError) {
     if (requestDbName.includes("_")) {
         return;
     }
-    assert.eq(false, str.includes("_" + requestDbName), logError);
+    assert.eq(false, str.includes(kTenantId.str + "_" + requestDbName), logError);
 }
 
 function checkReponse(res, requestDbName, logError) {
@@ -162,7 +162,7 @@ function runCommandWithResponseCheck(
     conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
     if (!isAllowedWithSecurityToken(cmdName)) {
         throw new Error(
-            "Refusing to run a test that issues commands that are not allowed in serverless mode, " +
+            "Refusing to run a test that issues commands that are not allowed with security token, " +
             " CmdName: " + cmdName + ", CmdObj: " + tojson(cmdObj));
     }
 

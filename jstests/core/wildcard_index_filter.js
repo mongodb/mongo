@@ -3,7 +3,10 @@
  *
  * Does not support stepdowns, because the stepdown/kill_primary passthroughs will reject commands
  * that may return different values after a failover; in this case, 'planCacheClearFilters'.
+ * The test runs commands that are not allowed with security token: planCacheClearFilters,
+ * planCacheListFilters, planCacheSetFilter.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   does_not_support_stepdowns,
  * ]
  */

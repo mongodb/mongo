@@ -1,7 +1,9 @@
 /**
  * Test the creation of views with various options.
  *
+ * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   # Commands on views not supported in implicitly sharded suites.
  *   assumes_unsharded_collection,
  *   # applyOps is not available on mongos.
