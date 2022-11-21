@@ -297,6 +297,8 @@ struct __wt_page_index;
 typedef struct __wt_page_index WT_PAGE_INDEX;
 struct __wt_page_modify;
 typedef struct __wt_page_modify WT_PAGE_MODIFY;
+struct __wt_page_stat;
+typedef struct __wt_page_stat WT_PAGE_STAT;
 struct __wt_process;
 typedef struct __wt_process WT_PROCESS;
 struct __wt_rec_chunk;
@@ -467,6 +469,7 @@ typedef uint64_t wt_timestamp_t;
 #include "misc_inline.h"    /* required by mutex_inline.h */
 
 #include "buf_inline.h"       /* required by cell_inline.h */
+#include "pagestat_inline.h"  /* required by btree_inline.h */
 #include "timestamp_inline.h" /* required by btree_inline.h */
 #include "cell_inline.h"      /* required by btree_inline.h */
 #include "mutex_inline.h"     /* required by btree_inline.h */
