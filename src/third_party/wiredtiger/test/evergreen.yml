@@ -5160,10 +5160,10 @@ buildvariants:
     - name: fops
     - name: unittest-test
 
-- name: macos-1014
-  display_name: "OS X 10.14"
+- name: macos-1100
+  display_name: "macOS 11.00"
   run_on:
-  - macos-1014
+  - macos-1100
   batchtime: 120 # 2 hours
   expansions:
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
