@@ -40,9 +40,14 @@ public:
     virtual StringData getForDocumentsProcessed() const override;
     virtual StringData getForBytesWritten() const override;
 
-    // TODO: Replace this placeholder method with one method per global index role/state
-    // combination. See ReshardingCumulativeMetricsFieldNameProvider for an example implementation.
+    // TODO: Replace this placeholder method with one method per global index coordinator
+    // role/state combination. See ReshardingCumulativeMetricsFieldNameProvider for an
+    // example implementation.
     StringData getForCountInstancesInRoleNameStateNStateName() const;
+
+    StringData getForCountInstancesInRecipientState1Cloning() const;
+    StringData getForCountInstancesInRecipientState2ReadyToCommit() const;
+    StringData getForCountInstancesInRecipientState3Done() const;
 };
 
 }  // namespace global_index

@@ -33,7 +33,7 @@ namespace mongo {
 namespace global_index {
 namespace {
 constexpr auto kBytesWritten = "bytesWritten";
-constexpr auto kKeysWrittenFromScan = "keysWrittenFromScan ";
+constexpr auto kKeysWrittenFromScan = "keysWrittenFromScan";
 constexpr auto kApproxBytesToScan = "approxBytesToScan";
 constexpr auto kApproxDocumentsToScan = "approxDocumentsToScan";
 }  // namespace

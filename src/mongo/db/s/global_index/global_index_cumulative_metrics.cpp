@@ -77,62 +77,16 @@ StringData GlobalIndexCumulativeMetrics::fieldNameFor(
 }
 
 StringData GlobalIndexCumulativeMetrics::fieldNameFor(
-    DonorStateEnum state, const GlobalIndexCumulativeMetricsFieldNameProvider* provider) {
-    switch (state) {
-        case DonorStateEnum::kPreparingToDonate:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
-
-        case DonorStateEnum::kDonatingInitialData:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
-
-        case DonorStateEnum::kDonatingOplogEntries:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
-
-        case DonorStateEnum::kPreparingToBlockWrites:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
-
-        case DonorStateEnum::kError:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
-
-        case DonorStateEnum::kBlockingWrites:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
-
-        case DonorStateEnum::kDone:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
-
-        default:
-            uasserted(6438704,
-                      str::stream()
-                          << "no field name for donor state " << static_cast<int32_t>(state));
-            break;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
-StringData GlobalIndexCumulativeMetrics::fieldNameFor(
     RecipientStateEnum state, const GlobalIndexCumulativeMetricsFieldNameProvider* provider) {
     switch (state) {
-        case RecipientStateEnum::kAwaitingFetchTimestamp:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
-
-        case RecipientStateEnum::kCreatingCollection:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
-
         case RecipientStateEnum::kCloning:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
+            return provider->getForCountInstancesInRecipientState1Cloning();
 
-        case RecipientStateEnum::kApplying:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
-
-        case RecipientStateEnum::kError:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
-
-        case RecipientStateEnum::kStrictConsistency:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
+        case RecipientStateEnum::kReadyToCommit:
+            return provider->getForCountInstancesInRecipientState2ReadyToCommit();
 
         case RecipientStateEnum::kDone:
-            return provider->getForCountInstancesInRoleNameStateNStateName();
+            return provider->getForCountInstancesInRecipientState3Done();
 
         default:
             uasserted(6438904,

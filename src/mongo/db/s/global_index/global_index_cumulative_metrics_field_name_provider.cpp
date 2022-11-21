@@ -36,6 +36,10 @@ namespace {
 using Provider = GlobalIndexCumulativeMetricsFieldNameProvider;
 constexpr auto kKeysWrittenFromScan = "keysWrittenFromScan";
 constexpr auto kBytesWrittenFromScan = "bytesWrittenFromScan";
+constexpr auto kCountInstancesInRecipientState1Cloning = "countInstancesInRecipientState1Cloning";
+constexpr auto kCountInstancesInRecipientState2ReadyToCommit =
+    "countInstancesInRecipientState2ReadyToCommit";
+constexpr auto kCountInstancesInRecipientState3Done = "countInstancesInRecipientState3Done";
 
 // TODO: Delete when at least one state name getter has been implemented.
 constexpr auto kPlaceholder = "placeholder";
@@ -52,6 +56,19 @@ StringData Provider::getForBytesWritten() const {
 StringData Provider::getForCountInstancesInRoleNameStateNStateName() const {
     return kPlaceholder;
 }
+
+StringData Provider::getForCountInstancesInRecipientState1Cloning() const {
+    return kCountInstancesInRecipientState1Cloning;
+}
+
+StringData Provider::getForCountInstancesInRecipientState2ReadyToCommit() const {
+    return kCountInstancesInRecipientState2ReadyToCommit;
+}
+
+StringData Provider::getForCountInstancesInRecipientState3Done() const {
+    return kCountInstancesInRecipientState3Done;
+}
+
 
 }  // namespace global_index
 }  // namespace mongo

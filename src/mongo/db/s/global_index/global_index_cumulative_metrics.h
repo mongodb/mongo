@@ -52,26 +52,10 @@ public:
         kNumStates
     };
 
-    enum class DonorStateEnum : int32_t {
-        kUnused = -1,
-        kPreparingToDonate,
-        kDonatingInitialData,
-        kDonatingOplogEntries,
-        kPreparingToBlockWrites,
-        kError,
-        kBlockingWrites,
-        kDone,
-        kNumStates
-    };
-
     enum class RecipientStateEnum : int32_t {
         kUnused = -1,
-        kAwaitingFetchTimestamp,
-        kCreatingCollection,
         kCloning,
-        kApplying,
-        kError,
-        kStrictConsistency,
+        kReadyToCommit,
         kDone,
         kNumStates
     };
@@ -81,8 +65,6 @@ public:
     template <typename T>
     void onStateTransition(boost::optional<T> before, boost::optional<T> after);
     static StringData fieldNameFor(CoordinatorStateEnum state,
-                                   const GlobalIndexCumulativeMetricsFieldNameProvider* provider);
-    static StringData fieldNameFor(DonorStateEnum state,
                                    const GlobalIndexCumulativeMetricsFieldNameProvider* provider);
     static StringData fieldNameFor(RecipientStateEnum state,
                                    const GlobalIndexCumulativeMetricsFieldNameProvider* provider);
@@ -95,8 +77,6 @@ private:
     CumulativeMetricsStateHolder<CoordinatorStateEnum,
                                  static_cast<size_t>(CoordinatorStateEnum::kNumStates)>
         _coordinatorStateList;
-    CumulativeMetricsStateHolder<DonorStateEnum, static_cast<size_t>(DonorStateEnum::kNumStates)>
-        _donorStateList;
     CumulativeMetricsStateHolder<RecipientStateEnum,
                                  static_cast<size_t>(RecipientStateEnum::kNumStates)>
         _recipientStateList;
@@ -105,8 +85,6 @@ private:
     auto getStateListForRole() const {
         if constexpr (std::is_same<T, CoordinatorStateEnum>::value) {
             return &_coordinatorStateList;
-        } else if constexpr (std::is_same<T, DonorStateEnum>::value) {
-            return &_donorStateList;
         } else if constexpr (std::is_same<T, RecipientStateEnum>::value) {
             return &_recipientStateList;
         } else {
@@ -118,8 +96,6 @@ private:
     auto getMutableStateListForRole() {
         if constexpr (std::is_same<T, CoordinatorStateEnum>::value) {
             return &_coordinatorStateList;
-        } else if constexpr (std::is_same<T, DonorStateEnum>::value) {
-            return &_donorStateList;
         } else if constexpr (std::is_same<T, RecipientStateEnum>::value) {
             return &_recipientStateList;
         } else {

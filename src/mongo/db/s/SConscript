@@ -101,6 +101,7 @@ env.Library(
         'collection_sharding_state_factory_shard.cpp',
         'commit_chunk_migration.idl',
         'config_server_op_observer.cpp',
+        'global_index/common_types.idl',
         'global_index/global_index_cloner_fetcher.cpp',
         'global_index/global_index_cloner_fetcher_factory.cpp',
         'global_index/global_index_cloner.idl',

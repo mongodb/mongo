@@ -45,6 +45,7 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kGlobalIndex
 
@@ -54,6 +55,10 @@ namespace global_index {
 namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
+
+GlobalIndexMetrics::RecipientState toMetrics(GlobalIndexClonerStateEnum state) {
+    return GlobalIndexMetrics::RecipientState{state};
+}
 
 }  // namespace
 
@@ -91,11 +96,7 @@ GlobalIndexCloningService::CloningStateMachine::CloningStateMachine(
     GlobalIndexClonerDoc clonerDoc)
     : _serviceContext(serviceContext),
       _cloningService(cloningService),
-      _indexCollectionUUID(clonerDoc.getIndexCollectionUUID()),
-      _sourceNss(clonerDoc.getNss()),
-      _sourceCollUUID(clonerDoc.getCollectionUUID()),
-      _indexName(clonerDoc.getIndexName()),
-      _indexSpec(clonerDoc.getIndexSpec().getOwned()),
+      _metadata(clonerDoc.getCommonGlobalIndexMetadata()),
       _minFetchTimestamp(clonerDoc.getMinFetchTimestamp()),
       _execForCancelableOpCtx(std::make_shared<ThreadPool>([] {
           ThreadPool::Options options;
@@ -106,7 +107,8 @@ GlobalIndexCloningService::CloningStateMachine::CloningStateMachine(
       }())),
       _mutableState(clonerDoc.getMutableState()),
       _fetcherFactory(std::move(fetcherFactory)),
-      _externalState(std::move(externalState)) {}
+      _externalState(std::move(externalState)),
+      _metrics{GlobalIndexMetrics::initializeFrom(clonerDoc, serviceContext)} {}
 
 SemiFuture<void> GlobalIndexCloningService::CloningStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -174,7 +176,7 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_cleanup(
 
                     const BSONObj instanceId(
                         BSON(GlobalIndexClonerDoc::kIndexCollectionUUIDFieldName
-                             << _indexCollectionUUID));
+                             << _metadata.getIndexCollectionUUID()));
 
                     DBDirectClient client(opCtx.get());
                     auto result = client.remove([&] {
@@ -197,6 +199,9 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_cleanup(
                         // This is to handle cases where the state document hasn't been inserted.
                         _cloningService->releaseInstance(instanceId, Status::OK());
                     }
+
+                    _metrics->onStateTransition(toMetrics(GlobalIndexClonerStateEnum::kDone),
+                                                boost::none);
                 });
         })
         .onTransientError([](const auto& status) {})
@@ -207,30 +212,32 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_cleanup(
 
 void GlobalIndexCloningService::CloningStateMachine::_init(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    const auto& indexSpec = _metadata.getIndexSpec();
     _inserter = std::make_unique<GlobalIndexInserter>(
-        _sourceNss, _indexName, _indexCollectionUUID, **executor);
+        _metadata.getNss(), indexSpec.getName(), _metadata.getIndexCollectionUUID(), **executor);
 
     auto client = _serviceContext->makeClient("globalIndexClonerServiceInit");
     AlternativeClientRegion clientRegion(client);
 
     auto opCtx = _serviceContext->makeOperationContext(Client::getCurrent());
 
-    auto routingInfo = _externalState->getShardedCollectionRoutingInfo(opCtx.get(), _sourceNss);
+    auto routingInfo =
+        _externalState->getShardedCollectionRoutingInfo(opCtx.get(), _metadata.getNss());
 
     uassert(6755901,
-            str::stream() << "Cannot create global index on unsharded ns " << _sourceNss.ns(),
+            str::stream() << "Cannot create global index on unsharded ns "
+                          << _metadata.getNss().ns(),
             routingInfo.isSharded());
 
     auto myShardId = _externalState->myShardId(_serviceContext);
 
-    auto indexKeyPattern = _indexSpec.getObjectField(IndexDescriptor::kKeyPatternFieldName);
-    _fetcher = _fetcherFactory->make(_sourceNss,
-                                     _sourceCollUUID,
-                                     _indexCollectionUUID,
+    _fetcher = _fetcherFactory->make(_metadata.getNss(),
+                                     _metadata.getCollectionUUID(),
+                                     _metadata.getIndexCollectionUUID(),
                                      myShardId,
                                      _minFetchTimestamp,
                                      routingInfo.getShardKeyPattern().getKeyPattern(),
-                                     indexKeyPattern.getOwned());
+                                     indexSpec.getKey().getOwned());
     if (auto id = _mutableState.getLastProcessedId()) {
         _fetcher->setResumeId(*id);
     }
@@ -265,8 +272,7 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_runUntilDo
 boost::optional<BSONObj> GlobalIndexCloningService::CloningStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode,
     MongoProcessInterface::CurrentOpSessionsMode) noexcept {
-    // TODO: SERVER-68707
-    return boost::none;
+    return _metrics->reportForCurrentOp();
 }
 
 void GlobalIndexCloningService::CloningStateMachine::checkIfOptionsConflict(
@@ -277,8 +283,9 @@ void GlobalIndexCloningService::CloningStateMachine::checkIfOptionsConflict(
     uassert(6755900,
             str::stream() << "New global index " << stateDoc
                           << " is incompatible with ongoing global index build in namespace: "
-                          << _sourceNss << ", uuid: " << _sourceCollUUID,
-            newCloning.getNss() == _sourceNss && newCloning.getCollectionUUID() == _sourceCollUUID);
+                          << _metadata.getNss() << ", uuid: " << _metadata.getCollectionUUID(),
+            newCloning.getNss() == _metadata.getNss() &&
+                newCloning.getCollectionUUID() == _metadata.getCollectionUUID());
 }
 
 CancellationToken GlobalIndexCloningService::CloningStateMachine::_initCleanupToken(
@@ -320,6 +327,9 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_persistSta
                 stdx::unique_lock lk(_mutex);
                 _mutableState.setState(GlobalIndexClonerStateEnum::kCloning);
             }
+
+            _metrics->onStateTransition(boost::none,
+                                        toMetrics(GlobalIndexClonerStateEnum::kCloning));
         })
         .onTransientError([](const Status& status) {})
         .onUnrecoverableError([](const Status& status) {})
@@ -335,6 +345,8 @@ GlobalIndexCloningService::CloningStateMachine::_transitionToReadyToCommit(
         // majority, so just return an empty opTime.
         return ExecutorFuture<repl::OpTime>(**executor, repl::OpTime());
     }
+
+    _metrics->onCopyingEnd();
 
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor](auto& cancelableFactory) {
@@ -358,7 +370,8 @@ void GlobalIndexCloningService::CloningStateMachine::_initializeCollections(
     auto cancelableOpCtx = cancelableOpCtxFactory.makeOperationContext(Client::getCurrent());
     auto opCtx = cancelableOpCtx.get();
 
-    resharding::data_copy::ensureCollectionExists(opCtx, skipIdNss(_sourceNss, _indexName), {});
+    resharding::data_copy::ensureCollectionExists(
+        opCtx, skipIdNss(_metadata.getNss(), _metadata.getIndexSpec().getName()), {});
 }
 
 ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_clone(
@@ -368,6 +381,8 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_clone(
     if (_getState() > GlobalIndexClonerStateEnum::kCloning) {
         return ExecutorFuture<void>(**executor);
     }
+
+    _metrics->onCopyingBegin();
 
     return AsyncTry([this, executor, cancelToken, cancelableOpCtxFactory] {
                auto cancelableOpCtx =
@@ -387,6 +402,10 @@ void GlobalIndexCloningService::CloningStateMachine::_fetchNextBatch(OperationCo
     }
 
     int totalSize = 0;
+    Timer timer;
+    ON_BLOCK_EXIT([&] {
+        _metrics->onCloningRemoteBatchRetrieval(duration_cast<Milliseconds>(timer.elapsed()));
+    });
 
     do {
         if (auto next = _fetcher->getNext(opCtx)) {
@@ -407,6 +426,7 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_processBat
                    return;
                }
 
+               Timer timer;
                const auto& next = _fetchedDocs.front();
 
                auto cancelableOpCtx =
@@ -417,6 +437,11 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_processBat
                _fetcher->setResumeId(_lastProcessedIdSinceStepUp);
 
                _fetchedDocs.pop();
+
+               _metrics->onDocumentsProcessed(1,
+                                              next.documentKey.objsize() +
+                                                  next.indexKeyValues.objsize(),
+                                              duration_cast<Milliseconds>(timer.elapsed()));
            })
         .until([this](const Status& status) { return !status.isOK() || _fetchedDocs.empty(); })
         .on(**executor, cancelToken)
@@ -487,11 +512,7 @@ GlobalIndexClonerStateEnum GlobalIndexCloningService::CloningStateMachine::_getS
 
 GlobalIndexClonerDoc GlobalIndexCloningService::CloningStateMachine::_makeClonerDoc() const {
     GlobalIndexClonerDoc clonerDoc;
-    clonerDoc.setIndexCollectionUUID(_indexCollectionUUID);
-    clonerDoc.setNss(_sourceNss);
-    clonerDoc.setCollectionUUID(_sourceCollUUID);
-    clonerDoc.setIndexName(_indexName);
-    clonerDoc.setIndexSpec(_indexSpec);
+    clonerDoc.setCommonGlobalIndexMetadata(_metadata);
     clonerDoc.setMinFetchTimestamp(_minFetchTimestamp);
 
     {
@@ -508,9 +529,13 @@ void GlobalIndexCloningService::CloningStateMachine::_updateMutableState(
     BSONObj update(BSON(
         "$set" << BSON(GlobalIndexClonerDoc::kMutableStateFieldName << newMutableState.toBSON())));
     store.update(opCtx,
-                 BSON(GlobalIndexClonerDoc::kIndexCollectionUUIDFieldName << _indexCollectionUUID),
+                 BSON(GlobalIndexClonerDoc::kIndexCollectionUUIDFieldName
+                      << _metadata.getIndexCollectionUUID()),
                  update);
+
+    const auto oldState = _mutableState.getState();
     _mutableState = std::move(newMutableState);
+    _metrics->onStateTransition(toMetrics(oldState), toMetrics(_mutableState.getState()));
 }
 
 }  // namespace global_index

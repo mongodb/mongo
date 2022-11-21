@@ -36,6 +36,7 @@
 #include "mongo/db/s/global_index/global_index_cloner_fetcher_factory.h"
 #include "mongo/db/s/global_index/global_index_cloner_gen.h"
 #include "mongo/db/s/global_index/global_index_inserter.h"
+#include "mongo/db/s/global_index/global_index_metrics.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
@@ -205,11 +206,7 @@ private:
     // The primary-only service instance corresponding to the cloner instance. Not owned.
     GlobalIndexCloningService* const _cloningService;  // (TS)
 
-    const UUID _indexCollectionUUID;
-    const NamespaceString _sourceNss;
-    const UUID _sourceCollUUID;
-    const std::string _indexName;
-    const BSONObj _indexSpec;
+    const CommonGlobalIndexMetadata _metadata;
     const Timestamp _minFetchTimestamp;
 
     // A separate executor different from the one supplied by the primary only service is needed
@@ -247,6 +244,8 @@ private:
     SharedPromise<void> _readyToCommitPromise;                   // (TS)
     SharedPromise<void> _waitForCleanupPromise;                  // (M)
     const std::unique_ptr<CloningExternalState> _externalState;  // (TS)
+
+    std::unique_ptr<GlobalIndexMetrics> _metrics;  // (TS)
 };
 
 }  // namespace global_index

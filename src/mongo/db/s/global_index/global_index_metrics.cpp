@@ -28,7 +28,9 @@
  */
 
 #include "mongo/db/s/global_index/global_index_metrics.h"
+
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/s/global_index/global_index_cloner_gen.h"
 
 namespace mongo {
 namespace global_index {
@@ -40,9 +42,9 @@ inline GlobalIndexMetrics::State getDefaultState(GlobalIndexMetrics::Role role) 
         case Role::kCoordinator:
             return GlobalIndexMetrics::GlobalIndexCoordinatorStateEnumPlaceholder::kUnused;
         case Role::kRecipient:
-            return GlobalIndexMetrics::GlobalIndexRecipientStateEnumPlaceholder::kUnused;
+            return GlobalIndexClonerStateEnum::kUnused;
         case Role::kDonor:
-            return GlobalIndexMetrics::GlobalIndexDonorStateEnumPlaceholder::kUnused;
+            MONGO_UNREACHABLE;
     }
     MONGO_UNREACHABLE;
 }
@@ -62,48 +64,7 @@ BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj keyPattern, bo
 }
 }  // namespace
 
-GlobalIndexMetrics::DonorState::DonorState(GlobalIndexDonorStateEnumPlaceholder enumVal)
-    : _enumVal(enumVal) {}
-
-GlobalIndexCumulativeMetrics::DonorStateEnum GlobalIndexMetrics::DonorState::toMetrics() const {
-    using MetricsEnum = GlobalIndexCumulativeMetrics::DonorStateEnum;
-
-    switch (_enumVal) {
-        case GlobalIndexDonorStateEnumPlaceholder::kUnused:
-            return MetricsEnum::kUnused;
-
-        case GlobalIndexDonorStateEnumPlaceholder::kPreparingToDonate:
-            return MetricsEnum::kPreparingToDonate;
-
-        case GlobalIndexDonorStateEnumPlaceholder::kDonatingInitialData:
-            return MetricsEnum::kDonatingInitialData;
-
-        case GlobalIndexDonorStateEnumPlaceholder::kDonatingOplogEntries:
-            return MetricsEnum::kDonatingOplogEntries;
-
-        case GlobalIndexDonorStateEnumPlaceholder::kPreparingToBlockWrites:
-            return MetricsEnum::kPreparingToBlockWrites;
-
-        case GlobalIndexDonorStateEnumPlaceholder::kError:
-            return MetricsEnum::kError;
-
-        case GlobalIndexDonorStateEnumPlaceholder::kBlockingWrites:
-            return MetricsEnum::kBlockingWrites;
-
-        case GlobalIndexDonorStateEnumPlaceholder::kDone:
-            return MetricsEnum::kDone;
-        default:
-            invariant(false, str::stream() << "Unexpected Global Index coordinator state: ");
-            MONGO_UNREACHABLE;
-    }
-}
-
-GlobalIndexMetrics::GlobalIndexDonorStateEnumPlaceholder GlobalIndexMetrics::DonorState::getState()
-    const {
-    return _enumVal;
-}
-
-GlobalIndexMetrics::RecipientState::RecipientState(GlobalIndexRecipientStateEnumPlaceholder enumVal)
+GlobalIndexMetrics::RecipientState::RecipientState(GlobalIndexClonerStateEnum enumVal)
     : _enumVal(enumVal) {}
 
 GlobalIndexCumulativeMetrics::RecipientStateEnum GlobalIndexMetrics::RecipientState::toMetrics()
@@ -111,28 +72,16 @@ GlobalIndexCumulativeMetrics::RecipientStateEnum GlobalIndexMetrics::RecipientSt
     using MetricsEnum = GlobalIndexCumulativeMetrics::RecipientStateEnum;
 
     switch (_enumVal) {
-        case GlobalIndexRecipientStateEnumPlaceholder::kUnused:
+        case GlobalIndexClonerStateEnum::kUnused:
             return MetricsEnum::kUnused;
 
-        case GlobalIndexRecipientStateEnumPlaceholder::kAwaitingFetchTimestamp:
-            return MetricsEnum::kAwaitingFetchTimestamp;
-
-        case GlobalIndexRecipientStateEnumPlaceholder::kCreatingCollection:
-            return MetricsEnum::kCreatingCollection;
-
-        case GlobalIndexRecipientStateEnumPlaceholder::kCloning:
+        case GlobalIndexClonerStateEnum::kCloning:
             return MetricsEnum::kCloning;
 
-        case GlobalIndexRecipientStateEnumPlaceholder::kApplying:
-            return MetricsEnum::kApplying;
+        case GlobalIndexClonerStateEnum::kReadyToCommit:
+            return MetricsEnum::kReadyToCommit;
 
-        case GlobalIndexRecipientStateEnumPlaceholder::kError:
-            return MetricsEnum::kError;
-
-        case GlobalIndexRecipientStateEnumPlaceholder::kStrictConsistency:
-            return MetricsEnum::kStrictConsistency;
-
-        case GlobalIndexRecipientStateEnumPlaceholder::kDone:
+        case GlobalIndexClonerStateEnum::kDone:
             return MetricsEnum::kDone;
 
         default:
@@ -141,8 +90,7 @@ GlobalIndexCumulativeMetrics::RecipientStateEnum GlobalIndexMetrics::RecipientSt
     }
 }
 
-GlobalIndexMetrics::GlobalIndexRecipientStateEnumPlaceholder
-GlobalIndexMetrics::RecipientState::getState() const {
+GlobalIndexClonerStateEnum GlobalIndexMetrics::RecipientState::getState() const {
     return _enumVal;
 }
 
@@ -192,7 +140,6 @@ GlobalIndexMetrics::CoordinatorState::getState() const {
     return _enumVal;
 }
 
-
 GlobalIndexMetrics::GlobalIndexMetrics(UUID instanceId,
                                        BSONObj originatingCommand,
                                        NamespaceString nss,
@@ -229,10 +176,24 @@ GlobalIndexCumulativeMetrics* GlobalIndexMetrics::getGlobalIndexCumulativeMetric
     return dynamic_cast<GlobalIndexCumulativeMetrics*>(getCumulativeMetrics());
 }
 
-
 boost::optional<Milliseconds> GlobalIndexMetrics::getRecipientHighEstimateRemainingTimeMillis()
     const {
     return boost::none;
+}
+
+BSONObj GlobalIndexMetrics::getOriginalCommand(const CommonGlobalIndexMetadata& metadata) {
+    CreateIndexesCommand cmd(metadata.getNss(), {metadata.getIndexSpec().toBSON()});
+    return cmd.toBSON({});
+}
+
+StringData GlobalIndexMetrics::getStateString() const noexcept {
+    return stdx::visit(OverloadedVisitor{[](GlobalIndexCoordinatorStateEnumPlaceholder state) {
+                                             return "TODO"_sd;
+                                         },
+                                         [](GlobalIndexClonerStateEnum state) {
+                                             return GlobalIndexClonerState_serializer(state);
+                                         }},
+                       _stateHolder.getState());
 }
 
 }  // namespace global_index

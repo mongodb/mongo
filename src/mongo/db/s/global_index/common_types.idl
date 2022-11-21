@@ -26,50 +26,38 @@
 # it in the license file.
 #
 
-# This file contains the schema for the document representing a global index cloner primary only
-# service state document.
+# This file defines types used among global index recipient and coordinator IDL structs.
 
 global:
-    cpp_namespace: "mongo::global_index"
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/pipeline/value.idl"
-    - "mongo/db/s/global_index/common_types.idl"
-
-enums:
-    GlobalIndexClonerState:
-        description: "The current state of a global index cloner."
-        type: string
-        values:
-            kUnused: "unused"
-            kCloning: "cloning"
-            kReadyToCommit: "ready-to-commit"
-            # done is not a real state but only used in tests.
-            kDone: "done"
+    - "mongo/db/create_indexes.idl"
 
 structs:
-    GlobalIndexClonerMutableState:
-        description: "Contains the mutable state for global index cloning operation."
+    CommonGlobalIndexMetadata:
+        description: "Immutable metadata shared across global index recipient and coordinator."
+        generate_comparison_operators: false
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
         strict: false
         fields:
-            state:
-                type: GlobalIndexClonerState
-                description: "The current state of cloner."
-            lastProcessedId:
-                type: Value
-                description: "Contains the _id value of the last cloned document."
+            _id:
+                type: uuid
+                cpp_name: indexCollectionUUID
+                description: "The uuid of the global index collection."
+            nss:
+                type: namespacestring
+                description: "The namespace of the source collection."
+            collectionUUID:
+                type: uuid
+                description: "The uuid of source collection."
+            indexSpec:
+                type: NewIndexSpec
+                description: "Index spec from the original command."
+            startTime:
+                type: date
+                description: "Operation start time."
                 optional: true
-
-    GlobalIndexClonerDoc:
-        description: "Document containing the state and specs of global index cloning operation."
-        inline_chained_structs: true
-        chained_structs:
-            CommonGlobalIndexMetadata: CommonGlobalIndexMetadata
-        strict: false
-        fields:
-            minFetchTimestamp:
-                type: timestamp
-                description: "The minimum timestamp to use for fetching documents from the source
-                                collection"
-            mutableState: GlobalIndexClonerMutableState

@@ -335,13 +335,12 @@ public:
     }
 
     GlobalIndexClonerDoc makeStateDocument() {
-        return GlobalIndexClonerDoc(_indexCollectionUUID,
-                                    kSourceNss,
-                                    _collectionUUID,
-                                    _indexName,
-                                    _indexSpec,
-                                    {},
-                                    {GlobalIndexClonerStateEnum::kUnused});
+        NewIndexSpec indexSpec(_indexSpec, _indexName);
+        CommonGlobalIndexMetadata metadata(
+            _indexCollectionUUID, kSourceNss, _collectionUUID, indexSpec);
+        GlobalIndexClonerDoc clonerDoc({}, {GlobalIndexClonerStateEnum::kUnused});
+        clonerDoc.setCommonGlobalIndexMetadata(metadata);
+        return clonerDoc;
     }
 
     bool doesCollectionExist(OperationContext* opCtx, const NamespaceString& nss) {
@@ -445,7 +444,9 @@ TEST_F(GlobalIndexClonerServiceTest, CloneInsertsToGlobalIndexCollection) {
     auto resumeId = getLastSetResumeId();
     ASSERT_EQ(kDefaultMockId, resumeId.getInt());
 
-    ASSERT_TRUE(doesCollectionExist(rawOpCtx, skipIdNss(doc.getNss(), doc.getIndexName())));
+    ASSERT_TRUE(doesCollectionExist(
+        rawOpCtx,
+        skipIdNss(doc.getNss(), doc.getCommonGlobalIndexMetadata().getIndexSpec().getName())));
     checkIndexCollection(rawOpCtx);
 }
 
@@ -533,7 +534,9 @@ TEST_F(GlobalIndexClonerServiceTest, ShouldBeAbleToConsumeMultipleBatchesWorthof
     cloner->cleanup();
     future.get();
 
-    ASSERT_TRUE(doesCollectionExist(rawOpCtx, skipIdNss(doc.getNss(), doc.getIndexName())));
+    ASSERT_TRUE(doesCollectionExist(
+        rawOpCtx,
+        skipIdNss(doc.getNss(), doc.getCommonGlobalIndexMetadata().getIndexSpec().getName())));
     checkIndexCollection(rawOpCtx);
 }
 
@@ -550,7 +553,9 @@ TEST_F(GlobalIndexClonerServiceTest, ShouldWorkWithEmptyCollection) {
     cloner->cleanup();
     future.get();
 
-    ASSERT_TRUE(doesCollectionExist(rawOpCtx, skipIdNss(doc.getNss(), doc.getIndexName())));
+    ASSERT_TRUE(doesCollectionExist(
+        rawOpCtx,
+        skipIdNss(doc.getNss(), doc.getCommonGlobalIndexMetadata().getIndexSpec().getName())));
     checkIndexCollection(rawOpCtx);
 }
 
@@ -648,8 +653,33 @@ TEST_F(GlobalIndexClonerServiceTest, ClonerShouldAutoRetryOnNetworkError) {
     cloner->cleanup();
     future.get();
 
-    ASSERT_TRUE(doesCollectionExist(rawOpCtx, skipIdNss(doc.getNss(), doc.getIndexName())));
+    ASSERT_TRUE(doesCollectionExist(
+        rawOpCtx,
+        skipIdNss(doc.getNss(), doc.getCommonGlobalIndexMetadata().getIndexSpec().getName())));
     checkIndexCollection(rawOpCtx);
+}
+
+TEST_F(GlobalIndexClonerServiceTest, MetricsGetsUpdatedWhileRunning) {
+    auto doc = makeStateDocument();
+    auto opCtx = makeOperationContext();
+    auto rawOpCtx = opCtx.get();
+
+    auto cloner = GlobalIndexStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
+    auto readyToCommitFuture = cloner->getReadyToCommitFuture();
+    readyToCommitFuture.get();
+
+    auto currentOpBSONOpt =
+        cloner->reportForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode::kIncludeIdle,
+                                   MongoProcessInterface::CurrentOpSessionsMode::kIncludeIdle);
+    ASSERT_TRUE(currentOpBSONOpt);
+    const auto currentOpBSON = *currentOpBSONOpt;
+
+    ASSERT_EQ("ready-to-commit", currentOpBSON["recipientState"].str()) << currentOpBSON;
+    ASSERT_EQ(1, currentOpBSON["keysWrittenFromScan"].safeNumberInt()) << currentOpBSON;
+    ASSERT_EQ(35, currentOpBSON["bytesWritten"].safeNumberInt()) << currentOpBSON;
+
+    cloner->cleanup();
+    cloner->getCompletionFuture().get();
 }
 
 }  // namespace

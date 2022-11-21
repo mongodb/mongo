@@ -46,7 +46,7 @@ class GlobalIndexMetricsTest : public ShardingDataTransformMetricsTestFixture {
 public:
     std::unique_ptr<GlobalIndexMetrics> createInstanceMetrics(ClockSource* clockSource,
                                                               UUID instanceId = UUID::gen(),
-                                                              Role role = Role::kDonor) {
+                                                              Role role = Role::kRecipient) {
         return std::make_unique<GlobalIndexMetrics>(instanceId,
                                                     kTestCommand,
                                                     kTestNamespace,
@@ -58,7 +58,7 @@ public:
 };
 
 TEST_F(GlobalIndexMetricsTest, ReportForCurrentOpShouldHaveGlobalIndexDescription) {
-    std::vector<Role> roles{Role::kCoordinator, Role::kDonor, Role::kRecipient};
+    std::vector<Role> roles{Role::kCoordinator, Role::kRecipient};
 
     std::for_each(roles.begin(), roles.end(), [&](Role role) {
         auto instanceId = UUID::gen();
