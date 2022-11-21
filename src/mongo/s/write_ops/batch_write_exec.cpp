@@ -161,7 +161,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         // If we've already had a targeting error, we've refreshed the metadata once and can
         // record target errors definitively.
         bool recordTargetErrors = refreshedTargeter;
-        Status targetStatus = batchOp.targetBatch(targeter, recordTargetErrors, &childBatches);
+        auto targetStatus = batchOp.targetBatch(targeter, recordTargetErrors, &childBatches);
         if (!targetStatus.isOK()) {
             // Don't do anything until a targeter refresh
             targeter.noteCouldNotTarget();
@@ -173,7 +173,9 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
                 // Throw when there is a transient transaction error since this should be a top
                 // level error and not just a write error.
-                if (isTransientTransactionError(targetStatus.code(), false, false)) {
+                if (isTransientTransactionError(targetStatus.getStatus().code(),
+                                                false /* hasWriteConcernError */,
+                                                false /* isCommitOrAbort */)) {
                     uassertStatusOK(targetStatus);
                 }
 

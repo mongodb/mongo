@@ -42,6 +42,11 @@ bool canTargetQueryByShardKeyOrId(OperationContext* opCtx,
                                   const BSONObj& query) {
     auto cm =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, ns));
+
+    // If a collection is unsharded then the query is always targetable to the primary shard.
+    if (!cm.isSharded()) {
+        return true;
+    }
     auto shardKey =
         uassertStatusOK(cm.getShardKeyPattern().extractShardKeyFromQuery(opCtx, ns, query));
 

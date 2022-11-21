@@ -140,10 +140,13 @@ public:
      * targeting errors, but if not we should refresh once first.)
      *
      * Returned TargetedWriteBatches are owned by the caller.
+     * If a write without a shard key is detected, return an OK StatusWith that has 'true' as the
+     * value.
      */
-    Status targetBatch(const NSTargeter& targeter,
-                       bool recordTargetErrors,
-                       std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>* targetedBatches);
+    StatusWith<bool> targetBatch(
+        const NSTargeter& targeter,
+        bool recordTargetErrors,
+        std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>* targetedBatches);
 
     /**
      * Fills a BatchCommandRequest from a TargetedWriteBatch for this BatchWriteOp.
