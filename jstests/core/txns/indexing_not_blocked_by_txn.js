@@ -4,7 +4,9 @@
  * as a result of taking strong database locks. Additionally tests that a
  * createIndexes for an index that already exist does not conflict with an open
  * transaction on that same collection.
- * @tags: [uses_transactions, assumes_unsharded_collection]
+ * The test runs commands that are not allowed with security token: endSession.
+ * @tags: [
+ *   not_allowed_with_security_token,uses_transactions, assumes_unsharded_collection]
  */
 (function() {
 "use strict";

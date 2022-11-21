@@ -4,7 +4,9 @@
 // require taking further locks that would queue up behind the drop cmd's database exclusive lock
 // request.
 //
-// @tags: [uses_transactions]
+// The test runs commands that are not allowed with security token: endSession, setParameter.
+// @tags: [
+//   not_allowed_with_security_token,uses_transactions]
 (function() {
 "use strict";
 

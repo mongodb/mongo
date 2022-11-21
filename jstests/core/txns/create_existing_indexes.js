@@ -3,7 +3,9 @@
  * permitted inside multi-document transactions. Also test that attempts to create new
  * indexes on existing collections are not permitted inside multi-document transactions.
  *
+ * The test runs commands that are not allowed with security token: endSession.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   uses_transactions,
  * ]
  */

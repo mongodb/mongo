@@ -2,7 +2,9 @@
  * Ensures createCollection and createIndexes are not permitted to run with a readConcern other than
  * `local` inside transactions.
  *
+ * The test runs commands that are not allowed with security token: endSession.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   assumes_no_implicit_collection_creation_after_drop,
  *   uses_snapshot_read_concern,
  *   uses_transactions,

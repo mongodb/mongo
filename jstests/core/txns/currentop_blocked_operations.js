@@ -1,7 +1,13 @@
 /**
  * Tests that currentOp reports debug information for operations that are blocked on transactions.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, uses_parallel_shell]
+ * The test runs commands that are not allowed with security token: prepareTransaction.
+ * @tags: [
+ *   not_allowed_with_security_token,
+ *   uses_transactions,
+ *   uses_prepare_transaction,
+ *   uses_parallel_shell
+ * ]
  */
 (function() {
 "use strict";

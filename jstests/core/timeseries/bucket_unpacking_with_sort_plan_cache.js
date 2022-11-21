@@ -2,7 +2,9 @@
  * Test that the bucket unpacking with sorting rewrite is performed when plan is cached or
  * replanned.
  *
+ * The test runs commands that are not allowed with security token: setProfilingLevel.
  * @tags: [
+ *   not_allowed_with_security_token,
  *     # Plan cache stats doesn't support different read concerns.
  *     assumes_read_concern_unchanged,
  *     # Explain of a resolved view must be executed by mongos.

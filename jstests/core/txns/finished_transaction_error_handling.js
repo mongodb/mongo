@@ -1,5 +1,7 @@
 // Test committed and aborted transactions cannot be changed but commitTransaction is retryable.
+// The test runs commands that are not allowed with security token: endSession.
 // @tags: [
+//   not_allowed_with_security_token,
 //  uses_transactions,
 //  uses_snapshot_read_concern,
 //  # Retrying an aborted transaction is allowed on shardsvrs.

@@ -1,7 +1,9 @@
 /*
  * This test ensures that dbstats does not conflict with multi-statement transactions as a result of
  * taking MODE_S locks that are incompatible with MODE_IX needed for writes.
- * @tags: [uses_transactions]
+ * The test runs commands that are not allowed with security token: endSession.
+ * @tags: [
+ *   not_allowed_with_security_token,uses_transactions]
  */
 (function() {
 "use strict";

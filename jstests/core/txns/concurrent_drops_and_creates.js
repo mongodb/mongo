@@ -2,7 +2,9 @@
  * Test that a transaction cannot write to a collection that has been dropped or created since the
  * transaction started.
  *
+ * The test runs commands that are not allowed with security token: endSession.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   assumes_no_implicit_collection_creation_after_drop,
  *   uses_snapshot_read_concern,
  *   uses_transactions,

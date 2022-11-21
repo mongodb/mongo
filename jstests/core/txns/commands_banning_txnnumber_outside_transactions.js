@@ -1,5 +1,8 @@
 // Test that commands other than retryable writes may not use txnNumber outside transactions.
+// The test runs commands that are not allowed with security token: applyOps,
+// coordinateCommitTransaction, endSession, killCursors, mapReduce, prepareTransaction.
 // @tags: [
+//   not_allowed_with_security_token,
 //   uses_map_reduce_with_temp_collections,
 //   # Tenant migrations don't support applyOps.
 //   tenant_migration_incompatible,

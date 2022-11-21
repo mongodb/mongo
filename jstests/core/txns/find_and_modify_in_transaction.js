@@ -1,5 +1,7 @@
 // Test transactions including find-and-modify
-// @tags: [assumes_unsharded_collection, uses_transactions]
+// The test runs commands that are not allowed with security token: endSession.
+// @tags: [
+//   not_allowed_with_security_token,assumes_unsharded_collection, uses_transactions]
 (function() {
 "use strict";
 

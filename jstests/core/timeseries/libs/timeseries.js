@@ -1,4 +1,6 @@
 // Helper functions for testing time-series collections.
+// The test runs commands that are not allowed with security token: movechunk, split.
+// @tags: [not_allowed_with_security_token]
 
 load("jstests/libs/feature_flag_util.js");
 load("jstests/aggregation/extras/utils.js");

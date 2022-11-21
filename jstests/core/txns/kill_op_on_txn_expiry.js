@@ -1,5 +1,7 @@
 // Test that ongoing operations in a transaction are interrupted when the transaction expires.
-// @tags: [uses_transactions]
+// The test runs commands that are not allowed with security token: endSession, setParameter.
+// @tags: [
+//   not_allowed_with_security_token,uses_transactions]
 (function() {
 "use strict";
 

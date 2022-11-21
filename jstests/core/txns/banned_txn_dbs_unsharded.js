@@ -1,6 +1,8 @@
 // Tests that reads and writes to the config and local databases are forbidden within
 // transactions on non-sharded clusters. Behavior on sharded clusters is tested separately.
+// The test runs commands that are not allowed with security token: endSession.
 // @tags: [
+//   not_allowed_with_security_token,
 //  assumes_against_mongod_not_mongos,
 //  assumes_unsharded_collection,
 //  uses_transactions,

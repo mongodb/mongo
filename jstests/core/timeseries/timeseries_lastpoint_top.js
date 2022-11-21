@@ -1,7 +1,9 @@
 /**
  * Tests the optimization of "lastpoint"-type queries on time-series collections.
  *
+ * The test runs commands that are not allowed with security token: top.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   # Testing last point optimization.

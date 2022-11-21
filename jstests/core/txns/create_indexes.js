@@ -2,7 +2,9 @@
  * Tests simple cases of creating indexes inside a multi-document transaction, both
  * committing and aborting.
  *
+ * The test runs commands that are not allowed with security token: endSession.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   uses_transactions,
  * ]
  */

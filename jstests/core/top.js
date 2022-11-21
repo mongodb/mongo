@@ -5,7 +5,9 @@
  * former operation may be routed to a secondary in the replica set, whereas the latter must be
  * routed to the primary.
  *
+ * The test runs commands that are not allowed with security token: top.
  * @tags: [
+ *   not_allowed_with_security_token,
  *    assumes_read_preference_unchanged,
  *    requires_fastcount,
  *    # top command is not available on embedded

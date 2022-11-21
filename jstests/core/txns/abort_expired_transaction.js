@@ -2,7 +2,9 @@
 // 'transactionLifetimeLimitSeconds' to lower the transaction lifetime for quicker transaction
 // expiration.
 //
-// @tags: [uses_transactions]
+// The test runs commands that are not allowed with security token: endSession, setParameter.
+// @tags: [
+//   not_allowed_with_security_token,uses_transactions]
 
 (function() {
 "use strict";
