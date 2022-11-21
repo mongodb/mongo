@@ -63,10 +63,20 @@ std::string Bucket::dump() const {
     return os.str();
 }
 
+BSONObj Bucket::serialize() const {
+    BSONObjBuilder bob;
+    bob.appendNumber("boundaryCount", _equalFreq);
+    bob.appendNumber("rangeCount", _rangeFreq);
+    bob.appendNumber("rangeDistincts", _ndv);
+    bob.appendNumber("cumulativeCount", _cumulativeFreq);
+    bob.appendNumber("cumulativeDistincts", _cumulativeNDV);
+    bob.doneFast();
+    return bob.obj();
+}
+
 ScalarHistogram::ScalarHistogram() : ScalarHistogram({}, {}) {}
 
 ScalarHistogram::ScalarHistogram(const StatsHistogram& histogram) {
-
     for (const auto& bucket : histogram.getBuckets()) {
         Bucket b(bucket.getBoundaryCount(),
                  bucket.getRangeCount(),
@@ -158,6 +168,27 @@ const value::Array& ScalarHistogram::getBounds() const {
 
 const std::vector<Bucket>& ScalarHistogram::getBuckets() const {
     return _buckets;
+}
+
+BSONObj ScalarHistogram::serialize() const {
+    BSONObjBuilder histogramBuilder;
+
+    // Construct bucket BSON.
+    auto buckets = getBuckets();
+    BSONArrayBuilder bucketsBuilder(histogramBuilder.subarrayStart("buckets"));
+    for (const auto& bucket : buckets) {
+        bucketsBuilder.append(bucket.serialize());
+    }
+    bucketsBuilder.doneFast();
+
+    // Construct bucket bounds BSON.
+    auto bounds = getBounds();
+    BSONArrayBuilder boundsBuilder(histogramBuilder.subarrayStart("bounds"));
+    sbe::bson::convertToBsonObj(boundsBuilder, &bounds);
+    boundsBuilder.doneFast();
+
+    histogramBuilder.doneFast();
+    return histogramBuilder.obj();
 }
 
 }  // namespace mongo::ce

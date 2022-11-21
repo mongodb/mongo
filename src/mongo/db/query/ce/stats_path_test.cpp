@@ -32,8 +32,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/ce/array_histogram.h"
+#include "mongo/db/query/ce/scalar_histogram.h"
 #include "mongo/db/query/ce/stats_gen.h"
-#include "mongo/db/query/ce/stats_serialization_utils.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -42,50 +43,88 @@ namespace {
 
 IDLParserContext ctx("StatsPath");
 
-
 /**
- *  Validate round trip convertion for histogram bucket
+ *  Validate round trip conversion for histogram bucket
  */
 TEST(StatsPath, BasicValidStatsBucketDouble) {
-
-    auto serializedBucket = stats_serialization_utils::makeStatsBucket(1, 2, 3, 4, 5);
+    // Create & parse StatsBucket.
+    auto serializedBucket = ce::Bucket{3.0, 4.0, 15.0, 2.0, 6.0}.serialize();
     auto parsedBucket = StatsBucket::parse(ctx, serializedBucket);
 
-    // roundtrip
+    // Round-trip conversion.
     auto bucketToBSON = parsedBucket.toBSON();
     ASSERT_BSONOBJ_EQ(serializedBucket, bucketToBSON);
 }
 
 /**
- *  Validate round trip convertion for StatsPath datatype.
+ *  Validate round-trip conversion for StatsPath datatype.
  */
 TEST(StatsPath, BasicValidStatsPath) {
+    // Initialize histogram buckets.
+    constexpr double doubleCount = 15.0;
+    constexpr double trueCount = 12.0;
+    constexpr double falseCount = 16.0;
+    constexpr double numDocs = doubleCount + trueCount + falseCount;
+    std::vector<ce::Bucket> buckets{
+        ce::Bucket{1.0, 0.0, 1.0, 0.0, 1.0},
+        ce::Bucket{2.0, 5.0, 8.0, 1.0, 2.0},
+        ce::Bucket{3.0, 4.0, 15.0, 2.0, 6.0},
+    };
 
-    std::list<BSONObj> buckets;
+    // Initialize histogram bounds.
+    auto [boundsTag, boundsVal] = sbe::value::makeNewArray();
+    sbe::value::ValueGuard boundsGuard{boundsTag, boundsVal};
+    auto bounds = sbe::value::getArrayView(boundsVal);
+    bounds->push_back(sbe::value::TypeTags::NumberDouble, 1.0);
+    bounds->push_back(sbe::value::TypeTags::NumberDouble, 2.0);
+    bounds->push_back(sbe::value::TypeTags::NumberDouble, 3.0);
+
+    // Create a scalar histogram.
+    ce::TypeCounts tc{
+        {sbe::value::TypeTags::NumberDouble, doubleCount},
+        {sbe::value::TypeTags::Boolean, trueCount + falseCount},
+    };
+    ce::ScalarHistogram sh(*bounds, buckets);
+    ce::ArrayHistogram ah(sh, tc, trueCount, falseCount);
+
+    // Serialize to BSON.
+    auto serializedPath = stats::makeStatsPath("somePath", numDocs, ah);
+
+    // Parse StatsPath via IDL & serialize to BSON.
+    auto parsedPath = StatsPath::parse(ctx, serializedPath);
+    auto parsedPathToBSON = parsedPath.toBSON();
+
+    // We should end up with the same serialized BSON in the end.
+    ASSERT_BSONOBJ_EQ(serializedPath, parsedPathToBSON);
+}
+
+/**
+ *  Validate round-trip conversion for StatsPath datatype.
+ */
+TEST(StatsPath, BasicValidEmptyStatsPath) {
+    // Initialize histogram buckets.
+    constexpr double numDocs = 0.0;
+    std::vector<ce::Bucket> buckets;
+
+    // Initialize histogram bounds.
     auto [boundsTag, boundsVal] = sbe::value::makeNewArray();
     sbe::value::ValueGuard boundsGuard{boundsTag, boundsVal};
     auto bounds = sbe::value::getArrayView(boundsVal);
 
-    for (double i = 1; i <= 3; i++) {
-        bounds->push_back(sbe::value::TypeTags::NumberDouble, double{i + 1.0});
+    // Create an empty scalar histogram.
+    ce::TypeCounts tc;
+    ce::ScalarHistogram sh(*bounds, buckets);
+    ce::ArrayHistogram ah(sh, tc);
 
-        auto bucket = stats_serialization_utils::makeStatsBucket(i, i, i, i, i);
-        buckets.push_back(bucket);
-    }
-    stats_serialization_utils::TypeCount types;
-    for (double i = 1; i <= 3; i++) {
-        std::stringstream typeName;
-        typeName << "type" << i;
-        auto typeElem = std::pair<std::string, double>(typeName.str(), i);
-        types.push_back(typeElem);
-    }
-    auto serializedPath = stats_serialization_utils::makeStatsPath(
-        "somePath", 100, std::make_pair(4.0, 6.0), types, buckets, bounds, boost::none);
+    // Serialize to BSON.
+    auto serializedPath = stats::makeStatsPath("someEmptyPath", numDocs, ah);
 
+    // Parse StatsPath via IDL & serialize to BSON.
     auto parsedPath = StatsPath::parse(ctx, serializedPath);
-    auto pathToBSON = parsedPath.toBSON();
+    auto parsedPathToBSON = parsedPath.toBSON();
 
-    ASSERT_BSONOBJ_EQ(serializedPath, pathToBSON);
+    // We should end up with the same serialized BSON in the end.
+    ASSERT_BSONOBJ_EQ(serializedPath, parsedPathToBSON);
 }
 
 }  // namespace

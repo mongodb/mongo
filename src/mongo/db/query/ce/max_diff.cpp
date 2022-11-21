@@ -230,26 +230,85 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t 
     return {std::move(bounds), std::move(buckets)};
 }
 
+/**
+ * Helper for getting the input for constructing an array histogram for an array estimator using the
+ * values in an array. For each value in `arrayElements`, update the min, max, and unique value
+ * vectors. These will be used to generate the corresponding histograms for array values.
+ */
+void updateMinMaxUniqArrayVals(std::vector<SBEValue>& arrayElements,
+                               std::vector<SBEValue>& arrayMinData,
+                               std::vector<SBEValue>& arrayMaxData,
+                               std::vector<SBEValue>& arrayUniqueData) {
+
+    if (arrayElements.size() == 0) {
+        return;
+    }
+
+    sortValueVector(arrayElements);
+
+    // Emit values for arrayMin and arrayMax histograms.
+    {
+        boost::optional<SBEValue> prev;
+        for (const auto& element : arrayElements) {
+            if (!prev) {
+                arrayMinData.push_back(element);
+            } else if (!sameTypeClass(prev->getTag(), element.getTag())) {
+                arrayMaxData.push_back(*prev);
+                arrayMinData.push_back(element);
+            }
+            prev = element;
+        }
+        if (prev) {
+            arrayMaxData.push_back(*prev);
+        }
+    }
+
+    // Emit values for arrayUnique histogram.
+    {
+        boost::optional<SBEValue> prev;
+        for (const auto& element : arrayElements) {
+            if (!prev ||
+                compareValues(
+                    prev->getTag(), prev->getValue(), element.getTag(), element.getValue()) < 0) {
+                arrayUniqueData.push_back(element);
+                prev = element;
+            }
+        }
+    }
+}
+
 ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size_t nBuckets) {
+    // Values that will be used as inputs to histogram generation code.
     std::vector<SBEValue> scalarData;
     std::vector<SBEValue> arrayMinData;
     std::vector<SBEValue> arrayMaxData;
     std::vector<SBEValue> arrayUniqueData;
-    std::map<value::TypeTags, size_t> typeCounts;
-    std::map<value::TypeTags, size_t> arrayTypeCounts;
-    size_t emptyArrayCount = 0;
+
+    // Type counters.
+    TypeCounts typeCounts;
+    TypeCounts arrayTypeCounts;
+
+    // Value counters.
+    double emptyArrayCount = 0;
+    double trueCount = 0;
+    double falseCount = 0;
 
     for (const auto& v : arrayData) {
-        auto tagCount = typeCounts.insert({v.getTag(), 1});
+        const auto val = v.getValue();
+        const auto tag = v.getTag();
+
+        // Increment type counters.
+        auto tagCount = typeCounts.insert({tag, 1});
         if (!tagCount.second) {
             ++tagCount.first->second;
         }
-        if (v.getTag() == value::TypeTags::Null) {
-            continue;  // nulls are accounted for in typeCounts
-        }
-        if (v.getTag() == value::TypeTags::Array) {
+
+        if (tag == value::TypeTags::Array) {
+            // If we have an array, we can construct min, max, and unique histograms from its
+            // elements, provided that they are histogrammable.
             std::vector<SBEValue> arrayElements;
-            value::Array* arr = value::getArrayView(v.getValue());
+
+            value::Array* arr = value::getArrayView(val);
             size_t arrSize = arr->size();
             if (arrSize == 0) {
                 ++emptyArrayCount;
@@ -258,76 +317,60 @@ ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size
 
             for (size_t i = 0; i < arrSize; i++) {
                 const auto [tag, val] = arr->getAt(i);
+
+                // Increment array type tag counts.
                 auto arrTagCount = arrayTypeCounts.insert({tag, 1});
                 if (!arrTagCount.second) {
                     ++arrTagCount.first->second;
                 }
-                if (tag == value::TypeTags::Null) {
-                    continue;  // nulls are accounted for in arrayTypeCounts
+
+                if (!canEstimateTypeViaHistogram(tag)) {
+                    // If the elements of this array are not histogrammable, then we can only update
+                    // the array type counters
+                    continue;
                 }
+
                 const auto [tagCopy, valCopy] = value::copyValue(tag, val);
                 arrayElements.emplace_back(tagCopy, valCopy);
             }
+            updateMinMaxUniqArrayVals(arrayElements, arrayMinData, arrayMaxData, arrayUniqueData);
 
-            sortValueVector(arrayElements);
+        } else if (tag == value::TypeTags::Boolean) {
+            // If we have a boolean, we also have counters for true and false values we should
+            // increment here.
+            if (value::bitcastTo<bool>(val)) {
+                trueCount++;
+            } else {
+                falseCount++;
+            }
+            continue;
 
-            {
-                // Emit values for arrayMin and arrayMax histograms.
-                boost::optional<SBEValue> prev;
-                for (const auto& element : arrayElements) {
-                    uassert(6660506,
-                            "Multi-level array nesting is not supported yet",
-                            element.getTag() != value::TypeTags::Array);
-                    if (!prev) {
-                        arrayMinData.push_back(element);
-                    } else if (!sameTypeClass(prev->getTag(), element.getTag())) {
-                        arrayMaxData.push_back(*prev);
-                        arrayMinData.push_back(element);
-                    }
-                    prev = element;
-                }
-                if (prev) {
-                    arrayMaxData.push_back(*prev);
-                }
-            }
-            {
-                // Emit values for arrayUnique histogram.
-                boost::optional<SBEValue> prev;
-                for (const auto& element : arrayElements) {
-                    if (!prev ||
-                        compareValues(prev->getTag(),
-                                      prev->getValue(),
-                                      element.getTag(),
-                                      element.getValue()) < 0) {
-                        arrayUniqueData.push_back(element);
-                        prev = element;
-                    }
-                }
-            }
+        } else if (!canEstimateTypeViaHistogram(tag)) {
+            // If we have a non-histogrammable type, we can only increment the type counters for it;
+            // we cannot build a scalar histogram on it.
+            continue;
+
         } else {
-            // Assume non-arrays are scalars. Emit values for scalar histogram.
+            // Assume non-arrays are scalars. Emit values for the scalar histogram.
             scalarData.push_back(v);
         }
     }
 
-    sortValueVector(scalarData);
-    sortValueVector(arrayMinData);
-    sortValueVector(arrayMaxData);
-    sortValueVector(arrayUniqueData);
+    // Lambda helper to construct histogram from an unsorted value vector.
+    const auto makeHistogram = [&nBuckets](std::vector<SBEValue>& values) {
+        sortValueVector(values);
+        return genMaxDiffHistogram(getDataDistribution(values), nBuckets);
+    };
 
-    ScalarHistogram scalarHist = genMaxDiffHistogram(getDataDistribution(scalarData), nBuckets);
-    ScalarHistogram arrayMinHist = genMaxDiffHistogram(getDataDistribution(arrayMinData), nBuckets);
-    ScalarHistogram arrayMaxHist = genMaxDiffHistogram(getDataDistribution(arrayMaxData), nBuckets);
-    ScalarHistogram arrayUniqueHist =
-        genMaxDiffHistogram(getDataDistribution(arrayUniqueData), nBuckets);
-
-    return {std::move(scalarHist),
+    return {makeHistogram(scalarData),
             std::move(typeCounts),
-            std::move(arrayUniqueHist),
-            std::move(arrayMinHist),
-            std::move(arrayMaxHist),
+            makeHistogram(arrayUniqueData),
+            makeHistogram(arrayMinData),
+            makeHistogram(arrayMaxData),
             std::move(arrayTypeCounts),
-            emptyArrayCount};
+            emptyArrayCount,
+            trueCount,
+            falseCount};
 }
 
 }  // namespace mongo::ce

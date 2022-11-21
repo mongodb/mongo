@@ -36,7 +36,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/ce/max_diff.h"
-#include "mongo/db/query/ce/scalar_histogram.h"
 #include "mongo/db/query/ce/value_utils.h"
 #include "mongo/logv2/log.h"
 
@@ -69,53 +68,23 @@ void AccumulatorInternalConstructStats::processInternal(const Value& input, bool
     uassert(8423375, "Can not merge analyze pipelines", !merging);
 
     const auto& doc = input.getDocument();
-    auto key = doc["key"];
-    auto valArray = doc["val"];
+    auto val = doc["val"];
 
-    // its either empty or a different key.
-    if (valArray.getArray().empty()) {
-        return;
-    }
+    LOGV2_DEBUG(6735800, 4, "Extracted document", "val"_attr = val);
+    _values.emplace_back(ce::SBEValue(mongo::optimizer::convertFrom(val)));
+
     _count++;
-    for (const auto& val : valArray.getArray()) {
-        LOGV2_DEBUG(6735800, 4, "Extracted document", "val"_attr = val, "key"_attr = key);
-        _values.emplace_back(ce::SBEValue(mongo::optimizer::convertFrom(val)));
-    }
-
     _memUsageBytes = sizeof(*this);
 }
 
 Value AccumulatorInternalConstructStats::getValue(bool toBeMerged) {
     uassert(8423374, "Can not merge analyze pipelines", !toBeMerged);
 
-    BSONObjBuilder pathBuilder;
-    pathBuilder.appendNumber("documents", _count);
+    // Generate and serialize maxdiff histogram for scalar and array values.
+    auto arrayHistogram = ce::createArrayEstimator(_values, ce::ScalarHistogram::kMaxBuckets);
+    auto stats = stats::makeStatistics(_count, arrayHistogram);
 
-    if (!_values.empty()) {
-        ce::sortValueVector(_values);
-        auto data = ce::getDataDistribution(_values);
-        auto histogram = genMaxDiffHistogram(data, ce::ScalarHistogram::kMaxBuckets);
-        auto bounds = histogram.getBounds();
-        auto buckets = histogram.getBuckets();
-        BSONObjBuilder histogramBuilder(pathBuilder.subobjStart("scalarHistogram"));
-
-        BSONArrayBuilder bucketsBuilder(histogramBuilder.subarrayStart("buckets"));
-        for (const auto& bucket : buckets) {
-            auto bucketBSON = BSON(
-                "boundaryCount" << bucket._equalFreq << "rangeCount" << bucket._rangeFreq
-                                << "cumulativeCount" << bucket._cumulativeFreq << "rangeDistincts"
-                                << bucket._ndv << "cumulativeDistincts" << bucket._cumulativeNDV);
-            bucketsBuilder.append(bucketBSON);
-        }
-        bucketsBuilder.doneFast();
-        BSONArrayBuilder boundsBuilder(histogramBuilder.subarrayStart("bounds"));
-        sbe::bson::convertToBsonObj(boundsBuilder, &bounds);
-        boundsBuilder.doneFast();
-        histogramBuilder.doneFast();
-    }
-    pathBuilder.doneFast();
-
-    return Value(pathBuilder.obj());
+    return Value(stats);
 }
 
 void AccumulatorInternalConstructStats::reset() {

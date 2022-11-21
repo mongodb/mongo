@@ -30,10 +30,27 @@
 #include "mongo/db/query/ce/array_histogram.h"
 #include "mongo/db/query/ce/value_utils.h"
 
-namespace mongo::ce {
+namespace mongo {
+namespace ce {
 using namespace sbe;
 
+TypeCounts mapStatsTypeCountToTypeCounts(std::vector<TypeTag> tc) {
+    TypeCounts out;
+    for (const auto& t : tc) {
+        out.emplace(deserialize(t.getTypeName().toString()), t.getCount());
+    }
+    return out;
+}
+
 ArrayHistogram::ArrayHistogram() : ArrayHistogram(ScalarHistogram(), {}) {}
+
+ArrayHistogram::ArrayHistogram(Statistics stats)
+    : ArrayHistogram(stats.getScalarHistogram(),
+                     mapStatsTypeCountToTypeCounts(stats.getTypeCount()),
+                     stats.getTrueCount(),
+                     stats.getFalseCount()) {
+    // TODO SERVER-71513: initialize non-scalar histogram fields.
+}
 
 ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                TypeCounts typeCounts,
@@ -41,23 +58,30 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                ScalarHistogram arrayMin,
                                ScalarHistogram arrayMax,
                                TypeCounts arrayTypeCounts,
-                               size_t emptyArrayCount)
+                               double emptyArrayCount,
+                               double trueCount,
+                               double falseCount)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _emptyArrayCount(emptyArrayCount),
+      _trueCount(trueCount),
+      _falseCount(falseCount),
       _arrayUnique(std::move(arrayUnique)),
       _arrayMin(std::move(arrayMin)),
       _arrayMax(std::move(arrayMax)),
       _arrayTypeCounts(std::move(arrayTypeCounts)) {
     invariant(isArray());
-    // ArrayMin/Max histograms must have the same number of buckets.
-    invariant(_arrayMin->getBuckets().size() == _arrayMax->getBuckets().size());
 }
 
-ArrayHistogram::ArrayHistogram(ScalarHistogram scalar, TypeCounts typeCounts)
+ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
+                               TypeCounts typeCounts,
+                               double trueCount,
+                               double falseCount)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
-      _emptyArrayCount(0),
+      _emptyArrayCount(0.0),
+      _trueCount(trueCount),
+      _falseCount(falseCount),
       _arrayUnique(boost::none),
       _arrayMin(boost::none),
       _arrayMax(boost::none),
@@ -126,17 +150,65 @@ const TypeCounts& ArrayHistogram::getArrayTypeCounts() const {
     return *_arrayTypeCounts;
 }
 
-size_t ArrayHistogram::getArrayCount() const {
+double ArrayHistogram::getArrayCount() const {
     if (isArray()) {
         auto findArray = _typeCounts.find(value::TypeTags::Array);
         uassert(6979504,
                 "Histogram with array data must have a total array count.",
                 findArray != _typeCounts.end());
-        size_t arrayCount = findArray->second;
+        double arrayCount = findArray->second;
         uassert(6979503, "Histogram with array data must have at least one array.", arrayCount > 0);
         return arrayCount;
     }
     return 0;
 }
 
-}  // namespace mongo::ce
+BSONObj ArrayHistogram::serialize() const {
+    BSONObjBuilder histogramBuilder;
+
+    // Serialize boolean type counters.
+    histogramBuilder.append("trueCount", getTrueCount());
+    histogramBuilder.append("falseCount", getFalseCount());
+
+    // Serialize empty array counts.
+    histogramBuilder.appendNumber("emptyArrayCount", getEmptyArrayCount());
+
+    // Serialize type counts.
+    BSONArrayBuilder typeCountBuilder(histogramBuilder.subarrayStart("typeCount"));
+    const auto& typeCounts = getTypeCounts();
+    for (const auto& [sbeType, count] : typeCounts) {
+        auto typeCount = BSON("typeName" << ce::serialize(sbeType) << "count" << count);
+        typeCountBuilder.append(typeCount);
+    }
+    typeCountBuilder.doneFast();
+
+    // Serialize scalar histogram.
+    histogramBuilder.append("scalarHistogram", getScalar().serialize());
+
+    // TODO SERVER-71513: serialize array histograms.
+
+    histogramBuilder.doneFast();
+    return histogramBuilder.obj();
+}
+}  // namespace ce
+
+// TODO: update this once SERVER-71051 is done.
+namespace stats {
+BSONObj makeStatistics(double documents, const ce::ArrayHistogram& arrayHistogram) {
+    BSONObjBuilder builder;
+    builder.appendNumber("documents", documents);
+    builder.appendElements(arrayHistogram.serialize());
+    builder.doneFast();
+    return builder.obj();
+}
+
+BSONObj makeStatsPath(StringData path, double documents, const ce::ArrayHistogram& arrayHistogram) {
+    BSONObjBuilder builder;
+    builder.append("_id", path);
+    builder.append("statistics", makeStatistics(documents, arrayHistogram));
+    builder.doneFast();
+    return builder.obj();
+}
+}  // namespace stats
+
+}  // namespace mongo

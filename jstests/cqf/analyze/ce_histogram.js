@@ -13,17 +13,12 @@
 (function() {
 "use strict";
 
-load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
-load("jstests/libs/optimizer_utils.js");      // For checkCascadesOptimizerEnabled.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+load('jstests/libs/ce_stats_utils.js');
 
 const collName = "ce_histogram";
 const fields = ["int", "dbl", "str", "date"];
-const tolerance = 0.01;
 
 let _id;
-
-// Helper functions.
 
 /**
  * Generates 'val' documents where each document has a distinct value for each 'field' in 'fields'.
@@ -31,7 +26,7 @@ let _id;
 function generateDocs(val) {
     let docs = [];
     const fields = {
-        int: val,
+        int: NumberInt(val),  // Necessary to cast, otherwise we get a double here.
         dbl: val + 0.1,
         // A small note: the ordering of string bounds (lexicographical) is different than that of
         // int bounds. In order to simplify the histogram validation logic, we don't want to have to
@@ -50,48 +45,21 @@ function generateDocs(val) {
 }
 
 /**
- * Retrieves the cardinality estimate from a node in explain.
+ * Returns the correct type name in the stats 'typeCount' field for the given field name.
  */
-function extractCEFromExplain(node) {
-    const ce = node.properties.adjustedCE;
-    assert.neq(ce, null);
-    return ce;
-}
-
-/**
- * Extracts the cardinality estimate for the given $match predicate, assuming we get an index scan
- * plan.
- */
-function getIxscanCEForMatch(coll, predicate, hint) {
-    // We expect the plan to include a BinaryJoin whose left child is an IxScan whose logical
-    // representation was estimated via histograms.
-    const explain = coll.explain().aggregate([{$match: predicate}], {hint});
-    const ixScan = leftmostLeafStage(explain);
-    assert.neq(ixScan, null);
-    assert.eq(ixScan.nodeType, "IndexScan");
-    return extractCEFromExplain(ixScan);
-}
-
-/**
- * Asserts that expected and actual are equal, within a small tolerance.
- */
-function assertApproxEq(expected, actual, msg) {
-    assert(Math.abs(expected - actual) < tolerance, msg);
-}
-
-/**
- * Validates that the results and cardinality estimate for a given $match predicate agree.
- */
-function verifyCEForMatch({coll, predicate, expected, hint}) {
-    const actual = coll.aggregate([{$match: predicate}], {hint}).toArray();
-    assertArrayEq({actual, expected});
-
-    const expectedCE = expected.length;
-    const actualCE = getIxscanCEForMatch(coll, predicate, hint);
-    assertApproxEq(
-        actualCE,
-        expectedCE,
-        `${tojson(predicate)} returned ${expectedCE} documents, estimated ${actualCE} docs.`);
+function getTypeName(field) {
+    switch (field) {
+        case "int":
+            return "NumberInt32";
+        case "dbl":
+            return "NumberDouble";
+        case "str":
+            return "StringBig";
+        case "date":
+            return "Date";
+        default:
+            assert(false, `Name mapping for ${field} not defined.`);
+    }
 }
 
 /**
@@ -103,11 +71,22 @@ function verifyCEForNDV(ndv) {
     const coll = db[collName];
     coll.drop();
 
-    const expectedHistograms = [];
+    const expectedHistograms = {};
     for (const field of fields) {
         assert.commandWorked(coll.createIndex({[field]: 1}));
-        expectedHistograms.push(
-            {_id: field, statistics: {documents: 0, scalarHistogram: {buckets: [], bounds: []}}});
+
+        const typeName = getTypeName(field);
+        expectedHistograms[field] = {
+            _id: field,
+            statistics: {
+                documents: 0.0,
+                scalarHistogram: {buckets: [], bounds: []},
+                emptyArrayCount: 0.0,
+                trueCount: 0.0,
+                falseCount: 0.0,
+                typeCount: [{typeName, count: 0.0}],
+            }
+        };
     }
 
     // Set up test collection and initialize the expected histograms in order to validate basic
@@ -118,11 +97,18 @@ function verifyCEForNDV(ndv) {
     let cumulativeCount = 0;
     let allDocs = [];
     for (let val = 1; val <= ndv; val++) {
-        const docs = generateDocs(val);
+        let docs = generateDocs(val);
         assert.commandWorked(coll.insertMany(docs));
+
+        // Small hack; when we insert a doc, we want to insert it as a NumberInt so that the
+        // appropriate type counters increment. However, when we verify it later on, we expect to
+        // see a regular number, so we should update the "int" field of docs here.
+        for (let doc of docs) {
+            doc["int"] = val;
+        }
+
         cumulativeCount += docs.length;
-        for (const expectedHistogram of expectedHistograms) {
-            const field = expectedHistogram._id;
+        for (const [f, expectedHistogram] of Object.entries(expectedHistograms)) {
             const {statistics} = expectedHistogram;
             statistics.documents = cumulativeCount;
             statistics.scalarHistogram.buckets.push({
@@ -132,35 +118,15 @@ function verifyCEForNDV(ndv) {
                 rangeDistincts: 0,
                 cumulativeDistincts: val
             });
-            statistics.scalarHistogram.bounds.push(docs[0][field]);
+            statistics.scalarHistogram.bounds.push(docs[0][f]);
+            statistics.typeCount[0].count += val;
         }
         allDocs = allDocs.concat(docs);
     }
 
-    // Set up histogram for test collection.
-    const stats = db.system.statistics[collName];
-
     for (const field of fields) {
-        // We can't use forceBonsai here because the new optimizer doesn't know how to handle the
-        // analyze command.
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
-        const res = db.runCommand({analyze: collName, key: field});
-        assert.commandWorked(res);
-
-        // Validate histograms.
-        const actualHistograms = stats.aggregate([{$match: {_id: field}}]).toArray();
-        const isField = (elem) => elem === field;
-
-        assertArrayEq(
-            {actual: actualHistograms.find(isField), expected: expectedHistograms.find(isField)});
-
-        // We need to set the CE query knob to use histograms and force the use of the new optimizer
-        // to ensure that we use histograms to estimate CE here.
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryCardinalityEstimatorMode: "histogram"}));
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
+        createAndValidateHistogram({coll, expectedHistogram: expectedHistograms[field]});
+        forceHistogramCE();
 
         // Verify CE for all distinct values of each field across multiple types.
         let count = 0;
@@ -252,33 +218,10 @@ function verifyCEForNDV(ndv) {
     }
 }
 
-// Run test.
-
-if (!checkCascadesOptimizerEnabled(db)) {
-    jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
-}
-
-if (checkSBEEnabled(db, ["featureFlagSbeFull"], true)) {
-    jsTestLog("Skipping the test because it doesn't work in Full SBE");
-    return;
-}
-
-// We will be updating some query knobs, so store the old state and restore it after the test.
-const {internalQueryCardinalityEstimatorMode, internalQueryFrameworkControl} = db.adminCommand({
-    getParameter: 1,
-    internalQueryCardinalityEstimatorMode: 1,
-    internalQueryFrameworkControl: 1,
-});
-
-try {
+runHistogramsTest(function testScalarHistograms() {
     verifyCEForNDV(1);
     verifyCEForNDV(2);
     verifyCEForNDV(3);
     verifyCEForNDV(10);
-} finally {
-    // Reset query knobs to their original state.
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryCardinalityEstimatorMode, internalQueryFrameworkControl}));
-}
+});
 }());

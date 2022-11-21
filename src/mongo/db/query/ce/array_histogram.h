@@ -33,18 +33,26 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/scalar_histogram.h"
+#include "mongo/db/query/ce/stats_gen.h"
 
-namespace mongo::ce {
+namespace mongo {
+namespace ce {
 
-using TypeCounts = std::map<sbe::value::TypeTags, size_t>;
+using TypeCounts = std::map<sbe::value::TypeTags, double>;
 
 class ArrayHistogram {
 public:
     // Constructs an empty scalar histogram.
     ArrayHistogram();
 
+    // Constructor using StatsPath IDL as input.
+    ArrayHistogram(Statistics stats);
+
     // Constructor for scalar field histograms.
-    ArrayHistogram(ScalarHistogram scalar, TypeCounts typeCounts);
+    ArrayHistogram(ScalarHistogram scalar,
+                   TypeCounts typeCounts,
+                   double trueCount = 0.0,
+                   double falseCount = 0.0);
 
     // Constructor for array field histograms. We have to initialize all array fields in this case.
     ArrayHistogram(ScalarHistogram scalar,
@@ -53,7 +61,9 @@ public:
                    ScalarHistogram arrayMin,
                    ScalarHistogram arrayMax,
                    TypeCounts arrayTypeCounts,
-                   size_t emptyArrayCount);
+                   double emptyArrayCount = 0.0,
+                   double trueCount = 0.0,
+                   double falseCount = 0.0);
 
     // ArrayHistogram is neither copy-constructible nor copy-assignable.
     ArrayHistogram(const ArrayHistogram&) = delete;
@@ -64,34 +74,53 @@ public:
     ArrayHistogram& operator=(ArrayHistogram&&) = default;
     ~ArrayHistogram() = default;
 
-    // Returns whether or not this histogram includes array data points.
-    bool isArray() const;
-
     std::string toString() const;
+
+    // Serialize to BSON for storage in stats collection.
+    BSONObj serialize() const;
+
     const ScalarHistogram& getScalar() const;
     const ScalarHistogram& getArrayUnique() const;
     const ScalarHistogram& getArrayMin() const;
     const ScalarHistogram& getArrayMax() const;
     const TypeCounts& getTypeCounts() const;
     const TypeCounts& getArrayTypeCounts() const;
-    // The total number of arrays in the histogram's path including empty arrays.
-    size_t getArrayCount() const;
-    // The total number of empty arrays ( [] ) in the histogram's path.
-    size_t getEmptyArrayCount() const {
+
+    // Returns whether or not this histogram includes array data points.
+    bool isArray() const;
+
+    // Get the total number of arrays in the histogram's path including empty arrays.
+    double getArrayCount() const;
+
+    // Get the total number of empty arrays ( [] ) in the histogram's path.
+    double getEmptyArrayCount() const {
         return _emptyArrayCount;
     }
 
+    // Get the count of true booleans.
+    double getTrueCount() const {
+        return _trueCount;
+    }
+
+    // Get the count of false booleans.
+    double getFalseCount() const {
+        return _falseCount;
+    }
+
 private:
-    /* ScalarHistogram fields for all paths. */
+    /* Fields for all paths. */
 
     // Contains values which appeared originally as scalars on the path.
     ScalarHistogram _scalar;
-    // The number of values of each type inside all arrays.
+    // The number of values of each type.
     TypeCounts _typeCounts;
     // The number of empty arrays - they are not accounted for in the histograms.
-    size_t _emptyArrayCount;
+    double _emptyArrayCount;
+    // The counts of true & false booleans.
+    double _trueCount;
+    double _falseCount;
 
-    /* ScalarHistogram fields for array paths (only initialized if arrays are present). */
+    /* Fields for array paths (only initialized if arrays are present). */
 
     // Contains unique scalar values originating from arrays.
     boost::optional<ScalarHistogram> _arrayUnique;
@@ -99,8 +128,21 @@ private:
     boost::optional<ScalarHistogram> _arrayMin;
     // Contains maximum values originating from arrays **per class**.
     boost::optional<ScalarHistogram> _arrayMax;
+    // The number of values of each type inside all arrays.
     boost::optional<TypeCounts> _arrayTypeCounts;
 };
+}  // namespace ce
+// TODO: update this once SERVER-71051 is done.
+namespace stats {
+/**
+ * Returns an owned BSON Object representing data matching mongo::Statistics IDL.
+ */
+BSONObj makeStatistics(double documents, const ce::ArrayHistogram& arrayHistogram);
 
+/**
+ * Returns an owned BSON Object representing data matching mongo::StatsPath IDL.
+ */
+BSONObj makeStatsPath(StringData path, double documents, const ce::ArrayHistogram& arrayHistogram);
+}  // namespace stats
 
-}  // namespace mongo::ce
+}  // namespace mongo

@@ -43,7 +43,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/caching',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'query_stats',
-        'stats_serialization',
     ],
 )
 
@@ -63,6 +62,7 @@ env.Library(
     source=[
         'array_histogram.cpp',
         'scalar_histogram.cpp',
+        'stats.idl',
         'value_utils.cpp',
     ],
     LIBDEPS=[
@@ -77,7 +77,6 @@ env.Library(
     ],
     LIBDEPS=[
         'query_stats',
-        'stats_serialization',
     ],
 )
 
@@ -96,20 +95,6 @@ env.Library(
         'query_ce_histogram',
         'query_ce_sampling',
         'query_stats',
-    ],
-)
-
-env.Library(
-    target="stats_serialization",
-    source=[
-        'stats.idl',
-        'stats_serialization_utils.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 
@@ -211,7 +196,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/pcre_wrapper',
         'query_ce_histogram',
         'query_stats',
-        'stats_serialization',
     ],
 )
 
@@ -237,7 +221,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
         'ce_test_utils',
-        'stats_serialization',
     ],
 )
 
@@ -255,7 +238,6 @@ env.Library(
         'query_ce_histogram',
         'query_stats',
         'query_stats_gen',
-        'stats_serialization',
     ],
 )
 

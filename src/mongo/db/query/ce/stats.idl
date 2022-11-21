@@ -54,15 +54,6 @@ structs:
             bounds:
                 type: array<IDLAnyType>
 
-    BoolCount:
-        description: "Tracks count of booleans separately from histogram buckets and other type
-counts"
-        fields:
-            trueCount:
-                type: double
-            falseCount:
-                type: double
-
     TypeTag:
         description: "SBE types and their corresponding frequencies in the histogram"
         fields:
@@ -80,8 +71,6 @@ counts"
                 type: StatsHistogram
             uniqueHistogram:
                 type: StatsHistogram
-            boolCount:
-                type: BoolCount
             typeCount:
                 type: array<TypeTag>
 
@@ -90,15 +79,16 @@ counts"
         fields:
             documents:
                 type: double
-            boolCount:
-                type: BoolCount
-                optional: true
+            trueCount:
+                type: double
+            falseCount:
+                type: double
+            emptyArrayCount:
+                type: double
             typeCount:
                 type: array<TypeTag>
-                optional: true
             scalarHistogram:
                 type: StatsHistogram
-                optional: true
             arrayStatistics:
                 type: StatsArrayHistogram
                 optional: true

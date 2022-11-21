@@ -114,4 +114,10 @@ double valueToDouble(value::TypeTags tag, value::Value val);
  */
 bool canEstimateTypeViaHistogram(value::TypeTags tag);
 
+/**
+ * Serialize/Deserialize a TypeTag to a string for TypeCount storage in the stats collection.
+ */
+std::string serialize(value::TypeTags tag);
+value::TypeTags deserialize(const std::string& name);
+
 }  // namespace mongo::ce

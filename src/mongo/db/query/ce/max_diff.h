@@ -75,7 +75,7 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t 
 
 /**
     Given a vector containing SBEValues, generate a set of statistics to summarize the supplied
-    data. Histograms will use the supplied number of buckets
+    data. Histograms will use the supplied number of buckets.
 */
 ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size_t nBuckets);
 

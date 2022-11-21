@@ -30,10 +30,10 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/query/ce/scalar_histogram.h"
 #include "mongo/db/query/ce/stats_cache_loader_impl.h"
 #include "mongo/db/query/ce/stats_cache_loader_test_fixture.h"
 #include "mongo/db/query/ce/stats_gen.h"
-#include "mongo/db/query/ce/stats_serialization_utils.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -57,48 +57,59 @@ void StatsCacheLoaderTest::createStatsCollection(NamespaceString nss) {
 }
 
 TEST_F(StatsCacheLoaderTest, VerifyStatsLoad) {
+    // Initialize histogram buckets.
+    constexpr double doubleCount = 15.0;
+    constexpr double trueCount = 12.0;
+    constexpr double falseCount = 16.0;
+    constexpr double numDocs = doubleCount + trueCount + falseCount;
+    std::vector<ce::Bucket> buckets{
+        ce::Bucket{1.0, 0.0, 1.0, 0.0, 1.0},
+        ce::Bucket{2.0, 5.0, 8.0, 1.0, 2.0},
+        ce::Bucket{3.0, 4.0, 15.0, 2.0, 6.0},
+    };
 
-    NamespaceString nss("test", "stats");
-
-    std::string statsColl(StatsCacheLoader::kStatsPrefix + "." + nss.coll());
-    NamespaceString statsNss(nss.db(), statsColl);
-
-    std::list<BSONObj> buckets;
+    // Initialize histogram bounds.
     auto [boundsTag, boundsVal] = sbe::value::makeNewArray();
     sbe::value::ValueGuard boundsGuard{boundsTag, boundsVal};
-
     auto bounds = sbe::value::getArrayView(boundsVal);
-    for (long long i = 1; i <= 3; i++) {
-        bounds->push_back(sbe::value::TypeTags::NumberDouble, double{i + 1.0});
+    bounds->push_back(sbe::value::TypeTags::NumberDouble, 1.0);
+    bounds->push_back(sbe::value::TypeTags::NumberDouble, 2.0);
+    bounds->push_back(sbe::value::TypeTags::NumberDouble, 3.0);
 
-        auto bucket = stats_serialization_utils::makeStatsBucket(i, i, i, 3 * i, i + 2);
-        buckets.push_back(bucket);
-    }
-    stats_serialization_utils::TypeCount types;
-    for (long long i = 1; i <= 3; i++) {
-        std::stringstream typeName;
-        typeName << "type" << i;
-        auto typeElem = std::pair<std::string, long>(typeName.str(), i);
-        types.push_back(typeElem);
-    }
-    auto serializedPath = stats_serialization_utils::makeStatsPath(
-        "somePath", 100, std::make_pair(4.0, 6.0), types, buckets, bounds, boost::none);
+    // Create a scalar histogram.
+    ce::TypeCounts tc{
+        {sbe::value::TypeTags::NumberDouble, doubleCount},
+        {sbe::value::TypeTags::Boolean, trueCount + falseCount},
+    };
+    ce::ScalarHistogram sh(*bounds, buckets);
+    ce::ArrayHistogram ah(sh, tc, trueCount, falseCount);
+    auto expectedSerialized = ah.serialize();
 
+    // Serialize histogram into a stats path.
+    std::string path = "somePath";
+    auto serialized = stats::makeStatsPath(path, numDocs, ah);
+
+    // Initalize stats collection.
+    NamespaceString nss("test", "stats");
+    std::string statsColl(StatsCacheLoader::kStatsPrefix + "." + nss.coll());
+    NamespaceString statsNss(nss.db(), statsColl);
     createStatsCollection(statsNss);
 
+    // Write serialized stats path to collection.
     AutoGetCollection autoColl(operationContext(), statsNss, MODE_IX);
     const CollectionPtr& coll = autoColl.getCollection();
     {
         WriteUnitOfWork wuow(operationContext());
-
         ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), coll, InsertStatement(serializedPath), nullptr));
+            operationContext(), coll, InsertStatement(serialized), nullptr));
         wuow.commit();
     }
 
-    auto newStats =
-        _statsCacheLoader.getStats(operationContext(), std::make_pair(nss, "somePath")).get();
-    std::cout << newStats->toString() << std::endl;
+    // Read stats path & verify values are consistent with what we expect.
+    auto actualAH = _statsCacheLoader.getStats(operationContext(), std::make_pair(nss, path)).get();
+    auto actualSerialized = actualAH->serialize();
+
+    ASSERT_BSONOBJ_EQ(expectedSerialized, actualSerialized);
 }
 
 }  // namespace

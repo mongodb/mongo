@@ -69,6 +69,9 @@ struct Bucket {
 
     // Sum of distinct values in preceding buckets including this bucket.
     double _cumulativeNDV;
+
+    // Serialize to BSON for storage in stats collection.
+    BSONObj serialize() const;
 };
 
 /**
@@ -101,6 +104,9 @@ public:
     bool empty() const {
         return _buckets.empty();
     }
+
+    // Serialize to BSON for storage in stats collection.
+    BSONObj serialize() const;
 
     static constexpr size_t kMaxBuckets = 100;
 

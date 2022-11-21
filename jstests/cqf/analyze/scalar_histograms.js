@@ -45,18 +45,21 @@ testAnalyzeStats("a", [{a: 2}], 1);
 stats_doc = stats_coll.findOne({_id: "a"});
 assert.eq(stats_doc.statistics.scalarHistogram.bounds[0], 2);
 
-// Multiple documents single path component.
+// Multiple documents single path component. Note that we haven't dropped the document {a: 2}, so it
+// will be included in our document count with field "b" considered as a missing value (10 + 1).
 let docs = [];
 for (let i = 1; i < 11; i++) {
     docs.push({b: i});
 }
-testAnalyzeStats("b", docs, 10);
+testAnalyzeStats("b", docs, 11);
 
 docs = [];
 for (let i = 9; ++i < 36;) {
     docs.push({c: i.toString(36).repeat(10)});
 }
-testAnalyzeStats("c", docs, 26);
+// Once again, we still have the documents with only paths "a" & "b" (no "c"), so the histogram
+// document count should accurately reflect this (26 + 11).
+testAnalyzeStats("c", docs, 37);
 
 assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));

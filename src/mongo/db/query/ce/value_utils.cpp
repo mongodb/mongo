@@ -192,6 +192,7 @@ bool canEstimateTypeViaHistogram(value::TypeTags tag) {
         case value::TypeTags::Object:
         case value::TypeTags::Array:
         case value::TypeTags::Null:
+        case value::TypeTags::Nothing:
         case value::TypeTags::Boolean:
             return false;
 
@@ -204,5 +205,50 @@ bool canEstimateTypeViaHistogram(value::TypeTags tag) {
 
     MONGO_UNREACHABLE;
 }
+
+std::string serialize(value::TypeTags tag) {
+    std::ostringstream os;
+    os << tag;
+    return os.str();
+}
+
+// TODO: does this belong in SBE value utils?
+value::TypeTags deserialize(const std::string& name) {
+    if ("NumberInt32" == name) {
+        return value::TypeTags::NumberInt32;
+    } else if ("NumberInt64" == name) {
+        return value::TypeTags::NumberInt64;
+    } else if ("NumberDecimal" == name) {
+        return value::TypeTags::NumberDecimal;
+    } else if ("NumberDouble" == name) {
+        return value::TypeTags::NumberDouble;
+    } else if ("StringBig" == name) {
+        return value::TypeTags::StringBig;
+    } else if ("StringSmall" == name) {
+        return value::TypeTags::StringSmall;
+    } else if ("bsonString" == name) {
+        return value::TypeTags::bsonString;
+    } else if ("Date" == name) {
+        return value::TypeTags::Date;
+    } else if ("Timestamp" == name) {
+        return value::TypeTags::Timestamp;
+    } else if ("ObjectId" == name) {
+        return value::TypeTags::ObjectId;
+    } else if ("Object" == name) {
+        return value::TypeTags::Object;
+    } else if ("Boolean" == name) {
+        return value::TypeTags::Boolean;
+    } else if ("Array" == name) {
+        return value::TypeTags::Array;
+    } else if ("Null" == name) {
+        return value::TypeTags::Null;
+    } else if ("Nothing" == name) {
+        return value::TypeTags::Nothing;
+    }
+
+    // Trying to deserialize any other types should result in an error.
+    uasserted(6660600,
+              str::stream() << "String " << name << " is not convertable to SBE type tag.");
+}  // namespace mongo::ce
 
 }  // namespace mongo::ce

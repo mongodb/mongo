@@ -153,8 +153,8 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysSmall10Buckets) {
 
     const ScalarHistogram aUniqueHist = createHistogram(uniqueData);
 
-    std::map<value::TypeTags, size_t> typeCounts;
-    std::map<value::TypeTags, size_t> arrayTypeCounts;
+    TypeCounts typeCounts;
+    TypeCounts arrayTypeCounts;
     // Dataset generated as 1000 arrays of size between 3 to 5.
     typeCounts.insert({value::TypeTags::Array, 1000});
     arrayTypeCounts.insert({value::TypeTags::NumberInt32, 3996});
@@ -244,8 +244,8 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysLarge10Buckets) {
 
     const ScalarHistogram aUniqueHist = createHistogram(uniqueData);
 
-    std::map<value::TypeTags, size_t> typeCounts;
-    std::map<value::TypeTags, size_t> arrayTypeCounts;
+    TypeCounts typeCounts;
+    TypeCounts arrayTypeCounts;
     // Dataset generated as 1000 arrays of size between 8 to 10.
     typeCounts.insert({value::TypeTags::Array, 1000});
     arrayTypeCounts.insert({value::TypeTags::NumberInt32, 8940});

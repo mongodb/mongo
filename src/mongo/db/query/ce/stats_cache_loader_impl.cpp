@@ -42,7 +42,6 @@
 
 namespace mongo {
 
-
 SemiFuture<StatsCacheVal> StatsCacheLoaderImpl::getStats(OperationContext* opCtx,
                                                          const StatsPathString& statsPath) {
 
@@ -71,18 +70,8 @@ SemiFuture<StatsCacheVal> StatsCacheLoaderImpl::getStats(OperationContext* opCtx
             IDLParserContext ctx("StatsPath");
             BSONObj document = cursor->nextSafe().getOwned();
             auto parsedStats = StatsPath::parse(ctx, document);
-            if (auto parsedHistogram = parsedStats.getStatistics().getScalarHistogram()) {
-                ScalarHistogram scalar(*parsedHistogram);
-                std::map<sbe::value::TypeTags, size_t> typeCounts;
-                // TODO: translate type strings to sbe TypeTags
-                StatsCacheVal statsPtr(
-                    new ArrayHistogram(std::move(scalar), std::move(typeCounts)));
-                return makeReadyFutureWith([this, statsPtr] { return statsPtr; }).semi();
-            } else {
-                uasserted(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Stats is empty for " << statsNss.ns() << ",  path "
-                                        << statsPath.second);
-            }
+            StatsCacheVal statsPtr(new ArrayHistogram(parsedStats.getStatistics()));
+            return makeReadyFutureWith([this, statsPtr] { return statsPtr; }).semi();
         }
 
         uasserted(ErrorCodes::NamespaceNotFound,
