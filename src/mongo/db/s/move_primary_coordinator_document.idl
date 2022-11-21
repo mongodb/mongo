@@ -26,24 +26,40 @@
 # it in the license file.
 #
 
-# This file defines the format of documents used by the shard coordinator while moving a database.
+# This file defines the format of movePrimary coordinator persisted documents.
 
 global:
     cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/s/sharding_types.idl"
     - "mongo/db/s/sharding_ddl_coordinator.idl"
+    - "mongo/s/sharding_types.idl"
+
+enums:
+     MovePrimaryCoordinatorPhase:
+        description: "Coordinator phase of a movePrimary operation."
+        type: string
+        values:
+            kUnset: "unset"
+            kCheckPreconditions: "checkPreconditions"
+            kCloneCatalogData: "cloneCatalogData"
+            kEnterCriticalSection: "enterCriticalSection"
+            kCommitMetadataChanges: "commitMetadataChanges"
+            kCleanStaleData: "cleanStaleData"
 
 structs:
     MovePrimaryCoordinatorDocument:
-        description: "Object with neccessary fields to move a database between shards"
+        description: "Document representing an ongoing movePrimary operation."
         generate_comparison_operators: false
         strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
         fields:
+            phase:
+                type: MovePrimaryCoordinatorPhase
+                description: "Current coordinator phase."
+                default: kUnset
             toShardId:
                 type: shard_id
-                description: "Destination shard of the database"
+                description: "Destination shard of the database."

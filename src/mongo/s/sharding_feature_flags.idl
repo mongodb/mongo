@@ -91,6 +91,7 @@ feature_flags:
     cpp_varname: feature_flags::gStopUsingConfigVersion
     default: true
     version: 6.2
+  # TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
   featureFlagResilientMovePrimary:
     description: "Enable the resilient coordinator for the movePrimary command in order to improve
                   the tolerance in case of a failure on donor and recipient nodes"
@@ -101,4 +102,3 @@ feature_flags:
     cpp_varname: feature_flags::gConfigSettingsSchema
     default: true
     version: 6.2
-    

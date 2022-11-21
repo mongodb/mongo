@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/s/move_primary_coordinator.h"
 #include "mongo/db/s/move_primary_coordinator_no_resilient.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/grid.h"
@@ -39,7 +38,6 @@
 #include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -119,25 +117,47 @@ public:
         ON_BLOCK_EXIT(
             [opCtx, dbNss] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db()); });
 
-        // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
-        if (!feature_flags::gResilientMovePrimary.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            auto coordinatorDoc = MovePrimaryCoordinatorDocument();
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
-            coordinatorDoc.setToShardId(toShard.toString());
+        const auto coordinatorFuture = [&] {
+            FixedFCVRegion fcvRegion(opCtx);
 
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
-            auto movePrimaryCoordinator = checked_pointer_cast<MovePrimaryCoordinatorNoResilient>(
-                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
-            movePrimaryCoordinator->getCompletionFuture().get(opCtx);
+            // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
+            if (!feature_flags::gResilientMovePrimary.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                const auto coordinatorDoc = [&] {
+                    MovePrimaryCoordinatorDocument doc;
+                    doc.setShardingDDLCoordinatorMetadata(
+                        {{dbNss, DDLCoordinatorTypeEnum::kMovePrimaryNoResilient}});
+                    doc.setToShardId(toShard.toString());
+                    return doc.toBSON();
+                }();
 
-            return true;
-        }
+                const auto coordinator = [&] {
+                    auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                    return checked_pointer_cast<MovePrimaryCoordinatorNoResilient>(
+                        service->getOrCreateInstance(opCtx, std::move(coordinatorDoc)));
+                }();
 
-        // TODO (SERVER-71200): Resilient DDL Coordinator
-        MONGO_UNREACHABLE;
+                return coordinator->getCompletionFuture();
+            }
 
+            const auto coordinatorDoc = [&] {
+                MovePrimaryCoordinatorDocument doc;
+                doc.setShardingDDLCoordinatorMetadata(
+                    {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
+                doc.setToShardId(toShard.toString());
+                return doc.toBSON();
+            }();
+
+            const auto coordinator = [&] {
+                auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                return checked_pointer_cast<MovePrimaryCoordinator>(
+                    service->getOrCreateInstance(opCtx, std::move(coordinatorDoc)));
+            }();
+
+            return coordinator->getCompletionFuture();
+        }();
+
+        coordinatorFuture.get(opCtx);
         return true;
     }
 } movePrimaryCmd;

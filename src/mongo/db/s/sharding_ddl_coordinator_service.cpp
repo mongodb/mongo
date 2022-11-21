@@ -40,6 +40,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_database_coordinator.h"
+#include "mongo/db/s/move_primary_coordinator.h"
 #include "mongo/db/s/move_primary_coordinator_no_resilient.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
@@ -61,9 +62,13 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
     LOGV2(
         5390510, "Constructing new sharding DDL coordinator", "coordinatorDoc"_attr = op.toBSON());
     switch (op.getId().getOperationType()) {
-        case DDLCoordinatorTypeEnum::kMovePrimary:
+        // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
+        case DDLCoordinatorTypeEnum::kMovePrimaryNoResilient:
             return std::make_shared<MovePrimaryCoordinatorNoResilient>(service,
                                                                        std::move(initialState));
+            break;
+        case DDLCoordinatorTypeEnum::kMovePrimary:
+            return std::make_shared<MovePrimaryCoordinator>(service, std::move(initialState));
             break;
         case DDLCoordinatorTypeEnum::kDropDatabase:
             return std::make_shared<DropDatabaseCoordinator>(service, std::move(initialState));
