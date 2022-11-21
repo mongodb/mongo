@@ -1,4 +1,6 @@
+// The test runs commands that are not allowed with security token: stageDebug.
 // @tags: [
+//   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
 //   no_selinux,

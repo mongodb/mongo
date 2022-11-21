@@ -3,7 +3,9 @@
  * entry matching the server's response from the "getCmdLineOpts" command. The former operation may
  * be routed to a secondary in the replica set, whereas the latter must be routed to the primary.
  *
+ * The test runs commands that are not allowed with security token: getCmdLineOpts.
  * @tags: [
+ *  not_allowed_with_security_token,
  *  assumes_read_preference_unchanged,
  *  requires_collstats,
  *  requires_capped,

@@ -1,6 +1,8 @@
 // Confirms that profiled insert execution contains all expected metrics with proper values.
 //
+// The test runs commands that are not allowed with security token: setProfilingLevel.
 // @tags: [
+//   not_allowed_with_security_token,
 //   # Asserts on the number of index keys inserted.
 //   assumes_no_implicit_index_creation,
 //   assumes_write_concern_unchanged,

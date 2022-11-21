@@ -1,4 +1,7 @@
 // Test query stage sorting.
+// The test runs commands that are not allowed with security token: stageDebug.
+// @tags: [not_allowed_with_security_token]
+
 if (false) {
     t = db.stages_sort;
     t.drop();

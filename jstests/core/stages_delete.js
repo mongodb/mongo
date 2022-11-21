@@ -1,4 +1,6 @@
+// The test runs commands that are not allowed with security token: stageDebug.
 // @tags: [
+//   not_allowed_with_security_token,
 //   # This test attempts to remove documents using the stageDebug command, which doesn't support
 //   # specifying a writeConcern.
 //   assumes_write_concern_unchanged,

@@ -1,6 +1,8 @@
 // Confirms that profile entries for find commands contain the appropriate query hash.
 //
+// The test runs commands that are not allowed with security token: setProfilingLevel.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_against_mongod_not_mongos,
 //   assumes_read_concern_unchanged,
 //   does_not_support_stepdowns,

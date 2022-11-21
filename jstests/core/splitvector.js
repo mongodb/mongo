@@ -1,4 +1,6 @@
+// The test runs commands that are not allowed with security token: datasize, splitVector.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_superuser_permissions,
 //   # Cannot implicitly shard accessed collections because the "splitVector" command cannot be run
 //   # on a sharded collection

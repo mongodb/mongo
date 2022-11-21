@@ -1,4 +1,6 @@
+// The test runs commands that are not allowed with security token: getLog.
 // @tags: [
+//   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_capped,
 // ]

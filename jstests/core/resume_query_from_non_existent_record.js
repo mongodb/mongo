@@ -5,7 +5,9 @@
  * of the test. However, $_requestResumeToken and a subsequent $_resumeAfter must be directed at the
  * same node, since they rely on a record id which is assigned internally by a given node.
  *
+ * The test runs commands that are not allowed with security token: killCursors.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   assumes_against_mongod_not_mongos,
  *   multiversion_incompatible,
  *   requires_non_retryable_writes,

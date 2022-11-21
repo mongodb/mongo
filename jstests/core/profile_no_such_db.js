@@ -1,4 +1,6 @@
-// @tags: [does_not_support_stepdowns, requires_profiling]
+// The test runs commands that are not allowed with security token: setProfilingLevel.
+// @tags: [
+//   not_allowed_with_security_token,does_not_support_stepdowns, requires_profiling]
 
 // Test that reading the profiling level doesn't create databases, but setting it does.
 (function(db) {

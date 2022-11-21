@@ -1,4 +1,6 @@
+// The test runs commands that are not allowed with security token: setProfilingLevel.
 // @tags: [
+//   not_allowed_with_security_token,
 //   requires_profiling,
 //   does_not_support_stepdowns,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.

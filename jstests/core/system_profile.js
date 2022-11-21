@@ -1,4 +1,7 @@
+// The test runs commands that are not allowed with security token: convertToCapped, mapReduce,
+// profile.
 // @tags: [
+//   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_capped,
 //   requires_collstats,

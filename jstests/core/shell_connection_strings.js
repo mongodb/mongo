@@ -1,5 +1,7 @@
 // Test mongo shell connect strings.
+// The test runs commands that are not allowed with security token: eval.
 // @tags: [
+//   not_allowed_with_security_token,
 //   uses_multiple_connections,
 //   docker_incompatible,
 // ]

@@ -1,5 +1,7 @@
 // Confirms that the number of profiled operations is consistent with the sampleRate, if set.
+// The test runs commands that are not allowed with security token: setProfilingLevel.
 // @tags: [
+//   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_fastcount,
 //   requires_profiling,

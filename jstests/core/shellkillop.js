@@ -1,3 +1,5 @@
+// The test runs commands that are not allowed with security token: killop.
+// @tags: [not_allowed_with_security_token]
 baseName = "jstests_shellkillop";
 
 // 'retry' should be set to true in contexts where an exception should cause the test to be retried
