@@ -97,7 +97,7 @@ thread than the thread calling `CollectionCatalog::write`.
 To avoid a bottleneck in the case the catalog contains a large number of collections (being slow to
 copy), concurrent writes are batched together. Any thread that enters `CollectionCatalog::write`
 while a catalog instance is being copied is enqueued. When the copy finishes, all enqueued write
-jobs are run on that catalog instance by the copying thread. 
+jobs are run on that catalog instance by the copying thread.
 
 ### Collection objects
 Objects of the `Collection` class provide access to a collection's properties between
@@ -137,7 +137,7 @@ shallowed copied. Notably, a shallow copy is made for the [`IndexCatalog`](#inde
 
 The oplog `Collection` follows special rules, it does not use [read-copy-update][] or any other form
 of synchronization. Modifications operate directly on the instance installed in the catalog. It is
-not allowed to read concurrently with writes on the oplog `Collection`. 
+not allowed to read concurrently with writes on the oplog `Collection`.
 
 Finally, there are two kinds of decorations on `Collection` objects. The `Collection` object derives
 from `DecorableCopyable` and requires `Decoration`s to implement a copy-constructor. Collection
@@ -434,7 +434,7 @@ In MongoDB, Resources are arranged in a hierarchy, in order to provide an orderi
 deadlocks when locking multiple Resources, and also as an implementation of Intent Locking (an
 optimization for locking higher level resources). The hierarchy of ResourceTypes is as follows:
 
-1. Global (three - see below) 
+1. Global (three - see below)
 1. Database (one per database on the server)
 1. Collection (one per collection on the server)
 
@@ -1077,7 +1077,7 @@ of.
     * The value used for the `incrementalBackup` option, which is used to determine whether to take
       an incremental backup.
     * The value used for the `blockSize` option, which allows the granularity to be specified when
-      tracking a range of files to be included in a backup. 
+      tracking a range of files to be included in a backup.
     * The value used for the `thisBackupName` option, which tags the backup being taken with that
       name.
     * The value used for the `srcBackupName` option, which is the backup name that is used as the
@@ -1101,8 +1101,8 @@ of.
 ### Copy Files While Sending Heartbeats
 To prevent MongoDB from releasing the backup cursor's resources while copying files and start
 overwriting data that was previously reserved for the backup, a `getMore` request must be sent at
-least once every 10 minutes. Sending a `getMore` request is how this algorithm does heartbeats. 
-While copying files, WiredTiger still accepts writes and persists data while a backup cursor is 
+least once every 10 minutes. Sending a `getMore` request is how this algorithm does heartbeats.
+While copying files, WiredTiger still accepts writes and persists data while a backup cursor is
 open. This means the files being copied can be getting changed while the copy is happening. Thus,
 the first important property of backup cursors is that WiredTiger will never change the bytes in a
 file that is important to the backup. The second property is the number of bytes to copy can be

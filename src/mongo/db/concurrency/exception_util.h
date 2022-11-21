@@ -48,6 +48,25 @@ extern FailPoint skipWriteConflictRetries;
  */
 void logWriteConflictAndBackoff(int attempt, StringData operation, StringData ns);
 
+void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
+                                                int* writeConflictAttempts,
+                                                StringData opStr,
+                                                StringData ns,
+                                                const TransactionTooLargeForCacheException& e);
+
+/**
+ * A `TransactionTooLargeForCache` is thrown if it has been determined that it is unlikely to
+ * ever complete the operation because the configured cache is insufficient to hold all the
+ * transaction state. This helps to avoid retrying, maybe indefinitely, a transaction which would
+ * never be able to complete.
+ */
+[[noreturn]] inline void throwTransactionTooLargeForCache(StringData context) {
+    iasserted({ErrorCodes::TransactionTooLargeForCache, context});
+}
+
+extern Counter64 transactionTooLargeForCacheErrors;
+extern Counter64 transactionTooLargeForCacheErrorsConvertedToWriteConflict;
+
 /**
  * Runs the argument function f as many times as needed for f to complete or throw an exception
  * other than WriteConflictException.  For each time f throws a WriteConflictException, logs the
@@ -73,14 +92,27 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
         return f();
     }
 
-    int attempts = 0;
+    int writeConflictAttempts = 0;
     while (true) {
         try {
             return f();
         } catch (WriteConflictException const&) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-            logWriteConflictAndBackoff(attempts, opStr, ns);
-            ++attempts;
+            logWriteConflictAndBackoff(writeConflictAttempts, opStr, ns);
+            ++writeConflictAttempts;
+            opCtx->recoveryUnit()->abandonSnapshot();
+        } catch (TransactionTooLargeForCacheException const& e) {
+            transactionTooLargeForCacheErrors.increment(1);
+            if (opCtx->writesAreReplicated()) {
+                // Surface error on primaries.
+                throw e;
+            }
+            // If an operation succeeds on primary, it should always be retried on secondaries.
+            transactionTooLargeForCacheErrorsConvertedToWriteConflict.increment(1);
+            // Handle as write conflict.
+            CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+            logWriteConflictAndBackoff(writeConflictAttempts, opStr, ns);
+            ++writeConflictAttempts;
             opCtx->recoveryUnit()->abandonSnapshot();
         }
     }

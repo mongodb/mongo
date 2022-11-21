@@ -153,6 +153,19 @@ public:
 };
 
 /**
+ * Use `throwTransactionTooLargeForCache()` instead of throwing
+ * `TransactionTooLargeForCache` directly.
+ */
+class TransactionTooLargeForCacheException final : public DBException {
+public:
+    TransactionTooLargeForCacheException(const Status& status) : DBException(status) {}
+
+private:
+    void defineOnlyInFinalSubclassToPreventSlicing() final {}
+};
+
+
+/**
  * The base class of all DBExceptions for codes of the given ErrorCategory to allow catching by
  * category.
  */
@@ -210,6 +223,11 @@ struct ExceptionForDispatcher<code, CategoryList<categories...>> {
 template <>
 struct ExceptionForDispatcher<ErrorCodes::WriteConflict> {
     using type = WriteConflictException;
+};
+
+template <>
+struct ExceptionForDispatcher<ErrorCodes::TransactionTooLargeForCache> {
+    using type = TransactionTooLargeForCacheException;
 };
 
 }  // namespace error_details

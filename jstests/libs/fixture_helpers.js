@@ -166,6 +166,13 @@ var FixtureHelpers = (function() {
     }
 
     /**
+     * Returns a collection of connections to each primary in a cluster.
+     */
+    function getPrimaries(db) {
+        return _getAllReplicas(db).map((replSet) => replSet.getPrimary());
+    }
+
+    /**
      * Returns true if we have a replica set.
      */
     function isReplSet(db) {
@@ -184,6 +191,7 @@ var FixtureHelpers = (function() {
         runCommandOnAllShards: runCommandOnAllShards,
         runCommandOnEachPrimary: runCommandOnEachPrimary,
         getPrimaryForNodeHostingDatabase: getPrimaryForNodeHostingDatabase,
+        getPrimaries: getPrimaries,
         isReplSet: isReplSet,
     };
 })();

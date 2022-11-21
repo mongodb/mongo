@@ -4352,7 +4352,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core --storageEngine=wiredTiger --fuzzMongodConfigs
+      resmoke_args: --suites=core --storageEngine=wiredTiger --fuzzMongodConfigs --excludeWithAnyTags=does_not_support_config_fuzzer
 
 - <<: *task_template
   name: config_fuzzer_concurrency
@@ -4361,7 +4361,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency --storageEngine=wiredTiger --fuzzMongodConfigs
+      resmoke_args: --suites=concurrency --storageEngine=wiredTiger --fuzzMongodConfigs --excludeWithAnyTags=does_not_support_config_fuzzer
 
 - <<: *task_template
   name: config_fuzzer_concurrency_replication
@@ -4370,7 +4370,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_replication --storageEngine=wiredTiger --fuzzMongodConfigs
+      resmoke_args: --suites=concurrency_replication --storageEngine=wiredTiger --fuzzMongodConfigs --excludeWithAnyTags=does_not_support_config_fuzzer
 
 - <<: *task_template
   name: config_fuzzer_replica_sets_jscore_passthrough
@@ -4379,7 +4379,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=replica_sets_jscore_passthrough --storageEngine=wiredTiger --fuzzMongodConfigs
+      resmoke_args: --suites=replica_sets_jscore_passthrough --storageEngine=wiredTiger --fuzzMongodConfigs --excludeWithAnyTags=does_not_support_config_fuzzer
 
 - <<: *task_template
   name: jsCore_ese

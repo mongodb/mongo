@@ -35,6 +35,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log_and_backoff.h"
 
@@ -51,5 +52,13 @@ void logWriteConflictAndBackoff(int attempt, StringData operation, StringData ns
                   "operation"_attr = operation,
                   logAttrs(NamespaceString(ns)));
 }
+
+Counter64 transactionTooLargeForCacheErrors;
+Counter64 transactionTooLargeForCacheErrorsConvertedToWriteConflict;
+ServerStatusMetricField<Counter64> displayTransactionTooLargeForCacheErrors(
+    "operation.transactionTooLargeForCacheErrors", &transactionTooLargeForCacheErrors);
+ServerStatusMetricField<Counter64> displayTransactionTooLargeForCacheErrorsConvertedToWriteConflict(
+    "operation.transactionTooLargeForCacheErrorsConvertedToWriteConflict",
+    &transactionTooLargeForCacheErrorsConvertedToWriteConflict);
 
 }  // namespace mongo
