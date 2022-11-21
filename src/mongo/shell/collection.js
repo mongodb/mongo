@@ -533,8 +533,8 @@ DBCollection.prototype.save = function(obj, opts) {
     if (obj == null)
         throw Error("can't save a null");
 
-    if (typeof (obj) == "number" || typeof (obj) == "string")
-        throw Error("can't save a number or string");
+    if (typeof (obj) == "number" || typeof (obj) == "string" || Array.isArray(obj))
+        throw Error("can't save a number, a string or an array");
 
     if (typeof (obj._id) == "undefined") {
         obj._id = new ObjectId();
