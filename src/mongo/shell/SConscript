@@ -148,34 +148,33 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="kms_idl",
-    source=[
-        "kms.idl",
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
-
 if get_option('ssl') == 'on':
     kmsEnv = env.Clone()
+
+    kmsEnv.InjectThirdParty(libraries=['kms-message'])
 
     kmsEnv.Library(
         target="kms",
         source=[
             "kms.cpp",
+            "kms_aws.cpp",
+            "kms_azure.cpp",
+            "kms_gcp.cpp",
             "kms_local.cpp",
+            "kms_network.cpp",
+            "kms.idl",
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base/secure_allocator',
-            'kms_idl',
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/crypto/aead_encryption',
             '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+            '$BUILD_DIR/mongo/util/net/network',
+            '$BUILD_DIR/mongo/util/net/ssl_manager',
+            '$BUILD_DIR/mongo/util/net/ssl_options',
+            '$BUILD_DIR/third_party/shim_kms_message',
         ],
     )
 
@@ -206,6 +205,7 @@ if get_option('ssl') == 'on':
             target="encrypted_dbclient",
             source=[
                 "encrypted_dbclient_base.cpp",
+                "fle_shell_options.idl",
             ],
             LIBDEPS_PRIVATE=[
                 '$BUILD_DIR/mongo/client/clientdriver_minimal',

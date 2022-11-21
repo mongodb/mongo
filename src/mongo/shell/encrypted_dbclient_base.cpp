@@ -58,12 +58,15 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/shell/encrypted_shell_options.h"
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+
+EncryptedShellGlobalParams encryptedShellGlobalParams;
 
 namespace {
 constexpr Duration kCacheInvalidationTime = Minutes(1);
@@ -804,7 +807,7 @@ std::unique_ptr<DBClientBase> createEncryptedDBClientBase(std::unique_ptr<DBClie
 
     static constexpr auto keyVaultClientFieldId = "keyVaultClient";
 
-    if (!arg.isObject()) {
+    if (!arg.isObject() && encryptedShellGlobalParams.awsAccessKeyId.empty()) {
         return conn;
     }
 
@@ -812,7 +815,32 @@ std::unique_ptr<DBClientBase> createEncryptedDBClientBase(std::unique_ptr<DBClie
     JS::RootedValue client(cx);
     JS::RootedValue collection(cx);
 
-    {
+    if (!arg.isObject()) {
+        // If arg is not an object, but one of the required encryptedShellGlobalParams
+        // is defined, the user is trying to start an encrypted client with command line
+        // parameters.
+
+        AwsKMS awsKms = AwsKMS(encryptedShellGlobalParams.awsAccessKeyId,
+                               encryptedShellGlobalParams.awsSecretAccessKey);
+
+        awsKms.setUrl(StringData(encryptedShellGlobalParams.awsKmsURL));
+
+        awsKms.setSessionToken(StringData(encryptedShellGlobalParams.awsSessionToken));
+
+        KmsProviders kmsProviders;
+        kmsProviders.setAws(awsKms);
+
+        // The mongoConnection object will never be null.
+        // If the encrypted shell is started through command line parameters, then the user must
+        // default to the implicit connection for the keyvault collection.
+        client.setObjectOrNull(mongoConnection.get());
+
+        // Because we cannot add a schemaMap object through the command line, we set the
+        // schemaMap object in ClientSideFLEOptions to be null so we know to always use
+        // remote schemas.
+        encryptionOptions = ClientSideFLEOptions(encryptedShellGlobalParams.keyVaultNamespace,
+                                                 std::move(kmsProviders));
+    } else {
         uassert(ErrorCodes::BadValue,
                 "Collection object must be passed to Field Level Encryption Options",
                 arg.isObject());

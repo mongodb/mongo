@@ -37,7 +37,6 @@
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/crypto/symmetric_key.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
@@ -85,8 +84,6 @@ public:
      * needs to be store in the key vault.
      */
     virtual BSONObj encryptDataKeyByBSONObj(ConstDataRange cdr, BSONObj keyId);
-
-    virtual SymmetricKey& getMasterKey() = 0;
 };
 
 /**
@@ -133,5 +130,12 @@ public:
 private:
     static stdx::unordered_map<KMSProviderEnum, std::unique_ptr<KMSServiceFactory>> _factories;
 };
+
+/**
+ * Parse a basic url of "https://host:port" to a HostAndPort.
+ *
+ * Does not support URL encoding or anything else.
+ */
+HostAndPort parseUrl(StringData url);
 
 }  // namespace mongo

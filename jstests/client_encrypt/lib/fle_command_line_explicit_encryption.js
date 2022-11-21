@@ -3,8 +3,13 @@
  * jstests/fle/fle_command_line_encryption.js.
  */
 
+load("jstests/client_encrypt/lib/mock_kms.js");
+
 (function() {
 "use strict";
+
+const mock_kms = new MockKMSServerAWS();
+mock_kms.start();
 
 const shell = Mongo();
 const keyVault = shell.getKeyVault();
@@ -46,7 +51,7 @@ const failTestCases = [null, undefined, MinKey(), MaxKey(), DBRef("test", "test"
 for (const encryptionAlgorithm of encryptionAlgorithms) {
     collection.drop();
 
-    keyVault.createKey("local", ['mongoKey']);
+    keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']);
     const keyId = keyVault.getKeyByAltName("mongoKey").toArray()[0]._id;
 
     let pass;
@@ -73,5 +78,6 @@ for (const encryptionAlgorithm of encryptionAlgorithms) {
     }
 }
 
+mock_kms.stop();
 print("Test completed with no errors.");
 }());

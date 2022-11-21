@@ -1,10 +1,14 @@
 /**
  * Check the functionality of encrypt and decrypt functions in KeyStore.js
  */
+load("jstests/client_encrypt/lib/mock_kms.js");
 load('jstests/ssl/libs/ssl_helpers.js');
 
 (function() {
 "use strict";
+
+const mock_kms = new MockKMSServerAWS();
+mock_kms.start();
 
 const x509_options = {
     sslMode: "requireSSL",
@@ -16,6 +20,12 @@ const conn = MongoRunner.runMongod(x509_options);
 const test = conn.getDB("test");
 const collection = test.coll;
 
+const awsKMS = {
+    accessKeyId: "access",
+    secretAccessKey: "secret",
+    url: mock_kms.getURL(),
+};
+
 let localKMS = {
     key: BinData(
         0,
@@ -24,13 +34,14 @@ let localKMS = {
 
 const clientSideFLEOptions = {
     kmsProviders: {
+        aws: awsKMS,
         local: localKMS,
     },
     keyVaultNamespace: "test.coll",
     schemaMap: {}
 };
 
-const kmsTypes = ["local"];
+const kmsTypes = ["aws", "local"];
 
 const randomAlgorithm = "AEAD_AES_256_CBC_HMAC_SHA_512-Random";
 const deterministicAlgorithm = "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic";
@@ -113,4 +124,5 @@ for (const kmsType of kmsTypes) {
 }
 
 MongoRunner.stopMongod(conn);
+mock_kms.stop();
 }());

@@ -1394,6 +1394,15 @@ functions:
       args:
       - "./src/evergreen/jepsen_test_fail.sh"
 
+  "load aws test credentials":
+  - *f_expansions_write
+  - command: subprocess.exec
+    params:
+      binary: bash
+      silent: true
+      args:
+      - "./src/evergreen/functions/aws_test_credentials_load.sh"
+
   "setup jstestfuzz":
   - *f_expansions_write
   - command: subprocess.exec
@@ -6458,6 +6467,7 @@ tasks:
   tags: ["encrypt", "patch_build"]
   commands:
   - func: "do setup"
+  - func: "load aws test credentials"
   - func: "run tests"
     vars:
       resmoke_jobs_max: 1
@@ -6467,6 +6477,7 @@ tasks:
   tags: ["encrypt", "patch_build"]
   commands:
   - func: "do setup"
+  - func: "load aws test credentials"
   - func: "run tests"
 
 - <<: *task_template

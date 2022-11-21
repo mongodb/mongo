@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <kms_message/kms_message.h>
+
 #include <stdlib.h>
 
 #include "mongo/base/init.h"
@@ -61,10 +63,6 @@ public:
     SecureVector<uint8_t> decrypt(ConstDataRange cdr, BSONObj masterKey) final;
 
     BSONObj encryptDataKeyByString(ConstDataRange cdr, StringData keyId) final;
-
-    SymmetricKey& getMasterKey() final {
-        return _key;
-    }
 
 private:
     std::vector<uint8_t> encrypt(ConstDataRange cdr, StringData kmsKeyId);

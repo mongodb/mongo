@@ -37,6 +37,20 @@
 
 namespace mongo {
 
+HostAndPort parseUrl(StringData url) {
+    // Treat the URL as a host and port
+    // URL: https://(host):(port)
+    //
+    constexpr StringData urlPrefix = "https://"_sd;
+    uassert(51140,
+            str::stream() << "KMS URL must start with https://, URL: " << url,
+            url.startsWith(urlPrefix));
+
+    StringData hostAndPort = url.substr(urlPrefix.size());
+
+    return HostAndPort(hostAndPort);
+}
+
 BSONObj KMSService::encryptDataKeyByString(ConstDataRange cdr, StringData keyId) {
     uasserted(5380101,
               str::stream() << "Customer Master Keys for " << name()
