@@ -38,12 +38,14 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/util/exit.h"
@@ -180,6 +182,35 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 }
 
                 break;
+            }
+        } else {
+
+            // If the targetStatus value is true, then we have detected an updateOne/deleteOne
+            // request without a shard key or _id. We will use a two phase protocol to apply the
+            // write.
+            if (feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+                    serverGlobalParams.featureCompatibility) &&
+                targetStatus.getValue()) {
+                const auto currentWriteIndex =
+                    childBatches.begin()->second->getWrites()[0]->writeOpRef.first;
+
+                // Extract the current write from the batch and construct a command object with the
+                // write by itself.
+                BSONObj cmdObj = [&] {
+                    if (clientRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+                        auto updateInBatch =
+                            clientRequest.getUpdateRequest().getUpdates().at(currentWriteIndex);
+                        write_ops::UpdateCommandRequest updateRequest(clientRequest.getNS(),
+                                                                      {updateInBatch});
+                        return updateRequest.toBSON({}).getOwned();
+                    } else {
+                        auto deleteInBatch =
+                            clientRequest.getDeleteRequest().getDeletes().at(currentWriteIndex);
+                        write_ops::DeleteCommandRequest deleteRequest(clientRequest.getNS(),
+                                                                      {deleteInBatch});
+                        return deleteRequest.toBSON({}).getOwned();
+                    }
+                }();
             }
         }
 
