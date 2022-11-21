@@ -2352,6 +2352,7 @@ tasks:
     patch_only: true
     depends_on:
     - name: compile
+    run_on: ubuntu2004-medium
     commands:
       - func: "fetch artifacts"
       - func: "unit test"
