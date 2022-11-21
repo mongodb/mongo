@@ -63,3 +63,18 @@ server_parameters:
         default: 1000
         validator:
           gte: 0
+
+    transactionTooLargeForCacheThreshold:
+        description: "Threshold on the proportion of total dirty cache bytes that the running
+                      transaction's dirty cache bytes can represent and still be considered
+                      fullfillable on retry. If this threshold is exceeded, a
+                      TransactionTooLargeForCache exception is thrown. Setting this parameter to 1.0
+                      causes this check to be disabled, and TransactionTooLargeForCache exceptions
+                      will not be thrown."
+        set_at: [ startup, runtime ]
+        cpp_varname: 'gTransactionTooLargeForCacheThreshold'
+        cpp_vartype: AtomicWord<double>
+        default: 0.75
+        validator:
+          gte: 0.0
+          lte: 1.0

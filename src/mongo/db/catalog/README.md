@@ -432,6 +432,30 @@ See
 [wtRcToStatus](https://github.com/mongodb/mongo/blob/c799851554dc01493d35b43701416e9c78b3665c/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L178-L183)
 where we throw the exception in WiredTiger.
 See [TemporarilyUnavailableException](https://github.com/mongodb/mongo/blob/c799851554dc01493d35b43701416e9c78b3665c/src/mongo/db/concurrency/temporarily_unavailable_exception.h#L39-L45).
+
+## TransactionTooLargeForCacheException
+
+A TransactionTooLargeForCacheException may be thrown inside the server to indicate that an operation
+was rolled-back and is unlikely to ever complete because the storage engine cache is insufficient,
+even in the absence of concurrent operations. This is determined by a simple heuristic wherein,
+after a rollback, a threshold on the proportion of total dirty cache bytes the running transaction
+can represent and still be considered fullfillable is checked. The threshold can be tuned with the
+`transactionTooLargeForCacheThreshold` parameter. Setting this threshold to its maximum value (1.0)
+causes the check to be skipped and TransactionTooLargeForCacheException to be disabled.
+
+On replica sets, if an operation succeeds on a primary, it should also succeed on a secondary. It
+would be possible to convert to both TemporarilyUnavailableException and WriteConflictException,
+as if TransactionTooLargeForCacheException was disabled. But on secondaries the only
+difference between the two is the rate at which the operation is retried. Hence,
+TransactionTooLargeForCacheException is always converted to a WriteConflictException, which retries
+faster, to avoid stalling replication longer than necessary.
+
+Prior to 6.3, or when TransactionTooLargeForCacheException is disabled, multi-document
+transactions always return a WriteConflictException, which may result in drivers retrying  an
+operation indefinitely. For non-multi-document operations, there is a limited number of retries on
+TemporarilyUnavailableException, but it might still be beneficial to not retry operations which are
+unlikely to complete and are disruptive for concurrent operations.
+
 ## Collection and Index Writes
 
 Collection write operations (inserts, updates, and deletes) perform storage engine writes to both
