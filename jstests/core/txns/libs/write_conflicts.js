@@ -1,7 +1,9 @@
 /**
  * Helper functions for testing write conflicts between concurrent, multi-document transactions.
  *
- * @tags: [uses_transactions]
+ * The test runs commands that are not allowed with security token: killSessions.
+ * @tags: [
+ *   not_allowed_with_security_token,uses_transactions]
  *
  */
 var WriteConflictHelpers = (function() {

@@ -1,5 +1,7 @@
 // Test profiling for commands in multi-document transactions.
+// The test runs commands that are not allowed with security token: endSession, setProfilingLevel.
 // @tags: [
+//   not_allowed_with_security_token,
 //   uses_transactions,
 // ]
 (function() {

@@ -2,7 +2,9 @@
  * Tests that timestamped reads, reads with snapshot and afterClusterTime, wait for the prepare
  * transaction oplog entry to be visible before choosing a read timestamp.
  *
+ * The test runs commands that are not allowed with security token: prepareTransaction.
  * @tags: [
+ *  not_allowed_with_security_token,
  *  uses_transactions,
  *  uses_prepare_transaction,
  *  uses_parallel_shell,

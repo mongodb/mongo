@@ -2,7 +2,9 @@
  * Tests that other than insertions, it is illegal to modify config.transactions while the session
  * has a prepared transaction.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * The test runs commands that are not allowed with security token: endSession, prepareTransaction.
+ * @tags: [
+ *   not_allowed_with_security_token,uses_transactions, uses_prepare_transaction]
  */
 
 (function() {

@@ -1,6 +1,8 @@
 /**
  * Tests the validateDBMetaData commands with various input parameters.
+ * The test runs commands that are not allowed with security token: validateDBMetadata.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   no_selinux,
  * ]
  */

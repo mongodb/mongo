@@ -1,4 +1,6 @@
+// The test runs commands that are not allowed with security token: createUser, updateUser.
 // @tags: [
+//   not_allowed_with_security_token,
 //   assumes_superuser_permissions,
 //   assumes_write_concern_unchanged,
 //   requires_auth,

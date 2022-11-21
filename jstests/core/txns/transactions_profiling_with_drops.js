@@ -1,5 +1,7 @@
 // Tests that locks acquisitions for profiling in a transaction have a 0-second timeout.
-// @tags: [uses_transactions, uses_parallel_shell]
+// The test runs commands that are not allowed with security token: endSession, killOp, profile.
+// @tags: [
+//   not_allowed_with_security_token,uses_transactions, uses_parallel_shell]
 (function() {
 "use strict";
 

@@ -1,4 +1,6 @@
-// @tags: [uses_transactions, uses_snapshot_read_concern]
+// The test runs commands that are not allowed with security token: endSession.
+// @tags: [
+//   not_allowed_with_security_token,uses_transactions, uses_snapshot_read_concern]
 // This test ensures that listCollections does not conflict with multi-statement transactions
 // as a result of taking MODE_S locks that are incompatible with MODE_IX needed for writes.
 (function() {

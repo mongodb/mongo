@@ -2,7 +2,9 @@
  * Checks that commands included/omitted in API V1 behave correctly with various combinations of API
  * parameters.
  *
+ * The test runs commands that are not allowed with security token: createUser, dropUser.
  * @tags: [
+ *   not_allowed_with_security_token,
  *   requires_non_retryable_commands,
  *   uses_api_parameters,
  * ]

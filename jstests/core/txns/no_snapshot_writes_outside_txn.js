@@ -1,7 +1,9 @@
 /**
  * Verify that readConcern: snapshot is not permitted for writes outside transactions.
  *
- * @tags: [requires_persistence, uses_transactions]
+ * The test runs commands that are not allowed with security token: endSession.
+ * @tags: [
+ *   not_allowed_with_security_token,requires_persistence, uses_transactions]
  */
 
 (function() {

@@ -1,7 +1,9 @@
 // Test that no matter the readConcern specified on a multi-statement transaction, it has snapshot
 // isolation. Also test that readConcern linearizable and available are not allowed with a
 // transaction.
-// @tags: [uses_transactions, requires_majority_read_concern]
+// The test runs commands that are not allowed with security token: endSession.
+// @tags: [
+//   not_allowed_with_security_token,uses_transactions, requires_majority_read_concern]
 (function() {
 "use strict";
 

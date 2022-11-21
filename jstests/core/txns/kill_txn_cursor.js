@@ -1,5 +1,7 @@
 // Tests that killing a cursor created in a transaction does not abort the transaction.
-// @tags: [uses_transactions]
+// The test runs commands that are not allowed with security token: endSession, killCursors.
+// @tags: [
+//   not_allowed_with_security_token,uses_transactions]
 (function() {
 "use strict";
 
