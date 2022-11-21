@@ -28,6 +28,7 @@ struct __wt_process {
     bool use_epochtime;    /* use expensive time */
 
     bool fast_truncate_2022; /* fast-truncate fix run-time configuration */
+    bool page_stats_2022;    /* Page stats run-time configuration */
 
     WT_CACHE_POOL *cache_pool; /* shared cache information */
 
