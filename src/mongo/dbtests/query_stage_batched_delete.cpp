@@ -82,10 +82,14 @@ public:
 class QueryStageBatchedDeleteTest : public unittest::Test {
 public:
     QueryStageBatchedDeleteTest() : _client(&_opCtx) {
-        auto tickSource = std::make_unique<TickSourceMock<Milliseconds>>();
-        tickSource->reset(1);
-        _tickSource = tickSource.get();
-        _opCtx.getServiceContext()->setTickSource(std::move(tickSource));
+        // Avoid churning the ticket source on the service context which is shared
+        // with background jobs such as the checkpoint thread.
+        if (!_tickSource) {
+            auto tickSource = std::make_unique<TickSourceMock<Milliseconds>>();
+            _tickSource = tickSource.get();
+            _opCtx.getServiceContext()->setTickSource(std::move(tickSource));
+        }
+        _tickSource->reset(1);
         std::unique_ptr<ClockAdvancingOpObserver> opObserverUniquePtr =
             std::make_unique<ClockAdvancingOpObserver>();
         opObserverUniquePtr->tickSource = _tickSource;
@@ -224,11 +228,14 @@ protected:
     boost::intrusive_ptr<ExpressionContext> _expCtx =
         make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
     ClockAdvancingOpObserver* _opObserver;
-    TickSourceMock<Milliseconds>* _tickSource;
+    static TickSourceMock<Milliseconds>* _tickSource;
 
 private:
     DBDirectClient _client;
 };
+
+// static
+TickSourceMock<Milliseconds>* QueryStageBatchedDeleteTest::_tickSource = nullptr;
 
 // Confirms batched deletes wait until a batch meets the targetBatchDocs before deleting documents.
 TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchDocsBasic) {
