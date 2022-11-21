@@ -192,7 +192,6 @@ private:
         return lg;
     }
 
-    // TODO SERVER-67642 implement fine-grained per-collection locking
     // Protecting the access to all class members (DO NOT USE DIRECTLY: rely on
     // `_acquireMutexUnconditionally` and `_acquireMutexFailIfServiceNotUp`)
     Mutex _mutex_DO_NOT_USE_DIRECTLY = MONGO_MAKE_LATCH("RangeDeleterService::_mutex");
