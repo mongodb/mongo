@@ -184,11 +184,15 @@ public:
                 std::shared_ptr<Collection>& collection =
                     catalog._pendingCommitNamespaces[entry.nss];
 
-                if (!entry.collection)
-                    continue;
-
                 collection = entry.collection;
-                catalog._pendingCommitUUIDs[collection->uuid()] = collection;
+                if (collection) {
+                    // If we have a collection instance for this entry also mark the uuid as pending
+                    catalog._pendingCommitUUIDs[collection->uuid()] = collection;
+                } else if (entry.externalUUID) {
+                    // Drops do not have a collection instance but set their UUID in the entry. Mark
+                    // it as pending with no collection instance.
+                    catalog._pendingCommitUUIDs[*entry.externalUUID] = nullptr;
+                }
             }
         });
     }
@@ -1655,6 +1659,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     _orderedCollections.erase(dbIdPair);
     _collections.erase(ns);
     _catalog.erase(uuid);
+    _pendingCommitNamespaces.erase(ns);
+    _pendingCommitUUIDs.erase(uuid);
 
     // Push drop unless this is a rollback of a create
     if (coll->isCommitted()) {
