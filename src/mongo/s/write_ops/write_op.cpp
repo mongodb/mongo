@@ -53,24 +53,56 @@ bool errorsAllSame(const std::vector<ChildWriteOp const*>& errOps) {
     return false;
 }
 
+bool hasOnlyOneNonRetryableError(const std::vector<ChildWriteOp const*>& errOps) {
+    return std::count_if(errOps.begin(), errOps.end(), [](ChildWriteOp const* errOp) {
+               return !isRetryErrCode(errOp->error->getStatus().code());
+           }) == 1;
+}
+
+bool hasAnyNonRetryableError(const std::vector<ChildWriteOp const*>& errOps) {
+    return std::count_if(errOps.begin(), errOps.end(), [](ChildWriteOp const* errOp) {
+               return !isRetryErrCode(errOp->error->getStatus().code());
+           }) > 0;
+}
+
+write_ops::WriteError getFirstNonRetryableError(const std::vector<ChildWriteOp const*>& errOps) {
+    auto nonRetryableErr =
+        std::find_if(errOps.begin(), errOps.end(), [](ChildWriteOp const* errOp) {
+            return !isRetryErrCode(errOp->error->getStatus().code());
+        });
+
+    dassert(nonRetryableErr != errOps.end());
+
+    return *(*nonRetryableErr)->error;
+}
+
 // Aggregate a bunch of errors for a single op together
 write_ops::WriteError combineOpErrors(const std::vector<ChildWriteOp const*>& errOps) {
-    // Special case single response or all errors are the same
+    // Special case single response, all errors are the same, or a single non-retryable error
     if (errOps.size() == 1 || errorsAllSame(errOps)) {
         return *errOps.front()->error;
+    } else if (hasOnlyOneNonRetryableError(errOps)) {
+        return getFirstNonRetryableError(errOps);
     }
+
+    bool skipRetryableErrors = hasAnyNonRetryableError(errOps);
 
     // Generate the multi-error message below
     std::stringstream msg("multiple errors for op : ");
 
+    bool firstError = true;
     BSONArrayBuilder errB;
     for (std::vector<ChildWriteOp const*>::const_iterator it = errOps.begin(); it != errOps.end();
          ++it) {
         const ChildWriteOp* errOp = *it;
-        if (it != errOps.begin())
-            msg << " :: and :: ";
-        msg << errOp->error->getStatus().reason();
-        errB.append(errOp->error->serialize());
+        if (!skipRetryableErrors || !isRetryErrCode(errOp->error->getStatus().code())) {
+            if (firstError) {
+                msg << " :: and :: ";
+                firstError = false;
+            }
+            msg << errOp->error->getStatus().reason();
+            errB.append(errOp->error->serialize());
+        }
     }
 
     return write_ops::WriteError(errOps.front()->error->getIndex(),
