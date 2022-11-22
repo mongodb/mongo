@@ -93,12 +93,14 @@ bmEnv.Library(
     target='benchmark_main',
     source=[
         'benchmark_main.cpp',
+        'benchmark_options.idl',
     ],
     LIBDEPS=[
         # benchmark_main must not be made to depend on additional libraries.
         # Additional requirements should be handled by the benchmark itself.
         # Examples can be found in fail_point_bm and commands_bm. See SERVER-60691.
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/third_party/shim_benchmark',
     ],
     AIB_COMPONENT='benchmarks',
