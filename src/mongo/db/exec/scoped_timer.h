@@ -59,6 +59,6 @@ private:
     ClockSource* _clockSource = nullptr;
 
     Date_t _startCS;
-    TickSource::Tick _startTS;
+    TickSource::Tick _startTS = 0;
 };
 }  // namespace mongo
