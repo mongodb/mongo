@@ -113,7 +113,7 @@ public:
             auto parsedInfoFromRequest = [&] {
                 const auto commandName = request().getWriteCmd().firstElementFieldNameStringData();
                 BSONObjBuilder bob(request().getWriteCmd());
-                bob.append("$db", ns().dbName().toString());
+                bob.appendElementsUnique(BSON("$db" << ns().dbName().toString()));
                 auto writeCmdObj = bob.obj();
                 BSONObj query;
                 BSONObj collation;

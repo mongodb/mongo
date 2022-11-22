@@ -68,6 +68,15 @@ function isOwnedBySecondaryShard(doc) {
     return isOwnedByShard(secondaryShard, doc);
 }
 
+function isUpdateOneWithoutShardKeyDisabled(conn) {
+    return !(jsTestOptions().mongosBinVersion !== "last-lts" &&
+             jsTestOptions().mongosBinVersion !== "last-continuous" &&
+             assert
+                 .commandWorked(
+                     conn.adminCommand({getParameter: 1, featureFlagUpdateOneWithoutShardKey: 1}))
+                 .featureFlagUpdateOneWithoutShardKey.value);
+}
+
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 st.ensurePrimaryShard(kDbName, primaryShard);
 
@@ -170,13 +179,15 @@ assert.writeErrorWithCode(
     mongos.getCollection(kNsName).update({b: 1}, {$set: {c: 2}}, {upsert: true}),
     ErrorCodes.ShardKeyNotFound);
 
-// Find and modify will not treat missing shard key values as null and require the full shard key to
+// If updateOneWithoutShardKeyFeatureFlag is disabled, findAndModify requires the full shard key to
 // be specified.
-assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
-assert.commandFailedWithCode(
-    sessionDB.runCommand(
-        {findAndModify: kCollName, query: {a: 1}, update: {$set: {updated: true}}}),
-    ErrorCodes.ShardKeyNotFound);
+if (isUpdateOneWithoutShardKeyDisabled(st.s)) {
+    assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
+    assert.commandFailedWithCode(
+        sessionDB.runCommand(
+            {findAndModify: kCollName, query: {a: 1}, update: {$set: {updated: true}}}),
+        ErrorCodes.ShardKeyNotFound);
+}
 
 st.stop();
 })();

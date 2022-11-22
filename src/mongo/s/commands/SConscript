@@ -155,6 +155,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
         '$BUILD_DIR/mongo/s/sharding_api',
         '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/mongo/s/write_ops/write_without_shard_key_util',
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         'cluster_commands_common',

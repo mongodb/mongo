@@ -59,11 +59,13 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
+#include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -500,27 +502,37 @@ public:
         const auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
         if (cm.isSharded()) {
             const BSONObj query = cmdObjForShard.getObjectField("query");
-            const BSONObj collation = getCollation(cmdObjForShard);
-            const auto let = getLet(cmdObjForShard);
-            const auto rc = getLegacyRuntimeConstants(cmdObjForShard);
-            const BSONObj shardKey =
-                getShardKey(opCtx, cm, nss, query, collation, boost::none, let, rc);
 
-            // For now, set bypassIsFieldHashedCheck to be true in order to skip the
-            // isFieldHashedCheck in the special case where _id is hashed and used as the shard key.
-            // This means that we always assume that a findAndModify request using _id is targetable
-            // to a single shard.
-            auto chunk = cm.findIntersectingChunk(shardKey, collation, true);
-            ChunkVersion placementVersion = cm.getVersion(chunk.getShardId());
-            _runCommand(
-                opCtx,
-                chunk.getShardId(),
-                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)),
-                boost::none,
-                nss,
-                applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                false /* isExplain */,
-                &result);
+            if (write_without_shard_key::useTwoPhaseProtocol(
+                    opCtx, nss, false /* isUpdateOrDelete */, query)) {
+                _runCommandWithoutShardKey(opCtx,
+                                           boost::none /* dbVersion */,
+                                           nss,
+                                           applyReadWriteConcern(opCtx, this, cmdObjForShard),
+                                           &result);
+            } else {
+                const BSONObj collation = getCollation(cmdObjForShard);
+                const auto let = getLet(cmdObjForShard);
+                const auto rc = getLegacyRuntimeConstants(cmdObjForShard);
+                const BSONObj shardKey =
+                    getShardKey(opCtx, cm, nss, query, collation, boost::none, let, rc);
+
+                // For now, set bypassIsFieldHashedCheck to be true in order to skip the
+                // isFieldHashedCheck in the special case where _id is hashed and used as the shard
+                // key. This means that we always assume that a findAndModify request using _id is
+                // targetable to a single shard.
+                auto chunk = cm.findIntersectingChunk(shardKey, collation, true);
+                ChunkVersion placementVersion = cm.getVersion(chunk.getShardId());
+                _runCommand(
+                    opCtx,
+                    chunk.getShardId(),
+                    ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)),
+                    boost::none,
+                    nss,
+                    applyReadWriteConcern(opCtx, this, cmdObjForShard),
+                    false /* isExplain */,
+                    &result);
+            }
         } else {
             _runCommand(opCtx,
                         cm.dbPrimary(),
@@ -547,53 +559,20 @@ private:
             req.getEncryptionInformation()->getCrudProcessed().get_value_or(false);
     }
 
-    static void _runCommand(OperationContext* opCtx,
-                            const ShardId& shardId,
-                            const boost::optional<ShardVersion>& shardVersion,
-                            const boost::optional<DatabaseVersion>& dbVersion,
-                            const NamespaceString& nss,
-                            const BSONObj& cmdObj,
-                            bool isExplain,
-                            BSONObjBuilder* result) {
+    // Catches errors in the given response, and reruns the command if necessary. Uses the given
+    // response to construct the findAndModify command result passed to the client.
+    static void _contructResult(OperationContext* opCtx,
+                                const ShardId& shardId,
+                                const boost::optional<ShardVersion>& shardVersion,
+                                const boost::optional<DatabaseVersion>& dbVersion,
+                                const NamespaceString& nss,
+                                const BSONObj& cmdObj,
+                                const BSONObj& response,
+                                BSONObjBuilder* result) {
         auto txnRouter = TransactionRouter::get(opCtx);
         bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
 
-        const auto response = [&] {
-            std::vector<AsyncRequestsSender::Request> requests;
-            BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
-            if (!isExplain) {
-                if (auto sampleId = analyze_shard_key::tryGenerateSampleId(opCtx, nss)) {
-                    filteredCmdObj = analyze_shard_key::appendSampleId(std::move(filteredCmdObj),
-                                                                       std::move(*sampleId));
-                }
-            }
-
-            BSONObj cmdObjWithVersions(std::move(filteredCmdObj));
-            if (dbVersion) {
-                cmdObjWithVersions = appendDbVersionIfPresent(cmdObjWithVersions, *dbVersion);
-            }
-            if (shardVersion) {
-                cmdObjWithVersions = appendShardVersion(cmdObjWithVersions, *shardVersion);
-            }
-            requests.emplace_back(shardId, cmdObjWithVersions);
-
-            MultiStatementTransactionRequestsSender ars(
-                opCtx,
-                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                nss.db().toString(),
-                requests,
-                kPrimaryOnlyReadPreference,
-                isRetryableWrite ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
-
-            auto response = ars.next();
-            invariant(ars.done());
-
-            return uassertStatusOK(std::move(response.swResponse));
-        }();
-
-        uassertStatusOK(response.status);
-
-        const auto responseStatus = getStatusFromCommandResult(response.data);
+        const auto responseStatus = getStatusFromCommandResult(response);
         if (ErrorCodes::isNeedRetargettingError(responseStatus.code()) ||
             ErrorCodes::isSnapshotError(responseStatus.code()) ||
             responseStatus.code() == ErrorCodes::StaleDbVersion) {
@@ -654,12 +633,129 @@ private:
 
         // First append the properly constructed writeConcernError. It will then be skipped in
         // appendElementsUnique.
-        if (auto wcErrorElem = response.data["writeConcernError"]) {
+        if (auto wcErrorElem = response["writeConcernError"]) {
             appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
         }
 
-        result->appendElementsUnique(
-            CommandHelpers::filterCommandReplyForPassthrough(response.data));
+        result->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(response));
+    }
+
+    // Two-phase protocol to run a findAndModify command without a shard key or _id.
+    static void _runCommandWithoutShardKey(OperationContext* opCtx,
+                                           const boost::optional<DatabaseVersion>& dbVersion,
+                                           const NamespaceString& nss,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder* result) {
+        // Shared state for the transaction below.
+        struct SharedBlock {
+            SharedBlock(NamespaceString nss_, BSONObj cmdObj_) : nss(nss_), cmdObj(cmdObj_) {}
+            NamespaceString nss;
+            BSONObj cmdObj;
+            ClusterQueryWithoutShardKey clusterQueryCommand;
+            ClusterWriteWithoutShardKey clusterWriteCommand;
+            ClusterWriteWithoutShardKeyResponse clusterWriteResponse;
+        };
+
+        auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
+            IDLParserContext("ClusterFindAndModify"), cmdObj);
+
+        auto sharedBlock = std::make_shared<SharedBlock>(nss, cmdObj);
+        sharedBlock->clusterQueryCommand = ClusterQueryWithoutShardKey(
+            cmdObj, *parsedRequest.getStmtId() ? *parsedRequest.getStmtId() : 0);
+
+        auto txn = txn_api::SyncTransactionWithRetries(
+            opCtx,
+            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+            nullptr /* resourceYielder */);
+
+        txn.run(
+            opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                BSONObj res = txnClient
+                                  .runCommand(sharedBlock->nss.db(),
+                                              sharedBlock->clusterQueryCommand.toBSON(BSONObj()))
+                                  .get();
+                uassertStatusOK(getStatusFromCommandResult(res));
+
+                // Use _clusterQueryWithoutShardKeyResponse to construct
+                // _clusterWriteWithoutShardKeyCommand.
+                ClusterQueryWithoutShardKeyResponse queryResponse =
+                    ClusterQueryWithoutShardKeyResponse::parseOwned(
+                        IDLParserContext("_clusterQueryWithoutShardKeyResponse"), std::move(res));
+                sharedBlock->clusterWriteCommand = ClusterWriteWithoutShardKey(
+                    sharedBlock->cmdObj,
+                    std::string(*queryResponse.getShardId()) /* shardId */,
+                    *queryResponse.getTargetDoc() /* targetDocId */);
+
+                auto writeRes = txnClient
+                                    .runCommand(sharedBlock->nss.db(),
+                                                sharedBlock->clusterWriteCommand.toBSON(BSONObj()))
+                                    .get();
+
+                uassertStatusOK(getStatusFromCommandResult(writeRes));
+                sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(
+                    IDLParserContext("_clusterWriteWithoutShardKeyResponse"), std::move(writeRes));
+                return SemiFuture<void>::makeReady();
+            });
+
+        // Extract findAndModify command result from _clusterWriteWithoutShardKeyResponse.
+        _contructResult(opCtx,
+                        ShardId(sharedBlock->clusterWriteCommand.getShardId().toString()),
+                        boost::none /* shardVersion */,
+                        dbVersion,
+                        nss,
+                        cmdObj,
+                        sharedBlock->clusterWriteResponse.getResponse(),
+                        result);
+    }
+
+    // Command invocation to be used if a shard key is specified or the collection is unsharded.
+    static void _runCommand(OperationContext* opCtx,
+                            const ShardId& shardId,
+                            const boost::optional<ShardVersion>& shardVersion,
+                            const boost::optional<DatabaseVersion>& dbVersion,
+                            const NamespaceString& nss,
+                            const BSONObj& cmdObj,
+                            bool isExplain,
+                            BSONObjBuilder* result) {
+        auto txnRouter = TransactionRouter::get(opCtx);
+        bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
+
+        const auto response = [&] {
+            std::vector<AsyncRequestsSender::Request> requests;
+            BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+            if (!isExplain) {
+                if (auto sampleId = analyze_shard_key::tryGenerateSampleId(opCtx, nss)) {
+                    filteredCmdObj = analyze_shard_key::appendSampleId(std::move(filteredCmdObj),
+                                                                       std::move(*sampleId));
+                }
+            }
+
+            BSONObj cmdObjWithVersions(std::move(filteredCmdObj));
+            if (dbVersion) {
+                cmdObjWithVersions = appendDbVersionIfPresent(cmdObjWithVersions, *dbVersion);
+            }
+            if (shardVersion) {
+                cmdObjWithVersions = appendShardVersion(cmdObjWithVersions, *shardVersion);
+            }
+            requests.emplace_back(shardId, cmdObjWithVersions);
+
+            MultiStatementTransactionRequestsSender ars(
+                opCtx,
+                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                nss.db().toString(),
+                requests,
+                kPrimaryOnlyReadPreference,
+                isRetryableWrite ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
+
+            auto response = ars.next();
+            invariant(ars.done());
+
+            return uassertStatusOK(std::move(response.swResponse));
+        }();
+
+        uassertStatusOK(response.status);
+        _contructResult(
+            opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, response.data, result);
     }
 
     // TODO SERVER-67429: Remove this function.
