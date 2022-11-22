@@ -15,3 +15,15 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
     ],
 )
+
+env.CppUnitTest(
+    target="query_cost_model_test",
+    source=[
+        "cost_estimator_test.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
+        "$BUILD_DIR/mongo/unittest/unittest",
+        'query_cost_model',
+    ],
+)
