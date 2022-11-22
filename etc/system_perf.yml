@@ -3110,34 +3110,34 @@ buildvariants:
       - name: sb_timeseries
       - name: big_update_10k
 
-  # - name: linux-3-node-replSet-intel.2022-11
-  #   display_name: Linux 3-Node ReplSet Intel 2022-11
-  #   cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-  #   #    cron: "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
-  #   modules: *modules
-  #   expansions:
-  #     mongodb_setup_release: 2022-11
-  #     mongodb_setup: replica
-  #     infrastructure_provisioning_release: 2022-11
-  #     infrastructure_provisioning: replica-intel.2022-11
-  #     workload_setup: 2022-11
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #   run_on:
-  #     - "rhel70-perf-replset"
-  #   depends_on: *_compile_amazon2
-  #   tasks: &3nodetasks
-  #     - name: schedule_patch_auto_tasks
-  #     - name: schedule_variant_auto_tasks
-  #     - name: industry_benchmarks
-  #     - name: ycsb_60GB
-  #     - name: crud_workloads
-  #     - name: mixed_workloads
-  #     - name: smoke_test
-  #     - name: linkbench
-  #     - name: linkbench2
+  - name: linux-3-node-replSet-intel.2022-11
+    display_name: Linux 3-Node ReplSet Intel 2022-11
+    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
+    #    cron: "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica-intel.2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon2
+    tasks: &3nodetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: crud_workloads
+      - name: mixed_workloads
+      - name: smoke_test
+      - name: linkbench
+      - name: linkbench2
 
   # - name: linux-3-node-replSet-last-continuous-fcv.2022-11
   #   display_name: Linux 3-Node ReplSet (Last Continuous FCV) 2022-11
