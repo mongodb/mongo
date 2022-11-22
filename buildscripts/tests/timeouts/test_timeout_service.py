@@ -1,41 +1,42 @@
 """Unit tests for timeout_service.py."""
 import random
 import unittest
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from requests.exceptions import HTTPError
-from evergreen import EvergreenApi
 
 import buildscripts.timeouts.timeout_service as under_test
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
-from buildscripts.util.teststats import HistoricTaskData
+from buildscripts.util.teststats import HistoricTaskData, HistoricTestInfo
 
 # pylint: disable=missing-docstring,no-self-use,invalid-name,protected-access
 
+NS = "buildscripts.timeouts.timeout_service"
 
-def build_mock_service(evg_api=None, resmoke_proxy=None):
-    end_date = datetime.now()
-    start_date = end_date - timedelta(weeks=2)
-    timeout_settings = under_test.TimeoutSettings(
-        end_date=end_date,
-        start_date=start_date,
-    )
+
+def ns(relative_name):  # pylint: disable=invalid-name
+    """Return a full name from a name relative to the test module"s name space."""
+    return NS + "." + relative_name
+
+
+def build_mock_service(resmoke_proxy=None):
     return under_test.TimeoutService(
-        evg_api=evg_api if evg_api else MagicMock(spec_set=EvergreenApi),
-        resmoke_proxy=resmoke_proxy if resmoke_proxy else MagicMock(spec_set=ResmokeProxyService),
-        timeout_settings=timeout_settings)
+        resmoke_proxy=resmoke_proxy if resmoke_proxy else MagicMock(spec_set=ResmokeProxyService))
 
 
 def tst_stat_mock(file, duration, pass_count):
-    return MagicMock(test_file=file, avg_duration_pass=duration, num_pass=pass_count)
+    return MagicMock(test_name=file, avg_duration_pass=duration, num_pass=pass_count, hooks=[])
+
+
+def tst_runtime_mock(file, duration, pass_count):
+    return MagicMock(test_name=file, avg_duration_pass=duration, num_pass=pass_count)
 
 
 class TestGetTimeoutEstimate(unittest.TestCase):
-    def test_no_stats_should_return_default_timeout(self):
-        mock_evg_api = MagicMock(spec_set=EvergreenApi)
-        mock_evg_api.test_stats_by_project.return_value = []
-        timeout_service = build_mock_service(evg_api=mock_evg_api)
+    @patch(ns("HistoricTaskData.from_s3"))
+    def test_no_stats_should_return_default_timeout(self, from_s3_mock: MagicMock):
+        timeout_service = build_mock_service()
+        from_s3_mock.return_value = []
         timeout_params = under_test.TimeoutParams(
             evg_project="my project",
             build_variant="bv",
@@ -48,13 +49,17 @@ class TestGetTimeoutEstimate(unittest.TestCase):
 
         self.assertFalse(timeout.is_specified())
 
-    def test_a_test_with_missing_history_should_cause_a_default_timeout(self):
-        mock_evg_api = MagicMock(spec_set=EvergreenApi)
-        test_stats = [tst_stat_mock(f"test_{i}.js", 60, 1) for i in range(30)]
-        mock_evg_api.test_stats_by_project.return_value = test_stats
+    @patch(ns("HistoricTaskData.from_s3"))
+    def test_a_test_with_missing_history_should_cause_a_default_timeout(
+            self, from_s3_mock: MagicMock):
+        test_stats = [
+            HistoricTestInfo(test_name=f"test_{i}.js", avg_duration=60, num_pass=1, hooks=[])
+            for i in range(30)
+        ]
+        from_s3_mock.return_value = HistoricTaskData(test_stats)
         mock_resmoke_proxy = MagicMock(spec_set=ResmokeProxyService)
         mock_resmoke_proxy.list_tests.return_value = ["test_with_no_stats.js"]
-        timeout_service = build_mock_service(evg_api=mock_evg_api, resmoke_proxy=mock_resmoke_proxy)
+        timeout_service = build_mock_service(resmoke_proxy=mock_resmoke_proxy)
         timeout_params = under_test.TimeoutParams(
             evg_project="my project",
             build_variant="bv",
@@ -67,14 +72,19 @@ class TestGetTimeoutEstimate(unittest.TestCase):
 
         self.assertFalse(timeout.is_specified())
 
-    def test_a_test_with_zero_runtime_history_should_cause_a_default_timeout(self):
-        mock_evg_api = MagicMock(spec_set=EvergreenApi)
-        test_stats = [tst_stat_mock(f"test_{i}.js", 60, 1) for i in range(30)]
-        test_stats.append(tst_stat_mock("zero.js", 0.0, 1))
-        mock_evg_api.test_stats_by_project.return_value = test_stats
+    @patch(ns("HistoricTaskData.from_s3"))
+    def test_a_test_with_zero_runtime_history_should_cause_a_default_timeout(
+            self, from_s3_mock: MagicMock):
+        test_stats = [
+            HistoricTestInfo(test_name=f"test_{i}.js", avg_duration=60, num_pass=1, hooks=[])
+            for i in range(30)
+        ]
+        test_stats.append(
+            HistoricTestInfo(test_name="zero.js", avg_duration=0.0, num_pass=1, hooks=[]))
+        from_s3_mock.return_value = HistoricTaskData(test_stats)
         mock_resmoke_proxy = MagicMock(spec_set=ResmokeProxyService)
-        mock_resmoke_proxy.list_tests.return_value = [ts.test_file for ts in test_stats]
-        timeout_service = build_mock_service(evg_api=mock_evg_api, resmoke_proxy=mock_resmoke_proxy)
+        mock_resmoke_proxy.list_tests.return_value = [ts.test_name for ts in test_stats]
+        timeout_service = build_mock_service(resmoke_proxy=mock_resmoke_proxy)
         timeout_params = under_test.TimeoutParams(
             evg_project="my project",
             build_variant="bv",
@@ -87,15 +97,19 @@ class TestGetTimeoutEstimate(unittest.TestCase):
 
         self.assertFalse(timeout.is_specified())
 
-    def test_all_tests_with_runtime_history_should_use_custom_timeout(self):
-        mock_evg_api = MagicMock(spec_set=EvergreenApi)
+    @patch(ns("HistoricTaskData.from_s3"))
+    def test_all_tests_with_runtime_history_should_use_custom_timeout(self,
+                                                                      from_s3_mock: MagicMock):
         n_tests = 30
         test_runtime = 600
-        test_stats = [tst_stat_mock(f"test_{i}.js", test_runtime, 1) for i in range(n_tests)]
-        mock_evg_api.test_stats_by_project.return_value = test_stats
+        test_stats = [
+            HistoricTestInfo(test_name=f"test_{i}.js", avg_duration=test_runtime, num_pass=1,
+                             hooks=[]) for i in range(n_tests)
+        ]
+        from_s3_mock.return_value = HistoricTaskData(test_stats)
         mock_resmoke_proxy = MagicMock(spec_set=ResmokeProxyService)
-        mock_resmoke_proxy.list_tests.return_value = [ts.test_file for ts in test_stats]
-        timeout_service = build_mock_service(evg_api=mock_evg_api, resmoke_proxy=mock_resmoke_proxy)
+        mock_resmoke_proxy.list_tests.return_value = [ts.test_name for ts in test_stats]
+        timeout_service = build_mock_service(resmoke_proxy=mock_resmoke_proxy)
         timeout_params = under_test.TimeoutParams(
             evg_project="my project",
             build_variant="bv",
@@ -149,10 +163,10 @@ class TestGetTaskHookOverhead(unittest.TestCase):
 
 
 class TestLookupHistoricStats(unittest.TestCase):
-    def test_no_stats_from_evergreen_should_return_none(self):
-        mock_evg_api = MagicMock(spec_set=EvergreenApi)
-        mock_evg_api.test_stats_by_project.return_value = []
-        timeout_service = build_mock_service(evg_api=mock_evg_api)
+    @patch(ns("HistoricTaskData.from_s3"))
+    def test_no_stats_from_evergreen_should_return_none(self, from_s3_mock: MagicMock):
+        from_s3_mock.return_value = None
+        timeout_service = build_mock_service()
         timeout_params = under_test.TimeoutParams(
             evg_project="my project",
             build_variant="bv",
@@ -165,10 +179,10 @@ class TestLookupHistoricStats(unittest.TestCase):
 
         self.assertIsNone(stats)
 
-    def test_errors_from_evergreen_should_return_none(self):
-        mock_evg_api = MagicMock(spec_set=EvergreenApi)
-        mock_evg_api.test_stats_by_project.side_effect = HTTPError("failed to connect")
-        timeout_service = build_mock_service(evg_api=mock_evg_api)
+    @patch(ns("HistoricTaskData.from_s3"))
+    def test_errors_from_evergreen_should_return_none(self, from_s3_mock: MagicMock):
+        from_s3_mock.side_effect = HTTPError("failed to connect")
+        timeout_service = build_mock_service()
         timeout_params = under_test.TimeoutParams(
             evg_project="my project",
             build_variant="bv",
@@ -181,11 +195,11 @@ class TestLookupHistoricStats(unittest.TestCase):
 
         self.assertIsNone(stats)
 
-    def test_stats_from_evergreen_should_return_the_stats(self):
-        mock_evg_api = MagicMock(spec_set=EvergreenApi)
+    @patch(ns("HistoricTaskData.from_s3"))
+    def test_stats_from_evergreen_should_return_the_stats(self, from_s3_mock: MagicMock):
         test_stats = [tst_stat_mock(f"test_{i}.js", 60, 1) for i in range(100)]
-        mock_evg_api.test_stats_by_project.return_value = test_stats
-        timeout_service = build_mock_service(evg_api=mock_evg_api)
+        from_s3_mock.return_value = HistoricTaskData(test_stats)
+        timeout_service = build_mock_service()
         timeout_params = under_test.TimeoutParams(
             evg_project="my project",
             build_variant="bv",
