@@ -815,7 +815,7 @@ class MongoDBJavaScriptStack(gdb.Command):
 
                 # Switch frames so gdb actually knows about the mongo::mozjs namespace. It doesn't
                 # actually matter which frame so long as it isn't the top of the stack. This also
-                # enables gdb to know about the mongo::mozjs::kCurrentScope thread-local variable
+                # enables gdb to know about the mongo::mozjs::currentJSScope thread-local variable
                 # when using gdb.parse_and_eval().
                 gdb.selected_frame().older().select()
             except gdb.error as err:
@@ -825,11 +825,11 @@ class MongoDBJavaScriptStack(gdb.Command):
             try:
                 # The following block is roughly equivalent to this:
                 # namespace mongo::mozjs {
-                #   std::atomic<MozJSImplScope*> kCurrentScope = ...;
+                #   std::atomic<MozJSImplScope*> currentJSScope = ...;
                 # }
                 # if (!scope || scope->_inOp == 0) { continue; }
                 # print(scope->buildStackString()->c_str());
-                atomic_scope = gdb.parse_and_eval("mongo::mozjs::kCurrentScope")
+                atomic_scope = gdb.parse_and_eval("mongo::mozjs::currentJSScope")
                 ptr = MongoDBJavaScriptStack.atomic_get_ptr(atomic_scope)
                 if not ptr:
                     continue

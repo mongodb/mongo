@@ -118,7 +118,7 @@ bool closeToMaxMemory() {
 }
 }  // namespace
 
-thread_local MozJSImplScope::ASANHandles* kCurrentASANHandles = nullptr;
+thread_local MozJSImplScope::ASANHandles* currentASANHandles = nullptr;
 
 
 // You may wonder what the point is to making this thread local
@@ -132,7 +132,7 @@ thread_local MozJSImplScope::ASANHandles* kCurrentASANHandles = nullptr;
 // this from "another thread" (being GDB), it makes some sense. Or it
 // might be a GDB bug of some sort that forcing it into an atomic
 // papers over.
-thread_local std::atomic<MozJSImplScope*> kCurrentScope = nullptr;  // NOLINT
+thread_local std::atomic<MozJSImplScope*> currentJSScope = nullptr;  // NOLINT
 
 struct MozJSImplScope::MozJSEntry {
     MozJSEntry(MozJSImplScope* scope) : ac(scope->_context, scope->_global), _scope(scope) {
@@ -264,12 +264,12 @@ void MozJSImplScope::_gcCallback(JSContext* rt,
 #if __has_feature(address_sanitizer)
 
 MozJSImplScope::ASANHandles::ASANHandles() {
-    kCurrentASANHandles = this;
+    currentASANHandles = this;
 }
 
 MozJSImplScope::ASANHandles::~ASANHandles() {
-    invariant(kCurrentASANHandles == this);
-    kCurrentASANHandles = nullptr;
+    invariant(currentASANHandles == this);
+    currentASANHandles = nullptr;
 }
 
 void MozJSImplScope::ASANHandles::addPointer(void* ptr) {
@@ -473,9 +473,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
             "Failed to initialize ModuleLoader",
             _moduleLoader->init(_context, boost::filesystem::current_path()));
 
-    try {
-        kCurrentScope = this;
-
+    {
         JS_AddInterruptCallback(_context, _interruptCallback);
         JS_SetGCCallback(_context, _gcCallback, this);
         JS_SetContextPrivate(_context, this);
@@ -499,14 +497,13 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
         // assert.js)
         if (_engine->getScopeInitCallback())
             _engine->getScopeInitCallback()(*this);
-    } catch (...) {
-        kCurrentScope = nullptr;
-        throw;
     }
+
+    currentJSScope = this;
 }
 
 MozJSImplScope::~MozJSImplScope() {
-    kCurrentScope = nullptr;
+    currentJSScope = nullptr;
 
     for (auto&& x : _funcs) {
         x.reset();
@@ -1089,11 +1086,11 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
 void MozJSImplScope::setCompileOptions(JS::CompileOptions* co) {}
 
 MozJSImplScope* MozJSImplScope::getThreadScope() {
-    return kCurrentScope;
+    return currentJSScope;
 }
 
 auto MozJSImplScope::ASANHandles::getThreadASANHandles() -> ASANHandles* {
-    return kCurrentASANHandles;
+    return currentASANHandles;
 }
 
 void MozJSImplScope::setOOM() {
