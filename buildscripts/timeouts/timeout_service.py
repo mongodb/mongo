@@ -1,5 +1,4 @@
 """Service for determining task timeouts."""
-from datetime import datetime
 from typing import Any, Dict, NamedTuple, Optional
 
 import inject
@@ -31,29 +30,17 @@ class TimeoutParams(NamedTuple):
     is_asan: bool
 
 
-class TimeoutSettings(NamedTuple):
-    """Settings for determining timeouts."""
-
-    start_date: datetime
-    end_date: datetime
-
-
 class TimeoutService:
     """A service for determining task timeouts."""
 
     @inject.autoparams()
-    def __init__(self, evg_api: EvergreenApi, resmoke_proxy: ResmokeProxyService,
-                 timeout_settings: TimeoutSettings) -> None:
+    def __init__(self, resmoke_proxy: ResmokeProxyService) -> None:
         """
         Initialize the service.
 
-        :param evg_api: Evergreen API client.
         :param resmoke_proxy: Proxy to query resmoke.
-        :param timeout_settings: Settings for how timeouts are calculated.
         """
-        self.evg_api = evg_api
         self.resmoke_proxy = resmoke_proxy
-        self.timeout_settings = timeout_settings
 
     def get_timeout_estimate(self, timeout_params: TimeoutParams) -> TimeoutEstimate:
         """
@@ -129,7 +116,8 @@ class TimeoutService:
             return n_expected_runs * avg_clean_every_n_runtime
         return 0.0
 
-    def lookup_historic_stats(self, timeout_params: TimeoutParams) -> Optional[HistoricTaskData]:
+    @staticmethod
+    def lookup_historic_stats(timeout_params: TimeoutParams) -> Optional[HistoricTaskData]:
         """
         Lookup historic test results stats for the given task.
 
@@ -137,10 +125,8 @@ class TimeoutService:
         :return: Historic test results if they exist.
         """
         try:
-            evg_stats = HistoricTaskData.from_evg(
-                self.evg_api, timeout_params.evg_project, self.timeout_settings.start_date,
-                self.timeout_settings.end_date, timeout_params.task_name,
-                timeout_params.build_variant)
+            evg_stats = HistoricTaskData.from_s3(
+                timeout_params.evg_project, timeout_params.task_name, timeout_params.build_variant)
             if not evg_stats:
                 LOGGER.warning("No historic runtime information available")
                 return None

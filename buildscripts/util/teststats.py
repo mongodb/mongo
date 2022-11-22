@@ -1,15 +1,33 @@
 """Utility to support parsing a TestStat."""
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
 from itertools import chain
-from typing import NamedTuple, List, Callable, Optional
+from json import JSONDecodeError
 
-from evergreen import EvergreenApi, TestStats
+from typing import NamedTuple, List, Callable, Optional
+import requests
+from requests.adapters import HTTPAdapter, Retry
 
 from buildscripts.util.testname import split_test_hook_name, is_resmoke_hook, get_short_name_from_test_file
 
 TASK_LEVEL_HOOKS = {"CleanEveryN"}
+TESTS_STATS_S3_LOCATION = "https://mongo-test-stats.s3.amazonaws.com"
+
+
+class HistoricalTestInformation(NamedTuple):
+    """
+    Container for information about the historical runtime of a test.
+
+    test_name: Name of test.
+    avg_duration_pass: Average of runtime of test that passed.
+    num_pass: Number of times the test has passed.
+    num_fail: Number of times the test has failed.
+    """
+
+    test_name: str
+    num_pass: int
+    num_fail: int
+    avg_duration_pass: float
 
 
 class TestRuntime(NamedTuple):
@@ -74,9 +92,9 @@ class HistoricHookInfo(NamedTuple):
     avg_duration: float
 
     @classmethod
-    def from_test_stats(cls, test_stats: TestStats) -> "HistoricHookInfo":
+    def from_test_stats(cls, test_stats: HistoricalTestInformation) -> "HistoricHookInfo":
         """Create an instance from a test_stats object."""
-        return cls(hook_id=test_stats.test_file, num_pass=test_stats.num_pass,
+        return cls(hook_id=test_stats.test_name, num_pass=test_stats.num_pass,
                    avg_duration=test_stats.avg_duration_pass)
 
     def test_name(self) -> str:
@@ -101,10 +119,10 @@ class HistoricTestInfo(NamedTuple):
     hooks: List[HistoricHookInfo]
 
     @classmethod
-    def from_test_stats(cls, test_stats: TestStats,
+    def from_test_stats(cls, test_stats: HistoricalTestInformation,
                         hooks: List[HistoricHookInfo]) -> "HistoricTestInfo":
         """Create an instance from a test_stats object."""
-        return cls(test_name=test_stats.test_file, num_pass=test_stats.num_pass,
+        return cls(test_name=test_stats.test_name, num_pass=test_stats.num_pass,
                    avg_duration=test_stats.avg_duration_pass, hooks=hooks)
 
     def normalized_test_name(self) -> str:
@@ -137,46 +155,59 @@ class HistoricTaskData(object):
         """Initialize the TestStats with raw results from the Evergreen API."""
         self.historic_test_results = historic_test_results
 
-    # pylint: disable=too-many-arguments
-    @classmethod
-    def from_evg(cls, evg_api: EvergreenApi, project: str, start_date: datetime, end_date: datetime,
-                 task: str, variant: str) -> "HistoricTaskData":
+    @staticmethod
+    def get_stats_from_s3(project: str, task: str, variant: str) -> List[HistoricalTestInformation]:
         """
-        Retrieve test stats from evergreen for a given task.
+        Retrieve test stats from s3 for a given task.
 
-        :param evg_api: Evergreen API client.
         :param project: Project to query.
-        :param start_date: Start date to query.
-        :param end_date: End date to query.
+        :param task: Task to query.
+        :param variant: Build variant to query.
+        :return: A list of the Test stats for the specified task.
+        """
+        session = requests.Session()
+        retries = Retry(total=5, backoff_factor=1, status_forcelist=[502, 503, 504])
+        session.mount('https://', HTTPAdapter(max_retries=retries))
+
+        response = session.get(f"{TESTS_STATS_S3_LOCATION}/{project}/{variant}/{task}")
+
+        try:
+            data = response.json()
+            return [HistoricalTestInformation(**item) for item in data]
+        except JSONDecodeError:
+            return []
+
+    @classmethod
+    def from_s3(cls, project: str, task: str, variant: str) -> "HistoricTaskData":
+        """
+        Retrieve test stats from s3 for a given task.
+
+        :param project: Project to query.
         :param task: Task to query.
         :param variant: Build variant to query.
         :return: Test stats for the specified task.
         """
-        days = (end_date - start_date).days
-        historic_stats = evg_api.test_stats_by_project(
-            project, after_date=start_date, before_date=end_date, tasks=[task], variants=[variant],
-            group_by="test", group_num_days=days)
-
-        return cls.from_stats_list(historic_stats)
+        historical_test_data = cls.get_stats_from_s3(project, task, variant)
+        return cls.from_stats_list(historical_test_data)
 
     @classmethod
-    def from_stats_list(cls, historic_stats: List[TestStats]) -> "HistoricTaskData":
+    def from_stats_list(
+            cls, historical_test_data: List[HistoricalTestInformation]) -> "HistoricTaskData":
         """
         Build historic task data from a list of historic stats.
 
-        :param historic_stats: List of historic stats to build from.
+        :param historical_test_data: A list of information about the runtime of a test.
         :return: Historic task data from the list of stats.
         """
-
         hooks = defaultdict(list)
-        for hook in [stat for stat in historic_stats if is_resmoke_hook(stat.test_file)]:
+        for hook in [stat for stat in historical_test_data if is_resmoke_hook(stat.test_name)]:
             historical_hook = HistoricHookInfo.from_test_stats(hook)
             hooks[historical_hook.test_name()].append(historical_hook)
 
         return cls([
             HistoricTestInfo.from_test_stats(stat,
-                                             hooks[get_short_name_from_test_file(stat.test_file)])
-            for stat in historic_stats if not is_resmoke_hook(stat.test_file)
+                                             hooks[get_short_name_from_test_file(stat.test_name)])
+            for stat in historical_test_data if not is_resmoke_hook(stat.test_name)
         ])
 
     def get_tests_runtimes(self) -> List[TestRuntime]:

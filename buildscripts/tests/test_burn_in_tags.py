@@ -14,8 +14,9 @@ from buildscripts.tests.test_burn_in_tests import ns as burn_in_tests_ns
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig
 
 import buildscripts.burn_in_tags as under_test
+from buildscripts.util.teststats import HistoricalTestInformation
 
-# pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
+# pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access,too-many-arguments
 
 EMPTY_PROJECT = {
     "buildvariants": [],
@@ -105,7 +106,9 @@ class TestGenerateEvgTasks(unittest.TestCase):
         self.assertEqual(shrub_config.as_dict(), EMPTY_PROJECT)
 
     @patch(ns("create_tests_by_task"))
-    def test_generate_evg_tasks_one_test_changed(self, create_tests_by_task_mock):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_generate_evg_tasks_one_test_changed(self, get_stats_from_s3_mock,
+                                                 create_tests_by_task_mock):
         evg_conf_mock = get_evergreen_config()
         create_tests_by_task_mock.return_value = {
             "aggregation_mongos_passthrough": TaskInfo(
@@ -127,8 +130,13 @@ class TestGenerateEvgTasks(unittest.TestCase):
         shrub_config = ShrubProject.empty()
         evergreen_api = MagicMock()
         repo = MagicMock(working_dir=os.getcwd())
-        evergreen_api.test_stats_by_project.return_value = [
-            MagicMock(test_file="dir/test2.js", avg_duration_pass=10)
+        get_stats_from_s3_mock.return_value = [
+            HistoricalTestInformation(
+                test_name="dir/test2.js",
+                num_pass=1,
+                num_fail=0,
+                avg_duration_pass=10,
+            )
         ]
         under_test._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
                                        buildvariant_map, [repo], evg_conf_mock, 'install-dir/bin')
@@ -219,8 +227,9 @@ class TestAcceptance(unittest.TestCase):
     @patch(ns("_create_evg_build_variant_map"))
     @patch(ns("EvergreenFileChangeDetector"))
     @patch(burn_in_tests_ns("create_test_membership_map"))
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
     def test_tests_generated_if_a_file_changed(
-            self, create_test_membership_map_mock, find_changed_tests_mock,
+            self, get_stats_from_s3_mock, create_test_membership_map_mock, find_changed_tests_mock,
             create_evg_build_variant_map_mock, write_to_file_mock):
         """
         Given a git repository with changes,
@@ -236,6 +245,7 @@ class TestAcceptance(unittest.TestCase):
             'jstests/slow1/large_role_chain.js',
             'jstests/aggregation/accumulators/accumulator_js.js'
         }
+        get_stats_from_s3_mock.return_value = []
 
         under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf, MagicMock(), repos, 'install_dir/bin')
 

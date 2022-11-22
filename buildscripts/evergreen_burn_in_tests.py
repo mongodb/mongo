@@ -34,7 +34,6 @@ DEFAULT_VARIANT = "enterprise-rhel-80-64-bit-dynamic-required"
 BURN_IN_TESTS_GEN_TASK = "burn_in_tests_gen"
 BURN_IN_TESTS_TASK = "burn_in_tests"
 BURN_IN_ENV_VAR = "BURN_IN_TESTS"
-AVG_TEST_RUNTIME_ANALYSIS_DAYS = 14
 AVG_TEST_SETUP_SEC = 4 * 60
 AVG_TEST_TIME_MULTIPLIER = 3
 MIN_AVG_TEST_OVERFLOW_SEC = float(60)
@@ -328,23 +327,17 @@ class GenerateBurnInExecutor(BurnInExecutor):
 
     # pylint: disable=too-many-arguments
     def __init__(self, generate_config: GenerateConfig, repeat_config: RepeatConfig,
-                 evg_api: EvergreenApi, generate_tasks_file: Optional[str] = None,
-                 history_end_date: Optional[datetime] = None) -> None:
+                 generate_tasks_file: Optional[str] = None) -> None:
         """
         Create a new generate burn-in executor.
 
         :param generate_config: Configuration for how to generate tasks.
         :param repeat_config: Configuration for how tests should be repeated.
-        :param evg_api: Evergreen API client.
         :param generate_tasks_file: File to write generated task configuration to.
-        :param history_end_date: End date of range to query for historic test data.
         """
         self.generate_config = generate_config
         self.repeat_config = repeat_config
-        self.evg_api = evg_api
         self.generate_tasks_file = generate_tasks_file
-        self.history_end_date = history_end_date if history_end_date else datetime.utcnow()\
-            .replace(microsecond=0)
 
     def get_task_runtime_history(self, task: str) -> List[TestRuntime]:
         """
@@ -353,21 +346,10 @@ class GenerateBurnInExecutor(BurnInExecutor):
         :param task: Task to query.
         :return: List of runtime histories for all tests in specified task.
         """
-        try:
-            project = self.generate_config.project
-            variant = self.generate_config.build_variant
-            end_date = self.history_end_date
-            start_date = end_date - timedelta(days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
-            test_stats = HistoricTaskData.from_evg(self.evg_api, project, start_date=start_date,
-                                                   end_date=end_date, task=task, variant=variant)
-            return test_stats.get_tests_runtimes()
-        except requests.HTTPError as err:
-            if err.response.status_code == requests.codes.SERVICE_UNAVAILABLE:
-                # Evergreen may return a 503 when the service is degraded.
-                # We fall back to returning no test history
-                return []
-            else:
-                raise
+        project = self.generate_config.project
+        variant = self.generate_config.build_variant
+        test_stats = HistoricTaskData.from_s3(project, task, variant)
+        return test_stats.get_tests_runtimes()
 
     def _get_existing_tasks(self) -> Optional[Set[ExistingTask]]:
         """Get any existing tasks that should be included in the generated display task."""
@@ -434,7 +416,7 @@ def burn_in(task_id: str, build_variant: str, generate_config: GenerateConfig,
     :param install_dir: Path to bin directory of a testable installation
     """
     change_detector = EvergreenFileChangeDetector(task_id, evg_api, os.environ)
-    executor = GenerateBurnInExecutor(generate_config, repeat_config, evg_api, generate_tasks_file)
+    executor = GenerateBurnInExecutor(generate_config, repeat_config, generate_tasks_file)
 
     burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf, install_dir)
     burn_in_orchestrator.burn_in(repos, build_variant)

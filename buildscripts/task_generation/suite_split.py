@@ -201,25 +201,15 @@ class SuiteSplitService:
         if self.config.default_to_fallback:
             return self.calculate_fallback_suites(params)
 
-        try:
-            evg_stats = HistoricTaskData.from_evg(self.evg_api, self.config.evg_project,
-                                                  self.config.start_date, self.config.end_date,
-                                                  params.task_name, params.build_variant)
-            if not evg_stats:
-                LOGGER.debug("No test history, using fallback suites")
-                # This is probably a new suite, since there is no test history, just use the
-                # fallback values.
-                return self.calculate_fallback_suites(params)
+        evg_stats = HistoricTaskData.from_s3(self.config.evg_project, params.task_name,
+                                             params.build_variant)
+
+        if evg_stats:
             return self.calculate_suites_from_evg_stats(evg_stats, params)
-        except requests.HTTPError as err:
-            if err.response.status_code == requests.codes.SERVICE_UNAVAILABLE:
-                # Evergreen may return a 503 when the service is degraded.
-                # We fall back to splitting the tests into a fixed number of suites.
-                LOGGER.warning("Received 503 from Evergreen, "
-                               "dividing the tests evenly among suites")
-                return self.calculate_fallback_suites(params)
-            else:
-                raise
+
+        LOGGER.debug("No test history, using fallback suites")
+        # Since there is no test history this is probably a new suite, just use the fallback values.
+        return self.calculate_fallback_suites(params)
 
     def calculate_fallback_suites(self, params: SuiteSplitParameters) -> GeneratedSuite:
         """Divide tests into a fixed number of suites."""

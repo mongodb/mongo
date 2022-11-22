@@ -160,7 +160,7 @@ def _generate_evg_tasks(evergreen_api: EvergreenApi, shrub_project: ShrubProject
                                          repeat_tests_max=config_options.repeat_tests_max,
                                          repeat_tests_secs=config_options.repeat_tests_secs)
 
-            burn_in_generator = GenerateBurnInExecutor(gen_config, repeat_config, evergreen_api)
+            burn_in_generator = GenerateBurnInExecutor(gen_config, repeat_config)
             burn_in_generator.generate_tasks_for_variant(tests_by_task, shrub_build_variant)
             shrub_project.add_build_variant(shrub_build_variant)
 

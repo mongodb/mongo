@@ -8,7 +8,7 @@ import requests
 import buildscripts.task_generation.suite_split as under_test
 from buildscripts.task_generation.suite_split_strategies import greedy_division, \
     round_robin_fallback
-from buildscripts.util.teststats import TestRuntime
+from buildscripts.util.teststats import TestRuntime, HistoricalTestInformation
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
@@ -31,7 +31,12 @@ def build_mock_service(evg_api=None, split_config=None, resmoke_proxy=None):
 
 
 def tst_stat_mock(file, duration, pass_count):
-    return MagicMock(test_file=file, avg_duration_pass=duration, num_pass=pass_count)
+    return HistoricalTestInformation(
+        test_name=file,
+        num_pass=pass_count,
+        num_fail=0,
+        avg_duration_pass=duration,
+    )
 
 
 def build_mock_split_config(target_resmoke_time=None, max_sub_suites=None):
@@ -115,15 +120,16 @@ class TestGeneratedSuite(unittest.TestCase):
 
 
 class TestSplitSuite(unittest.TestCase):
-    def test_calculate_suites(self):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_calculate_suites(self, get_stats_from_s3_mock):
         mock_test_stats = [tst_stat_mock(f"test{i}.js", 60, 1) for i in range(100)]
         split_config = build_mock_split_config(target_resmoke_time=10)
         split_params = build_mock_split_params()
 
         suite_split_service = build_mock_service(split_config=split_config)
-        suite_split_service.evg_api.test_stats_by_project.return_value = mock_test_stats
+        get_stats_from_s3_mock.return_value = mock_test_stats
         suite_split_service.resmoke_proxy.list_tests.return_value = [
-            stat.test_file for stat in mock_test_stats
+            stat.test_name for stat in mock_test_stats
         ]
         suite_split_service.resmoke_proxy.read_suite_config.return_value = {}
 
@@ -137,32 +143,15 @@ class TestSplitSuite(unittest.TestCase):
         for sub_suite in suite.sub_suites:
             self.assertEqual(10, len(sub_suite.test_list))
 
-    def test_calculate_suites_fallback_on_error(self):
-        n_tests = 100
-        max_sub_suites = 4
-        split_config = build_mock_split_config(max_sub_suites=max_sub_suites)
-        split_params = build_mock_split_params()
-
-        suite_split_service = build_mock_service(split_config=split_config)
-        mock_evg_error(suite_split_service.evg_api)
-        suite_split_service.resmoke_proxy.list_tests.return_value = [
-            f"test_{i}.js" for i in range(n_tests)
-        ]
-
-        suite = suite_split_service.split_suite(split_params)
-
-        self.assertEqual(max_sub_suites, len(suite))
-        for sub_suite in suite.sub_suites:
-            self.assertEqual(n_tests / max_sub_suites, len(sub_suite.test_list))
-
-    def test_calculate_suites_uses_fallback_on_no_results(self):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_calculate_suites_uses_fallback_on_no_results(self, get_stats_from_s3_mock):
         n_tests = 100
         max_sub_suites = 5
         split_config = build_mock_split_config(max_sub_suites=max_sub_suites)
         split_params = build_mock_split_params()
 
         suite_split_service = build_mock_service(split_config=split_config)
-        suite_split_service.evg_api.test_stats_by_project.return_value = []
+        get_stats_from_s3_mock.return_value = []
         suite_split_service.resmoke_proxy.list_tests.return_value = [
             f"test_{i}.js" for i in range(n_tests)
         ]
@@ -173,7 +162,9 @@ class TestSplitSuite(unittest.TestCase):
         for sub_suite in suite.sub_suites:
             self.assertEqual(n_tests / max_sub_suites, len(sub_suite.test_list))
 
-    def test_calculate_suites_uses_fallback_if_only_results_are_filtered(self):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_calculate_suites_uses_fallback_if_only_results_are_filtered(
+            self, get_stats_from_s3_mock):
         n_tests = 100
         max_sub_suites = 10
         mock_test_stats = [tst_stat_mock(f"test{i}.js", 60, 1) for i in range(100)]
@@ -182,7 +173,7 @@ class TestSplitSuite(unittest.TestCase):
         split_params = build_mock_split_params()
 
         suite_split_service = build_mock_service(split_config=split_config)
-        suite_split_service.evg_api.test_stats_by_project.return_value = mock_test_stats
+        get_stats_from_s3_mock.return_value = mock_test_stats
         suite_split_service.resmoke_proxy.list_tests.return_value = [
             f"test_{i}.js" for i in range(n_tests)
         ]
@@ -198,31 +189,17 @@ class TestSplitSuite(unittest.TestCase):
         for sub_suite in suite.sub_suites:
             self.assertEqual(n_tests / max_sub_suites, len(sub_suite.test_list))
 
-    def test_calculate_suites_fail_on_unexpected_error(self):
-        n_tests = 100
-        max_sub_suites = 4
-        split_config = build_mock_split_config(max_sub_suites=max_sub_suites)
-        split_params = build_mock_split_params()
-
-        suite_split_service = build_mock_service(split_config=split_config)
-        mock_evg_error(suite_split_service.evg_api, error_code=requests.codes.INTERNAL_SERVER_ERROR)
-        suite_split_service.resmoke_proxy.list_tests.return_value = [
-            f"test_{i}.js" for i in range(n_tests)
-        ]
-
-        with self.assertRaises(requests.HTTPError):
-            suite_split_service.split_suite(split_params)
-
-    def test_calculate_suites_will_filter_specified_tests(self):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_calculate_suites_will_filter_specified_tests(self, get_stats_from_s3_mock):
         mock_test_stats = [tst_stat_mock(f"test_{i}.js", 60, 1) for i in range(100)]
         split_config = build_mock_split_config(target_resmoke_time=10)
         split_params = build_mock_split_params(
             test_filter=lambda t: t in {"test_1.js", "test_2.js"})
 
         suite_split_service = build_mock_service(split_config=split_config)
-        suite_split_service.evg_api.test_stats_by_project.return_value = mock_test_stats
+        get_stats_from_s3_mock.return_value = mock_test_stats
         suite_split_service.resmoke_proxy.list_tests.return_value = [
-            stat.test_file for stat in mock_test_stats
+            stat.test_name for stat in mock_test_stats
         ]
         suite_split_service.resmoke_proxy.read_suite_config.return_value = {}
 
